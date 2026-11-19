@@ -25,7 +25,7 @@ import Testing
     }
 
     @Test func runRewritesBothKeysIntoOne() throws {
-        let name = "zeus.halo.migration.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.halo.migration.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         defaults.set("Storm", forKey: HaloMigration.legacyKey)
@@ -37,7 +37,7 @@ import Testing
     }
 
     @Test func runNormalizesAnOldPickerValueAndLeavesIdsAlone() throws {
-        let name = "zeus.halo.migration.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.halo.migration.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         #expect(HaloMigration.run(defaults: defaults) == nil)

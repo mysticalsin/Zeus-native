@@ -3,10 +3,11 @@ import Observation
 import SwiftUI
 import ZeusCore
 
-/// Album art for what is playing. Spotify: the public oEmbed thumbnail of the track in its
-/// notification. Apple Music: the iTunes Search API. Both need no key and no permission; Apple
-/// Events (`artwork url of current track`, `data of artwork 1`) are only a fallback when
-/// Automation is already allowed. Covers are cached in ~/Library/Caches/Zeus/artwork (LRU, 50 MB).
+/// Album art for what is playing, found by the source's `artworkStrategy`. Spotify: the public oEmbed thumbnail
+/// of the track in its notification. Apple Music: the iTunes Search API. Both need no key and no permission; Apple
+/// Events (`artwork url of current track`, `data of artwork 1`) are only a fallback when Automation is already
+/// allowed. Covers are cached in ~/Library/Caches/Zeus/artwork (LRU, 50 MB). A browser page's cover is the page's
+/// own https link, fetched without cookies (see `sessionConfiguration`), kept in memory only and never read from or written to that folder.
 @MainActor
 @Observable
 final class ArtworkStore {
@@ -25,11 +26,22 @@ final class ArtworkStore {
     @ObservationIgnored private let session: URLSession
     @ObservationIgnored private let directory: URL
 
-    init(directory: URL? = nil) {
+    /// The one session for every cover request. It takes no cookie, keeps none and caches nothing, so a host named by
+    /// a page cannot recognise the owner on a later fetch. Tests start from this and swap the network for a stub.
+    nonisolated static func sessionConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
+        config.httpCookieAcceptPolicy = .never
+        config.httpShouldSetCookies = false
+        config.httpCookieStorage = nil
+        config.urlCache = nil
         config.timeoutIntervalForRequest = 8
         config.timeoutIntervalForResource = 20
-        session = URLSession(configuration: config)
+        return config
+    }
+
+    /// `session` is for tests, which answer every request themselves.
+    init(directory: URL? = nil, session: URLSession? = nil) {
+        self.session = session ?? URLSession(configuration: Self.sessionConfiguration())
         self.directory = directory ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Zeus/artwork", isDirectory: true)
     }
@@ -114,20 +126,55 @@ final class ArtworkStore {
     private func file(_ key: String) -> URL { directory.appendingPathComponent(key + ".img") }
 
     private func load(_ playing: NowPlaying, key: String) async -> Data? {
+        let strategy = playing.source.artworkStrategy
+        // A page's cover returns before the disk read and never reaches `save`.
+        switch strategy {
+        case .pageImage: return await pageCover(playing)
+        case .none: return nil
+        case .spotifyOEmbed, .catalogSearch: break
+        }
         if let cached = try? Data(contentsOf: file(key)), NSImage(data: cached) != nil {
             try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file(key).path)
             return cached
         }
         let data: Data?
-        switch playing.player {
-        case .spotify: data = await spotifyCover(playing)
-        case .music: data = await musicCover(playing)
+        switch strategy {
+        case .spotifyOEmbed: data = await spotifyCover(playing)
+        case .catalogSearch: data = await musicCover(playing)
+        case .pageImage, .none: data = nil
         }
         if let data, NSImage(data: data) != nil {
             save(data, key: key)
             return data
         }
         return nil
+    }
+
+    /// The page's own cover link, only when `pageImageAllowed`. Nothing else is tried.
+    private func pageCover(_ playing: NowPlaying) async -> Data? {
+        guard let url = playing.artworkURL, ArtworkSource.pageImageAllowed(url) else { return nil }
+        guard let data = await Self.fetchPageImage(url, session: session), NSImage(data: data) != nil else { return nil }
+        return data
+    }
+
+    /// Largest cover Zeus takes from a page.
+    private nonisolated static let pageImageLimit = 2_000_000
+
+    /// One request, read as it arrives and dropped past the limit, with every redirect checked against the same rule.
+    private nonisolated static func fetchPageImage(_ url: URL, session: URLSession) async -> Data? {
+        guard let (bytes, response) = try? await session.bytes(for: URLRequest(url: url), delegate: PageRedirectGuard()),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              response.expectedContentLength <= Int64(pageImageLimit) else { return nil }
+        var data = Data()
+        do {
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > pageImageLimit { return nil }
+            }
+        } catch {
+            return nil
+        }
+        return data
     }
 
     private func spotifyCover(_ playing: NowPlaying) async -> Data? {
@@ -208,5 +255,13 @@ final class ArtworkStore {
         }
         guard drawn, let average = ArtworkColor.average(rgba: pixels) else { return nil }
         return ArtworkColor.glow(average)
+    }
+}
+
+/// Follows a page cover's redirect only to an address `pageImageAllowed` accepts: https, a named host, nothing local.
+private final class PageRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(request.url.map(ArtworkSource.pageImageAllowed) == true ? request : nil)
     }
 }

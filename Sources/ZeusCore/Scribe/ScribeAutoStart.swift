@@ -1,9 +1,11 @@
 import Foundation
 
-// Meeting-start policy for Scribe: when a meeting begins, ask, start on its own, or do nothing; and when the
-// call ends, suggest stopping. Pure: no calendar, process, audio or UI access. The app reads the signals
-// (calendar, call apps, which process holds the microphone), feeds them in as `ScribeMeetingEvidence`, and
-// performs the `Effect`s this machine returns.
+// Meeting-start policy for Scribe: one machine for the whole life of a meeting, from the sighting to the result.
+// It asks, counts down, starts, confirms or says why capture did not begin, and when the call ends it suggests
+// stopping. Pure: no calendar, process, audio or UI access, and no clock of its own. The app reads the signals
+// (calendar, call apps, which process holds the microphone, Scribe's phase, microphone access), feeds them in as
+// events, performs the `Effect`s this machine returns, and draws `card(now:)`, the only source of what is on
+// screen. `nextWake(now:)` is the only source of when the app wakes.
 
 /// Settings > Scribe > "When a meeting starts".
 public enum ScribeAutoStartMode: String, CaseIterable, Sendable {
@@ -34,190 +36,6 @@ public enum ScribeAutoStartMode: String, CaseIterable, Sendable {
     }
 }
 
-/// What Scribe itself is doing, from `ScribePhase`.
-public enum ScribeActivity: Equatable, Sendable {
-    case idle
-    case starting
-    case recording
-    case ending
-    case processing
-
-    public init(_ phase: ScribePhase) {
-        switch phase {
-        case .idle, .complete, .failed: self = .idle
-        case .starting: self = .starting
-        case .recording: self = .recording
-        case .ending: self = .ending
-        case .processing: self = .processing
-        }
-    }
-}
-
-/// One meeting, identified so the same meeting never triggers twice.
-public struct ScribeMeeting: Equatable, Sendable {
-    /// The calendar slot id when a calendar event matched, else "call:<app>".
-    public var key: String
-    public var title: String
-    public var callApp: ScribeCallApp
-    public var slot: ScribeCalendarSlot?
-
-    public init(key: String, title: String, callApp: ScribeCallApp, slot: ScribeCalendarSlot? = nil) {
-        self.key = key
-        self.title = title
-        self.callApp = callApp
-        self.slot = slot
-    }
-
-    /// The decision the existing call popup and `ScribeController` hints already understand.
-    public var promptDecision: ScribePromptDecision {
-        if let slot { return .upcoming(slot) }
-        return .callDetected(callApp)
-    }
-}
-
-/// Everything the detector knows at one moment. The microphone signal is "which call app holds the input",
-/// read from CoreAudio process properties; Zeus's own process is never in `micApps`.
-public struct ScribeMeetingEvidence: Equatable, Sendable {
-    public var date: Date
-    public var slots: [ScribeCalendarSlot]
-    /// Known call apps (or a browser on a Meet tab) that hold the microphone now. Never Zeus.
-    public var micApps: [ScribeCallApp]
-    /// Known call apps running, or a browser showing a call tab, whether or not they use the microphone.
-    public var presentApps: [ScribeCallApp]
-    public var mode: ScribeAutoStartMode
-    /// Microphone permission is already granted. The detector never asks for it.
-    public var micPermissionGranted: Bool
-    public var activity: ScribeActivity
-    /// The person already agreed, once, that Zeus may start notes by itself (`ScribeAutoStartConsent`).
-    public var autoConsentGiven: Bool
-    /// Whether each call app's call window is still on screen. Missing means unknown, which never ends a call.
-    public var callWindows: [ScribeCallApp: ScribeCallWindowState]
-
-    public init(date: Date, slots: [ScribeCalendarSlot] = [], micApps: [ScribeCallApp] = [],
-                presentApps: [ScribeCallApp] = [], mode: ScribeAutoStartMode = .ask,
-                micPermissionGranted: Bool = false, activity: ScribeActivity = .idle,
-                autoConsentGiven: Bool = false, callWindows: [ScribeCallApp: ScribeCallWindowState] = [:]) {
-        self.date = date
-        self.slots = slots
-        self.micApps = micApps
-        self.presentApps = presentApps
-        self.mode = mode
-        self.micPermissionGranted = micPermissionGranted
-        self.activity = activity
-        self.autoConsentGiven = autoConsentGiven
-        self.callWindows = callWindows
-    }
-
-    /// A meeting is under way when a call app holds the microphone, or when a calendar event with a call link is
-    /// starting (a few minutes either side) and its call app is open. A calendar event alone, or an open app
-    /// alone (Teams is always open), is not enough.
-    public var candidate: ScribeMeeting? {
-        let slot = ScribeMeetingStartPolicy.slot(in: slots, at: date)
-        guard let app = micApps.first ?? (slot == nil ? nil : presentApps.first) else { return nil }
-        if let slot {
-            let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            return ScribeMeeting(key: slot.id, title: title.isEmpty ? "Meeting" : title, callApp: app, slot: slot)
-        }
-        return ScribeMeeting(key: "call:\(ScribeCallDetection.displayName(app))",
-                             title: ScribeCallPromptText.meetingTitle(for: .callDetected(app)) ?? "Meeting",
-                             callApp: app)
-    }
-}
-
-public enum ScribeMeetingStartPolicy {
-    /// A calendar event counts from this long before it starts...
-    public static let leadWindow: TimeInterval = ScribeCallPrompt.leadWindow
-    /// ...until this long after.
-    public static let lateWindow: TimeInterval = ScribeCallPrompt.lateWindow
-
-    /// The slot with a call link whose start is closest to `date`, within the window and not yet over.
-    public static func slot(in slots: [ScribeCalendarSlot], at date: Date) -> ScribeCalendarSlot? {
-        slots.filter { slot in
-            guard slot.hasCallLink else { return false }
-            if let end = slot.end, date >= end { return false }
-            let untilStart = slot.start.timeIntervalSince(date)
-            return untilStart <= leadWindow && -untilStart <= lateWindow
-        }.min { lhs, rhs in
-            let l = abs(lhs.start.timeIntervalSince(date))
-            let r = abs(rhs.start.timeIntervalSince(date))
-            return l != r ? l < r : lhs.id < rhs.id
-        }
-    }
-}
-
-extension ScribeMeetingStartPolicy {
-    /// Another calendar meeting (with a call link) about to start while one is recording: from this long before
-    /// its start until `nextLateWindow` after. Never the meeting already recording or one already offered.
-    public static let nextLeadWindow: TimeInterval = 120
-    public static let nextLateWindow: TimeInterval = 30
-
-    public static func nextSlot(in slots: [ScribeCalendarSlot], excluding keys: Set<String>, at date: Date) -> ScribeCalendarSlot? {
-        slots.filter { slot in
-            guard slot.hasCallLink, !keys.contains(slot.id) else { return false }
-            if let end = slot.end, date >= end { return false }
-            let untilStart = slot.start.timeIntervalSince(date)
-            return untilStart <= nextLeadWindow && -untilStart <= nextLateWindow
-        }.min { lhs, rhs in
-            let l = lhs.start.timeIntervalSince(date)
-            let r = rhs.start.timeIntervalSince(date)
-            return l != r ? l < r : lhs.id < rhs.id
-        }
-    }
-}
-
-public enum ScribeCallWindowState: Equatable, Sendable {
-    case unknown
-    case present
-    case gone
-}
-
-/// Is the call's own window still open? Read from window titles, which macOS only shows for other apps when
-/// Screen Recording is already allowed; otherwise the answer is `.unknown` and never ends a recording. Only apps
-/// with a reliable title are judged: Teams and FaceTime are left to the microphone signal.
-public enum ScribeCallWindow {
-    /// Nil when this app has no reliable call-window title.
-    public static func isCallWindow(_ app: ScribeCallApp, title: String) -> Bool? {
-        let lowered = title.lowercased()
-        switch app {
-        case .zoom:
-            return ["zoom meeting", "zoom webinar", "meeting controls"].contains { lowered.contains($0) }
-        case .meet:
-            return ScribeCallDetection.isMeetTitle(title)
-        case .teams:
-            return nil
-        case .other(let name):
-            switch name {
-            case "Slack": return lowered.contains("huddle")
-            case "Webex": return lowered.contains("webex meeting")
-            default: return nil
-            }
-        }
-    }
-
-    /// `complete` is false when any window's title could not be read.
-    public static func state(app: ScribeCallApp, titles: [String], complete: Bool) -> ScribeCallWindowState {
-        guard complete, isCallWindow(app, title: "") != nil else { return .unknown }
-        return titles.contains { isCallWindow(app, title: $0) == true } ? .present : .gone
-    }
-}
-
-/// The one-time agreement that lets "Start automatically" start without asking. Stored as a timestamp.
-public enum ScribeAutoStartConsent {
-    public static let key = "scribe.autoStart.consentAt"
-
-    public static func isGiven(defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: key) is Double
-    }
-
-    public static func consentDate(defaults: UserDefaults = .standard) -> Date? {
-        (defaults.object(forKey: key) as? Double).map(Date.init(timeIntervalSince1970:))
-    }
-
-    public static func record(at date: Date = Date(), defaults: UserDefaults = .standard) {
-        defaults.set(date.timeIntervalSince1970, forKey: key)
-    }
-}
-
 public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// The same meeting must be seen again this long after it first appeared before anything is shown.
     public var debounce: TimeInterval
@@ -228,32 +46,77 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// The call app must have released the microphone (or its call window must have been gone) this long before an
     /// end is suggested. Short enough to feel prompt, long enough for a Zoom breakout room hop.
     public var callEndedAfter: TimeInterval
-    /// After an end is suggested, Scribe still recording after this long means the person kept it.
-    public var endingGrace: TimeInterval
-    /// After a start, Scribe may take this long to show as active before "not active" counts as stopped.
-    public var startGrace: TimeInterval
-    /// After a meeting is handled (started, declined, timed out) it cannot trigger again for this long, and
-    /// then only once it has been gone for `rearmAfterAbsence`.
-    public var cooldown: TimeInterval
+    /// A call the ledger remembers is forgotten once its app has not held the microphone for this long.
     public var rearmAfterAbsence: TimeInterval
-    /// "Ask me" never leaves while the pointer is over it, and stays at least this long after the pointer leaves.
+    /// A card never leaves while the pointer is over it, and stays at least this long after the pointer leaves.
     public var hoverGrace: TimeInterval
+    /// Scribe must show a new session this soon after a start, or the card says it did not start.
+    public var startTimeout: TimeInterval
+    /// A session that is still "starting" (waiting on a macOS permission answer, say) gets this long.
+    public var slowStartTimeout: TimeInterval
+    /// How long "Recording" stays on the card before it leaves.
+    public var confirmFor: TimeInterval
+    /// How long a failure stays when the pointer is not over it.
+    public var failureLifetime: TimeInterval
 
     public init(debounce: TimeInterval = 3, askTimeout: TimeInterval = 20, countdown: TimeInterval = 5,
-                callEndedAfter: TimeInterval = 8, endingGrace: TimeInterval = 3, startGrace: TimeInterval = 10,
-                cooldown: TimeInterval = 60, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4) {
+                callEndedAfter: TimeInterval = 8, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4,
+                startTimeout: TimeInterval = 5, slowStartTimeout: TimeInterval = 45, confirmFor: TimeInterval = 1.5,
+                failureLifetime: TimeInterval = 60) {
         self.debounce = debounce
         self.askTimeout = askTimeout
         self.countdown = countdown
         self.callEndedAfter = callEndedAfter
-        self.endingGrace = endingGrace
-        self.startGrace = startGrace
-        self.cooldown = cooldown
         self.rearmAfterAbsence = rearmAfterAbsence
         self.hoverGrace = hoverGrace
+        self.startTimeout = startTimeout
+        self.slowStartTimeout = slowStartTimeout
+        self.confirmFor = confirmFor
+        self.failureLifetime = failureLifetime
     }
 
     public static let standard = ScribeAutoStartTiming()
+}
+
+/// What the app reads at the moment of each event that can start something: Scribe's phase, Microphone access,
+/// and whether an automatic start may count down. The machine keeps no copy between events.
+public struct ScribeStartContext: Equatable, Sendable {
+    public var scribe: ScribePhase
+    public var microphone: ScribeMicrophoneAccess
+    public var automatic: ScribeAutoStartReadiness
+
+    public init(scribe: ScribePhase = .idle, microphone: ScribeMicrophoneAccess = .allowed,
+                automatic: ScribeAutoStartReadiness = .blocked(.notChosen)) {
+        self.scribe = scribe
+        self.microphone = microphone
+        self.automatic = automatic
+    }
+}
+
+/// Who asked for a start. A tap has no Cancel; an automatic start keeps one until its confirmation ends.
+public enum ScribeStartOrigin: Equatable, Sendable {
+    case tap
+    case automatic
+}
+
+/// One request to start Scribe, from the moment it was made to the session it produced.
+public struct ScribeStartAttempt: Equatable, Sendable {
+    public var meeting: ScribeMeeting
+    public var since: TimeInterval
+    public var origin: ScribeStartOrigin
+    /// Scribe's session when the request was made. A phase of that session is never this attempt's result.
+    public var previousSession: ScribeSessionID?
+    /// The session this attempt produced, once Scribe shows it.
+    public var session: ScribeSessionID?
+
+    public init(meeting: ScribeMeeting, since: TimeInterval, origin: ScribeStartOrigin,
+                previousSession: ScribeSessionID?, session: ScribeSessionID?) {
+        self.meeting = meeting
+        self.since = since
+        self.origin = origin
+        self.previousSession = previousSession
+        self.session = session
+    }
 }
 
 public struct ScribeAutoStartRecording: Equatable, Sendable {
@@ -270,12 +133,20 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
     /// "Next meeting" card: the meeting offered and when the card leaves.
     public var nextMeeting: ScribeMeeting?
     public var nextDeadline: TimeInterval?
-    /// Calendar events already offered during this recording, so each is offered once.
-    public var nextOffered: Set<String>
+    /// An end was suggested and the call has not come back since. One suggestion per quiet spell: the person's
+    /// answer (Keep recording) is not read here, so nothing is suggested again until the call returns.
+    public var endSuggested: Bool
+    /// How this recording began. Only an automatic start can be discarded by Cancel.
+    public var origin: ScribeStartOrigin
+    /// The session this machine started or joined. Nil for a recording it only saw begin by hand.
+    public var session: ScribeSessionID?
+    /// The card says "Recording" until then, and an automatic start can still be cancelled. Nil afterwards.
+    public var confirmUntil: TimeInterval?
 
     init(meeting: ScribeMeeting, since: TimeInterval, micReleasedAt: TimeInterval? = nil, sawMic: Bool = false,
          sawWindow: Bool = false, windowGoneAt: TimeInterval? = nil, nextMeeting: ScribeMeeting? = nil,
-         nextDeadline: TimeInterval? = nil, nextOffered: Set<String> = []) {
+         nextDeadline: TimeInterval? = nil, endSuggested: Bool = false, origin: ScribeStartOrigin = .tap,
+         session: ScribeSessionID? = nil, confirmUntil: TimeInterval? = nil) {
         self.meeting = meeting
         self.since = since
         self.micReleasedAt = micReleasedAt
@@ -284,205 +155,681 @@ public struct ScribeAutoStartRecording: Equatable, Sendable {
         self.windowGoneAt = windowGoneAt
         self.nextMeeting = nextMeeting
         self.nextDeadline = nextDeadline
-        self.nextOffered = nextOffered
+        self.endSuggested = endSuggested
+        self.origin = origin
+        self.session = session
+        self.confirmUntil = confirmUntil
     }
-}
-
-public struct ScribeAutoStartCooldown: Equatable, Sendable {
-    public var key: String
-    public var until: TimeInterval
-    /// Since when this meeting has not been seen (a different meeting counts as not seen).
-    public var absentSince: TimeInterval?
-    /// The meeting was gone long enough that it coming back is a new meeting.
-    public var gapSeen: Bool
 }
 
 public enum ScribeAutoStartState: Equatable, Sendable {
     case idle
-    /// A meeting was seen; waiting for the debounce before showing anything.
-    case armed(meeting: ScribeMeeting, since: TimeInterval)
-    /// "Ask me": the banner is up.
-    case prompting(meeting: ScribeMeeting, deadline: TimeInterval)
-    /// "Start automatically": the banner is up with a Cancel button.
+    /// A calendar meeting starts within two minutes and nothing else is going on: the heads-up card is up until
+    /// `deadline`. Leaving on its own is not an answer.
+    case upcoming(meeting: ScribeMeeting, deadline: TimeInterval)
+    /// A meeting was seen; waiting for the debounce before showing anything. A heads-up that was up when the
+    /// meeting began stays on screen until `offerUntil`, so the card does not blink out during the check.
+    case armed(meeting: ScribeMeeting, since: TimeInterval, offerUntil: TimeInterval? = nil)
+    /// The offer is up. `blocked` is what stops an automatic start, so the card can say why.
+    case prompting(meeting: ScribeMeeting, deadline: TimeInterval, blocked: ScribeAutoStartBlock?)
+    /// "Start automatically": the countdown card is up with a Cancel button.
     case countingDown(meeting: ScribeMeeting, deadline: TimeInterval)
+    /// Scribe is still ending or saving the last meeting. `startOwed` is a tap (or Switch) that starts the moment
+    /// Scribe is free; without it the meeting is sighted again then.
+    case held(meeting: ScribeMeeting, startOwed: Bool)
+    /// Scribe was asked to start. The card says "Starting" until Scribe reports.
+    case starting(ScribeStartAttempt)
+    /// Capture began. The card confirms for a moment and leaves; the call is watched until Scribe is idle.
     case recording(ScribeAutoStartRecording)
-    /// The call ended; Scribe's own end window (with Keep recording) is up.
-    case endingSuggested(meeting: ScribeMeeting, since: TimeInterval)
-    case cooldown(ScribeAutoStartCooldown)
+    /// Capture did not begin. The card says why and offers the fix.
+    case failed(attempt: ScribeStartAttempt, failure: ScribeStartFailure, deadline: TimeInterval)
+
+    /// One plain line for the diagnostics log.
+    public var logName: String {
+        switch self {
+        case .idle: return "idle"
+        case .upcoming(let meeting, _): return "heads-up \(meeting.key)"
+        case .armed(let meeting, _, _): return "armed \(meeting.key)"
+        case .prompting(let meeting, _, _): return "offer \(meeting.key)"
+        case .countingDown(let meeting, _): return "countdown \(meeting.key)"
+        case .held(let meeting, _): return "waiting \(meeting.key)"
+        case .starting(let attempt): return "starting \(attempt.meeting.key)"
+        case .recording(let recording): return "recording \(recording.meeting.key)"
+        case .failed(let attempt, let failure, _): return "failed \(attempt.meeting.key): \(failure.logReason)"
+        }
+    }
+}
+
+extension ScribeStartFailure {
+    /// Short words for the diagnostics log.
+    public var logReason: String {
+        switch self {
+        case .microphoneOff: return "microphone off"
+        case .stillSaving: return "previous meeting still saving"
+        case .captureFailed(let reason): return "capture failed: \(reason)"
+        case .noResponse: return "no response"
+        }
+    }
+}
+
+extension ScribePhase {
+    /// Short words for the diagnostics log.
+    public var logName: String {
+        switch self {
+        case .idle: return "idle"
+        case .starting: return "starting"
+        case .recording: return "recording"
+        case .ending: return "ending"
+        case .processing: return "processing"
+        case .complete: return "complete"
+        case .failed(_, let reason): return "failed(\(reason))"
+        }
+    }
 }
 
 public struct ScribeAutoStartMachine: Equatable, Sendable {
     public enum Event: Equatable, Sendable {
         case evidence(ScribeMeetingEvidence, now: TimeInterval)
+        /// Scribe's phase, read after a start request and whenever it changes.
+        case scribe(ScribePhase, now: TimeInterval)
         /// Deadlines only. Never advances a debounce or the call-ended timer: those need fresh evidence.
-        case tick(now: TimeInterval)
-        /// Start was tapped (also valid during the countdown: start now).
-        case accept(now: TimeInterval)
-        /// Not now, or Cancel.
-        case decline(now: TimeInterval)
-        /// The pointer entered or left the banner. "Ask me" does not time out under the pointer.
+        case tick(now: TimeInterval, context: ScribeStartContext)
+        /// The primary button of the card the person saw. The machine reads only the card's case and meeting, so
+        /// a tap on a card that has since gone is still an answer (or ignored, by the late tap rules).
+        case primary(on: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext)
+        /// Cancel on the card the person saw.
+        case cancel(on: ScribeMeetingCard, now: TimeInterval)
+        /// The dismiss glyph on the card the person saw.
+        case dismiss(on: ScribeMeetingCard, now: TimeInterval)
+        /// The pointer entered or left the card. A card does not time out under the pointer.
         case pointer(inside: Bool, now: TimeInterval)
-        /// The person tapped Start on the card showing `meeting`, but the card's question is no longer pending
-        /// (it timed out or was replaced at the same moment). An explicit tap still starts, unless Scribe is
-        /// already recording a meeting.
-        case startNow(ScribeMeeting, now: TimeInterval)
     }
 
     public enum Effect: Equatable, Sendable {
-        case showAsk(ScribeMeeting)
-        case showCountdown(ScribeMeeting)
-        /// The first time "Start automatically" would fire: ask once, and remember the answer.
-        case showConsentAsk(ScribeMeeting)
-        /// Store the consent timestamp (`ScribeAutoStartConsent.record`).
-        case recordConsent
-        /// Another meeting is starting while this one records.
-        case showNextMeeting(ScribeMeeting)
-        case hideBanner
-        case startRecording(ScribeMeeting)
-        /// Open Scribe's end window, which stops and saves unless the person taps Keep recording.
-        case requestEnd(ScribeMeeting)
+        /// Ask Scribe to start for this meeting. Emitted once per request; the app then sends `scribe` at once.
+        case start(ScribeMeeting)
+        /// Throw away the session an automatic start produced: nothing is saved.
+        case abandonStart(ScribeSessionID)
+        case openMicrophoneSettings
+        /// The call looks over (microphone released, call window closed). Open Scribe's end window with no
+        /// countdown. Nothing stops until a button is tapped.
+        case suggestEnd(ScribeMeeting)
+        /// The call came back: close the suggestion.
+        case withdrawEnd
+        /// Switch: end the recording that is running, at once and without a second question.
+        case endNow
+    }
+
+    /// Wall time and machine time at the last evidence, to turn a slot's start into machine time.
+    private struct ClockPoint: Equatable, Sendable {
+        var date: Date
+        var uptime: TimeInterval
     }
 
     public private(set) var state: ScribeAutoStartState = .idle
     public let timing: ScribeAutoStartTiming
-    private var lastEvidence: ScribeMeetingEvidence?
-    /// The person chose "Switch" on the next-meeting card: the next meeting may trigger without the cooldown.
-    private var switching = false
-    /// The pointer is over the banner.
+    private var clock: ClockPoint?
+    /// What was done about each meeting: asked, declined, started. The machine keeps no other memory of it.
+    public private(set) var ledger = ScribeMeetingLedger()
+    /// The pointer is over the card.
     public private(set) var pointerInside = false
 
     public init(timing: ScribeAutoStartTiming = .standard) {
         self.timing = timing
     }
 
-    /// The banner's deadline, when one is showing.
-    public var bannerDeadline: TimeInterval? {
+    /// Nothing in hand and no clock, as at launch, but what was answered is kept: the choice going Off and back to
+    /// Ask must not bring a dismissed meeting's card back.
+    public mutating func reset() {
+        state = .idle
+        clock = nil
+        pointerInside = false
+    }
+
+    // MARK: Views
+
+    /// What is on screen. The card is a pure view of the state: nothing else decides it.
+    public func card(now: TimeInterval) -> ScribeMeetingCard {
         switch state {
-        case .prompting(_, let deadline), .countingDown(_, let deadline): return deadline
-        case .recording(let recording): return recording.nextMeeting == nil ? nil : recording.nextDeadline
-        default: return nil
+        case .idle:
+            return .hidden
+        case .armed(let meeting, _, let offerUntil):
+            return offerUntil == nil ? .hidden : .offer(meeting, blocked: nil)
+        case .upcoming(let meeting, _):
+            return .offer(meeting, blocked: nil)
+        case .prompting(let meeting, _, let blocked):
+            return .offer(meeting, blocked: blocked)
+        case .countingDown(let meeting, let deadline):
+            return .countdown(meeting, seconds: ScribeMeetingCardText.seconds(deadline: deadline, now: now),
+                              deadline: deadline, total: timing.countdown)
+        case .held(let meeting, _):
+            return .waiting(meeting)
+        case .starting(let attempt):
+            return .starting(attempt.meeting, cancellable: attempt.origin == .automatic)
+        case .recording(let recording):
+            if let until = recording.confirmUntil, now < until { return .recording(recording.meeting) }
+            if let next = recording.nextMeeting { return .next(next) }
+            return .hidden
+        case .failed(let attempt, let failure, _):
+            return .failed(attempt.meeting, failure)
         }
     }
 
-    /// The call looks over and the end timer is running: the app should read fresh signals each second, because
-    /// the timer only advances on evidence.
+    /// When the app must wake next: the earliest of the state's deadline, the next whole second of a countdown,
+    /// the minute a time on the card changes, and one second ahead while the call looks over. Nil means nothing
+    /// is scheduled. Never a moment that has already passed.
+    public func nextWake(now: TimeInterval) -> TimeInterval? {
+        var wakes: [TimeInterval] = []
+        switch state {
+        case .idle, .held:
+            break
+        case .armed(let meeting, _, let offerUntil):
+            if let offerUntil {
+                if !pointerInside { wakes.append(offerUntil) }
+                wakes += minuteChange(of: meeting, now: now)
+            }
+        case .upcoming(let meeting, let deadline):
+            if !pointerInside { wakes.append(deadline) }
+            wakes += minuteChange(of: meeting, now: now)
+        case .prompting(let meeting, let deadline, _):
+            if !pointerInside { wakes.append(deadline) }
+            wakes += minuteChange(of: meeting, now: now)
+        case .countingDown(_, let deadline):
+            wakes.append(deadline)
+            let left = deadline - now
+            if left > 0 { wakes.append(now + (left - (left.rounded(.up) - 1))) }
+        case .starting(let attempt):
+            wakes.append(attempt.since + (attempt.session == nil ? timing.startTimeout : timing.slowStartTimeout))
+        case .recording(let recording):
+            if let until = recording.confirmUntil { wakes.append(until) }
+            if let next = recording.nextMeeting {
+                if let deadline = recording.nextDeadline { wakes.append(deadline) }
+                wakes += minuteChange(of: next, now: now)
+            }
+            if needsFreshEvidence { wakes.append(now + 1) }
+        case .failed(_, _, let deadline):
+            if !pointerInside { wakes.append(deadline) }
+        }
+        return wakes.filter { $0 > now }.min()
+    }
+
+    /// The call looks over or is about to: the app should read fresh signals each second, because a quiet spell
+    /// only counts on evidence and a suggestion is withdrawn only when the call is seen coming back.
     public var needsFreshEvidence: Bool {
         guard case .recording(let recording) = state else { return false }
         return recording.micReleasedAt != nil || recording.windowGoneAt != nil
     }
 
-    /// The app runs a one second timer only while this is true.
-    public var needsTick: Bool { bannerDeadline != nil || needsFreshEvidence }
+    /// "in N min" turns to the next number, or to "now", at a whole minute before the meeting starts.
+    private func minuteChange(of meeting: ScribeMeeting, now: TimeInterval) -> [TimeInterval] {
+        guard let slot = meeting.slot, let clock else { return [] }
+        let until = slot.start.timeIntervalSince(clock.date) - (now - clock.uptime)
+        guard until > 0 else { return [] }
+        let minutes = (until / 60).rounded(.up)
+        return [now + (until - 60 * (minutes - 1))]
+    }
+
+    // MARK: Events
 
     @discardableResult
     public mutating func handle(_ event: Event) -> [Effect] {
+        let effects: [Effect]
         switch event {
         case .evidence(let evidence, let now):
-            lastEvidence = evidence
-            return step(evidence, now: now)
-        case .tick(let now):
-            return expire(now: now)
-        case .accept(let now):
+            clock = ClockPoint(date: evidence.date, uptime: now)
+            ledger.observe(evidence, now: now, rearmAfterAbsence: timing.rearmAfterAbsence)
+            effects = step(evidence, now: now)
+        case .scribe(let phase, let now):
+            effects = observe(phase, now: now)
+        case .tick(let now, let context):
+            effects = expire(now: now, context: context)
+        case .primary(let card, let now, let context):
+            effects = primary(card, now: now, context: context)
+        case .cancel(let card, let now):
+            effects = cancel(card, now: now)
+        case .dismiss(let card, _):
+            effects = dismiss(card)
+        case .pointer(let inside, let now):
+            pointer(inside: inside, now: now)
+            effects = []
+        }
+        // A card that has gone takes the pointer with it: the next card is a fresh one.
+        if !hasCard { pointerInside = false }
+        return effects
+    }
+
+    private var hasCard: Bool {
+        switch state {
+        case .idle: return false
+        case .armed(_, _, let offerUntil): return offerUntil != nil
+        case .recording(let recording): return recording.confirmUntil != nil || recording.nextMeeting != nil
+        default: return true
+        }
+    }
+
+    private mutating func pointer(inside: Bool, now: TimeInterval) {
+        pointerInside = inside
+        guard !inside else { return }
+        switch state {
+        case .upcoming(let meeting, let deadline):
+            state = .upcoming(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
+        case .armed(let meeting, let since, let offerUntil?):
+            state = .armed(meeting: meeting, since: since, offerUntil: max(offerUntil, now + timing.hoverGrace))
+        case .prompting(let meeting, let deadline, let blocked):
+            state = .prompting(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace), blocked: blocked)
+        case .failed(let attempt, let failure, let deadline):
+            state = .failed(attempt: attempt, failure: failure, deadline: max(deadline, now + timing.hoverGrace))
+        default:
+            break
+        }
+    }
+
+    // MARK: Taps
+
+    private mutating func primary(_ card: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext) -> [Effect] {
+        switch card {
+        case .offer(let seen, _):
             switch state {
-            case .prompting(let meeting, _), .countingDown(let meeting, _):
-                var effects: [Effect] = [.hideBanner]
-                if let last = lastEvidence, last.mode == .automatic, last.micPermissionGranted, !last.autoConsentGiven {
-                    effects.append(.recordConsent)
-                }
-                return effects + begin(meeting, now: now)
-            case .recording(let recording):
-                guard recording.nextMeeting != nil else { return [] }
-                // Switch: end this recording (the end window can still be cancelled) and let the next meeting start.
-                switching = true
-                state = .endingSuggested(meeting: recording.meeting, since: now)
-                return [.hideBanner, .requestEnd(recording.meeting)]
-            default:
+            case .prompting(let meeting, _, _) where meeting.key == seen.key:
+                return startRequest(meeting, origin: .tap, now: now, context: context)
+            case .upcoming(let meeting, _) where meeting.key == seen.key:
+                return startRequest(meeting, origin: .tap, now: now, context: context)
+            case .armed(let meeting, _, _) where meeting.key == seen.key:
+                // The call began while the heads-up was up: the meeting is the live one.
+                return startRequest(meeting, origin: .tap, now: now, context: context)
+            case .idle, .upcoming, .armed, .prompting:
+                // The offer ended in the same instant (or another one replaced it): the person asked to record.
+                return startRequest(seen, origin: .tap, now: now, context: context)
+            case .countingDown, .held, .starting, .recording, .failed:
+                // Something is already under way for a meeting: a second start would only cover it.
                 return []
             }
-        case .decline(let now):
+        case .failed(let seen, _):
+            guard case .failed(let attempt, let failure, _) = state, attempt.meeting.key == seen.key else { return [] }
+            if failure == .microphoneOff, context.microphone == .denied { return [.openMicrophoneSettings] }
+            return startRequest(attempt.meeting, origin: .tap, now: now, context: context)
+        case .next(let seen):
+            guard case .recording(let recording) = state, let next = recording.nextMeeting, next.key == seen.key else { return [] }
+            // Switch: end this recording now, and start the next meeting once the notes of this one are saved.
+            note(recording.meeting, .started)
+            state = .held(meeting: next, startOwed: true)
+            return [.endNow]
+        case .hidden, .countdown, .waiting, .starting, .recording:
+            return []
+        }
+    }
+
+    private mutating func cancel(_ card: ScribeMeetingCard, now: TimeInterval) -> [Effect] {
+        guard let key = card.meeting?.key else { return [] }
+        switch state {
+        case .countingDown(let meeting, _), .held(let meeting, _):
+            guard meeting.key == key else { return [] }
+            note(meeting, .declined)
+            state = .idle
+            return []
+        case .starting(let attempt):
+            guard attempt.meeting.key == key, attempt.origin == .automatic else { return [] }
+            note(attempt.meeting, .declined)
+            state = .idle
+            return attempt.session.map { [.abandonStart($0)] } ?? []
+        case .recording(let recording):
+            guard recording.meeting.key == key, recording.origin == .automatic, let until = recording.confirmUntil,
+                  now < until, let session = recording.session else { return [] }
+            note(recording.meeting, .declined)
+            state = .idle
+            return [.abandonStart(session)]
+        default:
+            return []
+        }
+    }
+
+    /// The dismiss glyph. A close on anything that is starting never cancels it.
+    private mutating func dismiss(_ card: ScribeMeetingCard) -> [Effect] {
+        switch card {
+        case .offer(let seen, _):
             switch state {
-            case .prompting(let meeting, _), .countingDown(let meeting, _):
-                state = cooling(meeting.key, now: now)
-                return [.hideBanner]
-            case .recording(var recording):
-                guard recording.nextMeeting != nil else { return [] }
+            case .prompting(let meeting, _, _) where meeting.key == seen.key:
+                note(meeting, .declined)
+                state = .idle
+            case .upcoming(let meeting, _) where meeting.key == seen.key:
+                note(meeting, .declined)
+                state = .idle
+            case .idle:
+                // The offer left in the same instant: the tap is still an answer.
+                note(seen, .declined)
+            case .armed(let meeting, _, _):
+                note(seen, .declined)
+                if meeting.key == seen.key { state = .idle }
+            default:
+                break
+            }
+        case .failed(let seen, _):
+            if case .failed(let attempt, _, _) = state, attempt.meeting.key == seen.key {
+                note(attempt.meeting, .declined)
+                state = .idle
+            }
+        case .next(let seen):
+            if case .recording(var recording) = state, recording.nextMeeting?.key == seen.key {
+                note(seen, .declined)
                 recording.nextMeeting = nil
                 recording.nextDeadline = nil
                 state = .recording(recording)
-                return [.hideBanner]
-            default:
-                return []
             }
-        case .pointer(let inside, let now):
-            pointerInside = inside
-            if !inside, case .prompting(let meeting, let deadline) = state {
-                state = .prompting(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
-            }
-            return []
-        case .startNow(let meeting, let now):
-            switch state {
-            case .prompting, .countingDown:
-                return handle(.accept(now: now))
-            case .recording, .endingSuggested:
-                return []
-            case .idle, .armed, .cooldown:
-                return [.hideBanner] + begin(meeting, now: now)
-            }
+        default:
+            break
         }
+        return []
+    }
+
+    // MARK: Starting
+
+    /// The start rules, for a tap, a countdown that ended, a held start and Try again alike.
+    private mutating func startRequest(_ meeting: ScribeMeeting, origin: ScribeStartOrigin, now: TimeInterval,
+                                       context: ScribeStartContext) -> [Effect] {
+        // Scribe is already on its way: join that session and start nothing. It is not ours to discard.
+        switch context.scribe {
+        case .starting(let id):
+            state = .starting(ScribeStartAttempt(meeting: meeting, since: now, origin: .tap, previousSession: nil, session: id))
+            return []
+        case .recording(let id, _):
+            confirm(meeting, origin: .tap, session: id, now: now)
+            return []
+        default:
+            break
+        }
+        let attempt = ScribeStartAttempt(meeting: meeting, since: now, origin: origin,
+                                         previousSession: context.scribe.sessionID, session: nil)
+        guard context.microphone != .denied else {
+            state = .failed(attempt: attempt, failure: .microphoneOff, deadline: now + timing.failureLifetime)
+            return []
+        }
+        switch context.scribe {
+        case .ending, .processing:
+            state = .held(meeting: meeting, startOwed: origin == .tap)
+            return []
+        default:
+            state = .starting(attempt)
+            return [.start(meeting)]
+        }
+    }
+
+    private mutating func confirm(_ meeting: ScribeMeeting, origin: ScribeStartOrigin, session: ScribeSessionID,
+                                  now: TimeInterval) {
+        state = .recording(ScribeAutoStartRecording(meeting: meeting, since: now, origin: origin, session: session,
+                                                    confirmUntil: now + timing.confirmFor))
+    }
+
+    private mutating func fail(_ attempt: ScribeStartAttempt, _ failure: ScribeStartFailure, now: TimeInterval) {
+        state = .failed(attempt: attempt, failure: failure, deadline: now + timing.failureLifetime)
+    }
+
+    /// Scribe's phase, read right after a start request and on every change.
+    private mutating func observe(_ phase: ScribePhase, now: TimeInterval) -> [Effect] {
+        switch state {
+        case .starting(let attempt):
+            follow(attempt, phase, now: now, late: false)
+        case .failed(let attempt, .noResponse, _):
+            // No response was said; a session that still arrives from this attempt is the late success.
+            follow(attempt, phase, now: now, late: true)
+        case .recording(var recording):
+            settle(&recording, now: now)
+            let sameSession = recording.session == nil || phase.sessionID == nil || phase.sessionID == recording.session
+            if ScribeActivity(phase) == .idle, sameSession {
+                note(recording.meeting, .started)
+                state = .idle
+            } else {
+                state = .recording(recording)
+            }
+        default:
+            break
+        }
+        return []
+    }
+
+    /// Reads a phase against one attempt. The session Scribe was on when the request was made is the previous
+    /// meeting, never this attempt's result.
+    private mutating func follow(_ attempt: ScribeStartAttempt, _ phase: ScribePhase, now: TimeInterval, late: Bool) {
+        guard let id = phase.sessionID else { return }
+        if id == attempt.previousSession {
+            // The request was refused because the last meeting is still being saved: say so at once.
+            if !late {
+                switch phase {
+                case .ending, .processing: fail(attempt, .stillSaving, now: now)
+                default: break
+                }
+            }
+            return
+        }
+        var attempt = attempt
+        switch phase {
+        case .starting:
+            attempt.session = id
+            if case .failed(_, let failure, let deadline) = state {
+                state = .failed(attempt: attempt, failure: failure, deadline: deadline)
+            } else {
+                state = .starting(attempt)
+            }
+        case .recording:
+            confirm(attempt.meeting, origin: attempt.origin, session: id, now: now)
+        case .ending, .processing, .complete:
+            // Capture was already over before the card could say it was recording: the card just leaves.
+            note(attempt.meeting, .started)
+            state = .idle
+        case .failed(_, let reason):
+            attempt.session = id
+            fail(attempt, .captureFailed(reason), now: now)
+        case .idle:
+            break
+        }
+    }
+
+    /// Ends the "Recording" confirmation once its time has passed. From then on it is a recording.
+    private mutating func settle(_ recording: inout ScribeAutoStartRecording, now: TimeInterval) {
+        guard let until = recording.confirmUntil, now >= until else { return }
+        recording.confirmUntil = nil
+        note(recording.meeting, .started)
+    }
+
+    // MARK: Deadlines
+
+    private mutating func expire(now: TimeInterval, context: ScribeStartContext) -> [Effect] {
+        switch state {
+        case .upcoming(_, let deadline) where now >= deadline && !pointerInside:
+            // Leaving on its own is not an answer: the ledger already says the heads-up was shown.
+            state = .idle
+            return []
+        case .armed(let meeting, let since, let offerUntil?) where now >= offerUntil && !pointerInside:
+            // The heads-up has had its time; the check on the call goes on without a card.
+            state = .armed(meeting: meeting, since: since)
+            return []
+        case .prompting(let meeting, let deadline, _) where now >= deadline && !pointerInside:
+            note(meeting, .asked)
+            state = .idle
+            return []
+        case .countingDown(let meeting, let deadline) where now >= deadline:
+            guard context.automatic.isReady else {
+                // Something the countdown needs went missing: ask instead.
+                return ask(meeting, now: now, blocked: context.automatic.block)
+            }
+            return startRequest(meeting, origin: .automatic, now: now, context: context)
+        case .held:
+            return advanceHeld(now: now, context: context, evidence: nil)
+        case .starting(let attempt):
+            let limit = attempt.session == nil ? timing.startTimeout : timing.slowStartTimeout
+            if now - attempt.since >= limit { fail(attempt, .noResponse, now: now) }
+            return []
+        case .failed(let attempt, _, let deadline) where now >= deadline && !pointerInside:
+            // The failure left on its own: the meeting is handled and nothing retries by itself.
+            note(attempt.meeting, .declined)
+            state = .idle
+            return []
+        case .recording(var recording):
+            settle(&recording, now: now)
+            expireNextMeeting(&recording, now: now)
+            state = .recording(recording)
+            return []
+        default:
+            return []
+        }
+    }
+
+    /// Takes the "next meeting" card down once its time is up. It counts as "Keep recording".
+    private func expireNextMeeting(_ recording: inout ScribeAutoStartRecording, now: TimeInterval) {
+        guard recording.nextMeeting != nil, let deadline = recording.nextDeadline, now >= deadline else { return }
+        recording.nextMeeting = nil
+        recording.nextDeadline = nil
     }
 
     // MARK: Steps
 
     private mutating func step(_ evidence: ScribeMeetingEvidence, now: TimeInterval) -> [Effect] {
+        let context = evidence.context
         switch state {
         case .idle:
-            guard evidence.mode != .off, let meeting = evidence.candidate else { return [] }
-            if evidence.activity != .idle {
-                // The person is already recording by hand: this meeting is handled.
-                state = cooling(meeting.key, now: now)
+            guard evidence.mode != .off else { return [] }
+            guard let meeting = evidence.candidate else {
+                announce(evidence, now: now)
                 return []
             }
-            state = .armed(meeting: meeting, since: now)
-            return armed(meeting, since: now, evidence: evidence, now: now)
-
-        case .armed(let meeting, let since):
-            guard evidence.mode != .off else { state = .idle; return [] }
-            guard let current = evidence.candidate else { state = .idle; return [] }
-            if evidence.activity != .idle { state = cooling(current.key, now: now); return [] }
-            if current.key != meeting.key {
-                state = .armed(meeting: current, since: now)
-                return armed(current, since: now, evidence: evidence, now: now)
+            switch ScribeActivity(context.scribe) {
+            case .starting, .recording:
+                // A recording this machine did not start: this meeting is handled.
+                note(meeting, .started)
+                return []
+            case .ending, .processing:
+                guard offerable(meeting, evidence) else { return [] }
+                state = .held(meeting: meeting, startOwed: false)
+                return []
+            case .idle:
+                guard offerable(meeting, evidence) else { return [] }
+                state = .armed(meeting: meeting, since: now)
+                return armed(meeting, since: now, evidence: evidence, now: now)
             }
-            state = .armed(meeting: current, since: since)
-            return armed(current, since: since, evidence: evidence, now: now)
 
-        case .prompting(let meeting, _), .countingDown(let meeting, _):
-            if evidence.mode == .off || evidence.activity != .idle {
-                state = cooling(meeting.key, now: now)
-                return [.hideBanner]
+        case .upcoming(let meeting, let deadline):
+            if evidence.mode == .off {
+                state = .idle
+                return []
             }
-            return expire(now: now)
+            switch ScribeActivity(context.scribe) {
+            case .starting, .recording:
+                // Recording began by hand: the card goes, and only a recording is an answer.
+                note(meeting, .started)
+                state = .idle
+                return []
+            case .idle, .ending, .processing:
+                break
+            }
+            guard let candidate = evidence.candidate else { return expire(now: now, context: context) }
+            if candidate.key == meeting.key {
+                // The meeting began, or its call did: the card stays up through the check that follows.
+                state = .armed(meeting: meeting, since: now, offerUntil: deadline)
+            } else {
+                // Something else is happening now: it replaces the heads-up and goes through the check on its own.
+                state = .idle
+            }
+            return step(evidence, now: now)
+
+        case .armed(let meeting, let since, let offerUntil):
+            guard evidence.mode != .off, let current = evidence.candidate else {
+                return backToHeadsUp(meeting, offerUntil: offerUntil, evidence, now: now)
+            }
+            switch ScribeActivity(context.scribe) {
+            case .starting, .recording:
+                note(current, .started)
+                state = .idle
+                return []
+            case .ending, .processing:
+                guard offerable(current, evidence) else { state = .idle; return [] }
+                state = .held(meeting: current, startOwed: false)
+                return []
+            case .idle:
+                break
+            }
+            guard offerable(current, evidence) else { state = .idle; return [] }
+            let same = current.key == meeting.key
+            let origin = same ? since : now
+            state = .armed(meeting: current, since: origin, offerUntil: same ? offerUntil : nil)
+            return armed(current, since: origin, evidence: evidence, now: now)
+
+        case .prompting(let meeting, let deadline, _):
+            if evidence.mode == .off {
+                note(meeting, .asked)
+                state = .idle
+                return []
+            }
+            switch ScribeActivity(context.scribe) {
+            case .starting, .recording:
+                // Recording began by hand: the card goes, and only a recording is an answer.
+                note(meeting, .started)
+                state = .idle
+                return []
+            case .idle, .ending, .processing:
+                break
+            }
+            state = .prompting(meeting: meeting, deadline: deadline, blocked: context.automatic.block)
+            return expire(now: now, context: context)
+
+        case .countingDown(let meeting, _):
+            if evidence.mode == .off {
+                note(meeting, .asked)
+                state = .idle
+                return []
+            }
+            switch ScribeActivity(context.scribe) {
+            case .starting, .recording:
+                note(meeting, .started)
+                state = .idle
+                return []
+            case .idle, .ending, .processing:
+                break
+            }
+            if !holdsCountdown(evidence) {
+                // The choice, the readiness or the live call changed: nothing starts by itself, so ask instead.
+                return ask(meeting, now: now, blocked: context.automatic.block)
+            }
+            return expire(now: now, context: context)
+
+        case .held(_, let startOwed):
+            if !startOwed, evidence.mode == .off {
+                state = .idle
+                return []
+            }
+            return advanceHeld(now: now, context: context, evidence: evidence)
+
+        case .starting, .failed:
+            // A start under way, or its failure, reacts only to Scribe, the time, taps and the pointer.
+            return []
 
         case .recording(var recording):
-            switch evidence.activity {
+            settle(&recording, now: now)
+            switch ScribeActivity(context.scribe) {
             case .idle:
-                guard now - recording.since >= timing.startGrace else { return [] }
-                state = cooling(recording.meeting.key, now: now)
-                return [.hideBanner]
+                note(recording.meeting, .started)
+                state = .idle
+                return []
             case .ending, .processing:
+                state = .recording(recording)
                 return []
             case .starting, .recording:
                 break
             }
-            var effects = expireNextMeeting(&recording, now: now)
-            let micHeld = evidence.micApps.contains(recording.meeting.callApp)
+            expireNextMeeting(&recording, now: now)
+            var effects: [Effect] = []
+            if !recording.meeting.isLive, let live = evidence.candidate, live.isLive, live.key == recording.meeting.key {
+                // The call began: the recording now follows the app that holds the microphone.
+                recording.meeting = live
+                note(live, .started)
+            }
+            let callApp = recording.meeting.callApp
+            let micHeld = callApp.map { evidence.micApps.contains($0) } ?? false
             if micHeld {
                 recording.micReleasedAt = nil
                 recording.sawMic = true
             } else if recording.sawMic, recording.micReleasedAt == nil {
                 recording.micReleasedAt = now
             }
-            switch evidence.callWindows[recording.meeting.callApp] ?? .unknown {
+            switch callApp.flatMap({ evidence.callWindows[$0] }) ?? .unknown {
             case .present:
                 recording.sawWindow = true
                 recording.windowGoneAt = nil
@@ -493,161 +840,135 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             }
             let micEnded = recording.micReleasedAt.map { now - $0 >= timing.callEndedAfter } ?? false
             let windowEnded = recording.windowGoneAt.map { now - $0 >= timing.callEndedAfter } ?? false
-            if (micEnded || windowEnded), evidence.activity == .recording {
-                if recording.nextMeeting != nil { effects.append(.hideBanner) }
-                state = .endingSuggested(meeting: recording.meeting, since: now)
-                return effects + [.requestEnd(recording.meeting)]
+            let callLooksOver = micEnded || windowEnded
+            if callLooksOver, ScribeActivity(context.scribe) == .recording, !recording.endSuggested {
+                // Advisory only: the recording keeps its state and Scribe keeps its phase.
+                recording.endSuggested = true
+                recording.nextMeeting = nil
+                recording.nextDeadline = nil
+                state = .recording(recording)
+                return [.suggestEnd(recording.meeting)]
             }
-            effects += offerNextMeeting(&recording, evidence, now: now)
+            if !callLooksOver {
+                // The call came back: the suggestion goes, and another one may follow a later quiet spell.
+                if recording.endSuggested {
+                    recording.endSuggested = false
+                    effects.append(.withdrawEnd)
+                }
+                offerNextMeeting(&recording, evidence, now: now)
+            }
             state = .recording(recording)
             return effects
+        }
+    }
 
-        case .endingSuggested(let meeting, let since):
-            switch evidence.activity {
-            case .idle:
-                state = cooling(meeting.key, now: now)
-                switching = false
-                return [.hideBanner]
-            case .recording where now - since >= timing.endingGrace:
-                // Keep recording was chosen (or the end window never opened): wait for the call to come back.
-                switching = false
-                state = .recording(ScribeAutoStartRecording(meeting: meeting, since: now))
-                return []
-            default:
+    /// Scribe may have become free (or busy by hand) while a meeting was held. A tap that is owed starts then,
+    /// once; a sighted meeting counts down or asks, as if seen now, and goes if its call is gone.
+    private mutating func advanceHeld(now: TimeInterval, context: ScribeStartContext,
+                                      evidence: ScribeMeetingEvidence?) -> [Effect] {
+        guard case .held(let meeting, let startOwed) = state else { return [] }
+        switch ScribeActivity(context.scribe) {
+        case .ending, .processing:
+            return []
+        case .starting, .recording:
+            if startOwed { return startRequest(meeting, origin: .tap, now: now, context: context) }
+            note(meeting, .started)
+            state = .idle
+            return []
+        case .idle:
+            if startOwed { return startRequest(meeting, origin: .tap, now: now, context: context) }
+            var current = meeting
+            if let evidence {
+                guard let candidate = evidence.candidate, candidate.key == meeting.key else { state = .idle; return [] }
+                current = candidate
+            }
+            if current.isLive, context.automatic.isReady {
+                state = .countingDown(meeting: current, deadline: now + timing.countdown)
                 return []
             }
+            return ask(current, now: now, blocked: context.automatic.block)
+        }
+    }
 
-        case .cooldown(var cooldown):
-            let candidate = evidence.candidate
-            let absent = candidate == nil || candidate?.key != cooldown.key
-            if absent {
-                let since = cooldown.absentSince ?? now
-                cooldown.absentSince = since
-                if now - since >= timing.rearmAfterAbsence { cooldown.gapSeen = true }
-            } else {
-                cooldown.absentSince = nil
-            }
-            let differentMeeting = candidate != nil && candidate?.key != cooldown.key
-            if now >= cooldown.until, cooldown.gapSeen || differentMeeting {
-                state = .idle
-                return step(evidence, now: now)
-            }
-            state = .cooldown(cooldown)
+    /// The heads-up: from `idle`, with no candidate and Scribe free, the closest meeting inside the lead window
+    /// that nothing was done about yet. The ledger notes it at once, so it is shown once per meeting and an empty
+    /// or failed calendar read cannot announce it again.
+    private mutating func announce(_ evidence: ScribeMeetingEvidence, now: TimeInterval) {
+        guard ScribeActivity(evidence.context.scribe) == .idle else { return }
+        let marked = Set(evidence.slots.map(\.id).filter { ledger.mark(ofSlot: $0) != nil })
+        guard let meeting = evidence.upcoming(excluding: marked) else { return }
+        note(meeting, .headsUp)
+        state = .upcoming(meeting: meeting, deadline: now + timing.askTimeout)
+    }
+
+    /// The call (or meeting) that armed a standing heads-up is gone before the check ended, a microphone blip
+    /// say: the heads-up is back as it was, with the time it had left, and nothing counts down.
+    private mutating func backToHeadsUp(_ armed: ScribeMeeting, offerUntil: TimeInterval?,
+                                        _ evidence: ScribeMeetingEvidence, now: TimeInterval) -> [Effect] {
+        guard evidence.mode != .off, let offerUntil, ScribeActivity(evidence.context.scribe) == .idle,
+              let meeting = evidence.upcoming, meeting.key == armed.key else {
+            state = .idle
             return []
         }
+        state = .upcoming(meeting: meeting, deadline: offerUntil)
+        return expire(now: now, context: evidence.context)
     }
 
     /// Debounced: shown only when the same meeting is still there once `debounce` has passed.
     private mutating func armed(_ meeting: ScribeMeeting, since: TimeInterval, evidence: ScribeMeetingEvidence,
                                 now: TimeInterval) -> [Effect] {
         guard now - since >= timing.debounce else { return [] }
-        if evidence.mode == .automatic, evidence.micPermissionGranted, evidence.autoConsentGiven {
+        if countsDown(meeting, evidence) {
             state = .countingDown(meeting: meeting, deadline: now + timing.countdown)
-            return [.showCountdown(meeting)]
-        }
-        return ask(meeting, evidence, now: now)
-    }
-
-    /// "Ask me", or "Start automatically" without Microphone permission already granted or without the one-time
-    /// consent: Zeus never starts capture from the detector without both, so it asks. The first automatic start asks
-    /// in words that also record the consent.
-    private mutating func ask(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence?, now: TimeInterval) -> [Effect] {
-        // A fresh card: an old "pointer inside" from a card that was taken down must not hold this one.
-        pointerInside = false
-        state = .prompting(meeting: meeting, deadline: now + timing.askTimeout)
-        if let evidence, evidence.mode == .automatic, evidence.micPermissionGranted, !evidence.autoConsentGiven {
-            return [.showConsentAsk(meeting)]
-        }
-        return [.showAsk(meeting)]
-    }
-
-    private mutating func expire(now: TimeInterval) -> [Effect] {
-        switch state {
-        case .prompting(let meeting, let deadline) where now >= deadline && !pointerInside:
-            state = cooling(meeting.key, now: now)
-            return [.hideBanner]
-        case .countingDown(let meeting, let deadline) where now >= deadline:
-            guard lastEvidence?.micPermissionGranted == true, lastEvidence?.autoConsentGiven == true else {
-                // Permission (or consent) was withdrawn during the countdown: ask instead.
-                return ask(meeting, lastEvidence, now: now)
-            }
-            return [.hideBanner] + begin(meeting, now: now)
-        case .recording(var recording):
-            let effects = expireNextMeeting(&recording, now: now)
-            state = .recording(recording)
-            return effects
-        default:
             return []
         }
+        return ask(meeting, now: now, blocked: evidence.context.automatic.block)
     }
 
-    private mutating func begin(_ meeting: ScribeMeeting, now: TimeInterval) -> [Effect] {
-        state = .recording(ScribeAutoStartRecording(meeting: meeting, since: now))
-        return [.startRecording(meeting)]
+    /// Automatic start counts down only for a live call, with "Start automatically" chosen and every part of
+    /// its readiness in place.
+    private func countsDown(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
+        meeting.isLive && holdsCountdown(evidence)
     }
 
-    private func cooling(_ key: String, now: TimeInterval) -> ScribeAutoStartState {
-        let until = switching ? now : now + timing.cooldown
-        return .cooldown(ScribeAutoStartCooldown(key: key, until: until, absentSince: nil, gapSeen: false))
+    /// What must still be true on every evidence while the countdown runs, and at its end.
+    private func holdsCountdown(_ evidence: ScribeMeetingEvidence) -> Bool {
+        evidence.mode == .automatic && evidence.context.automatic.isReady && evidence.candidate?.isLive == true
     }
 
-    /// Takes the "next meeting" card down once its time is up. It counts as "Keep recording".
-    private func expireNextMeeting(_ recording: inout ScribeAutoStartRecording, now: TimeInterval) -> [Effect] {
-        guard recording.nextMeeting != nil, let deadline = recording.nextDeadline, now >= deadline else { return [] }
-        recording.nextMeeting = nil
-        recording.nextDeadline = nil
-        return [.hideBanner]
+    /// An answered meeting is never shown again. Whatever the ledger knows about it, even a question that timed
+    /// out, is written onto the meeting itself, so a call's mark moves to its calendar slot and outlives the call's
+    /// entry. A meeting whose question timed out is shown again only when it would count down.
+    private mutating func offerable(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
+        guard let mark = ledger.mark(of: meeting) else { return true }
+        note(meeting, mark)
+        if mark.isAnswered { return false }
+        return mark != .asked || countsDown(meeting, evidence)
     }
 
-    /// While recording, another calendar meeting with a call link is about to start: offer it once.
-    private func offerNextMeeting(_ recording: inout ScribeAutoStartRecording, _ evidence: ScribeMeetingEvidence,
-                                  now: TimeInterval) -> [Effect] {
-        guard recording.nextMeeting == nil, evidence.mode != .off else { return [] }
-        let excluded = recording.nextOffered.union([recording.meeting.key])
-        guard let slot = ScribeMeetingStartPolicy.nextSlot(in: evidence.slots, excluding: excluded, at: evidence.date) else { return [] }
-        let title = slot.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let next = ScribeMeeting(key: slot.id, title: title.isEmpty ? "Meeting" : title,
-                                 callApp: evidence.presentApps.first ?? recording.meeting.callApp, slot: slot)
+    private mutating func note(_ meeting: ScribeMeeting, _ mark: ScribeMeetingLedger.Mark) {
+        ledger.note(meeting, mark, date: clock?.date ?? .distantPast)
+    }
+
+    /// "Ask me", or "Start automatically" while anything it needs is missing: Zeus never starts capture from the
+    /// detector on its own unless every part of the readiness holds, so it asks.
+    private mutating func ask(_ meeting: ScribeMeeting, now: TimeInterval, blocked: ScribeAutoStartBlock?) -> [Effect] {
+        state = .prompting(meeting: meeting, deadline: now + timing.askTimeout, blocked: blocked)
+        return []
+    }
+
+    /// While recording, another calendar meeting with a call link is about to start: offer it once. The ledger
+    /// remembers the offer, so it is not repeated and the meeting is still new when this recording ends.
+    private mutating func offerNextMeeting(_ recording: inout ScribeAutoStartRecording, _ evidence: ScribeMeetingEvidence,
+                                           now: TimeInterval) {
+        guard recording.nextMeeting == nil, evidence.mode != .off else { return }
+        let known = evidence.slots.map(\.id).filter { ledger.mark(ofSlot: $0) != nil }
+        let excluded = Set(known).union([recording.meeting.key])
+        guard let slot = ScribeMeetingStartPolicy.nextSlot(in: evidence.slots, excluding: excluded, at: evidence.date) else { return }
+        let next = ScribeMeeting(key: slot.id, title: ScribeMeetingEvidence.title(of: slot),
+                                 callApp: slot.callApp ?? evidence.presentApps.first ?? recording.meeting.callApp, slot: slot)
+        note(next, .headsUp)
         recording.nextMeeting = next
         recording.nextDeadline = now + timing.askTimeout
-        recording.nextOffered.insert(slot.id)
-        return [.showNextMeeting(next)]
     }
-}
-
-/// Banner wording. Plain words, no dashes.
-public enum ScribeAutoStartText {
-    public static func askHeadline(_ meeting: ScribeMeeting) -> String {
-        "Meeting started: \(meeting.title). Take notes?"
-    }
-
-    public static func countdownHeadline(_ meeting: ScribeMeeting, seconds: Int) -> String {
-        "Meeting started: \(meeting.title). Taking notes in \(max(0, seconds))."
-    }
-
-    /// Under the Settings choice.
-    public static func settingNote(_ mode: ScribeAutoStartMode) -> String {
-        switch mode {
-        case .off:
-            return "Zeus never offers to take notes when a meeting starts."
-        case .ask:
-            return "Zeus asks when a call or a calendar meeting starts. Nothing is recorded until you tap Start."
-        case .automatic:
-            return "Zeus starts taking notes 5 seconds after a meeting starts, and you can cancel. It asks once the first time, and asks every time while Microphone is not allowed."
-        }
-    }
-
-    public static let settingEndNote =
-        "When the call ends, Zeus offers to stop and save the notes. You can keep recording. If another meeting starts while you record, Zeus asks before switching."
-
-    public static func nextMeetingHeadline(_ meeting: ScribeMeeting) -> String {
-        "Next meeting: \(meeting.title) is starting. Switch notes to it?"
-    }
-
-    public static let nextMeetingDetail = "Switching stops this recording and saves it first. Keep recording leaves it running."
-    public static let consentDetail =
-        "You chose Start automatically. Tap Start and allow, and Zeus will start by itself from now on, after a 5 second countdown you can cancel."
-
-    public static let askDetail = "Nothing is recorded until you tap Start."
-    public static let countdownDetail = "Tap Cancel to keep Zeus from recording this meeting."
 }

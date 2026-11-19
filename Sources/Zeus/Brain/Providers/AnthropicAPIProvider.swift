@@ -80,7 +80,7 @@ final class AnthropicAPIProvider: BrainProvider, @unchecked Sendable {
             let timeout: TimeInterval = request.deep ? 45 : (request.firstTextBudget ?? 45)
             let maxTokens = request.deep ? 1024 : 512
             let finalMessages = messages
-            let system = request.systemPrompt
+            let system = ScreenSightNote.textOnlySystemPrompt(for: request)
             func makeRequest(model: String, lean: Bool) -> URLRequest? {
                 let body = AnthropicVoiceBody.make(model: model, system: system, messages: finalMessages, maxTokens: maxTokens, lean: lean)
                 guard JSONSerialization.isValidJSONObject(body), let payload = try? JSONSerialization.data(withJSONObject: body) else { return nil }

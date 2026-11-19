@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct KeychainStoreTests {
     func defaults() -> UserDefaults {
-        let name = "zeus.keychain.tests.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.keychain.tests.\(UUID().uuidString)"
         return UserDefaults(suiteName: name)!
     }
 
@@ -84,5 +84,54 @@ import Testing
         #expect(store.remove("absent"))
         #expect(store.get("unrelated") == "retained")
         #expect(backend.items == ["com.zeus.app|unrelated": "retained"])
+    }
+
+    /// A clock the test moves by hand.
+    final class TestClock: @unchecked Sendable {
+        var now = Date(timeIntervalSince1970: 1_000)
+        func advance(_ seconds: TimeInterval) { now.addTimeInterval(seconds) }
+    }
+
+    @Test func refreshPicksUpAValueSavedOutsideTheStore() {
+        let backend = MemoryKeychain(["com.zeus.app|elevenlabs.voice-id": "STOCK"])
+        let clock = TestClock()
+        let store = KeychainStore(backend: backend, defaults: defaults(), now: { clock.now })
+        #expect(store.get("elevenlabs.voice-id") == "STOCK")
+        _ = backend.write("TONY", service: "com.zeus.app", account: "elevenlabs.voice-id")
+        #expect(store.get("elevenlabs.voice-id") == "STOCK")
+        clock.advance(6)
+        #expect(store.refresh("elevenlabs.voice-id") == "TONY")
+        #expect(store.get("elevenlabs.voice-id") == "TONY")
+    }
+
+    @Test func refreshClearsAnAccountDeletedOutsideTheStoreButKeepsAnUnreadableOne() {
+        let backend = MemoryKeychain(["com.zeus.app|a": "1", "com.zeus.app|b": "2"])
+        let clock = TestClock()
+        let store = KeychainStore(backend: backend, defaults: defaults(), now: { clock.now })
+        #expect(store.get("a") == "1" && store.get("b") == "2")
+        backend.delete(service: "com.zeus.app", account: "a")
+        backend.locked = ["com.zeus.app|b"]
+        clock.advance(6)
+        #expect(store.refresh("a") == nil)
+        #expect(store.get("a") == nil)
+        #expect(store.refresh("b") == "2")
+    }
+
+    @Test func refreshReadsTheBackendAtMostOncePerFiveSecondsPerAccount() {
+        let backend = MemoryKeychain(["com.zeus.app|v": "1", "com.zeus.app|w": "9"])
+        let clock = TestClock()
+        let store = KeychainStore(backend: backend, defaults: defaults(), now: { clock.now })
+        store.load()
+        clock.advance(6)
+        let before = backend.reads
+        _ = store.refresh("v")
+        for _ in 0..<50 { _ = store.refresh("v") }
+        #expect(backend.reads == before + 1)
+        _ = store.refresh("w")
+        #expect(backend.reads == before + 2)
+        clock.advance(5)
+        _ = backend.write("2", service: "com.zeus.app", account: "v")
+        #expect(store.refresh("v") == "2")
+        #expect(backend.reads == before + 3)
     }
 }

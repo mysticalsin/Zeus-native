@@ -7,18 +7,37 @@ import ZeusCore
 /// modifiers (⌥Space, ⌃⌥Z) is recorded the moment you press it. Escape cancels.
 @MainActor
 final class ShortcutRecorderModel: ObservableObject {
+    /// Called with true when a recorder starts listening and false when it stops: the app lets go of its Carbon hot keys
+    /// (Chat, the talk chord) meanwhile, so a chord such as Control-Option-Space reaches the window and can be recorded.
+    static var pauseGlobalHotkeys: (Bool) -> Void = { _ in }
+    /// How many recorders listen now. The hot keys are let go when the first starts and given back when the last stops, so
+    /// two recorders, or one that begins again, cannot hand them back while another still listens.
+    private static var listening = 0
+
     @Published var recording = false
     @Published var preview = ""
     private var monitor: Any?
+    private var resignObserver: NSObjectProtocol?
     private var state = ShortcutRecorderState()
     private var onCapture: ((Shortcut) -> Void)?
 
     func begin(onCapture: @escaping (Shortcut) -> Void) {
-        end()
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        if !recording {
+            Self.listening += 1
+            if Self.listening == 1 { Self.pauseGlobalHotkeys(true) }
+        }
         self.onCapture = onCapture
         state = ShortcutRecorderState()
         recording = true
         preview = ""
+        // A local monitor hears nothing once another app is in front, so switching away ends the recording and gives the keys back.
+        if resignObserver == nil {
+            resignObserver = NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification,
+                                                                    object: nil, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated { self?.end() }
+            }
+        }
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp]) { [weak self] event in
             guard let self, let converted = Self.convert(event) else { return event }
             let swallow = MainActor.assumeIsolated { self.handle(converted) }
@@ -26,9 +45,18 @@ final class ShortcutRecorderModel: ObservableObject {
         }
     }
 
+    /// A model freed while it listens gives the keys back: the count of listening recorders must not stay above 0.
+    isolated deinit { end() }
+
     func end() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        resignObserver = nil
+        if recording {
+            Self.listening -= 1
+            if Self.listening == 0 { Self.pauseGlobalHotkeys(false) }
+        }
         recording = false
         preview = ""
     }
@@ -107,6 +135,10 @@ struct ShortcutRecorderRow: View {
     var other: Shortcut?
     /// The key that stands in for Control+Option while VoiceOver is on (the talk key has one).
     var voiceOverFallback: Shortcut?
+    /// Plain sentences under the row, such as a clash with another shortcut, shown like the warnings.
+    var notes: [String] = []
+    /// Plain sentences under the row for a state that needs no fixing, such as a default key that is off: no warning style.
+    var quietNotes: [String] = []
     let set: (Shortcut?) -> Void
 
     var body: some View {
@@ -121,6 +153,18 @@ struct ShortcutRecorderRow: View {
                                         off: { set(nil) }, reset: { set(defaultValue) })
                 }
             }
+        }
+        ForEach(notes, id: \.self) { note in
+            HStack(alignment: .firstTextBaseline, spacing: 9) {
+                Image(systemName: "exclamationmark.triangle").font(.system(size: 11.5))
+                Text(note).font(OB.font(13)).fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(Theme.ember)
+            .padding(.vertical, 6)
+        }
+        ForEach(quietNotes, id: \.self) { note in
+            Text(note).font(OB.font(13)).foregroundStyle(GS.secondary).fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 6)
         }
         if let shortcut {
             ForEach(ShortcutConflicts.warnings(for: shortcut, other: other, otherName: otherName,

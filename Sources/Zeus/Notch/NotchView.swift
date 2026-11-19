@@ -62,16 +62,54 @@ extension Theme {
     static let amber = Color(hex: 0xFFB833)
 }
 
+extension ClosedWingsFacts {
+    /// What the closed wings show right now. The extra width is read only while the body grows wings.
+    @MainActor init(of topBar: TopBarModel) {
+        self.init(kindIsNone: ClosedWings.kind(of: topBar) == .none, hasLights: !topBar.lights.isEmpty,
+                  hasLiveActivity: topBar.hasLiveActivity, extraWidth: 0)
+        if showsWings { extraWidth = ClosedWings.extraWidth(for: topBar) }
+    }
+}
+
 struct NotchView: View {
     let model: NotchModel
     /// The top bar (tabs, pages, closed wings). Nil keeps the classic agents-only notch.
     var topBar: TopBarModel? = nil
-    /// The hardware notch (width 0 on Macs without one).
-    let notch: CGSize
-    /// A slim pill on a display without a notch, so the notch still has a place to glow and open from.
-    var slimPill = false
+    /// What this display reports about its top edge. The closed shape is resolved from it: the hardware notch,
+    /// or where there is none the slim pill or the shape the owner drew.
+    var facts: NotchDisplayFacts? = nil
+    /// Snapshots and previews pin the closed shape and the guide, so they never read a store; nil asks the model.
+    var footprintOverride: NotchFootprint? = nil
+    var guideOverride: Bool? = nil
+    /// Tests pass their own model; nil is the app's.
+    var drawnNotch: DrawnNotchModel? = nil
     /// Snapshots and previews pin the drop; nil reads Settings > Appearance > Top bar position.
     var topOffsetOverride: Double? = nil
+    /// Snapshots and previews pin the island background; nil reads Settings > Appearance > Island background.
+    var backgroundOverride: NotchBackground? = nil
+    /// What the notch's accessibility action does: open the panel. The closed notch is click-through and opens on
+    /// the pointer, which a VoiceOver or Switch Control user does not have. Nil (previews, snapshots) does nothing.
+    var openPanel: (() -> Void)? = nil
+
+    /// The layers the body draws now: Transparent drops fill, outline and glow of the closed island only.
+    private var layers: NotchBodyLayers {
+        let background = backgroundOverride ?? NotchBackground.resolve(SettingsStore.shared.string(NotchBackground.settingID))
+        return background.layers(closed: model.presentation == .closed)
+    }
+
+    /// The closed shape on this display.
+    var footprint: NotchFootprint {
+        if let footprintOverride { return footprintOverride }
+        guard let facts else { return .pill }
+        return (drawnNotch ?? .shared).footprint(for: facts)
+    }
+
+    /// A guide outline on the drawn notch while it is closed and being calibrated: a black shape on a dark menu
+    /// bar cannot be seen otherwise.
+    var showsGuide: Bool {
+        guard model.presentation == .closed, case .drawn = footprint else { return false }
+        return guideOverride ?? DrawnNotchCalibration.showsGuide((drawnNotch ?? .shared).state)
+    }
 
     /// How far the closed bar and the peek card sit below the top of the screen. The open panel stays
     /// flush with the top; the notch light, ticker and wings are part of the closed bar and move with it.
@@ -80,7 +118,13 @@ struct NotchView: View {
         return CGFloat(TopBarPosition.applied(resolved: resolved, panelOpen: model.presentation == .panel))
     }
 
+    /// The hardware size (width 0 for the pill).
+    private var notch: CGSize { footprint.layoutSize }
+    private var slimPill: Bool { footprint.isPill }
     private var barHeight: CGFloat { max(notch.height, 30) }
+    /// The closed body is taller than the bar on a hardware notch (it hangs below the notch). The peek, the open
+    /// panel and the tab row keep `barHeight`.
+    private var closedBodyHeight: CGFloat { NotchFootprintRules.closedHeight(footprint, wings: closedWings) }
     private var hasNotch: Bool { notch.width > 0 }
 
     /// Idle and closed, the top bar is exactly the hardware notch (square top, no ears); open it
@@ -90,10 +134,88 @@ struct NotchView: View {
         return ClosedWings.kind(of: topBar) == .none
     }
     /// A stalled session the peek is talking about (no card of its own to compete with).
-    private var stalledPeek: NotchModel.Session? {
+    private var stalledPeek: NotchModel.Session? { Self.stalledPeek(model) }
+
+    private static func stalledPeek(_ model: NotchModel) -> NotchModel.Session? {
         guard model.approval == nil, model.completion == nil, model.failure == nil,
               let session = model.peekSession, session.status == .stalled else { return nil }
         return session
+    }
+
+    /// Whether the peek draws a card under its bar. A bar-only peek takes the mouse like the closed notch.
+    static func peekHasCard(model: NotchModel) -> Bool {
+        model.approval != nil || model.completion != nil || model.failure != nil || stalledPeek(model) != nil
+            || model.selectionEdit != nil || model.workBehind?.streaming == true || model.recap != nil
+    }
+
+    /// One diff row of the edit card and how many 15 pt text lines it takes.
+    struct SelectionEditRow: Identifiable {
+        var line: TextDiffLine
+        var textLines: Int
+        var id: Int { line.id }
+        var height: CGFloat { 15 * CGFloat(textLines) }
+    }
+
+    /// The edit card body: the visible rows, how many were left out, and the whole height.
+    struct SelectionEditLayout {
+        var rows: [SelectionEditRow]
+        var hidden: Int
+        var height: CGFloat
+        /// The plain line shown under a capped list, nil when every row is visible.
+        var moreText: String? { hidden > 0 ? "+\(hidden) more lines" : nil }
+    }
+
+    /// Room for the edit card body (rows, the more-lines line and the Accept row): the notch window below the lowest
+    /// bar position, the bar and the 10 pt gap. The card never grows past it, so Accept stays drawn and clickable.
+    static func selectionEditBudget(barHeight: CGFloat) -> CGFloat {
+        GlanceTopBar.windowHeight - CGFloat(TopBarPosition.maximum) - barHeight - 10
+    }
+
+    /// The edit card: each diff line takes up to two 15 pt lines (about 54 characters each), 4 pt apart, then the 28 pt
+    /// Accept row. Rows that would not fit the budget are left out and counted in `hidden`, with a 15 pt line saying so.
+    /// The view pins every row to `SelectionEditRow.height`, so what is drawn is what is measured here.
+    static func selectionEditLayout(_ edit: SelectionEdit, barHeight: CGFloat) -> SelectionEditLayout {
+        let budget = selectionEditBudget(barHeight: barHeight)
+        let moreLine: CGFloat = 15 + 4
+        var rows: [SelectionEditRow] = []
+        var height: CGFloat = 28
+        for (index, line) in edit.diff.enumerated() {
+            let row = SelectionEditRow(line: line, textLines: min(2, max(1, (line.text.count + 2 + 53) / 54)))
+            let reserve = index < edit.diff.count - 1 ? moreLine : 0
+            if height + row.height + 4 + reserve > budget { break }
+            rows.append(row)
+            height += row.height + 4
+        }
+        let hidden = edit.diff.count - rows.count
+        return SelectionEditLayout(rows: rows, hidden: hidden, height: height + (hidden > 0 ? moreLine : 0))
+    }
+
+    /// The peek card as drawn (the peek always has the 8 pt shoulders). The window's click-through rule reads it too.
+    static func peekSize(model: NotchModel, footprint: NotchFootprint) -> CGSize {
+        let notch = footprint.layoutSize
+        let barHeight = max(notch.height, 30)
+        let shoulder: CGFloat = 8
+        if let approval = model.approval {
+            let wide = (approval.detail?.height ?? 0) > 0
+            // 6 pt more than before for the avatar header row of the shared card grammar.
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, wide ? 520 : 440), height: barHeight + 98 + approval.extraHeight)
+        }
+        if model.completion != nil {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 460), height: barHeight + 10 + CompletionCardView.height)
+        }
+        if model.failure != nil || stalledPeek(model) != nil {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
+        }
+        if let edit = model.selectionEdit {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 10 + selectionEditLayout(edit, barHeight: barHeight).height)
+        }
+        if let preview = model.workBehind, preview.streaming {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 440), height: barHeight + 10 + 24)
+        }
+        if let recap = model.recap {
+            return CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))
+        }
+        return CGSize(width: (notch.width > 0 ? notch.width : 120) + 2 * shoulder + 230, height: barHeight)
     }
 
     private var shoulder: CGFloat {
@@ -111,54 +233,41 @@ struct NotchView: View {
     }
 
     /// How the closed notch grows into (and out of) its wings.
-    static let wingsSpring = Animation.spring(
-        response: NotchClosedBodyLayout.wingsSpringResponse,
-        dampingFraction: NotchClosedBodyLayout.wingsSpringDamping)
+    @MainActor static var wingsSpring: Animation? { Motion.reducible(Motion.cueGrow) }
 
-    /// The closed width while closed (nil otherwise), the trigger for `wingsSpring`.
-    var closedWidthKey: CGFloat? {
-        model.presentation == .closed ? size(for: .closed).width : nil
+    private var closedWings: ClosedWingsFacts { topBar.map(ClosedWingsFacts.init(of:)) ?? .noWings }
+
+    /// While closed (nil otherwise), what the closed width depends on besides the footprint: the trigger for
+    /// `wingsSpring`. It never reads the footprint, so a footprint change moves the body without the spring.
+    var closedWidthKey: ClosedWingsFacts.MotionKey? {
+        model.presentation == .closed ? closedWings.motionKey : nil
     }
 
-    /// The pill on displays without a notch.
-    static let pillSize = CGSize(width: 96, height: 9)
+    /// The open panel's height, or nil while it is not open. A tab change (Home is 122 pt shorter than the other
+    /// pages) or an approval changes it, so the height eases with the page spring instead of jumping.
+    static func panelHeightKey(presentation: NotchModel.Presentation, panelHeight: CGFloat) -> CGFloat? {
+        presentation == .panel ? panelHeight : nil
+    }
+
+    private var panelHeightKey: CGFloat? {
+        Self.panelHeightKey(presentation: model.presentation, panelHeight: size(for: .panel).height)
+    }
 
     private func size(for presentation: NotchModel.Presentation) -> CGSize {
         switch presentation {
         case .closed:
-            if let topBar {
-                let wingKind = ClosedWings.kind(of: topBar)
-                let showWings = NotchClosedBodyLayout.showWings(
-                    closedWingKindIsNone: wingKind == .none,
-                    hasLights: !topBar.lights.isEmpty,
-                    hasLiveActivity: topBar.hasLiveActivity)
-                if showWings {
-                    let extra = ClosedWings.extraWidth(for: topBar)
-                    let base = hasNotch ? notch.width : 40
-                    return CGSize(
-                        width: NotchClosedBodyLayout.bodyWidth(
-                            notchWidth: base, shoulder: shoulder, showWings: true,
-                            extraWidth: extra, hasNotch: hasNotch, slimPill: slimPill),
-                        height: barHeight)
-                }
+            let wings = closedWings
+            if wings.showsWings {
+                return CGSize(
+                    width: NotchClosedBodyLayout.bodyWidth(
+                        notchWidth: footprint.wingBase, shoulder: shoulder, showWings: true,
+                        extraWidth: wings.extraWidth, hasNotch: hasNotch, slimPill: slimPill),
+                    height: closedBodyHeight)
             }
-            if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: notch.height) }
-            return slimPill ? CGSize(width: Self.pillSize.width, height: Self.pillSize.height) : .zero
+            if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: closedBodyHeight) }
+            return footprint.idleSize
         case .peek:
-            let raw: CGSize
-            if let approval = model.approval {
-                let wide = (approval.detail?.height ?? 0) > 0
-                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, wide ? 520 : 440), height: barHeight + 98 + approval.extraHeight)
-            } else if model.completion != nil {
-                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, 460), height: barHeight + 10 + CompletionCardView.height)
-            } else if model.failure != nil || stalledPeek != nil {
-                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, 480), height: barHeight + 10 + AgentTroubleCard.height)
-            } else if let recap = model.recap {
-                raw = CGSize(width: max(notch.width + 2 * shoulder + 240, 520), height: barHeight + 14 + WelcomeRecapCardView.height(for: recap))
-            } else {
-                raw = CGSize(width: (hasNotch ? notch.width : 120) + 2 * shoulder + 230, height: barHeight)
-            }
-            return NotchLayoutBounds.clamp(raw)
+            return NotchLayoutBounds.clamp(Self.peekSize(model: model, footprint: footprint))
         case .panel:
             if let topBar {
                 return Self.topBarPanelSize(barHeight: barHeight, hasApproval: model.approval != nil, extra: model.approval?.extraHeight ?? 0,
@@ -179,7 +288,7 @@ struct NotchView: View {
     /// The closed outline the lights follow: the black shape with wings, or the bare notch.
     private var closedLightBody: CGSize {
         let closed = size
-        return closed.width > 0 ? closed : CGSize(width: notch.width + 2 * shoulder, height: notch.height)
+        return closed.width > 0 ? closed : CGSize(width: notch.width + 2 * shoulder, height: closedBodyHeight)
     }
 
     private var bottomRadius: CGFloat {
@@ -198,6 +307,9 @@ struct NotchView: View {
         NotchSizeReader { animated in canvas(size: animated) }
             .modifier(AnimatedNotchHeight(height: size(for: model.shownHeight).height))
             .animation(open ? TopBarStyle.openHeightSpring : TopBarStyle.closeMotion, value: model.shownHeight)
+            // Outside the open-height animation, which wins on open: this one only runs when the page or an approval
+            // changes the open panel's height.
+            .animation(TopBarStyle.pageSpring, value: panelHeightKey)
             .modifier(AnimatedNotchWidth(width: size(for: model.presentation).width))
             .animation(Self.wingsSpring, value: closedWidthKey)
             .animation(open ? TopBarStyle.openSpring : TopBarStyle.closeMotion, value: model.presentation)
@@ -211,11 +323,14 @@ struct NotchView: View {
                 if !model.alerts.isEmpty, model.presentation == .closed {
                     AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
                                    onHover: { NotchControllerBridge.alertHover($0) })
-                        .padding(.top, barHeight + 6 + topOffset)
+                        .padding(.top, closedBodyHeight + 6 + topOffset)
                         .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
                 }
             }
             .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
+            // The place of a drawn shape, applied last so the alerts move with the body. It moves the drawing and not
+            // the layout, which is why it cannot sit under the alert overlay. It has no animation of its own.
+            .offset(x: NotchAnchor.offset(footprint))
     }
 
     /// Whether the outline itself glows (and so breathes). With the top bar, the closed notch glows
@@ -229,14 +344,15 @@ struct NotchView: View {
     private func canvas(size: CGSize) -> some View {
         let status = model.status
         let halo = topBar?.haloStyle ?? .classic
-        let glowing = glowsOutline(status: status)
+        let drawn = layers
+        let glowing = glowsOutline(status: status) && drawn.glow
         // Only tick while the halo is drawn and breathing, and only the outline layers (never the
         // content): an idle notch, or a closed one whose arms carry the glow, costs nothing.
         let breathing = !Motion.reduced && glowing
         let shape = NotchShape(shoulder: shoulder, earHeight: earHeight, bottomRadius: bottomRadius)
         let glanceOpen = topBar != nil && model.presentation == .panel
         return ZStack(alignment: .top) {
-            TickingView(interval: 1 / 30, paused: !breathing) { context in
+            DisplaySynchronizedView(paused: !breathing, preferredFramesPerSecond: Motion.ambientFPS) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 let period = status == .needsYou ? 1.8 : 2.6
                 // Reduce Motion: a steady glow instead of breathing.
@@ -247,11 +363,12 @@ struct NotchView: View {
                     : status.color
                 ZStack(alignment: .top) {
                     shape
-                        // Always the same black fill with Glance's open gradient over it: switching the
-                        // fill between two style types cross-fades a new layer in at the final size
-                        // instead of growing the body.
+                        // Pitch black, closed and open, so the body reads as part of the hardware notch and
+                        // only Zeus's own marks show on it. One fill type, so opening grows the body instead of
+                        // cross-fading a new layer in.
                         .fill(Color.black)
-                        .overlay { shape.fill(Glass.notchPanelFill).opacity(glanceOpen ? 1 : 0) }
+                        // Transparent: the closed island has no body, only its marks (the hardware notch is black).
+                        .opacity(drawn.fill ? 1 : 0)
                         // Glance's soft drop shadow under the open body (parity/N4: alpha 0.19 at 2 pt
                         // below, 0.10 at 15 pt, gone by 50 pt; weaker at the sides).
                         .shadow(color: .black.opacity(glanceOpen ? Glass.notchShadow.opacity : 0),
@@ -259,7 +376,7 @@ struct NotchView: View {
                         .shadow(color: glow.opacity(glowing ? 0.28 * breath : 0), radius: 9)
                         .shadow(color: glow.opacity(glowing ? 0.2 * breath : 0), radius: 3)
                         .shadow(color: Theme.bolt.opacity(glowing && halo == .storm ? 0.3 * breath : 0), radius: 26)
-                    shape.stroke(glow.opacity(glowing ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
+                    shape.stroke(glow.opacity(glowing && drawn.outline ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
                 }
             }
 
@@ -273,8 +390,26 @@ struct NotchView: View {
                 // corners, and the page (inserted at its final layout) showed outside the body
                 // while it grew.
                 .clipShape(shape)
+
+            if showsGuide {
+                shape.stroke(Color.white.opacity(0.6), lineWidth: 1)
+                    .accessibilityHidden(true)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: size.width, height: size.height)
+        // One labelled element for the whole notch (its children stay reachable), so a closed notch that draws only
+        // marks still has a name and something to press.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Zeus")
+        .accessibilityAction { openPanel?() }
+        // Offered only while there is a panel to open, so VoiceOver does not list a dead action on the open panel.
+        .accessibilityActions {
+            if model.presentation != .panel {
+                Button("Open Zeus panel") { openPanel?() }
+            }
+        }
+        .ownedJourneyControl("notch.body")
         // Glance (parity/N7, frames 139 to 143): the glass rim sits on the final open outline from
         // the first frame while the body grows inside it, then fades. Behind the body, not animated.
         .background(alignment: .top) {
@@ -285,7 +420,7 @@ struct NotchView: View {
                 .transaction { $0.animation = nil }
         }
         .overlay(alignment: .top) {
-            if let topBar, model.presentation == .closed, hasNotch || slimPill || !topBar.lights.isEmpty {
+            if let topBar, model.presentation == .closed, layers.glow, hasNotch || slimPill || !topBar.lights.isEmpty {
                 NotchLights(topBar: topBar, status: status, body_: closedLightBody, shoulder: shoulder)
             }
         }
@@ -296,8 +431,8 @@ struct NotchView: View {
             topBar.flash(.entrance(style, tint))
             topBar.flash(.edgeWave(tint))
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: model.approval?.id)
-        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: model.sessions.count)
+        .animation(Motion.live(MotionTokens.peekContent), value: model.approval?.id)
+        .animation(Motion.live(MotionTokens.panelResize), value: model.sessions.count)
         .animation(Self.wingsSpring, value: topBar.map { ClosedWings.kind(of: $0) })
     }
 
@@ -306,7 +441,11 @@ struct NotchView: View {
         switch model.presentation {
         case .closed:
             if let topBar {
-                ClosedWings(topBar: topBar).frame(height: barHeight)
+                // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
+                ClosedWings(topBar: topBar, notchGap: footprint.wingBase).frame(height: barHeight)
+                    .allowsHitTesting(false)
+                    // Transparent: no body behind the white wing text, so a soft shadow keeps it readable.
+                    .shadow(color: .black.opacity(layers.fill ? 0 : 0.7), radius: 2, y: 0.5)
             }
         case .peek:
             VStack(spacing: 10) {
@@ -316,21 +455,21 @@ struct NotchView: View {
                         .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
                 } else if let completion = model.completion {
                     CompletionCardView(completion: completion) { model.completion = nil }
-                        .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                        .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let failure = model.failure {
                     AgentTroubleCard(kind: .failed, sessionID: failure.sessionID, agent: failure.agent, project: failure.project, reason: failure.reason) {
                         NotchControllerBridge.dismissFailure()
                     }
-                    .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                    .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let session = stalledPeek {
                     AgentTroubleCard(kind: .stalled, sessionID: session.id, agent: session.agent, project: session.project,
                                      reason: session.reason ?? "No activity for a while") {
                         model.peekSessionID = nil
                         NotchControllerBridge.closePeek()
                     }
-                    .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                    .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 } else if let edit = model.selectionEdit {
-                    SelectionEditBody(edit: edit)
+                    SelectionEditBody(layout: Self.selectionEditLayout(edit, barHeight: barHeight))
                         .padding(.horizontal, 16)
                 } else if let preview = model.workBehind, preview.streaming {
                     WorkBehindBody(preview: preview)
@@ -338,7 +477,7 @@ struct NotchView: View {
                 } else if let recap = model.recap {
                     WelcomeRecapCardView(recap: recap) { model.recap = nil; NotchControllerBridge.closePeek() }
                         .padding(.horizontal, 16)
-                        .transition(.opacity.combined(with: .offset(y: -4)).animation(.spring(response: 0.34, dampingFraction: 0.82).delay(0.1)))
+                        .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 }
             }
             .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.1)))
@@ -361,24 +500,30 @@ struct NotchView: View {
     private var peekBar: some View {
         let status = model.status
         return HStack(spacing: 7) {
-            BoltShape()
-                .fill(status.color)
-                .frame(width: 11, height: 13)
-                .shadow(color: status.color.opacity(0.9), radius: 4)
-            Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Theme.cloudPrimary)
-                .lineLimit(1)
-            Spacer(minLength: hasNotch ? notch.width + 8 : 12)
-            if !peekStatusText.isEmpty {
-                Text(peekStatusText)
+            HStack(spacing: 7) {
+                BoltShape()
+                    .fill(status.color)
+                    .frame(width: 11, height: 13)
+                    .shadow(color: status.color.opacity(0.9), radius: 4)
+                Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(status.color)
+                    .foregroundStyle(Theme.cloudPrimary)
                     .lineLimit(1)
             }
-            if let session = model.peekSession, model.approval == nil, session.status == .working {
-                ElapsedText(since: session.startedAt)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Color.clear.frame(width: hasNotch ? notch.width + 8 : 12, height: 1)
+            HStack(spacing: 7) {
+                if !peekStatusText.isEmpty {
+                    Text(peekStatusText)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(status.color)
+                        .lineLimit(1)
+                }
+                if let session = model.peekSession, model.approval == nil, session.status == .working {
+                    ElapsedText(since: session.startedAt)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(height: barHeight)
     }
@@ -396,20 +541,28 @@ struct NotchView: View {
 }
 
 private struct SelectionEditBody: View {
-    let edit: SelectionEdit
+    let layout: NotchView.SelectionEditLayout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(edit.diff) { line in
-                Text(prefix(line.kind) + line.text)
+            ForEach(layout.rows) { row in
+                Text(prefix(row.line.kind) + row.line.text)
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(color(line.kind))
+                    .foregroundStyle(color(row.line.kind))
                     .lineLimit(2)
+                    .frame(maxWidth: .infinity, minHeight: row.height, maxHeight: row.height, alignment: .topLeading)
+            }
+            if let more = layout.moreText {
+                Text(more)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 15, maxHeight: 15, alignment: .topLeading)
             }
             HStack {
                 Spacer()
                 NotchButton(title: "Accept", tint: Theme.leaf, filled: true) { HandsHUD.shared.accept() }
             }
+            .frame(height: 28)
         }
     }
 
@@ -690,15 +843,19 @@ private struct PanelBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
-                BoltShape().fill(Theme.bolt).frame(width: 11, height: 13)
-                    .shadow(color: Theme.bolt.opacity(0.8), radius: 4)
-                Text("Zeus")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Theme.cloudPrimary)
-                Spacer(minLength: notchWidth + 8)
+                HStack(spacing: 7) {
+                    BoltShape().fill(Theme.bolt).frame(width: 11, height: 13)
+                        .shadow(color: Theme.bolt.opacity(0.8), radius: 4)
+                    Text("Zeus")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.cloudPrimary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Color.clear.frame(width: notchWidth + 8, height: 1)
                 Text("\(model.sessions.count) agent\(model.sessions.count == 1 ? "" : "s")")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cloudSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .frame(height: barHeight)
 
@@ -760,12 +917,7 @@ private struct TopBarPanelBody: View {
     /// glow is content-driven (music hue when playing, otherwise copper behind Calendar).
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // Glance (parity/N4): brightest under the fourth card's left edge, about 77 % across,
-            // and it never reaches the tab row (y 37 stays black edge to edge).
-            RadialGradient(colors: [contentGlow.opacity(0.35), .clear], center: UnitPoint(x: 0.77, y: 1.0),
-                           startRadius: 10, endRadius: 170)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            // Absolute black behind the content: no ambient glow (the owner's choice over the reference look).
             VStack(alignment: .leading, spacing: 0) {
                 Color.clear.frame(height: GlanceTopBar.tabRowTop)
                 TopBarHeader(topBar: topBar, agentCount: model.sessions.count, needsYou: model.status == .needsYou,
@@ -784,15 +936,6 @@ private struct TopBarPanelBody: View {
                     }
             }
         }
-    }
-
-    /// Content tint: playing music paints a violet/album glow (Codex review 1 live pair); idle Home
-    /// keeps the copper behind Calendar from TOPBAR-SPEC §2.
-    private var contentGlow: Color {
-        if let playing = topBar.nowPlaying {
-            return ArtworkStore.shared.tint(for: playing, saturation: 0.45, brightness: 0.55, scale: 0.8)
-        }
-        return GlanceTint.glow
     }
 
     private var summary: String {

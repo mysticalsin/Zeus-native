@@ -61,6 +61,17 @@ final class SettingsStore {
     /// Background reads of the login-item status. A toggle made while one is in flight invalidates it, so the
     /// old answer cannot put the switch back.
     @ObservationIgnored private var launchReads = LatestRun()
+    /// What macOS says about the microphone, and the one way Zeus raises its prompt from a click here. Tests
+    /// replace both, so no real prompt is ever raised from a test.
+    @ObservationIgnored var microphoneAccess: @MainActor () -> ScribeMicrophoneAccess = {
+        ScribeMicrophoneAccess(authorizationRaw: AVCaptureDevice.authorizationStatus(for: .audio).rawValue)
+    }
+    @ObservationIgnored var askForMicrophone: @MainActor () -> Void = {}
+    /// Bumped when the microphone answer may have changed, so a row that shows it reads it again.
+    private(set) var microphoneEpoch = 0
+
+    /// Where a change came from. Only the owner's own click may opt in to automatic recording.
+    enum ChangeOrigin: Sendable { case person, reset, importFile }
 
     static func key(_ id: String) -> String { "opt." + id }
 
@@ -75,7 +86,27 @@ final class SettingsStore {
         for option in SettingsCatalog.all where option.state != .custom {
             values[option.id] = defaults.string(forKey: Self.key(option.id)) ?? option.defaultValue
         }
+        // One shared request per key, so a double click raises one prompt.
+        askForMicrophone = { [weak self] in
+            Task { @MainActor in
+                await PermissionPrompts.shared.run("microphone") { _ = await AVCaptureDevice.requestAccess(for: .audio) }
+                self?.microphoneMayHaveChanged()
+            }
+        }
         refreshLaunchAtLogin()
+    }
+
+    func microphoneMayHaveChanged() { microphoneEpoch &+= 1 }
+
+    /// What stops an automatic start, or nil when nothing does or the choice is not automatic. Reads the epoch, so
+    /// a row that shows it refreshes when the microphone answer changes.
+    func autoStartBlock() -> ScribeAutoStartBlock? {
+        _ = microphoneEpoch
+        return ScribeAutoStartReadiness.resolve(
+            mode: ScribeAutoStartMode.parse(string(ScribeAutoStartMode.settingID)),
+            optIn: ScribeAutoStartOptIn.date(defaults: defaults) != nil,
+            microphone: microphoneAccess(),
+            hasRecorded: ScribeAutoStartOptIn.hasRecorded(defaults: defaults)).block
     }
 
     /// Shows what macOS has registered, not the stored default. `SMAppService.status` is a synchronous
@@ -105,11 +136,22 @@ final class SettingsStore {
         string(id).split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
     }
 
-    func set(_ id: String, _ value: String) {
+    func set(_ id: String, _ value: String, origin: ChangeOrigin = .person) {
+        if id == ScribeAutoStartMode.settingID { applyAutoStartChoice(value, origin: origin) }
         guard values[id] != value else { return }
         values[id] = value
         if !TopBarStyle.isSnapshot { defaults.set(value, forKey: Self.key(id)) }
         onChange?(id)
+    }
+
+    /// The one seam for the opt-in to automatic recording. It runs before the unchanged-value check, so a click on
+    /// the choice already showing still gives the opt-in. A reset or an import can only withdraw it: whatever they
+    /// carry, the stamp is written as if "Ask me" was chosen. Only a click asks macOS, and only if it never asked.
+    private func applyAutoStartChoice(_ value: String, origin: ChangeOrigin) {
+        guard !TopBarStyle.isSnapshot else { return }
+        let mode = ScribeAutoStartMode.parse(value)
+        ScribeAutoStartOptIn.record(mode: mode == .automatic && origin != .person ? .ask : mode, defaults: defaults)
+        if origin == .person, mode == .automatic, microphoneAccess() == .notAsked { askForMicrophone() }
     }
 
     func boolBinding(_ id: String) -> Binding<Bool> {
@@ -156,7 +198,7 @@ final class SettingsStore {
 
     func reset(_ section: SettingsNavigation.Section) {
         for option in SettingsCatalog.options(in: section) where option.state != .custom && Self.isValue(option.kind) {
-            set(option.id, option.defaultValue)
+            set(option.id, option.defaultValue, origin: .reset)
         }
         if let keys = Self.extraKeys[section] { ExtraPreferences.shared.reset(keys) }
     }
@@ -223,7 +265,7 @@ final class SettingsStore {
         "notify.calendarLead": .number(0...180),
         "sound.volume": .number(0...100),
         "shortcut.openNotch": .text(40), "shortcut.quickTodo": .text(40),
-        "pushToTalk": .scalar, "talk.shortcut": .scalar, "dictation.shortcut": .scalar, "dictation.key": .scalar,
+        "pushToTalk": .scalar, "talk.shortcut": .scalar, ShortcutStore.secondTalkKey: .scalar, "dictation.shortcut": .scalar, "dictation.key": .scalar,
         "topBar.tabs": .text(2000), "topBar.tabs.known": .text(2000), "topBar.weatherCity": .text(120),
         // 0 is "Forever", so it must survive an export and import.
         "dictation.mode": .text(64), "dictation.keepDays": .whole(0...3650),
@@ -243,7 +285,6 @@ final class SettingsStore {
         var rules = otherRules
         for key in boolKeys { rules[key] = .bool }
         // Privacy and control switches the Settings pages own (they are not `opt.` values).
-        rules[CLIAccess.defaultsKey] = .bool
         rules[WakeWordController.defaultsKey] = .bool
         rules[DriveAutonomy.settingsKey] = .text(64)
         return rules
@@ -254,11 +295,18 @@ final class SettingsStore {
     /// Switches an imported file may leave alone or turn off, never on: they open the microphone, send data or
     /// loosen what Zeus may do. A person turns these on, on the Mac they are using.
     static let neverEnabledByImport: Set<String> = [
-        "voice.answers", "privacy.lyrics", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
+        "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
+        "face.presence",
+        // It reads other apps' window frames and moves their windows.
+        "tiling.enabled",
+        // It listens on the local network and advertises this Mac.
+        "fling.enabled",
     ]
+    /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
+    static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {
-        [CLIAccess.defaultsKey, WakeWordController.defaultsKey, "dictation.engineForVoice"]
+        [WakeWordController.defaultsKey, "dictation.engineForVoice"]
     }
     /// A cloud transcription engine or a non-local voice provider is only ever chosen on this Mac, by hand.
     static func importWouldSelectCloud(key: String, value: Any) -> Bool {
@@ -268,6 +316,11 @@ final class SettingsStore {
         case "voice.ttsProvider": return VoiceTTSProvider(rawValue: raw).map { $0 != .kokoro && $0 != .chatterbox } ?? false
         default: return false
         }
+    }
+    /// Choosing the drawn notch makes the closed window take clicks over its own shape, so only a person at this
+    /// Mac chooses it. A file may carry Pill and the size rows like any other row.
+    static func importWouldSelectDrawnNotch(id: String, value: String) -> Bool {
+        id == DrawnNotchModel.Row.style && NotchlessStyle(label: value) == .drawn
     }
     /// Decided on each Mac, never carried over: how far Zeus may drive.
     private static var neverImportedAppKeys: Set<String> { [DriveAutonomy.settingsKey] }
@@ -286,6 +339,12 @@ final class SettingsStore {
         }
     }
 
+    /// A specific talk microphone is a Core Audio id from this Mac: it is never exported. Automatic and This Mac's
+    /// microphone are plain names and travel like any other choice.
+    static func isExportable(id: String, value: String) -> Bool {
+        !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
+    }
+
     func exportJSON() throws -> Data {
         var app: [String: Any] = [:]
         for key in Self.appKeys {
@@ -295,6 +354,7 @@ final class SettingsStore {
         for option in SettingsCatalog.all where option.state == .custom {
             if let value = defaults.string(forKey: Self.key(option.id)) { optionValues[option.id] = value }
         }
+        optionValues = optionValues.filter { Self.isExportable(id: $0.key, value: $0.value) }
         let root: [String: Any] = ["format": "zeus.settings", "version": 1, "options": optionValues, "app": app]
         return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
     }
@@ -313,6 +373,8 @@ final class SettingsStore {
             guard let option = SettingsCatalog.option(id), option.state != .stub, let value = raw as? String,
                   Self.accepts(value, for: option) else { continue }
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
+            if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
+            if Self.neverChosenByImport[id]?.contains(value) == true { continue }
             if values[id] != value { optionChanges.append((id, value)) }
         }
         var appChanges: [(key: String, value: Any)] = []
@@ -324,7 +386,7 @@ final class SettingsStore {
             if Self.importWouldSelectCloud(key: key, value: value) { continue }
             appChanges.append((key, value))
         }
-        for change in optionChanges { set(change.id, change.value) }
+        for change in optionChanges { set(change.id, change.value, origin: .importFile) }
         for change in appChanges where !TopBarStyle.isSnapshot { defaults.set(change.value, forKey: change.key) }
         if !TopBarStyle.isSnapshot, let style = HaloMigration.run(defaults: defaults) { values["halo.style"] = style.rawValue }
         ExtraPreferences.shared.reload()

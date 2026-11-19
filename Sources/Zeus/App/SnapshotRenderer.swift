@@ -35,6 +35,77 @@ private struct GSPageSnapshot: View {
     }
 }
 
+/// Scribe's card on the Settings panel background, with a fixed choice and block.
+private struct ScribeCardSnapshot: View {
+    let choice: String
+    let block: ScribeAutoStartBlock?
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
+            ScribeAutoStartCard(selection: .constant(choice), block: block, allow: { _ in })
+                .padding(.horizontal, GS.pagePadding)
+                .padding(.top, 25)
+        }
+        .background(GS.window)
+    }
+}
+
+/// The Face presence card alone on the Settings panel colour, for one fixture state.
+private struct FacePresenceCardSnapshot: View {
+    let fixture: FacePresenceCardFixtures.Fixture
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
+            GSFacePresenceCard(model: fixture.model, isOn: .constant(fixture.isOn), lockAfter: .constant(fixture.model.lockAfterLabel))
+                .padding(.horizontal, GS.pagePadding)
+                .padding(.vertical, 25)
+        }
+        .background(GS.window)
+    }
+}
+
+/// The per-app sound card alone, on the Settings panel colour and at the page's content width, so a render shows
+/// the card without the rest of the Sounds page. Fixtures only: the card never starts the controller in a snapshot.
+private struct EqualiserCardStage: View {
+    let isOn: Bool
+    var openID: String? = nil
+    var fixture: EqualiserStatus? = nil
+    var body: some View {
+        GSEqualiserCard(controller: nil, isOn: .constant(isOn), openID: openID, fixture: fixture)
+            .padding(.leading, GS.pagePadding)
+            .padding(.trailing, 28)
+            .padding(.vertical, 24)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(GS.panel)
+    }
+}
+
+/// Fixed rows for the equaliser card renders: every row kind the card can show.
+private enum EqualiserCardFixtures {
+    static func settings(_ id: String, _ name: String, _ gains: [Double] = [Double](repeating: 0, count: 10),
+                         volume: Double = 1, shapes: Bool = true) -> AppSoundSettings {
+        AppSoundSettings(bundleID: id, displayName: name, gainsDB: gains, volume: volume, shapes: shapes,
+                         lastUsed: Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
+    /// A playing app that is not shaped, a call app, shared web audio, an app on another output and a quiet saved app.
+    static let mixed = EqualiserStatus(
+        line: "Paused while a call app uses the microphone.", symbol: "pause.circle",
+        rows: [
+            EqualiserRow(settings: settings("com.apple.Safari", "Safari", shapes: false), isPlaying: true),
+            EqualiserRow(settings: settings("us.zoom.xos", "Zoom"), isPlaying: true,
+                         exclusion: .callApp, exclusionLabel: EqualiserExclusion.callApp.label),
+            EqualiserRow(settings: settings("com.apple.WebKit.GPU", "Web content"), isPlaying: true,
+                         exclusion: .sharedEngine, exclusionLabel: EqualiserExclusion.sharedEngine.label),
+            EqualiserRow(settings: settings("com.spotify.client", "Spotify"), isPlaying: true,
+                         exclusion: .otherDevice, exclusionLabel: EqualiserExclusion.otherDevice.label),
+            EqualiserRow(settings: settings("com.apple.TV", "TV", [0, 0, 0, 0, 0, 1, 2, 4, 5, 6], volume: 0.4), isPlaying: false),
+        ])
+
+    static let off = EqualiserStatus(
+        line: EqualiserStatusText.line(for: .off), symbol: EqualiserStatusText.symbol(for: .off), rows: [])
+}
+
 /// `Zeus --snapshots <dir>` renders every notch and spark state to PNG and quits.
 /// Used to review the look without Screen Recording permission or a live demo.
 @MainActor
@@ -68,7 +139,7 @@ enum SnapshotRenderer {
         let notch = CGSize(width: 185, height: 32)
         TopBarStyle.isSnapshot = true
         for (name, model) in notchStates() {
-            save(NotchStage(model: model, notch: notch), size: CGSize(width: 960, height: 400 + (model.approval?.extraHeight ?? 0)),
+            save(NotchStage(model: model, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400 + (model.approval?.extraHeight ?? 0)),
                  to: directory.appendingPathComponent("notch-\(name).png"))
         }
         // The top bar: closed wings and cues, then every page opened.
@@ -80,16 +151,51 @@ enum SnapshotRenderer {
             if name.contains("waves") { // the Waves tab in each of its three styles
                 SettingsStore.shared.set(AudioSpectrumService.styleKey, name.hasSuffix("-wave") ? "Wave" : name.hasSuffix("-mirror") ? "Mirror" : "Bars")
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)),
                  size: wide ? CGSize(width: 1000, height: 120) : CGSize(width: 960, height: tall ? 520 : 400),
                  to: directory.appendingPathComponent("topbar-\(name).png"))
         }
+        // The owner's notch (220 x 38) with long cue text: the gap between the wings is exactly the notch.
+        let ownerNotch = CGSize(width: 220, height: 38)
+        let longTrack = NotchCue.trackChanged(title: "An Extremely Long Song Title That Keeps Going", artist: "An Artist With A Rather Long Name",
+                                              source: .player(.music), sourceChanged: true)
+        let wideCues: [(String, NotchCue)] = [
+            ("hint", .hint("Turn on Accessibility in System Settings so Zeus can read the focused field and insert text")),
+            ("track", longTrack),
+            ("copied", .copied("The quick brown fox jumps over the lazy dog and keeps running across the field")),
+            ("permission", .permission("Camera access is off. Turn it on to use face presence", pane: "Privacy_Camera")),
+        ]
+        for (name, cue) in wideCues {
+            let model = NotchModel(), topBar = TopBarModel()
+            topBar.setCueForSnapshot(cue)
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(ownerNotch)), size: CGSize(width: 960, height: 400),
+                 to: directory.appendingPathComponent("topbar-wide-notch-\(name).png"))
+        }
+        // Fling's cards and papers, drawn on their own.
+        let flingDeadline = Date().addingTimeInterval(42)
+        func flingCard(_ kind: FlingPromptModel.Kind, askWhere: Bool = false) -> some View {
+            ZStack {
+                Theme.storm
+                FlingPromptCard(model: FlingPromptModel(kind: kind, deadline: flingDeadline, clock: Date.init, onAnswer: { _ in }, askWhere: askWhere))
+            }.environment(\.colorScheme, .dark)
+        }
+        saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: true)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-asked")
+        saveSurface(flingCard(.pairing(code: "042917", peerName: "Beta Mac", canAccept: true, starter: true)), size: CGSize(width: 340, height: 190), name: "fling-prompt-pairing-starter")
+        saveSurface(flingCard(.offer(peerName: "Alpha Mac", itemCount: 3, totalBytes: 12_400_000)), size: CGSize(width: 340, height: 130), name: "fling-prompt-offer")
+        saveSurface(flingCard(.offer(peerName: "Alpha Mac", itemCount: 1, totalBytes: 4_100_000_000), askWhere: true), size: CGSize(width: 340, height: 130), name: "fling-prompt-ask")
+        saveSurface(ZStack { Theme.storm; FlingPaperView(url: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff"), peer: "Alpha Mac", close: {}) }
+            .environment(\.colorScheme, .dark), size: CGSize(width: 220, height: 160), name: "fling-paper")
         // Alerts page: nothing to show.
         saveSurface(ZStack { Theme.storm; AlertsAllClear() }.environment(\.colorScheme, .dark), size: CGSize(width: 480, height: 236), name: "alerts-page-empty")
+        // The meeting card in every state, with synthetic meetings.
+        for entry in ScribeMeetingCardFixture.entries {
+            saveSurface(ScribeMeetingCardFixture.view(entry), size: ScribeMeetingCardFixture.size, name: entry.name)
+        }
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
         renderParityStates(into: directory, notch: notch)
         renderLayoutBounds(into: directory, notch: notch)
+        renderSourceStates(into: directory, notch: notch)
         // The agent hub: sessions with a reply field, then the New chat form.
         let hub = AgentHub.shared
         let hubStarted = Date().addingTimeInterval(-300)
@@ -111,7 +217,7 @@ enum SnapshotRenderer {
                 hub.newDirectory = "/Users/fixture/Projects/Zeus"
                 hub.newInstruction = "fix the failing tests"
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("agents-\(name).png"))
         }
         hub.creating = false
@@ -121,7 +227,7 @@ enum SnapshotRenderer {
         for (index, state) in AvatarState.allCases.enumerated() {
             AvatarStatus.shared.pinned = state
             let tag = String(format: "%02d-%@", index + 1, state.rawValue)
-            save(NotchStage(model: NotchModel(), topBar: TopBarModel(), notch: notch), size: CGSize(width: 640, height: 120),
+            save(NotchStage(model: NotchModel(), topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 640, height: 120),
                  to: directory.appendingPathComponent("avatar-notch-\(tag).png"))
             let buddy = BuddyModel()
             buddy.hasAppeared = true
@@ -146,7 +252,7 @@ enum SnapshotRenderer {
         AvatarStatus.shared.pinned = .thinking
         let open = NotchModel()
         open.presentation = .panel
-        save(NotchStage(model: open, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 400),
+        save(NotchStage(model: open, topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
              to: directory.appendingPathComponent("avatar-open-thinking.png"))
         AvatarStatus.shared.pinned = nil
         AvatarStatus.shared.alwaysInNotch = true // the shipped default
@@ -159,7 +265,7 @@ enum SnapshotRenderer {
         // The floating teleprompter, mid-read.
         let prompter = PrompterWindowModel(topBar: TopBarModel())
         prompter.viewHeight = 262
-        prompter.notice = "Follow my words"
+        prompter.notice = "Imported launch-script.txt."
         save(PrompterWindowView(model: prompter, actions: .preview).background(Color(hex: 0x1B2030)), size: CGSize(width: 640, height: 300),
              to: directory.appendingPathComponent("prompter-window.png"))
         // Sticky notes: preview, editing on the right edge, and the save-to-brain sheet.
@@ -235,6 +341,12 @@ enum SnapshotRenderer {
                 save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: section,
                      to: directory.appendingPathComponent("gs-\(section.rawValue).png"))
             }
+            // The Chrome media switch with its reload hint, shown only while Chrome runs an older extension.
+            SettingsStore.shared.statusOverrides[BrowserMediaFeed.statusID] = (false, BrowserMediaFeed.reloadStatus)
+            nav.section = .privacy
+            save(GlanceSettingsRoot(navigation: nav, context: context), size: GS.size, scale: 1, pane: .privacy,
+                 to: directory.appendingPathComponent("gs-privacy-chrome-reload.png"))
+            SettingsStore.shared.statusOverrides[BrowserMediaFeed.statusID] = nil
         }
         let navigation = SettingsNavigation()
         let obServices = OnboardingServices(permissions: permissions)
@@ -296,6 +408,13 @@ enum SnapshotRenderer {
         }
         saveSurface(DragHelperView(), size: CGSize(width: 260, height: 160), name: "drag-helper")
 
+        // The per-app sound card: collapsed, one row opened, every row kind, and switched off.
+        saveSurface(EqualiserCardStage(isOn: true), size: CGSize(width: 845, height: 340), name: "eq-card-collapsed")
+        saveSurface(EqualiserCardStage(isOn: true, openID: "com.apple.Music"), size: CGSize(width: 845, height: 640), name: "eq-card-open")
+        saveSurface(EqualiserCardStage(isOn: true, openID: "com.apple.TV", fixture: EqualiserCardFixtures.mixed),
+                    size: CGSize(width: 845, height: 900), name: "eq-card-mixed")
+        saveSurface(EqualiserCardStage(isOn: false, fixture: EqualiserCardFixtures.off), size: CGSize(width: 845, height: 230), name: "eq-card-off")
+
         for section in GSSection.allCases where section.isShown {
             gsNav.section = section
             save(GlanceSettingsRoot(navigation: gsNav, context: gsContext), size: GS.size, pane: section,
@@ -320,6 +439,19 @@ enum SnapshotRenderer {
                  size: CGSize(width: GS.panelFrame.width, height: GlanceSettingsSnapshotHeight.height(for: section.rawValue)), pane: section,
                  to: directory.appendingPathComponent("settings-full-\(section.rawValue).png"))
         }
+        // Scribe's "When a meeting starts" row alone: each choice, and each reason an automatic start is blocked.
+        let scribeRows: [(name: String, choice: String, block: ScribeAutoStartBlock?)] = [
+            ("ask", ScribeAutoStartMode.ask.title, nil),
+            ("off", ScribeAutoStartMode.off.title, nil),
+            ("automatic", ScribeAutoStartMode.automatic.title, nil),
+            ("not-asked", ScribeAutoStartMode.automatic.title, .microphoneNotAsked),
+            ("denied", ScribeAutoStartMode.automatic.title, .microphoneDenied),
+            ("first-recording", ScribeAutoStartMode.automatic.title, .firstRecordingOwed),
+        ]
+        for row in scribeRows {
+            save(ScribeCardSnapshot(choice: row.choice, block: row.block), size: CGSize(width: GS.panelFrame.width, height: 280),
+                 to: directory.appendingPathComponent("settings-scribe-\(row.name).png"))
+        }
         // QA round 10 (report-10.md VISUAL section): this loop and the `GSSection.allCases` loop
         // just above it both used the bare name `"settings-\(section.rawValue)"`. `SettingsView`
         // (this one, the deprecated pre-Glance sidebar window) and `GlanceSettingsRoot` (the live
@@ -342,31 +474,90 @@ enum SnapshotRenderer {
 
         let notchClosed = NotchModel()
         notchClosed.presentation = .closed
-        saveSurface(NotchStage(model: notchClosed, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-closed")
+        saveSurface(NotchStage(model: notchClosed, topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "notch-closed")
 
         // Top bar position: the closed bar lowered 12 pt, light and wings with it.
         let notchLowered = NotchModel()
         notchLowered.presentation = .closed
-        saveSurface(NotchStage(model: notchLowered, topBar: TopBarModel(), notch: notch, topOffset: 12), size: CGSize(width: 960, height: 120), name: "notch-closed-lowered")
+        saveSurface(NotchStage(model: notchLowered, topBar: TopBarModel(), footprint: .hardware(notch), topOffset: 12), size: CGSize(width: 960, height: 120), name: "notch-closed-lowered")
 
         let notchPeek = NotchModel()
         notchPeek.presentation = .peek
-        saveSurface(NotchStage(model: notchPeek, topBar: TopBarModel(), notch: notch), size: CGSize(width: 960, height: 120), name: "notch-peek")
+        saveSurface(NotchStage(model: notchPeek, topBar: TopBarModel(), footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "notch-peek")
 
         let notchPanel = NotchModel()
         let panelTop = TopBarModel()
         notchPanel.presentation = .panel
-        saveSurface(NotchStage(model: notchPanel, topBar: panelTop, notch: notch), size: CGSize(width: 960, height: 400), name: "notch-panel")
+        saveSurface(NotchStage(model: notchPanel, topBar: panelTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400), name: "notch-panel")
 
         let volNotch = NotchModel()
         let volTop = TopBarModel()
         volTop.show(.volume(0.75, muted: false))
-        saveSurface(NotchStage(model: volNotch, topBar: volTop, notch: notch), size: CGSize(width: 960, height: 120), name: "hud-volume")
+        saveSurface(NotchStage(model: volNotch, topBar: volTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "hud-volume")
 
         let brightNotch = NotchModel()
         let brightTop = TopBarModel()
         brightTop.show(.brightness(0.75))
-        saveSurface(NotchStage(model: brightNotch, topBar: brightTop, notch: notch), size: CGSize(width: 960, height: 120), name: "hud-brightness")
+        saveSurface(NotchStage(model: brightNotch, topBar: brightTop, footprint: .hardware(notch)), size: CGSize(width: 960, height: 120), name: "hud-brightness")
+
+        // The drawn notch on a display without one: idle, with music wings, and with the calibration guide.
+        let drawn = NotchFootprint.drawn(DrawnNotchShape(width: 200, height: 34, offset: 0))
+        let drawnIdle = NotchModel()
+        saveSurface(NotchStage(model: drawnIdle, topBar: TopBarModel(), footprint: drawn), size: CGSize(width: 960, height: 120), name: "notch-drawn-idle")
+        let (drawnMusic, drawnMusicBar) = sampleModel()
+        drawnMusic.presentation = .closed
+        saveSurface(NotchStage(model: drawnMusic, topBar: drawnMusicBar, footprint: drawn), size: CGSize(width: 960, height: 120), name: "notch-drawn-music")
+        let drawnGuide = NotchModel()
+        saveSurface(NotchStage(model: drawnGuide, topBar: TopBarModel(), footprint: drawn, guide: true), size: CGSize(width: 960, height: 120), name: "notch-drawn-guide")
+
+        // The closed island at the owner's 220 x 38 notch, Black and Transparent: the body hangs 6 pt below the
+        // hardware notch so its whole bottom outline shows; Transparent draws only the mascot and the words.
+        let islandAvatar = AvatarStatus.shared
+        let islandPinned = islandAvatar.pinned
+        defer { islandAvatar.pinned = islandPinned }
+        for background in NotchBackground.allCases {
+            let tag = background.rawValue.lowercased()
+            islandAvatar.pinned = .thinking
+            let agent = NotchModel()
+            saveSurface(NotchStage(model: agent, topBar: TopBarModel(), footprint: .hardware(ownerNotch), background: background, wallpaper: true),
+                        size: CGSize(width: 700, height: 90), name: "island-\(tag)-agent")
+            islandAvatar.pinned = .idle
+            let cueModel = NotchModel()
+            let cueBar = TopBarModel()
+            cueBar.setCueForSnapshot(.hint("Allow Zeus to look"))
+            saveSurface(NotchStage(model: cueModel, topBar: cueBar, footprint: .hardware(ownerNotch), background: background, wallpaper: true),
+                        size: CGSize(width: 700, height: 90), name: "island-\(tag)-cue")
+        }
+        islandAvatar.pinned = islandPinned
+        let ownerPanel = NotchModel()
+        ownerPanel.presentation = .panel
+        saveSurface(NotchStage(model: ownerPanel, topBar: TopBarModel(), footprint: .hardware(ownerNotch), background: .transparent, wallpaper: true),
+                    size: CGSize(width: 960, height: 300), name: "island-transparent-panel")
+
+        // D4: the shape placed 200 pt right with an alert under it. The capsule is centred under the shape, not the screen.
+        let placedAlertTime = Date()
+        let placedAlert = NotchModel()
+        placedAlert.presentation = .closed
+        placedAlert.alerts.post(AlertItem(id: "1", appID: "com.apple.MobileSMS", appName: "Messages", title: "Anna",
+                                          body: "Deck looks great, ship it", postedAt: placedAlertTime), now: placedAlertTime)
+        saveSurface(NotchStage(model: placedAlert, topBar: TopBarModel(),
+                               footprint: .drawn(DrawnNotchShape(width: 200, height: 34, offset: 200))),
+                    size: CGSize(width: 960, height: 200), name: "notch-drawn-placed-alert")
+
+        // The Settings card for the drawn notch, one fixture per row set it can show. Each pins its own controller.
+        let drawnCardContext = GSContext(services: OnboardingServices(permissions: PermissionsModel()))
+        func drawnCard(_ name: String, height: CGFloat, _ pinned: SnapshotDrawnNotch) {
+            drawnCardContext.drawnNotch = pinned
+            guard let model = DrawnNotchCardModel(context: drawnCardContext, navigation: GSNavigation()) else { return }
+            saveSurface(DrawnNotchCard(model: model).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).background(GS.panel),
+                        size: CGSize(width: 760, height: height), name: "settings-drawn-card-\(name)")
+        }
+        let drawnDraft = DrawnNotchShape(width: 215, height: 36, offset: -60)
+        drawnCard("pill", height: 150, SnapshotDrawnNotch(style: .pill))
+        drawnCard("ready", height: 230, SnapshotDrawnNotch())
+        drawnCard("calibrating", height: 400, SnapshotDrawnNotch(state: .adjusting(draft: drawnDraft, saved: SnapshotDrawnNotch.savedShape)))
+        drawnCard("not-shown", height: 230, SnapshotDrawnNotch(availability: .notShown))
+        drawnCard("no-display", height: 230, SnapshotDrawnNotch(availability: .noDisplay))
 
         // Item 8's own row ("orb: the real voice orb or recorder pill view, not a MascotTile") and
         // P0 item F.3 (QA7): the real `RecorderPillView`, with its real `ThinkingOrbView`, in every
@@ -392,6 +583,11 @@ enum SnapshotRenderer {
         murmurCardState.text = "Send the draft by Friday."
         murmurCardState.modeName = "Murmure"
         saveSurface(DictationPreviewView(state: murmurCardState, insert: {}, cancel: {}).padding(20).background(Color(hex: 0x1B2030)), size: CGSize(width: 520, height: 180), name: "murmur-overlay")
+
+        // Face presence card: every status word, from fixed values (no controller, camera, vault or Keychain).
+        for fixture in FacePresenceCardFixtures.all {
+            saveSurface(FacePresenceCardSnapshot(fixture: fixture), size: CGSize(width: GS.panelFrame.width, height: 520), name: fixture.name)
+        }
 
         // QA tooling gate: a capture that shows the wrong pane, or two panes with identical bytes, fails the run.
         if !harnessFailures.isEmpty {
@@ -452,14 +648,19 @@ enum SnapshotRenderer {
     /// no other pane may have produced the same bytes; otherwise the run records a failure and exits 1.
     private static func writeOne<V: View>(_ view: V, size: CGSize, scale: CGFloat, pane: GSSection? = nil, to url: URL) {
         let content = view.environment(\.mascotRasterScale, scale).frame(width: size.width, height: size.height)
-        let renderer = ImageRenderer(content: content)
-        renderer.scale = scale
         // Let pending main-queue work from navigating to the pane land before rendering.
         if pane != nil { RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02)) }
         SnapshotPaneProbe.reset()
-        guard let image = renderer.nsImage,
-              let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+        let renderedPNG: Data?
+        if drawsAppKitControls(url.lastPathComponent) {
+            renderedPNG = hostedPNG(content, size: size, scale: scale)
+        } else {
+            let renderer = ImageRenderer(content: content)
+            renderer.scale = scale
+            renderedPNG = renderer.nsImage?.tiffRepresentation
+                .flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }
+        }
+        guard let png = renderedPNG else {
             if pane != nil { harnessFailures.append("\(url.lastPathComponent): render produced no image") }
             return
         }
@@ -478,6 +679,34 @@ enum SnapshotRenderer {
             paneByDigest[key] = pane.rawValue
         }
         try? png.write(to: url)
+    }
+
+    /// Screens with AppKit-backed controls (text fields, sliders, lists and scroll views). ImageRenderer cannot
+    /// draw those and paints a yellow prohibition box in their place, so these go through a real AppKit view.
+    static func drawsAppKitControls(_ fileName: String) -> Bool {
+        ["agents-chat", "topbar-28-page-scribe", "settings-"].contains { fileName.hasPrefix($0) }
+    }
+
+    /// Draws `content` in an NSHostingView inside a window that is never shown, then reads the pixels back with
+    /// cacheDisplay. Real AppKit drawing, offscreen: no screen capture and no window on screen.
+    private static func hostedPNG<V: View>(_ content: V, size: CGSize, scale: CGFloat) -> Data? {
+        let frame = NSRect(origin: .zero, size: size)
+        let hosting = NSHostingView(rootView: content)
+        hosting.frame = frame
+        let window = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.contentView = nil; window.close() }
+        hosting.layoutSubtreeIfNeeded()
+        // Long enough for entrance fades and list loading to settle, which ImageRenderer skips by drawing the end state.
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.8))
+        hosting.layoutSubtreeIfNeeded()
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        rep.size = size
+        hosting.cacheDisplay(in: frame, to: rep)
+        return rep.representation(using: .png, properties: [:])
     }
 
     private static func notchStates() -> [(String, NotchModel)] {
@@ -669,13 +898,13 @@ enum SnapshotRenderer {
         for (index, finish) in CardFinish.allCases.enumerated() {
             store.set("appearance.cardStyle", finish.rawValue)
             let (model, topBar) = sampleModel()
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent(String(format: "parity-card-%d-%@.png", index + 1, finish.rawValue.replacingOccurrences(of: " ", with: "-"))))
         }
         for (index, style) in ["Borderless", "Borderless colour"].enumerated() {
             store.set("appearance.homeStyle", style)
             let (model, topBar) = sampleModel()
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-home-\(index + 1)-\(style.replacingOccurrences(of: " ", with: "-")).png"))
         }
         store.set("appearance.homeStyle", "Device")
@@ -690,14 +919,14 @@ enum SnapshotRenderer {
             let (model, topBar) = sampleModel { $0.selectedTab = .music }
             if let playing = topBar.nowPlaying { LyricsStore.shared.seed(.synced(lines), for: playing) }
             LyricsToggle.snapshotShow = true
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-lyrics-music.png"))
             LyricsToggle.snapshotShow = false
             store.set("home.variant.music", "Lyrics")
             for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name) }
             let (homeModel, homeBar) = sampleModel()
             if let playing = homeBar.nowPlaying { LyricsStore.shared.seed(.synced(lines), for: playing) }
-            save(NotchStage(model: homeModel, topBar: homeBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: homeModel, topBar: homeBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-lyrics-home.png"))
             store.set("home.variant.music", "Art")
         }
@@ -719,7 +948,7 @@ enum SnapshotRenderer {
                 history.add("https://zeus.dev/docs", sourceApp: "Safari", at: now.addingTimeInterval(-90))
                 t.clipboard = history
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-clipboard.png"))
         }
 
@@ -734,7 +963,7 @@ enum SnapshotRenderer {
             RemindersController.shared.filter = filter
             RemindersController.shared.pendingDue = filter == .today ? .tomorrowMorning : nil
             let (model, topBar) = sampleModel { $0.selectedTab = .reminders }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-reminders-\(name).png"))
         }
         RemindersController.shared.filter = .all
@@ -743,7 +972,7 @@ enum SnapshotRenderer {
         // Focus dial.
         do {
             let (model, topBar) = sampleModel { t in t.selectedTab = .focus; t.focus.setTime(minutes: 35); t.focus.start(at: now.addingTimeInterval(-300)); t.focus.extend(by: 300, at: now) }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-focus.png"))
         }
         // The Quit peek on the closed notch.
@@ -754,7 +983,7 @@ enum SnapshotRenderer {
                 t.setLightsForSnapshot([(.shortcut(.quit), 0.3)])
             }
             model.presentation = .closed
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-quit-peek.png"))
         }
     }
@@ -767,7 +996,7 @@ enum SnapshotRenderer {
             model.presentation = .panel
             topBar.selectedTab = .home
             configure(model, topBar)
-            let view = NotchStage(model: model, topBar: topBar, notch: notch)
+            let view = NotchStage(model: model, topBar: topBar, footprint: .hardware(notch))
                 .environment(\.colorScheme, scheme)
             save(view, size: CGSize(width: 1000, height: 420), to: directory.appendingPathComponent(name))
         }
@@ -787,6 +1016,45 @@ enum SnapshotRenderer {
         }
     }
 
+    /// The source on screen: its name above the title, only the controls it can honour, and the track cue.
+    /// No feed reports a browser tab yet, so a browser item is made here with the same rules the views read.
+    private static func renderSourceStates(into directory: URL, notch: CGSize) {
+        let store = SettingsStore.shared
+        let ids = (1...4).map { HomeSlots.settingID(slot: $0) } + ["home.variant.music"]
+        let saved = ids.map { ($0, store.string($0)) }
+        defer { for (id, value) in saved { store.set(id, value) } }
+        for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name) }
+        store.set("home.variant.music", "Art")
+        let tab = NowPlayingSource.browser(BrowserMediaKey(tabID: 7, documentID: "doc-7", host: "radio.example.com", fingerprint: "ab12cd"))
+        let spotify = NowPlayingSource.player(.spotify)
+        func item(_ source: NowPlayingSource, duration: Double = 243) -> NowPlaying {
+            NowPlaying(source: source, title: "Midnight City", artist: "M83", album: "Hurry Up, We're Dreaming", isPlaying: true,
+                       duration: duration, position: 96)
+        }
+        func render(_ name: String, closed: Bool = false, _ configure: @escaping (TopBarModel) -> Void) {
+            let (model, topBar) = sampleModel(configure)
+            if closed { model.presentation = .closed }
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
+                 to: directory.appendingPathComponent("source-\(name).png"))
+        }
+        render("music-player") { $0.selectedTab = .music }
+        render("music-spotify") { $0.selectedTab = .music; $0.nowPlaying = item(spotify) }
+        render("music-browser") { $0.selectedTab = .music; $0.nowPlaying = item(tab) }
+        render("music-browser-no-length") { $0.selectedTab = .music; $0.nowPlaying = item(tab, duration: 0) }
+        render("music-nothing") { $0.selectedTab = .music; $0.nowPlaying = nil }
+        render("home-player") { $0.selectedTab = .home }
+        render("home-browser") { $0.selectedTab = .home; $0.nowPlaying = item(tab) }
+        render("closed-browser", closed: true) { $0.nowPlaying = item(tab) }
+        render("cue-new-source", closed: true) {
+            $0.nowPlaying = item(tab)
+            $0.setCueForSnapshot(.trackChanged(title: "Midnight City", artist: "M83", source: tab, sourceChanged: true))
+        }
+        render("cue-same-source", closed: true) {
+            $0.nowPlaying = item(spotify)
+            $0.setCueForSnapshot(.trackChanged(title: "Midnight City", artist: "M83", source: spotify, sourceChanged: false))
+        }
+    }
+
     private static func renderHomeStates(into directory: URL, notch: CGSize) {
         let store = SettingsStore.shared
         let ids = (1...4).map { HomeSlots.settingID(slot: $0) } + ["home.variant.clock", "home.variant.music", "home.variant.weather", "home.variant.calendar", HomeBackdrop.settingID]
@@ -799,7 +1067,7 @@ enum SnapshotRenderer {
         }
         func render(_ name: String, _ configure: (TopBarModel) -> Void = { _ in }) {
             let (model, topBar) = sampleModel(configure)
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("home-\(name).png"))
         }
         let defaults = ["Music", "Focus", "Weather", "Calendar"]
@@ -841,7 +1109,7 @@ enum SnapshotRenderer {
         do {
             let (model, topBar) = sampleModel { $0.tabEditing = true; $0.tabEditorNote = nil }
             topBar.layout = TopBarLayout.standard.trimmedToRow()
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("tabs-editor.png"))
         }
         do {
@@ -868,7 +1136,7 @@ enum SnapshotRenderer {
                 t.calendarDetailID = "m0"
                 t.quickAddNote = "Added Lunch with Ana, tomorrow 1:00 PM."
             }
-            save(NotchStage(model: model, topBar: topBar, notch: notch), size: CGSize(width: 960, height: 400),
+            save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("calendar-month.png"))
         }
     }
@@ -995,7 +1263,19 @@ enum SnapshotRenderer {
                 if tab == .usage { UsageModel.shared.loadNow() }
                 if tab == .polyglot { PolyglotController.shared.seedForSnapshot() }
                 if tab == .shelf { t.shelf = [.init(url: URL(fileURLWithPath: "/System/Library/Sounds/Glass.aiff"))] }
+                if tab == .tiling { t.tilingForSnapshot = TilingController.snapshotFixture(.running) }
             }))
+        }
+        // The Tiling page in the other states a person meets: two screens, off, Accessibility missing, paused.
+        for state in TilingSnapshotState.allCases where state != .running {
+            let index = TopBarTab.allCases.firstIndex(of: .tiling) ?? 0
+            states.append((String(format: "%02d-page-tiling-%@", 10 + index, state.rawValue), make(.tiling) { _, t in
+                t.tilingForSnapshot = TilingController.snapshotFixture(state)
+            }))
+        }
+        // The Shelf with Fling: off, Macs nearby, a send under way, Local Network refused, and a stack.
+        for (name, fling, items) in FlingSnapshotFling.shelfStates {
+            states.append(("28-page-shelf-fling-\(name)", make(.shelf) { _, t in t.fling = fling; t.shelf = items }))
         }
         // The Record page in the states a person meets: one or two displays, permission missing, countdown, recording, saved.
         for (name, displays, granted, state) in RecordlySnapshotFixtures.pageStates {
@@ -1061,19 +1341,51 @@ enum SnapshotRenderer {
     }
 }
 
+/// A controller of fixed answers for the card's fixtures. It reads no store, writes none and ignores every event,
+/// so a fixture never touches the drawn notch model.
+@MainActor
+private final class SnapshotDrawnNotch: DrawnNotchControlling {
+    static let savedShape = DrawnNotchShape(width: 200, height: 34, offset: 0)
+    let style: NotchlessStyle
+    let saved = SnapshotDrawnNotch.savedShape
+    let state: DrawnNotchCalibration.State
+    let availability: DrawnNotchAvailability
+
+    init(style: NotchlessStyle = .drawn, state: DrawnNotchCalibration.State = .idle, availability: DrawnNotchAvailability = .ready) {
+        self.style = style
+        self.state = state
+        self.availability = availability
+    }
+
+    func setStyle(_ style: NotchlessStyle) {}
+    func send(_ event: DrawnNotchCalibration.Event) {}
+}
+
 /// A notch on a slice of dark menu bar and desktop.
 private struct NotchStage: View {
     let model: NotchModel
     var topBar: TopBarModel? = nil
-    let notch: CGSize
+    let footprint: NotchFootprint
+    /// Pins the guide outline of a drawn notch under calibration.
+    var guide = false
     /// Pins the top bar drop; nil is no drop in snapshots (the stored setting is never read).
     var topOffset: Double = 0
+    /// Pins the island background; nil reads the setting.
+    var background: NotchBackground? = nil
+    /// A bright wallpaper with a black hardware notch of the footprint's size, so Transparent is judged on a real look.
+    var wallpaper = false
 
     var body: some View {
         ZStack(alignment: .top) {
-            LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
-            Rectangle().fill(Color.black.opacity(0.35)).frame(height: notch.height)
-            NotchView(model: model, topBar: topBar, notch: notch, topOffsetOverride: topOffset)
+            if wallpaper {
+                LinearGradient(colors: [Color(hex: 0x7C98C8), Color(hex: 0xC9B7A2)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                Rectangle().fill(Color.black).frame(width: footprint.layoutSize.width, height: footprint.layoutSize.height)
+            } else {
+                LinearGradient(colors: [Color(hex: 0x2B3446), Color(hex: 0x141922)], startPoint: .top, endPoint: .bottom)
+                Rectangle().fill(Color.black.opacity(0.35)).frame(height: footprint.layoutSize.height)
+            }
+            NotchView(model: model, topBar: topBar, footprintOverride: footprint, guideOverride: guide, topOffsetOverride: topOffset,
+                      backgroundOverride: background)
         }
     }
 }

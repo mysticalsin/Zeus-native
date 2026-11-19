@@ -18,11 +18,13 @@ import trusted_ax
 import shutil
 
 from contracts import (ROOT, Invalid, case_passed, digest, evaluate_features, load,
-                       manifest_matches, read_swift_testing_xunit, require, source_snapshot, swift_structured_results,
-                       swift_summary, swift_testing_xunit_path, validate_map, validate_registry, validate_native_build)
+                       manifest_matches, read_swift_testing_xunit, require, source_snapshot, swift_log_complete,
+                       swift_structured_results, swift_summary, swift_testing_xunit_path, validate_map, validate_registry,
+                       validate_native_build)
 
 
 TRUSTED_COMMAND = "scripts/trusted-ax-journey.sh"
+PORTABLE_LOG_ATTEMPTS = 3
 
 
 def portable_module():
@@ -338,8 +340,16 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         else:
             raise Invalid("unknown executable checker")
         row["command"] = command
-        code, seconds = execute(command, log, args.timeout,
-                                {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")})
+        attempt = 1
+        while True:
+            code, seconds = execute(command, log, args.timeout,
+                                    {"ZEUS_QA_ARTIFACT_DIR": str(folder / "native-artifacts")})
+            # A passing run whose console log lost lines is rerun, not trusted or failed: the runner
+            # drops lines under machine load. Failing runs and complete logs are never rerun.
+            if kind != "portable" or code != 0 or attempt == PORTABLE_LOG_ATTEMPTS or swift_log_complete(log.read_text()):
+                break
+            shutil.copyfile(log, folder / f"test.attempt-{attempt}.log")
+            attempt += 1
         row.update(exit_code=code, duration_seconds=seconds)
         if kind == "portable":
             structured = swift_testing_xunit_path(xunit)

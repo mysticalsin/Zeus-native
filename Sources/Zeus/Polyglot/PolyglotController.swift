@@ -111,7 +111,7 @@ final class PolyglotController {
         hotkeyMonitor.keyProvider = { [settings] in settings.enabled ? settings.hotkey : nil }
         hotkeyMonitor.sharedProvider = { false }
         hotkeyMonitor.directPressProvider = { true }
-        hotkeyMonitor.onPress = { [weak self] in self?.toggle() }
+        hotkeyMonitor.onPress = { [weak self] in self?.toggle(); return true }
         hotkeyMonitor.start()
     }
 

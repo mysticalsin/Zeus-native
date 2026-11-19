@@ -28,13 +28,13 @@ public enum GlanceTopBar {
     public static let capsuleInset = CGSize(width: 5.5, height: 3)
     public static let tabIcon: CGFloat = 13
     public static let tabPadding: CGFloat = 11
-    /// 12 pt (was 14) so a thirteenth tab, Agents, fits with the widest selected label and three counts.
-    public static let tabSpacing: CGFloat = 12
+    /// 8 pt (was 14, then 12) so a fourteenth tab, Tiling, fits with the widest selected label and three counts.
+    public static let tabSpacing: CGFloat = 8
     public static var plainTabSlot: CGFloat { tabIcon + 2 * tabPadding + tabSpacing }
     public static let moreSize: CGFloat = 30
-    /// Thirteen tabs: the default row with Agents after Home. At 12 pt spacing the widest selected label
-    /// ("Clipboard") with three 3-digit counts is 801.75 pt of the 803 pt `rowRoom`.
-    public static let maxTabs = 13
+    /// Fourteen tabs: the default row with Tiling and Agents after Home. At 8 pt spacing the widest selected label
+    /// ("Clipboard") with three 3-digit counts fits inside the 973 pt `rowRoom` of the wider body.
+    public static let maxTabs = 14
     /// Space after the "more" circle, to the body's right edge.
     public static let rowTrailing: CGFloat = 13
     /// Width the capsule may take: the body less its left inset, the more circle and the right inset.
@@ -58,16 +58,21 @@ public enum GlanceTopBar {
     public static let tallPageHeight: CGFloat = 168
 
     // Motion. Open: fitted to Glance's 60 fps hover-open (parity/N7-glance.mp4, width along y 37),
-    // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: not yet
-    // recorded on Glance; a firm 0.40 s with no overshoot. The bloom rim is 9 pt and gone by 0.4 s.
-    public static let openSpring = (response: 0.30, damping: 0.87)
+    // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: a critically
+    // damped spring (no overshoot) fitted to Glance's recorded close heights, rms about 12 pt against the real closed height (the old linear close was 19). The bloom rim is
+    // 9 pt and gone by 0.4 s.
+    public static let openSpring = (response: MotionTokens.panelOpen.response, damping: MotionTokens.panelOpen.damping)
     /// Close: Glance shrinks into the notch over about 6 frames (parity/N8-glance.mp4, height at x 1000:
     /// 231, 184, 157, 114, 101, 90, 72, 65, then a thin strip fades), about 0.54 s after the pointer leaves.
-    public static let closeDuration = 0.1
+    public static let closeSpring = (response: MotionTokens.panelClose.response, damping: MotionTokens.panelClose.damping)
+    /// Glance's recorded close: ms after the close starts (60 fps frames), body height in pt.
+    public static let measuredClose: [(ms: Double, height: Double)] = [
+        (0, 231), (16.7, 184), (33.3, 157), (50, 114), (66.7, 101), (83.3, 90), (100, 72), (116.7, 65),
+    ]
     public static let closeDelay = 0.5
     /// The open height leads the width: Glance's body is about 163 pt tall in the first frame the width
     /// is 311 (parity/N7, height_track.py), full by about 130 ms; fitted rms 15.6 pt (shadow in the trace).
-    public static let openHeightSpring = (response: 0.105, damping: 1.0)
+    public static let openHeightSpring = (response: MotionTokens.panelOpenHeight.response, damping: MotionTokens.panelOpenHeight.damping)
 
     /// Glance's measured open: ms after the body first reaches y 37, width there in pt.
     public static let measuredOpen: [(ms: Double, width: Double)] = [

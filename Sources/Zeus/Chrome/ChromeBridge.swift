@@ -38,7 +38,7 @@ enum ChromeBridge {
 
         var errorDescription: String? {
             switch self {
-            case .notConnected: "Chrome isn't connected to Zeus. Open Chrome and check the Zeus extension is on."
+            case .notConnected: "Chrome isn't connected to Zeus. Open Chrome and check the Zeus extension is on. After switching between a preview and a release build of Zeus, quit Chrome and open it again."
             case .failed(let error): error.spokenMessage
             }
         }
@@ -65,6 +65,54 @@ enum ChromeBridge {
             throw BridgeFailure.failed(response.error ?? BridgeError(code: "failed"))
         }
         return response.result
+    }
+
+    /// How one request ended, with a failure told apart. A bridge that closes without answering counts as not
+    /// connected: since the bridge checks its peer's signature, that is also how a refused app looks.
+    enum CallOutcome: Sendable {
+        case ok(JSONValue?)
+        case notConnected
+        case timedOut
+        case failed(BridgeError)
+    }
+
+    /// `call`, saying how it failed. `call` stays as it was for the callers that only need to know it failed.
+    static func callOutcome(_ type: String, _ params: [String: JSONValue] = [:], timeout: TimeInterval) async -> CallOutcome {
+        guard let payload = try? JSONEncoder().encode(BridgeRequest(type: type, params: params)) else {
+            return .failed(BridgeError(code: "bad_request"))
+        }
+        let path = ZeusPaths.chromeSocket.path
+        let outcome = await Task.detached {
+            UnixSocket.exchange(path: path, payload: payload, timeout: timeout)
+        }.value
+        switch outcome {
+        case .notConnected, .closedEarly: return .notConnected
+        case .timedOut: return .timedOut
+        case .reply(let reply):
+            // A reply that does not decode is a failure, never a state.
+            guard let response = try? JSONDecoder().decode(BridgeResponse.self, from: reply) else {
+                return .failed(BridgeError(code: "bad_reply"))
+            }
+            return response.ok ? .ok(response.result) : .failed(response.error ?? BridgeError(code: "failed"))
+        }
+    }
+
+    /// The extension's answer to a ping, for its version.
+    static func ping(timeout: TimeInterval = 1.5) async -> CallOutcome {
+        await callOutcome("ping", timeout: timeout)
+    }
+
+    /// The media in the tabs the extension picks plus the ones Zeus already shows (at most four).
+    static func mediaState(known: [BrowserMediaTarget], timeout: TimeInterval = 1.5) async -> CallOutcome {
+        let list = known.prefix(4).map {
+            JSONValue.object(["tabId": .number(Double($0.tabID)), "documentId": .string($0.documentID)])
+        }
+        return await callOutcome("media.state", ["known": .array(list)], timeout: timeout)
+    }
+
+    /// Plays, pauses or seeks one tab. Only `BrowserMediaFeed` calls this.
+    static func mediaCommand(_ command: BrowserMediaCommand, timeout: TimeInterval = 5) async -> CallOutcome {
+        await callOutcome("media.command", command.params(), timeout: timeout)
     }
 
     /// True when the extension answers a ping (Chrome open, extension loaded, host registered).

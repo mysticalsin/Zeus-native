@@ -75,10 +75,38 @@ struct TickingTests {
         #expect(!timer.isValid)
     }
 
-    @Test func idleMascotTicksSlowly() {
-        #expect(LivingAvatar.restFPS <= 8)
-        #expect(LivingAvatar.tickInterval(asleep: false, waking: false, state: .idle) >= 1.0 / 8)
-        #expect(LivingAvatar.tickInterval(asleep: false, waking: false, state: .thinking) <= 1.0 / 24 + 0.001)
+    /// The mascot's frame-rate budget. Trade-off: the idle clip is 12 fps, so a resting mascot now ticks at 12 fps
+    /// (it ticked at 6 before) so its own animation plays smoothly; that doubles its idle cost, and a closed notch
+    /// is still the cheapest thing on screen. Nothing at rest goes above 12 fps, the listening and approval clips
+    /// above their own rate (at most 24), and only the travel windows reach 60.
+    @MainActor @Test func idleMascotTicksSlowly() {
+        let atlas = MascotAtlasStore(directory: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zeus/Avatar/Anim"))
+        #expect(LivingAvatar.tickInterval(clipFPS: 12, travelling: false) == 1.0 / 12)
+        #expect(LivingAvatar.tickInterval(clipFPS: 12, travelling: true) == 1.0 / 60)
+        // At rest: at most 12 fps, asleep or awake.
+        for mood in [MascotMotion.Mood.awake(.idle), .asleep] {
+            let interval = LivingAvatar.tickInterval(for: MascotMotion.at(1, mood: mood, size: 22), atlas: atlas)
+            #expect(interval >= 1.0 / 12 - 1e-9, "\(mood) ticks faster than 12 fps")
+        }
+        // Listening and approval: their clip's rate, never above 24.
+        for state in [AvatarState.listening, .approval] {
+            let motion = MascotMotion.at(1, mood: .awake(state), size: 22)
+            let clip = atlas.clip(motion.pose.clipID)
+            #expect(clip != nil)
+            let interval = LivingAvatar.tickInterval(for: motion, atlas: atlas)
+            #expect(interval >= 1.0 / 24 - 1e-9)
+            #expect(abs(interval - 1.0 / Double(clip?.fps ?? 12)) < 1e-9)
+        }
+        // Over a long run of every state, only a travel window is faster than 24 fps.
+        for state in AvatarState.allCases {
+            for t in stride(from: 0.0, to: 80, by: 0.05) {
+                let motion = MascotMotion.at(t, mood: .awake(state), size: 22)
+                let interval = LivingAvatar.tickInterval(for: motion, atlas: atlas)
+                if interval < 1.0 / 24 - 1e-9 { #expect(motion.travelling && interval == 1.0 / 60, "\(state) at \(t)") }
+            }
+        }
     }
 
     @Test func mirrorChangeStampTracksTheStoreAndItsLog() throws {

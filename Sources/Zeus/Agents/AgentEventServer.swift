@@ -11,20 +11,24 @@ final class AgentEventServer {
     private var lastResponse: [String: String] = [:]
     private var codexWatcher: CodexSessionWatcher?
     private(set) var lastError: String?
-    /// Answers `zeus` CLI commands, which share this socket with hook events.
-    var commandHandler: (@MainActor (Data) async -> Data?)?
+    /// Answers `zeus` CLI commands, which share this socket with hook events. The peer context says
+    /// whether the sender is this app's own signed `zeus` command.
+    var commandHandler: (@MainActor (Data, PeerContext) async -> Data?)?
 
     init(notch: NotchController) {
         self.notch = notch
     }
 
     func start() {
-        let server = UnixSocketServer(path: ZeusPaths.socket.path) { [weak self] line, reply in
+        let server = UnixSocketServer(path: ZeusPaths.socket.path, contextHandler: { [weak self] line, peer, reply in
+            // With command-line control on, the sender's signature is read here, off the main thread,
+            // so the main actor only reads the remembered answer.
+            if CLIAccess.enabled, ZeusCommand.isCommand(line) { _ = peer.verifiedApp() }
             Task { @MainActor in
                 guard let self else { return reply(nil) }
-                reply(await self.handle(line))
+                reply(await self.handle(line, peer: peer))
             }
-        }
+        })
         let watcher = CodexSessionWatcher { [weak self] event in
             Task { @MainActor in _ = await self?.process(event) }
         }
@@ -42,14 +46,14 @@ final class AgentEventServer {
     func stop() { server?.stop() }
 
     /// Returns the reply line for decision events, nil otherwise.
-    private func handle(_ line: Data) async -> Data? {
+    private func handle(_ line: Data, peer: PeerContext) async -> Data? {
         if ZeusCommand.isCommand(line) {
             guard let commandHandler else {
                 let probe = try? JSONDecoder().decode(ZeusCommand.self, from: line)
                 let id = probe?.id ?? "unknown"
                 return try? JSONEncoder().encode(ZeusCommandReply(id: id, ok: false, text: "Zeus is still starting up."))
             }
-            return await commandHandler(line)
+            return await commandHandler(line, peer)
         }
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: line) else { return nil }
         return await process(event)

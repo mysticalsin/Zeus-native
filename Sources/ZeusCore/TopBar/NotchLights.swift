@@ -9,6 +9,8 @@ public enum NotchLightKind: Equatable, Sendable {
     case shiftCrest
     case battery(level: Double, charging: Bool)
     case landed(airDrop: Bool)
+    /// Files arrived from another Mac with Fling. It shares the landed burst with its own tint and setting.
+    case flingLanded
     case reminderPinned
     case eventRibbon
     case shortcut(ShortcutMotion)
@@ -26,7 +28,7 @@ public enum NotchLightKind: Equatable, Sendable {
         case .capsLock(let on): on ? 1.0 : 0.6
         case .shiftCrest: 0.9
         case .battery: 3.2
-        case .landed: 0.9
+        case .landed, .flingLanded: 0.9
         case .reminderPinned, .eventRibbon: 1.6
         case .shortcut: 0.8
         case .entrance(let style, _): style.choreography.duration
@@ -138,7 +140,7 @@ public enum NotchLightMath {
             guard charging else { return [fill] }
             let climb = (p * 3).truncatingRemainder(dividingBy: 1) * level
             return [fill, crest(climb, 0.06, fadeOut(p, from: 0.8))]
-        case .landed:
+        case .landed, .flingLanded:
             // Burst on the shoulders.
             return [crest(s, 0.04 + 0.16 * ease(p), 1 - ease(p))]
         case .reminderPinned:

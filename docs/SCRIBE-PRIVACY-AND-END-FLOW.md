@@ -44,6 +44,13 @@ binding. Microphone disappearance, missing window titles, silence and a calendar
 end time are never treated as a call ending. Remote hang-up detection is not
 implemented.
 
+Since 14 November 2026 a detector signal opens a suggestion that never stops capture. When the call app has
+released the microphone for 8 seconds, or its call window was seen and has been gone for 8 seconds, the end window
+opens with "The call looks over", End meeting now and Keep recording. There is no countdown and no deadline, so
+nothing stops until a button is tapped or the bound call app closes. If the call takes the microphone again, the
+window closes by itself. Keep recording leaves the call quiet until it returns. End meeting now is an explicit
+stop; it takes the same route as Stop and its nine second deadline is then confirmed at once.
+
 Keep recording cancels the deadline until a stop request has been sent. A consumed
 application-exit notification cannot rearm it after Keep; explicit Stop can arm a
 new deadline. End now and expiry share the same one-time stop gate. Capture stays
