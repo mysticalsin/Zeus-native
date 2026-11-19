@@ -181,9 +181,7 @@ public enum SocketClientTrust {
         let signature: Bool?
         if requireSignature {
             #if canImport(Darwin)
-            // The caller can name the peer, but the check still demands the app. A helper is refused.
-            _ = expectedIdentifier
-            signature = PeerSigning.verifyApp(auditToken: peer.auditToken, expectedPeerIdentifier: ZeusPaths.bundleIdentifier).isAllowed
+            signature = PeerSigning.verifyApp(auditToken: peer.auditToken, expectedPeerIdentifier: expectedIdentifier).isAllowed
             #else
             signature = false
             #endif

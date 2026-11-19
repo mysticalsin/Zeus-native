@@ -158,10 +158,10 @@ public enum UnixSocket {
 
     /// Sends one line. Returns nil on connect/write/read failure. No capture or permission API runs.
     public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval,
-                               requireSignedServer: Bool = false) -> Data? {
+                               requireSignedServer: Bool = false, serverIdentifier: String = SocketPeerIdentifier.app) -> Data? {
         guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return nil }
         defer { close(fd) }
-        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer) else { return nil }
+        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer, expectedIdentifier: serverIdentifier) else { return nil }
         guard writeAll(fd, payload + Data([0x0A])) else { return nil }
         guard expectReply else { return Data() }
         guard let reply = readLine(fd, timeout: timeout), boundedMessage(reply) else { return nil }
@@ -182,10 +182,11 @@ public enum UnixSocket {
 
     /// `request` with a reply, saying how a failure happened. It shares `request`'s connect, write and read steps,
     /// so both keep the same bounds.
-    public static func exchange(path: String, payload: Data, timeout: TimeInterval, requireSignedServer: Bool = false) -> Outcome {
+    public static func exchange(path: String, payload: Data, timeout: TimeInterval,
+                                requireSignedServer: Bool = false, serverIdentifier: String = SocketPeerIdentifier.app) -> Outcome {
         guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return .notConnected }
         defer { close(fd) }
-        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer) else { return .closedEarly }
+        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer, expectedIdentifier: serverIdentifier) else { return .closedEarly }
         guard writeAll(fd, payload + Data([0x0A])) else { return .closedEarly }
         switch readLineOutcome(fd, timeout: timeout) {
         case .line(let reply): return boundedMessage(reply) ? .reply(reply) : .closedEarly

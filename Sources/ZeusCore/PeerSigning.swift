@@ -8,12 +8,30 @@ import Security
 /// The Security framework side of peer identity: reads a connected peer's code signature from its
 /// audit token and hands the facts to `PeerBinaryRule`. Everything that can fail refuses.
 /// Nothing here logs a path, a token or any signing material beyond the refusal reason.
-public enum PeerSigning {
-    /// The verifier a server uses unless a test injects another.
-    /// Pins the app's signing identifier and asks for strict validation. A CLI or bridge talking to the app uses this.
-    public static let defaultVerifier: PeerVerifier = {
-        PeerSigning.verifyApp(auditToken: $0, expectedPeerIdentifier: ZeusPaths.bundleIdentifier)
+/// Signing identifiers for one direction of a socket. The file name is the identifier `scripts/bundle.sh` passes.
+public enum SocketPeerIdentifier {
+    public static let app = ZeusPaths.bundleIdentifier
+    public static let command = "zeus"
+    public static let hook = "zeus-hook"
+    public static let bridge = "zeus-bridge"
+    public static let helpers = [command, hook, bridge]
+
+    /// The app's server allows a helper only when that helper's own identifier matches.
+    public static func acceptHelper(_ auditToken: Data?) -> PeerVerdict {
+        var denial: PeerVerdict = .deny("peer is not a Zeus helper")
+        for name in helpers {
+            let verdict = PeerSigning.verifyApp(auditToken: auditToken, expectedPeerIdentifier: name)
+            if verdict.isAllowed { return verdict }
+            denial = verdict
+        }
+        return denial
     }
+}
+
+public enum PeerSigning {
+    /// The verifier the app's socket uses for a helper. Each helper carries its own identifier.
+    /// A client checking the app passes `SocketPeerIdentifier.app` instead.
+    public static let defaultVerifier: PeerVerifier = { SocketPeerIdentifier.acceptHelper($0) }
 
     #if canImport(Darwin)
     /// True when the process behind `auditToken` is this app's own program.
