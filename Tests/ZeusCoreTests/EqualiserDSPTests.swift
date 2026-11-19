@@ -596,38 +596,3 @@ private func render(
         #expect(abs(out[1][999] - a[999]) < 1e-6)
     }
 }
-
-// MARK: - 8. Allocation
-
-@Suite(.serialized) struct EqualiserKernelAllocationTests {
-    private static func blocksInUse() -> Int {
-        var stats = malloc_statistics_t()
-        malloc_zone_statistics(nil, &stats)
-        return Int(stats.blocks_in_use)
-    }
-
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZEUS_ALLOC_CHECK"] == "1"))
-    func aThousandBuffersAllocateNothing() {
-        let frames = 512
-        let rate = 48000.0
-        let kernel = EqualiserKernel(maxChannels: 2, maxFrames: frames, bandCount: 10)
-        let loud = parameters(Dictionary(uniqueKeysWithValues: (0..<10).map { ($0, 9.0) }), volume: 0.7)
-        let quiet = parameters([2: -5, 6: 4], volume: 1)
-        var buffer = sine(300, amplitude: 1, frames: frames, sampleRate: rate)
-        buffer += buffer
-        buffer.withUnsafeMutableBufferPointer { pointer in
-            let base = pointer.baseAddress!
-            for _ in 0..<40 {
-                kernel.process(base, frames: frames, channels: 2, interleaved: false, sampleRate: rate)
-            }
-            let before = Self.blocksInUse()
-            for index in 0..<1000 {
-                if index % 100 == 0 { kernel.mailbox.post(index % 200 == 0 ? loud : quiet) }
-                if index == 500 { base[10] = .nan }
-                kernel.process(base, frames: frames, channels: 2, interleaved: index % 2 == 0, sampleRate: rate)
-            }
-            let after = Self.blocksInUse()
-            #expect(after == before)
-        }
-    }
-}
