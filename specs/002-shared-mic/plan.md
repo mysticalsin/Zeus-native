@@ -36,7 +36,7 @@ One owner lends the microphone to Zeus, Murmur, or Scribe, and never to two of t
 
 - **I. Simplicity**: One owner, one engine, three callers. The top bar is not restyled. Pass.
 - **II. Red-first tests**: tasks.md names the failing test before each removal and each rule. A missing before/after measurement stays blocked. Pass.
-- **III. Clean-room**: Zeus, Murmur, and Scribe only. No third-party application name. Pass.
+- **III. Clean-room**: This slice adds no third-party package. Speech engines on the prior-art page stay unselected until their weight licences are read. Pass.
 - **IV. Privacy by default**: Capture still needs the person's own OS consent. Tests use generated audio. Nothing is logged. Pass.
 - **V. Motion and accessibility**: Reduce Motion stays a fade or an immediate change. VoiceOver hears denied, busy, and failure. Pass.
 

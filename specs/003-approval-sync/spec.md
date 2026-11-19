@@ -65,3 +65,7 @@ When the notch-parity face check is on, it is what allows the answer. This slice
 
 - PR #14's approval queue is the card this slice withdraws.
 - Face verification stays specified in notch parity. This slice calls it when that setting is on and does not bundle a model.
+
+## Prior art
+
+Approval sync adapts the hook-waits-for-answer pattern in [farouqaldori/vibe-notch](https://github.com/farouqaldori/vibe-notch). Its `LICENSE.md` was read on 19 Nov 2026: Apache-2.0, Copyright 2025 Farouq Aldori. The notice is in `THIRD_PARTY_NOTICES`. The hook blocks until Zeus answers, so one decision clears the card and the terminal. An AGPL-3.0 hook of the same shape is not copied. The face check this slice calls is specified under R-023, not here.

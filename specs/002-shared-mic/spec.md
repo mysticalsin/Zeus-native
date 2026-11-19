@@ -162,4 +162,8 @@ Measurements use the turn's own timestamps on Tony's Mac. Do not invent a before
 - "Warm" means the engine was started earlier and is idle, not constructed on the key-down.
 - The 20 s ask timeout and "Start automatically" stay until Tony decides. The 45 s slow-start stays.
 - The six removals are measured one by one. A task that only deletes a sleep without a before and after count is not done.
-- No third-party application is named. The recognizer and the command-line process are described by what they do.
+- The recognizer and the command-line process are described by what they do.
+
+## Prior art
+
+The prior-art page does not select a dependency for this slice. The shared owner stays Zeus code. AudioCap's private TCC path stays off. WhisperKit, FluidAudio, and Kokoro are not selected: their weight licences were not re-checked. No speech package is added here.

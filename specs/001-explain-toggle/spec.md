@@ -212,7 +212,11 @@ Each figure is a p50 on Tony's Mac. The sample is 20 scripted turns of that kind
 - The explain key is Right Option. Choosing a different key is out of this slice.
 - The overlay appears on the key-down of a clean Right Option hold and stays through the result. A modifier, another key, or a click means the hold never became a turn.
 - The drawn pointer is an overlay mark. It does not warp the system cursor.
-- Open, close, explain, describe, show, and walk are chosen from the speech captured during the hold. The tests use fixture names for applications. This slice does not name a third-party application.
+- Open, close, explain, describe, show, and walk are chosen from the speech captured during the hold. The tests use fixture names for applications.
+
+## Prior art
+
+The explain loop adapts [farzaa/clicky](https://github.com/farzaa/clicky). Its `LICENSE` was read on 19 Nov 2026: MIT, Copyright (c) 2026 Farza. The notice is in `THIRD_PARTY_NOTICES`. What is reused is the loop from a screen capture, to a model, to a drawn point. Zeus keeps its own Right Option hold and `FastIntent.parse`. Numbered-mark code under GPL-3.0 is not copied.
 - A walk that is already on screen still advances on a tap. That is the only tap in this slice.
 - Slice 002, a shared microphone owner and speech-engine registry for Murmur, Scribe, and Zeus, is named only so this slice does not build it. See `specs/002-shared-mic/spec.md`.
 - The existing on-screen explanation hold control stays as it is. This slice does not restyle it.

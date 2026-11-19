@@ -36,7 +36,7 @@ Holding Right Option reuses the existing second-talk hold (`VoiceKey.secondKeyCo
 
 - **I. Simplicity**: One hold, one overlay, one result when the key comes up. The top bar is not restyled. Pass.
 - **II. Red-first tests**: tasks.md writes each failing test before the change that makes it pass. A missing Mac proof stays blocked. Pass.
-- **III. Clean-room**: This spec names Zeus, Murmur, and Scribe only. Applications in tests are fixtures. It does not name another app. Pass.
+- **III. Clean-room**: Tests use fixture application names. The explain loop names farzaa/clicky because its MIT notice has to be kept. GPL sources are not copied. Pass.
 - **IV. Privacy by default**: Turns are local. Tests use synthetic screens and generated audio. Capture still needs the person's own OS consent. Pass.
 - **V. Motion and accessibility**: Reduce Motion fades instead of flying. VoiceOver can hear the hold, the release, and cancel, and hears mark numbers and control names. Status does not depend on color alone. Pass.
 
