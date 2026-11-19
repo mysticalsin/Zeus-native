@@ -87,7 +87,8 @@ enum LockScreenSpace {
         guard connection != 0 else { panel.close(); return false }
         let space = api.create(connection, 1, nil)
         guard space != 0 else { panel.close(); return false }
-        let level = Int32(CGWindowLevelForKey(.lockScreen)) + 1
+        // Public shield level, one step above the lock cover. There is no lock-screen case on CGWindowLevelKey.
+        let level = Int32(CGShieldingWindowLevel()) + 1
         api.setLevel(connection, space, level)
         panel.level = NSWindow.Level(rawValue: Int(level))
         panel.orderFrontRegardless()
@@ -114,7 +115,7 @@ enum LockScreenSpace {
         panel.backgroundColor = NSColor.black.withAlphaComponent(0.82)
         panel.isOpaque = false
         panel.hasShadow = false
-        let text = NSTextField(labelWithString: artist.isEmpty ? title : "\(title) — \(artist)")
+        let text = NSTextField(labelWithString: artist.isEmpty ? title : "\(title): \(artist)")
         text.textColor = .white
         text.font = .systemFont(ofSize: 15, weight: .semibold)
         text.frame = NSRect(x: 16, y: 22, width: 328, height: 28)
