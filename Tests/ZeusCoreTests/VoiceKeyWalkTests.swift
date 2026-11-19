@@ -548,6 +548,8 @@ private struct StateKey: Hashable {
     var pairOwner: Int?
     var pairBar: Int?
     var pairCheck = PairCheck()
+    /// The raw step, set only for the unfolded reference walk. Nil in the search, which folds ages.
+    var clock: Int? = nil
 }
 
 /// What the pair's rules remember between steps: which key's turn is open, and which key's turn ended while a key was still down.
@@ -584,8 +586,13 @@ private struct PointingNorm: Hashable {
     var activeAge: Int?
     var armedAge: Int?
 
-    init(_ gesture: PointingKeyGesture, now: TimeInterval, confirm: TimeInterval) {
-        func age(_ time: TimeInterval?) -> Int? { time.map { VoiceWalkClock.canonical(max(0, Int(((now - $0) / VoiceKeyMachine.Timing.step).rounded())), confirm: confirm) } }
+    init(_ gesture: PointingKeyGesture, now: TimeInterval, confirm: TimeInterval, foldAges: Bool = true) {
+        func age(_ time: TimeInterval?) -> Int? {
+            time.map { raw in
+                let steps = max(0, Int(((now - raw) / VoiceKeyMachine.Timing.step).rounded()))
+                return foldAges ? VoiceWalkClock.canonical(steps, confirm: confirm) : steps
+            }
+        }
         state = gesture.state
         active = gesture.isActive
         blocked = gesture.blockedByVoiceOver
@@ -599,9 +606,10 @@ private extension VoiceKeyMachine {
     /// The phase with ages in place of times, capped at 0.45 s, past every window (the longest is 0.4 s): the same
     /// phase whenever it was reached. A key heard late is read at its own time inside one move, before any state is
     /// recorded, and every key after it is stamped no earlier than the state, so the cap holds.
-    func normalizedPhase(at now: TimeInterval, confirm: TimeInterval) -> Phase {
-        func age(_ time: TimeInterval) -> TimeInterval { Double(VoiceWalkClock.canonical(max(0, Int(((now - time) / VoiceKeyMachine.Timing.step).rounded())), confirm: confirm)) * VoiceKeyMachine.Timing.step }
-        func ahead(_ time: TimeInterval) -> TimeInterval { Double(VoiceWalkClock.canonical(max(0, Int(((time - now) / VoiceKeyMachine.Timing.step).rounded())), confirm: confirm)) * VoiceKeyMachine.Timing.step }
+    func normalizedPhase(at now: TimeInterval, confirm: TimeInterval, foldAges: Bool = true) -> Phase {
+        func folded(_ steps: Int) -> Int { foldAges ? VoiceWalkClock.canonical(steps, confirm: confirm) : steps }
+        func age(_ time: TimeInterval) -> TimeInterval { Double(folded(max(0, Int(((now - time) / VoiceKeyMachine.Timing.step).rounded())))) * VoiceKeyMachine.Timing.step }
+        func ahead(_ time: TimeInterval) -> TimeInterval { Double(folded(max(0, Int(((time - now) / VoiceKeyMachine.Timing.step).rounded())))) * VoiceKeyMachine.Timing.step }
         switch phase {
         case .idle, .latched, .spent: return phase
         case .armed(let since, let press): return .armed(since: age(since), press: press)
@@ -713,7 +721,7 @@ private struct Sim {
         pointing = gesture
     }
 
-    func key(_ run: WalkRun) -> StateKey {
+    func key(_ run: WalkRun, foldAges: Bool = true) -> StateKey {
         // The keyboard's own history is read only by a timer that is settled ahead of a key: a start of an armed press, a send
         // of a tap that waits out its gap.
         var armed = false, gapOpen = false
@@ -723,21 +731,24 @@ private struct Sim {
         default: break
         }
         let confirm = self.confirm(of: run)
+        func folded(_ steps: Int) -> Int { foldAges ? VoiceWalkClock.canonical(steps, confirm: confirm) : steps }
         let canon = CanonicalControlOption(run, down: down, seen: seen, consumed: consumed, held: held,
                                            flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys,
                                            keysDown: machine.keys.keysDown, spoilers: machine.keys.spoilers)
         var out = StateKey(down: canon.down, seen: canon.seen, consumed: canon.consumed, held: canon.held,
-                 wakes: wakes.map { VoiceWalkClock.canonical($0 - step, confirm: confirm) }.sorted(), cfg: cfg,
+                 wakes: wakes.map { folded($0 - step) }.sorted(), cfg: cfg,
                  config: machine.config, flags: canon.flags, deviceKeys: canon.deviceKeys,
                  keysDown: canon.keysDown, spoilers: canon.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
-                 phase: machine.normalizedPhase(at: now, confirm: confirm), pointing: pointing.map { PointingNorm($0, now: now, confirm: confirm) },
+                 phase: machine.normalizedPhase(at: now, confirm: confirm, foldAges: foldAges),
+                 pointing: pointing.map { PointingNorm($0, now: now, confirm: confirm, foldAges: foldAges) },
                  refusing: refusing, checker: checker,
-                 aloneAge: armed ? aloneSince.map { VoiceWalkClock.canonical(max(0, step - $0), confirm: confirm) } : nil,
-                 upAge: gapOpen ? ownUpSince.map { VoiceWalkClock.canonical(max(0, step - $0), confirm: confirm) } : nil)
+                 aloneAge: armed ? aloneSince.map { folded(max(0, step - $0)) } : nil,
+                 upAge: gapOpen ? ownUpSince.map { folded(max(0, step - $0)) } : nil)
+        out.clock = foldAges ? nil : step
         if let pair {
             var theirs = self
             theirs.select(1)
-            out.second = theirs.slotKey()
+            out.second = theirs.slotKey(foldAges: foldAges)
             out.pairOwner = pair.owner.map { $0 == .primary ? 0 : 1 }
             out.pairBar = pair.bar.map { $0 == .primary ? 0 : 1 }
             out.pairCheck = pairCheck
@@ -746,7 +757,7 @@ private struct Sim {
     }
 
     /// The selected slot as the state key holds it.
-    private func slotKey() -> SlotKey {
+    private func slotKey(foldAges: Bool = true) -> SlotKey {
         var armed = false, gapOpen = false
         switch machine.phase {
         case .armed: armed = true
@@ -754,12 +765,13 @@ private struct Sim {
         default: break
         }
         let confirm = machine.config?.confirm ?? 0.15
-        return SlotKey(seen: seen, wakes: wakes.map { VoiceWalkClock.canonical($0 - step, confirm: confirm) }.sorted(), config: machine.config,
+        func folded(_ steps: Int) -> Int { foldAges ? VoiceWalkClock.canonical(steps, confirm: confirm) : steps }
+        return SlotKey(seen: seen, wakes: wakes.map { folded($0 - step) }.sorted(), config: machine.config,
                        flags: machine.keys.flagModifiers, deviceKeys: machine.keys.deviceKeys, keysDown: machine.keys.keysDown,
                        spoilers: machine.keys.spoilers, barred: machine.barred, chordSpoiled: machine.chordSpoiled,
-                       phase: machine.normalizedPhase(at: now, confirm: confirm), checker: checker,
-                       aloneAge: armed ? aloneSince.map { VoiceWalkClock.canonical(max(0, step - $0), confirm: confirm) } : nil,
-                       upAge: gapOpen ? ownUpSince.map { VoiceWalkClock.canonical(max(0, step - $0), confirm: confirm) } : nil)
+                       phase: machine.normalizedPhase(at: now, confirm: confirm, foldAges: foldAges), checker: checker,
+                       aloneAge: armed ? aloneSince.map { folded(max(0, step - $0)) } : nil,
+                       upAge: gapOpen ? ownUpSince.map { folded(max(0, step - $0)) } : nil)
     }
 
     func liveModifiers(_ run: WalkRun) -> ShortcutModifiers {
@@ -1901,7 +1913,11 @@ private struct AgeSample: Equatable {
     var furthest = 0
 }
 
-private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool, notPast: Int? = nil) -> AgeSample {
+private func referenceMoves(fold: Bool) -> [Move] {
+    [.toggle(0), .toggle(1), fold ? .waitToCut : .wait, .abandon]
+}
+
+private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool, notPast: Int? = nil, reference: Bool = false) -> AgeSample {
     let savedMerge = VoiceWalkClock.mergeControlOption
     VoiceWalkClock.mergeControlOption = merge
     defer { VoiceWalkClock.mergeControlOption = savedMerge }
@@ -1921,7 +1937,7 @@ private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool
     }
     func walk(_ sim: Sim, depth: Int) {
         if let notPast, sim.step > notPast { return }
-        guard seen.insert(sim.key(run)).inserted else { return }
+        guard seen.insert(sim.key(run, foldAges: fold)).inserted else { return }
         sample.steps.insert(sim.step)
         sample.furthest = max(sample.furthest, sim.step)
         sample.outcomes.insert(outcome(sim))
@@ -1929,7 +1945,8 @@ private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool
             sample.verdicts.insert(String(message.prefix(while: { $0 != ":" })))
         }
         if depth == limit { return }
-        for move in sim.moves(run) {
+        let choices = reference ? referenceMoves(fold: fold) : sim.moves(run)
+        for move in choices {
             var next = sim
             next.found = []
             let taken: Move
@@ -2041,13 +2058,13 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
     @Test func theExactAndFoldedWalksAgreePastTheFirstCut() {
         let run = WalkRun.all[0]
         let past = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
-        let exact = ageSample(run, depth: 4, fold: false, merge: true)
+        let exact = ageSample(run, depth: past + 1, fold: false, merge: true, reference: true)
         #expect(exact.steps.contains(1))
         #expect(exact.steps.contains(2))
         #expect(exact.furthest > VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.checkEvery))
         #expect(exact.furthest > VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdTapMax))
         #expect(exact.furthest > past)
-        let folded = ageSample(run, depth: 4, fold: true, merge: true, notPast: exact.furthest)
+        let folded = ageSample(run, depth: past + 1, fold: true, merge: true, notPast: exact.furthest, reference: true)
         #expect(exact.verdicts == folded.verdicts)
         #expect(exact.outcomes == folded.outcomes)
     }
@@ -2056,8 +2073,8 @@ private func jumpTrace(_ run: WalkRun, cuts: [Int]) -> [Int] {
     @Test func theControlOptionMergeAgreesWithTheUnmergedWalk() {
         let run = WalkRun.all[0]
         let past = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
-        let split = ageSample(run, depth: 3, fold: true, merge: false)
-        let merged = ageSample(run, depth: 3, fold: true, merge: true)
+        let split = ageSample(run, depth: past + 1, fold: true, merge: false, reference: true)
+        let merged = ageSample(run, depth: past + 1, fold: true, merge: true, reference: true)
         #expect(split.furthest > past)
         #expect(merged.furthest > past)
         #expect(split.verdicts == merged.verdicts)

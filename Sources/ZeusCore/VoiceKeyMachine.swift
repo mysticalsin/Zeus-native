@@ -98,50 +98,46 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
     // MARK: Timing
 
-    /// The windows the walk's age fold is derived from. One source for the machine and the search.
-    public enum Timing {
-        public static var step: TimeInterval = 0.05
-        public static var checkEvery: TimeInterval = 0.25
-        public static var holdTapMax: TimeInterval = 0.30
-        public static var sharedTapMax: TimeInterval = 0.25
-        public static var holdGap: TimeInterval = 0.40
-        public static var sharedGap: TimeInterval = 0.35
-        /// The pointing hold's watchdog, and the shared dictation delay.
-        public static var pointingWatchdog: TimeInterval = 0.25
-        public static var sharedDictationDelay: TimeInterval = 0.25
+    /// The windows the walk's age fold is derived from. The stored values are fixed. A test shifts `active`.
+    enum Timing {
+        static let shippedStep: TimeInterval = 0.05
+        static let shippedCheckEvery: TimeInterval = 0.25
+        static let shippedHoldTapMax: TimeInterval = 0.30
+        static let shippedSharedTapMax: TimeInterval = 0.25
+        static let shippedHoldGap: TimeInterval = 0.40
+        static let shippedSharedGap: TimeInterval = 0.35
+        static let shippedPointingWatchdog: TimeInterval = PointingKeyGesture.watchdog
+        static let shippedSharedDictationDelay: TimeInterval = 0.25
+
+        struct Values: Equatable {
+            var step = Timing.shippedStep
+            var checkEvery = Timing.shippedCheckEvery
+            var holdTapMax = Timing.shippedHoldTapMax
+            var sharedTapMax = Timing.shippedSharedTapMax
+            var holdGap = Timing.shippedHoldGap
+            var sharedGap = Timing.shippedSharedGap
+            var pointingWatchdog = Timing.shippedPointingWatchdog
+            var sharedDictationDelay = Timing.shippedSharedDictationDelay
+        }
+
+        static var active = Values()
+        static var step: TimeInterval { active.step }
+        static var checkEvery: TimeInterval { active.checkEvery }
+        static var holdTapMax: TimeInterval { active.holdTapMax }
+        static var sharedTapMax: TimeInterval { active.sharedTapMax }
+        static var holdGap: TimeInterval { active.holdGap }
+        static var sharedGap: TimeInterval { active.sharedGap }
+        static var pointingWatchdog: TimeInterval { active.pointingWatchdog }
+        static var sharedDictationDelay: TimeInterval { active.sharedDictationDelay }
         /// One step past the longest gap, so the cap is past every window.
-        public static var cap: TimeInterval { holdGap + step }
+        static var cap: TimeInterval { active.holdGap + active.step }
 
-        public static func steps(_ seconds: TimeInterval) -> Int { Int((seconds / step).rounded()) }
+        static func steps(_ seconds: TimeInterval) -> Int { Int((seconds / step).rounded()) }
 
-        public static func restoreDefaults() {
-            step = 0.05
-            checkEvery = 0.25
-            holdTapMax = 0.30
-            sharedTapMax = 0.25
-            holdGap = 0.40
-            sharedGap = 0.35
-            pointingWatchdog = 0.25
-            sharedDictationDelay = 0.25
-            active = Values()
-        }
-
-        /// A shifted copy for a mutation test. The machine still reads the variables above.
-        public struct Values {
-            public var step = Timing.step
-            public var checkEvery = Timing.checkEvery
-            public var holdTapMax = Timing.holdTapMax
-            public var sharedTapMax = Timing.sharedTapMax
-            public var holdGap = Timing.holdGap
-            public var sharedGap = Timing.sharedGap
-            public var pointingWatchdog = Timing.pointingWatchdog
-            public var sharedDictationDelay = Timing.sharedDictationDelay
-        }
-
-        public static var active = Values()
+        static func restoreDefaults() { active = Values() }
 
         /// Step counts of the windows, including `confirm` and the cap. Sorted, with duplicates removed.
-        public static func cuts(confirm: TimeInterval) -> [Int] {
+        static func cuts(confirm: TimeInterval) -> [Int] {
             let seconds = [0, confirm, checkEvery, holdTapMax, sharedTapMax, holdGap, sharedGap,
                            pointingWatchdog, sharedDictationDelay, cap]
             return Array(Set(seconds.map { Int(($0 / step).rounded()) })).sorted()
