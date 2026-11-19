@@ -252,14 +252,24 @@ public final class UnixSocketServer: @unchecked Sendable {
             let directoryFD = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
             guard directoryFD >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
             defer { close(directoryFD) }
-            if fchmod(directoryFD, 0o700) != 0, fchmodat(directoryFD, ".", 0o700, 0) != 0 {
-                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            var opened = stat()
+            guard fstat(directoryFD, &opened) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            // macOS returns EINVAL from fchmod on a directory descriptor. Tighten the mode, then accept
+            // the directory only when lstat still names this opened inode, owned by us, at 0700.
+            func directoryIsPrivate() -> Bool {
+                var info = stat()
+                guard lstat(directory, &info) == 0 else { return false }
+                let kind = info.st_mode & mode_t(S_IFMT)
+                return kind == mode_t(S_IFDIR) && info.st_uid == geteuid()
+                    && (info.st_mode & mode_t(0o777)) == mode_t(0o700)
+                    && info.st_ino == opened.st_ino && info.st_dev == opened.st_dev
             }
-            var directoryInfo = stat()
-            guard lstat(directory, &directoryInfo) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            let directoryType = directoryInfo.st_mode & mode_t(S_IFMT)
-            guard directoryType == mode_t(S_IFDIR), directoryInfo.st_uid == geteuid(),
-                  (directoryInfo.st_mode & mode_t(0o777)) == mode_t(0o700) else { throw POSIXError(.EPERM) }
+            if !directoryIsPrivate() { _ = fchmod(directoryFD, 0o700) }
+            if !directoryIsPrivate() { _ = fchmodat(directoryFD, ".", 0o700, 0) }
+            if !directoryIsPrivate() {
+                try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory)
+            }
+            guard directoryIsPrivate() else { throw POSIXError(.EPERM) }
             var existing = stat()
             if lstat(path, &existing) == 0 {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }
@@ -283,9 +293,12 @@ public final class UnixSocketServer: @unchecked Sendable {
             guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: bindError) ?? .EIO) }
             if fchmod(fd, 0o600) != 0 {
                 var modeInfo = stat()
-                guard fstat(fd, &modeInfo) == 0, (modeInfo.st_mode & mode_t(0o777)) == mode_t(0o600) else {
+                let descriptorMode = fstat(fd, &modeInfo) == 0 ? modeInfo.st_mode & mode_t(0o777) : nil
+                var pathInfo = stat()
+                let pathMode = lstat(path, &pathInfo) == 0 ? pathInfo.st_mode & mode_t(0o777) : nil
+                guard descriptorMode == mode_t(0o600) || pathMode == mode_t(0o600) else {
                     unlink(path)
-                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                    throw POSIXError(.EPERM)
                 }
             }
             guard listen(fd, 16) == 0 else {
