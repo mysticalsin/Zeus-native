@@ -1713,7 +1713,21 @@ private struct Report {
 }
 
 /// Full searches, so the shipped walk is not repeated by the count test and the plain walk.
-private var fullWalkCache: [String: Report] = [:]
+/// The suite runs in parallel under Swift 6, so the shared map is a lock, not a global `var`.
+private let fullWalkCache = FullWalkCache()
+
+private final class FullWalkCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: Report] = [:]
+
+    func report(named name: String) -> Report? {
+        lock.withLock { storage[name] }
+    }
+
+    func store(_ report: Report, named name: String) {
+        lock.withLock { storage[name] = report }
+    }
+}
 
 private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) -> String {
     var steps: [String] = []
@@ -1811,7 +1825,7 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
     let cacheable = !stopAtFirst && until == nil
-    if cacheable, let cached = fullWalkCache[run.name], !cached.truncated { return cached }
+    if cacheable, let cached = fullWalkCache.report(named: run.name), !cached.truncated { return cached }
     let start = Date()
     var report = Report()
     var seen: [StateKey: Int] = [:]
@@ -1887,7 +1901,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     }
     report.visited = Set(seen.keys)
     if cacheable, !report.truncated, limit == Int.max, run.stateBound == nil {
-        fullWalkCache[run.name] = report
+        fullWalkCache.store(report, named: run.name)
     }
     return report
 }
