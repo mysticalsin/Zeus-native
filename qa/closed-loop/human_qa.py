@@ -23,8 +23,8 @@ REPO = Path(__file__).resolve().parents[2]
 STATUSES = ("PASS", "FAIL", "MANUAL")
 FREEZE_SECONDS = 2.0
 SETTINGS_PAGES = ["general", "appearance", "sounds", "notifications", "shortcuts", "insomnia", "integrations",
-                  "murmure", "polyglot", "dictation", "voice", "engine", "features", "beamer", "license",
-                  "permissions", "privacy", "diagnostics", "about"]
+                  "murmure", "polyglot", "dictation", "voice", "engine", "features", "beamer", "tiling",
+                  "license", "permissions", "privacy", "diagnostics", "about"]
 
 # Every step id the Swift driver must report, per journey. A missing id is a failure, not a silent skip.
 JOURNEYS = {

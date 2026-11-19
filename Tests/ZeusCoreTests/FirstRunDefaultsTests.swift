@@ -6,15 +6,15 @@ import Testing
 /// `UserDefaults` suite yields the value the table promises.
 @Suite struct FirstRunDefaultsTests {
     private func fresh() -> (UserDefaults, () -> Void) {
-        let name = "zeus.firstrun.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.firstrun.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         return (defaults, { defaults.removePersistentDomain(forName: name) })
     }
 
-    @Test func voiceIsUltronAtSixtyPercent() {
+    @Test func voiceIsUltronAtSeventyFivePercent() {
         let (defaults, cleanup) = fresh(); defer { cleanup() }
         #expect(ZeusPersonality.current(defaults) == .ultron)
-        #expect(UltronEffectParameters.defaultPercent == 60)
+        #expect(UltronEffectParameters.defaultPercent == 75)
         #expect(!UltronEffectParameters.make(percent: Double(UltronEffectParameters.defaultPercent)).isNeutral)
     }
 
@@ -68,5 +68,15 @@ import Testing
     @Test func callWindowNamesNeverActivateWithoutAccessibility() {
         let (defaults, cleanup) = fresh(); defer { cleanup() }
         #expect(!ScribeCallWindowNamesPolicy.isActive(accessibilityGranted: false, defaults: defaults))
+    }
+
+    @Test func scribeMeetingStartIsAskMeWithNoOptInOnAFreshMac() {
+        let (defaults, cleanup) = fresh(); defer { cleanup() }
+        #expect(ScribeAutoStartMode.current(defaults: defaults) == .ask)
+        #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
+        #expect(!ScribeAutoStartOptIn.hasRecorded(defaults: defaults))
+        let readiness = ScribeAutoStartReadiness.resolve(mode: .current(defaults: defaults), optIn: false,
+                                                         microphone: .allowed, hasRecorded: false)
+        #expect(readiness == .blocked(.notChosen))
     }
 }

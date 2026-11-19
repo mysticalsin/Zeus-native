@@ -157,7 +157,7 @@ struct TeleprompterSettingsPage: View {
                     }), label: "Follow my presentation")
                 }
                 GlassDivider()
-                GlassRow(title: "Hide from screen shares", note: "Uses a sharing-type that stays off recordings.") {
+                GlassRow(title: "Hide from screen shares", note: "Keeps the prompter out of screen shares and recordings.") {
                     GlassStatus(ok: true, text: "Always on while the prompter runs")
                 }
                 GlassDivider()

@@ -35,7 +35,7 @@ struct GlassBloom: View {
             if done {
                 Color.clear
             } else {
-                TickingView(interval: 1.0 / 60) { context in
+                DisplaySynchronizedView(preferredFramesPerSecond: MotionRules.displayMaxFPS, until: start.map { $0.addingTimeInterval(duration) }) { context in
                     let t = start.map { min(max(context.date.timeIntervalSince($0) / duration, 0), 1) } ?? 1
                     let fade = 1 - t * t
                     bloom(fade: fade)

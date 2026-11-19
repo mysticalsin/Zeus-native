@@ -21,9 +21,12 @@ final class PersistentClaudeRunner: @unchecked Sendable {
     private var served = 0
     private var dead = false
     private var turnSawOutput = false
+    private var carried = false
     private let errorTail = BoundedTail()
 
     var turnsServed: Int { lock.withLock { served } }
+    /// True once a turn with a screenshot went in: the process keeps it in context until it is replaced.
+    var carriedImage: Bool { lock.withLock { carried } }
     var isAlive: Bool { lock.withLock { !dead } && process.isRunning }
     var isBusy: Bool { lock.withLock { active != nil || ghostResults > 0 } }
 
@@ -67,12 +70,13 @@ final class PersistentClaudeRunner: @unchecked Sendable {
 
     /// Hands one turn's message to the running process. False when the process is gone or already serving a turn.
     func begin(turn: UUID, message: Data, continuation: AsyncThrowingStream<BrainEvent, Error>.Continuation,
-               firstByteBudget: TimeInterval) -> Bool {
+               firstByteBudget: TimeInterval, carriesImage: Bool = false) -> Bool {
         let parser = StreamJSONParser(continuation: continuation)
         lock.lock()
         guard !dead, active == nil else { lock.unlock(); return false }
         active = (turn, parser)
         served += 1
+        if carriesImage { carried = true }
         turnSawOutput = false
         lock.unlock()
         let payload = message + Data([0x0A])
@@ -171,7 +175,8 @@ final class PersistentClaudeSession: @unchecked Sendable {
         return lock.withLock {
             let existing = runners[slotName]
             let slot = existing.map {
-                PersistentCLIPolicy.Slot(launchKey: $0.launchKey, turnsServed: $0.turnsServed, startedAt: $0.startedAt, alive: $0.isAlive)
+                PersistentCLIPolicy.Slot(launchKey: $0.launchKey, turnsServed: $0.turnsServed, startedAt: $0.startedAt, alive: $0.isAlive,
+                    carriedImage: $0.carriedImage)
             }
             if PersistentCLIPolicy.action(existing: slot, wantedKey: key, now: Date()) == .reuse, let existing { return existing }
             existing?.kill(reason: "Replaced")

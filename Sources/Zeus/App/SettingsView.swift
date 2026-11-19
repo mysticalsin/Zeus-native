@@ -8,7 +8,7 @@ import ZeusCore
 @MainActor @Observable
 final class SettingsNavigation {
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, notifications, sounds, voice, dictation, shortcuts, topBar, todo, memory, teleprompter, agents, stickies, routines, keepAwake, integrations, assistant, intelligence, permissions, privacy, interview, iPhone, diagnostics, license, about
+        case general, appearance, notifications, sounds, voice, dictation, shortcuts, topBar, todo, memory, teleprompter, agents, stickies, routines, keepAwake, integrations, assistant, intelligence, permissions, privacy, interview, iPhone, diagnostics, license, about, tiling, shelf
         var id: String { rawValue }
 
         /// Sections in the sidebar. Interview, iPhone and Intelligence wait for Lane B engine work.
@@ -43,6 +43,8 @@ final class SettingsNavigation {
             case .assistant: "Assistant"
             case .intelligence: "Intelligence"
             case .license: "License"
+            case .tiling: "Tiling"
+            case .shelf: "Shelf"
             }
         }
 
@@ -73,6 +75,8 @@ final class SettingsNavigation {
             case .assistant: "Your AI account, model and how replies behave."
             case .intelligence: "Which engine understands your commands, and what it costs."
             case .license: "Your trial, your key, and this Mac."
+            case .tiling: "Arrange your windows from the keyboard."
+            case .shelf: "Send files to nearby Macs from the Shelf."
             }
         }
 
@@ -103,6 +107,8 @@ final class SettingsNavigation {
             case .stickies: ("note.text", Theme.glow)
             case .routines: ("arrow.triangle.2.circlepath", Theme.accent)
             case .keepAwake: ("cup.and.saucer.fill", Theme.glow)
+            case .tiling: ("rectangle.split.2x2.fill", Theme.accent)
+            case .shelf: ("tray.fill", Theme.accent)
             }
         }
     }
@@ -281,6 +287,9 @@ struct SettingsView: View {
         case .assistant: AssistantSettings(account: .shared, drafts: .shared)
         case .intelligence: IntelligenceSettings(center: .shared)
         case .license: LicenseSettings(license: .shared, drafts: .shared)
+        // The rows come from the catalog (`SettingsOptionCards`); the live page is `TilingSettingsPage`.
+        case .tiling: EmptyView()
+        case .shelf: EmptyView()
         }
     }
 
@@ -311,7 +320,7 @@ struct SettingsView: View {
                 }
             }
             GlassCard(title: "Show me and drive") {
-                GlassRow(title: "Draw on screen", note: "Hold the left Command key, then circle or underline anything. ZEUS answers about that spot.") {
+                GlassRow(title: "Draw on screen", note: "Hold the left Control key, then circle or underline anything. ZEUS answers about that spot.") {
                     GlassToggle(isOn: $annotateEnabled, label: "Show me")
                 }
                 GlassDivider()

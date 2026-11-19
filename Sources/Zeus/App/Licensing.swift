@@ -10,6 +10,8 @@ enum Keychain {
     static let store: KeychainStore = KeychainStore(backend: TopBarStyle.isSnapshotSafe ? MemoryKeychain() : SystemKeychain())
 
     static func get(_ account: String) -> String? { store.get(account) }
+    /// Like `get`, but notices a value saved outside this process (throttled to once per 5 seconds per account).
+    static func fresh(_ account: String) -> String? { store.refresh(account) }
     @discardableResult static func set(_ value: String, for account: String) -> Bool { store.set(value, for: account) }
     @discardableResult static func remove(_ account: String) -> Bool { store.remove(account) }
 }

@@ -20,7 +20,7 @@ import Testing
     }
 
     @Test func unsetPreferenceIsGregorian() {
-        let suite = "zeus.dates.test.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.dates.test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         #expect(ZeusDates.followsSystem(defaults) == false)

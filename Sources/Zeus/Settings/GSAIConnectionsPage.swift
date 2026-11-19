@@ -167,11 +167,11 @@ private struct AnyLLMCard: View {
             GSDivider()
             field("Model", "model name", Binding(get: { model.anyLLM.model }, set: { model.anyLLM.model = $0 }))
             GSDivider()
-            GSRow(title: "API key", text: model.anyLLMKeySaved ? "Saved in your Keychain. Zeus reads it once." : "Kept in your Keychain. Leave empty for a local server.") {
+            GSRow(title: "API key", text: model.anyLLMKeyNeedsReentry ? "The saved key belongs to another address and is not sent here. Paste it again for this address." : model.anyLLMKeySaved ? "Saved in your Keychain for this address. Zeus reads it once." : "Kept in your Keychain. Leave empty for a local server.") {
                 HStack(spacing: 10) {
-                    SecureField(model.anyLLMKeySaved ? "Saved" : "Paste a key", text: Binding(get: { model.keyDraft }, set: { model.keyDraft = $0 }))
+                    SecureField(model.anyLLMKeyNeedsReentry ? "Paste again" : model.anyLLMKeySaved ? "Saved" : "Paste a key", text: Binding(get: { model.keyDraft }, set: { model.keyDraft = $0 }))
                         .textFieldStyle(.plain)
-                        .snapshotSafeText(model.keyDraft, placeholder: model.anyLLMKeySaved ? "Saved" : "Paste a key", secure: true)
+                        .snapshotSafeText(model.keyDraft, placeholder: model.anyLLMKeyNeedsReentry ? "Paste again" : model.anyLLMKeySaved ? "Saved" : "Paste a key", secure: true)
                         .font(OB.font(13.5)).foregroundStyle(GS.text)
                         .padding(.horizontal, 10).frame(width: 220, height: 30)
                         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))

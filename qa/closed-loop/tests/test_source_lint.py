@@ -24,10 +24,11 @@ HANDLER_APIS = re.compile(r"\b(?:SFSpeechRecognizer\.requestAuthorization|INFocu
 
 
 POINTING = APP / "Pointing"
+TILING = APP / "Tiling"
 # Pointing must advance on real events, never a sleep, and must never use the word-count clock.
 POINTING_FORBIDDEN = re.compile(r"\bTask\.sleep\b|SpeechDrawingTimeline\.estimate|\.installTap\(|\brequestAccess\(|\brequestAuthorization\b|CGRequestScreenCaptureAccess|CGRequestListenEventAccess")
-# System callbacks that must be installed from a nonisolated function.
-POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents")
+# System callbacks that must be installed from a nonisolated function (Pointing and Tiling both follow this).
+POINTING_CALLBACK_APIS = re.compile(r"CGEvent\.tapCreate|addGlobalMonitorForEvents|addLocalMonitorForEvents|AXObserverCreate")
 
 
 def pointing_callback_offenders(text, label="sample"):
@@ -40,6 +41,32 @@ def pointing_callback_offenders(text, label="sample"):
         header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
         if "nonisolated" not in header:
             offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
+# The tiling tap consumes keys, so the thread that services it must never be the main thread: the window server holds
+# every keystroke in every app until the tap callback runs, and Accessibility passes run on main.
+MAIN_RUN_LOOP = re.compile(r"CFRunLoopGetMain\s*\(|\bRunLoop\.main\b")
+
+
+def main_run_loop_offenders(text, label="sample"):
+    """Lines that name the main run loop, where a tap source could be added to it."""
+    return [f"{label}:{index + 1}" for index, line in enumerate(text.splitlines())
+            if not line.strip().startswith("//") and MAIN_RUN_LOOP.search(strip_trailing_comment(line))]
+
+
+def main_run_loop_offenders_under(directory):
+    offenders = []
+    for p in sorted(directory.rglob("*.swift")):
+        offenders += main_run_loop_offenders(p.read_text(), str(p.relative_to(directory.parent)))
+    return offenders
+
+
+def callback_offenders_under(directory):
+    """Every system-callback install under `directory` that is not in a nonisolated function."""
+    offenders = []
+    for p in sorted(directory.rglob("*.swift")):
+        offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(directory.parent)))
     return offenders
 
 
@@ -115,6 +142,7 @@ class SourceLint(unittest.TestCase):
             r"SFSpeechRecognizer\.requestAuthorization": "NSSpeechRecognitionUsageDescription",
             r"requestFullAccessToEvents": "NSCalendarsFullAccessUsageDescription",
             r"requestFullAccessToReminders": "NSRemindersFullAccessUsageDescription",
+            r"AudioHardwareCreateProcessTap": "NSAudioCaptureUsageDescription",
         }
         missing = []
         for pattern, key in required.items():
@@ -154,6 +182,23 @@ class SourceLint(unittest.TestCase):
             offenders += pointing_callback_offenders(p.read_text(), str(p.relative_to(ROOT)))
         self.assertEqual(offenders, [])
 
+    def test_tiling_system_callbacks_are_installed_from_nonisolated_functions(self):
+        self.assertEqual(callback_offenders_under(TILING), [])
+
+    def test_the_tiling_tap_source_is_never_added_to_the_main_run_loop(self):
+        self.assertEqual(main_run_loop_offenders_under(TILING), [])
+
+    def test_main_run_loop_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: the exact shape the first tiling tap had, and the ones that mean the same thing.
+        bad = "nonisolated func start() {\n    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)\n}\n"
+        self.assertEqual(main_run_loop_offenders(bad), ["sample:2"])
+        self.assertEqual(main_run_loop_offenders("RunLoop.main.add(timer, forMode: .common)"), ["sample:1"])
+        self.assertEqual(main_run_loop_offenders("CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)"), ["sample:1"])
+        good = "nonisolated func install(on loop: CFRunLoop) {\n    CFRunLoopAddSource(loop, source, .commonModes)\n}\n"
+        self.assertEqual(main_run_loop_offenders(good), [])
+        self.assertEqual(main_run_loop_offenders("// never CFRunLoopGetMain() here\nlet loop = CFRunLoopGetCurrent()"), [])
+        self.assertEqual(main_run_loop_offenders("let loop = CFRunLoopGetCurrent() // not CFRunLoopGetMain()"), [])
+
     def test_pointing_lint_detects_its_failure_shapes(self):
         # Fail-first samples: the exact shapes the lint exists to catch.
         self.assertTrue(POINTING_FORBIDDEN.search("try await Task.sleep(for: .seconds(1))"))
@@ -163,6 +208,25 @@ class SourceLint(unittest.TestCase):
         self.assertEqual(pointing_callback_offenders(bad), ["sample:3"])
         good = "enum B {\n    nonisolated static func start() {\n        CGEvent.tapCreate(tap: x)\n    }\n}"
         self.assertEqual(pointing_callback_offenders(good), [])
+
+    def test_tiling_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: a tap installed from a main-actor function under a Tiling folder is reported.
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "Tiling"
+            folder.mkdir()
+            (folder / "Bad.swift").write_text(
+                "@MainActor final class K {\n    func start() {\n"
+                "        CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap)\n    }\n}\n")
+            self.assertEqual(callback_offenders_under(folder), ["Tiling/Bad.swift:3"])
+            (folder / "Bad.swift").write_text(
+                "enum K {\n    nonisolated func start() {\n        CGEvent.tapCreate(tap: .cgSessionEventTap)\n    }\n}\n")
+            self.assertEqual(callback_offenders_under(folder), [])
+        # The observer API the later Accessibility upgrade will use is watched too.
+        observer = "@MainActor final class K {\n    func watch() {\n        AXObserverCreate(pid, callback, &observer)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(observer), ["sample:3"])
+        fine = "enum K {\n    nonisolated func watch() {\n        AXObserverCreate(pid, callback, &observer)\n    }\n}"
+        self.assertEqual(pointing_callback_offenders(fine), [])
 
     def test_lint_detects_the_original_crash_shapes(self):
         # Fail-first evidence kept as a test: the exact pre-fix lines must be flagged.
@@ -245,6 +309,7 @@ AUDITED_BLOCKING_FILES = {
     "Zeus/Watch/ZeusWatchRunner.swift": "Child wait inside a continuation on a global queue, killed after 3 s.",
     "Zeus/App/KeychainSelfTest.swift": "Command-line self test: no window exists.",
     "Zeus/Voice/VoiceSample.swift": "Command-line sample mode: no window exists.",
+    "Zeus/Tiling/TilingRunLoopThread.swift": "stop() waits for the tap thread to remove its tap. That thread runs only the tap callback and the teardown, so it ends in microseconds, and the wait is bounded to 2 s.",
     "ZeusCore/Insomnia/InsomniaCommands.swift": "ProcessCommandRunner runs on the Insomnia serial queue; every wait has a timeout.",
     "ZeusCore/Diagnostics/FlightRecorder.swift": "The ditto zip is exported from Task.detached (GSDiagnosticsLogs).",
 }
@@ -554,6 +619,133 @@ class Pass3NotchWiring(unittest.TestCase):
         self.assertIn("whileOpen: true", pass3_function_body(self.TEXT, "func snoozeAlert("))
 
 
+OPEN_ON_CLICK_RETURN = "if self?.openOnClick() == true { return }"
+HOVER_GATE = "guard NotchOpenRules.opensOnHover(Self.openTrigger) else"
+
+
+def click_open_returns_before_outside(text):
+    """True when the global mouse-down closure returns after a click that opened the notch, before
+    clickedOutside() can dismiss the panel that click just opened."""
+    returned = text.find(OPEN_ON_CLICK_RETURN)
+    outside = text.find("self?.clickedOutside()")
+    return returned != -1 and outside != -1 and returned < outside
+
+
+def local_mouse_down_opens_on_click(text):
+    return re.search(r"addLocalMonitorForEvents\(matching: \[\.leftMouseDown\]\)[^}]*?openOnClick\(\)", text) is not None
+
+
+def hover_gate_precedes_the_dwell(body):
+    """True when click mode returns before the hover dwell that opens the panel."""
+    gate = body.find(HOVER_GATE)
+    dwell = body.find("hoverTask = Task")
+    shortcut = body.find("guard topBar != nil else { show(.panel); return }")
+    return gate != -1 and gate < dwell and gate < shortcut
+
+
+def check_precedes(body, first, second):
+    return first in body and second in body and body.index(first) < body.index(second)
+
+
+class Pass4IslandWiring(unittest.TestCase):
+    """Island click open, corner overlay, music display hold and lyrics privacy: wiring no pure rule can see."""
+    NOTCH = pass3_source("Sources/Zeus/Notch/NotchController.swift")
+
+    def test_a_click_that_opens_the_notch_returns_before_clicked_outside(self):
+        start = pass3_function_body(self.NOTCH, "func start()")
+        self.assertTrue(click_open_returns_before_outside(start))
+
+    def test_click_mode_also_listens_while_a_zeus_window_is_frontmost(self):
+        self.assertTrue(local_mouse_down_opens_on_click(pass3_function_body(self.NOTCH, "func start()")))
+
+    def test_hovering_never_opens_the_notch_in_click_mode(self):
+        self.assertTrue(hover_gate_precedes_the_dwell(pass3_function_body(self.NOTCH, "private func mouseMoved()")))
+
+    def test_a_click_opens_only_through_the_pure_rule_and_a_known_surface(self):
+        body = pass3_function_body(self.NOTCH, "private func openOnClick() -> Bool")
+        self.assertIn("topBar != nil || !model.sessions.isEmpty || model.approval != nil", body)
+        self.assertTrue(check_precedes(body, "NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel", "show(.panel)"))
+
+    def test_the_corner_overlay_follows_screen_sharing_and_the_two_settings(self):
+        sharing = pass3_source("Sources/Zeus/App/ZeusWindowSharing.swift")
+        self.assertIn("ScreenCornerOverlay.shared.applyScreenSharePolicy(visibleInShare: visible)", pass3_function_body(sharing, "static func refresh("))
+        delegate = pass3_source("Sources/Zeus/App/AppDelegate.swift")
+        self.assertIn("ScreenCornerOverlay.shared.start()", delegate)
+        self.assertIn('case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()', delegate)
+
+    def test_the_corner_overlay_draws_only_on_notched_screens_and_keeps_unchanged_panels(self):
+        overlay = pass3_source("Sources/Zeus/Notch/ScreenCornerOverlay.swift")
+        self.assertIn("ScreenCorners.draws(hasNotch: Self.hasNotch(screen), enabled: enabled)", overlay)
+        self.assertIn("guard wanted != placements else { return }", pass3_function_body(overlay, "private func rebuild()"))
+        make = pass3_function_body(overlay, "static func makePanel(")
+        self.assertIn("ScreenCornerPanelFlags.standard", make)
+        self.assertIn("ZeusWindowSharing.apply(to: panel", make)
+        self.assertIn("ignoresMouseEvents: true", overlay)
+
+    def test_the_music_hold_takes_its_own_display_assertion_that_releases_itself(self):
+        hold = pass3_source("Sources/Zeus/TopBar/MusicAwakeHold.swift")
+        body = pass3_function_body(hold, "static func createAssertion(")
+        self.assertIn("IOPMAssertionCreateWithDescription(", body)
+        self.assertIn('"PreventUserIdleDisplaySleep"', body)
+        self.assertIn('"TimeoutActionRelease"', body)
+        self.assertIn("timeout,", body)
+        self.assertNotIn("KeepAwakeSession.shared.begin", hold)
+
+    def test_lyrics_are_never_requested_while_the_privacy_setting_is_off(self):
+        text = pass3_source("Sources/Zeus/TopBar/LyricsViews.swift")
+        load = pass3_function_body(text, "func load(for playing: NowPlaying?)")
+        self.assertIn("send(.load(enabled: isEnabled()", load, "the flow decides with the privacy switch")
+        self.assertIn("enabled: @escaping @MainActor () -> Bool = { LyricsStore.enabled }", text,
+                      "the switch the store asks is the privacy setting unless a test gives its own")
+        run = pass3_function_body(text, "private func run(_ query: LRCLIBQuery) async")
+        self.assertTrue(check_precedes(run, "guard mayRequest(key) else { return }", "Self.fetch("),
+                        "the switch is checked before every request")
+        self.assertIn("retryPlan(for: key, now: Date(), enabled: self?.isEnabled() ?? false)", text)
+        self.assertIn("let enabled = isEnabled()", pass3_function_body(text, "private func mayRequest(_ key: String) -> Bool"))
+        self.assertEqual(text.count("self?.run("), 1, "only the flow's lookup effect may start a request")
+
+    def test_the_sampling_reader_uses_the_occlusion_aware_rule(self):
+        text = pass3_source("Sources/Zeus/Perf/SamplingHold.swift")
+        body = pass3_function_body(text, "override func viewDidMoveToWindow()")
+        self.assertIn("SamplingVisibility.reading(after: name", body)
+        self.assertIn("onChange(SamplingVisibility.isSeen(window))", body)
+        self.assertNotIn("WindowVisibility.reading", body)
+        self.assertNotIn("WindowVisibility.isVisible", body)
+
+    def test_the_diagnostics_card_hears_thermal_changes_on_the_main_queue_from_one_publisher(self):
+        text = pass3_source("Sources/Zeus/Settings/GSLiveDiagnosticsCard.swift")
+        self.assertIn(".onReceive(Self.thermalPublisher)", text)
+        self.assertIn("static let thermalPublisher = thermalChanges()", text)
+        factory = pass3_function_body(text, "static func thermalChanges(")
+        self.assertIn(".receive(on: DispatchQueue.main)", factory)
+        self.assertEqual(text.count("publisher(for: ProcessInfo.thermalStateDidChangeNotification)"), 1,
+                         "only thermalChanges(center:) may subscribe, and it hops to the main queue")
+
+    def test_the_island_lints_detect_their_failure_shapes(self):
+        good = f"""func start() {{
+            addGlobalMonitorForEvents(matching: [.leftMouseDown]) {{ _ in
+                {OPEN_ON_CLICK_RETURN}
+                self?.clickedOutside()
+            }}
+            addLocalMonitorForEvents(matching: [.leftMouseDown]) {{ event in
+                MainActor.assumeIsolated {{ _ = self?.openOnClick() }}
+                return event
+            }}
+        }}"""
+        self.assertTrue(click_open_returns_before_outside(good))
+        self.assertTrue(local_mouse_down_opens_on_click(good))
+        self.assertFalse(click_open_returns_before_outside(good.replace(OPEN_ON_CLICK_RETURN, "_ = self?.openOnClick()")))
+        self.assertFalse(click_open_returns_before_outside(good.replace("self?.openOnClick() == true { return }", "self?.openOnClick() == true { }")))
+        self.assertFalse(local_mouse_down_opens_on_click(good.replace("self?.openOnClick()", "self?.noop()")))
+        hover = f"{HOVER_GATE} {{ return }}\nguard topBar != nil else {{ show(.panel); return }}\nhoverTask = Task {{ }}"
+        self.assertTrue(hover_gate_precedes_the_dwell(hover))
+        self.assertFalse(hover_gate_precedes_the_dwell(hover.replace(HOVER_GATE, "guard true else")))
+        self.assertFalse(hover_gate_precedes_the_dwell("guard topBar != nil else { show(.panel); return }\n" + HOVER_GATE + " { return }\nhoverTask = Task { }"))
+        self.assertTrue(check_precedes("guard Self.enabled else {}\nask(query)", "guard Self.enabled else", "ask(query)"))
+        self.assertFalse(check_precedes("ask(query)\nguard Self.enabled else {}", "guard Self.enabled else", "ask(query)"))
+        self.assertFalse(check_precedes("ask(query)", "guard Self.enabled else", "ask(query)"))
+
+
 class Pass3StaleReadWiring(unittest.TestCase):
     def test_launch_at_login_read_is_invalidated_by_a_toggle(self):
         text = pass3_source("Sources/Zeus/App/SettingsStore.swift")
@@ -639,6 +831,89 @@ class PointingMainActorLint(unittest.TestCase):
         self.assertIn("show(capturingMouse: false)", controller)
 
 
+class TilingWiringLint(unittest.TestCase):
+    """Tiling is off until the owner turns it on, never prompts, never ticks, and its panels are in every hand-kept list."""
+    DELEGATE = (APP / "App/AppDelegate.swift").read_text()
+
+    @staticmethod
+    def body(text, start, end):
+        first = text.index(start)
+        return text[first:text.index(end, first)]
+
+    def tiling_sources(self):
+        return sorted(TILING.rglob("*.swift")) + [APP / "TopBar/TilingPage.swift"]
+
+    def test_the_controller_starts_only_from_the_gated_sync_and_stops_at_quit(self):
+        self.assertIn("if on(.tiling)", self.DELEGATE)
+        self.assertEqual(self.DELEGATE.count("TilingController.shared.start()"), 1)
+        sync = self.body(self.DELEGATE, "private func syncTiling()", "\n    }\n")
+        self.assertIn("guard on(.tiling)", sync)
+        self.assertIn("TilingController.shared.start()", sync)
+        self.assertIn("UserDefaults.didChangeNotification", self.body(self.DELEGATE, "if on(.tiling) {\n", "\n        }\n"))
+        terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertIn("TilingController.shared.stop()", terminate)
+
+    def test_quitting_stops_tiling_only_when_the_startup_service_is_allowed(self):
+        terminate = self.body(self.DELEGATE, "func applicationWillTerminate", "func applicationDidFinishLaunching")
+        self.assertRegex(terminate, r"if on\(\.tiling\) \{\s*TilingController\.shared\.stop\(\)\s*\}")
+
+    def test_the_driver_never_reads_zeus_itself_and_every_driver_must_say_what_is_in_front(self):
+        ax = (TILING / "AXTilingWindowDriver.swift").read_text()
+        front = self.body(ax, "func frontmost()", "\n    }\n")
+        self.assertIn("ProcessInfo.processInfo.processIdentifier", front)
+        protocol = (ROOT / "Sources/ZeusCore/Tiling/TileWindowDriver.swift").read_text()
+        self.assertNotIn("extension TilingWindowDriver", protocol)
+
+    def test_the_page_marks_the_key_pair_by_shape_and_rechecks_accessibility_when_zeus_is_activated(self):
+        page = (APP / "TopBar/TilingPage.swift").read_text()
+        keys = self.body(page, "private var keysRow", "\n    }\n")
+        self.assertIn("checkmark", keys)
+        self.assertIn("NSApplication.didBecomeActiveNotification", page)
+
+    def test_both_overlays_are_in_the_sharing_refresh_and_the_debug_capture_boost(self):
+        sharing = (APP / "App/ZeusWindowSharing.swift").read_text()
+        for name in ("TilingFocusBorder", "TilingKeySheet"):
+            self.assertIn(f"{name}.shared.applyScreenSharePolicy(visibleInShare: visible)", sharing)
+            self.assertIn(f"{name}.shared.boostCaptureVisibility(for: captureBoost)", self.DELEGATE)
+
+    def test_every_tiling_panel_is_registered_with_the_window_sharing_policy_when_it_is_made(self):
+        for name in ("TilingFocusBorder", "TilingKeySheet"):
+            text = (TILING / f"{name}.swift").read_text()
+            self.assertIn("ZeusWindowSharing.apply(to: panel", text, name)
+            self.assertIn("surface: .zeusStandard", text, name)
+            self.assertIn("TopBarStyle.isSnapshot", text, name)
+
+    def test_tiling_never_prompts_for_a_permission(self):
+        forbidden = re.compile(r"AXIsProcessTrustedWithOptions|kAXTrustedCheckOptionPrompt|requestAccess\(|requestAuthorization|CGRequestListenEventAccess|CGRequestPostEventAccess|CGRequestScreenCaptureAccess")
+        for path in self.tiling_sources():
+            self.assertIsNone(forbidden.search(path.read_text()), path.name)
+
+    def test_tiling_has_no_ticking_clock_and_no_sleeping_task(self):
+        forbidden = re.compile(r"\bTimelineView\b|Timer\.scheduledTimer|\bTask\.sleep\b|\bTickingView\b|\bEdgeLightClock\b")
+        for path in self.tiling_sources():
+            self.assertIsNone(forbidden.search(path.read_text()), path.name)
+
+    def test_the_page_makes_no_accessibility_or_overlay_call_of_its_own(self):
+        page = (APP / "TopBar/TilingPage.swift").read_text()
+        for name in ("AXIsProcessTrusted", "AXUIElement", "AccessibilityGate", "TilingFocusBorder", "TilingKeySheet", "NSScreen"):
+            self.assertNotIn(name, page)
+
+    def test_the_page_is_routed_from_the_page_switch(self):
+        views = (APP / "TopBar/TopBarViews.swift").read_text()
+        self.assertIn("case .tiling: TilingPage(topBar: topBar, tiling: topBar.tilingForSnapshot ?? .shared)", views)
+
+    def test_tiling_is_a_startup_service_a_qa_startup_denies(self):
+        core = (ROOT / "Sources/ZeusCore/StartupPolicy.swift").read_text()
+        self.assertRegex(core, r"\bcase\b[^\n]*\btiling\b")
+        self.assertNotRegex(core.split("qaAllowed", 1)[1].split("\n", 1)[0], r"tiling")
+
+    def test_the_lint_notices_a_ticking_clock_and_a_prompt(self):
+        ticking = "struct V: View { var body: some View { TimelineView(.animation) { _ in Text(\"x\") } } }"
+        self.assertIsNotNone(re.search(r"\bTimelineView\b", ticking))
+        prompt = "let ok = AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt: true] as CFDictionary)"
+        self.assertIsNotNone(re.search(r"AXIsProcessTrustedWithOptions|kAXTrustedCheckOptionPrompt", prompt))
+
+
 def mic_read(relative):
     return (APP / relative).read_text()
 
@@ -684,35 +959,671 @@ class MicReleaseTests(unittest.TestCase):
 
 class ScribeMeetingCardTests(unittest.TestCase):
     def test_scribe_meeting_cards_take_the_first_click(self):
-        driver = mic_read("Scribe/ScribePopupDriver.swift")
-        host = mic_body(driver, "final class ScribeCardHostingView", "final class ScribePopupDriver")
+        panel = mic_read("Scribe/ScribeMeetingCardPanel.swift")
+        host = mic_body(panel, "final class ScribeCardHostingView", "private final class ScribeMeetingCardWindow")
         self.assertIn("override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }", host)
         self.assertIn(".activeAlways", host)
-        for card in ("Scribe/ScribeCallPopup.swift", "Scribe/ScribeMeetingBanner.swift"):
-            text = mic_read(card)
-            self.assertIn("ScribeCardHostingView(rootView:", text, card)
-            self.assertNotIn("NSHostingView(rootView:", text, card)
+        self.assertIn("ScribeCardHostingView(rootView:", panel)
+        self.assertNotIn("NSHostingView(rootView:", panel)
+        self.assertFalse((ROOT / "Sources/Zeus/Scribe/ScribeCallPopup.swift").exists())
 
     def test_scribe_meeting_card_taps_go_through_the_lifecycle(self):
-        popup = mic_read("Scribe/ScribeCallPopup.swift")
-        self.assertIn("model.onRecord = { [weak self] in self?.driver.click() }", popup)
-        self.assertNotIn("autoHide", popup)
-        hide = mic_body(popup, "    func hide() {", "    func refresh(")
-        self.assertIn("guard !driver.isBusy else { return }", hide)
-        banner = mic_read("Scribe/ScribeMeetingBanner.swift")
-        self.assertIn("Button(model.primaryTitle) { model.primaryTapped() }", banner)
-        hide = mic_body(banner, "    func hide() {", "    private func begin(")
-        self.assertIn("guard !driver.isBusy else { return }", hide)
+        # The meeting card, heads-up included: the panel leaves only through `render`, the controller draws the
+        # machine's card after every event, and the late tap is decided in the core.
+        panel = mic_read("Scribe/ScribeMeetingCardPanel.swift")
+        self.assertEqual(panel.count("orderOut("), 1)
+        render = mic_body(panel, "    func render(_ card: ScribeMeetingCard) {", "    private func view(")
+        self.assertIn("window.orderOut(nil)", render)
+        self.assertNotIn("func hide(", panel)
         controller = mic_read("Scribe/ScribeAutoStartController.swift")
-        accept = mic_body(controller, "    func accept() {", "    func decline() {")
-        self.assertIn(".startNow(meeting, now: now)", accept)
+        send = mic_body(controller, "    private func send(", "    /// Scribe's phase changed.")
+        self.assertIn("refresh()", send)
+        changed = mic_body(controller, "    private func scribeChanged(", "    private func perform(")
+        self.assertIn("refresh()", changed)
+        refresh = mic_body(controller, "    private func refresh() {", "    private func render() {")
+        self.assertIn("render()", refresh)
+        render_card = mic_body(controller, "    private func render() {", "    private static func log(")
+        self.assertIn("machine.card(now: clock())", render_card)
+        self.assertIn("panel.render(drawn)", render_card)
+        core = (ROOT / "Sources/ZeusCore/Scribe/ScribeAutoStart.swift").read_text()
+        self.assertIn("case primary(on: ScribeMeetingCard", core)
+        late = mic_body(core, "    private mutating func primary(", "    private mutating func cancel(")
+        self.assertIn("The offer ended in the same instant", late)
 
     def test_scribe_meeting_card_taps_are_logged(self):
-        driver = mic_read("Scribe/ScribePopupDriver.swift")
-        for stage in ('"click"', '"start requested"', '"start ok"', '"start failed"'):
-            self.assertIn(stage, driver)
-        self.assertIn('NSLog("[ZEUS] scribe popup: %@ %@"', driver)
-        self.assertIn("FlightRecorder.shared.record(", driver)
+        # The meeting card's own machine logs each state change once, and the taps that were ignored.
+        controller = mic_read("Scribe/ScribeAutoStartController.swift")
+        self.assertIn('NSLog("[ZEUS] scribe meeting: %@", line)', controller)
+        self.assertIn('FlightRecorder.shared.record("scribe", "meeting state", line)', controller)
+        self.assertIn('Self.log("tap ignored"', controller)
+        self.assertIn('Self.log("start"', controller)
+
+
+# Browser media (docs/NOTCH-SOURCES-PLAN.md, A3): a command reaches a tab only through the feed, and nothing here
+# listens to or taps audio.
+BROWSER_MEDIA_BRIDGE_FILE = "Chrome/ChromeBridge.swift"
+BROWSER_MEDIA_FEED_FILE = "Chrome/BrowserMediaFeed.swift"
+BROWSER_MEDIA_NEVER = ["Chrome/ChromeActions.swift", "../ZeusCore/ZeusTag.swift", "../ZeusCore/BrowserCommand.swift"]
+BROWSER_MEDIA_NEVER_DIRS = ["Intent", "Voice"]
+MEDIA_COMMAND_LITERAL = re.compile(r'"media\.command"')
+MEDIA_COMMAND_CALL = re.compile(r"ChromeBridge\.mediaCommand\(")
+MEDIA_WORDS = re.compile(r'"media\.command"|mediaCommand\(|"media\.state"')
+AUDIO_TAP_APIS = re.compile(r"AudioDeviceCreateIOProc|AudioHardwareCreateProcessTap|AudioHardwareCreateAggregateDevice|\.installTap\(")
+
+
+def code_text(text):
+    return "\n".join(line for line in text.splitlines() if not line.strip().startswith("//"))
+
+
+def media_literal_offenders(sources):
+    """`sources` maps a path under Sources/Zeus to its text. The command literal may appear only in the bridge file,
+    the call only in the feed, and the never-files and directories must not name either."""
+    offenders = []
+    for path, text in sources.items():
+        body = code_text(text)
+        if MEDIA_COMMAND_LITERAL.search(body) and path != BROWSER_MEDIA_BRIDGE_FILE:
+            offenders.append(f"{path}: media.command literal")
+        if MEDIA_COMMAND_CALL.search(body) and path != BROWSER_MEDIA_FEED_FILE:
+            offenders.append(f"{path}: mediaCommand call")
+        never = path in BROWSER_MEDIA_NEVER or any(path.startswith(d + "/") for d in BROWSER_MEDIA_NEVER_DIRS)
+        if never and MEDIA_WORDS.search(body):
+            offenders.append(f"{path}: names a media request")
+    return offenders
+
+
+def audio_tap_offenders(sources):
+    return [f"{path}" for path, text in sources.items() if AUDIO_TAP_APIS.search(code_text(text))]
+
+
+class BrowserMediaLint(unittest.TestCase):
+    def sources(self):
+        files = {str(p.relative_to(APP)): p.read_text() for p in swift_files()}
+        for rel in ["ZeusTag.swift", "BrowserCommand.swift"]:
+            files["../ZeusCore/" + rel] = (ROOT / "Sources/ZeusCore" / rel).read_text()
+        return files
+
+    def test_the_media_command_goes_out_only_through_the_bridge_and_the_feed(self):
+        self.assertEqual(media_literal_offenders(self.sources()), [])
+
+    def test_the_feed_and_bridge_files_exist_and_carry_their_halves(self):
+        self.assertTrue(MEDIA_COMMAND_LITERAL.search((APP / BROWSER_MEDIA_BRIDGE_FILE).read_text()))
+        self.assertTrue(MEDIA_COMMAND_CALL.search((APP / BROWSER_MEDIA_FEED_FILE).read_text()))
+
+    def test_the_feed_never_starts_the_call_watcher_and_the_watcher_gains_one_property(self):
+        feed = code_text((APP / BROWSER_MEDIA_FEED_FILE).read_text())
+        self.assertNotIn("ScribeCallWatcher.shared.start", feed)
+        self.assertNotIn("ScribeController", feed)
+        watcher = (APP / "Scribe/ScribeCallWatcher.swift").read_text()
+        self.assertEqual(watcher.count("var browserCallPresent: Bool"), 1)
+
+    def test_the_output_gate_listens_to_properties_and_never_taps_audio(self):
+        self.assertEqual(audio_tap_offenders({p.name: p.read_text() for p in (APP / "Chrome").glob("*.swift")}), [])
+        gate = code_text((APP / "Chrome/ChromeOutputActivity.swift").read_text())
+        self.assertIn("kAudioProcessPropertyIsRunningOutput", gate)
+        self.assertIn("kAudioDevicePropertyDeviceIsRunningSomewhere", gate)
+        self.assertNotIn("@MainActor final class", gate, "Core Audio calls these blocks off the main actor")
+        self.assertNotIn("@MainActor private", gate, "Core Audio calls these blocks off the main actor")
+
+    def test_the_feed_polls_only_what_the_rules_and_the_machine_allow(self):
+        feed = code_text((APP / BROWSER_MEDIA_FEED_FILE).read_text())
+        self.assertIn("BrowserPollMachine.next(", feed)
+        self.assertIn("BrowserMediaRules.usable(", feed)
+        self.assertEqual(feed.count('"media.state"'), 0, "the request type lives in ChromeBridge")
+
+    def test_the_media_toggle_is_never_turned_on_by_an_import(self):
+        text = (APP / "App/SettingsStore.swift").read_text()
+        block = text[text.index("static let neverEnabledByImport"):]
+        block = block[:block.index("]")]
+        self.assertIn('"music.browserMedia"', block)
+
+    def test_the_media_lint_detects_its_failure_shapes(self):
+        ok = {BROWSER_MEDIA_BRIDGE_FILE: 'send("media.command")', BROWSER_MEDIA_FEED_FILE: "ChromeBridge.mediaCommand(a)"}
+        self.assertEqual(media_literal_offenders(ok), [])
+        self.assertEqual(media_literal_offenders({**ok, "Chrome/Other.swift": 'let t = "media.command"'}), ["Chrome/Other.swift: media.command literal"])
+        self.assertEqual(media_literal_offenders({**ok, "TopBar/X.swift": "ChromeBridge.mediaCommand(a)"}), ["TopBar/X.swift: mediaCommand call"])
+        self.assertEqual(media_literal_offenders({**ok, "Voice/Say.swift": "ChromeBridge.mediaCommand(a)"}),
+                         ["Voice/Say.swift: mediaCommand call", "Voice/Say.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "Intent/Go.swift": 'let t = "media.state"'}), ["Intent/Go.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "Chrome/ChromeActions.swift": 'x = "media.command"'}),
+                         ["Chrome/ChromeActions.swift: media.command literal", "Chrome/ChromeActions.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "../ZeusCore/ZeusTag.swift": "mediaCommand(x)"}), ["../ZeusCore/ZeusTag.swift: names a media request"])
+        self.assertEqual(media_literal_offenders({**ok, "Chrome/Other.swift": '// "media.command" in a comment'}), [])
+        self.assertEqual(audio_tap_offenders({"a.swift": "AudioHardwareCreateProcessTap(d, &t)"}), ["a.swift"])
+        self.assertEqual(audio_tap_offenders({"a.swift": "// AudioDeviceCreateIOProcID"}), [])
+
+
+# --- Face presence (docs/FACE-PRESENCE-PLAN.md): presence only, never input, passwords, network or stored images ----
+FACE_CARD = APP / "Settings/GSFacePresenceCard.swift"
+FACE_FORBIDDEN = re.compile(
+    r"CGEvent|post\(tap|IOHIDPost|AXUIElementPostKeyboardEvent|keystroke|password|kSecClassInternetPassword|LAContext"
+    r"|SACLockScreenImmediate|ScreenLock\.lock\(\)|URLSession|CGImageDestination|NSBitmapImageRep|pngData|ArcFace",
+    re.IGNORECASE)
+# Face presence may use only the event-free members of ScreenLock.
+FACE_LOCK_CALL = re.compile(r"\bScreenLock\.(?!lockWithoutEvents\b|canLockWithoutEvents\b)\w+")
+
+
+def face_presence_files():
+    files = sorted(SOURCES.glob("*/FacePresence/**/*.swift"))
+    return files + ([FACE_CARD] if FACE_CARD.exists() else [])
+
+
+def face_code(text):
+    """(line number, code part) for every line of a Swift text, with comments removed."""
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.strip().startswith("//"):
+            yield number, strip_trailing_comment(line)
+
+
+def face_presence_offenders(text, label="sample", pattern=FACE_FORBIDDEN):
+    return [f"{label}:{n}" for n, code in face_code(text) if pattern.search(code)]
+
+
+class FacePresenceLint(unittest.TestCase):
+    def test_face_presence_never_posts_events_or_touches_passwords(self):
+        offenders = [o for p in face_presence_files() for o in face_presence_offenders(p.read_text(), str(p.relative_to(ROOT)))]
+        self.assertEqual(offenders, [], "face presence must never post events, read passwords, use the network or write images")
+
+    def test_face_presence_locks_only_through_the_event_free_call(self):
+        actions = (APP / "Intent/FastActions.swift").read_text()
+        enum = actions[actions.index("enum ScreenLock {"):]
+        self.assertIn("static var canLockWithoutEvents: Bool { lockFunction != nil }", enum)
+        free = "\n".join(code for _, code in face_code(enum[enum.index("static func lockWithoutEvents()"):enum.index("static func lock() -> Bool")]))
+        self.assertIn("SACLockScreenImmediate", enum)
+        self.assertNotRegex(free, r"CGEvent|AXIsProcessTrusted|\.post\(")
+        self.assertIn("guard let function else { return false }", free)
+        # lock() keeps its shortcut fallback for the voice intent; the event-free call must stay a separate path.
+        self.assertIn("event?.post(tap: .cghidEventTap)", enum[enum.index("static func lock() -> Bool"):])
+        offenders = [o for p in face_presence_files() for o in face_presence_offenders(p.read_text(), str(p.relative_to(ROOT)), FACE_LOCK_CALL)]
+        self.assertEqual(offenders, [], "face presence may call only lockWithoutEvents and canLockWithoutEvents")
+        elsewhere = [f"{p.relative_to(ROOT)}:{n}" for p in sorted(SOURCES.rglob("*.swift")) if p != APP / "Intent/FastActions.swift"
+                     for n, code in face_code(p.read_text()) if "SACLockScreenImmediate" in code]
+        self.assertEqual(elsewhere, [], "SACLockScreenImmediate is reached only through ScreenLock")
+
+    def test_face_presence_lint_detects_its_failure_shapes(self):
+        # Fail-first samples: each banned shape must be flagged, and comments must stay free.
+        for shape in ("let e = CGEvent(keyboardEventSource: nil, virtualKey: 12, keyDown: true)", "event.post(tap: .cghidEventTap)",
+                      "IOHIDPostEvent(port, 0, data, 0, 0, 0)", "AXUIElementPostKeyboardEvent(app, 0, 12, true)",
+                      "typeKeystroke(\"a\")", "let secret = loginPassword", "kSecClassInternetPassword", "let context = LAContext()",
+                      "SACLockScreenImmediate()", "_ = ScreenLock.lock()", "URLSession.shared.dataTask(with: url)",
+                      "CGImageDestinationCreateWithURL(url, type, 1, nil)", "NSBitmapImageRep(cgImage: image)", "image.pngData()",
+                      "let model = ArcFaceEmbedder()"):
+            self.assertEqual(face_presence_offenders(shape), ["sample:1"], shape)
+        clean = "// Adapted from Glance (MIT, Copyright (c) 2026 Jonathan Zhou): FaceDetector.swift.\nlet x = 1 // never a password\n_ = ScreenLock.lockWithoutEvents()"
+        self.assertEqual(face_presence_offenders(clean), [])
+        self.assertEqual(face_presence_offenders("let s = \"// password\""), ["sample:1"])
+        self.assertEqual(face_presence_offenders("a\nb\nimage.pngData()"), ["sample:3"])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.lock()", pattern=FACE_LOCK_CALL), ["sample:1"])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.canLockWithoutEvents", pattern=FACE_LOCK_CALL), [])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.lockWithoutEvents()", pattern=FACE_LOCK_CALL), [])
+        self.assertEqual(face_presence_offenders("_ = ScreenLock.lockWithoutEventsAnyway()", pattern=FACE_LOCK_CALL), ["sample:1"])
+
+
+# --- Per-app equaliser (docs/NOTCH-EQUALISER-PLAN.md, ticket B2b) --------------------------------------------
+# The render callback runs on a realtime thread; the lints below keep it free of allocation and main-actor hops,
+# keep IOProc blocks in audited files, keep every Core Audio listener block in a nonisolated function, and keep
+# real taps out of tests.
+EQ_DIR = APP / "Audio/Equaliser"
+EQ_SHAPING_TAP = EQ_DIR / "AppShapingTap.swift"
+EQ_MONITOR = EQ_DIR / "AudioProcessMonitor.swift"
+EQ_KERNEL = ROOT / "Sources/ZeusCore/Audio/EqualiserDSP.swift"
+EQ_RENDER_START = "// MARK: - Render (realtime)"
+EQ_RENDER_END = "// MARK: - End of render"
+KERNEL_CLASS_HEADER = "public final class EqualiserKernel"
+KERNEL_PROCESS_HEADER = "    public func process("
+IO_PROC_API = re.compile(r"\bAudioDeviceCreateIOProcID(?:WithBlock)?\b")
+AUDITED_IO_PROC_FILES = {"Audio/SystemAudioTap.swift", "Scribe/ScribeLiveCapture.swift", "Audio/Equaliser/AppShapingTap.swift"}
+# Nothing on the render path may allocate, lock, log or reach the main actor or Swift concurrency.
+RENDER_FORBIDDEN = re.compile(
+    r"\.append\(|\bArray\(|\bString\(|\bDispatchQueue\b|\bMainActor\b|\bprint\(|\bNSLog\(|\bos_log\b"
+    r"|\bTask\s*[{(.]|\bawait\b|\bNSLock\b|\.lock\(\)|\.withLock\b"
+    r"|(?:[=(,:]|\breturn\b|\bin\b)\s*\[|\]\s*\(")
+# Names that open a tap, a live monitor or the System Audio Recording prompt. Tests use fakes and pure rules.
+TAP_CREATION_NAMES = re.compile(
+    r"AudioHardwareCreateProcessTap|AudioHardwareCreateAggregateDevice|CATapDescription|LiveShapingTapFactory"
+    r"|AudioProcessMonitor\(|AppShapingTap\.build\(|\bSystemAudioTap\b|\bSpectrumPipeline\b|\bAudioSpectrumService\b"
+    r"|\bScribeLiveCaptureProvider\b")
+LIVE_PORT_CONSTRUCTORS = re.compile(r"\b(?:LiveShapingTapFactory|AudioProcessMonitor)\(")
+EQ_CONTROLLER = EQ_DIR / "EqualiserController.swift"
+APP_DELEGATE = APP / "App/AppDelegate.swift"
+PORT_NAMES = ("factory", "monitor", "claim", "scheduler")
+EQ_LISTENER_APIS = re.compile(r"AudioObjectAddPropertyListenerBlock|AudioObjectRemovePropertyListenerBlock")
+DASHES = ("—", "–")
+
+
+def render_offenders(text, label="sample"):
+    """`label:line` for each forbidden construct in the code part of `text`."""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        code = strip_trailing_comment(line)
+        if code.strip().startswith("//"):
+            continue
+        if RENDER_FORBIDDEN.search(code):
+            found.append(f"{label}:{number}")
+    return found
+
+
+def live_port_offenders(text, label="sample"):
+    """`label:line` for each line that builds a live tap factory or process monitor."""
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if not line.strip().startswith("//") and LIVE_PORT_CONSTRUCTORS.search(strip_trailing_comment(line))]
+
+
+def port_default_offenders(signature):
+    """Port parameters in an initializer signature that carry a default value."""
+    return [port for port in PORT_NAMES
+            if re.search(rf"^\s*{port}:[^\n]*=", signature, re.MULTILINE)]
+
+
+def io_proc_offenders(text, label="sample"):
+    return [f"{label}:{n}" for n, line in enumerate(text.splitlines(), 1)
+            if not line.strip().startswith("//") and IO_PROC_API.search(strip_trailing_comment(line))]
+
+
+def listener_offenders(text, label="sample"):
+    """Core Audio listener calls outside a function declared `nonisolated`."""
+    lines = text.splitlines()
+    offenders = []
+    for index, line in enumerate(lines):
+        if line.strip().startswith("//") or not EQ_LISTENER_APIS.search(strip_trailing_comment(line)):
+            continue
+        header = next((lines[i] for i in range(index, -1, -1) if re.search(r"\bfunc\b", lines[i])), "")
+        if "nonisolated" not in header:
+            offenders.append(f"{label}:{index + 1}")
+    return offenders
+
+
+def between(text, start, end=None):
+    first = text.index(start)
+    return text[first:text.index(end, first)] if end else text[first:]
+
+
+class EqualiserLint(unittest.TestCase):
+    def test_io_proc_blocks_only_in_audited_files(self):
+        offenders = []
+        for path in swift_files():
+            if path.relative_to(APP).as_posix() not in AUDITED_IO_PROC_FILES:
+                offenders += io_proc_offenders(path.read_text(), path.relative_to(ROOT).as_posix())
+        self.assertEqual(offenders, [], "an IOProc block belongs in an audited non-main-actor file")
+
+    def test_shaping_render_has_no_allocation_or_main_hops(self):
+        render = between(EQ_SHAPING_TAP.read_text(), EQ_RENDER_START, EQ_RENDER_END)
+        self.assertRegex(render, r"nonisolated static func makeRenderBlock\(\s*kernel:")
+        self.assertIn("kernel.process(", render)
+        kernel = between(between(EQ_KERNEL.read_text(), KERNEL_CLASS_HEADER), KERNEL_PROCESS_HEADER)
+        self.assertIn("private func processChunk(", kernel)
+        offenders = render_offenders(render, "AppShapingTap.swift") + render_offenders(kernel, "EqualiserDSP.swift")
+        self.assertEqual(offenders, [], "no allocation, lock, log or main-actor hop on the render path")
+
+    def test_the_io_proc_block_is_built_by_the_nonisolated_render_function(self):
+        text = EQ_SHAPING_TAP.read_text()
+        self.assertEqual(len(re.findall(r"AudioDeviceCreateIOProcIDWithBlock\(", text)), 1)
+        self.assertIn("AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue, block)", text)
+        self.assertIn("block = Self.makeRenderBlock(", text)
+        self.assertIn("block = Self.makeProbeBlock(", text)
+        self.assertRegex(text, r"nonisolated static func makeProbeBlock\(")
+
+    def test_core_audio_listeners_are_installed_from_nonisolated_functions(self):
+        text = EQ_MONITOR.read_text()
+        self.assertTrue(EQ_LISTENER_APIS.search(text))
+        self.assertEqual(listener_offenders(text, "AudioProcessMonitor.swift"), [])
+
+    def test_tests_never_create_a_tap(self):
+        offenders = []
+        for path in sorted((ROOT / "Tests").rglob("*.swift")):
+            offenders += [f"{path.relative_to(ROOT)}:{n}" for n, line in code_lines(path)
+                          if TAP_CREATION_NAMES.search(strip_trailing_comment(line))]
+        self.assertEqual(offenders, [], "tests use fakes; a real tap or monitor raises the system audio prompt")
+
+    def test_live_audio_ports_are_built_only_by_the_app_delegate(self):
+        offenders = []
+        for path in swift_files():
+            relative = path.relative_to(APP).as_posix()
+            if relative != "App/AppDelegate.swift":
+                offenders += live_port_offenders(path.read_text(), relative)
+        self.assertEqual(offenders, [], "a test reaches Sources through the module, so only the launch builds live ports")
+        launch = between(APP_DELEGATE.read_text(), "private func makeEqualiser()", "equaliser = controller")
+        self.assertEqual(len(live_port_offenders(launch, "AppDelegate.swift")), 2)
+
+    def test_the_controller_takes_its_audio_ports_without_defaults(self):
+        signature = between(EQ_CONTROLLER.read_text(), "    init(\n", "    ) {")
+        for port in PORT_NAMES:
+            self.assertRegex(signature, rf"\n\s+{port}: ", port)
+        self.assertEqual(port_default_offenders(signature), [], "a test that forgets a port must not get a live one")
+
+    def test_prompt_lints_detect_their_failure_shapes(self):
+        for shape in ("let t = SystemAudioTap()", "let p = SpectrumPipeline()", "AudioSpectrumService.shared.allowPressed()",
+                      "ScribeLiveCaptureProvider(monitor: m)", "try AppShapingTap.build(request, mode: .probe)",
+                      "AudioHardwareCreateAggregateDevice(d, &id)"):
+            self.assertTrue(TAP_CREATION_NAMES.search(shape), shape)
+        for quiet in ("AppShapingTap.makeRenderBlock(kernel: k)", "let m = FakeMonitor()", "SpectrumMath.gain(sensitivityPercent: 50)"):
+            self.assertFalse(TAP_CREATION_NAMES.search(quiet), quiet)
+        self.assertEqual(live_port_offenders("let f = LiveShapingTapFactory()", "s"), ["s:1"])
+        self.assertEqual(live_port_offenders("monitor: AudioProcessMonitor(),", "s"), ["s:1"])
+        self.assertEqual(live_port_offenders("// AudioProcessMonitor() is built at launch", "s"), [])
+        self.assertEqual(live_port_offenders("final class AudioProcessMonitor: EqualiserMonitoring {", "s"), [])
+        self.assertEqual(port_default_offenders("    init(\n        factory: any ShapingTapFactory = LiveShapingTapFactory(),\n"), ["factory"])
+        self.assertEqual(port_default_offenders("        monitor: any EqualiserMonitoring,\n        claim: any EqualiserClaiming,\n"), [])
+
+    def test_device_pickers_never_offer_a_zeus_aggregate(self):
+        for relative in ("TopBar/OutputDevices.swift", "Dictation/Microphones.swift"):
+            text = "\n".join(line for _, line in code_lines(APP / relative))
+            self.assertIn("ZeusAudioDevices.isOwnAggregate(", text, relative)
+
+    def test_equaliser_files_carry_no_dash(self):
+        paths = sorted(EQ_DIR.glob("*.swift")) + sorted((ROOT / "Sources/ZeusCore/Audio").glob("Equaliser*.swift"))
+        paths += sorted((ROOT / "Tests").rglob("Equaliser*.swift"))
+        self.assertTrue(paths)
+        offenders = [f"{p.relative_to(ROOT)}:{n}" for p in paths
+                     for n, line in enumerate(p.read_text().splitlines(), 1) if any(d in line for d in DASHES)]
+        self.assertEqual(offenders, [])
+
+    def test_equaliser_lints_detect_their_failure_shapes(self):
+        # Fail-first samples: the exact shapes each lint exists to catch.
+        self.assertEqual(render_offenders("scratch.append(sample)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let copy = Array(buffer)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let name = String(count)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let order = [0, 1]", "s"), ["s:1"])
+        self.assertEqual(render_offenders("let silent = [Float](repeating: 0, count: n)", "s"), ["s:1"])
+        self.assertEqual(render_offenders("DispatchQueue.main.async { tick() }", "s"), ["s:1"])
+        self.assertEqual(render_offenders("MainActor.assumeIsolated { tick() }", "s"), ["s:1"])
+        self.assertEqual(render_offenders("print(frames)", "s"), ["s:1"])
+        self.assertEqual(render_offenders('NSLog("late")', "s"), ["s:1"])
+        self.assertEqual(render_offenders("Task { await tick() }", "s"), ["s:1"])
+        self.assertEqual(render_offenders("lock.lock()", "s"), ["s:1"])
+        self.assertEqual(render_offenders("samples[frame * channels + channel] = 0", "s"), [])
+        self.assertEqual(render_offenders("kinds[band], frequency: frequencies[band],", "s"), [])
+        self.assertEqual(render_offenders("// scratch.append(sample) is forbidden here", "s"), [])
+        self.assertEqual(io_proc_offenders("AudioDeviceCreateIOProcIDWithBlock(&id, device, queue) { }", "s"), ["s:1"])
+        self.assertEqual(io_proc_offenders("// AudioDeviceCreateIOProcIDWithBlock is audited", "s"), [])
+        bad = "@MainActor final class A {\n    func start() {\n        AudioObjectAddPropertyListenerBlock(o, &a, q) { _, _ in }\n    }\n}"
+        self.assertEqual(listener_offenders(bad), ["sample:3"])
+        good = "enum B {\n    nonisolated static func start() {\n        AudioObjectAddPropertyListenerBlock(o, &a, q) { _, _ in }\n    }\n}"
+        self.assertEqual(listener_offenders(good), [])
+        self.assertTrue(TAP_CREATION_NAMES.search("let t = CATapDescription(stereoMixdownOfProcesses: [])"))
+        self.assertTrue(TAP_CREATION_NAMES.search("_ = AudioHardwareCreateProcessTap(d, &id)"))
+        self.assertTrue(TAP_CREATION_NAMES.search("let f = LiveShapingTapFactory()"))
+        self.assertTrue(TAP_CREATION_NAMES.search("let m = AudioProcessMonitor()"))
+        self.assertFalse(TAP_CREATION_NAMES.search("let m = FakeMonitor()"))
+
+
+class TalkChordOrderLint(unittest.TestCase):
+    """The talk chord's Carbon key (ZTLK) holds Control-Option-Space until the chord has been synced. A Carbon shortcut
+    registered before that sync fails silently while it holds, so the sync comes first where both run together."""
+
+    def test_the_chord_is_synced_before_the_shortcuts_are_registered(self):
+        lines = [line for _, line in code_lines(APP / "App/AppDelegate.swift")]
+        pairs = 0
+        for index, line in enumerate(lines):
+            if "registerShortcuts()" not in line or "func registerShortcuts" in line:
+                continue
+            nearby = lines[max(0, index - 3):index + 4]
+            if not any("syncTalkChord()" in other for other in nearby):
+                continue
+            pairs += 1
+            before = lines[max(0, index - 3):index]
+            self.assertTrue(any("syncTalkChord()" in other for other in before),
+                            f"syncTalkChord() must run before registerShortcuts(): {line.strip()}")
+        self.assertGreaterEqual(pairs, 1, "the shortcut change handler runs both")
+
+
+# The island and the screen overlays stay pinned to the screen edge: no system window animation, no ghost windows.
+#
+# A borderless panel keeps AppKit's default window animation unless told otherwise. When a top bar panel was ordered out
+# during a rebuild (wake, screen change), the system zoom-out stuck part way: a ghost copy of the island stayed on screen
+# at 98 percent scale, 4 pt below the top edge (window 1764 x 462 at 18, 4 on a 1800 x 470 frame), so the owner saw a strip
+# of wallpaper between the island and the screen edge. Every overlay window is created with `animationBehavior = .none`,
+# and a rebuild closes the windows it drops instead of only ordering them out.
+#
+# Each check is a function over source text, so every one has a sample that must fail it.
+PINNED_OVERLAYS = [
+    ROOT / "Sources/Zeus/Notch/NotchController.swift",
+    ROOT / "Sources/Zeus/Notch/ScreenEdgeGlowController.swift",
+    ROOT / "Sources/Zeus/Notch/EdgeWave.swift",
+    ROOT / "Sources/Zeus/Notch/ScreenCornerOverlay.swift",
+    ROOT / "Sources/Zeus/Overlay/BuddyController.swift",
+]
+WINDOW_CREATION = re.compile(r"\b(?:NSPanel|NSWindow|NotchPanel)\(contentRect:")
+
+
+def overlay_unpinned_creations(text):
+    """Window creations whose enclosing function (or a flags type it applies) never turns the system animation off."""
+    code = "\n".join(line.split("//")[0] for line in text.splitlines())
+    problems = []
+    for match in WINDOW_CREATION.finditer(code):
+        start = code.rfind("func ", 0, match.start())
+        end = code.find("\n    }\n", match.end())
+        body = code[start:end if end != -1 else len(code)]
+        if "animationBehavior = .none" in body:
+            continue
+        if re.search(r"\b\w+\.apply\(to: panel\)", body) and "panel.animationBehavior = .none" in code:
+            continue
+        line = code.count("\n", 0, match.start()) + 1
+        problems.append(f"line {line}: window created without animationBehavior = .none")
+    return problems
+
+
+def overlay_rebuild_problems(text, function, collection):
+    """The rebuild closes every window it drops, not only orders it out."""
+    start = text.index(f"private func {function}()")
+    body = text[start:text.index("\n    }\n", start)]
+    if not re.search(rf"{collection}[^\n]*\.close\(\)", body):
+        return [f"{function} orders old windows out without closing them"]
+    return []
+
+
+class OverlayPinnedLint(unittest.TestCase):
+    def test_every_overlay_window_turns_the_system_animation_off(self):
+        for path in PINNED_OVERLAYS:
+            with self.subTest(path=path.name):
+                self.assertEqual(overlay_unpinned_creations(path.read_text(encoding="utf-8")), [])
+
+    def test_rebuilds_close_the_windows_they_drop(self):
+        notch = (ROOT / "Sources/Zeus/Notch/NotchController.swift").read_text(encoding="utf-8")
+        buddy = (ROOT / "Sources/Zeus/Overlay/BuddyController.swift").read_text(encoding="utf-8")
+        self.assertEqual(overlay_rebuild_problems(notch, "build", "for entry in panels"), [])
+        self.assertEqual(overlay_rebuild_problems(buddy, "rebuildWindows", "windows.forEach"), [])
+
+    def test_samples_that_must_fail(self):
+        bare = "    private func make() -> NSPanel {\n        let panel = NSPanel(contentRect: .zero)\n        return panel\n    }\n"
+        self.assertTrue(overlay_unpinned_creations(bare))
+        commented = bare.replace("return panel", "// panel.animationBehavior = .none\n        return panel")
+        self.assertTrue(overlay_unpinned_creations(commented))
+        pinned = bare.replace("return panel", "panel.animationBehavior = .none\n        return panel")
+        self.assertFalse(overlay_unpinned_creations(pinned))
+        hidden = "    private func build() {\n        for entry in panels { entry.panel.orderOut(nil) }\n    }\n"
+        self.assertTrue(overlay_rebuild_problems(hidden, "build", "for entry in panels"))
+        closed = hidden.replace("orderOut(nil) }", "orderOut(nil); entry.panel.close() }")
+        self.assertFalse(overlay_rebuild_problems(closed, "build", "for entry in panels"))
+
+def closure_after(lines, needle):
+    """The text of the closure assigned on the first line with `needle`: from that line to where its braces balance."""
+    for index, line in enumerate(lines):
+        if needle not in line:
+            continue
+        depth, text = 0, []
+        for current in lines[index:]:
+            text.append(current)
+            depth += current.count("{") - current.count("}")
+            if depth <= 0 and "{" in "".join(text):
+                break
+        return "\n".join(text)
+    return None
+
+
+class TalkKeyPathLint(unittest.TestCase):
+    """The talk monitor reads its chord and its second key on every key event and every hold tick. Those closures read what the
+    sync points stored. Asking the system for access (AXIsProcessTrusted and Input Monitoring) or asking Carbon for a hot key
+    again on each event is work in the key path: a refused registration was retried on every key, and the access check ran
+    every time (review of the talk chord, minor a)."""
+
+    BANNED = ("syncTalkChord", "KeyListenAccess", "TalkChordHotkey", "TalkChordRouting", "SecondTalkRouting", "RegisterEventHotKey",
+              "ShortcutStore", "UserDefaults", "Preferences")
+
+    def test_the_key_path_closures_read_only_what_the_sync_points_stored(self):
+        lines = [line for _, line in code_lines(APP / "App/AppDelegate.swift")]
+        for name, stored in (("hotkey.chordProvider =", "cachedTalkChord"), ("hotkey.secondKeyProvider =", "cachedSecondTalkKey")):
+            text = closure_after(lines, name)
+            self.assertIsNotNone(text, f"{name} must be assigned in AppDelegate")
+            self.assertIn(stored, text, f"{name} must read the value the sync points stored ({stored})")
+            for banned in self.BANNED:
+                self.assertNotIn(banned, text, f"{name} runs on every key event and must not use {banned}")
+
+    def test_the_sync_points_store_what_the_key_path_reads(self):
+        lines = [line for _, line in code_lines(APP / "App/AppDelegate.swift")]
+        text = closure_after(lines, "private func syncTalkChord()") or ""
+        for stored in ("cachedTalkChord =", "cachedSecondTalkKey ="):
+            self.assertIn(stored, text, f"syncTalkChord() must store {stored.split()[0]}")
+        self.assertIn("KeyListenAccess.granted", text, "the access check belongs to the sync points")
+
+    def test_the_lint_sees_the_shapes_it_exists_for(self):
+        bad = ["hotkey.chordProvider = { [weak self] in self?.syncTalkChord()?.keyCode }"]
+        self.assertIn("syncTalkChord", closure_after(bad, "hotkey.chordProvider ="))
+        good = ["hotkey.secondKeyProvider = { [weak self] in", "    self?.cachedSecondTalkKey", "}", "other()"]
+        text = closure_after(good, "hotkey.secondKeyProvider =")
+        self.assertIn("cachedSecondTalkKey", text)
+        self.assertNotIn("other()", text)
+
+
+# Tests keep their settings out of the owner's ~/Library/Preferences. A throwaway suite named "zeus.x.<UUID>" leaves
+# an empty plist there for ever (cfprefsd writes it back even after removePersistentDomain), and the test runs had
+# left more than 10,000 of them. A suite named by a path in the temporary folder keeps its plist there instead.
+TEST_ROOTS = [ROOT / "Tests/ZeusAppTests", ROOT / "Tests/ZeusCoreTests"]
+TEST_SUITE_LITERAL = re.compile(r'UserDefaults\(suiteName: *"')
+TEST_SUITE_NAME = re.compile(r'(?:let|var) (?:suite|name|suiteName) *= *"[^"\n]*\\\(UUID\(')
+TEST_SUITE_FUNC = re.compile(r'-> String \{ *"[^"\n]*\\\(UUID\(')
+
+
+def preferences_leaks(text):
+    """Lines of a test file that name a settings suite outside the temporary folder."""
+    if "UserDefaults(suiteName" not in text and "JevBudgetStore(suite" not in text:
+        return []
+    problems = []
+    for number, line in enumerate(text.splitlines(), 1):
+        code = line.split("//")[0]
+        if TEST_SUITE_LITERAL.search(code) or TEST_SUITE_NAME.search(code) or TEST_SUITE_FUNC.search(code):
+            problems.append(f"line {number}: settings suite outside NSTemporaryDirectory(): {code.strip()}")
+    return problems
+
+
+class TestPreferencesStayInTemporaryFolderLint(unittest.TestCase):
+    def test_no_test_names_a_settings_suite_in_the_owner_preferences(self):
+        for root in TEST_ROOTS:
+            for path in sorted(root.rglob("*.swift")):
+                with self.subTest(path=path.name):
+                    self.assertEqual(preferences_leaks(path.read_text(encoding="utf-8")), [])
+
+    def test_preferences_leak_samples_that_must_fail(self):
+        self.assertTrue(preferences_leaks('let d = UserDefaults(suiteName: "zeus.x.\\(UUID().uuidString)")!'))
+        self.assertTrue(preferences_leaks('let suite = "zeus.x.\\(UUID().uuidString)"\nUserDefaults(suiteName: suite)'))
+        self.assertTrue(preferences_leaks('func f() -> String { "zeus.x.\\(UUID())" }\nJevBudgetStore(suite: f())'))
+        self.assertFalse(preferences_leaks('let suite = NSTemporaryDirectory() + "zeus.x.\\(UUID().uuidString)"\nUserDefaults(suiteName: suite)'))
+        self.assertFalse(preferences_leaks('let d = UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.x")'))
+
+
+# A test that turns the process-wide snapshot flag on and then suspends leaves it on for every main-actor test that
+# runs meanwhile; settings tests then skipped their writes and failed at random. Async tests inject their own fixture.
+def snapshot_flag_across_await(text):
+    problems = []
+    for match in re.finditer(r"func (\w+)\([^)]*\)[^{]*\{", text):
+        start = match.end()
+        depth, index = 1, start
+        while depth and index < len(text):
+            depth += {"{": 1, "}": -1}.get(text[index], 0)
+            index += 1
+        body = "\n".join(line.split("//")[0] for line in text[start:index].splitlines())
+        if "TopBarStyle.isSnapshot = true" in body and re.search(r"\bawait\b", body):
+            problems.append(f"{match.group(1)} sets TopBarStyle.isSnapshot and awaits")
+    return problems
+
+
+class SnapshotFlagAcrossAwaitLint(unittest.TestCase):
+    def test_no_async_test_holds_the_snapshot_flag_across_a_suspension(self):
+        for root in TEST_ROOTS:
+            for path in sorted(root.rglob("*.swift")):
+                with self.subTest(path=path.name):
+                    self.assertEqual(snapshot_flag_across_await(path.read_text(encoding="utf-8")), [])
+
+    def test_snapshot_flag_samples_that_must_fail(self):
+        bad = "func t() async {\n    TopBarStyle.isSnapshot = true\n    defer { TopBarStyle.isSnapshot = false }\n    await x()\n}\n"
+        self.assertTrue(snapshot_flag_across_await(bad))
+        self.assertFalse(snapshot_flag_across_await(bad.replace("await x()", "x()")))
+
+
+# A SwiftUI Button wrapped in `.accessibilityElement(children: .ignore)` is replaced by a new accessibility element that
+# can lose the Button's default action, so an outside AXPress (VoiceOver, Switch Control, a QA driver) did nothing. Every
+# modifier chain that is a Button under `children: .ignore`, or that adds the button trait, must carry an explicit default
+# `.accessibilityAction { ... }` (a named action does not count: it is not the one AXPress performs).
+def _indent(line):
+    return len(line) - len(line.lstrip())
+
+
+def _chain(lines, index):
+    """The modifier chain around lines[index]: its head line (or None) and the chain text."""
+    n = _indent(lines[index])
+    start = index
+    while start > 0:
+        previous = lines[start - 1]
+        if previous.strip() and _indent(previous) <= n and not previous.lstrip().startswith((".", "//")):
+            break
+        start -= 1
+    end = index + 1
+    while end < len(lines):
+        line = lines[end]
+        if line.strip() and (_indent(line) < n or (_indent(line) == n and not line.lstrip().startswith((".", "//")))):
+            break
+        end += 1
+    head = lines[start - 1] if start > 0 else ""
+    if head.strip().startswith("}"):
+        opener = start - 1
+        while opener > 0 and not (_indent(lines[opener]) == _indent(head) and not lines[opener].lstrip().startswith(("}", "."))):
+            opener -= 1
+        head = lines[opener]
+    return head, "\n".join(lines[start:end])
+
+
+DEFAULT_ACTION = re.compile(r"\.accessibilityAction\s*(?:\{|\(\.default\))")
+
+
+def button_without_default_action(text, label="sample"):
+    lines = text.splitlines()
+    problems = []
+    for index, line in enumerate(lines):
+        ignored = "children: .ignore" in line
+        tapped = ".accessibilityAddTraits(" in line and "isButton" in line
+        if line.strip().startswith("//") or not (ignored or tapped):
+            continue
+        head, chain = _chain(lines, index)
+        is_button = re.search(r"\bButton\b", head) or "isButton" in chain
+        # Only the chain's own modifiers count: an action nested inside a trailing `.overlay { ... }` belongs to a child.
+        own = "\n".join(l for l in chain.splitlines() if _indent(l) == _indent(line) and l.lstrip().startswith("."))
+        if is_button and not DEFAULT_ACTION.search(own):
+            problems.append(f"{label}:{index + 1}")
+    return sorted(set(problems))
+
+
+class ButtonDefaultActionLint(unittest.TestCase):
+    def test_every_button_under_an_ignored_element_has_a_default_action(self):
+        problems = []
+        for path in sorted(APP.rglob("*.swift")):
+            problems += button_without_default_action(path.read_text(encoding="utf-8"), str(path.relative_to(APP)))
+        # A line number is reported once per chain, so a chain with two matching modifiers is not double counted.
+        self.assertEqual(problems, [])
+
+    def test_button_default_action_samples_that_must_fail(self):
+        bad = "return Button {\n    go()\n} label: {\n    Text(\"x\")\n}\n.buttonStyle(.plain)\n.accessibilityElement(children: .ignore)\n.accessibilityLabel(\"x\")\n"
+        self.assertTrue(button_without_default_action(bad))
+        self.assertFalse(button_without_default_action(bad + ".accessibilityAction { go() }\n"))
+        # A named action is not the default one.
+        self.assertTrue(button_without_default_action(bad + ".accessibilityAction(named: \"Go\") { go() }\n"))
+        tapped = "Text(\"x\")\n    .onTapGesture { go() }\n    .accessibilityAddTraits(.isButton)\n"
+        self.assertTrue(button_without_default_action(tapped))
+        self.assertFalse(button_without_default_action(tapped + "    .accessibilityAction { go() }\n"))
+        # An action inside a child's closure is not the button's own default action.
+        nested = bad + ".overlay {\n    Text(\"y\")\n        .accessibilityAction { go() }\n}\n"
+        self.assertTrue(button_without_default_action(nested))
+        # A plain read-only element is not a button.
+        label = "VStack {\n    Text(\"x\")\n}\n.accessibilityElement(children: .ignore)\n.accessibilityLabel(\"x\")\n"
+        self.assertFalse(button_without_default_action(label))
 
 
 if __name__ == "__main__":

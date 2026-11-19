@@ -96,55 +96,64 @@ import Testing
     }
 }
 
+/// The talk key gestures, hold to talk or double-tap to latch listening on until the next tap, now driven through the
+/// voice key machine (docs/VOICE-KEY-MACHINE-PLAN.md part 5) with `confirm` 0. Each test keeps its old timeline:
+/// `stop` reads `.send`, `stopLater(0.4)` reads `.wake(after: 0.4)`, `cancelPendingStop` reads no effect, `cancelFromEsc`
+/// reads `abandon`. The `.wake(after: 0.25)` beside a start is the machine's own look at the live modifiers.
 @Suite struct TalkKeyLatchTests {
+    typealias Rig = VoiceKeyMachineTests.Rig
+    private static let ctrl = VoiceKeyMachineTests.ctrl, opt = VoiceKeyMachineTests.opt
+    private func makeRig() -> Rig { Rig(VoiceKeyMachineTests.talk()) }
+
     @Test func holdToTalk() {
-        var latch = TalkKeyLatch()
-        #expect(latch.keyDown(at: 0) == .start)
-        #expect(latch.keyUp(at: 1.2) == .stop)
+        var rig = makeRig()
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0) == [.start, .wake(after: 0.25)])
+        #expect(rig.release(Self.opt, Self.ctrl, at: 1.2) == [.send])
     }
 
     @Test func singleTapStopsAfterTheGap() {
-        var latch = TalkKeyLatch()
-        #expect(latch.keyDown(at: 0) == .start)
-        #expect(latch.keyUp(at: 0.1) == .stopLater(0.4))
-        #expect(latch.pendingStopFired() == .stop)
-        #expect(latch.keyDown(at: 2) == .start)
+        var rig = makeRig()
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0) == [.start, .wake(after: 0.25)])
+        #expect(rig.release(Self.opt, Self.ctrl, at: 0.1) == [.wake(after: 0.4)])
+        #expect(rig.tick(at: 0.5) == [.send])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 2) == [.start, .wake(after: 0.25)])
     }
 
     @Test func doubleTapLatchesUntilTheNextTap() {
-        var latch = TalkKeyLatch()
-        #expect(latch.keyDown(at: 0) == .start)
-        #expect(latch.keyUp(at: 0.1) == .stopLater(0.4))
-        #expect(latch.keyDown(at: 0.3) == .cancelPendingStop)
-        #expect(latch.keyUp(at: 0.4) == nil)
-        #expect(latch.isLatched)
-        #expect(latch.pendingStopFired() == nil)
-        #expect(latch.keyDown(at: 5) == .stop)
-        #expect(latch.keyUp(at: 5.1) == nil)
-        #expect(latch.keyDown(at: 6) == .start)
+        var rig = makeRig()
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0) == [.start, .wake(after: 0.25)])
+        #expect(rig.release(Self.opt, Self.ctrl, at: 0.1) == [.wake(after: 0.4)])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0.3) == [.wake(after: 0.25)], "the pending stop is dropped by the phase, not by an effect")
+        #expect(rig.release(Self.opt, Self.ctrl, at: 0.4) == [])
+        #expect(rig.machine.isLatched)
+        #expect(rig.tick(at: 0.5) == [], "the gap wake of the first tap finds the turn latched")
+        #expect(rig.press(Self.ctrl, Self.opt, at: 5) == [.send])
+        #expect(rig.release(Self.opt, Self.ctrl, at: 5.1) == [])
+        #expect(rig.press(Self.ctrl, Self.opt, at: 6) == [.start, .wake(after: 0.25)])
     }
 
     @Test func tapThenHoldIsANormalHold() {
-        var latch = TalkKeyLatch()
-        _ = latch.keyDown(at: 0)
-        _ = latch.keyUp(at: 0.1)
-        #expect(latch.keyDown(at: 0.3) == .cancelPendingStop)
-        #expect(latch.keyUp(at: 2) == .stop)
-        #expect(!latch.isLatched)
+        var rig = makeRig()
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        rig.release(Self.opt, Self.ctrl, at: 0.1)
+        #expect(rig.press(Self.ctrl, Self.opt, at: 0.3) == [.wake(after: 0.25)])
+        #expect(rig.release(Self.opt, Self.ctrl, at: 2) == [.send])
+        #expect(!rig.machine.isLatched)
     }
 
     @Test func escapeCancelsHoldOrLatch() {
-        var latch = TalkKeyLatch()
-        _ = latch.keyDown(at: 0)
-        #expect(latch.cancelFromEsc() == true)
-        #expect(latch.keyUp(at: 1) == nil)
-        _ = latch.keyDown(at: 2)
-        _ = latch.keyUp(at: 2.1)
-        _ = latch.keyDown(at: 2.3)
-        _ = latch.keyUp(at: 2.4)
-        #expect(latch.isLatched)
-        #expect(latch.cancelFromEsc() == true)
-        #expect(!latch.isLatched)
+        var rig = makeRig()
+        rig.press(Self.ctrl, Self.opt, at: 0)
+        #expect(rig.machine.phase != .idle)
+        #expect(rig.abandon() == [])
+        #expect(rig.machine.phase == .idle)
+        #expect(rig.release(Self.opt, Self.ctrl, at: 1) == [], "the key-up after the cancel sends nothing")
+        rig.tap([Self.ctrl, Self.opt], at: 2, length: 0.1)
+        rig.tap([Self.ctrl, Self.opt], at: 2.3, length: 0.1)
+        #expect(rig.machine.isLatched)
+        #expect(rig.abandon() == [])
+        #expect(!rig.machine.isLatched)
+        #expect(rig.machine.phase == .idle)
     }
 }
 

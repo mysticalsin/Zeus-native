@@ -12,6 +12,7 @@ enum DictationCuePlayer {
 
     /// Plays one cue. `force` is for the Settings preview: it ignores the sound switches.
     static func play(_ phase: DictationCuePhase, force: Bool = false) {
+        guard !ZeusSound.isMutedForTesting else { return }
         let settings = DictationSettings.shared
         let style = settings.cueStyle
         if !force {

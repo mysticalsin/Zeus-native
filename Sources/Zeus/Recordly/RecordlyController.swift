@@ -412,6 +412,8 @@ final class RecordlyController {
 
     /// One still of the selected display. Skipped without Screen Recording already granted; never requests it.
     private func refreshThumbnail(force: Bool) {
+        // A seeded snapshot fixture keeps the still it was given: a render must never take a real capture.
+        guard !holdsSeededStateForSnapshot else { return }
         guard screenRecordingGranted, case .display(let id)? = sourcePicker.selectionIntent else {
             thumbnailTask?.cancel()
             thumbnail = nil
@@ -463,7 +465,9 @@ final class RecordlyController {
     /// The Record page went away (another page, the notch closed): a countdown must not start a capture the owner can
     /// no longer see or cancel with Escape.
     func pageDisappeared() {
-        perform(countdown.send(.cancel))
+        // A seeded snapshot fixture is drawn more than once (1x, 2x, flat); each render ending must not cancel its
+        // countdown. The thumbnail request still stops, so a snapshot never keeps a real screen capture.
+        if !holdsSeededStateForSnapshot { perform(countdown.send(.cancel)) }
         thumbnailTask?.cancel()
     }
 
@@ -504,6 +508,8 @@ final class RecordlyController {
 
     // MARK: Snapshot harness
 
+    @ObservationIgnored private var holdsSeededStateForSnapshot = false
+
     enum SnapshotState {
         case idle
         case countdown(Int)
@@ -514,6 +520,7 @@ final class RecordlyController {
     /// Offscreen QA only: puts a controller built with a fake display lister into one visible state, with no
     /// timers, no capture and no permission request.
     func seedForSnapshot(granted: Bool, thumbnail: CGImage?, state: SnapshotState) {
+        holdsSeededStateForSnapshot = true
         screenRecordingGranted = granted
         refreshDisplays()
         self.thumbnail = granted ? thumbnail : nil

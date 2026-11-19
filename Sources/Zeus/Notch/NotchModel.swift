@@ -89,6 +89,9 @@ final class NotchModel {
         @MainActor var extraHeight: CGFloat { (detail?.height ?? 0) + previewHeight }
     }
 
+    /// Told after anything that decides which peek card is drawn changes; the window re-reads what it should take.
+    @ObservationIgnored var onCardChange: () -> Void = {}
+
     var presentation: Presentation = .closed
     /// The shape's height follows this, set in its own faster transaction (Glance's height leads its
     /// width on open). Nil follows `presentation` (snapshots, tests).
@@ -96,18 +99,18 @@ final class NotchModel {
     var shownHeight: Presentation { heightPresentation ?? presentation }
     /// When the panel last opened (starts the glass bloom).
     var openedAt: Date?
-    var sessions: [Session] = []
-    var approval: Approval?
+    var sessions: [Session] = [] { didSet { onCardChange() } }
+    var approval: Approval? { didSet { onCardChange() } }
     /// Covered window frames while Zeus works behind. Nil when nothing is streaming.
-    var workBehind: WorkBehindPreview?
+    var workBehind: WorkBehindPreview? { didSet { onCardChange() } }
     /// Before/after for a selection edit. Return accepts it.
-    var selectionEdit: SelectionEdit?
+    var selectionEdit: SelectionEdit? { didSet { onCardChange() } }
     /// "Done" card in the peek after an agent finishes.
-    var completion: AgentCompletion?
+    var completion: AgentCompletion? { didSet { onCardChange() } }
     /// Red card for a failed turn; shown in the peek until dismissed.
-    var failure: Failure?
+    var failure: Failure? { didSet { onCardChange() } }
     /// "Welcome back" recap after Tony was away; the lowest-priority peek card.
-    var recap: WelcomeRecap?
+    var recap: WelcomeRecap? { didSet { onCardChange() } }
     /// The keyboard agent picker (shortcut, arrows, Return, Esc); nil when closed.
     var picker: AgentPicker?
     /// Incoming alerts from other apps: the glass capsule under the notch (see `AlertStack`).
@@ -117,7 +120,7 @@ final class NotchModel {
         alerts.visible.first.map { NotificationLine(id: Int64($0.id) ?? 0, app: $0.appID, title: $0.title, detail: $0.body) }
     }
     /// The session the peek talks about when there is no approval.
-    var peekSessionID: String?
+    var peekSessionID: String? { didSet { onCardChange() } }
     /// Sessions ZEUS runs itself (the browser agent) get a Stop button on their card.
     @ObservationIgnored var stopHandlers: [String: @MainActor () -> Void] = [:]
 

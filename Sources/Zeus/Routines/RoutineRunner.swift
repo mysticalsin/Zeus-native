@@ -256,6 +256,7 @@ struct RoutineCardView: View {
             }
             .buttonStyle(PlainTextButtonStyle())
             .font(TopBarStyle.label(11, .semibold))
+            .foregroundStyle(Theme.cloudSecondary)
         }
         .padding(14)
         .frame(width: 400)

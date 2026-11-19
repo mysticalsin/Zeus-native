@@ -75,14 +75,20 @@ struct HomeWidgetCard: View {
         }
     }
 
+    /// Previous and Next are drawn only where the shown source can honour them; Play stays centred without them.
     private func transport(_ playing: NowPlaying?, size: CGFloat = 26) -> some View {
-        HStack {
-            GlanceRoundButton(symbol: "backward.fill", size: size, label: "Previous track") { topBar.musicCommand(.previous) }
+        let shown = NowPlayingDisplay.visibleControls(for: playing)
+        return HStack {
+            if shown.contains(.previous) {
+                GlanceRoundButton(symbol: "backward.fill", size: size, label: "Previous track") { topBar.musicCommand(.previous) }
+            }
             Spacer()
             GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 2, filled: true,
                               label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
             Spacer()
-            GlanceRoundButton(symbol: "forward.fill", size: size, label: "Next track") { topBar.musicCommand(.next) }
+            if shown.contains(.next) {
+                GlanceRoundButton(symbol: "forward.fill", size: size, label: "Next track") { topBar.musicCommand(.next) }
+            }
         }
     }
 
@@ -120,7 +126,9 @@ struct HomeWidgetCard: View {
                 HStack(spacing: 8) {
                     GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: 28, filled: true,
                                       label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
-                    GlanceRoundButton(symbol: "forward.fill", size: 26, label: "Next track") { topBar.musicCommand(.next) }
+                    if NowPlayingDisplay.visibleControls(for: playing).contains(.next) {
+                        GlanceRoundButton(symbol: "forward.fill", size: 26, label: "Next track") { topBar.musicCommand(.next) }
+                    }
                 }
             }
         }

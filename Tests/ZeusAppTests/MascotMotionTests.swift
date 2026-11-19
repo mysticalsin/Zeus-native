@@ -150,13 +150,66 @@ struct MascotMotionTests {
         #expect(AvatarState.thinking.pulses)
     }
 
-    @Test func tickRatesStayWithinTheBudget() {
+    private static let animDirectory = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/Zeus/Avatar/Anim")
+
+    @MainActor @Test func tickRatesStayWithinTheBudget() {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
         for state in AvatarState.allCases {
-            let busy = LivingAvatar.tickInterval(asleep: false, waking: false, state: state)
-            #expect(busy >= 1.0 / 24 - 1e-9)
-            #expect(state != .idle || busy >= 1.0 / 12 - 1e-9)
+            for t in stride(from: 0.0, to: 80, by: 0.05) {
+                let motion = MascotMotion.at(t, mood: .awake(state), size: 22)
+                let interval = LivingAvatar.tickInterval(for: motion, atlas: atlas)
+                #expect(interval >= 1.0 / 60 - 1e-9)
+                // Only the stroll and the short shake and jump ride faster than the slowest clip rate that is 24 fps.
+                #expect(motion.travelling || interval >= 1.0 / 24 - 1e-9, "\(state) at \(t): \(interval)")
+            }
         }
-        #expect(LivingAvatar.tickInterval(asleep: true, waking: false, state: .idle) >= 1.0 / 12 - 1e-9)
+        // At rest the idle mascot ticks at its clip's 12 fps, not faster.
+        let resting = MascotMotion.at(1, mood: .awake(.idle), size: 22)
+        #expect(abs(LivingAvatar.tickInterval(for: resting, atlas: atlas) - 1.0 / 12) < 1e-9)
+        #expect(LivingAvatar.tickInterval(for: MascotMotion.at(5, mood: .asleep, size: 22), atlas: atlas) >= 1.0 / 12 - 1e-9)
+    }
+
+    @MainActor @Test func theMascotTicksAtEachClipsOwnFPSAndSixtyOnItsStroll() throws {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
+        var seen = Set<Int>()
+        for pose in LivingPose.allCases where pose != .walking {
+            let clip = try #require(atlas.clip(pose.clipID), "\(pose) has no clip")
+            seen.insert(clip.fps)
+            let motion = MascotMotion(pose: pose)
+            #expect(abs(LivingAvatar.tickInterval(for: motion, atlas: atlas) - 1.0 / Double(clip.fps)) < 1e-9, "\(pose)")
+        }
+        #expect(seen.isSubset(of: [12, 20, 24]), "\(seen)")
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let walking = MascotMotion.at(walkStart + 0.8, mood: .awake(.idle), size: 22)
+        #expect(walking.travelling)
+        #expect(LivingAvatar.tickInterval(for: walking, atlas: atlas) == 1.0 / 60)
+        #expect(!MascotMotion.at(1, mood: .awake(.idle), size: 22).travelling)
+    }
+
+    @Test func theDisplayLinkStartsOneTickBeforeTheStrollSoItsFirstFramesAreNotLate() throws {
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let before = walkStart - 0.05
+        #expect(!MascotMotion.at(before, mood: .awake(.idle), size: 22).travelling)
+        #expect(MascotMotion.travels(at: before, within: 1.0 / 12, mood: .awake(.idle), size: 22))
+        #expect(!MascotMotion.travels(at: before, within: 0.01, mood: .awake(.idle), size: 22))
+        #expect(MascotMotion.travels(at: walkStart + 0.8, within: 0, mood: .awake(.idle), size: 22))
+        let source = try String(contentsOf: Self.animDirectory.deletingLastPathComponent().appendingPathComponent("MascotMotion.swift"), encoding: .utf8)
+        #expect(source.contains("travelling: MascotMotion.travels(at: t, within: clock.interval"))
+    }
+
+    @MainActor @Test func theStrollRunsOnTheDisplayLinkAndTheClipsOnTheirOwnTimer() throws {
+        let atlas = MascotAtlasStore(directory: Self.animDirectory)
+        let walkStart = MascotMotion.walkEvery - MascotMotion.walkLength
+        let walking = MascotMotion.at(walkStart + 0.8, mood: .awake(.idle), size: 22)
+        let clip = try #require(atlas.clip(walking.pose.clipID))
+        // The timer interval is always the clip's: 60 fps comes from the display link, not a run-loop timer.
+        #expect(abs(LivingAvatar.clipInterval(for: walking, atlas: atlas) - 1.0 / Double(clip.fps)) < 1e-9)
+        let source = try String(contentsOf: Self.animDirectory.deletingLastPathComponent().appendingPathComponent("MascotMotion.swift"), encoding: .utf8)
+        #expect(source.contains("DisplaySynchronizedView(paused: paused, preferredFramesPerSecond: Motion.ambientFPS)"))
+        #expect(source.contains("if clock.travelling"))
+        #expect(!source.contains("interval: 1 / 60"))
     }
 
     // MARK: QA7 round 11 -- `zeus debug animate <pose>` for the v2 poses no `AvatarState` reaches directly
@@ -246,21 +299,29 @@ struct MascotMotionTests {
         #expect(store.frame("idle", elapsed: 0.3, points: 22) === small) // cached, not decoded again
     }
 
-    /// Checked on disk: every state in the manifest has both atlases, timed from the manifest, with
-    /// metadata that matches the PNG on disk. Together they stay inside the bundle-size budget.
+    /// Checked on disk: every shipped state has both atlases, with metadata that matches the PNG on disk.
+    /// Together they stay inside the bundle-size budget. The design pack (`Design/mascot-v2`) is not in git, so
+    /// the shipped resources are what is always tested; when the pack is present on this machine its manifest
+    /// is also compared (same states, same kind, same timing).
     @Test func everyStateShipsAnAtlasMatchingItsMetadataAndTheManifest() throws {
         let manifestURL = Self.animDir.appendingPathComponent("../../../../Design/mascot-v2/ZEUS_Mascot_Pack_v2/manifest.json").standardizedFileURL
-        let manifest = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
-        let states = try #require(manifest["states"] as? [[String: Any]])
-        #expect(states.count == 24)
+        let manifestStates = try? (JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])?["states"] as? [[String: Any]]
+        let shipped = try FileManager.default.contentsOfDirectory(atPath: Self.animDir.path)
+            .filter { $0.hasSuffix(".json") && $0 != "index.json" }.map { String($0.dropLast(5)) }.sorted()
+        #expect(shipped.count == 24)
+        if let manifestStates {
+            #expect(manifestStates.compactMap { $0["id"] as? String }.sorted() == shipped, "the shipped states match the design manifest")
+        }
         var bytes = 0
-        for state in states {
-            let id = try #require(state["id"] as? String)
+        for id in shipped {
+            let state = manifestStates?.first { ($0["id"] as? String) == id }
             let clip = try JSONDecoder().decode(MascotClip.self, from: Data(contentsOf: Self.animDir.appendingPathComponent("\(id).json")))
             #expect(clip.state == id)
-            #expect(clip.kind == (state["timing_kind"] as? String))
-            let seconds = (state["seconds"] as? NSNumber)?.doubleValue ?? 0
-            #expect(abs(clip.length - seconds) < 0.002, "\(id) lasts \(clip.length)s, manifest says \(seconds)s")
+            if let state {
+                #expect(clip.kind == (state["timing_kind"] as? String))
+                let seconds = (state["seconds"] as? NSNumber)?.doubleValue ?? 0
+                #expect(abs(clip.length - seconds) < 0.002, "\(id) lasts \(clip.length)s, manifest says \(seconds)s")
+            }
             #expect(clip.frameDurationsMs.count == clip.frameCount && clip.frameCount >= 4)
             #expect(clip.fps >= 12 && clip.fps <= 24, "\(id) runs at \(clip.fps) fps")
             #expect(Set(clip.sizes.keys) == ["128", "320"])

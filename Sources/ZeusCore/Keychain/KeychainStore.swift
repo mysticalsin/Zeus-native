@@ -48,12 +48,18 @@ public final class KeychainStore: @unchecked Sendable {
     private var cache: [String: String] = [:]
     private var loaded = false
     private let defaults: UserDefaults
+    private let now: @Sendable () -> Date
+    private var lastRefresh: [String: Date] = [:]
+    /// Least time between two backend re-reads of the same account.
+    public static let refreshInterval: TimeInterval = 5
     /// Legacy items that exist but could not be read without a dialog.
     public private(set) var unreadableLegacy: [String] = []
 
-    public init(backend: KeychainBackend, defaults: UserDefaults = .standard) {
+    public init(backend: KeychainBackend, defaults: UserDefaults = .standard,
+                now: @escaping @Sendable () -> Date = { Date() }) {
         self.backend = backend
         self.defaults = defaults
+        self.now = now
     }
 
     /// Reads everything once (and migrates once). Safe to call again; later calls do nothing.
@@ -85,6 +91,27 @@ public final class KeychainStore: @unchecked Sendable {
     public func get(_ account: String) -> String? {
         load()
         lock.lock(); defer { lock.unlock() }
+        return cache[account]
+    }
+
+    /// Re-reads one account from the backend so a value saved outside this process (a script, another
+    /// ZEUS) shows up without a restart. The backend is asked at most once per `refreshInterval` per
+    /// account; inside that window the cached value is returned. An account that no longer exists is
+    /// cleared; one that exists but cannot be read without a dialog keeps its cached value.
+    @discardableResult
+    public func refresh(_ account: String) -> String? {
+        load()
+        lock.lock(); defer { lock.unlock() }
+        let stamp = now()
+        if let last = lastRefresh[account], stamp.timeIntervalSince(last) < Self.refreshInterval {
+            return cache[account]
+        }
+        lastRefresh[account] = stamp
+        if let value = backend.read(service: Self.service, account: account) {
+            cache[account] = value
+        } else if !backend.accounts(service: Self.service).contains(account) {
+            cache[account] = nil
+        }
         return cache[account]
     }
 
