@@ -537,12 +537,16 @@ private struct ApprovalBody: View {
                         .foregroundStyle(Theme.cloudSecondary)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
+                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
                         .accessibilityHint("Stops \(approval.agent) from running this.")
                 }
             } else if let detail = approval.detail, !MeetingState.hideDetails {
                 // Never built while details are hidden: a diff's file name and source text are the content too.
-                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: approval.resolve)
+                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: { verdict in
+                    if verdict == .deny { approval.deny() } else if verdict != .allow { approval.resolve(verdict) }
+                }, beginHold: { approval.beginHold() }, endHold: {
+                    if case .hold = approval.allowGate.gesture { approval.endHold() } else { approval.activateAllow() }
+                }, plainAllow: { approval.activateAllow() })
             }
             if approval.detail?.hasOwnActions != true {
                 if let why = facts.why {
@@ -588,27 +592,22 @@ private struct ApprovalBody: View {
                 }
                 HStack(spacing: 8) {
                     NotchButton(title: facts.keycaps ? (ApprovalCard.keycap(.deny, risk: approval.risk, modifiersHeld: true) ?? "") : "", tint: Theme.cloudSecondary, filled: false) {
-                        guarded { approval.resolve(.deny) }
+                        guarded { approval.deny() }
                     }
                     .accessibilityLabel("Deny")
-                    NotchButton(title: facts.keycaps ? (ApprovalCard.keycap(.allow, risk: approval.risk, modifiersHeld: true) ?? "") : "", tint: Theme.ember, filled: true, progress: facts.holdFraction) {
-                        guarded {
-                            if facts.twoStep {
-                                let next = ApprovalCard.nextAllowStep(allowStep, risk: approval.risk, reduceMotion: true)
-                                allowStep = next
-                                if next == .done { approval.resolve(.allow) }
-                            } else if approval.risk != .high || facts.holdFraction >= 1 {
-                                approval.resolve(.allow)
-                            }
-                        }
+                    ApprovalAllowButton(title: facts.keycaps ? (ApprovalCard.keycap(.allow, risk: approval.risk, modifiersHeld: true) ?? "") : "", tint: Theme.ember, fraction: max(facts.holdFraction, approval.allowGate.holdFraction(now: Date()))) {
+                        guarded { approval.beginHold() }
+                    } release: {
+                        if case .hold = approval.allowGate.gesture { approval.endHold() }
+                        else { guarded { approval.activateAllow() } }
+                    } accessibility: {
+                        guarded { approval.activateAllow() }
                     }
                     .accessibilityLabel(facts.twoStep && approval.allowStep == .confirm ? "Confirm allow" : "Allow")
-                    if approval.onDenyAll != nil {
-                        NotchButton(title: facts.keycaps ? "" : ApprovalCard.denyAllTitle, tint: Theme.cloudSecondary, filled: false) {
-                            guarded { approval.onDenyAll?() }
-                        }
-                        .accessibilityLabel(ApprovalCard.denyAllTitle)
+                    NotchButton(title: facts.keycaps ? "" : ApprovalCard.denyAllTitle, tint: Theme.cloudSecondary, filled: false) {
+                        guarded { approval.denyAll() }
                     }
+                    .accessibilityLabel(ApprovalCard.denyAllTitle)
                 }
             }
             if let trust = approval.trustChat, facts.allowChat, approval.detail?.hasOwnActions != true {
@@ -629,6 +628,32 @@ private struct ApprovalBody: View {
                     .accessibilityHidden(true)
             }
         }
+    }
+}
+
+/// Pointer presses begin and end a hold. A click, a key, or VoiceOver uses the plain activation,
+/// which cannot finish a high-risk hold.
+struct ApprovalAllowButton: View {
+    let title: String
+    let tint: Color
+    let fraction: Double
+    let press: () -> Void
+    let release: () -> Void
+    let accessibility: () -> Void
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.storm)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 28)
+            .background(Capsule().fill(tint.opacity(0.35 + 0.65 * fraction)))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(title)
+            .accessibilityAction(.default, accessibility)
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in press() }
+                .onEnded { _ in release() })
     }
 }
 

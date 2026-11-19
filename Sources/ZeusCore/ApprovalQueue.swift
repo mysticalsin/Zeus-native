@@ -19,6 +19,7 @@ public enum ApprovalTurn: Equatable, Sendable {
     case show(position: String)
     case waiting(position: String)
     case expired
+    case duplicate
 }
 
 /// FIFO of approval requests. The front card is the only one shown. There is no allow-all.
@@ -38,6 +39,7 @@ public struct ApprovalQueueState: Equatable, Sendable {
     public mutating func enqueue(_ ticket: ApprovalTicket, now: Date? = nil) -> ApprovalTurn {
         let now = now ?? ticket.arrived
         guard now < ticket.helperDeadline else { return .expired }
+        if items.contains(where: { $0.id == ticket.id }) { return .duplicate }
         items.append(ticket)
         items.sort { $0.arrived < $1.arrived }
         guard let index = items.firstIndex(where: { $0.id == ticket.id }) else { return .expired }
@@ -56,14 +58,25 @@ public struct ApprovalQueueState: Equatable, Sendable {
         items = []
         return denied
     }
+
+    /// Drops every ticket whose helper deadline has been reached. The caller supplies the clock.
+    public mutating func dropExpired(now: Date) -> [ApprovalTicket] {
+        let expired = items.filter { now >= $0.helperDeadline }
+        items.removeAll { now >= $0.helperDeadline }
+        return expired
+    }
 }
 
 public actor ApprovalGate {
     public static let shared = ApprovalGate()
     private var state = ApprovalQueueState()
     private var waiters: [String: CheckedContinuation<Void, Never>] = [:]
+    private var cancelled: Set<String> = []
+    private let now: @Sendable () -> Date
 
-    public init() {}
+    public init(now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
+    }
 
     public var front: ApprovalTicket? { state.front }
 
@@ -73,37 +86,63 @@ public actor ApprovalGate {
     }
 
     public func enqueue(_ ticket: ApprovalTicket) -> ApprovalTurn {
-        state.enqueue(ticket)
+        sweep()
+        if state.items.contains(where: { $0.id == ticket.id }) || waiters[ticket.id] != nil {
+            return .duplicate
+        }
+        return state.enqueue(ticket, now: now())
     }
 
     public func waitUntilFront(_ id: String) async {
         if state.front?.id == id { return }
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if waiters[id] != nil {
+                continuation.resume()
+                return
+            }
             waiters[id] = continuation
         }
     }
 
-    private var cancelled: Set<String> = []
+    /// Removes the front card only when it is still this request.
+    @discardableResult
+    public func clearFront(id: String) -> ApprovalTicket? {
+        guard state.front?.id == id else { return nil }
+        let removed = state.clearFront()
+        wakeNext()
+        return removed
+    }
 
     public func denyAll() {
         let denied = state.denyAll()
-        for ticket in denied { cancelled.insert(ticket.id) }
-        let pending = waiters
-        waiters = [:]
-        for waiter in pending.values { waiter.resume() }
+        for ticket in denied {
+            cancelled.insert(ticket.id)
+            waiters.removeValue(forKey: ticket.id)?.resume()
+        }
     }
 
     public func wasCancelled(_ id: String) -> Bool {
         cancelled.remove(id) != nil
     }
 
-    @discardableResult
-    public func clearFront() -> ApprovalTicket? {
-        let removed = state.clearFront()
+    /// False once the helper deadline has passed or this request is not the front card.
+    public func permits(_ id: String) -> Bool {
+        sweep()
+        guard let front = state.front, front.id == id else { return false }
+        return now() < front.helperDeadline
+    }
+
+    private func sweep() {
+        for ticket in state.dropExpired(now: now()) {
+            cancelled.insert(ticket.id)
+            waiters.removeValue(forKey: ticket.id)?.resume()
+        }
+    }
+
+    private func wakeNext() {
         if let next = state.front, let waiter = waiters.removeValue(forKey: next.id) {
             waiter.resume()
         }
-        return removed
     }
 }
 
@@ -192,21 +231,93 @@ public enum ApprovalPolicy {
     }
 }
 
+public struct ApprovalAllowGate: Equatable, Sendable {
+    public var risk: HookEvent.Risk
+    public var reduceMotion: Bool
+    public var voiceOver: Bool
+    public private(set) var armed = false
+    public private(set) var holdingSince: Date?
+
+    public init(risk: HookEvent.Risk, reduceMotion: Bool = false, voiceOver: Bool = false) {
+        self.risk = risk
+        self.reduceMotion = reduceMotion
+        self.voiceOver = voiceOver
+    }
+
+    public var gesture: ApprovalGesture {
+        ApprovalPolicy.allowGesture(risk: risk, reduceMotion: reduceMotion, voiceOver: voiceOver)
+    }
+
+    /// One click, key, or VoiceOver activation. A high-risk hold or the first confirm step does not allow.
+    public mutating func activate(now: Date) -> HookDecision.Verdict? {
+        switch gesture {
+        case .tap:
+            return .allow
+        case .hold:
+            if holdingSince == nil { holdingSince = now }
+            return nil
+        case .secondConfirm:
+            if armed { return .allow }
+            armed = true
+            return nil
+        }
+    }
+
+    /// Ends a press. Allows only when the hold has run for the full gesture.
+    public mutating func releaseHold(now: Date) -> HookDecision.Verdict? {
+        guard case .hold(let seconds) = gesture, let start = holdingSince else { return nil }
+        let elapsed = now.timeIntervalSince(start)
+        holdingSince = nil
+        return elapsed >= seconds ? .allow : nil
+    }
+
+    public func holdFraction(now: Date) -> Double {
+        guard case .hold(let seconds) = gesture, let start = holdingSince, seconds > 0 else { return 0 }
+        return min(max(now.timeIntervalSince(start) / seconds, 0), 1)
+    }
+}
+
 public struct ApprovalAudit: Equatable, Sendable {
+    public static let capacity = 200
+    public enum Kind: String, Equatable, Sendable {
+        case card, shortcut, voice, timeout, trusted
+    }
+
     public private(set) var entries: [String] = []
 
     public init() {}
 
+    public static func plain(_ text: String) -> String {
+        String(text.unicodeScalars.filter { scalar in
+            scalar.value >= 32 && scalar.value != 127 && scalar.properties.generalCategory != .control
+        }.map(Character.init))
+    }
+
+    public mutating func record(kind: Kind, session: String, command: String, verdict: String) {
+        entries.append("\(kind.rawValue) \(Self.plain(session)): \(Self.plain(command)) \(Self.plain(verdict))")
+        trim()
+    }
+
     public mutating func recordTrustedApproval(session: String, command: String) {
-        entries.append("trusted approval \(session): \(command)")
+        entries.append("trusted approval \(Self.plain(session)): \(Self.plain(command))")
+        trim()
+    }
+
+    private mutating func trim() {
+        if entries.count > Self.capacity { entries.removeFirst(entries.count - Self.capacity) }
     }
 }
 
 public actor ApprovalAuditLog {
     public static let shared = ApprovalAuditLog()
-    public private(set) var entries: [String] = []
+    private var audit = ApprovalAudit()
+    public var entries: [String] { audit.entries }
+
+    public func record(kind: ApprovalAudit.Kind, session: String, command: String, verdict: String) {
+        audit.record(kind: kind, session: session, command: command, verdict: verdict)
+    }
 
     public func recordTrustedApproval(session: String, command: String) {
-        entries.append("trusted approval \(session): \(command)")
+        audit.recordTrustedApproval(session: session, command: command)
     }
 }
