@@ -4297,13 +4297,13 @@
     },
     {
       "id": "REG-404",
-      "failure": "A hover used to hold the meeting card forever, which was the bug. The hover now pauses dismissal for at most 30 s, then the card dismisses. The card lifetime stays 45 s.",
+      "failure": "The meeting card timed out under the pointer of the person about to tap it.",
       "features": [
         "F04"
       ],
       "check": "portable-scribe",
       "guard": {
-        "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
+        "file": "Tests/ZeusCoreTests/ScribePopupLifecycleTests.swift",
         "function": "theCardNeverExpiresUnderThePointer"
       }
     },
