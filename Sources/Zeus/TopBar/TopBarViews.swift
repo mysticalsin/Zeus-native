@@ -1558,8 +1558,10 @@ struct ClosedWings: View {
                 AlbumTile(playing: topBar.nowPlaying, size: 18)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
+                    .clipped()
             } right: {
                 LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
+                    .clipped()
             }
         case .none:
             EmptyView()
@@ -1568,7 +1570,8 @@ struct ClosedWings: View {
 
     private func wings<L: View, R: View>(@ViewBuilder left: () -> L, @ViewBuilder right: () -> R) -> some View {
         // Width springs via `NotchView.wingsSpring`; scale insertion caused a one-frame full-size jump (R24 C1).
-        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar), left: left(), right: right())
+        let music = if case .music = Self.kind(of: topBar) { true } else { false }
+        ClosedWingsRow(notchGap: notchGap, extra: Self.extraWidth(for: topBar), clipMusic: music, left: left(), right: right())
     }
 
     static let wingWidth: CGFloat = NotchClosedBodyLayout.wingWidth
@@ -1870,33 +1873,34 @@ struct DictationWave: View {
     }
 }
 
-/// The closed wings as `NotchClosedBodyLayout.closedWingGeometry` places them: two equal wings and a gap that
+/// The closed wings as `NotchClosedBodyLayout.rowLayout` places them: two equal wings and a gap that
 /// is exactly the notch, so no wing content can start under the camera.
 struct ClosedWingsRow<L: View, R: View>: View {
     let notchGap: CGFloat
     let extra: CGFloat
+    var clipMusic = false
     let left: L
     let right: R
 
     var body: some View {
-        let geometry = NotchClosedBodyLayout.closedWingGeometry(notchWidth: notchGap, shoulder: 0, extra: extra)
+        let layout = NotchClosedBodyLayout.rowLayout(notchWidth: notchGap, extra: extra, clipsMusic: clipMusic)
         // Each wing is a fixed-width clear box with its content overlaid: a wing with nothing in it (the resting
-        // mascot's right side) still takes its width, so the gap cannot slide off the notch.
+        // mascot's right side) still takes its width, so the gap cannot slide off the notch. Only music is clipped
+        // to the box. A cue-icon shadow and the mascot glow paint into the outer inset.
         HStack(spacing: 0) {
-            Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
-                .overlay(alignment: .leading) {
-                    left.frame(width: geometry.wingContentWidth, alignment: .leading).clipped()
-                        .ownedJourneyControl("closed-wings.left.content")
-                }
-                .ownedJourneyControl("closed-wings.left")
-            Color.clear.frame(width: geometry.gapWidth)
-            Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
-                .overlay(alignment: .trailing) {
-                    right.frame(width: geometry.wingContentWidth, alignment: .trailing).clipped()
-                        .ownedJourneyControl("closed-wings.right.content")
-                }
-                .ownedJourneyControl("closed-wings.right")
+            wingBox(layout.leftWidth, alignment: .leading, content: left, id: "left")
+            Color.clear.frame(width: layout.gapWidth)
+            wingBox(layout.rightWidth, alignment: .trailing, content: right, id: "right")
         }
+    }
+
+    private func wingBox<V: View>(_ width: CGFloat, alignment: Alignment, content: V, id: String) -> some View {
+        Color.clear.frame(width: width).frame(maxHeight: .infinity)
+            .overlay(alignment: alignment) {
+                content.frame(width: width, alignment: alignment)
+                    .ownedJourneyControl("closed-wings.\(id).content")
+            }
+            .ownedJourneyControl("closed-wings.\(id)")
     }
 }
 

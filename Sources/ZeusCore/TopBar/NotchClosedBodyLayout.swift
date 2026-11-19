@@ -78,11 +78,14 @@ public enum NotchClosedBodyLayout {
         clipsMusic: Bool
     ) -> ClosedWingRowLayout {
         let box = max(0, wingWidth - contentInset + extra)
-        // The 14 pt failure: each wing kept its own proposal, so art and bars 14 pt apart skewed the pair.
-        let left = max(box, leftProposal)
-        let right = max(box, rightProposal)
-        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: left, rightWidth: right,
-                                   outwardInset: clipsMusic ? 0 : contentInset)
+        if clipsMusic {
+            return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: box, rightWidth: box, outwardInset: 0)
+        }
+        // Both wings take one width, at most the box plus the outer inset. A 14 pt proposal cannot skew the pair,
+        // and the glow still has the inset to paint into.
+        let cap = box + contentInset
+        let wanted = max(box, min(cap, max(leftProposal, rightProposal)))
+        return ClosedWingRowLayout(gapWidth: notchWidth, leftWidth: wanted, rightWidth: wanted, outwardInset: contentInset)
     }
 
     /// Extra width on each wing for a cue kind (mirrors `ClosedWings.extraWidth` in the app target).

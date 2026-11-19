@@ -98,43 +98,20 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
     // MARK: Timing
 
-    /// The windows the walk's age fold is derived from. The stored values are fixed. A test shifts `active`.
+    /// The windows the walk's age fold is derived from. These are fixed. A test injects its own copy into the harness.
     enum Timing {
-        static let shippedStep: TimeInterval = 0.05
-        static let shippedCheckEvery: TimeInterval = 0.25
-        static let shippedHoldTapMax: TimeInterval = 0.30
-        static let shippedSharedTapMax: TimeInterval = 0.25
-        static let shippedHoldGap: TimeInterval = 0.40
-        static let shippedSharedGap: TimeInterval = 0.35
-        static let shippedPointingWatchdog: TimeInterval = PointingKeyGesture.watchdog
-        static let shippedSharedDictationDelay: TimeInterval = 0.25
-
-        struct Values: Equatable {
-            var step = Timing.shippedStep
-            var checkEvery = Timing.shippedCheckEvery
-            var holdTapMax = Timing.shippedHoldTapMax
-            var sharedTapMax = Timing.shippedSharedTapMax
-            var holdGap = Timing.shippedHoldGap
-            var sharedGap = Timing.shippedSharedGap
-            var pointingWatchdog = Timing.shippedPointingWatchdog
-            var sharedDictationDelay = Timing.shippedSharedDictationDelay
-        }
-
-        static var active = Values()
-        static var step: TimeInterval { active.step }
-        static var checkEvery: TimeInterval { active.checkEvery }
-        static var holdTapMax: TimeInterval { active.holdTapMax }
-        static var sharedTapMax: TimeInterval { active.sharedTapMax }
-        static var holdGap: TimeInterval { active.holdGap }
-        static var sharedGap: TimeInterval { active.sharedGap }
-        static var pointingWatchdog: TimeInterval { active.pointingWatchdog }
-        static var sharedDictationDelay: TimeInterval { active.sharedDictationDelay }
+        static let step: TimeInterval = 0.05
+        static let checkEvery: TimeInterval = 0.25
+        static let holdTapMax: TimeInterval = 0.30
+        static let sharedTapMax: TimeInterval = 0.25
+        static let holdGap: TimeInterval = 0.40
+        static let sharedGap: TimeInterval = 0.35
+        static let pointingWatchdog: TimeInterval = PointingKeyGesture.watchdog
+        static let sharedDictationDelay: TimeInterval = 0.25
         /// One step past the longest gap, so the cap is past every window.
-        static var cap: TimeInterval { active.holdGap + active.step }
+        static var cap: TimeInterval { holdGap + step }
 
         static func steps(_ seconds: TimeInterval) -> Int { Int((seconds / step).rounded()) }
-
-        static func restoreDefaults() { active = Values() }
 
         /// Step counts of the windows, including `confirm` and the cap. Sorted, with duplicates removed.
         static func cuts(confirm: TimeInterval) -> [Int] {

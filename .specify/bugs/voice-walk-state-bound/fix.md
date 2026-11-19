@@ -1,4 +1,4 @@
-# Bug Fix: Shipped talk walk explodes to 1,883,647 states
+# Bug Fix: Shipped talk walk
 
 - **Slug**: voice-walk-state-bound
 - **Fixed**: 2026-11-19
@@ -7,27 +7,32 @@
 
 ## Summary
 
-A bound no longer lets the walk pass. If a bound or `WALK_LIMIT` stops the search, the run is marked truncated and fails. The shipped talk walk has no bound. Ages fold onto the rule thresholds, and only-Option-down is the same state as only-Control-down when the own set is exactly that pair. The canonical graph has 906,972 states. A search wait jumps to the soonest timer in `VoiceKeyMachine.Timing` (wakes, the confirm, the check, confirm plus the check, the gaps, the pointing watchdog and the shared dictation delay), and still no further than the next age cut. Visited states are compared by the whole key. The replay tests are unchanged.
+The canonical graph is the search the shipped talk run prints. It is not 864,682 and it is not 906,972: those two numbers disagreed, and neither is taken from a `swift test` log of this head. A bound or `WALK_LIMIT` still fails the run. Ages fold onto the fixed timing lets. The harness keeps its own clock and windows, so a test can shift a window without a mutable static on the machine. `Sim.now`, wake steps and cuts use that one quantum. The agreement walks include the late, held and chord moves.
 
 ## Changes
 
 | File | Change | Notes |
 |------|--------|-------|
-| `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift` | Search waits jump to the soonest machine timer. Visited states are the whole key. | Run A has no bound. The count is 906,972. |
+| `Sources/ZeusCore/VoiceKeyMachine.swift` | Timing values are `let`. | No `Timing.active`. |
+| `Tests/ZeusCoreTests/VoiceKeyWalkTests.swift` | Harness `WalkTiming`. Agreement moves. Unpinned count. | The printed state count is the graph. |
+| `Sources/Zeus/Pointing/PointingHotkeyMonitor.swift` | Watchdog period is `PointingKeyGesture.watchdog`. | Not the literal 0.25. |
 
 ## Tests Added or Updated
 
 - `VoiceKeyWalkTests.theShippedTalkHoldWalkFinishesUnderItsStateBound`
+- `VoiceKeyWalkTests.theExactAndFoldedWalksAgreePastTheFirstCut`
+- `VoiceKeyWalkTests.theControlOptionMergeAgreesWithTheUnmergedWalk`
+- `VoiceKeyWalkTests.shiftingEachMachineWindowChangesTheWalk`
+- `VoiceKeyWalkTests.productionTimingsAreFixedLets`
 
 ## Local Verification
 
-- A throwaway optimized build of this harness, not `swift test`, reported 906,972 states, depth 33, no violations. The exact-age walk and the folded walk are compared past the confirm cut, and the Control/Option mirror is compared with the mirror off. Shifting each `Timing` window by one step changes that window's own probe.
-- The replay functions are not edited. The macOS package was not built.
+- Planner and closed-loop selftests on Linux. The Swift walk was not executed here.
 
 ## Deviations from Assessment
 
-None.
+The exact state count stays unpinned until one hosted log of this head prints it.
 
 ## Follow-ups
 
-- Read the hosted ZeusCoreTests log. Run A should print 864682 states and the run must not be truncated.
+- Read the hosted ZeusCoreTests log for this head. The run A line is the canonical count.

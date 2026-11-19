@@ -1,4 +1,4 @@
-# Bug Verification: Shipped talk walk explodes to 1,883,647 states
+# Bug Verification: Shipped talk walk
 
 - **Slug**: voice-walk-state-bound
 - **Tested**: 2026-11-19
@@ -8,25 +8,24 @@
 
 ## Summary
 
-The silent 200,000 ceiling is gone. A local optimized run of the jump walk reported 906,972 states, depth 33, no violations. The exact and folded walks are compared past the first cut, and each Timing window has its own one-step probe. The hosted suite has not been re-run. This is not a verified verdict.
+The silent 200,000 ceiling is gone. The search prints its state count and fails if it is truncated. That count is not pinned. 864,682 and 906,972 were both written down, and no single `swift test` log of this head records one of them as the count, so neither number is the canonical graph. The agreement walks use the late, held and chord moves as well as the reference pair. Linux did not run the Swift suite.
 
 ## Checks Performed
 
 | Check | Command / Action | Result | Notes |
 |-------|------------------|--------|-------|
-| Reproduction (post-fix) | ZeusCoreTests voice walk on a Mac | not-run | The previous log showed 1883647 states before the ceiling. |
-| New / updated tests | `theShippedTalkHoldWalkFinishesUnderItsStateBound` | not-run | Linux cannot compile this target. |
-| Bridge replay tests | unchanged source | not-run | They were not edited and were not re-run. |
-| Regression suite | Hosted Zeus checks | not-run | Waiting on the hosted run. |
+| State count | `theShippedTalkHoldWalkFinishesUnderItsStateBound` | not-run | Unpinned. The run must finish, stay untruncated, and report more than 100 states. |
+| Agreement | `theExactAndFoldedWalksAgreePastTheFirstCut`, `theControlOptionMergeAgreesWithTheUnmergedWalk` | not-run | Late, held and chord moves are in the set. `reference: true` is not used. |
+| Hosted log | runs 44445557994 and 44445566167 | read | Both are SHA 48add1d1. The walk line there is `1883647 states`, from before this fold. |
 
 ## Output Excerpts
 
-Previous hosted line, before this fix: `voice key walk A talk hold Control-Option confirm 0.15: 1883647 states, 28473473 moves, 1067.94 s`.
+`voice key walk A talk hold Control-Option confirm 0.15: 1883647 states, 28473473 moves, 1067.94 s` in run 44445557994. That is the unfolded graph, not a count for this head.
 
 ## Residual Risks
 
-- Orders past the ceiling in this one run are not searched. The replay tests still cover the orders they name.
+- The canonical count is the next hosted line for run A. Until that line exists, the two earlier numbers stay unpinned.
 
 ## Recommendation
 
-Hold. Do not call this verified until the hosted Core suite finishes and the printed state count for run A is at or under 200,000.
+Hold the exact count until a hosted `swift test` log of this head prints it.
