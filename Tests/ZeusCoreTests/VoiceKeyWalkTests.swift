@@ -1601,8 +1601,13 @@ private final class FullWalkCache: @unchecked Sendable {
 
 private let fullWalkCache = FullWalkCache()
 
+/// Effects copied with a search node. The log is not part of the state, but each edge still copies it.
+private var walkLogEffectsCopied = 0
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
-private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
+/// `stopAfterStates`: measure a prefix. It is not a pass and it is not cached.
+private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil,
+                    stopAfterStates: Int? = nil) -> Report {
     let cacheable = !stopAtFirst && until == nil
     if cacheable, let cached = fullWalkCache.report(named: run.name), !searchHitItsBudget(cached) {
         return cached
@@ -1643,6 +1648,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
                 try? handle.close()
             }
         }
+        if let stopAfterStates, seen.count > stopAfterStates { break }
         if seen.count > limit {
             report.violations.append("the search passed the limit of \(limit) states")
             break
@@ -1653,6 +1659,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         frontier[cursor] = nil
         record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
         for move in sim.moves(run) {
+            walkLogEffectsCopied += sim.log.count
             var next = sim
             next.found = []
             next.apply(move, run)
@@ -1676,7 +1683,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         try? handle.close()
     }
     report.visited = Set(seen.keys)
-    if cacheable, !searchHitItsBudget(report), limit == walkSearchStateBudget {
+    if cacheable, stopAfterStates == nil, !searchHitItsBudget(report), limit == walkSearchStateBudget {
         fullWalkCache.store(report, named: run.name)
     }
     return report
@@ -1994,6 +2001,14 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 
     /// The plain walk calls the same full search as run A. That search has to have a finite state budget, or a second
     /// walk of the same graph keeps running past the suite limit.
+    /// The effect log rides along on every edge. A short prefix already copies more effects than it has states.
+    @Test func theSearchCopiesABoundedEffectLog() {
+        walkLogEffectsCopied = 0
+        let report = search(WalkRun.all[0], stopAfterStates: 40)
+        #expect(report.states > 20)
+        #expect(walkLogEffectsCopied < report.states)
+    }
+
     @Test func thePlainWalkSearchHasAFiniteBudget() {
         #expect(walkSearchStateBudget < Int.max, "aPlainWalk's search has no finite state budget")
         #expect(walkSearchStateBudget == 1_883_647)
