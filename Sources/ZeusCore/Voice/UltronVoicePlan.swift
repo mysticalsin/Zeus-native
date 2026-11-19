@@ -23,6 +23,31 @@ public enum UltronVoicePlan {
         }
     }
 
+    /// The engine a launch starts on. Only an explicit owner pick (`voice.engine.userSelected`) beats the
+    /// default order: ElevenLabs, then Kokoro, then the Mac voice.
+    public static func initialEngine(stored: Engine?, userSelected: Bool, kokoroReady: Bool, elevenLabsKeyValid: Bool) -> Engine {
+        if let stored, userSelected { return stored }
+        return preferred(kokoroReady: kokoroReady, elevenLabsKeyValid: elevenLabsKeyValid)
+    }
+
+    /// The provider shown in Settings when the owner never picked one: ElevenLabs whenever its key is usable.
+    public static func defaultProvider(kokoroReady: Bool, elevenLabsKeyValid: Bool) -> VoiceTTSProvider {
+        elevenLabsKeyValid ? .elevenLabs : .kokoro
+    }
+
+    /// How long ElevenLabs stays out of the chain after a failed request: a bad key or empty credits
+    /// (401, 402) for 15 minutes; a network error or timeout (nil status), a rate limit or a server error
+    /// for 60 seconds, so the rest of that reply and the next few go straight to Kokoro.
+    public static func pauseSeconds(status: Int?) -> TimeInterval {
+        (status == 401 || status == 402) ? 15 * 60 : 60
+    }
+
+    /// A stored pause only counts until its time passes, so ElevenLabs is tried again after credits reset.
+    public static func isPaused(until: Date?, now: Date) -> Bool {
+        guard let until else { return false }
+        return until > now
+    }
+
     /// 401 and 402 mean the key itself is bad. Speak with the local engine instead, and do not say an error aloud.
     /// Nil for any other status (the caller keeps its own retry or rate-limit pause).
     public static func afterRejection(status: Int, kokoroReady: Bool) -> Engine? {

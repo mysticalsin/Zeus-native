@@ -62,6 +62,6 @@ Anthropic API key (`assistant.key.anthropic`) for the 1.2 s route, and an Eleven
 
 ## Verified and not verified
 
-Verified from documentation text: ElevenLabs model list (`eleven_flash_v2_5` fastest, `eleven_v4` highest quality and expressive), PCM output formats (`pcm_44100` needs Pro; tier rules for other rates are not stated, so 24 kHz is used), `optimize_streaming_latency` is deprecated but still accepted.
+Verified from documentation text: ElevenLabs model list (`eleven_flash_v2_5` fastest, the Studio option is now `eleven_multilingual_v2`, a known model), PCM output formats (`pcm_44100` needs Pro; tier rules for other rates are not stated, so 24 kHz is used), `optimize_streaming_latency` is deprecated but still accepted.
 
-Not verified: that `eleven_v4` accepts the streaming endpoint (the Studio option falls back to the fast model for the whole answer if refused), the Spoken Content settings pane anchor, `claude-haiku-5-5` request fields on this account (the request retries plain forms), and the OpenAI fastest model name.
+Not verified: that `eleven_multilingual_v2` accepts the streaming endpoint (the Studio option falls back to the fast model for the whole answer if refused), the Spoken Content settings pane anchor, `claude-haiku-5-5` request fields on this account (the request retries plain forms), and the OpenAI fastest model name.

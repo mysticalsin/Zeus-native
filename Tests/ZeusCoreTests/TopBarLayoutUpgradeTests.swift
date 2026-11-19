@@ -20,21 +20,22 @@ import Testing
 }
 
 @Suite struct TenTabRowTests {
-    @Test func defaultRowIsThirteenWithAgentsSecondAndScribeLast() {
-        #expect(TopBarLayout.defaultRow.count == 13)
-        #expect(TopBarLayout.defaultRow[1] == .agents)
+    @Test func defaultRowIsFourteenWithTilingSecondAgentsThirdAndScribeLast() {
+        #expect(TopBarLayout.defaultRow.count == 14)
+        #expect(TopBarLayout.defaultRow[1] == .tiling)
+        #expect(TopBarLayout.defaultRow[2] == .agents)
         #expect(TopBarLayout.defaultRow.last == .scribe)
         let recordly = TopBarLayout.defaultRow.firstIndex(of: .recordly)
         let scribe = TopBarLayout.defaultRow.firstIndex(of: .scribe)
         #expect(recordly != nil && scribe != nil && recordly! < scribe!)
-        // Polyglot metadata is unchanged; Agents moved it to the eleventh place.
-        #expect(TopBarLayout.defaultRow[10] == .polyglot)
+        // Polyglot metadata is unchanged; Tiling moved it to the twelfth place.
+        #expect(TopBarLayout.defaultRow[11] == .polyglot)
         #expect(TopBarTab.polyglot.title == "Polyglot")
         #expect(TopBarTab.polyglot.symbol == "globe")
         #expect(TopBarTab.scribe.title == "Scribe")
         #expect(TopBarTab.scribe.symbol == "waveform.and.mic")
-        #expect(TopBarLayout.standard.tabs.prefix(13).elementsEqual(TopBarLayout.defaultRow))
-        #expect(GlanceTopBar.maxTabs == 13)
+        #expect(TopBarLayout.standard.tabs.prefix(14).elementsEqual(TopBarLayout.defaultRow))
+        #expect(GlanceTopBar.maxTabs == 14)
     }
 
     @Test func agentsUpgradePutsAgentsAfterHomeOnce() {
@@ -42,7 +43,8 @@ import Testing
         let saved = TopBarLayout(tabs: [.home, .chat, .notifications, .clipboard, .shelf, .todo, .dictation, .teleprompter,
                                         .insomnia, .polyglot, .recordly, .scribe, .reminders, .today, .agents, .music])
         let upgraded = saved.upgradedToAgentsRow()
-        #expect(Array(upgraded.tabs.prefix(13)) == TopBarLayout.defaultRow)
+        // This saved row has no Tiling tab, so the first thirteen are the default row without it.
+        #expect(Array(upgraded.tabs.prefix(13)) == TopBarLayout.defaultRow.filter { $0 != .tiling })
         #expect(GlanceTabRow.visible(upgraded.tabs, selected: .home).contains(.agents))
         // A layout without Agents gets it; one that already has it in front is unchanged.
         let custom = TopBarLayout(tabs: [.home, .chat])
@@ -116,12 +118,12 @@ import Testing
         #expect(layout.contains(.polyglot))
     }
 
-    @Test func thirteenTabsFitTheRoom() {
+    @Test func fourteenTabsFitTheRoom() {
         // Worst case: the longest selected label ("Teleprompter" is "Prompter"; Polyglot and Recordly are 8 letters) and three counts.
         let widest = TopBarLayout.defaultRow.map { GlanceTopBar.selectedPillWidth(title: $0.title, countWidth: 26) }.max() ?? 0
-        let worst = GlanceTopBar.capsuleWidth(tabs: 13, countsExtra: 3 * 26 + widest - GlanceTopBar.selectedPill.width)
+        let worst = GlanceTopBar.capsuleWidth(tabs: 14, countsExtra: 3 * 26 + widest - GlanceTopBar.selectedPill.width)
         #expect(worst < GlanceTopBar.rowRoom)
-        // Plain case: no counts, Home selected (13 tabs are 657 pt wide); the bound is the real row room.
-        #expect(GlanceTopBar.capsuleWidth(tabs: 13) < GlanceTopBar.rowRoom)
+        // Plain case: no counts, Home selected (14 tabs are 652 pt wide); the bound is the real row room.
+        #expect(GlanceTopBar.capsuleWidth(tabs: 14) < GlanceTopBar.rowRoom)
     }
 }

@@ -88,7 +88,7 @@ struct AIProvidersTests {
 @Suite("Jev local estimate cap")
 struct JevHardCapTests {
     @Test func noSettingRaisesTheCapPastTenDollars() async {
-        let suite = "zeus.test.jevcap.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jevcap.\(UUID().uuidString)"
         let guardian = JevGuard(key: "k", store: JevBudgetStore(suite: suite))
         await guardian.setCap(500)
         #expect(await guardian.budget.monthlyCap == 10)
@@ -109,7 +109,7 @@ struct JevHardCapTests {
 @Suite("Jev in-flight reservations")
 struct JevReservationTests {
     @Test func reservesConcurrentSpendAndReconcilesActualUsage() async throws {
-        let suite = "zeus.test.jev-reservations.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jev-reservations.\(UUID().uuidString)"
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         let store = JevBudgetStore(suite: suite)
         let request = jevRequest()
@@ -152,7 +152,7 @@ struct JevReservationTests {
     }
 
     @Test func ambiguousProviderFailureBlocksRetryUntilUsageIsReconciled() async throws {
-        let suite = "zeus.test.jev-reservation-error.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jev-reservation-error.\(UUID().uuidString)"
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         let store = JevBudgetStore(suite: suite)
         let request = jevRequest()
@@ -190,7 +190,7 @@ struct JevReservationTests {
     }
 
     @Test func cancellationKeepsTheReservationUntilReconciliation() async throws {
-        let suite = "zeus.test.jev-reservation-cancel.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jev-reservation-cancel.\(UUID().uuidString)"
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         let store = JevBudgetStore(suite: suite)
         let request = jevRequest()
@@ -209,7 +209,7 @@ struct JevReservationTests {
     }
 
     @Test func settingCapFromAStaleGuardPreservesSettledUsage() async throws {
-        let suite = "zeus.test.jev-stale-cap.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jev-stale-cap.\(UUID().uuidString)"
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         let store = JevBudgetStore(suite: suite)
         let request = jevRequest()
@@ -230,7 +230,7 @@ struct JevReservationTests {
     }
 
     @Test func usageAboveEstimateCanStillExceedTheLocalCap() async throws {
-        let suite = "zeus.test.jev-reservation-overage.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.jev-reservation-overage.\(UUID().uuidString)"
         defer { UserDefaults().removePersistentDomain(forName: suite) }
         let store = JevBudgetStore(suite: suite)
         let request = jevRequest()
@@ -294,7 +294,7 @@ struct JevSettingsTestModeTests {
 
     #if DEBUG
     @Test func volatileFixtureCanReconcileWithoutTouchingAnyPreferencesOrProvider() async throws {
-        let suiteName = "zeus.test.jev-harness-isolation.\(UUID().uuidString)"
+        let suiteName = NSTemporaryDirectory() + "zeus.test.jev-harness-isolation.\(UUID().uuidString)"
         let preferences = try #require(UserDefaults(suiteName: suiteName))
         defer { preferences.removePersistentDomain(forName: suiteName) }
         let sentinel = Data("pre-existing suite value".utf8)

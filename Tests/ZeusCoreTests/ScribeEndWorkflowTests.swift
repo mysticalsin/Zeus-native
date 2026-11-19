@@ -147,4 +147,141 @@ struct ScribeEndWorkflowTests {
             #expect(applied36)
         }
     }
+
+    // MARK: A detector signal only suggests an end
+
+    @Test func microphoneReleaseNeverStopsOnItsOwn() {
+        let id = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: id, boundCall: nil)
+        let suggested = flow.suggestEnd(session: id, now: 20)
+        #expect(suggested)
+        #expect(flow.isSuggested)
+        #expect(flow.reason == .callLooksOver)
+        #expect(flow.deadline == nil)
+        #expect(flow.remaining(now: 20) == nil)
+        for now: TimeInterval in [29, 30, 60, 3_600, 20 + 3_600] {
+            let stopped = flow.stopIfDue(session: id, now: now)
+            #expect(!stopped)
+        }
+        #expect(!flow.stopRequested)
+        let ended = flow.endNow(session: id)
+        #expect(!ended)
+    }
+
+    @Test func aSuggestionStartsClearAndKeepRecordingClearsIt() {
+        let id = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: id, boundCall: owner)
+        #expect(!flow.isSuggested)
+        let suggested = flow.suggestEnd(session: id, now: 20)
+        #expect(suggested)
+        let kept = flow.keepRecording(session: id)
+        #expect(kept)
+        #expect(!flow.isSuggested)
+        #expect(flow.reason == nil)
+        let keptAgain = flow.keepRecording(session: id)
+        #expect(!keptAgain)
+        let late = flow.stopIfDue(session: id, now: 3_600)
+        #expect(!late)
+        let again = flow.suggestEnd(session: id, now: 40)
+        #expect(again)
+    }
+
+    @Test func withdrawingASuggestionClearsItAndNothingElse() {
+        let id = ScribeSessionID(), other = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: id, boundCall: nil)
+        let none = flow.withdrawSuggestion(session: id)
+        #expect(!none)
+        _ = flow.suggestEnd(session: id, now: 20)
+        let wrong = flow.withdrawSuggestion(session: other)
+        #expect(!wrong)
+        #expect(flow.isSuggested)
+        let withdrawn = flow.withdrawSuggestion(session: id)
+        #expect(withdrawn)
+        #expect(!flow.isSuggested)
+        #expect(flow.reason == nil)
+        #expect(flow.deadline == nil)
+        _ = flow.requestEnd(session: id, now: 30)
+        let armed = flow.withdrawSuggestion(session: id)
+        #expect(!armed)
+        #expect(flow.reason == .requestedByUser)
+        #expect(flow.remaining(now: 30) == 9)
+    }
+
+    @Test func anExplicitStopAfterASuggestionArmsRequestedByUserWithNineSeconds() {
+        let id = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: id, boundCall: nil)
+        _ = flow.suggestEnd(session: id, now: 20)
+        let armed = flow.requestEnd(session: id, now: 50)
+        #expect(armed)
+        #expect(flow.reason == .requestedByUser)
+        #expect(!flow.isSuggested)
+        #expect(flow.remaining(now: 50) == 9)
+        let early = flow.stopIfDue(session: id, now: 58.999)
+        #expect(!early)
+        let due = flow.stopIfDue(session: id, now: 59)
+        #expect(due)
+    }
+
+    @Test func aDuplicateSuggestionDoesNotRearm() {
+        let id = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: id, boundCall: nil)
+        let first = flow.suggestEnd(session: id, now: 20)
+        #expect(first)
+        let second = flow.suggestEnd(session: id, now: 25)
+        #expect(!second)
+        #expect(flow.reason == .callLooksOver)
+        _ = flow.requestEnd(session: id, now: 30)
+        let afterStop = flow.suggestEnd(session: id, now: 31)
+        #expect(!afterStop)
+        #expect(flow.reason == .requestedByUser)
+        #expect(!flow.isSuggested)
+    }
+
+    @Test func theBoundAppClosingAfterASuggestionArmsBoundCallAppClosed() {
+        let id = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: id, boundCall: owner)
+        _ = flow.suggestEnd(session: id, now: 20)
+        let closed = flow.applicationTerminated(owner, session: id, now: 30)
+        #expect(closed)
+        #expect(flow.reason == .boundCallAppClosed)
+        #expect(!flow.isSuggested)
+        #expect(flow.remaining(now: 30) == 9)
+        let due = flow.stopIfDue(session: id, now: 39)
+        #expect(due)
+    }
+
+    @Test func aSuggestionIsRefusedForAnOldSessionAnAnsweredStopAndABadClock() {
+        let old = ScribeSessionID(), current = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: old, boundCall: nil)
+        flow.begin(session: current, boundCall: nil)
+        let stale = flow.suggestEnd(session: old, now: 20)
+        #expect(!stale)
+        for now: TimeInterval in [.nan, .infinity, -.infinity, -1] {
+            let bad = flow.suggestEnd(session: current, now: now)
+            #expect(!bad)
+        }
+        #expect(!flow.isSuggested)
+        _ = flow.requestEnd(session: current, now: 20)
+        _ = flow.stopIfDue(session: current, now: 29)
+        let stopped = flow.suggestEnd(session: current, now: 30)
+        #expect(!stopped)
+        #expect(!flow.isSuggested)
+    }
+
+    @Test func beginningANewSessionDropsAnOldSuggestion() {
+        let first = ScribeSessionID(), second = ScribeSessionID()
+        var flow = ScribeEndWorkflow()
+        flow.begin(session: first, boundCall: nil)
+        _ = flow.suggestEnd(session: first, now: 20)
+        flow.begin(session: second, boundCall: nil)
+        #expect(!flow.isSuggested)
+        #expect(flow.reason == nil)
+    }
 }

@@ -98,7 +98,7 @@ struct SpectrumTests {
     @Test func theWavesTabIsOffByDefaultButCanBeSwitchedOn() {
         #expect(!TopBarLayout.standard.contains(.waves))
         #expect(!TopBarLayout.defaultRow.contains(.waves))
-        #expect(TopBarTab.allCases.last == .waves)
+        #expect(TopBarTab.allCases.dropLast().last == .waves, "Waves was appended last; only Tiling came after it")
         #expect(TopBarTab.waves.symbol == "waveform")
         var layout = TopBarLayout.standard
         layout.toggle(.waves)
