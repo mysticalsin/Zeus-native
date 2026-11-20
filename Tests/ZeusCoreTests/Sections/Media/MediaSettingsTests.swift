@@ -186,6 +186,55 @@ import Testing
         #expect(MediaAwakePlan.verdict(enabled: true, isPlaying: true, lastPlayedAt: now, now: now, power: hot, rules: rules) == .release(.tooHot))
     }
 
+    @Test func addedKeysSurviveTheExistingSettingsStore() throws {
+        let name = "zeus.media.persist.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defaults.removePersistentDomain(forName: name)
+        defer { defaults.removePersistentDomain(forName: name) }
+
+        let fresh = MediaSettings(reading: { defaults.string(forKey: MediaDefaultsKey.stored($0)) })
+        #expect(fresh.tintFromSong == false)
+        #expect(fresh.likeFollowsSong == false)
+        #expect(fresh.explicitBadge == false)
+        #expect(fresh.explicitMatchesColour == false)
+        #expect(fresh.lyrics == false)
+        #expect(fresh.browserMedia == false)
+        #expect(fresh.equaliser == false)
+
+        var edited = MediaSettings.defaults
+        edited.look = .detailed
+        edited.tintFromSong = true
+        edited.likeFollowsSong = true
+        edited.explicitBadge = true
+        edited.explicitMatchesColour = true
+        edited.leftButton = .like
+        edited.hideOnPause = .instantly
+        edited.homeMusic = "Wave"
+        edited.lyrics = true
+        for (id, value) in edited.persisted() {
+            defaults.set(value, forKey: MediaDefaultsKey.stored(id))
+        }
+        let restored = MediaSettings(reading: { defaults.string(forKey: MediaDefaultsKey.stored($0)) })
+        #expect(restored == edited)
+
+        let root = repoRoot()
+        let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
+        let lines = catalog.split(separator: "\n").map(String.init)
+        for id in MediaSettingID.added {
+            #expect(lines.contains { $0.contains("id: \"\(id)\"") }, "\(id) is missing from the settings catalog")
+        }
+        for id in ["media.tintFromSong", "media.likeFollowsSong", "media.explicitBadge", "media.explicitMatchColour"] {
+            let line = lines.first { $0.contains("id: \"\(id)\"") }
+            #expect(line?.contains("defaultValue: \"false\"") == true)
+            #expect(line?.contains("state: .live") == true)
+        }
+        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
+        #expect(store.contains("neverEnabledByImport"))
+        for id in ["privacy.lyrics", "music.browserMedia", "audio.equaliser"] {
+            #expect(store.contains("\"\(id)\""))
+        }
+    }
+
     @Test func everyControlIsAKeyboardControl() {
         let interactions = Set(MediaSectionCatalog.controls(for: .defaults).map(\.interaction))
         #expect(interactions == [.toggle, .choice, .status, .held])
