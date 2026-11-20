@@ -46,7 +46,7 @@ import Testing
         }
         #expect(MediaHeldFeature.animatedArtworkImplemented == false)
         #expect(MediaHeldFeature.systemNowPlayingImplemented == false)
-        #expect(MediaSectionPlacement.topbarTab == 1)
+        #expect(MediaSectionPlacement.topbarTab == 0)
         let root = repoRoot()
         let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
         #expect(catalog.contains("choices: [\"Art\", \"Disc\", \"Cassette\", \"Wave\", \"Lyrics\"]"))

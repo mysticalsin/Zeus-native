@@ -1,8 +1,8 @@
 import Foundation
 
-/// Where the Media section sits once the shell can place a section. Order 1 is the first top bar tab.
+/// The shell's zero-based top bar index for Media. The slot file keeps that placement.
 public enum MediaSectionPlacement {
-    public static let topbarTab = 1
+    public static let topbarTab = 0
 }
 
 /// The defaults key is the same prefix the settings store already uses.
