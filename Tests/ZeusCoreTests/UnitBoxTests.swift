@@ -243,12 +243,10 @@ struct UnitBoxTests {
                 }
                 return false
             }
-            let moves = min(budget, LabelNudge.maxSteps)
+            let moves = min(budget, 8)
             #expect(seen == moves)
-            var y = start.y
-            for _ in 0..<moves { y += LabelNudge.dy }
-            #expect(end.box.y == y)
-            if budget < LabelNudge.maxSteps {
+            #expect(end.box.y == start.y + 0.03 * Double(moves))
+            if budget < 8 {
                 guard case .settled = end else {
                     Issue.record("a clear answer before eight steps should settle")
                     return
