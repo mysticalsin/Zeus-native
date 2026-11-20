@@ -10,6 +10,7 @@ struct AutoUpdateSessionTests {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
+        .deletingLastPathComponent()
 
     private static let publicKey = Data(repeating: 2, count: 32).base64EncodedString()
     private static let now = Date(timeIntervalSince1970: 1_763_683_200)
@@ -237,7 +238,7 @@ struct AutoUpdateSessionTests {
         #expect(UpdateVersions.release(" 1.2.0 ") == ZeusVersion(major: 1, minor: 2, patch: 0))
         for raw in ["", "1.2.3.4", "1.2.3-beta", "v1.2.3", "1..2", "1.2.a", "-1.0.0", "1.0.0 "] {
             if raw == "1.0.0 " { continue }
-            #expect(UpdateVersions.release(raw) == nil, raw)
+            #expect(UpdateVersions.release(raw) == nil)
         }
         #expect(UpdateVersions.release("1.0.0 ") == ZeusVersion(major: 1, minor: 0, patch: 0))
 
@@ -356,7 +357,7 @@ struct AutoUpdateSessionTests {
             for file in files where file.pathExtension == "swift" {
                 let text = try String(contentsOf: file, encoding: .utf8)
                 for word in banned {
-                    #expect(!text.contains(word), file.lastPathComponent)
+                    #expect(!text.contains(word))
                 }
             }
         }
