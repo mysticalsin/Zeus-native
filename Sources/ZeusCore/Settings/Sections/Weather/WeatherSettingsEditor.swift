@@ -3,7 +3,7 @@ import Foundation
 /// The weather section sits on the top bar page, second tab. The shell placement API is not part of this value.
 public enum WeatherSectionPlacement: Equatable, Sendable {
     case topbarTab(Int)
-    public static let specified = WeatherSectionPlacement.topbarTab(2)
+    public static let specified = WeatherSectionPlacement.topbarTab(1)
 }
 
 public enum WeatherSettingsKeys {
