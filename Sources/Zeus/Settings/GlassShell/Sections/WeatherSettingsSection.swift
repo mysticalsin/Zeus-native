@@ -5,14 +5,13 @@ extension WeatherSectionSlot: GlassSlotPage {
     static func erasePage() -> AnyView { AnyView(WeatherSettingsSection()) }
 }
 
-/// Weather controls and the forecast chip. The shell still has no `.topbarTab` placement, so this page
-/// waits to be mounted as the top bar tab at order 2.
+/// Weather controls and the forecast chip. The section is the second top bar tab.
 struct WeatherSettingsSection: View {
     @State private var model = WeatherSettingsModel()
 
     var body: some View {
         let reduceMotion = Motion.reduced
-        VStack(alignment: .leading, spacing: WeatherSettingsLayout.cardGap) {
+        VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
             preview(reduceMotion: reduceMotion)
             controlCard(model.editor.rows[0]) { cityControl }
             controlCard(model.editor.rows[1]) { locationControl }
@@ -47,7 +46,7 @@ struct WeatherSettingsSection: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: WeatherSettingsLayout.rowHeight, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
         .background(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).fill(GS.card))
         .overlay(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).strokeBorder(GS.cardStroke, lineWidth: 1))
         .simultaneousGesture(previewSwipe)
@@ -100,10 +99,11 @@ struct WeatherSettingsSection: View {
             Text(row.helper)
                 .font(GS.rowText)
                 .foregroundStyle(GS.secondary)
+                .frame(minHeight: CGFloat(GlassSettingsMetrics.helperLine), alignment: .topLeading)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: WeatherSettingsLayout.rowHeight, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
         .background(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).fill(GS.card))
         .overlay(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).strokeBorder(GS.cardStroke, lineWidth: 1))
         .accessibilityElement(children: .contain)
@@ -163,12 +163,6 @@ struct WeatherSettingsSection: View {
         .frame(width: 220)
         .accessibilityLabel("Weather layout")
     }
-}
-
-private enum WeatherSettingsLayout {
-    /// Spacing tokens from the shell are not in this tree yet.
-    static let rowHeight: CGFloat = 52
-    static let cardGap: CGFloat = 28
 }
 
 private struct WeatherChipTile: View {
@@ -243,13 +237,8 @@ final class WeatherSettingsModel {
         self.defaults = defaults
         let localeUsesUS = Locale.current.measurementSystem == .us
         var editor = WeatherSettingsEditor.fresh(localeUsesUSCustomary: localeUsesUS)
-        let city = defaults.string(forKey: WeatherCityPolicy.settingKey) ?? ""
-        editor.cityDraft = city
-        if defaults.object(forKey: WeatherTemperatureUnit.settingKey) != nil {
-            let stored = defaults.bool(forKey: WeatherTemperatureUnit.settingKey)
-            editor.setUnit(.resolve(stored: stored, localeUsesUSCustomary: localeUsesUS))
-        }
-        editor.setLayout(WeatherLayoutChoice.resolve(defaults.string(forKey: WeatherLayoutChoice.settingKey)))
+        let stored = WeatherSettingsDisk.load(defaults: defaults, localeUsesUSCustomary: localeUsesUS)
+        editor.restore(city: stored.city, unit: stored.unit, layout: stored.layout)
         self.editor = editor
         loader = WeatherForecastLoader { url in
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -274,7 +263,7 @@ final class WeatherSettingsModel {
 
     func applyCity() {
         let url = editor.commitCity()
-        defaults.set(editor.committedCity, forKey: WeatherCityPolicy.settingKey)
+        persist()
         guard url != nil else { return }
         let city = editor.committedCity
         let ticket = nextTicket()
@@ -287,12 +276,12 @@ final class WeatherSettingsModel {
 
     func setUnit(_ unit: WeatherTemperatureUnit) {
         editor.setUnit(unit)
-        defaults.set(unit.stored, forKey: WeatherTemperatureUnit.settingKey)
+        persist()
     }
 
     func setLayout(_ layout: WeatherLayoutChoice) {
         editor.setLayout(layout)
-        defaults.set(layout.rawValue, forKey: WeatherLayoutChoice.settingKey)
+        persist()
     }
 
     func setPreciseLocation(_ on: Bool) {
@@ -343,6 +332,11 @@ final class WeatherSettingsModel {
         case .failed(let text): editor.present(.failed(text))
         case .forecast(let snapshot, let place): editor.apply(snapshot: snapshot, place: place)
         }
+    }
+
+    private func persist() {
+        WeatherSettingsDisk.save(city: editor.committedCity, unit: editor.unit, layout: editor.layout, defaults: defaults)
+        SettingsStore.shared.set(WeatherLayoutChoice.settingKey, editor.layout.title)
     }
 
     private func nextTicket() -> Int {

@@ -680,10 +680,11 @@ public enum GlassSettingsAudit {
         }
         let shownRows = SettingsSectionRegistry.sections(slots: flipped, includePhone: false)
         if shownRows.last?.id != SettingsSectionRegistry.topbarID { failures.append("filled topbar tab did not add the Topbar row") }
-        if shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("a topbar tab became its own sidebar row") }
+        let tabIDs = Set(GlassSectionManifest.topbarTabs(in: flipped).map(\.id))
+        if shownRows.contains(where: { tabIDs.contains($0.id) }) { failures.append("a topbar tab became its own sidebar row") }
         if !SettingsSectionRegistry.search("Topbar", in: shownRows).contains(where: { $0.id == SettingsSectionRegistry.topbarID }) { failures.append("Topbar missing from search") }
         if !shownRows.map(\.accessibilityLabel).contains("Topbar") { failures.append("Topbar missing from voiceover order") }
-        if GlassSectionManifest.topbarTabs(in: flipped).map(\.id) != ["glass.media"] { failures.append("media tab missing from the host") }
+        if GlassSectionManifest.topbarTabs(in: flipped).map(\.id).first != "glass.media" { failures.append("media tab missing from the host") }
         if shownRows.filter({ $0.id == SettingsSectionRegistry.topbarID }).count != 1 { failures.append("more than one Topbar row") }
         if GlassSettingsMetrics.controlRow != 52 || GlassSettingsMetrics.helperLine != 16 || GlassSettingsMetrics.panelPadding != 32 || GlassSettingsMetrics.cardSpacing != 28 {
             failures.append("metrics")

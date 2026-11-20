@@ -50,6 +50,13 @@ public struct WeatherSettingsEditor: Equatable, Sendable {
         self.place = place
     }
 
+    public mutating func restore(city: String, unit: WeatherTemperatureUnit, layout: WeatherLayoutChoice) {
+        cityDraft = city
+        committedCity = city
+        self.unit = unit
+        self.layout = layout
+    }
+
     public static func fresh(localeUsesUSCustomary: Bool) -> WeatherSettingsEditor {
         WeatherSettingsEditor(
             cityDraft: "",
