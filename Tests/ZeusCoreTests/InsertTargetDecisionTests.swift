@@ -7,6 +7,12 @@ import Testing
     private let zeus = DictationAppIdentity(processID: 1, bundleID: "app.zeus")
     private let browser = DictationAppIdentity(processID: 44, bundleID: "app.browser")
 
+    @Test func aPasteUsesTheKeyDownAppNotTheAppAfterOpen() {
+        let planned = InsertTargetDecision.plan(keyDown: notes, postOpen: browser, frontmost: notes, ownPid: zeus.processID)
+        #expect(planned.action == .paste)
+        #expect(planned.app == notes)
+    }
+
     @Test func aSwitchDuringOpenReactivatesTheKeyDownApp() {
         let route = InsertTargetDecision.route(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
         #expect(route == .reactivate(notes))

@@ -10,6 +10,17 @@ public enum InsertTarget: Equatable, Sendable {
     case copyOnly
 }
 
+public struct InsertPlan: Equatable, Sendable {
+    public enum Action: Equatable, Sendable { case paste, reactivate, copyOnly }
+    public var action: Action
+    public var app: DictationAppIdentity?
+
+    public init(action: Action, app: DictationAppIdentity?) {
+        self.action = action
+        self.app = app
+    }
+}
+
 /// Which app a deliver or a correction acts on.
 public enum InsertRoute: Equatable, Sendable {
     case paste
@@ -46,6 +57,22 @@ public enum InsertTargetDecision {
             return .paste
         }
         return .copyOnly
+    }
+
+    /// What `deliver()` and `deliverCorrection()` execute. The paste app is whoever was frontmost after the open.
+    public static func plan(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity?, frontmost: DictationAppIdentity, ownPid: Int32) -> InsertPlan {
+        switch route(keyDown: keyDown, postOpen: postOpen, frontmost: frontmost, ownPid: ownPid) {
+        case .paste:
+            return InsertPlan(action: .paste, app: postOpen ?? keyDown)
+        case .copyOnly:
+            return InsertPlan(action: .copyOnly, app: nil)
+        case .reactivate(let id):
+            return InsertPlan(action: .reactivate, app: id)
+        }
+    }
+
+    public static func correctionPlan(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity?, frontmost: DictationAppIdentity, ownPid: Int32) -> InsertPlan {
+        plan(keyDown: keyDown, postOpen: postOpen, frontmost: frontmost, ownPid: ownPid)
     }
 
     /// The branch `deliver()` runs. Copy-only stays copy-only.
