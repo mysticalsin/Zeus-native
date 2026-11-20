@@ -94,19 +94,20 @@ import Testing
     @Test func aRepeatChangeExtendsAtFullOpacity() {
         let rules = config()
         let (shown, _) = SensoryHUDLifecycle.reduce(.hidden, show(level: 0.2), config: rules)
+        let change = at(0.02)
         let (extended, effects) = SensoryHUDLifecycle.reduce(shown, show(level: 0.8, at: 0.02), config: rules)
         #expect(extended.phase == .extending)
         #expect(extended.level == 0.8)
-        #expect(extended.anchor == at(0.02))
+        #expect(extended.anchor == change)
         #expect(extended.fadeAnchor == nil)
-        #expect(SensoryHUDLifecycle.opacity(extended, at: at(0.02), config: rules) == 1)
-        #expect(effects == [.announce("Volume 80 percent"), .wake(at(0.02 + 1.2))])
+        #expect(SensoryHUDLifecycle.opacity(extended, at: change, config: rules) == 1)
+        #expect(effects == [.announce("Volume 80 percent"), .wake(change.addingTimeInterval(1.2))])
 
-        let (still, _) = SensoryHUDLifecycle.reduce(extended, .tick(at(0.02 + 1.2 - 0.001)), config: rules)
+        let (still, _) = SensoryHUDLifecycle.reduce(extended, .tick(change.addingTimeInterval(1.2 - 0.001)), config: rules)
         #expect(still.phase == .extending)
-        let (fading, _) = SensoryHUDLifecycle.reduce(extended, .tick(at(0.02 + 1.2)), config: rules)
+        let (fading, _) = SensoryHUDLifecycle.reduce(extended, .tick(change.addingTimeInterval(1.2)), config: rules)
         #expect(fading.phase == .fading)
-        let (gone, _) = SensoryHUDLifecycle.reduce(extended, .tick(at(0.02 + 1.2 + 0.25)), config: rules)
+        let (gone, _) = SensoryHUDLifecycle.reduce(extended, .tick(change.addingTimeInterval(1.2 + 0.25)), config: rules)
         #expect(gone == .hidden)
     }
 
@@ -180,7 +181,8 @@ import Testing
         let (gone, goneEffects) = SensoryHUDLifecycle.reduce(shown, .tick(at(1.2)), config: rules)
         #expect(gone == .hidden)
         #expect(goneEffects.isEmpty)
-        #expect(SensoryHUDLifecycle.timeUntilHidden(shown, now: start, config: rules) == 1.2)
+        let stay = SensoryHUDLifecycle.timeUntilHidden(shown, now: start, config: rules)
+        #expect(abs(stay - 1.2) < 0.000_001)
     }
 
     @Test func timeUntilHiddenMatchesTheTickThatHides() {
