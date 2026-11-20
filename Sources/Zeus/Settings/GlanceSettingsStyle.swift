@@ -84,6 +84,7 @@ struct GSRow<Trailing: View>: View {
     var symbol: String? = nil
     let title: String
     var text: String? = nil
+    var detail: String? = nil
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
@@ -105,12 +106,26 @@ struct GSRow<Trailing: View>: View {
         .padding(.vertical, 16.5)
         .frame(minHeight: 64)
         .accessibilityElement(children: .contain)
+        .modifier(GSRowDetail(detail))
+    }
+}
+
+/// Extra explanation for a row. It is available to pointer help and to VoiceOver, and it is not a second line.
+private struct GSRowDetail: ViewModifier {
+    var detail: String?
+
+    func body(content: Content) -> some View {
+        if let detail, !detail.isEmpty {
+            content.help(detail).accessibilityHint(detail)
+        } else {
+            content
+        }
     }
 }
 
 extension GSRow where Trailing == EmptyView {
-    init(symbol: String? = nil, title: String, text: String? = nil) {
-        self.init(symbol: symbol, title: title, text: text) { EmptyView() }
+    init(symbol: String? = nil, title: String, text: String? = nil, detail: String? = nil) {
+        self.init(symbol: symbol, title: title, text: text, detail: detail) { EmptyView() }
     }
 }
 
@@ -119,9 +134,10 @@ struct GSToggleRow: View {
     var symbol: String? = nil
     let title: String
     var text: String? = nil
+    var detail: String? = nil
     @Binding var isOn: Bool
     var body: some View {
-        GSRow(symbol: symbol, title: title, text: text) {
+        GSRow(symbol: symbol, title: title, text: text, detail: detail) {
             Toggle(title, isOn: $isOn).toggleStyle(GSToggleStyle()).labelsHidden()
         }
     }
@@ -133,10 +149,11 @@ struct GSLinkRow: View {
     let symbol: String?
     let title: String
     var text: String? = nil
+    var detail: String? = nil
     let destination: GSSection
     let navigation: GSNavigation
     var body: some View {
-        GSRow(symbol: symbol, title: title, text: text) {
+        GSRow(symbol: symbol, title: title, text: text, detail: detail) {
             Button { navigation.section = destination } label: {
                 HStack(spacing: 6) {
                     Text("Set in \(destination.title)")
