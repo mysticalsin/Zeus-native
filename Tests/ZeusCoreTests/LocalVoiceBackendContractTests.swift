@@ -39,9 +39,28 @@ import Testing
         }
     }
 
-    @Test func flagsDefaultToOff() {
+    @Test func flagsDefaultToOff() throws {
         let flags = LocalVoiceFlags()
         #expect(flags.conversationMode == false)
         #expect(flags.pocketTTS == false)
+
+        let fresh = try JSONDecoder().decode(PersistedVoiceSettings.self, from: Data("{}".utf8))
+        #expect(fresh.resolvedEngine(kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
+        #expect(fresh.resolvedProvider(kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
+        #expect(fresh.resolvedEngineAuto())
+
+        let saved = Data("""
+        {"voice.engine":"kokoro","voice.engine.userSelected":true,"voice.ttsProvider":"kokoro","voice.engine.auto":false}
+        """.utf8)
+        let kept = try JSONDecoder().decode(PersistedVoiceSettings.self, from: saved)
+        #expect(kept.resolvedEngine(kokoroReady: false, elevenLabsKeyValid: false) == .kokoro)
+        #expect(kept.resolvedProvider(kokoroReady: false, elevenLabsKeyValid: true) == .kokoro)
+        #expect(kept.resolvedEngineAuto() == false)
+
+        let withFlagsOff = Data("""
+        {"voice.engine":"system","voice.engine.userSelected":true,"conversationMode":false,"pocketTTS":false}
+        """.utf8)
+        let stillSystem = try JSONDecoder().decode(PersistedVoiceSettings.self, from: withFlagsOff)
+        #expect(stillSystem.resolvedEngine(kokoroReady: true, elevenLabsKeyValid: true) == .system)
     }
 }
