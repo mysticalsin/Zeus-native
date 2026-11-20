@@ -45,8 +45,8 @@ struct FaceVerificationSectionTests {
         #expect(ready.animationDuration > 0)
         #expect(!ready.controls.isEmpty)
         for control in ready.controls {
-            #expect(!control.helper.isEmpty, control.id)
-            #expect(!control.accessibilityLabel.isEmpty, control.id)
+            #expect(!control.helper.isEmpty, "\(control.id)")
+            #expect(!control.accessibilityLabel.isEmpty, "\(control.id)")
             #expect(control.keyboardReachable)
         }
         #expect(ready.controls.contains { $0.id == "face.presence" })

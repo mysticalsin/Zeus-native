@@ -198,14 +198,14 @@ struct FaceApprovalTests {
 
     @Test func approvalSyncUsesFaceBeforeItClearsBothSides() {
         let action = FaceVerificationFixtures.action("nonce-sync", id: "card-and-terminal")
-        var machine = FaceVerificationFixtures.passedLiveness(nonce: action.nonce)
+        var machine = FaceVerificationFixtures.passedLiveness(nonce: action.nonce, id: action.id)
         _ = machine.handle(.identity(matched: false, uptime: 12))
         let refused = ApprovalFaceGate.clear(grant: machine.grant, action: action, consumed: [])
         #expect(refused.sides == .neither)
         #expect(!refused.sides.cardCleared)
         #expect(!refused.sides.terminalCleared)
 
-        var approved = FaceVerificationFixtures.matched(nonce: action.nonce)
+        var approved = FaceVerificationFixtures.matched(nonce: action.nonce, id: action.id)
         let cleared = ApprovalFaceGate.clear(grant: approved.grant, action: action, consumed: [])
         #expect(cleared.sides.cardCleared)
         #expect(cleared.sides.terminalCleared)

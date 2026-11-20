@@ -29,38 +29,38 @@ enum FaceVerificationFixtures {
         return machine
     }
 
-    static func capturing(nonce: String = "nonce-1", at uptime: Double = 10) -> FaceVerificationMachine {
+    static func capturing(nonce: String = "nonce-1", id: String = "approve-command", at uptime: Double = 10) -> FaceVerificationMachine {
         var machine = idle()
-        _ = machine.handle(.beginApproval(action(nonce), uptime: uptime))
+        _ = machine.handle(.beginApproval(action(nonce, id: id), uptime: uptime))
         return machine
     }
 
-    static func liveness(nonce: String = "nonce-1", at uptime: Double = 10) -> FaceVerificationMachine {
-        var machine = capturing(nonce: nonce, at: uptime)
+    static func liveness(nonce: String = "nonce-1", id: String = "approve-command", at uptime: Double = 10) -> FaceVerificationMachine {
+        var machine = capturing(nonce: nonce, id: id, at: uptime)
         _ = machine.handle(.capture(.seen(distance: 0, spoof: [], virtualCamera: false), uptime: uptime))
         return machine
     }
 
-    static func passedLiveness(nonce: String = "nonce-1", at uptime: Double = 10) -> FaceVerificationMachine {
-        var machine = liveness(nonce: nonce, at: uptime)
+    static func passedLiveness(nonce: String = "nonce-1", id: String = "approve-command", at uptime: Double = 10) -> FaceVerificationMachine {
+        var machine = liveness(nonce: nonce, id: id, at: uptime)
         _ = machine.handle(.liveness(FaceLivenessResult(blinked: true, turnedHead: false, virtualCamera: false), uptime: uptime))
         return machine
     }
 
-    static func matched(nonce: String = "nonce-1", at uptime: Double = 10) -> FaceVerificationMachine {
-        var machine = passedLiveness(nonce: nonce, at: uptime)
+    static func matched(nonce: String = "nonce-1", id: String = "approve-command", at uptime: Double = 10) -> FaceVerificationMachine {
+        var machine = passedLiveness(nonce: nonce, id: id, at: uptime)
         _ = machine.handle(.identity(matched: true, uptime: uptime))
         return machine
     }
 
-    static func rejected(nonce: String = "nonce-1", at uptime: Double = 10) -> FaceVerificationMachine {
-        var machine = capturing(nonce: nonce, at: uptime)
+    static func rejected(nonce: String = "nonce-1", id: String = "approve-command", at uptime: Double = 10) -> FaceVerificationMachine {
+        var machine = capturing(nonce: nonce, id: id, at: uptime)
         _ = machine.handle(.capture(.noFace, uptime: uptime))
         return machine
     }
 
-    static func fallback(nonce: String = "nonce-1", at uptime: Double = 10) -> FaceVerificationMachine {
-        var machine = rejected(nonce: nonce, at: uptime)
+    static func fallback(nonce: String = "nonce-1", id: String = "approve-command", at uptime: Double = 10) -> FaceVerificationMachine {
+        var machine = rejected(nonce: nonce, id: id, at: uptime)
         _ = machine.handle(.chooseFallback)
         return machine
     }

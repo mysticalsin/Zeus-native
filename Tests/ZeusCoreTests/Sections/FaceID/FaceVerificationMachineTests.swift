@@ -98,7 +98,7 @@ struct FaceVerificationMachineTests {
         #expect(virtual.phase != .matched)
 
         let action = FaceVerificationFixtures.action("bound-nonce", id: "specific-action")
-        var machine = FaceVerificationFixtures.passedLiveness(nonce: action.nonce)
+        var machine = FaceVerificationFixtures.passedLiveness(nonce: action.nonce, id: action.id)
         #expect(machine.livenessPassed)
         _ = machine.handle(.identity(matched: true, uptime: 13))
         #expect(machine.phase == .matched)
@@ -115,7 +115,7 @@ struct FaceVerificationMachineTests {
     @Test func aGrantCannotBeReplayedForAnotherAction() {
         let first = FaceVerificationFixtures.action("nonce-a", id: "action-a")
         let second = FaceVerificationFixtures.action("nonce-b", id: "action-b")
-        var machine = FaceVerificationFixtures.matched(nonce: first.nonce)
+        var machine = FaceVerificationFixtures.matched(nonce: first.nonce, id: first.id)
         let grant = machine.grant
         let firstClear = ApprovalFaceGate.clear(grant: grant, action: first, consumed: [])
         #expect(firstClear.sides.cardCleared && firstClear.sides.terminalCleared)
@@ -165,7 +165,7 @@ struct FaceVerificationMachineTests {
         _ = below.handle(.beginApproval(FaceVerificationFixtures.action("still-open"), uptime: started))
         #expect(below.phase == .capturing)
 
-        var atLimit = FaceVerificationFixtures.locked(at: started)
+        let atLimit = FaceVerificationFixtures.locked(at: started)
         #expect(atLimit.failures == limit)
         #expect(atLimit.phase == .lockedOut)
         #expect(atLimit.lockoutStarted == started)
@@ -193,6 +193,17 @@ struct FaceVerificationMachineTests {
         _ = after.handle(.chooseFallback)
         _ = after.handle(.fallbackResult(succeeded: true, action: FaceVerificationFixtures.action("after-lock"), uptime: started + duration + 2))
         #expect(after.grant?.method == .localAuthentication)
+    }
+
+    @Test func aDeniedCameraDuringACheckLocksFromThatCheckClock() {
+        let started = 2_000.0
+        var machine = FaceVerificationFixtures.fail(times: FaceVerificationPolicy.failureLimit - 1, at: started)
+        _ = machine.handle(.beginApproval(FaceVerificationFixtures.action("late-denial"), uptime: started))
+        _ = machine.handle(.cameraAnswered(granted: false))
+        #expect(machine.phase == .lockedOut)
+        #expect(machine.lockoutStarted == started)
+        _ = machine.handle(.tick(uptime: started + FaceVerificationPolicy.lockoutSeconds))
+        #expect(machine.phase == .lockedOut)
     }
 
     @Test func disableDoesNotClearAnActiveLockout() {

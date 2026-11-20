@@ -7,8 +7,7 @@ extension FaceIDSectionSlot: GlassSlotPage {
 
 struct FaceIDSettingsSection: View {
     var body: some View {
-        Text(FaceIDSectionSlot.descriptor.title)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel(FaceIDSectionSlot.descriptor.title)
+        FaceVerificationSettingsPage()
+            .accessibilityElement(children: .contain)
     }
 }
