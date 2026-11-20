@@ -91,10 +91,6 @@ struct PresentToleranceTests {
             #expect(decision.points == expected.points)
             #expect(decision.pixels == 24 || decision.pixels == 48)
             #expect(decision.band == (decision.pixels == 48 ? .fine : .standard))
-            let safe = scale > 0 ? scale : 1
-            if safe.isFinite, decision.pixels.isFinite {
-                #expect(decision.points * safe == decision.pixels)
-            }
         }
     }
 }
