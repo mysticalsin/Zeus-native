@@ -33,6 +33,17 @@ import Testing
         #expect(choice == .reactivateThenPaste)
     }
 
+    @Test func aSwitchDuringOpenReactivatesTheKeyDownApp() {
+        // deliver() re-activates context.targetApp, which is read after the microphone opens.
+        let reactivated = appReactivatedByTheCurrentDeliver(keyDown: notes, postOpen: browser)
+        #expect(reactivated == notes)
+    }
+
+    private func appReactivatedByTheCurrentDeliver(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity) -> DictationAppIdentity {
+        _ = keyDown
+        return postOpen
+    }
+
     @Test func deliverAndCorrectionCallTheInsertDecision() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
