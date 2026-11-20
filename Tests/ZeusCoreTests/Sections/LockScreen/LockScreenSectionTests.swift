@@ -170,9 +170,9 @@ import Testing
             #expect(!file.contains("\\"))
             #expect(file.unicodeScalars.allSatisfy { $0 != "\0" })
             let stem = String(file.split(separator: ".").first ?? "")
-            #expect(catalog.contains("file: \"\(stem)\""), stem)
+            #expect(catalog.contains("file: \"\(stem)\""))
             let url = root.appendingPathComponent("Sources/Zeus/Sounds").appendingPathComponent(file)
-            #expect(FileManager.default.fileExists(atPath: url.path), file)
+            #expect(FileManager.default.fileExists(atPath: url.path))
         }
     }
 
@@ -211,7 +211,7 @@ import Testing
     }
 
     @Test func aFailedPrivateCallShowsNothingAndLogsOnlyTheReason() {
-        var session = locked(space: { _ in .callFailed })
+        let session = locked(space: { _ in .callFailed })
         #expect(session.surface.visible == false)
         #expect(session.surface.log == "lock-screen hidden call-failed")
         #expect(Self.allowedLogs.contains(session.surface.log ?? ""))
@@ -301,7 +301,7 @@ import Testing
     }
 
     @Test func pointsOutsideTheCardAndBrokenPointsReachTheSession() {
-        var session = locked(space: { _ in .shown }, playback: .paused)
+        let session = locked(space: { _ in .shown }, playback: .paused)
         let box = LockScreenCardBox.standard
         #expect(session.hit(LockScreenPointer(x: box.x, y: box.y)) == .inertCard)
         #expect(session.hit(LockScreenPointer(x: box.x + box.width - 0.1, y: box.y + box.height - 0.1)) == .inertCard)
@@ -431,7 +431,7 @@ import Testing
         let failed = page(settings: on, space: .symbolMissing)
         #expect(failed.phase == .unavailable(LockScreenCopy.unavailable))
         #expect(failed.controls.count == 4)
-        #expect(failed.controls.allSatisfy { $0.keyboardReachable && !$0.label.isEmpty && !$0.helper.isEmpty })
+        #expect(failed.controls.filter { $0.keyboardReachable && !$0.label.isEmpty && !$0.helper.isEmpty }.count == failed.controls.count)
         #expect(failed.preview.controlCount == 0)
 
         let sample = page(settings: cardOn(), space: nil, playback: .playing)
@@ -453,7 +453,7 @@ import Testing
         #expect(moving.rowHeight == 52)
         #expect(moving.panelPadding == 32)
         #expect(moving.cardGap == 28)
-        #expect(still.controls.allSatisfy(\.keyboardReachable))
+        #expect(still.controls.allSatisfy { $0.keyboardReachable })
     }
 
     @Test func aMissingSoundFileIsExplainedAndNotPlayed() {
