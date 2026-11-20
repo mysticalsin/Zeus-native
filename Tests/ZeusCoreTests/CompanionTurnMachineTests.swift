@@ -307,14 +307,14 @@ struct CompanionTurnMachineTests {
         machine.send(.keyDown)
         clock.advance(to: 1_000.25)
         machine.send(.keyUp)
-        clock.advance(to: 1_000.40)
+        clock.advance(to: 1_000.5)
         machine.send(.finalTranscript("Point at the clock", instant: false))
-        clock.advance(to: 1_000.70)
+        clock.advance(to: 1_000.75)
         machine.send(.firstToken)
-        clock.advance(to: 1_001.05)
+        clock.advance(to: 1_001)
         machine.send(.firstAudio)
-        #expect(machine.interval(.keyUp, .firstToken) == 0.45)
-        #expect(machine.keyUpToFirstAudio == 0.80)
+        #expect(machine.interval(.keyUp, .firstToken) == 0.5)
+        #expect(machine.keyUpToFirstAudio == 0.75)
         #expect(machine.withinExistingFirstAudioCeiling(apiBrain: true, cloudVoice: true) == true)
         let ceiling = Double(VoiceLatencyTargets.apiCloudVoiceMs) / 1_000
         #expect(ceiling == 1.2)
@@ -331,7 +331,7 @@ struct CompanionTurnMachineTests {
         let phaseSource = try String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/Companion/CompanionTurnPhase.swift"), encoding: .utf8)
         let deep = try Self.firstInteger(#"deep \? ([0-9]+)"#, in: controller)
         let quiet = try Self.firstInteger(#"\.seconds\(([0-9]+)\)"#, in: latency)
-        let firstByte = try Self.firstInteger(#"cursorAgent \? ([0-9]+)"#, in: router)
+        let firstByte = try Self.firstInteger(#"\? ([0-9]+) : Self\.silentLimit"#, in: router)
         #expect(deep == 45)
         #expect(quiet == 45)
         #expect(firstByte == 20)
@@ -437,8 +437,11 @@ struct CompanionTurnMachineTests {
                     if outcome.steps.contains(where: { $0.to == .interrupted }) {
                         speechBlocked = true
                     }
-                    if machine.phase == .listening, before == .interrupted || before == .idle || before == .error {
-                        speechBlocked = false
+                    if machine.phase == .listening {
+                        switch before {
+                        case .interrupted, .idle, .error: speechBlocked = false
+                        default: break
+                        }
                     }
                     if case .reset = event { speechBlocked = false }
                 }
