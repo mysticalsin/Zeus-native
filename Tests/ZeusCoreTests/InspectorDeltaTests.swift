@@ -10,29 +10,19 @@ import ZeusCore
         .deletingLastPathComponent()
 
     @Test func fillingOneDescriptorShowsThatSlot() throws {
-        let slots = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
+        let slots = Self.topbarDescriptors(filled: true) + GlassSectionManifest.providers.compactMap { provider -> GlassSectionSlot? in
             let slot = provider.descriptor
-            guard slot.id == "glass.media" || slot.id == "glass.battery" else { return slot }
-            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
+            if case .topbarTab = slot.placement { return nil }
+            return slot
         }
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
+        let tabIDs = Set(Self.topbarDescriptors(filled: true).map(\.id))
         #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
         #expect(rows.last?.title == "Topbar")
-        #expect(!rows.contains { $0.id == "glass.media" })
-        #expect(!rows.contains { $0.id == "glass.battery" })
+        #expect(!rows.contains { tabIDs.contains($0.id) })
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
         #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
-        let tabs = GlassSectionManifest.topbarTabs(in: slots)
-        #expect(tabs.contains { $0.id == "glass.media" })
-        #expect(tabs.contains { $0.id == "glass.battery" })
-        #expect(tabs.allSatisfy(\.filled))
-        #expect(tabs.allSatisfy(\.enabled))
-        #expect(!tabs.contains { $0.id == "glass.weather" })
-        let orders = tabs.map(\.placement.order)
-        #expect(orders == orders.sorted())
-        let mediaOrder = tabs.first { $0.id == "glass.media" }?.placement.order
-        let batteryOrder = tabs.first { $0.id == "glass.battery" }?.placement.order
-        #expect(mediaOrder != nil && batteryOrder != nil && (mediaOrder ?? 0) < (batteryOrder ?? 0))
+        #expect(GlassSettingsAudit.topbarPresentationFailures(Self.topbarDescriptors(filled: true)).isEmpty)
         #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
         #expect(host.contains("as? any GlassSlotPage.Type"))
@@ -59,7 +49,7 @@ import ZeusCore
 
     @Test func topbarSelectionRejectsHiddenTabsAndCardsStayOnTheirPage() {
         let media = GlassSectionSlot(id: "glass.media", title: "Media", filled: true, keys: [], placement: .topbarTab(0))
-        let weather = GlassSectionSlot(id: "glass.weather", title: "Weather", filled: false, keys: [], placement: .topbarTab(1))
+        let weather = GlassSectionSlot(id: "glass.hiddenTab", title: "Hidden", filled: false, keys: [], placement: .topbarTab(1))
         let disabled = GlassSectionSlot(id: "glass.focus", title: "Focus", filled: true, keys: [], enabled: false, placement: .topbarTab(2))
         let face = GlassSectionSlot(id: "glass.faceID", title: "Face ID", filled: true, keys: [], placement: .cardOn(.privacy, 0))
         let license = GlassSectionSlot(id: "glass.license", title: "License", filled: true, keys: [], placement: .cardOn(.license, 1))
@@ -69,7 +59,7 @@ import ZeusCore
         var state = SettingsSelectionState.section("settings.general")
         state = SettingsSelectionRules.selectingTopbar("glass.media", filledTabs: tabs.map(\.id), current: state)
         #expect(state == .topbar(tab: "glass.media"))
-        let kept = SettingsSelectionRules.selectingTopbar("glass.weather", filledTabs: tabs.map(\.id), current: state)
+        let kept = SettingsSelectionRules.selectingTopbar("glass.hiddenTab", filledTabs: tabs.map(\.id), current: state)
         #expect(kept == state)
         #expect(SettingsSelectionRules.selectingTopbar("  ", filledTabs: tabs.map(\.id), current: state) == state)
         state = SettingsSelectionRules.selectingSection("settings.sounds", current: state)
@@ -88,16 +78,36 @@ import ZeusCore
             .sorted()
         let manifest = try String(contentsOf: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsShell.swift"), encoding: .utf8)
         guard let start = manifest.range(of: "static let providers"),
-              let marker = manifest[start.upperBound...].range(of: "= ["),
-              let close = manifest[marker.upperBound...].firstIndex(of: "]") else {
+              let marker = manifest[start.upperBound...].range(of: "= [") else {
             Issue.record("provider list missing")
             return
         }
-        let registered = manifest[marker.upperBound..<close]
+        var depth = 1
+        var index = marker.upperBound
+        var body = ""
+        while index < manifest.endIndex, depth > 0 {
+            let character = manifest[index]
+            if character == "[" { depth += 1 }
+            if character == "]" {
+                depth -= 1
+                if depth == 0 { break }
+            }
+            body.append(character)
+            index = manifest.index(after: index)
+        }
+        guard depth == 0 else {
+            Issue.record("provider list missing")
+            return
+        }
+        let registered = body
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { $0.hasSuffix(".self") || $0.hasSuffix(".self,") }
-            .map { $0.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: ".self", with: "") }
+            .filter { $0.contains(".self") }
+            .map { line in
+                line.replacingOccurrences(of: ",", with: "")
+                    .replacingOccurrences(of: ".self", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+            }
         #expect(registered.sorted() == files)
         #expect(Set(registered).count == registered.count)
         #expect(GlassSectionManifest.providers.count == files.count)
