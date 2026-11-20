@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ZeusCore
 
 /// What the screen-wide overlays draw: the stroke you are drawing (show-me) and the trail of
 /// the cursor while ZEUS drives. Global AppKit points.
@@ -11,6 +12,8 @@ final class MarkModel {
     var caption = ""
     /// Ink colour for the pointing trail. nil uses the Zeus accent.
     var inkColor: Color?
+    /// Numbered marks in global points. A mark whose display is gone is removed on the next rebuild.
+    var pins: [MarkPin] = []
 }
 
 /// One transparent, click-through panel per screen, above everything, excluded from capture.
@@ -18,6 +21,9 @@ final class MarkModel {
 final class MarkOverlay {
     static let shared = MarkOverlay()
     private var panels: [NSPanel] = []
+    private var panelsByID: [String: NSPanel] = [:]
+    private var screenObserver: NSObjectProtocol?
+    private var announcedLabels: [String] = []
     private(set) var capturesMouse = false
     /// The panels, for own-process window-policy checks.
     var ownedWindows: [NSWindow] { panels }
@@ -32,28 +38,16 @@ final class MarkOverlay {
     /// Called with global points while the overlay captures the mouse (show-me drawing).
     var onMouse: ((NSEvent.EventType, CGPoint) -> Void)?
 
-    func show(capturingMouse: Bool) {
-        if panels.isEmpty {
-            panels = NSScreen.screens.map { screen in
-                let panel = MarkPanel(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel],
-                                      backing: .buffered, defer: false)
-                panel.isOpaque = false
-                panel.backgroundColor = .clear
-                panel.hasShadow = false
-                panel.level = .screenSaver
-                panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-                ZeusWindowSharing.apply(to: panel, visibleInShare: lastVisibleInShare, surface: .zeusStandard)
-                panel.setFrame(screen.frame, display: false)
-                let view = MarkCaptureView(frame: CGRect(origin: .zero, size: screen.frame.size))
-                view.owner = self
-                let host = NSHostingView(rootView: MarkCanvas(origin: screen.frame.origin, height: screen.frame.height))
-                host.frame = view.bounds
-                host.autoresizingMask = [.width, .height]
-                view.addSubview(host)
-                panel.contentView = view
-                return panel
-            }
+    private init() {
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.screensChanged() }
         }
+    }
+
+    func show(capturingMouse: Bool) {
+        if panels.isEmpty { rebuild() }
         capturesMouse = capturingMouse
         for panel in panels {
             panel.ignoresMouseEvents = !capturingMouse
@@ -67,6 +61,97 @@ final class MarkOverlay {
         capturesMouse = false
         panels.forEach { $0.orderOut(nil) }
         panels = []
+        panelsByID = [:]
+        announcedLabels = []
+    }
+
+    private func screensChanged() {
+        guard !panels.isEmpty else { return }
+        rebuild()
+        for panel in panels {
+            panel.ignoresMouseEvents = !capturesMouse
+            panel.orderFrontRegardless()
+        }
+    }
+
+    /// One panel per display. An existing panel for a display that is still attached is moved, not replaced.
+    private func rebuild() {
+        let attached = NSScreen.screens
+        let markScreens = attached.map { MarkScreen(id: Self.screenID($0), frame: $0.frame) }
+        let placed = MarkLayout { markScreens }.place(MarkModel.shared.pins)
+        let kept = Set(placed.map { "\($0.number)\u{1f}\($0.title)" })
+        MarkModel.shared.pins.removeAll { !kept.contains("\($0.number)\u{1f}\($0.title)") }
+
+        var next: [String: NSPanel] = [:]
+        for screen in attached {
+            let id = Self.screenID(screen)
+            let panel = panelsByID[id] ?? makePanel(frame: screen.frame)
+            panel.setFrame(screen.frame, display: false)
+            installCanvas(on: panel, screen: MarkScreen(id: id, frame: screen.frame))
+            next[id] = panel
+        }
+        for (id, panel) in panelsByID where next[id] == nil { panel.orderOut(nil) }
+        panelsByID = next
+        panels = attached.compactMap { next[Self.screenID($0)] }
+        announce(placed)
+    }
+
+    private static func screenID(_ screen: NSScreen) -> String {
+        if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
+            return number.stringValue
+        }
+        let frame = screen.frame
+        return "\(frame.origin.x),\(frame.origin.y),\(frame.width),\(frame.height)"
+    }
+
+    private func makePanel(frame: CGRect) -> NSPanel {
+        let panel = MarkPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                              backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = .screenSaver
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        ZeusWindowSharing.apply(to: panel, visibleInShare: lastVisibleInShare, surface: .zeusStandard)
+        let view = MarkCaptureView(frame: CGRect(origin: .zero, size: frame.size))
+        view.owner = self
+        panel.contentView = view
+        return panel
+    }
+
+    private func installCanvas(on panel: NSPanel, screen: MarkScreen) {
+        guard let view = panel.contentView else { return }
+        view.frame = CGRect(origin: .zero, size: screen.frame.size)
+        let canvas = MarkCanvas(screen: screen)
+        if let host = view.subviews.compactMap({ $0 as? NSHostingView<MarkCanvas> }).first {
+            host.frame = view.bounds
+            host.rootView = canvas
+        } else {
+            let host = NSHostingView(rootView: canvas)
+            host.frame = view.bounds
+            host.autoresizingMask = [.width, .height]
+            view.addSubview(host)
+        }
+        let labels = MarkLayout { [screen] }.place(MarkModel.shared.pins).map(\.accessibilityLabel)
+        view.setAccessibilityElement(!labels.isEmpty)
+        if labels.isEmpty {
+            view.setAccessibilityLabel(nil)
+        } else {
+            view.setAccessibilityLabel(labels.joined(separator: ", "))
+        }
+    }
+
+    private func announce(_ placed: [PlacedMark]) {
+        let labels = placed.map(\.accessibilityLabel)
+        guard labels != announcedLabels, !labels.isEmpty else {
+            if labels.isEmpty { announcedLabels = [] }
+            return
+        }
+        announcedLabels = labels
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+            .announcement: labels.joined(separator: ". "),
+            .priority: NSAccessibilityPriorityLevel.high.rawValue,
+        ])
     }
 
     fileprivate func mouse(_ type: NSEvent.EventType) {
@@ -88,13 +173,12 @@ private final class MarkCaptureView: NSView {
 }
 
 private struct MarkCanvas: View {
-    let origin: CGPoint
-    let height: CGFloat
+    let screen: MarkScreen
     private var model: MarkModel { .shared }
 
     var body: some View {
         Canvas { context, _ in
-            func local(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x - origin.x, y: height - (p.y - origin.y)) }
+            func local(_ p: CGPoint) -> CGPoint { MarkLayout.local(p, on: screen) }
             for stroke in model.strokes where stroke.count > 1 {
                 var path = Path()
                 path.addLines(stroke.map(local))
@@ -119,5 +203,7 @@ private struct MarkCanvas: View {
             }
         }
         .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(MarkLayout { [screen] }.place(model.pins).map(\.accessibilityLabel).joined(separator: ", "))
     }
 }
