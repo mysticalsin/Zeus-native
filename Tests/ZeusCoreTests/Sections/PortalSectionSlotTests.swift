@@ -8,6 +8,7 @@ import ZeusCore
         #expect(slot.title == "Portal")
         #expect(slot.filled == true)
         #expect(slot.keys.isEmpty)
+        #expect(PortalSectionSlot.keyContributions.isEmpty)
         #expect(slot.order == 7)
         #expect(slot.placement == .topbarTab(7))
     }
