@@ -175,8 +175,8 @@ public struct MediaSettings: Equatable, Sendable {
     }
 
     public static let defaults = MediaSettings(
-        follow: .any, homeMusic: MediaHomeMusicStyle.default, look: .art, tintFromSong: false, likeFollowsSong: true,
-        explicitBadge: true, explicitMatchesColour: false, waveform: true, lyrics: false, wordByWord: true,
+        follow: .any, homeMusic: MediaHomeMusicStyle.default, look: .art, tintFromSong: false, likeFollowsSong: false,
+        explicitBadge: false, explicitMatchesColour: false, waveform: true, lyrics: false, wordByWord: true,
         leftButton: .previous, hideOnPause: .never, openTrigger: .hover, keepAwake: false, equaliser: false, browserMedia: false
     )
 
