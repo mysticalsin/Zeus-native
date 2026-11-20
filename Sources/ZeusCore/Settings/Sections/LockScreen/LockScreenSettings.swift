@@ -107,6 +107,47 @@ public struct LockScreenSettings: Equatable, Sendable {
     }
 }
 
+/// The value table behind the lock screen settings. A second store on the same table reads what the first saved.
+public struct LockScreenSettingsStore: Equatable, Sendable {
+    public private(set) var values: [String: String]
+
+    public init(values: [String: String] = [:]) {
+        self.values = values
+    }
+
+    public var settings: LockScreenSettings {
+        LockScreenSettings.resolve(
+            playerCard: values[LockScreenSettingKey.playerCard].map { $0 == "true" },
+            lockSound: values[LockScreenSettingKey.lockSound],
+            unlockSound: values[LockScreenSettingKey.unlockSound],
+            soundLevel: values[LockScreenSettingKey.soundLevel],
+            origin: .owner
+        )
+    }
+
+    public mutating func save(_ settings: LockScreenSettings) {
+        values[LockScreenSettingKey.playerCard] = settings.playerCard ? "true" : "false"
+        values[LockScreenSettingKey.lockSound] = settings.lockSound.title
+        values[LockScreenSettingKey.unlockSound] = settings.unlockSound.title
+        values[LockScreenSettingKey.soundLevel] = settings.soundLevel.rawValue
+    }
+
+    /// An import may turn a control off. It cannot turn the card on, choose a sound, or raise the level.
+    public static func importing(_ incoming: [String: String], into existing: [String: String] = [:]) -> [String: String] {
+        var result = existing
+        if let card = incoming[LockScreenSettingKey.playerCard], card != "true" {
+            result[LockScreenSettingKey.playerCard] = card
+        }
+        for key in [LockScreenSettingKey.lockSound, LockScreenSettingKey.unlockSound] where incoming[key] == LockScreenSoundOption.off.title {
+            result[key] = LockScreenSoundOption.off.title
+        }
+        if incoming[LockScreenSettingKey.soundLevel] == LockScreenSoundLevel.off.rawValue {
+            result[LockScreenSettingKey.soundLevel] = LockScreenSoundLevel.off.rawValue
+        }
+        return result
+    }
+}
+
 public enum LockScreenSounds {
     /// A cue only when a lock or unlock finishes, the level is on, and the file is still there.
     public static func cue(

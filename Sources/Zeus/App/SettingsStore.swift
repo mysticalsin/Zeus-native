@@ -193,17 +193,22 @@ final class SettingsStore {
     ]
 
     func resettable(_ section: SettingsNavigation.Section) -> Bool {
-        Self.extraKeys[section] != nil || SettingsCatalog.options(in: section).contains { $0.state != .custom && Self.isValue($0.kind) }
+        Self.extraKeys[section] != nil || SettingsCatalog.options(in: section).contains { Self.resets($0) }
     }
 
     func reset(_ section: SettingsNavigation.Section) {
-        for option in SettingsCatalog.options(in: section) where option.state != .custom && Self.isValue(option.kind) {
+        for option in SettingsCatalog.options(in: section) where Self.resets(option) {
             set(option.id, option.defaultValue, origin: .reset)
         }
         if let keys = Self.extraKeys[section] { ExtraPreferences.shared.reset(keys) }
     }
 
     private static func isValue(_ kind: SettingOption.Kind) -> Bool { kind != .action && kind != .status }
+
+    /// Custom rows stay out of a section reset, except the lock screen values, which have no other reset.
+    private static func resets(_ option: SettingOption) -> Bool {
+        isValue(option.kind) && (option.state != .custom || lockScreenResetIDs.contains(option.id))
+    }
 
     // MARK: Import and export
 
@@ -302,9 +307,19 @@ final class SettingsStore {
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
+        // A private call can place a card on the lock screen. Only the person at this Mac turns that on.
+        "lockScreen.playerCard",
     ]
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
-    static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
+    static let neverChosenByImport: [String: Set<String>] = [
+        ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title],
+        "lockScreen.lockSound": ["Gentle", "Listening", "Stopped listening", "To-do"],
+        "lockScreen.unlockSound": ["Gentle", "Listening", "Stopped listening", "To-do"],
+        "lockScreen.soundLevel": ["Quiet", "Loud"],
+    ]
+    private static let lockScreenResetIDs: Set<String> = [
+        "lockScreen.playerCard", "lockScreen.lockSound", "lockScreen.unlockSound", "lockScreen.soundLevel",
+    ]
     private static var neverEnabledAppKeys: Set<String> {
         [WakeWordController.defaultsKey, "dictation.engineForVoice"]
     }

@@ -7,10 +7,7 @@ extension LockScreenSectionSlot: GlassSlotPage {
 
 /// Lock Screen settings. The preview is read-only, and every control explains itself.
 struct LockScreenSettingsSection: View {
-    @AppStorage(LockScreenSettingKey.playerCard) private var playerCard = false
-    @AppStorage(LockScreenSettingKey.lockSound) private var lockSound = LockScreenSoundOption.off.title
-    @AppStorage(LockScreenSettingKey.unlockSound) private var unlockSound = LockScreenSoundOption.off.title
-    @AppStorage(LockScreenSettingKey.soundLevel) private var soundLevel = LockScreenSoundLevel.off.rawValue
+    private var store: SettingsStore { .shared }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var loaded = false
     @State private var space: LockScreenSpaceAnswer?
@@ -25,12 +22,12 @@ struct LockScreenSettingsSection: View {
             soundFileExists: LockScreenCuePlayer.exists,
             loaded: loaded
         )
-        VStack(alignment: .leading, spacing: model.cardGap) {
+        VStack(alignment: .leading, spacing: GlassSettingsMetrics.cardSpacing) {
             preview(model)
             if model.phase != .loading {
                 card("Lock screen") {
                     labeledRow(model.controls[0]) {
-                        Toggle(model.controls[0].title, isOn: $playerCard)
+                        Toggle(model.controls[0].title, isOn: store.boolBinding(LockScreenSettingKey.playerCard))
                             .toggleStyle(LockScreenSwitch(duration: model.animationDuration))
                             .labelsHidden()
                             .accessibilityLabel(model.controls[0].label)
@@ -46,9 +43,9 @@ struct LockScreenSettingsSection: View {
                     }
                 }
                 card("Sounds") {
-                    soundRow(model.controls[1], selection: resolvedTitle($lockSound, options: LockScreenSoundOption.all.map(\.title)), options: LockScreenSoundOption.all.map(\.title), moment: .lock)
-                    soundRow(model.controls[2], selection: resolvedTitle($unlockSound, options: LockScreenSoundOption.all.map(\.title)), options: LockScreenSoundOption.all.map(\.title), moment: .unlock)
-                    soundRow(model.controls[3], selection: resolvedTitle($soundLevel, options: LockScreenSoundLevel.allCases.map(\.rawValue)), options: LockScreenSoundLevel.allCases.map(\.rawValue), moment: nil)
+                    soundRow(model.controls[1], selection: store.stringBinding(LockScreenSettingKey.lockSound), options: LockScreenSoundOption.all.map(\.title), moment: .lock)
+                    soundRow(model.controls[2], selection: store.stringBinding(LockScreenSettingKey.unlockSound), options: LockScreenSoundOption.all.map(\.title), moment: .unlock)
+                    soundRow(model.controls[3], selection: store.stringBinding(LockScreenSettingKey.soundLevel), options: LockScreenSoundLevel.allCases.map(\.rawValue), moment: nil)
                     if let note = model.soundNote {
                         Text(note)
                             .font(GS.rowText)
@@ -59,36 +56,23 @@ struct LockScreenSettingsSection: View {
                 }
             }
         }
-        .padding(model.panelPadding)
+        .padding(GlassSettingsMetrics.panelPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(model.animationDuration == 0 ? nil : .easeOut(duration: model.animationDuration), value: playerCard)
+        .animation(model.animationDuration == 0 ? nil : .easeOut(duration: model.animationDuration), value: resolved)
         .onAppear {
             loaded = true
             refresh()
         }
-        .onChange(of: playerCard) { _, _ in refresh() }
-        .onChange(of: lockSound) { _, _ in refresh() }
-        .onChange(of: unlockSound) { _, _ in refresh() }
-        .onChange(of: soundLevel) { _, _ in refresh() }
+        .onChange(of: resolved) { _, _ in refresh() }
     }
 
     private var resolved: LockScreenSettings {
-        LockScreenSettings.resolve(
-            playerCard: playerCard,
-            lockSound: lockSound,
-            unlockSound: unlockSound,
-            soundLevel: soundLevel,
-            origin: .owner
-        )
+        LockScreenSettingsStore(values: Dictionary(uniqueKeysWithValues: LockScreenSettingKey.all.map { ($0, store.string($0)) })).settings
     }
 
     private func refresh() {
-        space = playerCard ? LockScreenSpaceLoader.probe() : nil
+        space = resolved.playerCard ? LockScreenSpaceLoader.probe() : nil
         LockScreenCoordinator.shared.sync(resolved)
-    }
-
-    private func resolvedTitle(_ stored: Binding<String>, options: [String]) -> Binding<String> {
-        Binding(get: { options.contains(stored.wrappedValue) ? stored.wrappedValue : options[0] }, set: { stored.wrappedValue = $0 })
     }
 
     private func preview(_ model: LockScreenPageModel) -> some View {
@@ -152,11 +136,12 @@ struct LockScreenSettingsSection: View {
                 Spacer(minLength: 12)
                 trailing()
             }
-            .frame(minHeight: LockScreenLayout.rowHeight)
+            .frame(minHeight: GlassSettingsMetrics.controlRow)
             Text(control.helper)
                 .font(GS.rowText)
                 .foregroundStyle(GS.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: GlassSettingsMetrics.helperLine, alignment: .leading)
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .contain)

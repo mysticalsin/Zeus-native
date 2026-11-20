@@ -14,12 +14,6 @@ public enum LockScreenCopy {
     public static let levelHelper = "Quiet is softer. Loud is full. Off plays nothing."
 }
 
-public enum LockScreenLayout {
-    public static let rowHeight = 52.0
-    public static let panelPadding = 32.0
-    public static let cardGap = 28.0
-    public static let motionDuration = 0.22
-}
 
 public struct LockScreenControl: Equatable, Sendable, Identifiable {
     public var id: String
@@ -62,6 +56,8 @@ public struct LockScreenPageModel: Equatable, Sendable {
     public var panelPadding: Double
     public var cardGap: Double
 
+    public static let motionDuration = 0.22
+
     public static func make(
         settings: LockScreenSettings,
         playback: LockScreenPlayback,
@@ -70,7 +66,7 @@ public struct LockScreenPageModel: Equatable, Sendable {
         soundFileExists: (String) -> Bool,
         loaded: Bool
     ) -> LockScreenPageModel {
-        let duration = reduceMotion ? 0 : LockScreenLayout.motionDuration
+        let duration = reduceMotion ? 0 : motionDuration
         guard loaded else {
             return LockScreenPageModel(
                 phase: .loading,
@@ -79,9 +75,9 @@ public struct LockScreenPageModel: Equatable, Sendable {
                 preview: LockScreenPreviewTile(body: .loading, accessibilityLabel: LockScreenCopy.loading, controlCount: 0),
                 soundNote: nil,
                 animationDuration: duration,
-                rowHeight: LockScreenLayout.rowHeight,
-                panelPadding: LockScreenLayout.panelPadding,
-                cardGap: LockScreenLayout.cardGap
+                rowHeight: GlassSettingsMetrics.controlRow,
+                panelPadding: GlassSettingsMetrics.panelPadding,
+                cardGap: GlassSettingsMetrics.cardSpacing
             )
         }
         let unavailable = settings.playerCard && (space == .symbolMissing || space == .callFailed)
@@ -100,9 +96,9 @@ public struct LockScreenPageModel: Equatable, Sendable {
             preview: preview(settings: settings, playback: playback, unavailable: unavailable),
             soundNote: missingSound(settings, soundFileExists: soundFileExists),
             animationDuration: duration,
-            rowHeight: LockScreenLayout.rowHeight,
-            panelPadding: LockScreenLayout.panelPadding,
-            cardGap: LockScreenLayout.cardGap
+            rowHeight: GlassSettingsMetrics.controlRow,
+            panelPadding: GlassSettingsMetrics.panelPadding,
+            cardGap: GlassSettingsMetrics.cardSpacing
         )
     }
 

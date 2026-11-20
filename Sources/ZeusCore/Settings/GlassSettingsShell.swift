@@ -211,10 +211,10 @@ public enum GlassSettingsFocus {
 
 /// Keys the existing settings surface already stores. Catalog ids are read from the catalog source.
 public enum SettingsKeyReachability {
-    public static let catalogCount = 212
+    public static let catalogCount = 216
     public static let outsideCount = 77
     public static let sectionCount = 27
-    public static let requiredFingerprint = "42a6fb1152bb4c71"
+    public static let requiredFingerprint = "f22b13c9bd0f1d30"
 
     public static let outsideKeys: [String] = [
         "showCaptions",
@@ -683,7 +683,9 @@ public enum GlassSettingsAudit {
         if shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("a topbar tab became its own sidebar row") }
         if !SettingsSectionRegistry.search("Topbar", in: shownRows).contains(where: { $0.id == SettingsSectionRegistry.topbarID }) { failures.append("Topbar missing from search") }
         if !shownRows.map(\.accessibilityLabel).contains("Topbar") { failures.append("Topbar missing from voiceover order") }
-        if GlassSectionManifest.topbarTabs(in: flipped).map(\.id) != ["glass.media"] { failures.append("media tab missing from the host") }
+        let tabs = GlassSectionManifest.topbarTabs(in: flipped).map(\.id)
+        if !tabs.contains("glass.media") { failures.append("media tab missing from the host") }
+        if tabs.contains(where: { id in flipped.contains { $0.id == id && !$0.isShown } }) { failures.append("a hidden tab was shown") }
         if shownRows.filter({ $0.id == SettingsSectionRegistry.topbarID }).count != 1 { failures.append("more than one Topbar row") }
         if GlassSettingsMetrics.controlRow != 52 || GlassSettingsMetrics.helperLine != 16 || GlassSettingsMetrics.panelPadding != 32 || GlassSettingsMetrics.cardSpacing != 28 {
             failures.append("metrics")

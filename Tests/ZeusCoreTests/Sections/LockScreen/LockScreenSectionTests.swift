@@ -442,17 +442,18 @@ import Testing
     }
 
     @Test func layoutTokensAndReduceMotion() {
-        #expect(LockScreenLayout.rowHeight == 52)
-        #expect(LockScreenLayout.panelPadding == 32)
-        #expect(LockScreenLayout.cardGap == 28)
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.helperLine == 16)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
         let moving = page(reduceMotion: false)
         let still = page(reduceMotion: true)
-        #expect(moving.animationDuration == LockScreenLayout.motionDuration)
+        #expect(moving.animationDuration == LockScreenPageModel.motionDuration)
         #expect(moving.animationDuration > 0)
         #expect(still.animationDuration == 0)
-        #expect(moving.rowHeight == 52)
-        #expect(moving.panelPadding == 32)
-        #expect(moving.cardGap == 28)
+        #expect(moving.rowHeight == GlassSettingsMetrics.controlRow)
+        #expect(moving.panelPadding == GlassSettingsMetrics.panelPadding)
+        #expect(moving.cardGap == GlassSettingsMetrics.cardSpacing)
         #expect(still.controls.allSatisfy { $0.keyboardReachable })
     }
 
