@@ -124,6 +124,9 @@ final class OnboardingFlow {
     private(set) var completedThisPresentation = false
     /// Whether the guide still opens by itself: not started, in progress, dismissed or completed.
     private(set) var progress: OnboardingProgress.State
+    /// Expanded or folded into the chip. The step itself stays on `step`.
+    var presentation: OnboardingPresentation
+    var onPresentation: (([OnboardingPresentation.Effect]) -> Void)?
 
     var completed: Bool { persistence.readCompleted() }
     var reducesMotion: Bool { feedback.reduceMotion() }
@@ -137,7 +140,18 @@ final class OnboardingFlow {
         progress = OnboardingProgress.saved(completed: persistence.readCompleted(), dismissed: persistence.readDismissed())
         let start = OnboardingStep(rawValue: persistence.readStep()) ?? .welcome
         step = start
+        presentation = OnboardingPresentation(
+            progress: .init(step: start.rawValue, choices: [], permissionState: []),
+            reduceMotion: feedback.reduceMotion())
         wake = start == .welcome && !feedback.reduceMotion() && !feedback.isSnapshot() ? .asleep : .awake
+    }
+
+    func sendPresentation(_ command: OnboardingPresentation.Command) {
+        presentation.progress = OnboardingPresentation.Progress(
+            step: step.rawValue, choices: [agent.rawValue], permissionState: [])
+        presentation.reduceMotion = reducesMotion
+        let effects = presentation.send(command)
+        onPresentation?(effects)
     }
 
     func beginPresentation() {
@@ -262,7 +276,19 @@ struct OnboardingRoot: View {
 
     var body: some View {
         let reduce = reduceMotion || flow.reducesMotion
+        let minimized = flow.presentation.phase == .minimized
+        let canvas = minimized
+            ? CGSize(width: OnboardingPresentation.minimizedSize.width, height: OnboardingPresentation.minimizedSize.height)
+            : OB.size
         ZStack(alignment: .topLeading) {
+            if minimized {
+                Button("Setup") { flow.sendPresentation(.reopen) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Resume setup")
+                    .keyboardShortcut(.defaultAction)
+                    .frame(width: canvas.width, height: canvas.height)
+            } else {
+            Group {
             palette.canvas
             OnboardingWatermark(shift: OnboardingTransition.watermarkShift(step: flow.step.rawValue, reduceMotion: reduce))
             OnboardingBrand().offset(x: OB.leadingEdge, y: 67.5)
@@ -299,8 +325,24 @@ struct OnboardingRoot: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
+            VStack(alignment: .trailing, spacing: 2) {
+                Button("Minimize") { flow.sendPresentation(.minimizeControl) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Minimize setup")
+                Text("Esc to minimize")
+                    .font(OB.progress)
+                    .foregroundStyle(palette.secondary)
+            }
+            .frame(width: 140, height: 36, alignment: .trailing)
+            .offset(x: OB.size.width - 172, y: 28)
+            }
+            }
         }
-        .frame(width: OB.size.width, height: OB.size.height)
+        .frame(width: canvas.width, height: canvas.height)
+        .onKeyPress(.escape) {
+            flow.sendPresentation(.escape)
+            return .handled
+        }
         .ignoresSafeArea()
         .environment(\.ob, palette)
         .preferredColorScheme(palette.canvas == OB.light.canvas ? .light : .dark)
@@ -434,6 +476,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         self.journeyRegistry = journeyRegistry
         pollingLifecycle = OnboardingPollingLifecycle(services: services)
         super.init()
+        flow.onPresentation = { [weak self] effects in self?.apply(effects) }
         for name in [NSApplication.didHideNotification, NSApplication.didUnhideNotification] {
             NotificationCenter.default.addObserver(self, selector: #selector(applicationVisibilityChanged),
                                                    name: name, object: nil)
@@ -474,9 +517,37 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             self.window = window
         }
         presented = true
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        if OnboardingPresentation.takesKeyFocusOnFirstShow {
+            NSApp.activate()
+            window?.makeKeyAndOrderFront(nil)
+        } else {
+            window?.orderFront(nil)
+        }
         synchronizePolling()
+    }
+
+    private func apply(_ effects: [OnboardingPresentation.Effect]) {
+        let animated = effects.contains { if case .animated(true) = $0 { return true } else { return false } }
+        for effect in effects {
+            switch effect {
+            case .resize(let size):
+                guard let window else { continue }
+                var frame = window.frame
+                let next = NSSize(width: size.width, height: size.height)
+                frame.origin.y += frame.size.height - next.height
+                frame.size = next
+                window.setFrame(frame, display: true, animate: animated)
+            case .announce(let text):
+                NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested, userInfo: [
+                    .announcement: text,
+                    .priority: NSAccessibilityPriorityLevel.high.rawValue,
+                ])
+            case .releaseKeyFocus:
+                if window?.isKeyWindow == true { window?.resignKey() }
+            case .animated:
+                break
+            }
+        }
     }
 
     func windowWillClose(_ notification: Notification) {

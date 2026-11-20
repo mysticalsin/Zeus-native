@@ -202,6 +202,34 @@ struct OnboardingIsolationTests {
         #expect(services.requests.isEmpty && services.connections.isEmpty && services.downloads == 0)
     }
 
+    @Test func escapeCollapsesAndReopenRestoresTheSameStep() async throws {
+        let memory = Memory()
+        let flow = memory.flow()
+        flow.next()
+        try await settle(flow, at: .murmure)
+        var presentation = OnboardingPresentation(
+            progress: .init(step: flow.step.rawValue, choices: [flow.agent.rawValue], permissionState: ["not-granted"]),
+            reduceMotion: true)
+        let collapsed = presentation.send(.escape)
+        #expect(presentation.phase == .minimized)
+        #expect(presentation.progress.step == OnboardingStep.murmure.rawValue)
+        #expect(collapsed.contains(.animated(false)))
+        let restored = presentation.send(.reopen)
+        #expect(presentation.phase == .expanded)
+        #expect(presentation.progress.step == OnboardingStep.murmure.rawValue)
+        #expect(restored.contains(.announce("Setup restored")))
+        #expect(presentation.send(.escape).isEmpty == false)
+        let again = presentation
+        #expect(presentation.send(.escape).isEmpty)
+        #expect(presentation.phase == again.phase)
+        for step in OnboardingStep.allCases.dropFirst().dropFirst() {
+            flow.next()
+            try await settle(flow, at: step)
+        }
+        #expect(flow.complete())
+        #expect(memory.completed && memory.finishes == 1)
+    }
+
     @Test func pollingFollowsOwnWindowMiniaturizeRestoreAndCloseWithoutActions() async throws {
         // Native own-window/delegate lifecycle, not button activation or OS-consent proof.
         try await OwnedWindowJourneyLease.perform {
