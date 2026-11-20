@@ -1,4 +1,5 @@
 import Testing
+import ZeusCore
 
 @Suite struct AutoUpdateSectionSlotTests {
     @Test func autoUpdateSlotStartsEmpty() {
