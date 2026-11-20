@@ -29,19 +29,21 @@ public struct PersistedVoiceSettings: Codable, Equatable, Sendable {
         engineAuto = try container.decodeIfPresent(Bool.self, forKey: .engineAuto)
     }
 
-    /// Placeholder. The stored engine is not read yet, so a saved choice comes back as the Mac voice.
+    /// The engine a launch already starts on. Local-voice flags are not an input.
     public func resolvedEngine(kokoroReady: Bool, elevenLabsKeyValid: Bool) -> UltronVoicePlan.Engine {
-        _ = (kokoroReady, elevenLabsKeyValid, engine, userSelected)
-        return .system
+        UltronVoicePlan.initialEngine(
+            stored: engine.flatMap(UltronVoicePlan.Engine.init(rawValue:)),
+            userSelected: userSelected, kokoroReady: kokoroReady, elevenLabsKeyValid: elevenLabsKeyValid)
     }
 
+    /// A stored provider wins. Otherwise the existing default is used.
     public func resolvedProvider(kokoroReady: Bool, elevenLabsKeyValid: Bool) -> VoiceTTSProvider {
-        _ = (kokoroReady, elevenLabsKeyValid, ttsProvider)
-        return .kokoro
+        if let ttsProvider, let provider = VoiceTTSProvider(rawValue: ttsProvider) { return provider }
+        return UltronVoicePlan.defaultProvider(kokoroReady: kokoroReady, elevenLabsKeyValid: elevenLabsKeyValid)
     }
 
+    /// Automatic unless the owner already wrote `voice.engine.auto`.
     public func resolvedEngineAuto() -> Bool {
-        _ = engineAuto
-        return false
+        ElevenLabsFailsafe.defaultEngineAuto(explicit: engineAuto, storedProvider: ttsProvider)
     }
 }
