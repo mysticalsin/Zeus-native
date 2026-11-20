@@ -433,7 +433,7 @@ import Testing
 
     @Test func machineSourcesDoNotLogTheKeyOrAddAnEndpoint() throws {
         let root = try repoRoot()
-        let directory = root.appendingPathComponent("Sources/ZeusCore/Settings/Sections/License")
+        let directory = root.appendingPathComponent("Sources/ZeusCore/Settings/Sections/License").resolvingSymlinksInPath()
         let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }
         #expect(!files.isEmpty)
@@ -444,7 +444,8 @@ import Testing
                 #expect(!text.contains(token), "\(file.lastPathComponent) contains \(token)")
             }
         }
-        let client = try String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/License/LicenseServerClient.swift"), encoding: .utf8)
+        let clientURL = root.appendingPathComponent("Sources/ZeusCore/License/LicenseServerClient.swift").resolvingSymlinksInPath()
+        let client = try String(contentsOf: clientURL, encoding: .utf8)
         for path in LicenseActivationEndpoint.allCases.map(\.rawValue) {
             #expect(client.contains("\"\(path)\""))
         }
