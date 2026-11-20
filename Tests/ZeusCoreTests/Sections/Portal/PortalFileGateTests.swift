@@ -46,9 +46,10 @@ struct PortalFileGateTests {
         for (claim, failure) in cases {
             let decision = PortalFileGate.decide(claim)
             if let failure {
-                #expect(decision == .failure(failure), "expected \(failure) for \(claim.displayName) \(claim.path)")
+                #expect(decision == .failure(failure))
+            } else if case .success = decision {
             } else {
-                #expect(decision.isSuccess, "expected admit for \(claim.path) \(claim.displayName)")
+                Issue.record("expected admit for \(claim.displayName)")
             }
         }
     }
@@ -90,7 +91,7 @@ struct PortalFileGateTests {
             let head = parts.dropLast().joined(separator: "/")
             let path = head.isEmpty ? "/sandbox/inbox/\(name)" : "/sandbox/inbox/\(head)/\(name)"
             let claim = PortalFixtures.claim(name: name, path: path)
-            #expect(PortalFileGate.decide(claim).isSuccess, path)
+            if case .failure = PortalFileGate.decide(claim) { Issue.record("refused \(path)") }
 
             let escape = "/sandbox/inbox/" + parts.joined(separator: "/") + "/../secret.txt"
             #expect(PortalFileGate.decide(PortalFixtures.claim(name: "secret.txt", path: escape)) == .failure(.escapesSandbox))
@@ -126,12 +127,5 @@ struct PortalFileGateTests {
         #expect(PortalCopy.sentence(.tooLarge) == "The file is larger than 8 MB.")
         #expect(PortalCopy.sentence(.symlink) == "Symbolic links are not converted.")
         #expect(PortalCopy.sentence(.systemCodecUnavailable) == "This Mac cannot convert that image locally.")
-    }
-}
-
-private extension Result where Failure == PortalDropFailure {
-    var isSuccess: Bool {
-        if case .success = self { return true }
-        return false
     }
 }

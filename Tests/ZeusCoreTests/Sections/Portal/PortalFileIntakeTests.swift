@@ -12,13 +12,13 @@ struct PortalFileIntakeTests {
         defer { try? FileManager.default.removeItem(at: sandbox) }
         let source = try PortalFixtures.write("note.txt", bytes: Data("A\r\nB".utf8), in: sandbox)
         let flow = PortalLocalConversion.importDrop(path: source, declaredType: .plainText, inbox: inbox.path)
-        let output = try #require(output(of: flow))
-        #expect(String(decoding: output.bytes, as: UTF8.self) == "A\nB")
-        let written = inbox.appendingPathComponent(output.fileName)
-        #expect(try Data(contentsOf: written) == output.bytes)
+        let converted = try #require(doneOutput(flow))
+        #expect(String(decoding: converted.bytes, as: UTF8.self) == "A\nB")
+        let written = inbox.appendingPathComponent(converted.fileName)
+        #expect(try Data(contentsOf: written) == converted.bytes)
         let mode = try FileManager.default.attributesOfItem(atPath: written.path)[.posixPermissions] as? NSNumber
         #expect(mode?.intValue == 0o600)
-        #expect(try String(contentsOfFile: source) == "A\r\nB")
+        #expect(try String(contentsOf: URL(fileURLWithPath: source), encoding: .utf8) == "A\r\nB")
     }
 
     @Test func symlinksTraversalAndHardLinksAreRefused() throws {
@@ -73,7 +73,7 @@ struct PortalFileIntakeTests {
         #expect(try folderFiles(parent) == ["inbox"])
     }
 
-    private func output(of flow: PortalDropFlow) -> PortalConversionOutput? {
+    private func doneOutput(_ flow: PortalDropFlow) -> PortalConversionOutput? {
         if case .done(let output) = flow.phase { return output }
         return nil
     }
