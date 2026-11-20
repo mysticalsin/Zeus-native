@@ -90,13 +90,6 @@ o(S,'Everyday lights','Glow when AirDrop arrives','toggle','off','Blue intake gl
 o(S,'Everyday lights','Glow when a Fling arrives','toggle','-','Glow and a short cue when files arrive from another Mac with Fling.','missing','lights.fling','toggle',[],'true','live','Zeus addition. Gates the Fling arrival cue and glow. Also on the Shelf page.')
 o(S,'Everyday lights','Screenshot cue','toggle','off','Camera cue and shelf drop for new screenshots.','missing','lights.screenshot','toggle',[],'false','live','Gated by Desktop folder access.')
 o(S,'Music','Show music from','menu','-','Any player shows what started playing last.','missing','music.follow','choice',['Any player','Music','Spotify'],'Any player','live','A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player.')
-o(S,'Player','Player look','menu','-','Art, glass art, a glass card, or a detailed card.','missing','media.playerLook','choice',['art','glassArt','glassCard','detailed'],'art','live','The notch player card. The home widget keeps its own music style.')
-o(S,'Player','Tint with the song','toggle','off','The player takes its colours from the artwork.','missing','media.tintFromSong','toggle',[],'false','live','Off until chosen. The colours stay on this Mac.')
-o(S,'Player','Like follows the song','toggle','off','The like button uses the song colour.','missing','media.likeFollowsSong','toggle',[],'false','live','Off on a fresh store.')
-o(S,'Player','Explicit badge','toggle','off','Shows a badge on a track marked explicit.','missing','media.explicitBadge','toggle',[],'false','live','Off on a fresh store.')
-o(S,'Player','Match the badge colour','toggle','off','The badge uses the song colour.','missing','media.explicitMatchColour','toggle',[],'false','live','Off keeps the badge neutral.')
-o(S,'Player','Left button','menu','-','The button to the left of play.','missing','media.leftButton','choice',['previous','like','lyrics'],'previous','live','Previous, like, or lyrics.')
-o(S,'Player','Hide on pause','menu','-','Hide the player instantly, after a short delay, or never.','missing','media.hideOnPause','choice',['instantly','afterDelay','never'],'never','live','Never leaves the player where it is.')
 o(S,'Screen','Round the bottom screen corners','toggle','off','Rounds the two bottom corners of a notched display to match the top. Click-through.','missing','screen.roundBottomCorners','toggle',[],'false','live','Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes.')
 o(S,'Screen','Corner size','segmented','Medium','How large the rounded corners are.','missing','screen.cornerRadius','choice',['Small','Medium','Large'],'Medium','live','Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt.')
 
@@ -289,7 +282,6 @@ def validate_table():
             by_id.setdefault(row[7], row)  # Same first-row-wins rule as write_swift.
     opt_in = ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts',
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
-              'media.tintFromSong', 'media.likeFollowsSong', 'media.explicitBadge', 'media.explicitMatchColour',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
               'face.presence', 'tiling.enabled', 'fling.enabled')

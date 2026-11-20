@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 221 of 221 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 221 in scope). 210 are wired to real behaviour (95%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 214 of 214 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 214 in scope). 203 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 170.
+**Before this round:** has 19, partial 27, missing 163.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -96,13 +96,6 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Glow when a Fling arrives | toggle | - | Glow and a short cue when files arrive from another Mac with Fling. | missing | live | `lights.fling` | Zeus addition. Gates the Fling arrival cue and glow. Also on the Shelf page. |
 | Everyday lights | Screenshot cue | toggle | off | Camera cue and shelf drop for new screenshots. | missing | live | `lights.screenshot` | Gated by Desktop folder access. |
 | Music | Show music from | menu | - | Any player shows what started playing last. | missing | live | `music.follow` | A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player. |
-| Player | Player look | menu | - | Art, glass art, a glass card, or a detailed card. | missing | live | `media.playerLook` | The notch player card. The home widget keeps its own music style. |
-| Player | Tint with the song | toggle | off | The player takes its colours from the artwork. | missing | live | `media.tintFromSong` | Off until chosen. The colours stay on this Mac. |
-| Player | Like follows the song | toggle | off | The like button uses the song colour. | missing | live | `media.likeFollowsSong` | Off on a fresh store. |
-| Player | Explicit badge | toggle | off | Shows a badge on a track marked explicit. | missing | live | `media.explicitBadge` | Off on a fresh store. |
-| Player | Match the badge colour | toggle | off | The badge uses the song colour. | missing | live | `media.explicitMatchColour` | Off keeps the badge neutral. |
-| Player | Left button | menu | - | The button to the left of play. | missing | live | `media.leftButton` | Previous, like, or lyrics. |
-| Player | Hide on pause | menu | - | Hide the player instantly, after a short delay, or never. | missing | live | `media.hideOnPause` | Never leaves the player where it is. |
 | Screen | Round the bottom screen corners | toggle | off | Rounds the two bottom corners of a notched display to match the top. Click-through. | missing | live | `screen.roundBottomCorners` | Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes. |
 | Screen | Corner size | segmented | Medium | How large the rounded corners are. | missing | live | `screen.cornerRadius` | Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt. |
 

@@ -217,22 +217,32 @@ import Testing
         let restored = MediaSettings(reading: { defaults.string(forKey: MediaDefaultsKey.stored($0)) })
         #expect(restored == edited)
 
+        let contributions = MediaSectionSlot.keyContributions
+        #expect(contributions.map(\.id) == MediaSettingID.added)
+        var ledger: [String: String] = [:]
+        for item in contributions {
+            #expect(SettingsKeyLedger.load(item, stored: nil) == item.defaultValue)
+            if item.kind == .toggle {
+                #expect(item.defaultValue == "false")
+                #expect(item.policy == .exportable)
+            }
+            let written = edited.persisted()[item.id] ?? item.defaultValue
+            #expect(SettingsKeyLedger.save(&ledger, item, written))
+            #expect(SettingsKeyLedger.load(item, stored: ledger[item.id]) == written)
+            let brought = SettingsKeyLedger.imported(item, current: item.defaultValue, incoming: written)
+            #expect(brought == written)
+        }
         let root = repoRoot()
         let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
-        let lines = catalog.split(separator: "\n").map(String.init)
+        let catalogIDs = catalog.split(separator: "\n").compactMap { line -> String? in
+            guard line.contains("SettingOption(id:") else { return nil }
+            guard let open = line.firstIndex(of: "\""), let close = line[line.index(after: open)...].firstIndex(of: "\"") else { return nil }
+            return String(line[line.index(after: open)..<close])
+        }
         for id in MediaSettingID.added {
-            #expect(lines.contains { $0.contains("id: \"\(id)\"") }, "\(id) is missing from the settings catalog")
+            #expect(!catalogIDs.contains(id))
         }
-        for id in ["media.tintFromSong", "media.likeFollowsSong", "media.explicitBadge", "media.explicitMatchColour"] {
-            let line = lines.first { $0.contains("id: \"\(id)\"") }
-            #expect(line?.contains("defaultValue: \"false\"") == true)
-            #expect(line?.contains("state: .live") == true)
-        }
-        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
-        #expect(store.contains("neverEnabledByImport"))
-        for id in ["privacy.lyrics", "music.browserMedia", "audio.equaliser"] {
-            #expect(store.contains("\"\(id)\""))
-        }
+        #expect(SettingsKeyLedger.problems(catalogIDs: catalogIDs, contributions: contributions).isEmpty)
     }
 
     @Test func everyControlIsAKeyboardControl() {
