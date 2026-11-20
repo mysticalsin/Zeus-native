@@ -87,10 +87,11 @@ public enum PortalCopy {
 }
 
 public enum PortalSectionMetrics {
-    public static let panelPadding = 32.0
-    public static let cardSpacing = 28.0
-    public static let rowHeight = 52.0
-    public static let topbarTab = 8
+    public static let panelPadding = GlassSettingsMetrics.panelPadding
+    public static let cardSpacing = GlassSettingsMetrics.cardSpacing
+    public static let rowHeight = GlassSettingsMetrics.controlRow
+    /// Eighth tab, numbered from zero by the placement API.
+    public static let topbarTab = 7
 
     public static func animationDuration(reduceMotion: Bool) -> Double {
         reduceMotion ? 0 : MotionTokens.crossfadeDuration

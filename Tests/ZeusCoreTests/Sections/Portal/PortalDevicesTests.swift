@@ -169,9 +169,10 @@ struct PortalDevicesTests {
         let hits = sources.flatMap { PortalToolBoundary.violations(in: $0) }
         #expect(hits.isEmpty)
         let view = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/Sections/PortalSettingsSection.swift"), encoding: .utf8)
-        #expect(view.contains("PortalSectionMetrics.panelPadding"))
-        #expect(view.contains("PortalSectionMetrics.cardSpacing"))
-        #expect(view.contains("PortalSectionMetrics.rowHeight"))
+        #expect(view.contains("GlassSettingsMetrics.panelPadding"))
+        #expect(view.contains("GlassSettingsMetrics.cardSpacing"))
+        #expect(view.contains("GlassSettingsMetrics.controlRow"))
+        #expect(view.contains("GlassSettingsMetrics.helperLine"))
         #expect(view.contains("control.helper"))
         #expect(view.contains("control.label"))
         #expect(view.contains("accessibilityReduceMotion"))

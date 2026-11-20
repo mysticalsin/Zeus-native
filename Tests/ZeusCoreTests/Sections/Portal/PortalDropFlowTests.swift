@@ -10,16 +10,18 @@ struct PortalDropFlowTests {
         #expect(slot.title == "Portal")
         #expect(slot.filled == true)
         #expect(slot.keys.isEmpty)
-        #expect(slot.order == 120)
+        #expect(slot.order == 7)
+        #expect(slot.placement == .topbarTab(7))
         #expect(PortalDevices.existingKeys == [
             "fling.enabled", "fling.receiveInBackground", "fling.deviceName", "fling.visibility",
             "fling.autoAcceptPaired", "fling.saveMode", "fling.papers", "fling.flickSensitivity",
             "fling.openLinks", "fling.pairedMacs",
         ])
-        #expect(PortalSectionMetrics.topbarTab == 8)
-        #expect(PortalSectionMetrics.panelPadding == 32)
-        #expect(PortalSectionMetrics.cardSpacing == 28)
-        #expect(PortalSectionMetrics.rowHeight == 52)
+        #expect(PortalSectionMetrics.topbarTab == 7)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.helperLine == 16)
     }
 
     @Test func phasesAreTheFiveNamedStates() throws {

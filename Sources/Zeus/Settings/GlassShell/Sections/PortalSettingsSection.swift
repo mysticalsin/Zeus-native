@@ -18,13 +18,13 @@ struct PortalSettingsSection: View {
         let preview = PortalSectionModel.preview(flow.phase, reduceMotion: motion)
         let controls = PortalSectionModel.controls(for: board, flow: flow)
         ScrollView {
-            VStack(alignment: .leading, spacing: PortalSectionMetrics.cardSpacing) {
+            VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
                 previewTile(preview)
                     .focusable(true)
                 card("File tray", controls.filter { ["portal.preview", "portal.conversion", "portal.reset"].contains($0.id) })
                 card("Nearby devices", controls.filter { !$0.id.hasPrefix("portal.preview") && $0.id != "portal.conversion" && $0.id != "portal.reset" })
             }
-            .padding(PortalSectionMetrics.panelPadding)
+            .padding(CGFloat(GlassSettingsMetrics.panelPadding))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .contain)
@@ -59,7 +59,7 @@ struct PortalSettingsSection: View {
             Text(preview.detail).font(GS.rowText).foregroundStyle(GS.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, minHeight: PortalSectionMetrics.rowHeight, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
         .padding(16)
         .background(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).fill(GS.card))
         .overlay(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).strokeBorder(targeted ? GS.selectedText : GS.cardStroke, lineWidth: 1))
@@ -100,12 +100,13 @@ struct PortalSettingsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(control.label).font(GS.rowTitle).foregroundStyle(GS.text)
                 Text(control.helper).font(GS.rowText).foregroundStyle(GS.secondary)
+                    .frame(minHeight: CGFloat(GlassSettingsMetrics.helperLine), alignment: .topLeading)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
             trailing(control)
         }
-        .frame(minHeight: PortalSectionMetrics.rowHeight, alignment: .leading)
+        .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(control.label)
         .focusable(true)

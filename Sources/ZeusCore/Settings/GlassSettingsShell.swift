@@ -1,5 +1,22 @@
 import Foundation
 
+/// A page that can host a card. These raw values match the existing sidebar pages.
+public enum GlassCardPage: String, Equatable, Sendable {
+    case general, license, privacy, about
+}
+
+/// Where a section appears. A topbar tab joins the Topbar row. A card sits on an existing page.
+public enum GlassSectionPlacement: Equatable, Sendable {
+    case topbarTab(Int)
+    case cardOn(GlassCardPage, Int)
+
+    public var order: Int {
+        switch self {
+        case .topbarTab(let order), .cardOn(_, let order): return order
+        }
+    }
+}
+
 /// Placeholder slots for settings sections a later change fills. This change adds no setting key.
 public struct GlassSectionSlot: Equatable, Sendable {
     public var id: String
@@ -7,14 +24,20 @@ public struct GlassSectionSlot: Equatable, Sendable {
     public var filled: Bool
     public var keys: [String]
     public var order: Int
+    public var enabled: Bool
+    public var placement: GlassSectionPlacement
 
-    public init(id: String, title: String, filled: Bool, keys: [String], order: Int = 0) {
+    public init(id: String, title: String, filled: Bool, keys: [String], order: Int = 0, enabled: Bool = true, placement: GlassSectionPlacement = .cardOn(.general, 0)) {
         self.id = id
         self.title = title
         self.filled = filled
         self.keys = keys
         self.order = order
+        self.enabled = enabled
+        self.placement = placement
     }
+
+    public var isShown: Bool { filled && enabled }
 }
 
 public protocol GlassSlotProviding: Sendable {
@@ -40,6 +63,24 @@ public enum GlassSectionManifest {
 
     public static var slots: [GlassSectionSlot] {
         providers.map { $0.descriptor }
+    }
+
+    /// Filled, enabled topbar tabs, in tab order. An unfilled or disabled tab is absent.
+    public static func topbarTabs(in slots: [GlassSectionSlot]? = nil) -> [GlassSectionSlot] {
+        let source = slots ?? self.slots
+        return SettingsSectionRegistry.orderedSlots(source.filter { slot in
+            if case .topbarTab = slot.placement { return slot.isShown }
+            return false
+        })
+    }
+
+    /// Filled, enabled cards for one existing page, in card order.
+    public static func cards(on page: GlassCardPage, in slots: [GlassSectionSlot]? = nil) -> [GlassSectionSlot] {
+        let source = slots ?? self.slots
+        return SettingsSectionRegistry.orderedSlots(source.filter { slot in
+            if case .cardOn(let card, _) = slot.placement { return card == page && slot.isShown }
+            return false
+        })
     }
 
     public static var newSettingKeyCount: Int {
@@ -635,14 +676,20 @@ public enum GlassSettingsAudit {
         let flipped = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
             let slot = provider.descriptor
             guard slot.id == "glass.media" else { return slot }
-            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order)
+            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
         }
         let shownRows = SettingsSectionRegistry.sections(slots: flipped, includePhone: false)
-        if !shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("filled descriptor missing from the sidebar") }
-        if !SettingsSectionRegistry.search("Media", in: shownRows).contains(where: { $0.id == "glass.media" }) { failures.append("filled descriptor missing from search") }
-        if !shownRows.map(\.accessibilityLabel).contains("Media") { failures.append("filled descriptor missing from voiceover order") }
-        if !SettingsSectionHostPlan.hostedIDs(in: shownRows).contains("glass.media") { failures.append("filled descriptor missing from the host") }
-        if shownRows.contains(where: { $0.id == "glass.general" }) { failures.append("an unfilled descriptor appeared") }
+        if shownRows.last?.id != SettingsSectionRegistry.topbarID { failures.append("filled topbar tab did not add the Topbar row") }
+        if shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("a topbar tab became its own sidebar row") }
+        if !SettingsSectionRegistry.search("Topbar", in: shownRows).contains(where: { $0.id == SettingsSectionRegistry.topbarID }) { failures.append("Topbar missing from search") }
+        if !shownRows.map(\.accessibilityLabel).contains("Topbar") { failures.append("Topbar missing from voiceover order") }
+        let tabs = GlassSectionManifest.topbarTabs(in: flipped)
+        if !tabs.contains(where: { $0.id == "glass.media" }) { failures.append("media tab missing from the host") }
+        if tabs.contains(where: { !$0.filled }) { failures.append("an unfilled tab appeared") }
+        if shownRows.filter({ $0.id == SettingsSectionRegistry.topbarID }).count != 1 { failures.append("more than one Topbar row") }
+        if GlassSettingsMetrics.controlRow != 52 || GlassSettingsMetrics.helperLine != 16 || GlassSettingsMetrics.panelPadding != 32 || GlassSettingsMetrics.cardSpacing != 28 {
+            failures.append("metrics")
+        }
         let window = windowSource
         var state = SettingsSelectionState.section("settings.general")
         state = SettingsSelectionRules.selectingSlot("glass.probe", current: state)
@@ -650,11 +697,12 @@ public enum GlassSettingsAudit {
         state = SettingsSelectionRules.selectingSection("settings.sounds", current: state)
         if state != .section("settings.sounds") { failures.append("section left the slot selected") }
         if SettingsSelectionRules.selectingSlot("  ", current: state) != state { failures.append("blank slot changed the selection") }
-        for count in [21, 22, 23, 34] where SettingsSidebarLayout.bottom(rowCount: count) > SettingsSidebarLayout.versionY {
-            failures.append("sidebar row \(count) crosses the version line")
+        for count in [21, 22, 23, 34] where SettingsSidebarLayout.rowMetrics(rowCount: count).height != 30 {
+            failures.append("sidebar row \(count) is not 30 points")
         }
+        if SettingsSidebarLayout.bottom(rowCount: 34) <= SettingsSidebarLayout.versionY { failures.append("tall sidebar does not scroll") }
         if window.contains("rowMetrics(rowCount: GSSection.shown.count)") { failures.append("sidebar metrics ignore filled rows") }
-        if !window.contains("enum SettingsSelection") || !window.contains("case slot(SlotID)") || window.contains("var glassSlotID") {
+        if !window.contains("enum SettingsSelection") || !window.contains("case slot(SlotID)") || !window.contains("case topbar") || window.contains("var glassSlotID") {
             failures.append("selection is not one value")
         }
         if !window.contains("includePhone: GSSection.iPhonePairingAvailable") { failures.append("phone row is not wired") }
@@ -664,7 +712,7 @@ public enum GlassSettingsAudit {
         let second = GlassSectionSlot(id: "glass.dup", title: "Second", filled: true, keys: [], order: 11)
         let later = GlassSectionSlot(id: "glass.later", title: "Later", filled: true, keys: [], order: 12)
         let earlier = GlassSectionSlot(id: "glass.earlier", title: "Earlier", filled: true, keys: [], order: 9)
-        let rows = SettingsSectionRegistry.sections(slots: [later, second, first, earlier], includePhone: false)
+        let rows = SettingsSectionRegistry.orderedSlots([later, second, first, earlier])
         if rows.filter({ $0.id == "glass.dup" }).count != 1 { failures.append("duplicate slot kept") }
         if rows.suffix(3).map(\.id) != ["glass.earlier", "glass.dup", "glass.later"] { failures.append("slot order") }
         return failures
@@ -678,12 +726,12 @@ public enum GlassSettingsAudit {
         if existing.contains(where: { $0.placeholder != nil }) { failures.append("an existing section has a placeholder") }
         let again = SettingsSectionRegistry.sections(slots: [])
         if again != existing { failures.append("empty slot list changed the existing order") }
-        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [])
-        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [])
+        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [], placement: .topbarTab(0))
+        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(1))
         let withSynthetic = SettingsSectionRegistry.sections(slots: [hidden, synthetic])
         if withSynthetic.prefix(existing.count).map(\.id) != existing.map(\.id) { failures.append("existing order changed") }
-        if withSynthetic.last?.id != "glass.synthetic" { failures.append("filled slot did not append") }
-        if withSynthetic.contains(where: { $0.id == "glass.hidden" }) { failures.append("unfilled slot appeared") }
+        if withSynthetic.last?.id != SettingsSectionRegistry.topbarID { failures.append("filled topbar tab did not append") }
+        if withSynthetic.contains(where: { $0.id == "glass.hidden" || $0.id == "glass.synthetic" }) { failures.append("a tab appeared as its own row") }
         if SettingsSectionRegistry.existing.contains(where: { $0.id == "glass.synthetic" }) { failures.append("synthetic id was written into the registry") }
         let repeated = SettingsSectionRegistry.sections(slots: [synthetic])
         if repeated != SettingsSectionRegistry.sections(slots: [synthetic]) { failures.append("order is not stable") }

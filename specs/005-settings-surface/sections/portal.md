@@ -2,7 +2,7 @@
 
 Low confidence. `specs/005-settings-surface/inventory.md` marks Portal UNSPECIFIED: no R-contract and no D-decision names a Portal setting. This file records the reading used for the section. It adds no UserDefaults key.
 
-Placement, once the shell exposes it: `.topbarTab(8)`.
+Placement: the eighth topbar tab. The landed API numbers tabs from zero, so the slot is `.topbarTab(7)`.
 
 ## What this section is
 
@@ -54,4 +54,4 @@ Dark glass cards. Panel padding 32 pt, 28 pt between cards, rows at least 52 pt,
 - A hard link is refused. Is a byte copy of a single-link file enough?
 - Should Portal repeat the Shelf's Fling controls, or only show status and point at Shelf?
 - The macOS sandbox and a real drag are not established here.
-- `.topbarTab(8)` waits on the shell placement API. The sidebar order value stays 120.
+- The brief said `.topbarTab(8)`. The shell numbers the eight tabs from zero and already assigns Portal to `.topbarTab(7)`. This spec follows that.
