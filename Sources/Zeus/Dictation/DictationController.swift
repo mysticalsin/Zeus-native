@@ -148,6 +148,8 @@ struct DictationTurnContext {
     let generation: UInt64
     let mode: DictationMode
     let targetApp: NSRunningApplication?
+    /// Frontmost app at key down, before the microphone opens. Process id and bundle id only.
+    let keyDownApp: DictationAppIdentity
     let selection: String?
     let useLocal: Bool
     let engine: (any TranscriptionEngine)?
@@ -632,6 +634,8 @@ final class DictationController {
         } else {
             speech.onSamples = nil
         }
+        let keyDownApp = DictationAppIdentity(processID: NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0,
+                                             bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
         let turnGeneration = ownership.beginTurn()
         var readField: DictationInsertionTracker.Field?
         var readMode = mode
@@ -653,8 +657,8 @@ final class DictationController {
             selection = readSelection
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
             turnContext = DictationTurnContext(generation: turnGeneration, mode: readMode, targetApp: readApp,
-                                               selection: readSelection, useLocal: local, engine: turnEngine,
-                                               insertionField: readField)
+                                               keyDownApp: keyDownApp, selection: readSelection, useLocal: local,
+                                               engine: turnEngine, insertionField: readField)
         } catch {
             speech.onCaptureFailure = nil
             ownership.invalidate()
@@ -709,6 +713,8 @@ final class DictationController {
         speech.contextualStrings = hints
         let turnGeneration = ownership.beginTurn()
         let context = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
+                                           keyDownApp: DictationAppIdentity(processID: targetApp?.processIdentifier ?? 0,
+                                                                            bundleID: targetApp?.bundleIdentifier),
                                            selection: selection, useLocal: false, engine: nil, insertionField: insertionField)
         let sessionID: Int
         do {
@@ -1057,6 +1063,15 @@ final class DictationController {
                          onTextReady: (@MainActor (String) -> Void)? = nil) async -> TextInserter.Outcome {
         // A new ordinary turn supersedes any older replacement receipt, even on clipboard fallback.
         insertionTracker.invalidate()
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
+        if DictationFocusRule.choose(keyDown: context.keyDownApp, frontmost: live) == .copyInstead {
+            if allowClipboardFallback {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+            return .copiedOnly
+        }
         // Hold Shift while releasing to press Return after pasting.
         // Paste where the person was, even if the notch took a click meanwhile.
         if let app = context.targetApp, app != NSWorkspace.shared.frontmostApplication {
