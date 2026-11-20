@@ -103,6 +103,40 @@ import Testing
         #expect(preview.card == "Change\nNotes.txt\nshorter")
     }
 
+    @Test func aRecordedCommandHasItsTokenRedacted() {
+        var log = HandsCommandLog()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        log.record(command: "curl --header Authorization: Bearer sk-live-abc https://user:pw@example.com/v1 API_KEY=supersecret --password hunter2 --token=sk-test",
+                   verdict: "allow", outcome: "ran", at: date)
+        let text = log.text
+        #expect(!text.contains("sk-live-abc"))
+        #expect(!text.contains("user:pw"))
+        #expect(!text.contains("supersecret"))
+        #expect(!text.contains("hunter2"))
+        #expect(!text.contains("sk-test"))
+        #expect(text.contains("[redacted]"))
+        #expect(text.contains("curl"))
+    }
+
+    @Test func aRecordedCommandKeepsNonSecretArgs() {
+        var log = HandsCommandLog()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        log.record(command: "echo hello --verbose Notes.txt", verdict: "allow", outcome: "ran", at: date)
+        #expect(log.contains(command: "echo hello --verbose Notes.txt"))
+        #expect(!log.text.contains("[redacted]"))
+    }
+
+    @Test func aRecordedCommandLogIsPrivateToItsOwner() throws {
+        var log = HandsCommandLog()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        log.record(command: "echo hello", verdict: "allow", outcome: "ran", at: date)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-hands-mode-\(UUID().uuidString).log")
+        try log.write(to: url)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+        #expect((mode?.uint16Value ?? 0) & 0o777 == 0o600)
+        try? FileManager.default.removeItem(at: url)
+    }
+
     @Test func logRoundTripNamesEveryVerdict() throws {
         var log = HandsCommandLog()
         let date = Date(timeIntervalSince1970: 1_700_000_000)
