@@ -10,7 +10,7 @@ public enum AccessorySectionSlot: GlassSlotProviding {
             AccessoryPreferenceKey.overlayStyle,
             AccessoryPreferenceKey.speakerNames,
         ],
-        order: 6,
-        placement: .topbarTab(6)
+        order: 5,
+        placement: .topbarTab(5)
     )
 }

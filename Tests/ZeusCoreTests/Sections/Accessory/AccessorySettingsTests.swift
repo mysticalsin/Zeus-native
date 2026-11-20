@@ -9,13 +9,13 @@ struct AccessorySettingsTests {
         #expect(slot.id == "glass.accessory")
         #expect(slot.title == "Accessory")
         #expect(slot.filled == true)
-        #expect(slot.order == 6)
+        #expect(slot.order == 5)
         #expect(slot.keys == [
             "accessory.earbudsOverlay",
             "accessory.overlayStyle",
             "accessory.speakerNames",
         ])
-        #expect(slot.placement == .topbarTab(6))
+        #expect(slot.placement == .topbarTab(5))
         #expect(GlassSectionManifest.slotProblems([slot]).isEmpty)
     }
 
