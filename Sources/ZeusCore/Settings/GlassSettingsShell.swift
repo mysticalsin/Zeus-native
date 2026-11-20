@@ -675,15 +675,24 @@ public enum GlassSettingsAudit {
         var failures: [String] = []
         let flipped = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
             let slot = provider.descriptor
-            guard slot.id == "glass.media" else { return slot }
+            guard slot.id == "glass.media" || slot.id == "glass.battery" else { return slot }
             return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
         }
         let shownRows = SettingsSectionRegistry.sections(slots: flipped, includePhone: false)
         if shownRows.last?.id != SettingsSectionRegistry.topbarID { failures.append("filled topbar tab did not add the Topbar row") }
-        if shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("a topbar tab became its own sidebar row") }
+        if shownRows.contains(where: { $0.id == "glass.media" || $0.id == "glass.battery" }) { failures.append("a topbar tab became its own sidebar row") }
         if !SettingsSectionRegistry.search("Topbar", in: shownRows).contains(where: { $0.id == SettingsSectionRegistry.topbarID }) { failures.append("Topbar missing from search") }
         if !shownRows.map(\.accessibilityLabel).contains("Topbar") { failures.append("Topbar missing from voiceover order") }
-        if GlassSectionManifest.topbarTabs(in: flipped).map(\.id) != ["glass.media", "glass.battery"] { failures.append("media tab missing from the host") }
+        let tabs = GlassSectionManifest.topbarTabs(in: flipped)
+        if !tabs.contains(where: { $0.id == "glass.media" }) { failures.append("media tab missing from the host") }
+        if !tabs.contains(where: { $0.id == "glass.battery" }) { failures.append("second filled tab missing from the host") }
+        if tabs.contains(where: { !$0.filled || !$0.enabled }) { failures.append("an unfilled tab is shown") }
+        if tabs.contains(where: { $0.id == "glass.weather" }) { failures.append("unfilled weather tab appeared") }
+        let orders = tabs.map(\.placement.order)
+        if orders != orders.sorted() { failures.append("tabs are not ordered by topbar index") }
+        let mediaOrder = tabs.first { $0.id == "glass.media" }?.placement.order ?? -1
+        let batteryOrder = tabs.first { $0.id == "glass.battery" }?.placement.order ?? -1
+        if mediaOrder >= batteryOrder { failures.append("media is not before battery") }
         if shownRows.filter({ $0.id == SettingsSectionRegistry.topbarID }).count != 1 { failures.append("more than one Topbar row") }
         if GlassSettingsMetrics.controlRow != 52 || GlassSettingsMetrics.helperLine != 16 || GlassSettingsMetrics.panelPadding != 32 || GlassSettingsMetrics.cardSpacing != 28 {
             failures.append("metrics")
