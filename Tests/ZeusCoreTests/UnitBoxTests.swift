@@ -43,6 +43,20 @@ struct UnitBoxTests {
         #expect(fraction.width == 0.096 && fraction.height == 0.09)
     }
 
+    @Test func aNonFinitePointIsDroppedTheWayTheOldRectangleDroppedIt() {
+        let kept = UnitBox(x: 0.99, y: 1.99, width: 0.02, height: 0.02)
+        #expect(UnitBox.path([UnitSample(x: .infinity, y: .infinity), UnitSample(x: 1, y: 2)]) == kept)
+        #expect(UnitBox.path([UnitSample(x: 1, y: 2), UnitSample(x: .infinity, y: .infinity)]) == kept)
+        #expect(UnitBox.path([UnitSample(x: .infinity, y: 0), UnitSample(x: 1, y: 2)]) == kept)
+        #expect(UnitBox.path([UnitSample(x: .infinity, y: .infinity)])?.isNull == true)
+        let extended = UnitBox.path([UnitSample(x: -.infinity, y: 0), UnitSample(x: 1, y: 2)])
+        #expect(extended?.isNull == false)
+        #expect(extended?.x == -.infinity)
+        #expect(extended?.y == -0.01)
+        #expect(extended?.width == .infinity)
+        #expect(extended?.height == 2.02)
+    }
+
     @Test func anEmptyPathHasNoBoxAndOnePointExpandsByOneHundredth() {
         #expect(UnitBox.path([]) == nil)
         let point = UnitBox(x: 1, y: 2, width: 0, height: 0).insetBy(dx: -0.01, dy: -0.01)
