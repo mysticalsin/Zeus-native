@@ -21,12 +21,12 @@ import Testing
     }
 
     @Test func aFilledSlotAppearsWithoutEditingTheRegistry() {
-        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [])
-        #expect(!SettingsSectionRegistry.existing.contains { $0.id == synthetic.id })
+        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [], placement: .topbarTab(0))
+        #expect(!SettingsSectionRegistry.existing.contains { $0.id == SettingsSectionRegistry.topbarID })
         let rows = SettingsSectionRegistry.sections(slots: [synthetic])
-        #expect(rows.last?.id == synthetic.id)
-        #expect(rows.last?.accessibilityLabel == synthetic.title)
-        #expect(rows.last?.placeholder == synthetic.title)
+        #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
+        #expect(rows.last?.accessibilityLabel == SettingsSectionRegistry.topbarTitle)
+        #expect(!rows.contains { $0.id == synthetic.id })
     }
 
     @Test func searchStaysInRegistryOrder() {

@@ -12,17 +12,42 @@ import Testing
         let slots = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
             let slot = provider.descriptor
             guard slot.id == "glass.media" else { return slot }
-            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order)
+            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
         }
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
-        #expect(rows.contains { $0.id == "glass.media" })
-        #expect(SettingsSectionRegistry.search("Media", in: rows).contains { $0.id == "glass.media" })
-        #expect(rows.map(\.accessibilityLabel).contains("Media"))
-        #expect(SettingsSectionHostPlan.hostedIDs(in: rows).contains("glass.media"))
-        #expect(!rows.contains { $0.id == "glass.general" })
+        #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
+        #expect(rows.last?.title == "Topbar")
+        #expect(!rows.contains { $0.id == "glass.media" })
+        #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
+        #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
+        #expect(GlassSectionManifest.topbarTabs(in: slots).map(\.id) == ["glass.media"])
+        #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
         #expect(host.contains("as? any GlassSlotPage.Type"))
         #expect(!host.contains("switch id"))
+    }
+
+    @Test func topbarSelectionRejectsHiddenTabsAndCardsStayOnTheirPage() {
+        let media = GlassSectionSlot(id: "glass.media", title: "Media", filled: true, keys: [], placement: .topbarTab(0))
+        let weather = GlassSectionSlot(id: "glass.weather", title: "Weather", filled: false, keys: [], placement: .topbarTab(1))
+        let disabled = GlassSectionSlot(id: "glass.focus", title: "Focus", filled: true, keys: [], enabled: false, placement: .topbarTab(2))
+        let face = GlassSectionSlot(id: "glass.faceID", title: "Face ID", filled: true, keys: [], placement: .cardOn(.privacy, 0))
+        let license = GlassSectionSlot(id: "glass.license", title: "License", filled: true, keys: [], placement: .cardOn(.license, 1))
+        let earlier = GlassSectionSlot(id: "glass.license", title: "Earlier", filled: true, keys: [], placement: .cardOn(.license, 0))
+        let tabs = GlassSectionManifest.topbarTabs(in: [weather, disabled, media])
+        #expect(tabs.map(\.id) == ["glass.media"])
+        var state = SettingsSelectionState.section("settings.general")
+        state = SettingsSelectionRules.selectingTopbar("glass.media", filledTabs: tabs.map(\.id), current: state)
+        #expect(state == .topbar(tab: "glass.media"))
+        let kept = SettingsSelectionRules.selectingTopbar("glass.weather", filledTabs: tabs.map(\.id), current: state)
+        #expect(kept == state)
+        #expect(SettingsSelectionRules.selectingTopbar("  ", filledTabs: tabs.map(\.id), current: state) == state)
+        state = SettingsSelectionRules.selectingSection("settings.sounds", current: state)
+        #expect(state == .section("settings.sounds"))
+        let cards = GlassSectionManifest.cards(on: .license, in: [license, earlier, face])
+        #expect(cards.map(\.title) == ["Earlier"])
+        #expect(GlassSectionManifest.cards(on: .privacy, in: [license, earlier, face]).map(\.id) == ["glass.faceID"])
+        #expect(SettingsSectionRegistry.sections(slots: [weather, disabled]).last?.id != SettingsSectionRegistry.topbarID)
     }
 
     @Test func everySectionFileIsRegisteredAndEveryProviderHasAFile() throws {
@@ -67,12 +92,12 @@ import Testing
 
     @Test func sidebarFitsEveryVisibleRowCount() {
         for count in [21, 22, 23, 34] {
-            let bottom = SettingsSidebarLayout.bottom(rowCount: count)
-            #expect(bottom <= SettingsSidebarLayout.versionY)
             let metrics = SettingsSidebarLayout.rowMetrics(rowCount: count)
-            #expect(metrics.height >= 1)
+            #expect(metrics.height == 30)
             #expect(metrics.gap >= 1)
         }
+        #expect(SettingsSidebarLayout.bottom(rowCount: 34) > SettingsSidebarLayout.versionY)
+        #expect(SettingsSidebarLayout.scrollHeight <= SettingsSidebarLayout.versionY - SettingsSidebarLayout.top)
         let window = try! String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/SettingsWindow.swift"), encoding: .utf8)
         #expect(!window.contains("rowMetrics(rowCount: GSSection.shown.count)"))
         #expect(window.contains("SettingsSidebarLayout.rowMetrics(rowCount:"))
@@ -96,7 +121,7 @@ import Testing
         let second = GlassSectionSlot(id: "glass.dup", title: "Second", filled: true, keys: [], order: 11)
         let later = GlassSectionSlot(id: "glass.later", title: "Later", filled: true, keys: [], order: 12)
         let earlier = GlassSectionSlot(id: "glass.earlier", title: "Earlier", filled: true, keys: [], order: 9)
-        let rows = SettingsSectionRegistry.sections(slots: [later, second, first, earlier], includePhone: false)
+        let rows = SettingsSectionRegistry.orderedSlots([later, second, first, earlier])
         let duplicates = rows.filter { $0.id == "glass.dup" }
         #expect(duplicates.count == 1)
         #expect(duplicates.first?.title == "First")
@@ -114,8 +139,13 @@ import Testing
         #expect(shell.contains("topbarTab"))
         #expect(shell.contains("cardOn"))
         #expect(window.contains("case topbar"))
-        #expect(window.contains("Topbar"))
-        #expect(FileManager.default.fileExists(atPath: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsMetrics.swift").path))
+        #expect(window.contains("selectTopbar"))
+        let registry = try String(contentsOf: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/SettingsSectionRegistry.swift"), encoding: .utf8)
+        #expect(registry.contains("\"Topbar\""))
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.helperLine == 16)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
     }
 
     @Test func registrationDoesNotReadSectionSources() throws {
