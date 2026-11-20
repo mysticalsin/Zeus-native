@@ -12,13 +12,14 @@ import ZeusCore
     @Test func fillingOneDescriptorShowsThatSlot() throws {
         let slots = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
             let slot = provider.descriptor
-            guard slot.id == "glass.media" else { return slot }
+            guard slot.id == "glass.media" || slot.id == "glass.battery" else { return slot }
             return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
         }
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
         #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
         #expect(rows.last?.title == "Topbar")
         #expect(!rows.contains { $0.id == "glass.media" })
+        #expect(!rows.contains { $0.id == "glass.battery" })
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
         #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
         #expect(GlassSectionManifest.topbarTabs(in: slots).map(\.id) == ["glass.media"])
