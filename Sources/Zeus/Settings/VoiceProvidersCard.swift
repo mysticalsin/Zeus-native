@@ -35,6 +35,7 @@ struct VoiceProvidersCard: View {
             Text(controller.model.statusLine)
                 .font(GS.rowText)
                 .foregroundStyle(GS.text)
+                .accessibilityIdentifier("settings.voiceProviders.status")
                 .accessibilityLabel("Provider status")
                 .accessibilityValue(controller.model.statusLine)
         }
@@ -64,19 +65,23 @@ struct VoiceProvidersCard: View {
                 .padding(.horizontal, 10)
                 .frame(height: 28)
                 .background(Capsule().fill(GS.window))
+                .accessibilityIdentifier("settings.voiceProviders.status.\(row.id)")
                 .accessibilityLabel("\(row.title) status")
                 .accessibilityValue(row.status)
             Button(row.isSelected ? "Selected" : "Use") { controller.use(row.id) }
                 .buttonStyle(GSButtonStyle(prominent: row.isSelected))
                 .disabled(row.id != VoiceProviderChoice.localID && !row.hasKey)
+                .accessibilityIdentifier("settings.voiceProviders.use.\(row.id)")
                 .accessibilityLabel("Use \(row.title)")
             if row.id != VoiceProviderChoice.localID {
                 Button("Key") { controller.configure(row.id) }
                     .buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.voiceProviders.add.\(row.id)")
                     .accessibilityLabel("Add \(row.title)")
                 if row.hasKey {
                     Button("Remove") { controller.remove(row.id) }
                         .buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.voiceProviders.remove.\(row.id)")
                         .accessibilityLabel("Remove \(row.title)")
                 }
             }
@@ -95,13 +100,16 @@ struct VoiceProvidersCard: View {
                 .frame(height: VoiceProviderMetrics.standard.rowHeight)
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                .accessibilityIdentifier("settings.voiceProviders.key")
                 .accessibilityLabel("API key")
             Button("Validate") { controller.validate() }
                 .buttonStyle(GSButtonStyle(prominent: true))
                 .disabled(controller.keyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || controller.busy)
+                .accessibilityIdentifier("settings.voiceProviders.validate")
             Button("Test voice") { controller.testVoice() }
                 .buttonStyle(GSButtonStyle())
                 .disabled(controller.busy)
+                .accessibilityIdentifier("settings.voiceProviders.test")
         }
         .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)
     }
@@ -119,6 +127,7 @@ struct VoiceProvidersCard: View {
                 }
             }
             .labelsHidden()
+            .accessibilityIdentifier("settings.voiceProviders.voice")
             .accessibilityLabel("Voice")
         }
         .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)

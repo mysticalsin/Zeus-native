@@ -42,11 +42,16 @@ enum PluginVoiceBridge {
 
     static func sharedSession() -> VoiceProviderSession {
         if let session { return session }
+        let fake = VoiceProviderE2E.isEnabled()
+        if fake { VoiceProviderFakeProtocol.failSynthesis = VoiceProviderE2E.failsSynthesis() }
+        let log = ProviderLog { line in NSLog("[ZEUS] voice-provider %@", line) }
         let created = VoiceProviderSession(
             store: KeychainCredentialStore(),
-            transport: URLSessionProviderTransport(),
+            transport: URLSessionProviderTransport(protocolClasses: fake ? [VoiceProviderFakeProtocol.self] : [], log: log),
             local: MarkerLocalVoice(),
-            preferences: VoiceProviderPreferences(defaults: .standard)
+            preferences: VoiceProviderPreferences(defaults: .standard),
+            log: log,
+            serviceName: fake ? { VoiceProviderE2E.service(for: $0) } : { ProviderCredentialLocation.service(for: $0) }
         )
         session = created
         return created

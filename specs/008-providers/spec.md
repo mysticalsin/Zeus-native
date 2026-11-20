@@ -126,3 +126,6 @@ ZEUS_LIVE_GOOGLE_TTS_KEY='…' swift test --filter VoiceProviderLiveContractTest
 Run both by exporting either variable, or both, and filtering on `VoiceProviderLiveContractTests`.
 Do not pass the key as a command-line argument. Do not echo it. If a test fails, the message
 says that audio or validation failed. It does not include the key.
+
+The Mac walk with a fake provider, a test-only Keychain service, and the Accessibility harness
+is `specs/008-providers/e2e-mac.md`. That run does not use a real key.

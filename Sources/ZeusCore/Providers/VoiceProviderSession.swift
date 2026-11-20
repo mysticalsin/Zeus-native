@@ -111,6 +111,7 @@ public actor VoiceProviderSession {
     private let log: ProviderLog
     private let signposter: ProviderSignposter
     private let adapters: [any TTSProvider]
+    private let serviceName: @Sendable (String) -> String
     private var selection: VoiceProviderSelectionMachine
     private var readiness: [String: ProviderReadiness] = [:]
     private var catalog: [String: [ProviderVoice]] = [:]
@@ -121,7 +122,8 @@ public actor VoiceProviderSession {
 
     public init(store: any CredentialStore, transport: any ProviderHTTPTransport, local: any LocalVoiceSpeaking,
                 preferences: VoiceProviderPreferences, log: ProviderLog = ProviderLog(), signposter: ProviderSignposter = ProviderSignposter(),
-                adapters: [any TTSProvider]? = nil) {
+                adapters: [any TTSProvider]? = nil,
+                serviceName: @escaping @Sendable (String) -> String = ProviderCredentialLocation.service(for:)) {
         self.store = store
         self.transport = transport
         self.local = local
@@ -129,6 +131,7 @@ public actor VoiceProviderSession {
         self.log = log
         self.signposter = signposter
         self.adapters = adapters ?? ProviderRegistry.entries.map { $0.make() }
+        self.serviceName = serviceName
         var machine = VoiceProviderSelectionMachine(choice: preferences.choice)
         for entry in ProviderRegistry.entries {
             if let voice = preferences.voiceID(for: entry.descriptor.id) {
@@ -156,7 +159,7 @@ public actor VoiceProviderSession {
     }
 
     public func remove(providerID: String) {
-        let service = ProviderCredentialLocation.service(for: providerID)
+        let service = serviceName(providerID)
         guard store.delete(service: service) else {
             log.record("provider=\(providerID) remove failed")
             return
@@ -178,7 +181,7 @@ public actor VoiceProviderSession {
             return
         }
         guard !trimmed.isEmpty else { return }
-        let service = ProviderCredentialLocation.service(for: providerID)
+        let service = serviceName(providerID)
         guard store.write(trimmed, service: service, account: ProviderCredentialLocation.account) else { return }
         var machine = ProviderReadinessMachine(state: readiness[providerID] ?? .unset)
         _ = machine.reduce(.saveCredential)
@@ -234,7 +237,7 @@ public actor VoiceProviderSession {
             guard let voiceID = selection.voiceID(for: id), !voiceID.isEmpty else {
                 return await finishLocal(.missingVoice, text: trimmed, providerID: id, started: started, routeName: "local-fallback")
             }
-            guard let key = store.read(service: ProviderCredentialLocation.service(for: id), account: ProviderCredentialLocation.account),
+            guard let key = store.read(service: serviceName(id), account: ProviderCredentialLocation.account),
                   !key.isEmpty,
                   let adapter = adapters.first(where: { $0.descriptor.id == id }),
                   let synthesis = adapter.synthesize(text: trimmed, voice: ProviderVoice(id: voiceID, name: voiceID, language: catalog[id]?.first { $0.id == voiceID }?.language), credential: ProviderCredential(fields: [ProviderCredentialLocation.account: key]), using: transport) else {
@@ -287,7 +290,7 @@ public actor VoiceProviderSession {
                 isSelected: selection.choice == .provider(id),
                 voices: catalog[id] ?? [],
                 selectedVoiceID: selection.voiceID(for: id),
-                hasKey: store.read(service: ProviderCredentialLocation.service(for: id), account: ProviderCredentialLocation.account) != nil
+                hasKey: store.read(service: serviceName(id), account: ProviderCredentialLocation.account) != nil
             ))
         }
         return VoiceProvidersCardModel(rows: rows, keyIsMasked: true, onboarding: VoiceProviderCopy.onboarding,
