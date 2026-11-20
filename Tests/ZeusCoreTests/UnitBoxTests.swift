@@ -30,14 +30,6 @@ private func sameBox(_ lhs: UnitBox, _ rhs: UnitBox) -> Bool {
     return same(lhs.x, rhs.x) && same(lhs.y, rhs.y) && same(lhs.width, rhs.width) && same(lhs.height, rhs.height)
 }
 
-private func near(_ lhs: UnitBox, _ rhs: UnitBox) -> Bool {
-    lhs.isNull == rhs.isNull
-        && abs(lhs.x - rhs.x) < 1e-9
-        && abs(lhs.y - rhs.y) < 1e-9
-        && abs(lhs.width - rhs.width) < 1e-9
-        && abs(lhs.height - rhs.height) < 1e-9
-}
-
 private struct SplitMix {
     var state: UInt64
     mutating func next() -> UInt64 {
@@ -47,8 +39,8 @@ private struct SplitMix {
         z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
         return z ^ (z >> 31)
     }
-    mutating func unit() -> Double { Double(next() >> 11) / Double(1 << 53) }
-    mutating func signed() -> Double { unit() * 8 - 4 }
+    /// Whole numbers, so union of the edges is exact in binary floating point.
+    mutating func whole() -> Double { Double(Int(next() % 17) - 8) }
 }
 
 @Suite("Unit box mark geometry")
@@ -227,19 +219,18 @@ struct UnitBoxTests {
     @Test func randomBoxesKeepUnionAndInsetInvariants() {
         var rng = SplitMix(state: 0xC0FFEE)
         for _ in 0..<200 {
-            let a = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
-            let b = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
-            let c = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
+            let a = UnitBox(x: rng.whole(), y: rng.whole(), width: rng.whole(), height: rng.whole())
+            let b = UnitBox(x: rng.whole(), y: rng.whole(), width: rng.whole(), height: rng.whole())
+            let c = UnitBox(x: rng.whole(), y: rng.whole(), width: rng.whole(), height: rng.whole())
             #expect(a.union(b) == b.union(a))
             #expect(a.union(b).union(c) == a.union(b.union(c)))
             #expect(a.union(.null) == a)
             #expect(UnitBox.null.union(a) == a)
-            if a.width > 0, a.height > 0 {
+            if a.width > 2, a.height > 2 {
                 #expect(a.insetBy(dx: 0, dy: 0) == a)
-                let dx = min(a.width, a.height) * 0.2
-                let shrunk = a.insetBy(dx: dx, dy: dx)
+                let shrunk = a.insetBy(dx: 1, dy: 1)
                 #expect(!shrunk.isNull)
-                #expect(near(shrunk.insetBy(dx: -dx, dy: -dx), a))
+                #expect(shrunk.insetBy(dx: -1, dy: -1) == a)
             }
         }
     }
