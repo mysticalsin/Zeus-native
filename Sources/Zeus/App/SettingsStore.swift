@@ -338,15 +338,9 @@ final class SettingsStore {
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
-        // Earbud overlay on connect, and nearby speaker names. An import cannot turn either on.
-        "accessory.earbudsOverlay",
-        "accessory.speakerNames",
     ]
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
-    static let neverChosenByImport: [String: Set<String>] = [
-        ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title],
-        "accessory.overlayStyle": ["compact", "split"],
-    ]
+    static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {
         [WakeWordController.defaultsKey, "dictation.engineForVoice"]
     }

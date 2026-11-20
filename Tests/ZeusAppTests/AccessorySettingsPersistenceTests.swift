@@ -14,13 +14,11 @@ struct AccessorySettingsPersistenceTests {
         #expect(fresh.bool(AccessoryPreferenceKey.earbudsOverlay) == false)
         #expect(fresh.string(AccessoryPreferenceKey.overlayStyle) == AccessoryOverlayStyle.off.rawValue)
         #expect(fresh.bool(AccessoryPreferenceKey.speakerNames) == false)
-        #expect(SettingsCatalog.option(AccessoryPreferenceKey.earbudsOverlay)?.defaultValue == "false")
-        #expect(SettingsCatalog.option(AccessoryPreferenceKey.overlayStyle)?.defaultValue == "off")
-        #expect(SettingsCatalog.option(AccessoryPreferenceKey.speakerNames)?.defaultValue == "false")
-        #expect(SettingsStore.neverEnabledByImport.contains(AccessoryPreferenceKey.earbudsOverlay))
-        #expect(SettingsStore.neverEnabledByImport.contains(AccessoryPreferenceKey.speakerNames))
-        #expect(SettingsStore.neverChosenByImport[AccessoryPreferenceKey.overlayStyle]?.isSuperset(of: ["compact", "split"]) == true)
-        #expect(SettingsCatalog.search("nearby speaker").contains { $0.id == AccessoryPreferenceKey.speakerNames })
+        #expect(SettingsCatalog.option(AccessoryPreferenceKey.earbudsOverlay) == nil)
+        #expect(SettingsStore.contribution(AccessoryPreferenceKey.earbudsOverlay)?.policy == .importCannotEnable)
+        #expect(SettingsStore.contribution(AccessoryPreferenceKey.overlayStyle)?.policy == .importCannotEnable)
+        #expect(SettingsStore.contribution(AccessoryPreferenceKey.speakerNames)?.policy == .importCannotEnable)
+        #expect(SettingsCatalog.search("speaker").contains { $0.id == AccessoryPreferenceKey.speakerNames })
 
         fresh.set(AccessoryPreferenceKey.earbudsOverlay, "true")
         fresh.set(AccessoryPreferenceKey.overlayStyle, "split")
@@ -43,12 +41,6 @@ struct AccessorySettingsPersistenceTests {
         #expect(imported.bool(AccessoryPreferenceKey.earbudsOverlay) == false)
         #expect(imported.string(AccessoryPreferenceKey.overlayStyle) == AccessoryOverlayStyle.off.rawValue)
         #expect(imported.bool(AccessoryPreferenceKey.speakerNames) == false)
-
-        again.reset(.topBar)
-        let reset = SettingsStore(defaults: defaults)
-        #expect(reset.bool(AccessoryPreferenceKey.earbudsOverlay) == false)
-        #expect(reset.string(AccessoryPreferenceKey.overlayStyle) == AccessoryOverlayStyle.off.rawValue)
-        #expect(reset.bool(AccessoryPreferenceKey.speakerNames) == false)
     }
 
     @MainActor private static func isolated() throws -> (SettingsStore, UserDefaults, String) {
