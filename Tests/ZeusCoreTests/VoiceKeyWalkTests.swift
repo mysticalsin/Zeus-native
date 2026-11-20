@@ -1632,7 +1632,8 @@ private let walkLogEffectsCopied = WalkLogCopyCount()
 /// `retainEffectLog`: the old walk copies the effect log onto every edge. The log is not part of the state.
 /// The fast walk drops it before the next edge. Both visit the same states.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil,
-                    stopAfterStates: Int? = nil, retainEffectLog: Bool = false, useCache: Bool = true) -> Report {
+                    stopAfterStates: Int? = nil, retainEffectLog: Bool = false, useCache: Bool = true,
+                    breadthFirst: Bool = false) -> Report {
     let cacheable = useCache && !retainEffectLog && stopAfterStates == nil && !stopAtFirst && until == nil
     if cacheable, let cached = fullWalkCache.report(named: run.name), !searchHitItsBudget(cached) {
         return cached
@@ -1669,9 +1670,9 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     // search does not keep a breadth-first frontier of full states.
     var stack: [Sim] = [root]
     var expanded = 0
-    let breadthFirst = stopAtFirst || until != nil
+    let breadthFirstOrder = breadthFirst || stopAtFirst || until != nil
     while !stack.isEmpty {
-        let current = breadthFirst ? stack.removeFirst() : stack.removeLast()
+        let current = breadthFirstOrder ? stack.removeFirst() : stack.removeLast()
         if let progress, expanded % 100_000 == 0 {
             let line = "[walk] \(run.name): \(seen.count) states, \(expanded) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
             if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
@@ -2066,12 +2067,14 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 
     /// The plain walk calls the same full search as run A. That search has to have a finite state budget, or a second
     /// walk of the same graph keeps running past the suite limit.
-    /// The effect log rides along on every edge. A short prefix already copies more effects than it has states.
+    /// The effect log rides along on every edge of the pre-fix search. Five thousand states of that
+    /// breadth-first search copy more effects than they have states.
     @Test func theSearchCopiesABoundedEffectLog() {
         walkLogEffectsCopied.reset()
-        let report = search(WalkRun.all[0], stopAfterStates: 40)
-        #expect(report.states > 20)
-        #expect(walkLogEffectsCopied.read() < report.states)
+        let report = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: true, useCache: false, breadthFirst: true)
+        let copied = walkLogEffectsCopied.read()
+        #expect(report.states > 1_000)
+        #expect(copied < report.states, "the retained log copied \(copied) effects across \(report.states) states")
     }
 
     @Test func thePlainWalkSearchHasAFiniteBudget() {
