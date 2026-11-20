@@ -1354,7 +1354,7 @@ private struct PrivacyPage: View {
             GSToggleRow(symbol: "terminal", title: "Allow command-line control of sensitive actions",
                         text: cliAccess.failed
                             ? "Zeus could not change this in your Keychain."
-                            : "Lets the zeus command listen, record, type and click for you.",
+                            : "Lets the zeus command use the microphone, record, type and click.",
                         isOn: Binding(get: { cliAccess.enabled }, set: { cliAccess.set($0) }))
         }
     }
