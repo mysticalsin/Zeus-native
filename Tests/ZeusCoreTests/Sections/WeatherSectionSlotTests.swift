@@ -2,7 +2,7 @@ import Testing
 
 @Suite struct WeatherSectionSlotTests {
     @Test func weatherSlotStartsEmpty() {
-        let slot = WeatherSectionSlot.slot
+        let slot = WeatherSectionSlot.descriptor
         #expect(slot.id == "glass.weather")
         #expect(slot.title == "Weather")
         #expect(slot.filled == false)
