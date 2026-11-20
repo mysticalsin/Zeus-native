@@ -32,12 +32,25 @@ struct GlassSettingsShellCheck {
             windowSource: windows[0],
             chromeSource: try text("Sources/Zeus/Settings/GlassSettingsChrome.swift")
         )
-        failures += GlassSettingsAudit.sourceRuleFailures([
+        var sources = [
             try text("Sources/ZeusCore/Settings/GlassSettingsShell.swift"),
             try text("Sources/Zeus/Settings/GlassSettingsChrome.swift"),
+            try text("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"),
             try text("Tests/ZeusCoreTests/ExistingSettingsKeyReachabilityTests.swift"),
             try text("qa/glass-settings-shell/check.swift"),
-        ])
+        ]
+        for relative in [
+            "Sources/ZeusCore/Settings/Sections",
+            "Tests/ZeusCoreTests/Sections",
+            "Sources/Zeus/Settings/GlassShell/Sections",
+        ] {
+            let directory = root.appendingPathComponent(relative)
+            let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            for file in files.filter({ $0.pathExtension == "swift" }).sorted(by: { $0.path < $1.path }) {
+                sources.append(try String(contentsOf: file, encoding: .utf8))
+            }
+        }
+        failures += GlassSettingsAudit.sourceRuleFailures(sources)
 
         let fingerprint = SettingsKeyReachability.fingerprint(
             SettingsKeyReachability.reachableKeys(

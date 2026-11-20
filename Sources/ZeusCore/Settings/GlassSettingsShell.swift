@@ -16,19 +16,20 @@ public struct GlassSectionSlot: Equatable, Sendable {
 }
 
 public enum GlassSectionManifest {
+    /// Fixed order. A section change edits its own slot file, not this list.
     public static let slots: [GlassSectionSlot] = [
-        GlassSectionSlot(id: "media", title: "Media", filled: false, keys: []),
-        GlassSectionSlot(id: "general", title: "General", filled: false, keys: []),
-        GlassSectionSlot(id: "portal", title: "Portal", filled: false, keys: []),
-        GlassSectionSlot(id: "sensory", title: "Sensory", filled: false, keys: []),
-        GlassSectionSlot(id: "battery", title: "Battery", filled: false, keys: []),
-        GlassSectionSlot(id: "focus", title: "Focus", filled: false, keys: []),
-        GlassSectionSlot(id: "weather", title: "Weather", filled: false, keys: []),
-        GlassSectionSlot(id: "lockScreen", title: "Lock Screen", filled: false, keys: []),
-        GlassSectionSlot(id: "faceID", title: "Face ID", filled: false, keys: []),
-        GlassSectionSlot(id: "accessory", title: "Accessory", filled: false, keys: []),
-        GlassSectionSlot(id: "license", title: "License", filled: false, keys: []),
-        GlassSectionSlot(id: "autoUpdate", title: "Auto-update", filled: false, keys: []),
+        MediaSectionSlot.slot,
+        GeneralSectionSlot.slot,
+        PortalSectionSlot.slot,
+        SensorySectionSlot.slot,
+        BatterySectionSlot.slot,
+        FocusSectionSlot.slot,
+        WeatherSectionSlot.slot,
+        LockScreenSectionSlot.slot,
+        FaceIDSectionSlot.slot,
+        AccessorySectionSlot.slot,
+        LicenseSectionSlot.slot,
+        AutoUpdateSectionSlot.slot,
     ]
 
     public static var newSettingKeyCount: Int {
@@ -369,8 +370,9 @@ public enum GlassSettingsAudit {
         if SettingsKeyReachability.existingSectionIDs.count != SettingsKeyReachability.sectionCount {
             failures.append("section pin \(SettingsKeyReachability.existingSectionIDs.count)")
         }
-        if GlassSectionManifest.newSettingKeyCount != 0 {
-            failures.append("new keys \(GlassSectionManifest.newSettingKeyCount)")
+        let declaredKeys = GlassSectionManifest.slots.reduce(0) { $0 + $1.keys.count }
+        if declaredKeys != GlassSectionManifest.newSettingKeyCount {
+            failures.append("new key accounting \(GlassSectionManifest.newSettingKeyCount) vs \(declaredKeys)")
         }
         return failures
     }
@@ -384,8 +386,10 @@ public enum GlassSettingsAudit {
         if slots.map(\.id) != expectedIDs { failures.append("slot ids") }
         if slots.map(\.title) != expectedTitles { failures.append("slot titles") }
         if SettingsKeyReachability.duplicateIDs(slots.map(\.id)).isEmpty == false { failures.append("duplicate slots") }
-        if slots.contains(where: { $0.filled || !$0.keys.isEmpty }) { failures.append("a placeholder is filled") }
-        if GlassSectionManifest.newSettingKeyCount != 0 { failures.append("placeholder keys") }
+        let declaredKeys = slots.reduce(0) { $0 + $1.keys.count }
+        if declaredKeys != GlassSectionManifest.newSettingKeyCount {
+            failures.append("new key accounting \(GlassSectionManifest.newSettingKeyCount) vs \(declaredKeys)")
+        }
         let broken = slots.filter { $0.id.trimmingCharacters(in: .whitespaces).isEmpty || $0.title.isEmpty }
         if !broken.isEmpty { failures.append("blank slot") }
         return failures

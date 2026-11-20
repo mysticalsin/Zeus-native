@@ -15,9 +15,11 @@ import Testing
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
     }
 
-    @Test func manifestPlaceholdersStayEmpty() {
+    @Test func manifestOrderAndIdentityStayFixed() {
         let failures = GlassSettingsAudit.manifestFailures()
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
+        let declared = GlassSectionManifest.slots.reduce(0) { $0 + $1.keys.count }
+        #expect(GlassSectionManifest.newSettingKeyCount == declared)
     }
 
     @Test func keySetDifferenceIsOrderIndependent() {
@@ -41,19 +43,31 @@ import Testing
         let failures = GlassSettingsAudit.windowFailures(windowSource: window, chromeSource: chrome)
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
         #expect(window.contains("GlassSettingsChrome("))
-        #expect(chrome.contains("accessibilityReduceMotion"))
+        #expect(chrome.contains("Motion.reduced"))
         #expect(chrome.contains("accessibilityReduceTransparency"))
         #expect(chrome.contains("colorSchemeContrast"))
         #expect(chrome.contains("accessibilityHidden(true)"))
     }
 
     @Test func newSettingsSourcesDoNotSkipOrWriteAccessibility() throws {
-        let sources = [
+        var sources = [
             try text("Sources/ZeusCore/Settings/GlassSettingsShell.swift"),
             try text("Sources/Zeus/Settings/GlassSettingsChrome.swift"),
+            try text("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"),
             try text("Tests/ZeusCoreTests/ExistingSettingsKeyReachabilityTests.swift"),
             try text("qa/glass-settings-shell/check.swift"),
         ]
+        for relative in [
+            "Sources/ZeusCore/Settings/Sections",
+            "Tests/ZeusCoreTests/Sections",
+            "Sources/Zeus/Settings/GlassShell/Sections",
+        ] {
+            let directory = Self.root.appendingPathComponent(relative)
+            let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            for file in files.filter({ $0.pathExtension == "swift" }).sorted(by: { $0.path < $1.path }) {
+                sources.append(try String(contentsOf: file, encoding: .utf8))
+            }
+        }
         let failures = GlassSettingsAudit.sourceRuleFailures(sources)
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
     }
