@@ -85,4 +85,28 @@ import Testing
         let tail = rows.suffix(3).map(\.id)
         #expect(tail == ["glass.earlier", "glass.dup", "glass.later"])
     }
+
+    @Test func registrationDoesNotReadSectionSources() throws {
+        let settings = Self.root.appendingPathComponent("Sources/ZeusCore/Settings")
+        let files = try Self.swiftSources(at: settings)
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            #expect(!text.contains("FileManager"), "\(file.lastPathComponent) reads the filesystem")
+            #expect(!text.contains("#filePath"), "\(file.lastPathComponent) uses the build path")
+        }
+        let sections = settings.appendingPathComponent("Sections")
+        let parked = sections.appendingPathExtension("held")
+        try FileManager.default.moveItem(at: sections, to: parked)
+        defer { try? FileManager.default.moveItem(at: parked, to: sections) }
+        #expect(GlassSectionManifest.slots.count == 12)
+    }
+
+    private static func swiftSources(at directory: URL) throws -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil) else { return [] }
+        var files: [URL] = []
+        for case let url as URL in enumerator where url.pathExtension == "swift" {
+            files.append(url)
+        }
+        return files
+    }
 }
