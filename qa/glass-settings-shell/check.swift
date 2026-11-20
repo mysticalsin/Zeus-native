@@ -23,7 +23,7 @@ struct GlassSettingsShellCheck {
             }
             exit(1)
         case .passed:
-            let count = SettingsKeyReachability.reachableKeys(
+            let count = SettingsKeyReachability.baseKeys(
                 catalogIDs: SettingsKeyReachability.catalogIDs(in: try text(root, "Sources/Zeus/App/SettingsCatalog.swift"))
             ).count
             print("passed \(count) keys, \(GlassSectionManifest.slots.count) placeholders, \(SettingsWindowCensus.productWindowCount) window")
@@ -111,7 +111,7 @@ struct GlassSettingsShellCheck {
         }
         failures += GlassSettingsAudit.sourceRuleFailures(sources)
         let fingerprint = SettingsKeyReachability.fingerprint(
-            SettingsKeyReachability.reachableKeys(
+            SettingsKeyReachability.baseKeys(
                 catalogIDs: SettingsKeyReachability.catalogIDs(in: try text("Sources/Zeus/App/SettingsCatalog.swift"))
             )
         )
