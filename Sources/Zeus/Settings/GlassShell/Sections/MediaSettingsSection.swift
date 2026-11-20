@@ -1,7 +1,11 @@
 import SwiftUI
 import ZeusCore
 
-/// The Media page. The shell mounts it when a section can supply its own view.
+extension MediaSectionSlot: GlassSlotPage {
+    static func erasePage() -> AnyView { AnyView(MediaSettingsSection()) }
+}
+
+/// The Media page. The host asks the slot for this view.
 struct MediaSettingsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency

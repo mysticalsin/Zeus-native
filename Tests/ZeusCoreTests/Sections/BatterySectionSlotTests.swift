@@ -2,7 +2,7 @@ import Testing
 
 @Suite struct BatterySectionSlotTests {
     @Test func batterySlotStartsEmpty() {
-        let slot = BatterySectionSlot.slot
+        let slot = BatterySectionSlot.descriptor
         #expect(slot.id == "glass.battery")
         #expect(slot.title == "Battery")
         #expect(slot.filled == false)

@@ -35,7 +35,7 @@ struct MediaSettingsPage: View {
         )
         VStack(alignment: .leading, spacing: 28) {
             previewCard(preview)
-            ForEach(grouped, id: \.name) { group in
+            ForEach(grouped) { group in
                 card(group.name, group.rows)
             }
         }
@@ -58,13 +58,19 @@ struct MediaSettingsPage: View {
         }
     }
 
-    private var grouped: [(name: String, rows: [MediaControl])] {
-        var groups: [(name: String, rows: [MediaControl])] = []
+    private struct CardGroup: Identifiable {
+        var name: String
+        var rows: [MediaControl]
+        var id: String { name }
+    }
+
+    private var grouped: [CardGroup] {
+        var groups: [CardGroup] = []
         for control in MediaSectionCatalog.controls(for: settings) {
             if groups.last?.name == control.card {
                 groups[groups.count - 1].rows.append(control)
             } else {
-                groups.append((control.card, [control]))
+                groups.append(CardGroup(name: control.card, rows: [control]))
             }
         }
         return groups
