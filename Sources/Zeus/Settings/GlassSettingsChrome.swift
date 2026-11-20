@@ -14,21 +14,22 @@ struct GlassSettingsChrome: View {
         ))
         let solid = material.solidFallback || TopBarStyle.isSnapshot
         ZStack {
-            if solid {
-                GS.window
-            } else {
-                Rectangle().fill(.ultraThinMaterial)
-                LinearGradient(
-                    colors: [Color.white.opacity(material.highlightOpacity), Color.white.opacity(0)],
-                    startPoint: .top,
-                    endPoint: .center
-                )
+            Group {
+                if solid {
+                    GS.window
+                } else {
+                    Rectangle().fill(.ultraThinMaterial)
+                    LinearGradient(
+                        colors: [Color.white.opacity(material.highlightOpacity), Color.white.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                }
             }
-            GlassSettingsFilledSections()
+            .accessibilityHidden(true)
         }
         .shadow(color: Color.black.opacity(solid ? 0 : 0.24), radius: solid ? 0 : material.depth, y: solid ? 0 : 10)
         .animation(material.animationDuration == 0 ? nil : .easeOut(duration: material.animationDuration), value: solid)
-        .accessibilityHidden(true)
     }
 }
 

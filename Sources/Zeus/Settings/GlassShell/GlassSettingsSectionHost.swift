@@ -23,16 +23,20 @@ enum GlassSettingsSectionHost {
     }
 }
 
-struct GlassSettingsFilledSections: View {
+struct GlassSettingsSlotPage: View {
+    let slot: GlassSectionSlot
+
     var body: some View {
-        let filled = GlassSectionManifest.slots.filter(\.filled)
-        if !filled.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(filled, id: \.id) { slot in
-                    GlassSettingsSectionHost.page(for: slot.id)
-                }
+        let exposed = GlassSettingsAccessibility.exposure(slots: [slot])
+        VStack(alignment: .leading, spacing: 8) {
+            if let item = exposed.first {
+                Text(item.label)
+                    .accessibilityLabel(item.label)
+                    .accessibilityAddTraits(item.heading ? .isHeader : [])
+                    .accessibilityHidden(item.hidden)
             }
-            .accessibilityElement(children: .contain)
+            GlassSettingsSectionHost.page(for: slot.id)
         }
+        .accessibilityElement(children: .contain)
     }
 }

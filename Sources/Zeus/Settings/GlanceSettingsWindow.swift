@@ -127,6 +127,8 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
 @Observable
 final class GSNavigation {
     var section: GSSection = .general
+    /// Set when a filled glass slot's sidebar row is selected. Existing rows clear it.
+    var glassSlotID: String?
     var meetingOpen = false
     var licenseKey = ""
     var licenseMessage: String?
@@ -237,6 +239,13 @@ struct GSSidebar: View {
                         item(section)
                     }
                 }
+                let existing = GSSection.shown.map(\.rawValue)
+                let extra = Array(GlassSettingsSidebar.rowIDs(existing: existing, slots: GlassSectionManifest.slots).dropFirst(existing.count))
+                ForEach(extra, id: \.self) { id in
+                    if let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.filled }) {
+                        glassItem(slot)
+                    }
+                }
             }
             .frame(width: 194)
             .offset(x: 12, y: GSSection.SidebarLayout.top)
@@ -249,7 +258,10 @@ struct GSSidebar: View {
     private func item(_ section: GSSection) -> some View {
         let selected = navigation.section == section
         let metrics = GSSection.SidebarLayout.rowMetrics(rowCount: GSSection.shown.count)
-        return Button { navigation.section = section } label: {
+        return Button {
+            navigation.section = section
+            navigation.glassSlotID = nil
+        } label: {
             HStack(spacing: 0) {
                 Image(systemName: section.symbol).font(.system(size: 15, weight: .regular))
                     .frame(width: 29, alignment: .leading)
@@ -268,6 +280,27 @@ struct GSSidebar: View {
         .accessibilityIdentifier("settings.sidebar.\(section.rawValue)")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
+
+    private func glassItem(_ slot: GlassSectionSlot) -> some View {
+        let selected = navigation.glassSlotID == slot.id
+        let metrics = GSSection.SidebarLayout.rowMetrics(rowCount: GSSection.shown.count)
+        return Button { navigation.glassSlotID = slot.id } label: {
+            HStack(spacing: 0) {
+                Text(slot.title).font(GS.sidebarItem)
+                Spacer()
+            }
+            .foregroundStyle(selected ? GS.selectedText : GS.text)
+            .padding(.leading, 14)
+            .frame(height: metrics.height)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(selected ? GS.selectedFill : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, metrics.gap)
+        .accessibilityLabel(slot.title)
+        .accessibilityIdentifier("settings.sidebar.\(slot.id)")
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
 }
 
 /// The rounded panel: page title, subtitle, header glyph and the page's cards, scrolling.
@@ -276,12 +309,19 @@ struct GSPanelHost: View {
     let context: GSContext
 
     var body: some View {
-        let page = GSPageView(section: navigation.section, navigation: navigation, context: context)
+        let page = Group {
+            if let id = navigation.glassSlotID,
+               let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.filled }) {
+                GlassSettingsSlotPage(slot: slot)
+            } else {
+                GSPageView(section: navigation.section, navigation: navigation, context: context)
+            }
+        }
             .padding(.leading, GS.pagePadding)
             .padding(.trailing, 28)
             .padding(.top, 25)
             .padding(.bottom, 32)
-            .id(navigation.section)
+            .id(navigation.glassSlotID ?? navigation.section.rawValue)
         ZStack {
             RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
             GlassSettingsPanelHighlight()

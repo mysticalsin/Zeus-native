@@ -1,5 +1,5 @@
 import Foundation
 
 public enum FocusSectionSlot {
-    public static let slot = GlassSectionSlot(id: "focus", title: "Focus", filled: false, keys: [])
+    public static let slot = GlassSectionSlot(id: "glass.focus", title: "Focus", filled: false, keys: [])
 }

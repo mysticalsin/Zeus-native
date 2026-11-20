@@ -103,6 +103,52 @@ public enum GlassSettingsMaterialRules {
     }
 }
 
+public enum GlassSettingsSidebar {
+    /// Existing rows stay first. Filled slots follow, in manifest order.
+    public static func rowIDs(existing: [String], slots: [GlassSectionSlot]) -> [String] {
+        existing + slots.filter(\.filled).map(\.id)
+    }
+}
+
+public struct GlassAccessibilityItem: Equatable, Sendable {
+    public var label: String
+    public var heading: Bool
+    public var hidden: Bool
+
+    public init(label: String, heading: Bool, hidden: Bool) {
+        self.label = label
+        self.heading = heading
+        self.hidden = hidden
+    }
+}
+
+public enum GlassSettingsAccessibility {
+    /// A filled slot exposes its title as a heading. An unfilled slot exposes nothing.
+    public static func exposure(slots: [GlassSectionSlot]) -> [GlassAccessibilityItem] {
+        slots.filter(\.filled).map { GlassAccessibilityItem(label: $0.title, heading: true, hidden: false) }
+    }
+}
+
+public enum GlassSettingsCheckRunner {
+    /// A run past the budget is a timeout. Two timeouts are an infrastructure error.
+    public static func attempt(elapsed: TimeInterval, succeeded: Bool, budget: TimeInterval) -> GlassSettingsVerification.Run {
+        if elapsed > budget { return .timedOut }
+        return .finished(succeeded)
+    }
+
+    public static func verdict(firstElapsed: TimeInterval, firstSucceeded: Bool, secondElapsed: TimeInterval?, secondSucceeded: Bool?, budget: TimeInterval) -> GlassSettingsVerification.Verdict {
+        let first = attempt(elapsed: firstElapsed, succeeded: firstSucceeded, budget: budget)
+        if case .timedOut = first {
+            guard let secondElapsed, let secondSucceeded else {
+                return GlassSettingsVerification.verdict(attempts: [first])
+            }
+            let second = attempt(elapsed: secondElapsed, succeeded: secondSucceeded, budget: budget)
+            return GlassSettingsVerification.verdict(attempts: [first, second])
+        }
+        return GlassSettingsVerification.verdict(attempts: [first])
+    }
+}
+
 public enum GlassSettingsFocus {
     /// Clamps to the sidebar. An empty list stays at 0.
     public static func index(after current: Int, delta: Int, count: Int) -> Int {
@@ -211,6 +257,25 @@ public enum SettingsKeyReachability {
             guard line.contains("SettingOption(id:") else { return nil }
             return firstQuotedString(in: String(line))
         }
+    }
+
+    public static func gsSectionRawValues(in source: String) -> [String] {
+        let lines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        guard let start = lines.firstIndex(where: { $0.contains("enum GSSection:") }) else { return [] }
+        var ids: [String] = []
+        for line in lines[start...] {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("var ") { break }
+            guard trimmed.hasPrefix("case "), !trimmed.contains("case .") else { continue }
+            let rest = trimmed.dropFirst("case ".count)
+            ids.append(contentsOf: rest.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+        }
+        return ids
+    }
+
+    public static func collidingSlotIDs(slotIDs: [String], sectionIDs: [String]) -> [String] {
+        let sections = Set(sectionIDs)
+        return slotIDs.filter { sections.contains($0) }
     }
 
     public static func sectionIDs(in settingsViewSource: String) -> [String] {
@@ -380,7 +445,7 @@ public enum GlassSettingsAudit {
     public static func manifestFailures() -> [String] {
         var failures: [String] = []
         let slots = GlassSectionManifest.slots
-        let expectedIDs = ["media", "general", "portal", "sensory", "battery", "focus", "weather", "lockScreen", "faceID", "accessory", "license", "autoUpdate"]
+        let expectedIDs = ["glass.media", "glass.general", "glass.portal", "glass.sensory", "glass.battery", "glass.focus", "glass.weather", "glass.lockScreen", "glass.faceID", "glass.accessory", "glass.license", "glass.autoUpdate"]
         let expectedTitles = ["Media", "General", "Portal", "Sensory", "Battery", "Focus", "Weather", "Lock Screen", "Face ID", "Accessory", "License", "Auto-update"]
         if slots.count != 12 { failures.append("slot count \(slots.count)") }
         if slots.map(\.id) != expectedIDs { failures.append("slot ids") }
@@ -538,6 +603,58 @@ public enum GlassSettingsAudit {
             failures.append("window title")
         }
         return failures
+    }
+
+    public static func collisionFailures(windowSource: String) -> [String] {
+        let sections = SettingsKeyReachability.gsSectionRawValues(in: windowSource)
+        if sections.isEmpty { return ["sidebar sections were not read"] }
+        let hits = SettingsKeyReachability.collidingSlotIDs(
+            slotIDs: GlassSectionManifest.slots.map(\.id),
+            sectionIDs: sections
+        )
+        if !hits.isEmpty { return ["slot ids collide with sidebar rows \(hits.joined(separator: ","))"] }
+        let bare = SettingsKeyReachability.collidingSlotIDs(slotIDs: ["general", "license"], sectionIDs: sections)
+        if bare != ["general", "license"] { return ["collision sample \(bare)"] }
+        let namespaced = SettingsKeyReachability.collidingSlotIDs(slotIDs: ["glass.general", "glass.license"], sectionIDs: sections)
+        if !namespaced.isEmpty { return ["namespaced ids collided"] }
+        return []
+    }
+
+    public static func sidebarFailures() -> [String] {
+        let existing = ["general", "appearance", "license"]
+        let slots = [
+            GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: []),
+            GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: []),
+        ]
+        let rows = GlassSettingsSidebar.rowIDs(existing: existing, slots: slots)
+        if rows != existing + ["glass.synthetic"] { return ["sidebar rows \(rows)"] }
+        if Array(rows.prefix(existing.count)) != existing { return ["existing sidebar rows changed"] }
+        return []
+    }
+
+    public static func accessibilityFailures() -> [String] {
+        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [])
+        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic title", filled: true, keys: [])
+        let items = GlassSettingsAccessibility.exposure(slots: [hidden, synthetic])
+        let expected = [GlassAccessibilityItem(label: "Synthetic title", heading: true, hidden: false)]
+        if items != expected { return ["accessibility exposure \(items)"] }
+        return []
+    }
+
+    public static func hungCheckFailures() -> [String] {
+        let hung = GlassSettingsCheckRunner.verdict(
+            firstElapsed: 31, firstSucceeded: false, secondElapsed: 31, secondSucceeded: false, budget: 30
+        )
+        if hung != .infrastructure { return ["a second timeout was \(hung)"] }
+        let recovered = GlassSettingsCheckRunner.verdict(
+            firstElapsed: 31, firstSucceeded: false, secondElapsed: 1, secondSucceeded: true, budget: 30
+        )
+        if recovered != .passed { return ["a retry that finished was \(recovered)"] }
+        let product = GlassSettingsCheckRunner.verdict(
+            firstElapsed: 1, firstSucceeded: false, secondElapsed: nil, secondSucceeded: nil, budget: 30
+        )
+        if product != .productFailure { return ["a finished failure was \(product)"] }
+        return []
     }
 
     public static func sourceRuleFailures(_ sources: [String]) -> [String] {
