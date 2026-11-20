@@ -37,7 +37,7 @@ Types are plain text (`.txt`, `.text`), PNG, JPEG, GIF, TIFF, and HEIC. The exte
 
 ## Paired devices
 
-The section reads `fling.enabled`, `fling.receiveInBackground`, `fling.deviceName`, `fling.visibility`, `fling.autoAcceptPaired`, `fling.saveMode`, `fling.papers`, `fling.flickSensitivity`, `fling.openLinks`, and `fling.pairedMacs`. It does not add a key.
+The section reads `fling.enabled`, `fling.receiveInBackground`, `fling.deviceName`, `fling.visibility`, `fling.autoAcceptPaired`, `fling.saveMode`, `fling.papers`, `fling.flickSensitivity`, `fling.openLinks`, and `fling.pairedMacs`. It does not add a key. Those rows are already in the settings catalog, on Shelf, and `SettingsStore` saves them as `opt.<id>`. `fling.enabled` defaults off. An import can turn it off and cannot turn it on. Nearby sync is that same switch.
 
 `fling.enabled` other than `true` means sync is off: nothing is sent, received, or opened. An unknown visibility value is treated as off. Local network denial fails closed even when the switch is on. Removing a device asks inline, then uses the existing pairing store. It does not open a window.
 
