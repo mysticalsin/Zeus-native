@@ -35,10 +35,13 @@ public enum FocusSettingsPersistence {
               let options = root["options"] as? [String: Any] else {
             throw CocoaError(.fileReadCorruptFile)
         }
+        let contributions = Dictionary(uniqueKeysWithValues: FocusSectionSlot.keyContributions.map { ($0.id, $0) })
         for (id, raw) in options {
             guard let value = raw as? String else { continue }
-            if FocusSettingKey.sensitive.contains(id) {
-                if value == "false" { write("false", id: id, to: defaults) }
+            if let item = contributions[id] {
+                let current = defaults.string(forKey: storageKey(id)) ?? item.defaultValue
+                guard let applied = SettingsKeyLedger.imported(item, current: current, incoming: value) else { continue }
+                write(applied, id: id, to: defaults)
                 continue
             }
             if id == FocusSettingKey.homeWidget {

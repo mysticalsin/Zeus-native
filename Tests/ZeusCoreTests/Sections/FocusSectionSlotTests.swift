@@ -10,5 +10,9 @@ import ZeusCore
         #expect(slot.order == 3)
         #expect(slot.placement == .topbarTab(3))
         #expect(slot.keys.isEmpty)
+        #expect(FocusSectionSlot.keyContributions.map(\.id) == FocusSettingKey.optIn)
+        #expect(FocusSectionSlot.keyContributions.allSatisfy {
+            $0.kind == .toggle && $0.defaultValue == "false" && $0.policy == .importCannotEnable
+        })
     }
 }

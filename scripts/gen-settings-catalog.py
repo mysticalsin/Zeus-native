@@ -83,13 +83,6 @@ o(S,'Everyday lights','Screen-edge glow on volume, brightness and keyboard-backl
 o(S,'Everyday lights','Ignore mic conflicts (debug)','toggle','-','For QA environments where Core Audio keeps reporting a stale recorder.','has','wake.ignoreMicConflicts','toggle',[],'false','stub','Item 6 (Hey Zeus). Never shown. Read only in DEBUG builds (WakeWordController); release builds always keep the call guard.')
 o(S,'Everyday lights','Incoming rain alert','toggle','on','"Rain in X min" pill before a shower.','partial','lights.rain','toggle',[],'true','live','Uses hourly forecast timing; suppresses repeat alerts for three hours after a shower starts.')
 o(S,'Everyday lights','Timer light gauge','toggle','on','Outline counts down a focus session.','partial','lights.timer','toggle',[],'true','live','Gates the closed focus wings.')
-o(S,'Focus','Overlay when a Focus turns on or off','toggle','-','Shows a short overlay when a Focus turns on or off. Off until you turn it on.','missing','focus.transitionOverlay','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
-o(S,'Focus','Overlays allowed during a Focus','toggle','-','While a Focus is on, only the overlays in the filter may appear. Off blocks every overlay.','missing','focus.overlaysAllowed','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
-o(S,'Focus','Show the Focus on the lock screen','toggle','-','Shows that a Focus is on at the lock screen. The name stays hidden. Off until you turn it on.','missing','focus.lockScreen','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
-o(S,'Focus','Read the Focus name','toggle','-','Uses the public filter. Off reads nothing.','missing','focus.name.read','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
-o(S,'Focus','Read the Focus store','toggle','-','A second path, only if you turn it on. It needs Full Disk Access. Off reads nothing.','missing','focus.name.storeFile','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
-o(S,'Focus','Find a name on the local network','toggle','-','Off does not browse.','missing','focus.name.localNetwork','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
-o(S,'Focus','Accept a name from a link','toggle','-','A plain link on shared Wi-Fi is refused. Off until you turn it on.','missing','focus.name.sharedLink','toggle',[],'false','live','Zeus addition. Off by default. A settings import cannot turn it on.')
 o(S,'Everyday lights','Purple glow while the mic listens','toggle','on','Glows with your voice during a spoken answer.','partial','lights.micGlow','toggle',[],'true','live','Gates the mic-listening glow while Zeus speaks.')
 o(S,'Everyday lights','Glow when a reminder is added','toggle','on','Blue crests after you add a reminder.','missing','lights.reminderGlow','toggle',[],'true','live','Fires when ZEUS saves a reminder.')
 o(S,'Everyday lights','Glow when an event is added','toggle','on','Cyan ribbon after you add an event.','partial','lights.eventGlow','toggle',[],'true','live','Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm".')
@@ -291,9 +284,7 @@ def validate_table():
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
-              'face.presence', 'tiling.enabled', 'fling.enabled',
-              'focus.transitionOverlay', 'focus.overlaysAllowed', 'focus.lockScreen',
-              'focus.name.read', 'focus.name.storeFile', 'focus.name.localNetwork', 'focus.name.sharedLink')
+              'face.presence', 'tiling.enabled', 'fling.enabled')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':
