@@ -12,10 +12,10 @@ public enum AutoUpdateSectionSlot: GlassSlotProviding {
     )
     public static let cardTitle = "Updates"
 
-    /// Feed address and SUPublicEDKey are build configuration, not settings keys.
+    /// `about.autoUpdate` stays a catalog row. The shell rejects a second contribution of a catalog id.
+    /// The feed address and SUPublicEDKey are build configuration, not settings keys.
     public static var keyContributions: [SettingsKeyContribution] {
         [
-            SettingsKeyContribution(id: "about.autoUpdate", defaultValue: "false", kind: .toggle, policy: .importCannotEnable),
             SettingsKeyContribution(id: "about.autoInstall", defaultValue: "false", kind: .toggle, policy: .importCannotEnable),
             SettingsKeyContribution(id: "about.lastChecked", defaultValue: "", kind: .text, policy: .localOnly),
             SettingsKeyContribution(id: "about.updateStatus", defaultValue: "", kind: .text, policy: .localOnly),

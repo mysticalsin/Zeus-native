@@ -120,16 +120,20 @@ struct UpdatePersistenceTests {
         #expect(output.isEmpty)
     }
 
-    @Test func autoUpdateContributionsUseTheShellPolicy() {
+    @Test func autoUpdateContributionsUseTheShellPolicy() throws {
         let items = AutoUpdateSectionSlot.keyContributions
         func policy(_ id: String) -> SettingsKeyPolicy? { items.first { $0.id == id }?.policy }
-        #expect(policy("about.autoUpdate") == .importCannotEnable)
+        #expect(policy("about.autoUpdate") == nil)
         #expect(policy("about.autoInstall") == .importCannotEnable)
         #expect(policy("about.lastChecked") == .localOnly)
         #expect(policy("about.updateStatus") == .localOnly)
         #expect(policy("about.updateNotes") == .localOnly)
         #expect(items.allSatisfy { $0.id != "SUPublicEDKey" && $0.id != "about.updateFeedURL" && $0.id != "SUFeedURL" })
         #expect(SettingsKeyLedger.problems(catalogIDs: ["general.language"], contributions: items).isEmpty)
+        let catalog = try String(contentsOf: Self.gitRoot.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
+        let settingsView = try String(contentsOf: Self.gitRoot.appendingPathComponent("Sources/Zeus/App/SettingsView.swift"), encoding: .utf8)
+        let failures = GlassSettingsAudit.keyAndSectionFailures(catalogSource: catalog, settingsViewSource: settingsView)
+        #expect(failures.isEmpty)
     }
 
     private static var gitRoot: URL {
