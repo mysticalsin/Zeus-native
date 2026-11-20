@@ -5,60 +5,59 @@ import Testing
 
 @Suite("General settings")
 struct GeneralSettingsTests {
-    @Test func windowAppearanceResolvesTheThreeFinishesAndLegacyValues() {
-        #expect(GeneralWindowAppearance.resolve(nil) == .dark)
-        #expect(GeneralWindowAppearance.resolve("") == .dark)
-        #expect(GeneralWindowAppearance.resolve("System") == .dark)
-        #expect(GeneralWindowAppearance.resolve("Light") == .dark)
-        #expect(GeneralWindowAppearance.resolve("dark") == .dark)
-        #expect(GeneralWindowAppearance.resolve("GLASS") == .dark)
-        #expect(GeneralWindowAppearance.resolve("Dark") == .dark)
-        #expect(GeneralWindowAppearance.resolve("Glass") == .glass)
-        #expect(GeneralWindowAppearance.resolve("Clear glass") == .clearGlass)
-        for appearance in GeneralWindowAppearance.allCases {
-            #expect(GeneralWindowAppearance.resolve(appearance.rawValue) == appearance)
-        }
-        #expect(GeneralWindowAppearance.key == "general.windowTheme")
+    @Test func windowAppearanceIsTheWelcomeGuideChoice() {
+        #expect(WindowAppearance.key == "general.windowTheme")
+        #expect(WindowAppearance.allCases.map(\.rawValue) == ["System", "Light", "Dark"])
+        #expect(WindowAppearance.resolve(nil) == .system)
+        #expect(WindowAppearance.resolve("") == .system)
+        #expect(WindowAppearance.resolve("Glass") == .system)
+        #expect(WindowAppearance.resolve("Clear glass") == .system)
+        #expect(WindowAppearance.resolve("System") == .system)
+        #expect(WindowAppearance.resolve("Light") == .light)
+        #expect(WindowAppearance.resolve("Dark") == .dark)
+        #expect(WindowAppearance.system.next() == .light)
+        #expect(WindowAppearance.light.next() == .dark)
+        #expect(WindowAppearance.dark.next() == .system)
+        #expect(WindowAppearance.system.finish(systemIsLight: true) == .light)
+        #expect(WindowAppearance.system.finish(systemIsLight: false) == .dark)
+        #expect(WindowAppearance.light.finish(systemIsLight: false) == .light)
+        #expect(WindowAppearance.dark.finish(systemIsLight: true) == .dark)
+        #expect(GeneralSettingsSectionModel.appearanceChoices == WindowAppearance.allCases.map(\.rawValue))
     }
 
-    @Test func windowPreviewStaysInsideOpacityAndRespectsReduceMotion() {
+    @Test func windowPreviewUsesTheWelcomeGuideFinishAndRespectsReduceMotion() {
         let blurSamples = [0.0, 40.0, 50.0, 100.0, -10.0, 140.0, Double.nan]
-        for appearance in GeneralWindowAppearance.allCases {
-            for blur in blurSamples {
-                for motion in [false, true] {
-                    for transparency in [false, true] {
-                        let preview = appearance.preview(blur: blur, reduceMotion: motion, reduceTransparency: transparency)
-                        #expect(preview.appearance == appearance)
-                        #expect(preview.fillOpacity >= 0 && preview.fillOpacity <= 1)
-                        #expect(preview.blurRadius >= 0)
-                        #expect(preview.animationDuration >= 0)
-                        #expect(!preview.accessibilityLabel.isEmpty)
-                        if motion {
-                            #expect(preview.animationDuration == 0)
-                        } else {
-                            #expect(preview.animationDuration == MotionTokens.crossfadeDuration)
-                        }
-                        if appearance == .dark || transparency {
-                            #expect(preview.solid)
-                            #expect(preview.fillOpacity == 1)
-                            #expect(preview.blurRadius == 0)
+        for appearance in WindowAppearance.allCases {
+            for systemIsLight in [false, true] {
+                for blur in blurSamples {
+                    for motion in [false, true] {
+                        for transparency in [false, true] {
+                            let preview = GeneralWindowPreview.make(appearance: appearance, systemIsLight: systemIsLight, blur: blur, reduceMotion: motion, reduceTransparency: transparency)
+                            #expect(preview.appearance == appearance)
+                            #expect(preview.finish == appearance.finish(systemIsLight: systemIsLight))
+                            #expect(preview.blurRadius >= 0)
+                            #expect(preview.animationDuration >= 0)
+                            #expect(!preview.accessibilityLabel.isEmpty)
+                            if motion {
+                                #expect(preview.animationDuration == 0)
+                            } else {
+                                #expect(preview.animationDuration == MotionTokens.crossfadeDuration)
+                            }
+                            if transparency {
+                                #expect(preview.blurRadius == 0)
+                            }
                         }
                     }
                 }
             }
         }
-        let glass = GeneralWindowAppearance.glass.preview(blur: 50, reduceMotion: false, reduceTransparency: false)
-        #expect(glass.solid == false)
-        #expect(glass.fillOpacity == 0.72)
-        #expect(glass.blurRadius == 16)
-        let clear = GeneralWindowAppearance.clearGlass.preview(blur: 0, reduceMotion: false, reduceTransparency: false)
-        #expect(clear.solid == false)
-        #expect(clear.fillOpacity == 0.38)
-        #expect(clear.blurRadius == 0)
-        let full = GeneralWindowAppearance.glass.preview(blur: 100, reduceMotion: true, reduceTransparency: false)
-        #expect(full.blurRadius == 32)
-        #expect(full.animationDuration == 0)
-        #expect(glass.accessibilityLabel == "Window appearance preview, Glass")
+        let light = GeneralWindowPreview.make(appearance: .light, systemIsLight: false, blur: 50, reduceMotion: false, reduceTransparency: false)
+        #expect(light.finish == .light)
+        #expect(light.blurRadius == 16)
+        #expect(light.accessibilityLabel == "Window appearance preview, Light")
+        let hidden = GeneralWindowPreview.make(appearance: .dark, systemIsLight: true, blur: 100, reduceMotion: true, reduceTransparency: true)
+        #expect(hidden.blurRadius == 0)
+        #expect(hidden.animationDuration == 0)
     }
 
     @Test func blurStrengthClampsToTheClosedRangeOnItsStep() {
@@ -201,11 +200,10 @@ struct GeneralSettingsTests {
         #expect(GeneralSettingsSectionModel.placementSection == "general")
         #expect(GeneralSettingsSectionModel.placementOrder == 1)
         #expect(GeneralSettingsSectionModel.previewControlID == "settings.general.windowTheme")
-        #expect(GeneralSectionSlot.descriptor.filled == false)
-        #expect(GeneralSectionSlot.descriptor.keys.isEmpty)
-        #expect(GeneralSettingsLayout.rowHeight == 52)
-        #expect(GeneralSettingsLayout.panelPadding == 32)
-        #expect(GeneralSettingsLayout.cardSpacing == 28)
+        #expect(GeneralSectionSlot.descriptor.placement == .cardOn(.general, 1))
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
         #expect(GeneralSettingsSectionModel.controls.map(\.id) == expectedControls.map(\.id))
         #expect(GeneralSettingsSectionModel.controls == expectedControls)
         let labels = GeneralSettingsSectionModel.controls.map(\.accessibilityLabel)
@@ -237,7 +235,7 @@ struct GeneralSettingsTests {
 
     @Test func resolverReadsTheWholeSectionFromOneSnapshot() {
         var input = sampleInput(values: [
-            "general.windowTheme": "Clear glass",
+            "general.windowTheme": "Light",
             "general.backgroundBlur": "25.4",
             "notch.displays": "Display with the pointer",
             "general.hideInFullScreen": "false",
@@ -250,8 +248,8 @@ struct GeneralSettingsTests {
         input.forceTouch = true
         input.reduceMotion = true
         let output = GeneralSettingsResolver.resolve(input)
-        #expect(output.appearance == .clearGlass)
-        #expect(output.preview.solid == false)
+        #expect(output.appearance == .light)
+        #expect(output.preview.finish == .light)
         #expect(output.preview.blurRadius == 8)
         #expect(output.preview.animationDuration == 0)
         #expect(output.blur == 25)
@@ -454,7 +452,7 @@ struct GeneralSettingsTests {
 }
 
 private let expectedControls: [GeneralControlSpec] = [
-    GeneralControlSpec(id: "settings.general.windowTheme", keys: ["general.windowTheme"], title: "Window appearance", helper: "Dark, glass, or clear glass for Settings.", accessibilityLabel: "Window appearance", kind: .choice, placement: .card(1)),
+    GeneralControlSpec(id: "settings.general.windowTheme", keys: ["general.windowTheme"], title: "Window appearance", helper: "System, Light, or Dark. The welcome guide uses the same choice.", accessibilityLabel: "Window appearance", kind: .choice, placement: .card(1)),
     GeneralControlSpec(id: "settings.general.backgroundBlur", keys: ["general.backgroundBlur"], title: "Background blur", helper: "0 is no blur and 100 is the strongest.", accessibilityLabel: "Background blur strength", kind: .slider, placement: .card(2)),
     GeneralControlSpec(id: "settings.general.notchDisplays", keys: ["notch.displays"], title: "Show the notch on", helper: "Which screens carry the notch.", accessibilityLabel: "Show the notch on", kind: .choice, placement: .existingPage),
     GeneralControlSpec(id: "settings.general.hideInFullScreen", keys: ["general.hideInFullScreen"], title: "Hide in full-screen apps", helper: "Hides the notch while the front app is full screen.", accessibilityLabel: "Hide in full-screen apps", kind: .toggle, placement: .card(3)),
