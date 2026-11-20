@@ -1,20 +1,20 @@
 import SwiftUI
 import ZeusCore
 
-/// Shows whatever slot the registry discovered. A new section file does not add a branch here.
+/// The app-side page for a compile-time slot provider. The host asks the provider; it does not branch on the id.
+protocol GlassSlotPage: GlassSlotProviding {
+    static func erasePage() -> AnyView
+}
+
 enum GlassSettingsSectionHost {
     @ViewBuilder
     static func page(for slot: GlassSectionSlot) -> some View {
-        let descriptor = SettingsSectionDescriptor(
-            id: slot.id,
-            title: slot.title,
-            order: slot.order,
-            accessibilityLabel: slot.title,
-            placeholder: slot.keys.isEmpty ? slot.title : nil
-        )
-        if SettingsSectionHostPlan.hostedIDs(in: [descriptor]).contains(slot.id) {
-            Text(descriptor.accessibilityLabel)
-                .accessibilityLabel(descriptor.accessibilityLabel)
+        if let provider = GlassSectionManifest.providers.first(where: { $0.descriptor.id == slot.id }),
+           let page = provider as? any GlassSlotPage.Type {
+            page.erasePage()
+        } else {
+            Text(slot.title)
+                .accessibilityLabel(slot.title)
                 .accessibilityAddTraits(.isHeader)
         }
     }

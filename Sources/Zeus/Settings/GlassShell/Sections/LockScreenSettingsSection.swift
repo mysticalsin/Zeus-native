@@ -1,6 +1,10 @@
 import SwiftUI
 import ZeusCore
 
+extension LockScreenSectionSlot: GlassSlotPage {
+    static func erasePage() -> AnyView { AnyView(LockScreenSettingsSection()) }
+}
+
 /// Lock Screen settings. The preview is read-only, and every control explains itself.
 struct LockScreenSettingsSection: View {
     @AppStorage(LockScreenSettingKey.playerCard) private var playerCard = false
