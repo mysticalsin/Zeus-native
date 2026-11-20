@@ -42,6 +42,7 @@ public struct GlassSectionSlot: Equatable, Sendable {
 
 public protocol GlassSlotProviding: Sendable {
     static var descriptor: GlassSectionSlot { get }
+    static var keyContributions: [SettingsKeyContribution] { get }
 }
 
 public enum GlassSectionManifest {
@@ -63,6 +64,10 @@ public enum GlassSectionManifest {
 
     public static var slots: [GlassSectionSlot] {
         providers.map { $0.descriptor }
+    }
+
+    public static var keyContributions: [SettingsKeyContribution] {
+        providers.flatMap { $0.keyContributions }
     }
 
     /// Filled, enabled topbar tabs, in tab order. An unfilled or disabled tab is absent.
@@ -669,6 +674,10 @@ public enum GlassSettingsAudit {
         let namespaced = SettingsKeyReachability.collidingSlotIDs(slotIDs: ["glass.general", "glass.license"], sectionIDs: sections)
         if !namespaced.isEmpty { return ["namespaced ids collided"] }
         return []
+    }
+
+    public static func contributionFailures(catalogIDs: [String]) -> [String] {
+        SettingsKeyLedger.problems(catalogIDs: catalogIDs, contributions: GlassSectionManifest.keyContributions)
     }
 
     public static func inspectorDeltaFailures(windowSource: String) -> [String] {
