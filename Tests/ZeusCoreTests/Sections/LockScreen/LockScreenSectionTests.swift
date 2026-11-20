@@ -501,6 +501,53 @@ import Testing
         #expect(!loader.contains("dlsym(") || loader.contains("lookup"))
     }
 
+    // MARK: Persistence
+
+    @Test func eachSettingSurvivesASecondStoreOnTheSameValues() {
+        var first = LockScreenSettingsStore()
+        #expect(first.settings == .off)
+        let chosen = LockScreenSettings.resolve(
+            playerCard: true, lockSound: "Gentle", unlockSound: "To-do", soundLevel: "Quiet", origin: .owner
+        )
+        first.save(chosen)
+        let second = LockScreenSettingsStore(values: first.values)
+        #expect(second.settings == chosen)
+        #expect(second.values[LockScreenSettingKey.playerCard] == "true")
+        #expect(second.values[LockScreenSettingKey.lockSound] == "Gentle")
+        #expect(second.values[LockScreenSettingKey.unlockSound] == "To-do")
+        #expect(second.values[LockScreenSettingKey.soundLevel] == "Quiet")
+    }
+
+    @Test func aFreshStoreIsOffAndAnImportCannotTurnTheCardOrTheSoundsOn() {
+        let fresh = LockScreenSettingsStore()
+        #expect(fresh.settings == .off)
+        let incoming = [
+            LockScreenSettingKey.playerCard: "true",
+            LockScreenSettingKey.lockSound: "Gentle",
+            LockScreenSettingKey.unlockSound: "Listening",
+            LockScreenSettingKey.soundLevel: "Loud",
+        ]
+        let imported = LockScreenSettingsStore(values: LockScreenSettingsStore.importing(incoming))
+        #expect(imported.settings == .off)
+        let kept = LockScreenSettingsStore.importing(incoming, into: ["lockScreen.playerCard": "false"])
+        #expect(LockScreenSettingsStore(values: kept).settings.playerCard == false)
+    }
+
+    @Test func theCatalogRegistersTheKeysForExportImportSearchAndReset() throws {
+        let root = try repositoryRoot()
+        let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
+        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
+        for key in LockScreenSettingKey.all {
+            #expect(catalog.contains("id: \"\(key)\""))
+        }
+        #expect(catalog.contains("id: \"lockScreen.playerCard\""))
+        #expect(catalog.contains("defaultValue: \"false\""))
+        #expect(store.contains("\"lockScreen.playerCard\""))
+        for key in [LockScreenSettingKey.lockSound, LockScreenSettingKey.unlockSound, LockScreenSettingKey.soundLevel] {
+            #expect(store.contains("\"\(key)\""))
+        }
+    }
+
     // MARK: Helpers
 
     private func cardOn() -> LockScreenSettings {
