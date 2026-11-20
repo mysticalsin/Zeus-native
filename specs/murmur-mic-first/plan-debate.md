@@ -1,6 +1,6 @@
 # Plan debate: Murmur mic first
 
-Status: pending challenger. Rounds used: 0 of 3.
+Status: pending challenger. Rounds used: 0 of 3. No challenger round has been run. The notes under the challenger heading are the author's record of the inspector finding, not a debate.
 
 ## Plan
 
@@ -23,6 +23,10 @@ Before the microphone opens, the turn stores only the frontmost app's process id
 1. Can reading focus after the microphone opens pick the wrong field, if the person clicks elsewhere while the device is still starting?
 
 ## Challenger: Devin the Dev
+
+Pending. Rounds used: 0 of 3. Nothing below was written by a challenger.
+
+## Inspector finding, recorded by the author
 
 The insert guard treated every frontmost app other than the key-down app as copy-only. That runs before the re-activate-and-paste branch. With preview-before-insert on, the preview card activates Zeus and its panel can become key, so the frontmost app is Zeus. A notch click does the same. Both are Zeus, not a third app, and both were refused.
 

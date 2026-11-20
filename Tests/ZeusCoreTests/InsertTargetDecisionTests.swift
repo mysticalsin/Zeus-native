@@ -7,55 +7,45 @@ import Testing
     private let zeus = DictationAppIdentity(processID: 1, bundleID: "app.zeus")
     private let browser = DictationAppIdentity(processID: 44, bundleID: "app.browser")
 
-    @Test func aPreviewCardWithZeusFrontmostPastesIntoTheTarget() {
-        let choice = InsertTargetDecision.decide(keyDown: notes, frontmost: zeus, ownPid: zeus.processID)
-        #expect(choice == .reactivateThenPaste)
+    @Test func aSwitchDuringOpenReactivatesTheKeyDownApp() {
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
+        #expect(route == .reactivate(notes))
     }
 
-    @Test func aNotchClickWithZeusFrontmostPastesIntoTheTarget() {
-        let choice = InsertTargetDecision.decide(keyDown: notes, frontmost: zeus, ownPid: zeus.processID)
-        #expect(choice == .reactivateThenPaste)
+    @Test func aNotchClickReactivatesTheKeyDownAppWhileTheFieldStayed() {
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: zeus, ownPid: zeus.processID)
+        #expect(route == .reactivate(notes))
     }
 
     @Test func aThirdAppFrontmostIsCopyOnly() {
-        let choice = InsertTargetDecision.decide(keyDown: notes, frontmost: browser, ownPid: zeus.processID)
-        #expect(choice == .copyOnly)
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: zeus.processID)
+        #expect(InsertTargetDecision.deliverEffect(route) == .copyOnly)
     }
 
     @Test func aMissingKeyDownAppFallsBackToPaste() {
         let missing = DictationAppIdentity(processID: 0, bundleID: nil)
-        let choice = InsertTargetDecision.decide(keyDown: missing, frontmost: browser, ownPid: zeus.processID)
-        #expect(choice == .paste)
+        let route = InsertTargetDecision.route(keyDown: missing, postOpen: browser, frontmost: browser, ownPid: zeus.processID)
+        #expect(route == .paste)
     }
 
-    @Test func aCorrectionWithZeusFrontmostReactivatesTheTarget() {
-        let choice = InsertTargetDecision.decide(keyDown: notes, frontmost: zeus, ownPid: zeus.processID)
-        #expect(choice == .reactivateThenPaste)
+    @Test func aMissingKeyDownAppReactivatesTheAppReadAfterOpen() {
+        let missing = DictationAppIdentity(processID: 0, bundleID: nil)
+        let route = InsertTargetDecision.route(keyDown: missing, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
+        #expect(route == .reactivate(browser))
     }
 
-    @Test func aSwitchDuringOpenReactivatesTheKeyDownApp() {
-        // deliver() re-activates context.targetApp, which is read after the microphone opens.
-        let reactivated = appReactivatedByTheCurrentDeliver(keyDown: notes, postOpen: browser)
-        #expect(reactivated == notes)
+    @Test func aCorrectionKeepsTheKeyDownApp() {
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
+        #expect(InsertTargetDecision.correctionEffect(route) == .reactivate(notes))
     }
 
-    private func appReactivatedByTheCurrentDeliver(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity) -> DictationAppIdentity {
-        _ = keyDown
-        return postOpen
+    @Test func aZeroOwnPidDoesNotTreatTheFrontmostAppAsZeus() {
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: 0)
+        #expect(route == .copyOnly)
     }
 
-    @Test func deliverAndCorrectionCallTheInsertDecision() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Dictation/DictationController.swift"), encoding: .utf8)
-        let deliver = slice(source, from: "private func deliver(", to: "private func deliverCorrection")
-        let correction = slice(source, from: "private func deliverCorrection", to: "private func removeEscape")
-        #expect(deliver.contains("InsertTargetDecision.decide"))
-        #expect(correction.contains("InsertTargetDecision.decide"))
-    }
-
-    private func slice(_ source: String, from start: String, to end: String) -> String {
-        guard let lower = source.range(of: start), let upper = source.range(of: end, range: lower.upperBound..<source.endIndex) else { return "" }
-        return String(source[lower.lowerBound..<upper.lowerBound])
+    @Test func passingTheFrontmostPidTreatsThatAppAsZeus() {
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: browser.processID)
+        #expect(route == .reactivate(notes))
     }
 }
