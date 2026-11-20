@@ -7,7 +7,7 @@ import ZeusCore
         let slot = GeneralSectionSlot.descriptor
         #expect(slot.id == "glass.general")
         #expect(slot.title == "General")
-        #expect(slot.filled == false)
+        #expect(slot.filled)
         #expect(slot.enabled)
         #expect(slot.keys.isEmpty)
         #expect(slot.placement == .cardOn(.general, 1))
@@ -16,7 +16,7 @@ import ZeusCore
             GeneralSectionSlot.hideInFullScreen,
             GeneralSectionSlot.hapticFeedback,
         ])
-        #expect(GlassSectionManifest.cards(on: .general).isEmpty)
+        #expect(GlassSectionManifest.cards(on: .general).map(\.id) == ["glass.general"])
         #expect(GlassSectionManifest.cards(on: .license).contains { $0.id == "glass.general" } == false)
         #expect(GlassSectionManifest.topbarTabs().contains { $0.id == "glass.general" } == false)
     }

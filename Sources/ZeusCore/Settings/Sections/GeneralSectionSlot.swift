@@ -18,7 +18,7 @@ public enum GeneralSectionSlot: GlassSlotProviding {
     public static let descriptor = GlassSectionSlot(
         id: "glass.general",
         title: "General",
-        filled: false,
+        filled: true,
         keys: [],
         order: 1,
         placement: .cardOn(.general, 1)
