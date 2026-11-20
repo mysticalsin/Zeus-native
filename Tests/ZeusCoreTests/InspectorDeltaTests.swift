@@ -39,6 +39,24 @@ import ZeusCore
         #expect(!host.contains("switch id"))
     }
 
+    @Test func topbarAuditFollowsFilledState() {
+        let eight = Self.topbarDescriptors(filled: true)
+        #expect(eight.count == 8)
+        #expect(GlassSettingsAudit.topbarPresentationFailures(eight).isEmpty)
+        let hidden = GlassSectionSlot(id: "glass.syntheticHidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(80))
+        #expect(GlassSettingsAudit.topbarPresentationFailures(eight + [hidden]).isEmpty)
+        let leaked = GlassSectionManifest.topbarTabs(in: eight + [hidden]) + [hidden]
+        #expect(!GlassSettingsAudit.topbarPresentationFailures(eight + [hidden], shown: leaked).isEmpty)
+    }
+
+    private static func topbarDescriptors(filled: Bool) -> [GlassSectionSlot] {
+        GlassSectionManifest.providers.compactMap { provider in
+            let slot = provider.descriptor
+            guard case .topbarTab = slot.placement else { return nil }
+            return GlassSectionSlot(id: slot.id, title: slot.title, filled: filled, keys: slot.keys, order: slot.order, enabled: true, placement: slot.placement)
+        }
+    }
+
     @Test func topbarSelectionRejectsHiddenTabsAndCardsStayOnTheirPage() {
         let media = GlassSectionSlot(id: "glass.media", title: "Media", filled: true, keys: [], placement: .topbarTab(0))
         let weather = GlassSectionSlot(id: "glass.weather", title: "Weather", filled: false, keys: [], placement: .topbarTab(1))
