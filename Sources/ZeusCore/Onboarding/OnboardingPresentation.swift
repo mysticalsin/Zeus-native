@@ -58,9 +58,19 @@ public struct OnboardingPresentation: Equatable, Sendable {
         self.reduceMotion = reduceMotion
     }
 
-    /// Placeholder. Escape does not change the guide yet.
+    /// Escape or the minimize control folds the guide. A second Escape leaves it folded.
+    /// Reopen brings the same step back. Reduce Motion skips the resize animation.
     public mutating func send(_ command: Command) -> [Effect] {
-        _ = command
-        return []
+        let motion = Effect.animated(!reduceMotion)
+        switch (phase, command) {
+        case (.expanded, .escape), (.expanded, .minimizeControl):
+            phase = .minimized
+            return [.resize(Self.minimizedSize), .announce("Setup minimized"), motion, .releaseKeyFocus]
+        case (.minimized, .escape), (.minimized, .minimizeControl), (.expanded, .reopen):
+            return []
+        case (.minimized, .reopen):
+            phase = .expanded
+            return [.resize(Self.expandedSize), .announce("Setup restored"), motion]
+        }
     }
 }
