@@ -104,6 +104,20 @@ import Testing
         #expect(tail == ["glass.earlier", "glass.dup", "glass.later"])
     }
 
+    @Test func sidebarRowsStayThirtyPointsAndTheFoundationIsDeclared() throws {
+        for count in [21, 22, 23, 34] {
+            #expect(SettingsSidebarLayout.rowMetrics(rowCount: count).height == 30)
+        }
+        #expect(SettingsSidebarLayout.bottom(rowCount: 34) > SettingsSidebarLayout.versionY)
+        let shell = try String(contentsOf: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsShell.swift"), encoding: .utf8)
+        let window = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/SettingsWindow.swift"), encoding: .utf8)
+        #expect(shell.contains("topbarTab"))
+        #expect(shell.contains("cardOn"))
+        #expect(window.contains("case topbar"))
+        #expect(window.contains("Topbar"))
+        #expect(FileManager.default.fileExists(atPath: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsMetrics.swift").path))
+    }
+
     @Test func registrationDoesNotReadSectionSources() throws {
         let settings = Self.root.appendingPathComponent("Sources/ZeusCore/Settings")
         let files = try Self.swiftSources(at: settings)
