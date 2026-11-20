@@ -2,7 +2,6 @@ import AppKit
 import CoreAudio
 import AudioToolbox
 import EventKit
-import IOKit.ps
 import ZeusCore
 
 /// Feeds `TopBarModel` from the system. Every source is optional: nothing here asks for a
@@ -25,7 +24,7 @@ final class TopBarServices {
     private var volumeDevice = AudioObjectID(kAudioObjectUnknown)
     private var lastVolume: Float32 = -1
     private var lastWeatherFetch = Date.distantPast
-    private var lastBatteryCue: Int?
+    private var batteryOverlay = BatteryOverlayMachine()
     private var keyMonitor: Any?
     private var systemKeyMonitor: Any?
     private var shiftGate = ShiftPeekGate()
@@ -62,7 +61,9 @@ final class TopBarServices {
         hudMonitor = monitor
         monitor.start(volumeDevice: { [weak self] in self?.volumeDevice ?? AudioObjectID(kAudioObjectUnknown) },
                       currentVolume: { [weak self] in self?.currentVolume() })
-        pollBattery()
+        PowerMonitor.shared.onBatteryOverlay = { [weak self] in self?.deliverBatteryOverlay() }
+        PowerMonitor.shared.start(for: .batteryOverlay)
+        deliverBatteryOverlay()
         refreshCalendarIfAllowed()
         fetchWeather(force: false)
         updateIntakeWatcher()
@@ -71,7 +72,7 @@ final class TopBarServices {
 
         every(1) { [weak self] in self?.tickFocus() }
         every(60) { [weak self] in
-            self?.pollBattery()
+            self?.deliverBatteryOverlay()
             self?.refreshCalendarIfAllowed()
             self?.fetchWeather(force: false)
             self?.updateIntakeWatcher()
@@ -269,27 +270,32 @@ final class TopBarServices {
 
     // MARK: Battery
 
-    private func pollBattery() {
-        guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let list = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef] else { return }
-        for source in list {
-            guard let info = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue() as? [String: Any],
-                  (info[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType,
-                  let current = info[kIOPSCurrentCapacityKey] as? Int,
-                  let max = info[kIOPSMaxCapacityKey] as? Int, max > 0 else { continue }
-            let level = current * 100 / max
-            let charging = info[kIOPSIsChargingKey] as? Bool ?? false
-            let plugged = (info[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
-            let previous = model.battery
-            model.battery = .init(level: level, charging: charging, pluggedIn: plugged)
-            if let previous, previous.pluggedIn != plugged {
-                if plugged { model.show(.charging(level)) }
-                model.flash(.battery(level: Double(level) / 100, charging: plugged))
-            } else if !plugged, level <= 10, lastBatteryCue != level {
-                lastBatteryCue = level
-                model.show(.lowBattery(level))
+    /// The charge overlay follows the idle, showing, cooldown machine. A charger change is what shows it.
+    private func deliverBatteryOverlay() {
+        let reading = PowerMonitor.shared.power
+        let sample = BatteryPowerSample(percent: reading.batteryPercent, charging: reading.isCharging, onAC: !reading.onBattery)
+        if let percent = sample.percent {
+            model.battery = .init(level: percent, charging: sample.charging, pluggedIn: sample.onAC)
+        }
+        batteryOverlay.lightsEnabled = SettingsStore.shared.bool(BatteryLightsSetting.key)
+        batteryOverlay.style = BatteryOverlayStyle.resolve(SettingsStore.shared.string(BatteryOverlayStyle.storageKey))
+        batteryOverlay.reduceMotion = Motion.reduced
+        let now = ProcessInfo.processInfo.systemUptime
+        let advanced = BatteryOverlayMachine.reduce(batteryOverlay, .advance(to: now))
+        let powered = BatteryOverlayMachine.reduce(advanced.0, .power(sample, at: now))
+        batteryOverlay = powered.0
+        let effects = advanced.1 + powered.1
+        for action in BatteryOverlayHostPlan.actions(for: effects) {
+            switch action {
+            case .showCharging(let percent, _):
+                model.show(.charging(percent))
+            case .showLowBattery(let percent, _):
+                model.show(.lowBattery(percent))
+            case .flashGauge(let level, let charging):
+                model.flash(.battery(level: level, charging: charging))
+            case .dismiss:
+                break
             }
-            return
         }
     }
 

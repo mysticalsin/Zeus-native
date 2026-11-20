@@ -48,6 +48,8 @@
 	<string>ZEUS checks whether a Focus is on so it can hold its morning brief and nudges until you are free.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>ZEUS shows today's reminders in the notch.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>ZEUS shows your earbuds in the notch when they connect or disconnect, with their battery level. It looks only after you turn this on.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

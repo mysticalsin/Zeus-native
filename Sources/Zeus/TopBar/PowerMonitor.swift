@@ -10,13 +10,15 @@ final class PowerMonitor {
     static let shared = PowerMonitor()
 
     /// Who is listening. The readings stay on until the last client stops.
-    enum Client { case keepAwake, music }
+    enum Client { case keepAwake, music, batteryOverlay }
 
     private(set) var power = KeepAwakeRules.Power()
     /// The keep-awake session's callback. Called after every change, on the main thread.
     @ObservationIgnored var onChange: () -> Void = {}
     /// The music hold's callback. Called right after `onChange`.
     @ObservationIgnored var onMusicChange: () -> Void = {}
+    /// The charge overlay. Called after the music hold, still on the main thread.
+    @ObservationIgnored var onBatteryOverlay: () -> Void = {}
 
     @ObservationIgnored private var source: CFRunLoopSource?
     @ObservationIgnored private var thermalObserver: NSObjectProtocol?
@@ -62,6 +64,7 @@ final class PowerMonitor {
         power = next
         onChange()
         onMusicChange()
+        onBatteryOverlay()
     }
 
     /// The internal battery, if there is one. A desktop Mac reads as on AC with no percent.

@@ -143,6 +143,7 @@ class SourceLint(unittest.TestCase):
             r"requestFullAccessToEvents": "NSCalendarsFullAccessUsageDescription",
             r"requestFullAccessToReminders": "NSRemindersFullAccessUsageDescription",
             r"AudioHardwareCreateProcessTap": "NSAudioCaptureUsageDescription",
+            r"CBCentralManager\(": "NSBluetoothAlwaysUsageDescription",
         }
         missing = []
         for pattern, key in required.items():
