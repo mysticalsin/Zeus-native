@@ -96,7 +96,11 @@ final class LicenseManager {
 
     /// Shown when a saved server address is unbound. The seat on the server cannot be freed or claimed until the
     /// owner saves the address again, so the key stays on this Mac instead of leaving the seat held.
-    static let reentryMessage = "Save the license server address again in the License server section first. Zeus keeps its license key on this Mac until you do, so no seat is left held on the server."
+    static let reentryMessage = LicenseActivationMachine.reentryMessage
+
+    /// The key in the existing Keychain item `license.key`, for an explicit settings action.
+    /// Callers must not log it, copy it into crash or analytics text, or save it anywhere else.
+    func storedLicenseKey() -> String? { credentials.get("license.key") }
 
     func setServer(_ text: String) {
         credentialRevision &+= 1
