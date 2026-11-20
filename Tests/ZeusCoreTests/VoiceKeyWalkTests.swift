@@ -1646,6 +1646,12 @@ private enum VoiceKeyWalkOrder {
         "J dictation Right Command hold toggle off, changes ride on events": (222_639, 2_199_960),
         "B2 dictation Right Command hold, late": (871_099, 12_882_265),
         "A1 talk hold Control-Option confirm 0.15, no chord": (253_450, 3_581_849),
+        "A-carbon talk hold Control-Option confirm 0.15, every Space swallowed": (1_302_124, 18_199_394),
+        "K talk pair Control-Option confirm 0.15 and Right Option confirm 0.25": (254_890, 2_228_516),
+        "K0 talk pair Control-Option confirm 0 and Right Option confirm 0.25": (108_202, 944_588),
+        "K-late15 talk pair, late timers, primary confirm 0.15": (484_984, 5_633_520),
+        "K-late0 talk pair, late timers, primary confirm 0": (292_648, 3_395_848),
+        "K-flip talk pair, second key turned off and on": (387_418, 3_335_970),
     ]
 }
 
