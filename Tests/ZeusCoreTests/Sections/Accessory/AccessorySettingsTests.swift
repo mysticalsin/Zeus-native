@@ -5,7 +5,7 @@ import ZeusCore
 @Suite("Accessory settings")
 struct AccessorySettingsTests {
     @Test func accessorySlotCarriesTheClosedSettingsAndTheTopBarPlacement() {
-        let slot = AccessorySectionSlot.slot
+        let slot = AccessorySectionSlot.descriptor
         #expect(slot.id == "glass.accessory")
         #expect(slot.title == "Accessory")
         #expect(slot.filled == true)

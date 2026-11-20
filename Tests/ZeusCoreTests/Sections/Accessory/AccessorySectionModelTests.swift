@@ -68,7 +68,7 @@ struct AccessorySectionModelTests {
         #expect(model.confirmation == .idle)
         let controls = AccessorySectionSurface.controls(model)
         #expect(controls.contains(where: { $0.id == "speakers.look" }))
-        #expect(controls.allSatisfy(\.keyboardReachable))
+        #expect(controls.allSatisfy { $0.keyboardReachable })
         #expect(model.handle(.askToEnableSpeakers).isEmpty)
         #expect(model.confirmation == .enableSpeakers)
         #expect(model.handle(.confirmSpeakerEnable) == [.requestPermission])
@@ -141,7 +141,7 @@ struct AccessorySectionModelTests {
         _ = model.handle(.confirmSpeakerEnable)
         #expect(model.speakers.phase.isLoading)
         let asking = AccessorySectionSurface.controls(model)
-        #expect(asking.allSatisfy(\.keyboardReachable))
+        #expect(asking.allSatisfy { $0.keyboardReachable })
         #expect(asking.contains(where: { $0.id == "speakers" }))
 
         _ = model.handle(.permissionAllowed)

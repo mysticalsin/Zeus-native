@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZeusCore
 
 /// Pins the settings that already ship. A dropped catalog row, outside-catalog key, section, or window fails these checks.
 @Suite struct ExistingSettingsKeyReachabilityTests {

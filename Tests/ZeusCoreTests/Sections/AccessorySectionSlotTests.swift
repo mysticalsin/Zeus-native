@@ -1,11 +1,17 @@
 import Testing
+import ZeusCore
 
 @Suite struct AccessorySectionSlotTests {
-    @Test func accessorySlotStartsEmpty() {
+    @Test func accessorySlotPublishesClosedKeys() {
         let slot = AccessorySectionSlot.descriptor
         #expect(slot.id == "glass.accessory")
         #expect(slot.title == "Accessory")
-        #expect(slot.filled == false)
-        #expect(slot.keys.isEmpty)
+        #expect(slot.filled == true)
+        #expect(slot.keys == [
+            "accessory.earbudsOverlay",
+            "accessory.overlayStyle",
+            "accessory.speakerNames",
+        ])
+        #expect(AccessorySectionSlot.placement == .topbarTab(6))
     }
 }

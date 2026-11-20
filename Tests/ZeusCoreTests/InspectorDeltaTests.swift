@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ZeusCore
 
 /// Findings from the delta review at 896512ae. These fail on that tree and pass once each hole is closed.
 @Suite struct InspectorDeltaTests {
