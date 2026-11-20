@@ -12,16 +12,27 @@ import ZeusCore
     @Test func fillingOneDescriptorShowsThatSlot() throws {
         let slots = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
             let slot = provider.descriptor
-            guard slot.id == "glass.media" else { return slot }
+            guard slot.id == "glass.media" || slot.id == "glass.battery" else { return slot }
             return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
         }
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
         #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
         #expect(rows.last?.title == "Topbar")
         #expect(!rows.contains { $0.id == "glass.media" })
+        #expect(!rows.contains { $0.id == "glass.battery" })
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
         #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
-        #expect(GlassSectionManifest.topbarTabs(in: slots).map(\.id) == ["glass.media"])
+        let tabs = GlassSectionManifest.topbarTabs(in: slots)
+        #expect(tabs.contains { $0.id == "glass.media" })
+        #expect(tabs.contains { $0.id == "glass.battery" })
+        #expect(tabs.allSatisfy(\.filled))
+        #expect(tabs.allSatisfy(\.enabled))
+        #expect(!tabs.contains { $0.id == "glass.weather" })
+        let orders = tabs.map(\.placement.order)
+        #expect(orders == orders.sorted())
+        let mediaOrder = tabs.first { $0.id == "glass.media" }?.placement.order
+        let batteryOrder = tabs.first { $0.id == "glass.battery" }?.placement.order
+        #expect(mediaOrder != nil && batteryOrder != nil && (mediaOrder ?? 0) < (batteryOrder ?? 0))
         #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
         #expect(host.contains("as? any GlassSlotPage.Type"))
@@ -59,12 +70,12 @@ import ZeusCore
             .sorted()
         let manifest = try String(contentsOf: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsShell.swift"), encoding: .utf8)
         guard let start = manifest.range(of: "static let providers"),
-              let open = manifest[start.upperBound...].firstIndex(of: "["),
-              let close = manifest[open...].firstIndex(of: "]") else {
+              let marker = manifest[start.upperBound...].range(of: "= ["),
+              let close = manifest[marker.upperBound...].firstIndex(of: "]") else {
             Issue.record("provider list missing")
             return
         }
-        let registered = manifest[manifest.index(after: open)..<close]
+        let registered = manifest[marker.upperBound..<close]
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { $0.hasSuffix(".self") || $0.hasSuffix(".self,") }
