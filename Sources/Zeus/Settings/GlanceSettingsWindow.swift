@@ -156,6 +156,9 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.hasShadow = true
             window.title = "Zeus Settings"
             window.delegate = self
             let hosting = NSHostingView(rootView: GlanceSettingsRoot(navigation: navigation, context: context))
@@ -191,8 +194,16 @@ struct GlanceSettingsRoot: View {
     let context: GSContext
     var body: some View {
         ZStack(alignment: .topLeading) {
-            GS.window
+            GlassSettingsChrome()
             GSSidebar(navigation: navigation)
+                .onMoveCommand { direction in
+                    let ids = GSSection.shown.map(\.rawValue)
+                    guard let index = ids.firstIndex(of: navigation.section.rawValue) else { return }
+                    let delta = direction == .down ? 1 : direction == .up ? -1 : 0
+                    guard delta != 0 else { return }
+                    let next = GlassSettingsFocus.index(after: index, delta: delta, count: ids.count)
+                    if let section = GSSection(rawValue: ids[next]) { navigation.section = section }
+                }
             GSPanelHost(navigation: navigation, context: context)
                 .frame(width: GS.panelFrame.width, height: GS.panelFrame.height)
                 .offset(x: GS.panelFrame.minX, y: GS.panelFrame.minY)
@@ -200,6 +211,8 @@ struct GlanceSettingsRoot: View {
         .frame(width: GS.size.width, height: GS.size.height)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Settings")
     }
 }
 
@@ -271,6 +284,7 @@ struct GSPanelHost: View {
             .id(navigation.section)
         ZStack {
             RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
+            GlassSettingsPanelHighlight()
             // QA7 round 11 (report-11.md): named surfaces that go through this exact view
             // (`murmur-settings`, every live `settings-<name>` in `SnapshotRenderer.swift`) rendered
             // a blank content pane under `ImageRenderer`'s one-shot `--snapshots` pass -- round 10
