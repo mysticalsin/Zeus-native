@@ -56,6 +56,21 @@ struct PresentToleranceTests {
         #expect(PresentTolerance.decide(scale: 1, pixelWidth: .max).band == .fine)
     }
 
+    @Test func productionReadersGoThroughTheDecision() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let mapper = try String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/Present/CoordinateMapper.swift"), encoding: .utf8)
+        let mapping = try String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/Present/PresentPointMapping.swift"), encoding: .utf8)
+        #expect(mapper.contains("PresentTolerance.decide("))
+        #expect(mapping.contains("PresentTolerance.decide("))
+        #expect(!mapper.contains("PresentTolerance.ringPixels("))
+        #expect(!mapper.contains("PresentTolerance.ringPoints("))
+        #expect(!mapping.contains("PresentTolerance.ringPoints("))
+        #expect(!mapping.contains("PresentTolerance.ringPixels("))
+    }
+
     @Test func theExistingReadersFollowTheDecision() {
         for (scale, width) in [(1.0, 1920), (2.0, 2560), (1.0, 3840), (0.0, 100), (-3.0, 4000)] {
             let decision = PresentTolerance.decide(scale: scale, pixelWidth: width)
