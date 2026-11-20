@@ -177,7 +177,7 @@ struct AvatarView: View {
                                         removal: .opacity.combined(with: .scale(scale: 1.08))))
         }
         .frame(width: size, height: size)
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: state)
+        .animation(Motion.reducible(.spring(response: 0.32, dampingFraction: 0.78)), value: state)
         .accessibilityElement()
         .accessibilityLabel("Zeus: \(state.title)")
     }
@@ -332,7 +332,7 @@ struct MiniMascotView: View {
         let status = AvatarStatus.shared
         LivingAvatar(state: state, size: size, asleep: status.asleep && state == .idle,
                      waking: status.waking && state == .idle, frameTime: frameTime, pinnedPose: status.posePreview)
-            .animation(.easeInOut(duration: 0.25), value: state)
+            .animation(Motion.reducible(.easeInOut(duration: 0.25)), value: state)
     }
 }
 

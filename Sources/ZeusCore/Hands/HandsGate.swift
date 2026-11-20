@@ -248,8 +248,138 @@ public struct HandsCommandLog: Equatable, Sendable {
 
     public mutating func record(command: String, verdict: String, outcome: String, at: Date = Date()) {
         let stamp = ISO8601DateFormatter().string(from: at)
-        let flat = command.replacingOccurrences(of: "\n", with: " ")
+        let flat = Self.redacted(command.replacingOccurrences(of: "\n", with: " "))
         lines.append("\(stamp)\t\(flat)\t\(verdict)\t\(outcome)")
+    }
+
+    /// Drops bearer tokens, password-like arguments, env assignments and URL credentials.
+    /// Ordinary arguments stay so the log still says what ran.
+    static func redacted(_ command: String) -> String {
+        var text = replace(command, #"(?i)([a-z][a-z0-9+.-]*://)[^\s/:@]+:[^\s/@]+@"#, "$1[redacted]@")
+        text = redactArguments(text)
+        text = replace(text, #"(?i)\bBearer\s+(?!\[redacted\])\S+"#, "Bearer [redacted]")
+        return text
+    }
+
+    private static let secretFlagNames: Set<String> = [
+        "password", "passwd", "token", "api-key", "apikey", "api_key", "secret",
+        "access-token", "access_token", "authorization", "bearer", "client-secret",
+        "client_secret", "private-key", "private_key", "pwd", "p",
+    ]
+
+    /// An env name, or a name that is itself a secret (`API_KEY`, `TOKEN`). `if` and `of` are not.
+    private static func isSecretName(_ name: String) -> Bool {
+        let key = name.lowercased().replacingOccurrences(of: "-", with: "_")
+        if key == "key" || key.hasSuffix("_key") { return true }
+        return ["token", "secret", "password", "passwd", "apikey", "api_key", "bearer", "credential"].contains { key.contains($0) }
+    }
+
+    private static func flagName(_ word: String) -> String? {
+        guard word.hasPrefix("-"), !HandsShell.isAssignment(word) else { return nil }
+        let bare = word.drop { $0 == "-" }.split(separator: "=", maxSplits: 1).first.map(String.init) ?? ""
+        let name = bare.lowercased()
+        return secretFlagNames.contains(name) ? name : nil
+    }
+
+    /// Env assignments sit before the command. A secret-named assignment is removed wherever it sits.
+    private static func redactArguments(_ command: String) -> String {
+        let parsed = commandWords(command)
+        guard !parsed.isEmpty else { return command }
+        var replacements: [(start: String.Index, end: String.Index, text: String)] = []
+        var index = 0
+        while index < parsed.count {
+            let end = segmentEnd(parsed, from: index)
+            let commandAt = commandWord(parsed[index..<end])
+            var cursor = index
+            while cursor < end {
+                let word = parsed[cursor]
+                if let equals = word.text.firstIndex(of: "="), HandsShell.isAssignment(word.text) {
+                    let name = String(word.text[..<equals])
+                    if cursor - index < commandAt || isSecretName(name) {
+                        let value = command.index(word.start, offsetBy: name.count + 1)
+                        replacements.append((value, word.end, "[redacted]"))
+                    }
+                } else if flagName(word.text) != nil, let equals = word.text.firstIndex(of: "=") {
+                    let value = command.index(word.start, offsetBy: word.text.distance(from: word.text.startIndex, to: word.text.index(after: equals)))
+                    replacements.append((value, word.end, "[redacted]"))
+                } else if flagName(word.text) != nil, cursor + 1 < end, flagName(parsed[cursor + 1].text) == nil {
+                    let next = parsed[cursor + 1]
+                    replacements.append((next.start, next.end, "[redacted]"))
+                    cursor += 1
+                }
+                cursor += 1
+            }
+            index = end + 1
+        }
+        var text = command
+        for item in replacements.sorted(by: { $0.start > $1.start }) {
+            text.replaceSubrange(item.start..<item.end, with: item.text)
+        }
+        return text
+    }
+
+    private struct CommandWord {
+        var start: String.Index
+        var end: String.Index
+        var text: String
+    }
+
+    private static func commandWords(_ command: String) -> [CommandWord] {
+        var words: [CommandWord] = []
+        var index = command.startIndex
+        while index < command.endIndex {
+            while index < command.endIndex, command[index] == " " || command[index] == "\t" { index = command.index(after: index) }
+            guard index < command.endIndex else { break }
+            if command[index] == ";" || command[index] == "|" || command[index] == "&" {
+                index = command.index(after: index)
+                continue
+            }
+            let start = index
+            var quote: Character?
+            while index < command.endIndex {
+                let character = command[index]
+                if let open = quote {
+                    index = command.index(after: index)
+                    if character == open { quote = nil }
+                    continue
+                }
+                if character == "'" || character == "\"" { quote = character; index = command.index(after: index); continue }
+                if character == " " || character == "\t" || character == ";" || character == "|" || character == "&" { break }
+                index = command.index(after: index)
+            }
+            words.append(CommandWord(start: start, end: index, text: String(command[start..<index])))
+        }
+        return words
+    }
+
+    private static func segmentEnd(_ words: [CommandWord], from start: Int) -> Int {
+        start + 1 <= words.count ? words.count : start
+    }
+
+    /// How many leading words are the env prefix and wrappers, using the same skip as the blocklist.
+    private static func commandWord(_ words: ArraySlice<CommandWord>) -> Int {
+        let list = Array(words)
+        var index = 0
+        while index < list.count {
+            let word = list[index].text
+            if HandsShell.isAssignment(word) { index += 1; continue }
+            let base = URL(fileURLWithPath: word).lastPathComponent.lowercased()
+            if HandsShell.wrappers.contains(base) {
+                index += 1
+                while index < list.count, list[index].text.hasPrefix("-") || HandsShell.isAssignment(list[index].text) {
+                    index += 1
+                }
+                continue
+            }
+            return index
+        }
+        return index
+    }
+
+    private static func replace(_ text: String, _ pattern: String, _ template: String) -> String {
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return expression.stringByReplacingMatches(in: text, range: range, withTemplate: template)
     }
 
     public func contains(command: String) -> Bool {
@@ -266,9 +396,10 @@ public struct HandsCommandLog: Equatable, Sendable {
             defer { try? handle.close() }
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
-        } else {
-            try data.write(to: url)
+        } else if !FileManager.default.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600]) {
+            throw CocoaError(.fileWriteUnknown)
         }
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }
 
@@ -290,8 +421,9 @@ public enum HandsCommandLogger {
             _ = try? handle.seekToEnd()
             try? handle.write(contentsOf: data)
         } else {
-            try? data.write(to: url)
+            FileManager.default.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600])
         }
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }
 
