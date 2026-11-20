@@ -56,10 +56,22 @@ public struct UnitBox: Equatable, Sendable {
         return lhs.x == rhs.x && lhs.y == rhs.y && lhs.width == rhs.width && lhs.height == rhs.height
     }
 
-    public var minX: Double { width < 0 ? x + width : x }
-    public var maxX: Double { width < 0 ? x : x + width }
-    public var minY: Double { height < 0 ? y + height : y }
-    public var maxY: Double { height < 0 ? y : y + height }
+    public var minX: Double {
+        if x.isNaN || width.isNaN { return .nan }
+        return width < 0 ? x + width : x
+    }
+    public var maxX: Double {
+        if x.isNaN || width.isNaN { return .nan }
+        return width < 0 ? x : x + width
+    }
+    public var minY: Double {
+        if y.isNaN || height.isNaN { return .nan }
+        return height < 0 ? y + height : y
+    }
+    public var maxY: Double {
+        if y.isNaN || height.isNaN { return .nan }
+        return height < 0 ? y : y + height
+    }
 
     public func insetBy(dx: Double, dy: Double) -> UnitBox {
         if isNull { return .null }
