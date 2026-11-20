@@ -24,7 +24,7 @@ struct BatterySettingsPersistenceTests {
         #expect(BatteryEarbudSetting.enabled(requested: false, origin: .importFile, currently: true) == false)
     }
 
-    @Test func theCatalogRegistersBatterySettingsAndImportCannotEnableEarbuds() throws {
+    @Test func theSlotContributesBatterySettingsAndImportCannotEnableEarbuds() throws {
         let root = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -32,20 +32,32 @@ struct BatterySettingsPersistenceTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
-        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
-        let style = try #require(catalogLine("battery.overlayStyle", in: catalog))
-        let earbuds = try #require(catalogLine("battery.earbuds", in: catalog))
-        #expect(style.contains("kind: .choice"))
-        #expect(style.contains("defaultValue: \"gauge\""))
-        #expect(earbuds.contains("kind: .toggle"))
-        #expect(earbuds.contains("defaultValue: \"false\""))
-        #expect(store.contains("\"battery.earbuds\""))
-        #expect(store.contains("SettingsDefaultsKey.key"))
+        let catalogIDs = catalog.split(separator: "\n").compactMap { line -> String? in
+            guard line.contains("SettingOption(id:") else { return nil }
+            return catalogLineID(String(line))
+        }
+        #expect(!catalogIDs.contains(BatteryEarbudSetting.key))
+        #expect(!catalogIDs.contains(BatteryOverlayStyle.storageKey))
+        let items = BatterySectionSlot.keyContributions
+        #expect(SettingsKeyLedger.problems(catalogIDs: catalogIDs, contributions: items).isEmpty)
+        let style = try #require(items.first { $0.id == BatteryOverlayStyle.storageKey })
+        let earbuds = try #require(items.first { $0.id == BatteryEarbudSetting.key })
+        #expect(style.kind == .choice)
+        #expect(style.policy == .exportable)
+        #expect(style.defaultValue == "gauge")
+        #expect(earbuds.kind == .toggle)
+        #expect(earbuds.policy == .importCannotEnable)
+        #expect(earbuds.defaultValue == "false")
+        #expect(SettingsKeyLedger.imported(earbuds, current: "false", incoming: "true") == nil)
+        #expect(SettingsKeyLedger.imported(earbuds, current: "true", incoming: "false") == "false")
         #expect(SettingsDefaultsKey.key(BatteryEarbudSetting.key) == "opt.battery.earbuds")
         #expect(SettingsDefaultsKey.key(BatteryOverlayStyle.storageKey) == "opt.battery.overlayStyle")
     }
 
-    private func catalogLine(_ id: String, in source: String) -> String? {
-        source.split(separator: "\n").first { $0.contains("SettingOption(id: \"\(id)\"") }.map(String.init)
+    private func catalogLineID(_ line: String) -> String? {
+        guard let open = line.firstIndex(of: "\"") else { return nil }
+        let rest = line[line.index(after: open)...]
+        guard let close = rest.firstIndex(of: "\"") else { return nil }
+        return String(rest[..<close])
     }
 }

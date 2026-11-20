@@ -20,14 +20,21 @@ public struct BatterySettingsStore: Equatable, Sendable {
     }
 
     public static func load(_ defaults: UserDefaults) -> BatterySettingsStore {
-        let styleRaw = defaults.string(forKey: SettingsDefaultsKey.key(BatteryOverlayStyle.storageKey)) ?? BatteryOverlayStyle.default.rawValue
-        let earbudsRaw = defaults.string(forKey: SettingsDefaultsKey.key(BatteryEarbudSetting.key)) ?? "false"
+        let style = contribution(BatteryOverlayStyle.storageKey)
+        let earbuds = contribution(BatteryEarbudSetting.key)
+        let styleRaw = SettingsKeyLedger.load(style, stored: defaults.string(forKey: SettingsDefaultsKey.key(style.id)))
+        let earbudsRaw = SettingsKeyLedger.load(earbuds, stored: defaults.string(forKey: SettingsDefaultsKey.key(earbuds.id)))
         return BatterySettingsStore(
             overlayStyle: BatteryOverlayStyle.resolve(styleRaw),
             earbudsEnabled: earbudsRaw == "true",
             styleRaw: styleRaw,
             earbudsRaw: earbudsRaw
         )
+    }
+
+    private static func contribution(_ id: String) -> SettingsKeyContribution {
+        BatterySectionSlot.keyContributions.first { $0.id == id }
+            ?? SettingsKeyContribution(id: id, defaultValue: "false", kind: .toggle, policy: .importCannotEnable)
     }
 
     public func save(_ defaults: UserDefaults) {

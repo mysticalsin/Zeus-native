@@ -83,7 +83,7 @@ final class SettingsStore {
     /// Where a change came from. Only the owner's own click may opt in to automatic recording.
     enum ChangeOrigin: Sendable { case person, reset, importFile }
 
-    static func key(_ id: String) -> String { SettingsDefaultsKey.key(id) }
+    static func key(_ id: String) -> String { "opt." + id }
 
     static func contribution(_ id: String) -> SettingsKeyContribution? {
         GlassSectionManifest.keyContributions.first { $0.id == id }
@@ -228,11 +228,8 @@ final class SettingsStore {
         Self.extraKeys[section] != nil || SettingsCatalog.options(in: section).contains { $0.state != .custom && Self.isValue($0.kind) }
     }
 
-    /// Hand-built rows that still belong to a section reset.
-    static let resetEvenWhenCustom: Set<String> = [BatteryOverlayStyle.storageKey, BatteryEarbudSetting.key]
-
     func reset(_ section: SettingsNavigation.Section) {
-        for option in SettingsCatalog.options(in: section) where Self.isValue(option.kind) && (option.state != .custom || Self.resetEvenWhenCustom.contains(option.id)) {
+        for option in SettingsCatalog.options(in: section) where option.state != .custom && Self.isValue(option.kind) {
             set(option.id, option.defaultValue, origin: .reset)
         }
         let prefix = section.rawValue + "."
@@ -337,8 +334,6 @@ final class SettingsStore {
         "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
         "face.presence",
-        // Bluetooth and the private earbud keys stay off until the person turns this on.
-        "battery.earbuds",
         // It reads other apps' window frames and moves their windows.
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.
