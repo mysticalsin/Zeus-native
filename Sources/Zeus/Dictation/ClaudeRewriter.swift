@@ -26,14 +26,14 @@ enum ClaudeRewriter {
                 let once = OnceFlag()
                 do {
                     let collected = try RewriterStream.collect(stdout: output, stderr: errors, timeout: timeout) {
-                        let gate = DispatchSemaphore(value: 0)
-                        process.terminationHandler = { _ in gate.signal() }
                         try process.run()
                         input.fileHandleForWriting.write(Data(prompt.utf8))
                         try? input.fileHandleForWriting.close()
-                        if gate.wait(timeout: .now() + timeout) == .timedOut {
-                            process.terminate()
-                            gate.wait()
+                        do {
+                            try RewriterStream.waitUntilStopped(isRunning: { process.isRunning }, timeout: timeout) {
+                                process.terminate()
+                            }
+                        } catch {
                             throw Failure.timedOut
                         }
                     }
