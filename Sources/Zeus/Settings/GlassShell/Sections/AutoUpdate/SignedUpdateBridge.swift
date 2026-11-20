@@ -11,6 +11,7 @@ final class SignedUpdateBridge: NSObject {
 
     private var resume: ((UpdateEvent) -> Void)?
     private var accepted: UpdateCandidate?
+    private var installArmed = false
     private var context = UpdateContext(
         configuration: UpdateConfiguration(),
         currentVersion: ZeusVersion(major: 0, minor: 0, patch: 0),
@@ -55,6 +56,7 @@ final class SignedUpdateBridge: NSObject {
             return
         }
         installReply = nil
+        installArmed = true
         reply(.install)
         #else
         finish(.installFinished(false))
@@ -68,6 +70,7 @@ final class SignedUpdateBridge: NSObject {
     }
 
     func cancel() {
+        installArmed = false
         #if canImport(Sparkle)
         downloadCancellation?()
         downloadCancellation = nil
@@ -125,6 +128,11 @@ final class SignedUpdateBridge: NSObject {
     }
 
     fileprivate func sparkleFailed(_ error: Error) {
+        if installArmed {
+            installArmed = false
+            finish(.installFinished(false))
+            return
+        }
         let ns = error as NSError
         let signature = ns.domain == SUSparkleErrorDomain && (
             ns.code == Int(SUError.signatureError.rawValue)
