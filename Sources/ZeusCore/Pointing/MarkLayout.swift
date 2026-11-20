@@ -44,11 +44,18 @@ public struct MarkLayout {
     public func place(_ marks: [MarkPin]) -> [PlacedMark] {
         let current = screens()
         return marks.compactMap { mark in
-            guard let screen = current.first(where: { $0.frame.contains(mark.point) }) else { return nil }
+            guard let screen = current.first(where: { Self.owns(mark.point, on: $0) }) else { return nil }
             return PlacedMark(number: mark.number, title: mark.title, screenID: screen.id,
                               local: Self.local(mark.point, on: screen),
                               accessibilityLabel: "Mark \(mark.number), \(mark.title)")
         }
+    }
+
+    /// The minimum corner is inside the frame. The maximum corner is too: it is the one point
+    /// `CGRect.contains` leaves outside.
+    static func owns(_ point: CGPoint, on screen: MarkScreen) -> Bool {
+        if screen.frame.contains(point) { return true }
+        return point.x == screen.frame.maxX && point.y == screen.frame.maxY
     }
 
     /// Flip into one screen. The screen's own height is the top, not a shared window.

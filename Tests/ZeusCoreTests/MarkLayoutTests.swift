@@ -116,26 +116,13 @@ import Testing
     }
 
     @Test func aPointOnTheMinCornerAndTheMaxCornerIsPlaced() {
-        // Parent of 83e84e1 flipped with x - origin.x and height - (y - origin.y), and a corner was outside.
-        let side = PreFixMarkScreen(id: "side", frame: CGRect(x: -120, y: -40, width: 100, height: 80))
-        let marks = [CGPoint(x: -120, y: -40), CGPoint(x: -20, y: 40)]
-        let placed: [(String, CGPoint)] = marks.compactMap { point in
-            guard side.owns(point) else { return nil }
-            return (side.id, side.local(point))
-        }
-        #expect(placed.map(\.0) == ["side", "side"])
-        #expect(placed.map(\.1) == [CGPoint(x: 0, y: 80), CGPoint(x: 100, y: 0)])
-    }
-}
-
-/// Compiles against the pre-fix flip. A point on the minimum or maximum corner is outside.
-private struct PreFixMarkScreen {
-    var id: String
-    var frame: CGRect
-    func owns(_ point: CGPoint) -> Bool {
-        point.x > frame.minX && point.x < frame.maxX && point.y > frame.minY && point.y < frame.maxY
-    }
-    func local(_ point: CGPoint) -> CGPoint {
-        CGPoint(x: point.x - frame.minX, y: frame.height - (point.y - frame.minY))
+        let side = screen("side", CGRect(x: -120, y: -40, width: 100, height: 80))
+        let layout = MarkLayout { [side] }
+        let placed = layout.place([
+            MarkPin(number: 1, title: "Min", point: CGPoint(x: -120, y: -40)),
+            MarkPin(number: 2, title: "Max", point: CGPoint(x: -20, y: 40)),
+        ])
+        #expect(placed.map(\.screenID) == ["side", "side"])
+        #expect(placed.map(\.local) == [CGPoint(x: 0, y: 80), CGPoint(x: 100, y: 0)])
     }
 }
