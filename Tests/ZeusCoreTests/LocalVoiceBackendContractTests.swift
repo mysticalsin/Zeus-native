@@ -36,19 +36,26 @@ import Testing
         let frame = try await backend.start()
         #expect(frame.samples.count == VoiceFrame.sampleCount)
         #expect(frame.samples == first)
+        #expect(await backend.state == .streaming)
     }
 
     @Test func aWrongSizeFrameThrows() async throws {
         let backend = try FakeDuplexVoiceBackend(frames: [tone(0.25), tone(0.5)])
         _ = try await backend.start()
-        await #expect(throws: DuplexVoiceError.wrongFrameSize(count: 3)) {
+        await #expect(throws: VoiceSessionError.badFrameSize(expected: 3_200, got: 3)) {
             try await backend.push(userFrame: [0, 0, 0])
         }
     }
 
+    @Test func closeBeforeStartLeavesTheSessionIdle() async throws {
+        let backend = try FakeDuplexVoiceBackend(frames: [tone(0.1)])
+        await backend.close()
+        #expect(await backend.state == .idle)
+    }
+
     @Test func aPushBeforeStartThrows() async throws {
         let backend = try FakeDuplexVoiceBackend(frames: [tone(0.25)])
-        await #expect(throws: DuplexVoiceError.pushBeforeStart) {
+        await #expect(throws: VoiceSessionError.illegalTransition(from: .idle, event: .push)) {
             try await backend.push(userFrame: tone(0.1))
         }
     }
@@ -57,7 +64,8 @@ import Testing
         let backend = try FakeDuplexVoiceBackend(frames: [tone(0.25), tone(0.5)])
         _ = try await backend.start()
         await backend.close()
-        await #expect(throws: DuplexVoiceError.pushAfterClose) {
+        #expect(await backend.state == .closed)
+        await #expect(throws: VoiceSessionError.illegalTransition(from: .closed, event: .push)) {
             try await backend.push(userFrame: tone(0.1))
         }
     }
@@ -93,9 +101,10 @@ import Testing
         let backend = try FakeDuplexVoiceBackend(frames: [tone(0.2), tone(0.2)])
         _ = try await backend.start()
         for count in [0, 3_199, 3_201] {
-            await #expect(throws: DuplexVoiceError.wrongFrameSize(count: count)) {
+            await #expect(throws: VoiceSessionError.badFrameSize(expected: 3_200, got: count)) {
                 try await backend.push(userFrame: Array(repeating: 0, count: count))
             }
+            #expect(await backend.state == .streaming)
         }
         let accepted = try await verifyWithin("sized push") {
             try await backend.push(userFrame: Array(repeating: 0, count: 3_200))
@@ -129,6 +138,13 @@ import Testing
             }
         }
         #expect(tries.value == 2)
+    }
+
+    @Test func thisSuiteAddsNoSkipOrXfail() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        for token in ["XCT" + "Skip", "expected" + "Failure", "with" + "KnownIssue", ".dis" + "abled"] {
+            #expect(source.contains(token) == false)
+        }
     }
 }
 

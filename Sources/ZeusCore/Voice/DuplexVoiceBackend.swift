@@ -11,19 +11,14 @@ public struct VoiceFrame: Equatable, Sendable {
 
     public init(samples: [Float]) throws {
         guard samples.count == Self.sampleCount else {
-            throw DuplexVoiceError.wrongFrameSize(count: samples.count)
+            throw VoiceSessionError.badFrameSize(expected: Self.sampleCount, got: samples.count)
         }
         self.samples = samples
     }
 }
 
-public enum DuplexVoiceError: Error, Equatable, Sendable {
-    case wrongFrameSize(count: Int)
-    case pushBeforeStart
-    case pushAfterClose
-}
-
 public protocol DuplexVoiceBackend: Sendable {
+    var state: VoiceSessionState { get async }
     func start() async throws -> VoiceFrame
     func push(userFrame: [Float]) async throws -> VoiceFrame
     func close() async
@@ -32,32 +27,39 @@ public protocol DuplexVoiceBackend: Sendable {
 /// Canned frames for tests. Not a model and not a download.
 public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
     private let frames: [VoiceFrame]
-    private var started = false
-    private var closed = false
+    private var session = VoiceSessionState.idle
     private var nextReply = 1
+
+    public var state: VoiceSessionState { session }
 
     public init(frames: [[Float]]) throws {
         let built = try frames.map { try VoiceFrame(samples: $0) }
-        guard !built.isEmpty else { throw DuplexVoiceError.wrongFrameSize(count: 0) }
+        guard !built.isEmpty else {
+            throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: 0)
+        }
         self.frames = built
     }
 
     public func start() async throws -> VoiceFrame {
-        started = true
+        session = try session.next(on: .start)
+        session = try session.next(on: .started)
         nextReply = 1
         return frames[0]
     }
 
     public func push(userFrame: [Float]) async throws -> VoiceFrame {
-        if closed { throw DuplexVoiceError.pushAfterClose }
-        if !started { throw DuplexVoiceError.pushBeforeStart }
-        _ = try VoiceFrame(samples: userFrame)
+        let advanced = try session.next(on: .push)
+        guard userFrame.count == VoiceFrame.sampleCount else {
+            throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: userFrame.count)
+        }
+        session = advanced
         let reply = nextReply < frames.count ? frames[nextReply] : frames[frames.count - 1]
         if nextReply < frames.count { nextReply += 1 }
         return reply
     }
 
     public func close() async {
-        closed = true
+        guard let closing = try? session.next(on: .close) else { return }
+        session = (try? closing.next(on: .closed)) ?? closing
     }
 }

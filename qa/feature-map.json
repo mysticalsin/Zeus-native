@@ -408,7 +408,7 @@
       "kind": "portable",
       "tier": "contract",
       "group": "local-voice",
-      "scope": "Duplex frame contract and the two local voice switches, with canned frames only. No model, download, microphone, or app wiring."
+      "scope": "Duplex frame contract, the explicit session state table, and the two local voice switches, with canned frames only. No model, download, microphone, or app wiring."
     },
     {
       "id": "portable-wiki-export",
@@ -6559,11 +6559,15 @@
         {
           "id": "F11.local-voice-contract",
           "check": "portable-local-voice",
-          "acceptance": "A duplex turn starts with one 3200-sample frame at 24 kHz before the user speaks, refuses a wrong size, a push before start, and a push after close, and both local voice switches default to off. Canned frames only. No model, download, or device.",
+          "acceptance": "A duplex turn starts with one 3200-sample frame at 24 kHz before the user speaks. The session moves only through VoiceSessionState.next(on:). A bad frame size is its own error and does not move the session. Both local voice switches default to off, and a saved engine stays that engine. Canned frames only. No model, download, or device.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
               "function": "startReturnsFrameZeroOf3200Samples"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "everyStateAndEventHasOneOutcome"
             },
             {
               "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",

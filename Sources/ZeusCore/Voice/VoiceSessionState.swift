@@ -24,8 +24,25 @@ public indirect enum VoiceSessionState: Sendable, Equatable, Hashable {
     case closed
     case failed(VoiceSessionError)
 
-    /// Placeholder. Every event is refused until the table is filled in.
     public func next(on event: VoiceSessionEvent) throws -> VoiceSessionState {
-        throw VoiceSessionError.illegalTransition(from: self, event: event)
+        switch (self, event) {
+        case (.idle, .start):
+            return .starting
+        case (.starting, .started):
+            return .streaming
+        case (.streaming, .push):
+            return .streaming
+        case (.streaming, .close):
+            return .closing
+        case (.closing, .closed):
+            return .closed
+        case (.idle, .fail(let error)),
+             (.starting, .fail(let error)),
+             (.streaming, .fail(let error)),
+             (.closing, .fail(let error)):
+            return .failed(error)
+        default:
+            throw VoiceSessionError.illegalTransition(from: self, event: event)
+        }
     }
 }
