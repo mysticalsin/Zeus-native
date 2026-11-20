@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 216 of 216 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 216 in scope). 205 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 214 of 214 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 214 in scope). 203 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 165.
+**Before this round:** has 19, partial 27, missing 163.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -86,8 +86,6 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Mute pulse in the notch | toggle | on | Dim slash pulse when output is muted. | live | live | `lights.hud.mute` |  |
 | Everyday lights | Replace macOS volume and brightness HUD | toggle | on | Needs Accessibility in Settings > Permissions. Without it, both HUDs can show. | live | live | `lights.hud.replaceSystem` | CGEventTap consumes media keys when trusted. |
 | Everyday lights | Screen-edge glow on volume, brightness and keyboard-backlight HUDs | toggle | on | A glow runs around every screen edge and joins the notch, filled to the level. | missing | live | `lights.hud.screenEdge` | P0 item G. Click-through overlay above the menu bar on every display; fades in 120 ms, holds, fades out after about 1.2 s idle; respects Reduce Motion and Reduce Transparency. |
-| Everyday lights | How long the overlay stays | slider | - | How long the volume and brightness overlay stays fully visible. | missing | live | `lights.hud.hold` | Full-opacity dwell, from 0.4 to 6 seconds. A fresh store keeps the historical 1.2 second dwell. |
-| Everyday lights | Overlay label (icon, words) | segmented | icon | An icon, or the level in words. | missing | live | `lights.hud.label` | Icon keeps the level marks. Words is off until chosen. |
 | Everyday lights | Ignore mic conflicts (debug) | toggle | - | For QA environments where Core Audio keeps reporting a stale recorder. | has | stub | `wake.ignoreMicConflicts` | Item 6 (Hey Zeus). Never shown. Read only in DEBUG builds (WakeWordController); release builds always keep the call guard. |
 | Everyday lights | Incoming rain alert | toggle | on | "Rain in X min" pill before a shower. | partial | live | `lights.rain` | Uses hourly forecast timing; suppresses repeat alerts for three hours after a shower starts. |
 | Everyday lights | Timer light gauge | toggle | on | Outline counts down a focus session. | partial | live | `lights.timer` | Gates the closed focus wings. |

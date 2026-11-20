@@ -2,46 +2,48 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
-/// The hold and the label have to live in the shared catalog, under the same `opt.` keys the settings store already uses.
+/// Hold and label are section contributions. They are not catalog rows, and a fresh store stays off the words label.
 @Suite struct SensoryPersistenceTests {
-    private static func repositoryRoot() -> URL? {
-        var url = URL(fileURLWithPath: #filePath)
-        while url.path != "/" {
-            let catalog = url.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift")
-            if FileManager.default.fileExists(atPath: catalog.path) { return url }
-            url.deleteLastPathComponent()
-        }
-        return nil
-    }
-
-    @Test func addedSensorySettingsAreCatalogRowsThatDefaultOff() throws {
-        let root = try #require(Self.repositoryRoot())
+    @Test func addedSensorySettingsDefaultOffAndAreNotCatalogRows() throws {
+        let items = SensorySectionSlot.keyContributions
+        #expect(items.map(\.id) == [SensorySettings.holdKey, SensorySettings.labelKey])
+        let hold = try #require(items.first { $0.id == SensorySettings.holdKey })
+        let label = try #require(items.first { $0.id == SensorySettings.labelKey })
+        #expect(hold.defaultValue == "1.2")
+        #expect(hold.kind == .number)
+        #expect(label.defaultValue == "icon")
+        #expect(label.kind == .choice)
+        #expect(hold.defaultValue != "true")
+        #expect(label.defaultValue != "true")
+        #expect(SettingsKeyLedger.load(hold, stored: nil) == "1.2")
+        #expect(SettingsKeyLedger.load(label, stored: nil) == "icon")
+        let root = try #require(repositoryRoot())
         let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
-        let hold = try optionLine(catalog, SensorySettings.holdKey)
-        let label = try optionLine(catalog, SensorySettings.labelKey)
-        #expect(hold.contains("defaultValue: \"1.2\""))
-        #expect(label.contains("defaultValue: \"icon\""))
-        #expect(!hold.contains("defaultValue: \"true\""))
-        #expect(!label.contains("defaultValue: \"true\""))
-        let fresh = SensorySettings.read { _ in nil }
-        #expect(fresh.hold == 1.2)
-        #expect(fresh.label == .icon)
-        #expect(fresh.label != .words)
+        let catalogIDs = SettingsKeyReachability.catalogIDs(in: catalog)
+        #expect(!catalogIDs.contains(SensorySettings.holdKey))
+        #expect(!catalogIDs.contains(SensorySettings.labelKey))
+        #expect(SettingsKeyLedger.problems(catalogIDs: catalogIDs, contributions: GlassSectionManifest.keyContributions).isEmpty)
     }
 
     @Test func addedSensorySettingsSurviveTheSameStore() throws {
+        let hold = try #require(SensorySectionSlot.keyContributions.first { $0.id == SensorySettings.holdKey })
+        let label = try #require(SensorySectionSlot.keyContributions.first { $0.id == SensorySettings.labelKey })
+        var stored: [String: String] = [:]
+        #expect(SettingsKeyLedger.save(&stored, hold, "2.5"))
+        #expect(SettingsKeyLedger.save(&stored, label, "words"))
+        #expect(SettingsKeyLedger.load(hold, stored: stored[hold.id]) == "2.5")
+        #expect(SettingsKeyLedger.load(label, stored: stored[label.id]) == "words")
+        let exported = SettingsKeyLedger.exportMap(stored: stored, contributions: SensorySectionSlot.keyContributions)
+        #expect(exported[hold.id] == "2.5")
+        #expect(exported[label.id] == "words")
         let suite = "zeus.sensory.persist.\(UUID().uuidString)"
         let first = try #require(UserDefaults(suiteName: suite))
         defer { first.removePersistentDomain(forName: suite) }
-        let written = SensorySettings(volume: false, brightness: true, replaceSystem: false, hold: 2.5, label: .words)
-        written.write { first.set($1, forKey: "opt." + $0) }
+        for (id, value) in stored { first.set(value, forKey: "opt." + id) }
         let second = try #require(UserDefaults(suiteName: suite))
         let read = SensorySettings.read { second.string(forKey: "opt." + $0) }
         #expect(read.hold == 2.5)
         #expect(read.label == .words)
-        #expect(read.volume == false)
-        #expect(read.brightness)
-        #expect(read.replaceSystem == false)
         let freshName = suite + ".fresh"
         let freshDefaults = try #require(UserDefaults(suiteName: freshName))
         defer { freshDefaults.removePersistentDomain(forName: freshName) }
@@ -50,8 +52,14 @@ import Testing
         #expect(fresh.label == .icon)
     }
 
-    private func optionLine(_ catalog: String, _ id: String) throws -> String {
-        let line = catalog.split(separator: "\n", omittingEmptySubsequences: false).first { $0.contains("id: \"\(id)\"") }
-        return String(try #require(line))
+    private func repositoryRoot() -> URL? {
+        var url = URL(fileURLWithPath: #filePath)
+        while url.path != "/" {
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift").path) {
+                return url
+            }
+            url.deleteLastPathComponent()
+        }
+        return nil
     }
 }

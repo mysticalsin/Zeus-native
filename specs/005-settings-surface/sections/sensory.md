@@ -16,7 +16,7 @@ Existing keys stay as they are. Absent values keep the catalog default, on.
 | `lights.hud.brightness` | toggle | on | Show the overlay when built-in display brightness changes. |
 | `lights.hud.replaceSystem` | toggle | on | While the overlay is up, hide the system overlay. Off leaves the system overlay alone. On does nothing until Accessibility is trusted; until then both overlays can show and the row explains why. |
 
-New keys are catalog rows in Everyday lights, stored as `opt.<id>` like every other catalog value. A fresh store keeps the historical 1.2 second dwell and the icon. Words is off until chosen.
+New keys are section contributions, not catalog rows. A fresh store keeps the historical 1.2 second dwell and the icon. Words is off until chosen. Export and import carry both.
 
 | Key | Control | Default | Meaning |
 | --- | --- | --- | --- |
