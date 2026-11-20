@@ -9,6 +9,21 @@ import ZeusCore
         .deletingLastPathComponent()
         .deletingLastPathComponent()
 
+    @Test func addingAContributionDoesNotChangeTheBasePin() throws {
+        let catalog = try text("Sources/Zeus/App/SettingsCatalog.swift")
+        let ids = SettingsKeyReachability.catalogIDs(in: catalog)
+        let base = SettingsKeyReachability.baseKeys(catalogIDs: ids)
+        #expect(base.count == 285)
+        let pinned = SettingsKeyReachability.fingerprint(base)
+        #expect(pinned == SettingsKeyReachability.requiredFingerprint)
+        let extra = SettingsKeyContribution(id: "battery.level", defaultValue: "0", kind: .number, policy: .localOnly)
+        let reachable = SettingsKeyReachability.reachableKeys(catalogIDs: ids, contributions: [extra])
+        #expect(reachable.contains("battery.level"))
+        #expect(reachable.count == base.count + 1)
+        #expect(SettingsKeyReachability.fingerprint(reachable) != pinned)
+        #expect(SettingsKeyReachability.fingerprint(SettingsKeyReachability.baseKeys(catalogIDs: ids)) == pinned)
+    }
+
     @Test func everyExistingSettingsKeyStaysPresentAndReachable() throws {
         let catalog = try text("Sources/Zeus/App/SettingsCatalog.swift")
         let settingsView = try text("Sources/Zeus/App/SettingsView.swift")
