@@ -35,9 +35,14 @@ enum OrbOffscreenHarness {
         }
     }
 
+    /// Injected speaking bands. No microphone and no provider: a stand-in for playback amplitude.
+    static let speakingBands = OrbAudioBands(bass: 0.35, mid: 0.55)
+
     /// Renders each visual state offscreen. `framesPerState` steps the pure simulation at 60 Hz and
     /// records how long each Metal encode took. That log is evidence only after a run on Apple Silicon.
-    static func writeProof(to directory: URL, framesPerState: Int = 30, side: Int = 256) throws -> Proof {
+    /// `speakingAudio` is applied only in `.speaking`. Every other state is silent.
+    static func writeProof(to directory: URL, framesPerState: Int = 30, side: Int = 256,
+                           reduceMotion: Bool = false, speakingAudio: OrbAudioBands = speakingBands) throws -> Proof {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure.metalUnavailable }
         let renderer = try OrbMetalRenderer(device: device, bands: OrbPlaybackMeter.shared)
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
@@ -51,8 +56,9 @@ enum OrbOffscreenHarness {
         var images: [URL] = []
         for state in OrbVisualState.allCases {
             var simulation = OrbSimulation(seed: 1, state: state)
+            let audio: OrbAudioBands = state == .speaking ? speakingAudio : .silent
             for frame in 0..<framesPerState {
-                simulation.renderFrame(delta: 1.0 / 60.0, audio: .silent, reduceMotion: false)
+                simulation.renderFrame(delta: 1.0 / 60.0, audio: audio, reduceMotion: reduceMotion)
                 let started = Date()
                 try renderer.draw(snapshot: simulation, into: texture)
                 let elapsed = Date().timeIntervalSince(started) * 1000
@@ -65,6 +71,35 @@ enum OrbOffscreenHarness {
         let frameLog = directory.appendingPathComponent("frame-times.csv")
         try log.write(to: frameLog, atomically: true, encoding: .utf8)
         return Proof(directory: directory, frameLog: frameLog, images: images)
+    }
+
+    /// Reads `frame-times.csv`. A row is one encode. Under 8.3 ms fits a 120 Hz frame and a 60 Hz frame.
+    /// This is encode time, not a display-link gap.
+    static func summarize(_ proof: Proof, reduceMotion: Bool, framesPerState: Int = 30) throws -> (text: String, passed: Bool) {
+        let csv = try String(contentsOf: proof.frameLog, encoding: .utf8)
+        var rows = 0
+        var maxMs = 0.0
+        for line in csv.split(separator: "\n").dropFirst() {
+            let columns = line.split(separator: ",")
+            guard columns.count >= 3, let ms = Double(columns[2]) else { continue }
+            rows += 1
+            if ms > maxMs { maxMs = ms }
+        }
+        let expected = OrbVisualState.allCases.count * framesPerState
+        let passed = rows == expected && maxMs < 8.3
+        let names = proof.images.map { $0.lastPathComponent }.joined(separator: " ")
+        let text = """
+        orb-proof: \(proof.directory.path)
+        reduce-motion: \(reduceMotion)
+        png: \(names)
+        frame-log: \(proof.frameLog.lastPathComponent)
+        rows: \(rows)
+        max_encode_ms: \(String(format: "%.3f", maxMs))
+        frame-budget: \(passed ? "PASS" : "FAIL")
+        providers: none
+        audio: speaking bass 0.35 mid 0.55, other states silent
+        """
+        return (text, passed)
     }
 
     private static func writePNG(texture: MTLTexture, to url: URL) throws {

@@ -27,7 +27,7 @@ struct DebugForwardTests {
     }
 
     @Test func instanceGuardStaysForExemptFlags() {
-        for flag in ["--snapshots", "--settings-only", "--onboarding-only", "--voice-selftest"] {
+        for flag in ["--snapshots", "--settings-only", "--onboarding-only", "--voice-selftest", "--orb-proof"] {
             #expect(!InstanceGuard.shouldExit(argv: [flag, "/tmp/out"], others: [4242]), "\(flag)")
         }
     }
