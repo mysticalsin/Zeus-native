@@ -69,6 +69,23 @@ struct AccessorySettingsTests {
         )) == styleStaysOff)
     }
 
+    @Test func accessoryKeysAreRegisteredForExportImportSearchAndReset() throws {
+        let root = accessoryRepositoryRoot()
+        let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
+        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
+        let expected = [
+            (AccessoryPreferenceKey.earbudsOverlay, "defaultValue: \"false\""),
+            (AccessoryPreferenceKey.overlayStyle, "defaultValue: \"off\""),
+            (AccessoryPreferenceKey.speakerNames, "defaultValue: \"false\""),
+        ]
+        for (id, marker) in expected {
+            let line = catalog.split(separator: "\n", omittingEmptySubsequences: false).first { $0.contains("id: \"\(id)\"") }
+            #expect(line?.contains(marker) == true)
+            #expect(line?.contains("section: .topBar") == true)
+            #expect(store.contains("\"\(id)\""))
+        }
+    }
+
     @Test func layoutUsesTheGlassRowPaddingAndCardSpacing() {
         #expect(GlassSettingsMetrics.controlRow == 52)
         #expect(GlassSettingsMetrics.helperLine == 16)
