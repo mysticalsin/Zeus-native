@@ -38,17 +38,23 @@ public struct UnitBox: Equatable, Sendable {
     public var y: Double
     public var width: Double
     public var height: Double
-    public var isNull: Bool
 
-    public init(x: Double, y: Double, width: Double, height: Double, isNull: Bool = false) {
+    public init(x: Double, y: Double, width: Double, height: Double) {
         self.x = x
         self.y = y
         self.width = width
         self.height = height
-        self.isNull = isNull
     }
 
-    public static let null = UnitBox(x: .infinity, y: .infinity, width: 0, height: 0, isNull: true)
+    /// A positive-infinity origin is the null rectangle. Union drops it and inset leaves it null.
+    public static let null = UnitBox(x: .infinity, y: .infinity, width: 0, height: 0)
+
+    public var isNull: Bool { x == .infinity || y == .infinity }
+
+    public static func == (lhs: UnitBox, rhs: UnitBox) -> Bool {
+        if lhs.isNull || rhs.isNull { return lhs.isNull && rhs.isNull }
+        return lhs.x == rhs.x && lhs.y == rhs.y && lhs.width == rhs.width && lhs.height == rhs.height
+    }
 
     public var minX: Double { width < 0 ? x + width : x }
     public var maxX: Double { width < 0 ? x : x + width }
