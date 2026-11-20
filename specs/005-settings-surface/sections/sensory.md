@@ -2,7 +2,7 @@
 
 **Status**: Draft, inferred. The settings inventory records no Sensory contract, so this file is the working spec for the section. Open questions are listed at the end and in the pull request.
 
-**Placement**: `.topbarTab(7)`. The slot is filled, so it joins the Topbar strip. Spacing comes from `GlassSettingsMetrics`.
+**Placement**: `.topbarTab(6)`, the shell's zero-based tab. The slot is filled. Spacing comes from `GlassSettingsMetrics`.
 
 Sensory is the volume and brightness overlay. It keeps the keys the app already stores and adds the two controls the overlay was missing: how long it stays, and whether the level is an icon or words.
 
@@ -60,4 +60,4 @@ Dark glass cards. Each control is a 52 pt row with a helper line under it. The p
 - Should keyboard backlight, mute, and the screen-edge glow move here, and should the glow use this hold?
 - Are 0.4 s and 6 s the right bounds, and is the dwell the full-opacity time rather than the whole time on screen?
 - Should replace-system stay on by default?
-- Is top bar tab 7 the only placement, with no sidebar row?
+- The shell places this section at `.topbarTab(6)`. Portal keeps `.topbarTab(7)`.
