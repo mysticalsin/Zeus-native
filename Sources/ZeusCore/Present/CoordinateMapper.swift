@@ -145,12 +145,12 @@ public struct ScreenCoordinateMapper: CoordinateMapping {
 
     public func ringPixelTolerance(displayID: Int) -> Double? {
         guard let display = display(id: displayID) else { return nil }
-        return PresentTolerance.ringPixels(scale: display.scale, pixelWidth: display.pixelWidth)
+        return PresentTolerance.decide(scale: display.scale, pixelWidth: display.pixelWidth).pixels
     }
 
     public func ringPointTolerance(displayID: Int) -> Double? {
         guard let display = display(id: displayID) else { return nil }
-        return PresentTolerance.ringPoints(scale: display.scale, pixelWidth: display.pixelWidth)
+        return PresentTolerance.decide(scale: display.scale, pixelWidth: display.pixelWidth).points
     }
 
     public func withinRing(_ point: CGPoint, of target: CGPoint, displayID: Int) -> Bool? {
