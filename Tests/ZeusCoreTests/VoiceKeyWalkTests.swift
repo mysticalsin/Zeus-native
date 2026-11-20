@@ -1627,6 +1627,10 @@ private final class WalkLogCopyCount: @unchecked Sendable {
 
 private let walkLogEffectsCopied = WalkLogCopyCount()
 
+private enum VoiceKeyWalkOrder {
+    static let casesRunTogether = false
+}
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 /// `stopAfterStates`: measure a prefix. It is not a pass and it is not cached.
 /// `retainEffectLog`: the old walk copies the effect log onto every edge. The log is not part of the state.
@@ -1782,6 +1786,12 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 
     @Test func theWalkKeepsEveryCase() {
         #expect(WalkRun.all.count == 20)
+    }
+
+    /// The twenty orders are one parameterized test inside a serialized suite, so `--jobs 4` still
+    /// walks them one at a time. They have to be free to run together.
+    @Test func theOrderCasesAreFreeToRunTogether() {
+        #expect(VoiceKeyWalkOrder.casesRunTogether)
     }
 
     /// The fast walk and the walk that still copies the effect log, on one prefix of run A.
