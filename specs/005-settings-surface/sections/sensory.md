@@ -2,7 +2,7 @@
 
 **Status**: Draft, inferred. The settings inventory records no Sensory contract, so this file is the working spec for the section. Open questions are listed at the end and in the pull request.
 
-**Placement**: top bar tab 7, when the shell exposes `.topbarTab(7)`. Until that placement exists, the slot stays an unfilled placeholder and does not appear in the sidebar.
+**Placement**: `.topbarTab(7)`. The slot is filled, so it joins the Topbar strip. Spacing comes from `GlassSettingsMetrics`.
 
 Sensory is the volume and brightness overlay. It keeps the keys the app already stores and adds the two controls the overlay was missing: how long it stays, and whether the level is an icon or words.
 
@@ -16,7 +16,7 @@ Existing keys stay as they are. Absent values keep the catalog default, on.
 | `lights.hud.brightness` | toggle | on | Show the overlay when built-in display brightness changes. |
 | `lights.hud.replaceSystem` | toggle | on | While the overlay is up, hide the system overlay. Off leaves the system overlay alone. On does nothing until Accessibility is trusted; until then both overlays can show and the row explains why. |
 
-New keys, stored as `opt.<id>` strings beside the catalog. They are not catalog rows: the shell pins the catalog fingerprint, and this section does not move that pin.
+New keys are catalog rows in Everyday lights, stored as `opt.<id>` like every other catalog value. A fresh store keeps the historical 1.2 second dwell and the icon. Words is off until chosen.
 
 | Key | Control | Default | Meaning |
 | --- | --- | --- | --- |

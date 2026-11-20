@@ -406,11 +406,10 @@ final class TopBarModel {
         }
         guard cuesEnabled || essential else { return }
         if case .focusFinished = newCue { ZeusSound.play(.timer) }
-        let continuing = Self.sameLevelOverlay(cue, newCue)
         cue = newCue
         cueStartedAt = Date()
         cueTask?.cancel()
-        let stay = Self.levelOverlayStay(newCue, continuing: continuing)
+        let stay = Self.sensoryCueStay(newCue)
         cueTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(stay))
             guard !Task.isCancelled else { return }
@@ -531,7 +530,7 @@ final class TopBarModel {
             EdgeWaveController.shared.play(tint: tint, ignoreSettings: ignoreSettings)
             return
         }
-        let duration = Self.lightStay(kind, continuing: Self.levelLightIsUp(kind, in: lights))
+        let duration = Self.sensoryLightStay(kind)
         if case .hudLevel(let newSystemKind, _, _, _, _) = kind,
            let index = lights.firstIndex(where: { if case .hudLevel(let k, _, _, _, _) = $0.kind { k == newSystemKind } else { false } }) {
             let id = lights[index].id
@@ -570,53 +569,29 @@ final class TopBarModel {
         return text
     }
 
-    /// Volume and brightness share one overlay, so a change of either continues the one already up.
-    static func sameLevelOverlay(_ current: NotchCue?, _ next: NotchCue) -> Bool {
-        switch (current, next) {
-        case (.volume, .volume), (.volume, .brightness), (.brightness, .volume), (.brightness, .brightness):
-            true
-        default:
-            false
-        }
-    }
-
-    /// How long the cue stays. Volume and brightness follow the Sensory lifecycle. Everything else keeps its own duration.
-    static func levelOverlayStay(_ cue: NotchCue, continuing: Bool) -> TimeInterval {
-        let kind: SystemHUDKind?
+    /// The historical dwell stays on the existing cue timer. A stored hold that differs from it
+    /// is the only change: the same ease-out is added to that dwell.
+    static func sensoryCueStay(_ cue: NotchCue) -> TimeInterval {
         switch cue {
-        case .volume: kind = .volume
-        case .brightness: kind = .brightness
-        default: kind = nil
-        }
-        guard let kind else { return cue.duration }
-        return levelStay(kind, continuing: continuing)
-    }
-
-    static func lightStay(_ kind: NotchLightKind, continuing: Bool) -> TimeInterval {
-        if case .hudLevel(let systemKind, _, _, _, _) = kind, systemKind == .volume || systemKind == .brightness {
-            return levelStay(systemKind, continuing: continuing)
-        }
-        return kind.duration(speedPercent: SettingsStore.shared.double("halo.speed"))
-    }
-
-    private static func levelLightIsUp(_ kind: NotchLightKind, in lights: [ActiveLight]) -> Bool {
-        guard case .hudLevel(let systemKind, _, _, _, _) = kind else { return false }
-        return lights.contains { light in
-            if case .hudLevel(let existing, _, _, _, _) = light.kind { existing == systemKind } else { false }
+        case .volume, .brightness:
+            return sensoryHold(cue.duration)
+        default:
+            return cue.duration
         }
     }
 
-    private static func levelStay(_ kind: SystemHUDKind, continuing: Bool) -> TimeInterval {
-        let now = Date()
-        let snapshot = SensoryHUDSnapshot(
-            phase: continuing ? .extending : .showing,
-            kind: kind, level: 0, muted: false, anchor: now, fadeAnchor: nil
-        )
-        let settings = SensorySettings.read { SettingsStore.shared.string($0) }
-        return SensoryHUDLifecycle.timeUntilHidden(
-            snapshot, now: now,
-            config: SensoryHUDConfig(settings: settings, reduceMotion: Motion.reduced)
-        )
+    static func sensoryLightStay(_ kind: NotchLightKind) -> TimeInterval {
+        let legacy = kind.duration(speedPercent: SettingsStore.shared.double("halo.speed"))
+        guard case .hudLevel(let systemKind, _, _, _, _) = kind, systemKind == .volume || systemKind == .brightness else {
+            return legacy
+        }
+        return sensoryHold(legacy)
+    }
+
+    private static func sensoryHold(_ legacy: TimeInterval) -> TimeInterval {
+        let hold = SensorySettings.read { SettingsStore.shared.string($0) }.hold
+        guard abs(hold - SystemHUDMath.holdAfterChange) > 0.000_001 else { return legacy }
+        return hold + SystemHUDMath.easeOut
     }
 
     static func lightOption(for kind: NotchLightKind) -> String? {

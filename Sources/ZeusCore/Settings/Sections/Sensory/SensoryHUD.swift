@@ -410,16 +410,6 @@ public enum SensoryControls {
     }
 }
 
-public enum SensoryLayout {
-    public static let rowHeight = 52.0
-    public static let panelPadding = 32.0
-    public static let cardSpacing = 28.0
-
-    public static func animationDuration(reduceMotion: Bool) -> Double {
-        reduceMotion ? 0 : 0.22
-    }
-}
-
 public enum SensoryPreviewStatus: Equatable, Sendable {
     case loading
     case empty

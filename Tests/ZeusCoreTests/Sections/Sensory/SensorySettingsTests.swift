@@ -211,12 +211,22 @@ import Testing
         #expect(off.first { $0.id == SensorySettings.replaceSystemKey }?.accessibilityValue == "Off")
     }
 
-    @Test func metricsMatchTheGlassSection() {
-        #expect(SensoryLayout.rowHeight == 52)
-        #expect(SensoryLayout.panelPadding == 32)
-        #expect(SensoryLayout.cardSpacing == 28)
-        #expect(SensoryLayout.animationDuration(reduceMotion: true) == 0)
-        #expect(SensoryLayout.animationDuration(reduceMotion: false) == 0.22)
+    @Test func thePageUsesTheShellSpacingTokens() throws {
+        var url = URL(fileURLWithPath: #filePath)
+        let page = "Sources/Zeus/Settings/GlassShell/Sections/SensorySettingsSection.swift"
+        while url.path != "/" && !FileManager.default.fileExists(atPath: url.appendingPathComponent(page).path) {
+            url.deleteLastPathComponent()
+        }
+        let source = try String(contentsOf: url.appendingPathComponent(page), encoding: .utf8)
+        #expect(source.contains("GlassSettingsMetrics.controlRow"))
+        #expect(source.contains("GlassSettingsMetrics.helperLine"))
+        #expect(source.contains("GlassSettingsMetrics.panelPadding"))
+        #expect(source.contains("GlassSettingsMetrics.cardSpacing"))
+        #expect(!source.contains("SensoryLayout"))
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.helperLine == 16)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
     }
 
     @Test func previewShowsLoadingEmptyAndThePermissionError() {

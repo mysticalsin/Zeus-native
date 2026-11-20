@@ -5,7 +5,7 @@ extension SensorySectionSlot: GlassSlotPage {
     static func erasePage() -> AnyView { AnyView(SensorySettingsSection()) }
 }
 
-/// Volume and brightness overlay. The slot stays unfilled until the shell can place it with `.topbarTab(7)`.
+/// Volume and brightness overlay, placed on the Topbar tab strip.
 struct SensorySettingsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var reading = true
@@ -23,8 +23,8 @@ struct SensorySettingsSection: View {
             settings: settings, trusted: trusted, reading: reading,
             snapshot: snapshot, now: now, reduceMotion: reduceMotion
         )
-        let motion = SensoryLayout.animationDuration(reduceMotion: reduceMotion)
-        VStack(alignment: .leading, spacing: SensoryLayout.cardSpacing) {
+        let motion = reduceMotion ? 0.0 : 0.22
+        VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
             previewCard(frame, motion: motion)
             card("Overlay") {
                 toggle(row(SensorySettings.volumeKey, in: rows), key: SensorySettings.volumeKey)
@@ -41,7 +41,7 @@ struct SensorySettingsSection: View {
                 previewButton(row(SensoryControls.previewID, in: rows))
             }
         }
-        .padding(SensoryLayout.panelPadding)
+        .padding(CGFloat(GlassSettingsMetrics.panelPadding))
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { reading = false }
         .task(id: previewRun) { await playPreview(settings: settings) }
@@ -82,7 +82,7 @@ struct SensorySettingsSection: View {
                     .accessibilityValue(model.accessibilityValue)
                     .accessibilityHint(model.helper)
             }
-            .frame(minHeight: SensoryLayout.rowHeight)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow))
             helper(model.helper)
         }
     }
@@ -109,7 +109,7 @@ struct SensorySettingsSection: View {
                 .accessibilityValue(model.accessibilityValue)
                 .accessibilityHint(model.helper)
             }
-            .frame(minHeight: SensoryLayout.rowHeight)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow))
             helper(model.helper)
         }
     }
@@ -133,7 +133,7 @@ struct SensorySettingsSection: View {
                 .accessibilityValue(model.accessibilityValue)
                 .accessibilityHint(model.helper)
             }
-            .frame(minHeight: SensoryLayout.rowHeight)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow))
             helper(model.helper)
         }
     }
@@ -148,7 +148,7 @@ struct SensorySettingsSection: View {
                     .accessibilityLabel(model.accessibilityLabel)
                     .accessibilityHint(model.helper)
             }
-            .frame(minHeight: SensoryLayout.rowHeight)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow))
             helper(model.helper)
         }
     }
@@ -158,7 +158,7 @@ struct SensorySettingsSection: View {
             .font(GS.rowText)
             .foregroundStyle(GS.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: CGFloat(GlassSettingsMetrics.helperLine), alignment: .leading)
             .padding(.bottom, 8)
     }
 
