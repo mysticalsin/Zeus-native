@@ -573,6 +573,55 @@ import Testing
     }
 }
 
+@Suite struct WeatherSettingsPersistenceTests {
+    @Test func eachStoredKeySurvivesANewReader() {
+        let suite = "zeus-weather-\(UUID().uuidString)"
+        let first = UserDefaults(suiteName: suite)!
+        defer { first.removePersistentDomain(forName: suite) }
+        WeatherSettingsDisk.save(city: "Lisbon", unit: .fahrenheit, layout: .hourly, defaults: first)
+        let second = UserDefaults(suiteName: suite)!
+        let loaded = WeatherSettingsDisk.load(defaults: second, localeUsesUSCustomary: true)
+        #expect(loaded.city == "Lisbon")
+        #expect(loaded.unit == .fahrenheit)
+        #expect(loaded.layout == .hourly)
+        #expect(loaded.preciseLocation == false)
+        #expect(second.string(forKey: WeatherSettingsDisk.layoutKey) == "Hourly curve")
+        #expect(second.object(forKey: WeatherSettingsDisk.locationKey) == nil)
+        #expect(WeatherSettingsDisk.layoutKey == "opt." + WeatherLayoutChoice.settingKey)
+        #expect(WeatherSettingsDisk.cityKey == "topBar.weatherCity")
+        #expect(WeatherSettingsDisk.celsiusKey == "topBar.celsius")
+    }
+
+    @Test func aFreshStoreStaysOffAndImportCannotEnablePreciseLocation() {
+        let suite = "zeus-weather-fresh-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let fresh = WeatherSettingsDisk.load(defaults: defaults, localeUsesUSCustomary: false)
+        #expect(fresh.city == "")
+        #expect(fresh.layout == .summary)
+        #expect(fresh.unit == .celsius)
+        #expect(fresh.preciseLocation == false)
+        let imported = WeatherSettingsDisk.applyingImport(
+            [
+                WeatherSettingsDisk.cityKey: "Oslo",
+                WeatherSettingsDisk.celsiusKey: true,
+                WeatherSettingsDisk.layoutKey: "Wind",
+                WeatherSettingsDisk.locationKey: "true",
+            ],
+            onto: fresh
+        )
+        #expect(imported.city == "Oslo")
+        #expect(imported.unit == .celsius)
+        #expect(imported.layout == .wind)
+        #expect(imported.preciseLocation == false)
+        let rejected = WeatherSettingsDisk.applyingImport(
+            [WeatherSettingsDisk.cityKey: String(repeating: "a", count: 121)],
+            onto: fresh
+        )
+        #expect(rejected.city == "")
+    }
+}
+
 @Suite struct WeatherSettingsEditorTests {
     @Test func committingACityLoadsAndUnitsChangeWithoutAnotherRequest() throws {
         var editor = WeatherSettingsEditor.fresh(localeUsesUSCustomary: false)
