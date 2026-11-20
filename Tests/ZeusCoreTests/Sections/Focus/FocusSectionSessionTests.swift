@@ -193,10 +193,11 @@ import Testing
         let content = FocusSectionSession().content()
         #expect(content.title == "Focus")
         #expect(content.placement == "topbarTab")
-        #expect(content.placementOrder == 3)
-        #expect(content.rowHeight == 52)
-        #expect(content.panelPadding == 32)
-        #expect(content.cardGap == 28)
+        #expect(content.placementOrder == 4)
+        #expect(FocusSectionSlot.descriptor.placement == .topbarTab(4))
+        #expect(content.rowHeight == GlassSettingsMetrics.controlRow)
+        #expect(content.panelPadding == GlassSettingsMetrics.panelPadding)
+        #expect(content.cardGap == GlassSettingsMetrics.cardSpacing)
         #expect(content.controls.map(\.id) == [
             FocusSettingKey.transitionOverlay,
             FocusSettingKey.overlaysAllowed,

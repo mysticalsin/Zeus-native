@@ -13,7 +13,7 @@ struct FocusSettingsSection: View {
     var body: some View {
         let content = session.content()
         ScrollView {
-            VStack(alignment: .leading, spacing: content.cardGap) {
+            VStack(alignment: .leading, spacing: GlassSettingsMetrics.cardSpacing) {
                 Text(content.title)
                     .font(GS.pageTitle)
                     .foregroundStyle(GS.text)
@@ -24,7 +24,7 @@ struct FocusSettingsSection: View {
                 controls(content)
                 rules(content)
             }
-            .padding(content.panelPadding)
+            .padding(GlassSettingsMetrics.panelPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear {
@@ -55,7 +55,7 @@ struct FocusSettingsSection: View {
                 .foregroundStyle(GS.secondary)
         }
         .padding(GS.cardInset)
-        .frame(maxWidth: .infinity, minHeight: content.rowHeight, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: GlassSettingsMetrics.controlRow, alignment: .leading)
         .background(card)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(content.preview.accessibilityLabel)
@@ -81,7 +81,7 @@ struct FocusSettingsSection: View {
             }
         }
         .padding(.horizontal, GS.cardInset)
-        .frame(minHeight: content.rowHeight)
+        .frame(minHeight: GlassSettingsMetrics.controlRow)
         .background(card)
         .accessibilityElement(children: .contain)
     }
@@ -89,7 +89,7 @@ struct FocusSettingsSection: View {
     private func controls(_ content: FocusSectionContent) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(content.controls) { control in
-                row(control, height: content.rowHeight)
+                row(control, height: GlassSettingsMetrics.controlRow)
                 if control.id != content.controls.last?.id {
                     Rectangle().fill(GS.separator).frame(height: 1).accessibilityHidden(true)
                 }
@@ -116,13 +116,14 @@ struct FocusSettingsSection: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(ruleTitle(rule.kind)).font(GS.rowTitle).foregroundStyle(GS.text)
                         Text(ruleHelper(rule)).font(GS.rowText).foregroundStyle(GS.secondary)
+                            .frame(minHeight: GlassSettingsMetrics.helperLine, alignment: .leading)
                     }
                     Spacer(minLength: 12)
                     Text(decisionTitle(decision))
                         .font(GS.rowText)
                         .foregroundStyle(GS.secondary)
                 }
-                .frame(minHeight: content.rowHeight, alignment: .center)
+                .frame(minHeight: GlassSettingsMetrics.controlRow, alignment: .center)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(ruleTitle(rule.kind)), \(decisionTitle(decision)). \(ruleHelper(rule))")
             }
@@ -138,6 +139,7 @@ struct FocusSettingsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(control.title).font(GS.rowTitle).foregroundStyle(GS.text)
                 Text(control.helper).font(GS.rowText).foregroundStyle(GS.secondary)
+                    .frame(minHeight: GlassSettingsMetrics.helperLine, alignment: .leading)
                 Text(control.accessibilityValue).font(GS.rowText).foregroundStyle(GS.text)
             }
             .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
@@ -147,7 +149,9 @@ struct FocusSettingsSection: View {
             Toggle(isOn: binding(control.id, isOn: control.isOn)) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(control.title).font(GS.rowTitle).foregroundStyle(GS.text)
-                    Text(control.helper).font(GS.rowText).foregroundStyle(GS.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text(control.helper).font(GS.rowText).foregroundStyle(GS.secondary)
+                        .frame(minHeight: GlassSettingsMetrics.helperLine, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .toggleStyle(.switch)

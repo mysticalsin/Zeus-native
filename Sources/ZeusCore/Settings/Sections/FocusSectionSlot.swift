@@ -6,7 +6,7 @@ public enum FocusSectionSlot: GlassSlotProviding {
         title: "Focus",
         filled: true,
         keys: FocusSettingKey.optIn,
-        order: 3,
-        placement: .topbarTab(3)
+        order: 4,
+        placement: .topbarTab(4)
     )
 }

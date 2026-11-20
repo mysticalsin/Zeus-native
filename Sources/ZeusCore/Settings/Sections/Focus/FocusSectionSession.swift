@@ -231,10 +231,15 @@ public struct FocusSectionSession: Equatable, Sendable {
             animates: showing && !reduceMotion,
             animationDuration: FocusTransitionMachine.animationDuration(reduceMotion: reduceMotion)
         )
+        let placement = FocusSectionSlot.descriptor.placement
+        let (placementName, placementOrder): (String, Int) = switch placement {
+        case .topbarTab(let order): ("topbarTab", order)
+        case .cardOn(let page, let order): (page.rawValue, order)
+        }
         return FocusSectionContent(
-            title: "Focus", placement: FocusSectionMetrics.placement, placementOrder: FocusSectionMetrics.placementOrder,
-            rowHeight: FocusSectionMetrics.rowHeight, panelPadding: FocusSectionMetrics.panelPadding,
-            cardGap: FocusSectionMetrics.cardGap, controls: controls(), status: status, preview: preview,
+            title: "Focus", placement: placementName, placementOrder: placementOrder,
+            rowHeight: GlassSettingsMetrics.controlRow, panelPadding: GlassSettingsMetrics.panelPadding,
+            cardGap: GlassSettingsMetrics.cardSpacing, controls: controls(), status: status, preview: preview,
             filterSummary: filterSummary()
         )
     }

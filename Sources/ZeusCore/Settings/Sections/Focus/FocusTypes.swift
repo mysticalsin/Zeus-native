@@ -82,12 +82,3 @@ public enum FocusRowStatus: Equatable, Sendable {
     case unavailable(String)
 }
 
-/// Spacing and placement the Focus page asks the glass shell to use.
-public enum FocusSectionMetrics {
-    public static let rowHeight = GlassSettingsMetrics.controlRow
-    public static let panelPadding = GlassSettingsMetrics.panelPadding
-    public static let cardGap = GlassSettingsMetrics.cardSpacing
-    public static let placement = "topbarTab"
-    /// The shell places Focus on top bar tab 3. Tab 4 is Lock Screen.
-    public static let placementOrder = 3
-}
