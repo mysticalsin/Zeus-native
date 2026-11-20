@@ -1,5 +1,5 @@
 import Testing
-@testable import ZeusCore
+import ZeusCore
 
 @Suite struct FocusSectionSlotTests {
     @Test func focusSlotPublishesTheOptInKeys() {
@@ -7,7 +7,8 @@ import Testing
         #expect(slot.id == "glass.focus")
         #expect(slot.title == "Focus")
         #expect(slot.filled)
-        #expect(slot.order == 150)
+        #expect(slot.order == 3)
+        #expect(slot.placement == .topbarTab(3))
         #expect(slot.keys == FocusSettingKey.optIn)
         #expect(!slot.keys.contains("home.widget.2"))
         #expect(!slot.keys.contains("notify.focus"))
