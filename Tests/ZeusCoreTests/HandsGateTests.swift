@@ -118,6 +118,29 @@ import Testing
         #expect(text.contains("curl"))
     }
 
+    @Test func aSecretValueUnderAPlainNameOnALaterCommandIsRedacted() {
+        var log = HandsCommandLog()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        log.record(command: "echo hello; FOO=supersecret-value ls", verdict: "allow", outcome: "ran", at: date)
+        #expect(!log.text.contains("supersecret-value"))
+        #expect(log.text.contains("echo hello"))
+        #expect(log.text.contains("FOO="))
+        #expect(log.text.contains("ls"))
+    }
+
+    @Test func aNonBearerSecretHeaderIsRedacted() {
+        var log = HandsCommandLog()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        log.record(command: "curl -H X-Api-Key: sk-live-abc -H \"Authorization: Basic dXNlcjpwYXNz\" -H Cookie: session=abcdef",
+                   verdict: "allow", outcome: "ran", at: date)
+        #expect(!log.text.contains("sk-live-abc"))
+        #expect(!log.text.contains("dXNlcjpwYXNz"))
+        #expect(!log.text.contains("session=abcdef"))
+        #expect(log.text.contains("X-Api-Key"))
+        #expect(log.text.contains("Basic"))
+        #expect(log.text.contains("Cookie"))
+    }
+
     @Test func aRecordedCommandKeepsNonSecretArgs() {
         var log = HandsCommandLog()
         let date = Date(timeIntervalSince1970: 1_700_000_000)
