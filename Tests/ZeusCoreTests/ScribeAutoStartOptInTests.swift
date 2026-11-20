@@ -30,6 +30,7 @@ struct ScribeAutoStartOptInTests {
         let (first, firstName, cleanup) = try fresh()
         defer { cleanup() }
         first.set("stamp", forKey: ScribeAutoStartOptIn.key)
+        #expect(first.object(forKey: ScribeAutoStartOptIn.key) as? String == "stamp")
         let (second, secondName, cleanupSecond) = try fresh()
         defer { cleanupSecond() }
         #expect(firstName != secondName)
