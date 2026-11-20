@@ -620,6 +620,35 @@ public enum GlassSettingsAudit {
         return []
     }
 
+    public static func registryFailures() -> [String] {
+        var failures: [String] = []
+        let existing = SettingsSectionRegistry.existing
+        if Set(existing.map(\.id)).count != existing.count { failures.append("duplicate existing ids") }
+        if existing.map(\.order) != Array(0..<existing.count) { failures.append("existing orders are not 0...n") }
+        if existing.contains(where: { $0.placeholder != nil }) { failures.append("an existing section has a placeholder") }
+        let again = SettingsSectionRegistry.sections(slots: [])
+        if again != existing { failures.append("empty slot list changed the existing order") }
+        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [])
+        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [])
+        let withSynthetic = SettingsSectionRegistry.sections(slots: [hidden, synthetic])
+        if withSynthetic.prefix(existing.count).map(\.id) != existing.map(\.id) { failures.append("existing order changed") }
+        if withSynthetic.last?.id != "glass.synthetic" { failures.append("filled slot did not append") }
+        if withSynthetic.contains(where: { $0.id == "glass.hidden" }) { failures.append("unfilled slot appeared") }
+        if SettingsSectionRegistry.existing.contains(where: { $0.id == "glass.synthetic" }) { failures.append("synthetic id was written into the registry") }
+        let repeated = SettingsSectionRegistry.sections(slots: [synthetic])
+        if repeated != SettingsSectionRegistry.sections(slots: [synthetic]) { failures.append("order is not stable") }
+        let found = SettingsSectionRegistry.search("License", in: existing)
+        if found.first?.id != SettingsSectionRegistry.id(for: "license") { failures.append("search left registry order") }
+        if SettingsSectionRegistry.search("u", in: existing).first?.title != "Sounds" { failures.append("search order") }
+        let liveIDs = Set(SettingsSectionRegistry.live.map(\.id))
+        for slot in GlassSectionManifest.slots where !slot.filled && liveIDs.contains(slot.id) {
+            failures.append("unfilled live slot \(slot.id)")
+        }
+        let allIDs = existing.map(\.id) + GlassSectionManifest.slots.map(\.id)
+        if Set(allIDs).count != allIDs.count { failures.append("registry ids are not unique") }
+        return failures
+    }
+
     public static func sidebarFailures() -> [String] {
         let existing = ["general", "appearance", "license"]
         let slots = [

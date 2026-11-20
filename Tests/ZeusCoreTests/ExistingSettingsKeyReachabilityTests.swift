@@ -45,6 +45,7 @@ import Testing
             + GlassSettingsAudit.sidebarFailures()
             + GlassSettingsAudit.accessibilityFailures()
             + GlassSettingsAudit.hungCheckFailures()
+            + GlassSettingsAudit.registryFailures()
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
         #expect(window.contains("GlassSettingsChrome("))
         #expect(chrome.contains("Motion.reduced"))

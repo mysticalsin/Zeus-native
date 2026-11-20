@@ -78,6 +78,7 @@ struct GlassSettingsShellCheck {
         failures += GlassSettingsAudit.sidebarFailures()
         failures += GlassSettingsAudit.accessibilityFailures()
         failures += GlassSettingsAudit.hungCheckFailures()
+        failures += GlassSettingsAudit.registryFailures()
         var sources = [
             try text("Sources/ZeusCore/Settings/GlassSettingsShell.swift"),
             try text("Sources/Zeus/Settings/GlassSettingsChrome.swift"),
