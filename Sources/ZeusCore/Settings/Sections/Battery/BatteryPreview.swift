@@ -1,5 +1,41 @@
 import Foundation
 
+/// The `opt.` prefix `SettingsStore` writes. One function, so a recreated store reads the same key.
+public enum SettingsDefaultsKey {
+    public static func key(_ id: String) -> String { "opt." + id }
+}
+
+/// Battery values in the same defaults the settings window uses.
+public struct BatterySettingsStore: Equatable, Sendable {
+    public var overlayStyle: BatteryOverlayStyle
+    public var earbudsEnabled: Bool
+    public var styleRaw: String
+    public var earbudsRaw: String
+
+    public init(overlayStyle: BatteryOverlayStyle, earbudsEnabled: Bool, styleRaw: String, earbudsRaw: String) {
+        self.overlayStyle = overlayStyle
+        self.earbudsEnabled = earbudsEnabled
+        self.styleRaw = styleRaw
+        self.earbudsRaw = earbudsRaw
+    }
+
+    public static func load(_ defaults: UserDefaults) -> BatterySettingsStore {
+        let styleRaw = defaults.string(forKey: SettingsDefaultsKey.key(BatteryOverlayStyle.storageKey)) ?? BatteryOverlayStyle.default.rawValue
+        let earbudsRaw = defaults.string(forKey: SettingsDefaultsKey.key(BatteryEarbudSetting.key)) ?? "false"
+        return BatterySettingsStore(
+            overlayStyle: BatteryOverlayStyle.resolve(styleRaw),
+            earbudsEnabled: earbudsRaw == "true",
+            styleRaw: styleRaw,
+            earbudsRaw: earbudsRaw
+        )
+    }
+
+    public func save(_ defaults: UserDefaults) {
+        defaults.set(overlayStyle.rawValue, forKey: SettingsDefaultsKey.key(BatteryOverlayStyle.storageKey))
+        defaults.set(earbudsEnabled ? "true" : "false", forKey: SettingsDefaultsKey.key(BatteryEarbudSetting.key))
+    }
+}
+
 public struct BatteryPreferences: Equatable, Sendable {
     public var lightsEnabled: Bool
     public var style: BatteryOverlayStyle
