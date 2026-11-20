@@ -51,6 +51,13 @@
       "scope": "Fake signing/notary/install tools and throwaway bundles; no Developer ID, real notarization, Gatekeeper or installation."
     },
     {
+      "id": "selftest-placed-mark",
+      "kind": "selftests",
+      "tier": "contract",
+      "scope": "ZeusCore declares PlacedMark once. The screen mark's place signature is exact. Comments and string literals are not declarations.",
+      "file": "qa/closed-loop/tests/test_placed_mark.py"
+    },
+    {
       "id": "native-DictationOwnershipIntegrationTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8166,6 +8173,21 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.placed-mark",
+          "check": "selftest-placed-mark",
+          "acceptance": "ZeusCore declares PlacedMark once, including a declaration split across lines, wrapped in a comment, or prefixed by an attribute or package. The place signature is the exact MarkLayout form and nothing follows the return type.",
+          "cases": [
+            {
+              "file": "qa/closed-loop/tests/test_placed_mark.py",
+              "function": "test_zeuscore_declares_placed_mark_once"
+            },
+            {
+              "file": "qa/closed-loop/tests/test_placed_mark.py",
+              "function": "test_each_survivor_mutant_fails_the_guard"
             }
           ]
         },

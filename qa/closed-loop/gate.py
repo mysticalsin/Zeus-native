@@ -328,7 +328,7 @@ def validate_feature_map(root: Path, expected_sha: str, head_sha: str, mode: str
     by_id = {}
     count = 0
     required = {"closed-loop-selftests"} | {ident for ident, definition in definitions.items()
-                                                if mode == "full" or definition["kind"] in {"portable", "release-mocks"}}
+                                                if mode == "full" or definition["kind"] in {"portable", "release-mocks", "selftests"}}
     for check in checks:
         if not isinstance(check, dict) or not isinstance(check.get("id"), str) or not check["id"] or check["id"] in by_id:
             raise ValueError("feature map has missing or duplicate check IDs")

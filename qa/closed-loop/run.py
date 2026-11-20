@@ -336,7 +336,8 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
         elif kind == "release-mocks":
             command = [sys.executable, "qa/release-scripts/test_release_scripts.py"]
         elif kind == "selftests":
-            command = [sys.executable, "-m", "unittest", "discover", "-s", "qa/closed-loop/tests", "-p", "test_*.py", "-v"]
+            pattern = Path(definition["file"]).name if definition.get("file") else "test_*.py"
+            command = [sys.executable, "-m", "unittest", "discover", "-s", "qa/closed-loop/tests", "-p", pattern, "-v"]
         else:
             raise Invalid("unknown executable checker")
         row["command"] = command
@@ -465,7 +466,7 @@ def main(argv=None):
         result["features"] = evaluate_features(feature_map, checks, output)
         result["regressions"] = evaluate_registry(registry, checks, output)
         result["totals"] = {key: sum(r[key] for r in result["checks"]) for key in ("tests", "suites")}
-        required = {"closed-loop-selftests"} | {c["id"] for c in definitions.values() if args.mode == "full" or c["kind"] in {"portable", "release-mocks"}}
+        required = {"closed-loop-selftests"} | {c["id"] for c in definitions.values() if args.mode == "full" or c["kind"] in {"portable", "release-mocks", "selftests"}}
         bad = [c["id"] for c in result["checks"] if c["id"] in required and c["status"] != "passed"]
         # A passing group cannot hide a removed/not-executed feature or regression case.
         bad += [o["id"] for f in result["features"] for o in f["obligations"] if o["check"] in required and o["status"] != "passed"]

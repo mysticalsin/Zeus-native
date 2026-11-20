@@ -163,7 +163,8 @@ def validate_case(case, root=ROOT):
         "qa/closed-loop/tests/test_native_evidence.py", "qa/closed-loop/tests/test_native_processes.py",
         "qa/closed-loop/tests/test_native_app_host.py", "qa/closed-loop/tests/test_ci_motion_profile.py",
         "qa/closed-loop/tests/test_execution_cleanup.py", "qa/closed-loop/tests/test_ax_crash_report.py",
-        "qa/closed-loop/tests/test_settings_catalog.py", "qa/closed-loop/tests/test_source_lint.py"}, "case must be a repository test")
+        "qa/closed-loop/tests/test_settings_catalog.py", "qa/closed-loop/tests/test_source_lint.py",
+        "qa/closed-loop/tests/test_placed_mark.py"}, "case must be a repository test")
     require(type(case["function"]) is str and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", case["function"]), "invalid test function")
     require(declared_tests(file).count(case["function"]) == 1, f"runnable test removed or ambiguous: {case}")
 
@@ -217,6 +218,10 @@ def validate_map(data, portable, root=ROOT):
                     "only audited ZeusCoreTests may run as a complete native module")
         elif check["kind"] == "release-mocks":
             require(set(check) == {"id", "kind", "tier", "scope"} and check["tier"] == "contract", "release mocks are contract evidence only")
+        elif check["kind"] == "selftests":
+            require(set(check) == {"id", "kind", "tier", "scope", "file"}, "invalid selftest fields")
+            require(check["tier"] == "contract" and check["file"].startswith("qa/closed-loop/tests/test_"),
+                    "selftests are one closed-loop test module")
         elif check["kind"] == "unimplemented":
             require(set(check) == {"id", "kind", "tier", "scope", "reason"}, "invalid unimplemented fields")
             nonempty(check["reason"])
@@ -254,6 +259,8 @@ def validate_map(data, portable, root=ROOT):
                 elif check["kind"] == "portable":
                     # Exact excerpt membership is checked against the prepared manifest.
                     require(case["file"].startswith(("Tests/ZeusCoreTests/", "Tests/ZeusAppTests/")), "portable case must be selected real repository test")
+                elif check["kind"] == "selftests":
+                    require(case["file"] == check["file"], "selftest case is not the selected module")
                 else:
                     require(case["file"] == "qa/release-scripts/test_release_scripts.py", "release case not in mock suite")
         require(TIERS <= tiers, f"{feature['id']} needs contract, native integration, and device proof obligations")
