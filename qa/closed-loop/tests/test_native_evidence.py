@@ -234,6 +234,55 @@ class NativeEventEvidenceTests(unittest.TestCase):
         with self.assertRaises(Invalid):
             n.validate_receipt(output, "a" * 40, "b" * 40, definitions, self.repo)
 
+    def test_listing_recovers_tests_a_later_product_dropped_from_the_event_stream(self):
+        """Captured `swift test list` stdout. The event stream kept only the last product."""
+        self.source.write_text("import Testing\nstruct SampleTests {\n    @Test func example() {}\n"
+                               "    @Test(arguments: [1, 2]) func counted(_ value: Int) {}\n}\n"
+                               "struct Outer {\n    @Suite struct NestedTests {\n        @Test func inside() {}\n    }\n}\n")
+        app = self.repo / "Tests/ZeusAppTests/AppMarkTests.swift"
+        legacy = self.repo / "Tests/ZeusAppTests/AppLegacyTests.swift"
+        app.parent.mkdir(parents=True)
+        app.write_text("import Testing\nstruct AppMarkTests {\n    @Test func shows() {}\n}\n")
+        legacy.write_text("import XCTest\nfinal class AppLegacyTests: XCTestCase {\n    func testLegacy() {}\n}\n")
+        shows = {"kind": "function", "id": "ZeusAppTests.AppMarkTests/shows()/AppMarkTests.swift:3:6",
+                 "name": "shows()", "isParameterized": False,
+                 "sourceLocation": {"_filePath": str(app), "fileID": "ZeusAppTests/AppMarkTests.swift", "line": 3, "column": 6}}
+        folder = self.repo / "native-discovery"
+        folder.mkdir()
+        events = folder / "events.jsonl"
+        events.write_text("".join(json.dumps(row) + "\n" for row in [
+            {"kind": "test", "version": 0, "payload": {"kind": "suite", "id": "ZeusAppTests.AppMarkTests"}},
+            {"kind": "test", "version": 0, "payload": shows},
+        ]))
+        (folder / "test.log").write_text("\n".join([
+            "ZeusAppTests.AppLegacyTests/testLegacy",
+            "ZeusCoreTests.Outer/NestedTests/inside()",
+            "ZeusCoreTests.SampleTests/counted(_:)",
+            "ZeusCoreTests.SampleTests/example()",
+            "ZeusAppTests.AppMarkTests/shows()",
+            "",
+        ]))
+        definitions = [{"kind": "native-module", "module": "ZeusCoreTests"},
+                       {"kind": "native-fixture", "id": "native-AppMarkTests", "suite": "AppMarkTests",
+                        "file": "Tests/ZeusAppTests/AppMarkTests.swift"},
+                       {"kind": "native-fixture", "id": "native-AppLegacyTests", "suite": "AppLegacyTests",
+                        "file": "Tests/ZeusAppTests/AppLegacyTests.swift"}]
+        try:
+            compiled = n.discovery(events, definitions, self.repo)
+        except Invalid as error:
+            self.fail(str(error))
+        found = {(row["file"], row["function"], row["parameterized"]) for row in compiled["functions"].values()}
+        self.assertEqual(found, {
+            ("Tests/ZeusCoreTests/SampleTests.swift", "example", False),
+            ("Tests/ZeusCoreTests/SampleTests.swift", "counted", True),
+            ("Tests/ZeusCoreTests/SampleTests.swift", "inside", False),
+            ("Tests/ZeusAppTests/AppMarkTests.swift", "shows", False),
+            ("Tests/ZeusAppTests/AppLegacyTests.swift", "testLegacy", False),
+        })
+        self.assertIn("ZeusCoreTests.Outer/NestedTests/inside()/SampleTests.swift:8:10", compiled["functions"])
+        self.assertIn("ZeusCoreTests.SampleTests/example()/SampleTests.swift:3:6", compiled["functions"])
+        self.assertIn("ZeusCoreTests.SampleTests/counted(_:)/SampleTests.swift:4:6", compiled["functions"])
+
     def test_changed_events_or_foreign_commit_cannot_use_successful_console_output(self):
         output, _ = self.receipt()
         definitions = [{**self.definitions[0], "id": "native-ZeusCoreTests"}]
