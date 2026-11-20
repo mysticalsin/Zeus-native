@@ -59,11 +59,12 @@ public enum InsertTargetDecision {
         return .copyOnly
     }
 
-    /// What `deliver()` and `deliverCorrection()` execute. The paste app is whoever was frontmost after the open.
+    /// What `deliver()` and `deliverCorrection()` execute. A paste uses the key-down app.
     public static func plan(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity?, frontmost: DictationAppIdentity, ownPid: Int32) -> InsertPlan {
+        let captured = keyDown.processID != 0 && keyDown.bundleID?.isEmpty == false
         switch route(keyDown: keyDown, postOpen: postOpen, frontmost: frontmost, ownPid: ownPid) {
         case .paste:
-            return InsertPlan(action: .paste, app: postOpen ?? keyDown)
+            return InsertPlan(action: .paste, app: captured ? keyDown : (postOpen ?? keyDown))
         case .copyOnly:
             return InsertPlan(action: .copyOnly, app: nil)
         case .reactivate(let id):

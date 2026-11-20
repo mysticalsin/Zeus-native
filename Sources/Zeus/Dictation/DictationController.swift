@@ -285,6 +285,8 @@ final class DictationController {
         var contextRead: @MainActor (DictationController) -> FocusedContext = { $0.readFocusedContext() }
     }
     var seams = Seams()
+    /// This process. Tests can substitute another pid. Production uses the running app.
+    var ownProcessID: @MainActor () -> Int32 = { NSRunningApplication.current.processIdentifier }
     private let ownership = DictationTurnOwnership()
     private let hotkey = HotkeyMonitor()
     private let store: DictationStore
@@ -1084,11 +1086,10 @@ final class DictationController {
         let frontmost = NSWorkspace.shared.frontmostApplication
         let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
         let postOpen = context.targetApp.map { DictationAppIdentity(processID: $0.processIdentifier, bundleID: $0.bundleIdentifier) }
-        let effect = InsertTargetDecision.deliverEffect(InsertTargetDecision.route(
-            keyDown: context.keyDownApp, postOpen: postOpen, frontmost: live,
-            ownPid: NSRunningApplication.current.processIdentifier))
+        let planned = InsertTargetDecision.plan(
+            keyDown: context.keyDownApp, postOpen: postOpen, frontmost: live, ownPid: ownProcessID())
         let gateApp: NSRunningApplication?
-        switch effect {
+        switch planned.action {
         case .copyOnly:
             if allowClipboardFallback {
                 NSPasteboard.general.clearContents()
@@ -1096,9 +1097,9 @@ final class DictationController {
             }
             return .copiedOnly
         case .paste:
-            gateApp = context.targetApp
-        case .reactivate(let id):
-            gateApp = app(id, in: context)
+            gateApp = planned.app.map { app($0, in: context) }
+        case .reactivate:
+            gateApp = planned.app.map { app($0, in: context) }
         }
         // Hold Shift while releasing to press Return after pasting.
         // Paste where the person was, even if the notch took a click meanwhile.
@@ -1162,10 +1163,9 @@ final class DictationController {
         let frontmost = NSWorkspace.shared.frontmostApplication
         let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
         let postOpen = context.targetApp.map { DictationAppIdentity(processID: $0.processIdentifier, bundleID: $0.bundleIdentifier) }
-        let effect = InsertTargetDecision.correctionEffect(InsertTargetDecision.route(
-            keyDown: context.keyDownApp, postOpen: postOpen, frontmost: live,
-            ownPid: NSRunningApplication.current.processIdentifier))
-        if case .copyOnly = effect {
+        let planned = InsertTargetDecision.correctionPlan(
+            keyDown: context.keyDownApp, postOpen: postOpen, frontmost: live, ownPid: ownProcessID())
+        if planned.action == .copyOnly {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
             return (.copiedOnly, "Couldn't paste into a different app. Replacement copied; select the field, then press ⌘V.")
@@ -1173,7 +1173,7 @@ final class DictationController {
         // The optional preview can temporarily take focus. Restore only the original app; the
         // retained element and exact owned range still have to pass the replacement executor.
         let restoreApp: NSRunningApplication?
-        if case .reactivate(let id) = effect {
+        if planned.action == .reactivate, let id = planned.app {
             restoreApp = app(id, in: context)
         } else if restoreAfterPreview {
             restoreApp = context.targetApp

@@ -24,8 +24,8 @@ import Testing
     }
 
     @Test func aThirdAppFrontmostIsCopyOnly() {
-        let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: zeus.processID)
-        #expect(InsertTargetDecision.deliverEffect(route) == .copyOnly)
+        let planned = InsertTargetDecision.plan(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: zeus.processID)
+        #expect(planned.action == .copyOnly)
     }
 
     @Test func aMissingKeyDownAppFallsBackToPaste() {
@@ -41,8 +41,9 @@ import Testing
     }
 
     @Test func aCorrectionKeepsTheKeyDownApp() {
-        let route = InsertTargetDecision.route(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
-        #expect(InsertTargetDecision.correctionEffect(route) == .reactivate(notes))
+        let planned = InsertTargetDecision.correctionPlan(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
+        #expect(planned.action == .reactivate)
+        #expect(planned.app == notes)
     }
 
     @Test func aZeroOwnPidDoesNotTreatTheFrontmostAppAsZeus() {
@@ -53,5 +54,35 @@ import Testing
     @Test func passingTheFrontmostPidTreatsThatAppAsZeus() {
         let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: browser.processID)
         #expect(route == .reactivate(notes))
+    }
+
+    @Test func deliverCopyOnlyReturnsBeforeItActivates() throws {
+        let deliver = try functionSource("private func deliver(", "private func deliverCorrection")
+        let copyOnly = slice(deliver, from: "case .copyOnly:", to: "case .paste:")
+        #expect(copyOnly.contains("return .copiedOnly"))
+        #expect(!copyOnly.contains("activate()"))
+        #expect(deliver.contains("ownPid: ownProcessID()"))
+        #expect(!deliver.contains("ownPid: 0"))
+        #expect(!deliver.contains("ownPid: frontmost"))
+        #expect(!deliver.contains("ownPid: live.processID"))
+    }
+
+    @Test func correctionStillActivatesWhenThePlanSaysReactivate() throws {
+        let correction = try functionSource("private func deliverCorrection", "private func removeEscape")
+        #expect(correction.contains("InsertTargetDecision.correctionPlan"))
+        #expect(correction.contains("planned.action == .reactivate"))
+        #expect(correction.contains("app.activate()"))
+    }
+
+    private func functionSource(_ start: String, _ end: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Dictation/DictationController.swift"), encoding: .utf8)
+        return slice(source, from: start, to: end)
+    }
+
+    private func slice(_ source: String, from start: String, to end: String) -> String {
+        guard let lower = source.range(of: start), let upper = source.range(of: end, range: lower.upperBound..<source.endIndex) else { return "" }
+        return String(source[lower.lowerBound..<upper.lowerBound])
     }
 }
