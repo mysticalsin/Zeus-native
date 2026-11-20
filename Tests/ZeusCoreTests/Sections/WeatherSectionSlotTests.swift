@@ -11,6 +11,7 @@ import ZeusCore
         #expect(slot.keys.isEmpty)
         #expect(slot.placement == .topbarTab(1))
         #expect(slot.order == 1)
+        #expect(WeatherSectionSlot.keyContributions.isEmpty)
         #expect(GlassSectionManifest.topbarTabs().map(\.id) == ["glass.weather"])
         let rows = SettingsSectionRegistry.sections(slots: GlassSectionManifest.slots)
         #expect(!rows.contains { $0.id == "glass.weather" })
