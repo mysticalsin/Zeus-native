@@ -230,6 +230,34 @@ def discovery(path, definitions, repo=ROOT, recorded_root=None):
     return {"functions": functions, "suites": suites}
 
 
+def drop_leading_empty_run(rows):
+    """Drop one opening run that started and ended with zero tests, before any declaration.
+
+    A later Testing library emits that empty run, then the declarations, then the real run.
+    Anything else stays in the stream so the one-run rules reject it.
+    """
+    if len(rows) < 2:
+        return rows
+    first, second = rows[0], rows[1]
+    if first.get("kind") != "event" or second.get("kind") != "event":
+        return rows
+    started, ended = first.get("payload"), second.get("payload")
+    if type(started) is not dict or type(ended) is not dict:
+        return rows
+    if started.get("kind") != "runStarted" or ended.get("kind") != "runEnded":
+        return rows
+    messages = ended.get("messages", [])
+    if type(messages) is not list or any(type(message) is not dict for message in messages):
+        return rows
+    symbols = {message.get("symbol") for message in messages}
+    texts = [message.get("text") for message in messages if type(message.get("text")) is str]
+    if "pass" not in symbols or symbols.intersection({"fail", "skip", "knownIssue", "issue"}):
+        return rows
+    if not any(re.search(r"\b0 tests\b", text) for text in texts):
+        return rows
+    return rows[2:]
+
+
 def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
     recorded_root = str(repo) if recorded_root is None else recorded_root
     expected = {ident: row for ident, row in compiled["functions"].items() if selected(ident, definitions)}
@@ -240,7 +268,7 @@ def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
     case_started, case_ended = set(), set()
     suite_started, suite_ended = set(), set()
     runs_started = runs_ended = 0
-    for row in stream(path):
+    for row in drop_leading_empty_run(stream(path)):
         payload = row["payload"]
         if row["kind"] == "test":
             require(runs_started == 0, "runtime declarations must precede runStarted")

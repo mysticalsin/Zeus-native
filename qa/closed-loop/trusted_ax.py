@@ -71,7 +71,7 @@ def validate_events(path):
     problems, declared, started, ended = [], set(), set(), set()
     runs_started = runs_ended = issues = 0
     try:
-        rows = native.stream(Path(path))
+        rows = native.drop_leading_empty_run(native.stream(Path(path)))
     except (Invalid, OSError, ValueError) as error:
         return [str(error)], []
     for row in rows:

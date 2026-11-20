@@ -72,6 +72,33 @@ class NativeEventEvidenceTests(unittest.TestCase):
         self.assertEqual((metrics["tests"], metrics["suites"]), (1, 1))
         n.case_passed({"file": "Tests/ZeusCoreTests/SampleTests.swift", "function": "example"}, metrics["passed_cases"])
 
+    def test_a_stream_with_no_empty_run_still_verifies_the_selected_tests(self):
+        metrics = self.verify(self.events())
+        self.assertEqual((metrics["tests"], metrics["suites"]), (1, 1))
+
+    def test_two_real_runs_are_still_rejected(self):
+        with self.assertRaises(Invalid):
+            self.verify(self.events() + self.events()[2:])
+
+    def test_an_empty_run_after_declarations_is_rejected(self):
+        rows = self.events()
+        rows[2:2] = self.empty_run()
+        with self.assertRaises(Invalid):
+            self.verify(rows)
+
+    def test_an_empty_run_that_carries_a_test_or_an_issue_is_rejected(self):
+        for extra in [self.event("testStarted", self.ident), self.event("issueRecorded", self.ident)]:
+            with self.subTest(kind=extra["payload"]["kind"]), self.assertRaises(Invalid):
+                self.verify([self.event("runStarted"), extra, self.empty_run()[1]] + self.events())
+
+    def test_two_leading_empty_runs_are_rejected(self):
+        with self.assertRaises(Invalid):
+            self.verify(self.empty_run() + self.empty_run() + self.events())
+
+    def test_an_empty_run_that_does_not_pass_is_rejected(self):
+        with self.assertRaises(Invalid):
+            self.verify(self.empty_run(symbol="fail") + self.events())
+
     def test_complete_qualified_execution_binds_exact_file_and_function(self):
         metrics = self.verify(self.events())
         self.assertEqual((metrics["tests"], metrics["suites"]), (1, 1))

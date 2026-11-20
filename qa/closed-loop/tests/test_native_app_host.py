@@ -173,6 +173,19 @@ class TrustedAXRunnerTests(unittest.TestCase):
         self.assertEqual(argv, ["/h", "--test-bundle-path", "/t", "--filter", "^ZeusAppTests\\." + self.SUITE + "/",
                                 "--event-stream-output-path", "/e/events.jsonl", "--event-stream-version", "0"])
 
+    def empty_run(self):
+        return [{"kind": "event", "payload": {"kind": "runStarted", "messages": [{"text": "Test run started."}]}},
+                {"kind": "event", "payload": {"kind": "runEnded", "messages": [
+                    {"symbol": "pass", "text": "Test run with 0 tests in 0 suites passed after 0.001 seconds."}]}}]
+
+    def test_a_leading_empty_run_still_passes_the_trusted_stream(self):
+        problems, ids = trusted_ax.validate_events(self.events(self.empty_run() + self.clean()))
+        self.assertEqual((problems, ids), ([], [self.TEST]))
+
+    def test_two_leading_empty_runs_fail_the_trusted_stream(self):
+        problems, _ = trusted_ax.validate_events(self.events(self.empty_run() + self.empty_run() + self.clean()))
+        self.assertTrue(problems)
+
     def test_clean_stream_passes_and_missing_stream_never_does(self):
         problems, ids = trusted_ax.validate_events(self.events(self.clean()))
         self.assertEqual((problems, ids), ([], [self.TEST]))
