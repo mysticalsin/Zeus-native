@@ -69,20 +69,30 @@ struct AccessorySettingsTests {
         )) == styleStaysOff)
     }
 
-    @Test func accessoryKeysAreRegisteredForExportImportSearchAndReset() throws {
-        let root = accessoryRepositoryRoot()
-        let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
-        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
-        let expected = [
-            (AccessoryPreferenceKey.earbudsOverlay, "defaultValue: \"false\""),
-            (AccessoryPreferenceKey.overlayStyle, "defaultValue: \"off\""),
-            (AccessoryPreferenceKey.speakerNames, "defaultValue: \"false\""),
-        ]
-        for (id, marker) in expected {
-            let line = catalog.split(separator: "\n", omittingEmptySubsequences: false).first { $0.contains("id: \"\(id)\"") }
-            #expect(line?.contains(marker) == true)
-            #expect(line?.contains("section: .topBar") == true)
-            #expect(store.contains("\"\(id)\""))
+    @Test func accessorySettingsSurviveRecreateAndAnImportCannotEnableThem() {
+        let items = AccessorySectionSlot.keyContributions
+        #expect(items.map(\.id) == [
+            AccessoryPreferenceKey.earbudsOverlay,
+            AccessoryPreferenceKey.overlayStyle,
+            AccessoryPreferenceKey.speakerNames,
+        ])
+        var stored: [String: String] = [:]
+        for item in items {
+            #expect(item.policy == .importCannotEnable)
+            #expect(item.defaultValue == "false" || item.defaultValue == "off")
+            #expect(SettingsKeyLedger.load(item, stored: nil) == item.defaultValue)
+            let enabled = item.kind == .toggle ? "true" : "split"
+            #expect(SettingsKeyLedger.save(&stored, item, enabled))
+        }
+        let recreated = stored
+        for item in items {
+            let enabled = item.kind == .toggle ? "true" : "split"
+            #expect(SettingsKeyLedger.load(item, stored: recreated[item.id]) == enabled)
+            #expect(SettingsKeyLedger.imported(item, current: item.defaultValue, incoming: enabled) == nil)
+            #expect(SettingsKeyLedger.resetValue(item) == item.defaultValue)
+        }
+        if let overlay = items.first(where: { $0.id == AccessoryPreferenceKey.earbudsOverlay }) {
+            #expect(SettingsKeyLedger.imported(overlay, current: "true", incoming: "false") == "false")
         }
     }
 
