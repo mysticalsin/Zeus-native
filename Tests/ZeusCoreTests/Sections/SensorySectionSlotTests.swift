@@ -1,4 +1,5 @@
 import Testing
+import ZeusCore
 
 @Suite struct SensorySectionSlotTests {
     @Test func sensorySlotStartsEmpty() {

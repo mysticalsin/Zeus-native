@@ -163,13 +163,3 @@ public enum BatterySectionAccessibility {
     public static let focusOrder: [String] = BatterySectionCopy.controls.map(\.id) + ["battery.preview"]
 }
 
-public enum BatterySectionMetrics {
-    public static let rowHeight = 52.0
-    public static let panelPadding = 32.0
-    public static let cardGap = 28.0
-}
-
-public enum BatterySectionPlacement {
-    /// Third tab on the Topbar page, once that placement API is available.
-    public static let topbarTab = 3
-}

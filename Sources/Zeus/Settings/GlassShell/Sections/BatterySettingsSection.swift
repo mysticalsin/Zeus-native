@@ -24,7 +24,7 @@ struct BatterySettingsSection: View {
             reduceMotion: reduceMotion
         )
         ScrollView {
-            VStack(alignment: .leading, spacing: BatterySectionMetrics.cardGap) {
+            VStack(alignment: .leading, spacing: GlassSettingsMetrics.cardSpacing) {
                 overlayCard
                     .accessibilitySortPriority(3)
                 earbudCard
@@ -32,7 +32,7 @@ struct BatterySettingsSection: View {
                 preview(model)
                     .accessibilitySortPriority(1)
             }
-            .padding(BatterySectionMetrics.panelPadding)
+            .padding(GlassSettingsMetrics.panelPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .contain)
@@ -63,7 +63,7 @@ struct BatterySettingsSection: View {
                 }
                 helper(BatterySectionCopy.controls[1].helper)
             }
-            .frame(minHeight: BatterySectionMetrics.rowHeight, alignment: .center)
+            .frame(minHeight: GlassSettingsMetrics.controlRow, alignment: .center)
             .accessibilityElement(children: .contain)
             .accessibilityHint(BatterySectionCopy.controls[1].helper)
         }
@@ -119,14 +119,14 @@ struct BatterySettingsSection: View {
                 ProgressView()
                 Text(BatterySectionCopy.loadingLabel).font(GS.rowText).foregroundStyle(GS.secondary)
             }
-            .frame(minHeight: BatterySectionMetrics.rowHeight, alignment: .leading)
+            .frame(minHeight: GlassSettingsMetrics.controlRow, alignment: .leading)
             .accessibilityLabel(BatterySectionCopy.loadingLabel)
         case .empty:
             VStack(alignment: .leading, spacing: 4) {
                 Text(BatterySectionCopy.emptyTitle).font(GS.rowTitle).foregroundStyle(GS.text)
                 Text(BatterySectionCopy.emptyHelper).font(GS.rowText).foregroundStyle(GS.secondary)
             }
-            .frame(minHeight: BatterySectionMetrics.rowHeight, alignment: .leading)
+            .frame(minHeight: GlassSettingsMetrics.controlRow, alignment: .leading)
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
                 Text(message).font(GS.rowTitle).foregroundStyle(GS.text)
@@ -142,7 +142,7 @@ struct BatterySettingsSection: View {
                     Text(model.style.title).font(GS.rowText).foregroundStyle(GS.secondary)
                 }
             }
-            .frame(minHeight: BatterySectionMetrics.rowHeight, alignment: .leading)
+            .frame(minHeight: GlassSettingsMetrics.controlRow, alignment: .leading)
         }
     }
 
@@ -188,7 +188,7 @@ struct BatterySettingsSection: View {
             .accessibilityHint(copy.helper)
             helper(copy.helper)
         }
-        .frame(minHeight: BatterySectionMetrics.rowHeight, alignment: .center)
+        .frame(minHeight: GlassSettingsMetrics.controlRow, alignment: .center)
     }
 
     private func helper(_ text: String) -> some View {
@@ -196,6 +196,7 @@ struct BatterySettingsSection: View {
             .font(GS.rowText)
             .foregroundStyle(GS.secondary)
             .fixedSize(horizontal: false, vertical: true)
+            .frame(minHeight: GlassSettingsMetrics.helperLine, alignment: .leading)
             .accessibilityHidden(true)
     }
 

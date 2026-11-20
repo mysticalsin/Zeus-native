@@ -55,9 +55,28 @@ public enum SettingsSectionRegistry {
         return pairs.enumerated().map { row($0.offset, $0.element.0, $0.element.1) }
     }
 
+    public static let topbarID = "settings.topbar"
+    public static let topbarTitle = "Topbar"
+
+    /// One Topbar row follows the existing rows when any topbar tab is filled and enabled.
     public static func sections(slots: [GlassSectionSlot], includePhone: Bool = false) -> [SettingsSectionDescriptor] {
         let base = existing(includePhone: includePhone)
-        let ranked = slots.filter(\.filled).sorted { lhs, rhs in
+        guard !GlassSectionManifest.topbarTabs(in: slots).isEmpty else { return base }
+        return base + [
+            SettingsSectionDescriptor(
+                id: topbarID,
+                title: topbarTitle,
+                order: base.count,
+                accessibilityLabel: topbarTitle,
+                placeholder: nil
+            ),
+        ]
+    }
+
+    /// First id wins. Order is placement order, then the descriptor order. The final sort is load-bearing.
+    public static func orderedSlots(_ slots: [GlassSectionSlot]) -> [GlassSectionSlot] {
+        let ranked = slots.sorted { lhs, rhs in
+            if lhs.placement.order != rhs.placement.order { return lhs.placement.order < rhs.placement.order }
             if lhs.order != rhs.order { return lhs.order < rhs.order }
             if lhs.id != rhs.id { return lhs.id < rhs.id }
             return lhs.title < rhs.title
@@ -68,16 +87,8 @@ public enum SettingsSectionRegistry {
             seen.insert(slot.id)
             return true
         }
-        let extra = Array(unique.enumerated().map { index, slot in
-            SettingsSectionDescriptor(
-                id: slot.id,
-                title: slot.title,
-                order: base.count + index,
-                accessibilityLabel: slot.title,
-                placeholder: slot.keys.isEmpty ? slot.title : nil
-            )
-        }.reversed())
-        return (base + extra).sorted { lhs, rhs in
+        return Array(unique.reversed()).sorted { lhs, rhs in
+            if lhs.placement.order != rhs.placement.order { return lhs.placement.order < rhs.placement.order }
             if lhs.order != rhs.order { return lhs.order < rhs.order }
             return lhs.id < rhs.id
         }
@@ -108,7 +119,7 @@ public enum SettingsSectionRegistry {
             return "Settings"
         case id(for: "integrations"), id(for: "murmure"), id(for: "polyglot"), id(for: "dictation"), id(for: "voice"), id(for: "engine"), id(for: "iPhone"), id(for: "features"), id(for: "beamer"), id(for: "tiling"), id(for: "shelf"):
             return "Your tools"
-        case id(for: "license"), id(for: "permissions"), id(for: "privacy"), id(for: "diagnostics"), id(for: "about"):
+        case id(for: "license"), id(for: "permissions"), id(for: "privacy"), id(for: "diagnostics"), id(for: "about"), topbarID:
             return "Zeus"
         default:
             return nil
@@ -138,6 +149,7 @@ public enum SettingsSectionHostPlan {
 public enum SettingsSelectionState: Equatable, Sendable {
     case section(String)
     case slot(String)
+    case topbar(tab: String)
 }
 
 public enum SettingsSelectionRules {
@@ -153,21 +165,28 @@ public enum SettingsSelectionRules {
         return .slot(trimmed)
     }
 
+    /// A blank, unknown, unfilled, or disabled tab leaves the current selection alone.
+    public static func selectingTopbar(_ id: String, filledTabs: [String], current: SettingsSelectionState) -> SettingsSelectionState {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, filledTabs.contains(trimmed) else { return current }
+        return .topbar(tab: trimmed)
+    }
+
     public static func isExclusive(_ state: SettingsSelectionState) -> Bool {
         switch state {
-        case .section, .slot: return true
+        case .section, .slot, .topbar: return true
         }
     }
 }
 
-/// Sidebar pitch. Every visible row, existing and filled, shares the room above the version line.
+/// Sidebar rows stay 30 points and scroll above the version line.
 public enum SettingsSidebarLayout {
     public static let top = 114.0
     public static let versionY = 751.0
     public static let headingHeight = 20.0
     public static let headingBottom = 5.0
     public static let groupGap = 8.5
-    public static let rowHeight = 26.0
+    public static let rowHeight = 30.0
     public static let rowGap = 2.0
 
     public static var headingsHeight: Double {
@@ -175,12 +194,11 @@ public enum SettingsSidebarLayout {
         return groups * (headingHeight + headingBottom) + (groups - 1) * groupGap
     }
 
+    public static var scrollHeight: Double { versionY - top }
+
     public static func rowMetrics(rowCount: Int) -> (height: Double, gap: Double) {
-        let full = rowHeight + rowGap
-        let room = versionY - top - headingsHeight
-        let pitch = min(full, (room / Double(max(rowCount, 1))).rounded(.down))
-        let gap = pitch >= full ? rowGap : 1
-        return (max(1, min(rowHeight, pitch - gap)), gap)
+        _ = rowCount
+        return (rowHeight, rowGap)
     }
 
     public static func bottom(rowCount: Int) -> Double {

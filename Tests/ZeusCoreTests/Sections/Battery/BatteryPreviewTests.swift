@@ -111,10 +111,10 @@ struct BatteryPreviewTests {
     }
 
     @Test func metricsMatchTheGlassShell() {
-        #expect(BatterySectionMetrics.rowHeight == 52)
-        #expect(BatterySectionMetrics.panelPadding == 32)
-        #expect(BatterySectionMetrics.cardGap == 28)
-        #expect(BatterySectionPlacement.topbarTab == 3)
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.helperLine == 16)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
     }
 
     @Test func reduceMotionCoversEveryPreviewStyle() {
