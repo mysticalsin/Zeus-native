@@ -218,6 +218,8 @@ public enum GlassSettingsFocus {
 public enum SettingsKeyReachability {
     public static let catalogCount = 212
     public static let outsideCount = 77
+    /// Union of the catalog and the outside-catalog keys. Contributions are not included.
+    public static let baseCount = 285
     public static let sectionCount = 27
     public static let requiredFingerprint = "42a6fb1152bb4c71"
 
@@ -348,8 +350,15 @@ public enum SettingsKeyReachability {
         return rest.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 
-    public static func reachableKeys(catalogIDs: [String]) -> Set<String> {
+    /// The pinned set: catalog rows plus the outside-catalog keys. Section contributions are not part of it.
+    public static func baseKeys(catalogIDs: [String]) -> Set<String> {
         Set(catalogIDs).union(outsideKeys)
+    }
+
+    /// Base keys plus contributed section keys. The fingerprint pin stays on `baseKeys`.
+    public static func reachableKeys(catalogIDs: [String], contributions: [SettingsKeyContribution] = []) -> Set<String> {
+        let contributed = contributions.map { $0.id.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return baseKeys(catalogIDs: catalogIDs).union(contributed)
     }
 
     public static func missing(required: Set<String>, present: Set<String>) -> [String] {
@@ -471,7 +480,16 @@ public enum GlassSettingsAudit {
         if !SettingsKeyReachability.duplicateIDs(SettingsKeyReachability.outsideKeys).isEmpty {
             failures.append("duplicate outside keys")
         }
-        let reachable = SettingsKeyReachability.reachableKeys(catalogIDs: ids)
+        let base = SettingsKeyReachability.baseKeys(catalogIDs: ids)
+        if base.count != SettingsKeyReachability.baseCount {
+            failures.append("base pin count \(base.count)")
+        }
+        let fingerprint = SettingsKeyReachability.fingerprint(base)
+        if fingerprint != SettingsKeyReachability.requiredFingerprint {
+            failures.append("fingerprint \(fingerprint)")
+        }
+        let contributions = GlassSectionManifest.keyContributions
+        let reachable = SettingsKeyReachability.reachableKeys(catalogIDs: ids, contributions: contributions)
         let missingCatalog = SettingsKeyReachability.missing(required: Set(ids), present: reachable)
         if !missingCatalog.isEmpty {
             failures.append("catalog keys missing \(missingCatalog.joined(separator: ","))")
@@ -480,10 +498,14 @@ public enum GlassSettingsAudit {
         if !missingOutside.isEmpty {
             failures.append("outside keys missing \(missingOutside.joined(separator: ","))")
         }
-        let fingerprint = SettingsKeyReachability.fingerprint(reachable)
-        if fingerprint != SettingsKeyReachability.requiredFingerprint {
-            failures.append("fingerprint \(fingerprint)")
+        let missingContributed = SettingsKeyReachability.missing(required: Set(contributions.map(\.id)), present: reachable)
+        if !missingContributed.isEmpty {
+            failures.append("contributed keys missing \(missingContributed.joined(separator: ","))")
         }
+        if SettingsKeyReachability.fingerprint(base) != SettingsKeyReachability.fingerprint(SettingsKeyReachability.baseKeys(catalogIDs: ids)) {
+            failures.append("base pin moved")
+        }
+        failures += contributionFailures(catalogIDs: ids)
         let sections = SettingsKeyReachability.sectionIDs(in: settingsViewSource)
         if sections != SettingsKeyReachability.existingSectionIDs {
             failures.append("sections \(sections)")
