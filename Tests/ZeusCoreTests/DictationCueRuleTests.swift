@@ -174,6 +174,36 @@ struct DictationCueRuleTests {
         return (Array(UnsafeBufferPointer(start: channel[0], count: Int(buffer.frameLength))), audio.processingFormat.sampleRate)
     }
 
+    @Test func theContextIsReadAfterTheMicrophoneOpens() {
+        var log: [String] = []
+        let opened = DictationCueRule.beginCapture(cue: { phase in
+            log.append("cue \(phase)")
+        }, open: {
+            log.append("mic open")
+            return 7
+        }, afterOpen: {
+            log.append("context")
+        })
+        #expect(opened == 7)
+        #expect(log == ["cue start", "mic open", "context"])
+    }
+
+    @Test func aFailedOpenReadsNoContext() {
+        struct Closed: Error {}
+        var log: [String] = []
+        #expect(throws: Closed.self) {
+            try DictationCueRule.beginCapture(cue: { phase in
+                log.append("cue \(phase)")
+            }, open: { () throws -> Int in
+                log.append("mic open")
+                throw Closed()
+            }, afterOpen: {
+                log.append("context")
+            })
+        }
+        #expect(log == ["cue start", "mic open"])
+    }
+
     @Test func crystalChimesAreShortSoftAndRiseThenFall() throws {
         let start = try read("dictation_crystal_start.wav")
         let stop = try read("dictation_crystal_stop.wav")

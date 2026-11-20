@@ -148,6 +148,10 @@ struct DictationTurnContext {
     let generation: UInt64
     let mode: DictationMode
     let targetApp: NSRunningApplication?
+    /// Frontmost app at key down, before the microphone opens. Process id and bundle id only.
+    let keyDownApp: DictationAppIdentity
+    /// The running app from key down, the one to bring forward if Zeus is in front at insert.
+    let pasteBackApp: NSRunningApplication?
     let selection: String?
     let useLocal: Bool
     let engine: (any TranscriptionEngine)?
@@ -277,8 +281,12 @@ final class DictationController {
         var speechStart: (SpeechInput, UInt64) throws -> Int = { try $0.start(controllerGeneration: $1) }
         var speechStop: (SpeechInput, Bool) async -> String = { await $0.stop(waitForFinal: $1) }
         var pauseMedia: ((TopBarModel) -> NowPlayingSource?)?
+        /// The focused app and field, read after the microphone has opened. Tests replace it.
+        var contextRead: @MainActor (DictationController) -> FocusedContext = { $0.readFocusedContext() }
     }
     var seams = Seams()
+    /// This process. Tests can substitute another pid. Production uses the running app.
+    var ownProcessID: @MainActor () -> Int32 = { NSRunningApplication.current.processIdentifier }
     private let ownership = DictationTurnOwnership()
     private let hotkey = HotkeyMonitor()
     private let store: DictationStore
@@ -288,7 +296,24 @@ final class DictationController {
     private var selection: String?
     private var mode = DictationMode.builtIns[0]
     /// The running turn's immutable copy of mode, target, selection and engine.
-    private var turnContext: DictationTurnContext?
+    private(set) var turnContext: DictationTurnContext?
+
+    /// What begin reads once the microphone is open: the front app, the focused field, the mode and any selection.
+    struct FocusedContext {
+        var targetApp: NSRunningApplication?
+        var insertionField: DictationInsertionTracker.Field?
+        var mode: DictationMode
+        var selection: String?
+    }
+
+    func readFocusedContext() -> FocusedContext {
+        let app = NSWorkspace.shared.frontmostApplication
+        let field = insertionTracker.beginTurn()
+        let resolved = DictationMode.resolve(topBar.dictationModes, selectedKey: topBar.selectedModeKey,
+                                             frontmostBundleID: app?.bundleIdentifier, autoSwitch: settings.autoSwitch)
+        let selected = resolved.useSelectedText ? TextInserter.selectedText() : nil
+        return FocusedContext(targetApp: app, insertionField: field, mode: resolved, selection: selected)
+    }
     /// The chosen engine hears this turn (ready and chosen); Apple otherwise.
     private var useLocal = false
     /// The source dictation paused, so the same one is resumed afterwards and never another.
@@ -604,11 +629,6 @@ final class DictationController {
             }
         }
         useLocal = local
-        targetApp = NSWorkspace.shared.frontmostApplication
-        let insertionField = insertionTracker.beginTurn()
-        mode = DictationMode.resolve(topBar.dictationModes, selectedKey: topBar.selectedModeKey,
-                                     frontmostBundleID: targetApp?.bundleIdentifier, autoSwitch: settings.autoSwitch)
-        selection = mode.useSelectedText ? TextInserter.selectedText() : nil
         let turnHints = hints
         speech.contextualStrings = turnHints
         turnStream?.cancel()
@@ -618,15 +638,35 @@ final class DictationController {
         } else {
             speech.onSamples = nil
         }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let keyDownApp = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
+        // The mode is a settings read (selected key and auto-switch). It is taken before the microphone opens.
+        // The focused field and any selected text are Accessibility reads and stay after the open.
+        let modeBeforeMic = DictationMode.resolve(topBar.dictationModes, selectedKey: topBar.selectedModeKey,
+                                                 frontmostBundleID: frontmost?.bundleIdentifier, autoSwitch: settings.autoSwitch)
         let turnGeneration = ownership.beginTurn()
+        var readField: DictationInsertionTracker.Field?
+        var readMode = mode
+        var readApp: NSRunningApplication?
+        var readSelection: String?
         do {
-            // The start cue sounds first: on key down, before the microphone warms up.
-            let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
+            // The start cue sounds first, then the microphone, then the focused field.
+            let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }, open: {
                 try seams.speechStart(speech, turnGeneration)
-            }
+            }, afterOpen: {
+                let read = seams.contextRead(self)
+                readApp = read.targetApp
+                readField = read.insertionField
+                readMode = modeBeforeMic
+                readSelection = read.selection
+            })
+            targetApp = readApp
+            mode = readMode
+            selection = readSelection
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
-            turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
-                                               selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
+            turnContext = DictationTurnContext(generation: turnGeneration, mode: readMode, targetApp: readApp,
+                                               keyDownApp: keyDownApp, pasteBackApp: frontmost, selection: readSelection,
+                                               useLocal: local, engine: turnEngine, insertionField: readField)
         } catch {
             speech.onCaptureFailure = nil
             ownership.invalidate()
@@ -681,6 +721,9 @@ final class DictationController {
         speech.contextualStrings = hints
         let turnGeneration = ownership.beginTurn()
         let context = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
+                                           keyDownApp: DictationAppIdentity(processID: targetApp?.processIdentifier ?? 0,
+                                                                            bundleID: targetApp?.bundleIdentifier),
+                                           pasteBackApp: targetApp,
                                            selection: selection, useLocal: false, engine: nil, insertionField: insertionField)
         let sessionID: Int
         do {
@@ -1016,22 +1059,51 @@ final class DictationController {
 
     /// What the delivery gate says right now for `context`'s turn: `.abort` once the turn was
     /// cancelled or replaced, else the target's live state (PID and bundle ID, fail closed).
-    private func deliveryVerdict(for context: DictationTurnContext, allowClipboardFallback: Bool) -> TextInserter.DeliveryGate.Action {
+    private func deliveryVerdict(for context: DictationTurnContext, app: NSRunningApplication?, allowClipboardFallback: Bool) -> TextInserter.DeliveryGate.Action {
         guard ownership.owns(generation: context.generation) else { return .abort }
-        let target = context.targetApp.map { TextInserter.DeliveryGate.identity(of: $0) }
+        let target = app.map { TextInserter.DeliveryGate.identity(of: $0) }
         let state = TextInserter.DeliveryGate.state(
-            target: target, terminated: context.targetApp?.isTerminated ?? true,
+            target: target, terminated: app?.isTerminated ?? true,
             probe: TextInserter.DeliveryGate.live)
         return TextInserter.DeliveryGate.action(for: state, allowClipboardFallback: allowClipboardFallback)
+    }
+
+    private func app(_ id: DictationAppIdentity, in context: DictationTurnContext) -> NSRunningApplication? {
+        let candidates = [context.pasteBackApp, context.targetApp].compactMap { $0 }
+        if let match = candidates.first(where: {
+            DictationAppIdentity(processID: $0.processIdentifier, bundleID: $0.bundleIdentifier).sameApp(as: id)
+        }) {
+            return match
+        }
+        guard id.processID != 0 else { return nil }
+        return NSRunningApplication(processIdentifier: id.processID)
     }
 
     private func deliver(_ text: String, context: DictationTurnContext, allowClipboardFallback: Bool,
                          onTextReady: (@MainActor (String) -> Void)? = nil) async -> TextInserter.Outcome {
         // A new ordinary turn supersedes any older replacement receipt, even on clipboard fallback.
         insertionTracker.invalidate()
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
+        let postOpen = context.targetApp.map { DictationAppIdentity(processID: $0.processIdentifier, bundleID: $0.bundleIdentifier) }
+        let planned = InsertTargetDecision.plan(
+            keyDown: context.keyDownApp, postOpen: postOpen, frontmost: live, ownPid: ownProcessID())
+        let gateApp: NSRunningApplication?
+        switch planned.action {
+        case .copyOnly:
+            if allowClipboardFallback {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+            return .copiedOnly
+        case .paste:
+            gateApp = planned.app.map { app($0, in: context) }
+        case .reactivate:
+            gateApp = planned.app.map { app($0, in: context) }
+        }
         // Hold Shift while releasing to press Return after pasting.
         // Paste where the person was, even if the notch took a click meanwhile.
-        if let app = context.targetApp, app != NSWorkspace.shared.frontmostApplication {
+        if let app = gateApp, app != frontmost {
             app.activate()
             // The preview card had focus: only type once the target app is truly in front.
             let back = await FrontmostHandoff.waitUntilFrontmost(
@@ -1047,7 +1119,7 @@ final class DictationController {
             }
         }
         // Only a target that is still alive, frontmost and focused gets an automatic paste.
-        switch deliveryVerdict(for: context, allowClipboardFallback: allowClipboardFallback) {
+        switch deliveryVerdict(for: context, app: gateApp, allowClipboardFallback: allowClipboardFallback) {
         case .paste:
             break
         case .clipboardOnly:
@@ -1061,14 +1133,14 @@ final class DictationController {
         let before = insertionTracker.prepareInsertion(in: context.insertionField)
         // The same verdict is asked again at every delayed paste, Return and typed piece.
         let check: TextInserter.DeliveryCheck = { [self] in
-            let verdict = deliveryVerdict(for: context, allowClipboardFallback: allowClipboardFallback)
+            let verdict = deliveryVerdict(for: context, app: gateApp, allowClipboardFallback: allowClipboardFallback)
             if verdict == .paste, let field = context.insertionField, !insertionTracker.matchesFocus(field) {
                 return allowClipboardFallback ? .clipboardOnly : .abort
             }
             return verdict
         }
         let outcome: TextInserter.Outcome
-        if KeystrokeTyping.shouldType(bundleID: context.targetApp?.bundleIdentifier, alwaysType: settings.alwaysType, typedApps: settings.typedApps) {
+        if KeystrokeTyping.shouldType(bundleID: gateApp?.bundleIdentifier, alwaysType: settings.alwaysType, typedApps: settings.typedApps) {
             onTextReady?("type")
             outcome = await TextInserter.type(text, pressReturn: pressReturn, deliveryCheck: check)
         } else {
@@ -1088,9 +1160,27 @@ final class DictationController {
         -> (outcome: TextInserter.Outcome, message: String) {
         let isCurrent = { [ownership] in ownership.owns(generation: context.generation) }
         guard isCurrent() else { return (.copiedOnly, "Correction cancelled") }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
+        let postOpen = context.targetApp.map { DictationAppIdentity(processID: $0.processIdentifier, bundleID: $0.bundleIdentifier) }
+        let planned = InsertTargetDecision.correctionPlan(
+            keyDown: context.keyDownApp, postOpen: postOpen, frontmost: live, ownPid: ownProcessID())
+        if planned.action == .copyOnly {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            return (.copiedOnly, "Couldn't paste into a different app. Replacement copied; select the field, then press ⌘V.")
+        }
         // The optional preview can temporarily take focus. Restore only the original app; the
         // retained element and exact owned range still have to pass the replacement executor.
-        if restoreAfterPreview, let app = context.targetApp, app != NSWorkspace.shared.frontmostApplication {
+        let restoreApp: NSRunningApplication?
+        if planned.action == .reactivate, let id = planned.app {
+            restoreApp = app(id, in: context)
+        } else if restoreAfterPreview {
+            restoreApp = context.targetApp
+        } else {
+            restoreApp = nil
+        }
+        if let app = restoreApp, app != frontmost {
             app.activate()
             _ = await FrontmostHandoff.waitUntilFrontmost(
                 target: app.bundleIdentifier, current: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },

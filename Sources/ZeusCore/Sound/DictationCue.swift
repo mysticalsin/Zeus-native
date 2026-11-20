@@ -76,8 +76,17 @@ public enum DictationCueRule {
     /// Key down: the start cue first, then the microphone. The cue is never late behind a slow
     /// device start, and it is already playing before the first sample is captured.
     public static func beginCapture<T>(cue: (DictationCuePhase) -> Void, open: () throws -> T) rethrows -> T {
+        try beginCapture(cue: cue, open: open, afterOpen: {})
+    }
+
+    /// The start cue, then the microphone, then work that may read the focused field. `afterOpen`
+    /// runs only when `open` succeeds, so a failed open leaves no turn context to read.
+    public static func beginCapture<T>(cue: (DictationCuePhase) -> Void, open: () throws -> T,
+                                       afterOpen: () -> Void) rethrows -> T {
         cue(.start)
-        return try open()
+        let opened = try open()
+        afterOpen()
+        return opened
     }
 
     private static func isLiveTurn(_ state: DictationFlow.State) -> Bool {
