@@ -7,6 +7,29 @@ import Testing
         Array(repeating: value, count: VoiceFrame.sampleCount)
     }
 
+    @Test func everyStateAndEventHasOneOutcome() throws {
+        let failure = VoiceSessionError.badFrameSize(expected: 3_200, got: 1)
+        let states: [VoiceSessionState] = [.idle, .starting, .streaming, .closing, .closed, .failed(failure)]
+        let events: [VoiceSessionEvent] = [.start, .started, .push, .close, .closed, .fail(failure)]
+        let legal: [VoiceSessionState: [VoiceSessionEvent: VoiceSessionState]] = [
+            .idle: [.start: .starting, .fail(failure): .failed(failure)],
+            .starting: [.started: .streaming, .fail(failure): .failed(failure)],
+            .streaming: [.push: .streaming, .close: .closing, .fail(failure): .failed(failure)],
+            .closing: [.closed: .closed, .fail(failure): .failed(failure)],
+        ]
+        for state in states {
+            for event in events {
+                if let next = legal[state]?[event] {
+                    #expect(try state.next(on: event) == next)
+                } else {
+                    #expect(throws: VoiceSessionError.illegalTransition(from: state, event: event)) {
+                        try state.next(on: event)
+                    }
+                }
+            }
+        }
+    }
+
     @Test func startReturnsFrameZeroOf3200Samples() async throws {
         let first = tone(0.25)
         let backend = try FakeDuplexVoiceBackend(frames: [first, tone(0.5)])

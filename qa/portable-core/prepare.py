@@ -72,7 +72,7 @@ GROUPS = {
         tests("TextInsertionReceiptTests"),
     ),
     "local-voice": (
-        core("Voice/DuplexVoiceBackend.swift", "Voice/LocalVoiceFlags.swift", "Voice/PersistedVoiceSettings.swift",
+        core("Voice/DuplexVoiceBackend.swift", "Voice/VoiceSessionState.swift", "Voice/LocalVoiceFlags.swift", "Voice/PersistedVoiceSettings.swift",
              "Voice/UltronEngineRouter.swift", "Voice/UltronVoicePlan.swift", "Voice/VoiceTTSProvider.swift",
              "Voice/VoiceTTSChain.swift", "Voice/ElevenLabsFailsafe.swift"),
         tests("LocalVoiceBackendContractTests"),
