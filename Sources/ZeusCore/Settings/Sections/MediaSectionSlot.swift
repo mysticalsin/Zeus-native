@@ -6,6 +6,7 @@ public enum MediaSectionSlot: GlassSlotProviding {
         title: "Media",
         filled: true,
         keys: MediaSettingID.added,
-        order: 100
+        order: 1,
+        placement: .topbarTab(1)
     )
 }

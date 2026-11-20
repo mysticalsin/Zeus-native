@@ -132,11 +132,13 @@ typealias SlotID = String
 enum SettingsSelection: Equatable {
     case section(GSSection)
     case slot(SlotID)
+    case topbar(tab: SlotID)
 
     var rowID: String {
         switch self {
         case .section(let section): SettingsSectionRegistry.id(for: section.rawValue)
         case .slot(let id): id
+        case .topbar: SettingsSectionRegistry.topbarID
         }
     }
 
@@ -144,6 +146,7 @@ enum SettingsSelection: Equatable {
         switch self {
         case .section(let section): .section(SettingsSectionRegistry.id(for: section.rawValue))
         case .slot(let id): .slot(id)
+        case .topbar(let tab): .topbar(tab: tab)
         }
     }
 }
@@ -163,6 +166,10 @@ final class GSNavigation {
     }
 
     func select(_ descriptor: SettingsSectionDescriptor) {
+        if descriptor.id == SettingsSectionRegistry.topbarID {
+            if let tab = GlassSectionManifest.topbarTabs().first { selectTopbar(tab.id) }
+            return
+        }
         if let section = GSSection.allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == descriptor.id }) {
             selectSection(section)
         } else {
@@ -178,6 +185,11 @@ final class GSNavigation {
     func selectSlot(_ id: SlotID) {
         let next = SettingsSelectionRules.selectingSlot(id, current: selection.state)
         if case .slot(let slot) = next { selection = .slot(slot) }
+    }
+
+    func selectTopbar(_ id: SlotID) {
+        let next = SettingsSelectionRules.selectingTopbar(id, filledTabs: GlassSectionManifest.topbarTabs().map(\.id), current: selection.state)
+        if case .topbar(let tab) = next { selection = .topbar(tab: tab) }
     }
 
     var licenseKey = ""
@@ -274,7 +286,7 @@ struct GlanceSettingsRoot: View {
     }
 }
 
-/// Logo tile, wordmark, three groups of items (28 pt apart, tighter when more rows show), version at the foot.
+/// Logo tile, wordmark, three groups of 30 point rows that scroll above the version line.
 struct GSSidebar: View {
     let navigation: GSNavigation
 
@@ -283,26 +295,29 @@ struct GSSidebar: View {
             MascotTile(pose: .idle, side: 48, animated: false).offset(x: 26, y: 48)
             Text("Zeus").font(GS.wordmark).tracking(-1.6).foregroundStyle(GS.text).offset(x: 90, y: 51)
                 .accessibilityAddTraits(.isHeader)
-            VStack(alignment: .leading, spacing: 0) {
-                let rows = glassSettingsRows()
-                ForEach(Array(rows.enumerated()), id: \.element.id) { index, descriptor in
-                    if let heading = SettingsSectionRegistry.heading(before: descriptor, previous: index > 0 ? rows[index - 1] : nil) {
-                        Text(heading).font(GS.sidebarHead).foregroundStyle(GS.secondary)
-                            .frame(height: GSSection.SidebarLayout.headingHeight, alignment: .leading)
-                            .padding(.leading, 14)
-                            .padding(.top, index == 0 ? 0 : GSSection.SidebarLayout.groupGap)
-                            .padding(.bottom, GSSection.SidebarLayout.headingBottom)
-                            .accessibilityAddTraits(.isHeader)
-                            .accessibilityLabel(heading)
-                    }
-                    if let section = GSSection.allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == descriptor.id }) {
-                        item(section)
-                    } else if let slot = GlassSectionManifest.slots.first(where: { $0.id == descriptor.id && $0.filled }) {
-                        glassItem(slot)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    let rows = glassSettingsRows()
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, descriptor in
+                        if let heading = SettingsSectionRegistry.heading(before: descriptor, previous: index > 0 ? rows[index - 1] : nil) {
+                            Text(heading).font(GS.sidebarHead).foregroundStyle(GS.secondary)
+                                .frame(height: GSSection.SidebarLayout.headingHeight, alignment: .leading)
+                                .padding(.leading, 14)
+                                .padding(.top, index == 0 ? 0 : GSSection.SidebarLayout.groupGap)
+                                .padding(.bottom, GSSection.SidebarLayout.headingBottom)
+                                .accessibilityAddTraits(.isHeader)
+                                .accessibilityLabel(heading)
+                        }
+                        if let section = GSSection.allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == descriptor.id }) {
+                            item(section)
+                        } else if descriptor.id == SettingsSectionRegistry.topbarID {
+                            topbarItem()
+                        }
                     }
                 }
+                .frame(width: 194)
             }
-            .frame(width: 194)
+            .frame(width: 194, height: SettingsSidebarLayout.scrollHeight)
             .offset(x: 12, y: GSSection.SidebarLayout.top)
             Text("Zeus \(Self.version)").font(OB.font(13)).foregroundStyle(GS.secondary).offset(x: 26, y: GSSection.SidebarLayout.versionY)
         }
@@ -338,15 +353,19 @@ struct GSSidebar: View {
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
-    private func glassItem(_ slot: GlassSectionSlot) -> some View {
+    private func topbarItem() -> some View {
         let selected: Bool = {
-            if case .slot(let id) = navigation.selection { return id == slot.id }
+            if case .topbar = navigation.selection { return true }
             return false
         }()
         let metrics = SettingsSidebarLayout.rowMetrics(rowCount: glassSettingsRows().count)
-        return Button { navigation.selectSlot(slot.id) } label: {
+        return Button {
+            if let tab = GlassSectionManifest.topbarTabs().first { navigation.selectTopbar(tab.id) }
+        } label: {
             HStack(spacing: 0) {
-                Text(slot.title).font(GS.sidebarItem)
+                Image(systemName: "menubar.rectangle").font(.system(size: 15, weight: .regular))
+                    .frame(width: 29, alignment: .leading)
+                Text(SettingsSectionRegistry.topbarTitle).font(GS.sidebarItem)
                 Spacer()
             }
             .foregroundStyle(selected ? GS.selectedText : GS.text)
@@ -357,8 +376,8 @@ struct GSSidebar: View {
         }
         .buttonStyle(.plain)
         .padding(.bottom, metrics.gap)
-        .accessibilityLabel(slot.title)
-        .accessibilityIdentifier("settings.sidebar.\(slot.id)")
+        .accessibilityLabel(SettingsSectionRegistry.topbarTitle)
+        .accessibilityIdentifier("settings.sidebar.topbar")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
@@ -371,18 +390,17 @@ struct GSPanelHost: View {
     var body: some View {
         let page = Group {
             switch navigation.selection {
+            case .topbar(let tab):
+                GlassTopbarPage(selected: tab, navigation: navigation)
             case .slot(let id):
-                if let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.filled }) {
+                if let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.isShown }) {
                     GlassSettingsSlotPage(slot: slot)
                 }
             case .section(let section):
                 GSPageView(section: section, navigation: navigation, context: context)
             }
         }
-            .padding(.leading, GS.pagePadding)
-            .padding(.trailing, 28)
-            .padding(.top, 25)
-            .padding(.bottom, 32)
+            .padding(CGFloat(GlassSettingsMetrics.panelPadding))
             .id(navigation.selection.rowID)
         ZStack {
             RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)

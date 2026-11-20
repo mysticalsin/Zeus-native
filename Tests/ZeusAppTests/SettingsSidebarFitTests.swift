@@ -11,15 +11,14 @@ struct SettingsSidebarFitTests {
     }
 
     @Test func theShownRowsClearTheVersionLine() {
-        #expect(bottom(rowCount: GSSection.shown.count) <= Layout.versionY)
+        #expect(Layout.scrollHeight <= Layout.versionY - Layout.top)
+        #expect(bottom(rowCount: GSSection.shown.count) > Layout.versionY)
     }
 
     @Test func everySectionShownStillClearsTheVersionLine() {
-        // The worst case: the iPhone page joins the sidebar and nothing is hidden.
-        #expect(bottom(rowCount: GSSection.allCases.count) <= Layout.versionY)
-        for count in 1...(GSSection.allCases.count + 4) {
-            #expect(bottom(rowCount: count) <= Layout.versionY, "\(count) rows")
-        }
+        // Rows stay 30 points. A full sidebar is taller than the version line and scrolls inside it.
+        #expect(bottom(rowCount: GSSection.allCases.count) > Layout.versionY)
+        #expect(Layout.rowMetrics(rowCount: GSSection.allCases.count).height == 30)
     }
 
     @Test func theHeadingsAreThreeGroupsWithTwoGaps() {
@@ -29,16 +28,15 @@ struct SettingsSidebarFitTests {
 
     @Test func fewRowsKeepTheOriginalSpacing() {
         let metrics = Layout.rowMetrics(rowCount: 19)
-        #expect(metrics.height == 26)
+        #expect(metrics.height == 30)
         #expect(metrics.gap == 2)
     }
 
     @Test func aRowNeverGetsTallerThanTheDesign() {
         for count in 1...30 {
             let metrics = Layout.rowMetrics(rowCount: count)
-            #expect(metrics.height <= 26, "\(count) rows")
-            #expect(metrics.height > 0, "\(count) rows")
-            #expect(metrics.gap >= 1, "\(count) rows")
+            #expect(metrics.height == 30, "\(count) rows")
+            #expect(metrics.gap == 2, "\(count) rows")
         }
     }
 }

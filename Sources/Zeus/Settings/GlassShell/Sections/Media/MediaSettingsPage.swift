@@ -1,7 +1,7 @@
 import SwiftUI
 import ZeusCore
 
-/// Dark glass page: 52 pt rows, a helper under each control, 32 pt padding, 28 pt between cards.
+/// Dark glass page. Spacing comes from the shell's metrics. The panel padding is the host's.
 struct MediaSettingsPage: View {
     var settings: MediaSettings
     var reduceMotion: Bool
@@ -33,13 +33,12 @@ struct MediaSettingsPage: View {
             access: access,
             lyricsPhase: lyricPhase
         )
-        VStack(alignment: .leading, spacing: 28) {
+        VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
             previewCard(preview)
             ForEach(grouped) { group in
                 card(group.name, group.rows)
             }
         }
-        .padding(32)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { alignMachine() }
         .onChange(of: settings.hideOnPause) { _, _ in alignMachine() }
@@ -126,8 +125,9 @@ struct MediaSettingsPage: View {
                 Spacer(minLength: 12)
                 trailing(control)
             }
-            .frame(minHeight: 52)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow))
             Text(control.helper).font(GS.rowText).foregroundStyle(GS.secondary)
+                .frame(minHeight: CGFloat(GlassSettingsMetrics.helperLine), alignment: .top)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHidden(true)
         }
