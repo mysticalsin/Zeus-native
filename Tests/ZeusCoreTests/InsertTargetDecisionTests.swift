@@ -51,6 +51,23 @@ import Testing
         #expect(route == .copyOnly)
     }
 
+    @Test func aFrontmostPidOfZeroIsNotThisProcess() {
+        let unnamed = DictationAppIdentity(processID: 0, bundleID: "app.unknown")
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: unnamed, ownPid: 0)
+        #expect(route == .copyOnly)
+    }
+
+    @Test func deliverKeepsAReactivate() {
+        let route = InsertTargetDecision.route(keyDown: notes, postOpen: browser, frontmost: zeus, ownPid: zeus.processID)
+        #expect(InsertTargetDecision.deliverEffect(route) == .reactivate(notes))
+    }
+
+    @Test func correctionKeepsPasteAndCopyOnly() {
+        #expect(InsertTargetDecision.correctionEffect(.paste) == .paste)
+        #expect(InsertTargetDecision.correctionEffect(.copyOnly) == .copyOnly)
+        #expect(InsertTargetDecision.correctionEffect(.reactivate(notes)) == .reactivate(notes))
+    }
+
     @Test func passingTheFrontmostPidTreatsThatAppAsZeus() {
         let route = InsertTargetDecision.route(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: browser.processID)
         #expect(route == .reactivate(notes))
@@ -65,6 +82,16 @@ import Testing
         #expect(!deliver.contains("ownPid: 0"))
         #expect(!deliver.contains("ownPid: frontmost"))
         #expect(!deliver.contains("ownPid: live.processID"))
+    }
+
+    @Test func beginKeepsPasteBackOnTheKeyDownApp() throws {
+        let begin = try functionSource("func begin() {", "func injectDictationFile")
+        let keyDown = try #require(begin.range(of: "let keyDownApp"))
+        let laterRead = try #require(begin.range(of: "seams.contextRead"))
+        #expect(keyDown.lowerBound < laterRead.lowerBound)
+        #expect(begin.contains("pasteBackApp: frontmost"))
+        #expect(!begin.contains("pasteBackApp: readApp"))
+        #expect(!begin.contains("pasteBackApp: read.targetApp"))
     }
 
     @Test func correctionStillActivatesWhenThePlanSaysReactivate() throws {

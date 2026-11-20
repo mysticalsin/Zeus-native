@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zeus
@@ -33,5 +34,31 @@ struct DictationBeginOrderTests {
         #expect(controller.flow.isListening)
         let generation = UInt64(log[0].dropFirst(4))
         #expect(controller.turnContext?.generation == generation)
+    }
+
+    @Test func pasteBackStaysTheKeyDownAppWhenTheLaterReadNamesAnother() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("mic-first-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let controller = DictationController(topBar: TopBarModel(), store: DictationStore(root: root))
+        let keyDown = try #require(NSWorkspace.shared.frontmostApplication)
+        let other = try #require(NSWorkspace.shared.runningApplications.first {
+            $0.processIdentifier != keyDown.processIdentifier
+        })
+        var seams = DictationController.Seams()
+        seams.access = { _, _ in .init(speech: true, microphone: true, language: true, onDevice: true) }
+        seams.readyEngine = { nil }
+        seams.pauseMedia = { _ in nil }
+        seams.speechStart = { _, _ in 41 }
+        seams.contextRead = { _ in
+            DictationController.FocusedContext(targetApp: other, insertionField: nil,
+                                               mode: DictationMode.builtIns[0], selection: nil)
+        }
+        controller.seams = seams
+        controller.begin()
+        let turn = try #require(controller.turnContext)
+        #expect(turn.keyDownApp.processID == keyDown.processIdentifier)
+        #expect(turn.pasteBackApp?.processIdentifier == keyDown.processIdentifier)
+        #expect(turn.targetApp?.processIdentifier == other.processIdentifier)
+        #expect(turn.pasteBackApp?.processIdentifier != other.processIdentifier)
     }
 }
