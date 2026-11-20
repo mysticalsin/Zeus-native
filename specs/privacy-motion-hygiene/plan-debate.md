@@ -14,6 +14,10 @@ TEST COMMAND: `swift test --filter aRecordedCommandHasItsTokenRedacted`
 
 `record` replaces the secret and keeps the rest of the line. The file mode is set on create and again after every write. Prune uses the existing store function. No new timer. `Motion.reducible` returns the same animation when Reduce Motion is off, and nil when it is on. Preferences.swift is not edited, and the system setting is not written.
 
+## Author response
+
+An env assignment before each command is redacted, including one after a semicolon, even when the name is not itself a secret. `X-Api-Key`, `Authorization: Basic` and `Cookie` values are redacted as well. `dd if=a of=b` stays, because those are arguments of one command. A turn end still calls `store.prune`. #21 and this branch both edit `DictationController.swift`, so the second merge needs another gate.
+
 ## Open challenge questions
 
 1. Can a secret still reach the log inside a second command, a quoted value, or a header the patterns do not name?

@@ -258,6 +258,9 @@ public struct HandsCommandLog: Equatable, Sendable {
         var text = replace(command, #"(?i)([a-z][a-z0-9+.-]*://)[^\s/:@]+:[^\s/@]+@"#, "$1[redacted]@")
         text = redactArguments(text)
         text = replace(text, #"(?i)\bBearer\s+(?!\[redacted\])\S+"#, "Bearer [redacted]")
+        text = replace(text, #"(?i)\bX-Api-Key:\s*\S+"#, "X-Api-Key: [redacted]")
+        text = replace(text, #"(?i)\bAuthorization:\s+Basic\s+\S+"#, "Authorization: Basic [redacted]")
+        text = replace(text, #"(?i)\bCookie:\s*\S+"#, "Cookie: [redacted]")
         return text
     }
 
@@ -281,35 +284,32 @@ public struct HandsCommandLog: Equatable, Sendable {
         return secretFlagNames.contains(name) ? name : nil
     }
 
-    /// Env assignments sit before the command. A secret-named assignment is removed wherever it sits.
+    /// Env assignments sit before each command, including one after `;`. A secret-named assignment is removed wherever it sits.
     private static func redactArguments(_ command: String) -> String {
-        let parsed = commandWords(command)
-        guard !parsed.isEmpty else { return command }
+        let segments = commandSegments(command)
+        guard !segments.isEmpty else { return command }
         var replacements: [(start: String.Index, end: String.Index, text: String)] = []
-        var index = 0
-        while index < parsed.count {
-            let end = segmentEnd(parsed, from: index)
-            let commandAt = commandWord(parsed[index..<end])
-            var cursor = index
-            while cursor < end {
-                let word = parsed[cursor]
+        for segment in segments {
+            let commandAt = commandWord(segment[...])
+            var cursor = 0
+            while cursor < segment.count {
+                let word = segment[cursor]
                 if let equals = word.text.firstIndex(of: "="), HandsShell.isAssignment(word.text) {
                     let name = String(word.text[..<equals])
-                    if cursor - index < commandAt || isSecretName(name) {
+                    if cursor < commandAt || isSecretName(name) {
                         let value = command.index(word.start, offsetBy: name.count + 1)
                         replacements.append((value, word.end, "[redacted]"))
                     }
                 } else if flagName(word.text) != nil, let equals = word.text.firstIndex(of: "=") {
                     let value = command.index(word.start, offsetBy: word.text.distance(from: word.text.startIndex, to: word.text.index(after: equals)))
                     replacements.append((value, word.end, "[redacted]"))
-                } else if flagName(word.text) != nil, cursor + 1 < end, flagName(parsed[cursor + 1].text) == nil {
-                    let next = parsed[cursor + 1]
+                } else if flagName(word.text) != nil, cursor + 1 < segment.count, flagName(segment[cursor + 1].text) == nil {
+                    let next = segment[cursor + 1]
                     replacements.append((next.start, next.end, "[redacted]"))
                     cursor += 1
                 }
                 cursor += 1
             }
-            index = end + 1
         }
         var text = command
         for item in replacements.sorted(by: { $0.start > $1.start }) {
@@ -324,13 +324,14 @@ public struct HandsCommandLog: Equatable, Sendable {
         var text: String
     }
 
-    private static func commandWords(_ command: String) -> [CommandWord] {
-        var words: [CommandWord] = []
+    private static func commandSegments(_ command: String) -> [[CommandWord]] {
+        var segments: [[CommandWord]] = [[]]
         var index = command.startIndex
         while index < command.endIndex {
             while index < command.endIndex, command[index] == " " || command[index] == "\t" { index = command.index(after: index) }
             guard index < command.endIndex else { break }
             if command[index] == ";" || command[index] == "|" || command[index] == "&" {
+                if !(segments.last?.isEmpty ?? true) { segments.append([]) }
                 index = command.index(after: index)
                 continue
             }
@@ -347,13 +348,9 @@ public struct HandsCommandLog: Equatable, Sendable {
                 if character == " " || character == "\t" || character == ";" || character == "|" || character == "&" { break }
                 index = command.index(after: index)
             }
-            words.append(CommandWord(start: start, end: index, text: String(command[start..<index])))
+            segments[segments.count - 1].append(CommandWord(start: start, end: index, text: String(command[start..<index])))
         }
-        return words
-    }
-
-    private static func segmentEnd(_ words: [CommandWord], from start: Int) -> Int {
-        start + 1 <= words.count ? words.count : start
+        return segments.filter { !$0.isEmpty }
     }
 
     /// How many leading words are the env prefix and wrappers, using the same skip as the blocklist.
