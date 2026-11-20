@@ -10,24 +10,31 @@ import ZeusCore
         .deletingLastPathComponent()
 
     @Test func fillingOneDescriptorShowsThatSlot() throws {
-        let slots = Self.topbarDescriptors(filled: true) + GlassSectionManifest.providers.compactMap { provider -> GlassSectionSlot? in
-            let slot = provider.descriptor
-            if case .topbarTab = slot.placement { return nil }
-            return slot
-        }
+        let slots = Self.topbarDescriptors(filled: true)
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
-        let tabIDs = Set(Self.topbarDescriptors(filled: true).map { $0.id })
+        let tabIDs = Set(slots.map { $0.id })
         #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
         #expect(rows.last?.title == "Topbar")
         #expect(!rows.contains { tabIDs.contains($0.id) })
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
         let labels = rows.map { $0.accessibilityLabel }
         #expect(labels.contains("Topbar"))
-        #expect(GlassSettingsAudit.topbarPresentationFailures(Self.topbarDescriptors(filled: true)).isEmpty)
-        #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
+        #expect(GlassSettingsAudit.topbarPresentationFailures(slots).isEmpty)
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
         #expect(host.contains("as? any GlassSlotPage.Type"))
         #expect(!host.contains("switch id"))
+    }
+
+    @Test func filledCardsShowInCardOrder() {
+        let later = GlassSectionSlot(id: "glass.card.later", title: "Later", filled: true, keys: [], placement: .cardOn(.general, 2))
+        let hidden = GlassSectionSlot(id: "glass.card.hidden", title: "Hidden", filled: false, keys: [], placement: .cardOn(.general, 1))
+        let earlier = GlassSectionSlot(id: "glass.card.earlier", title: "Earlier", filled: true, keys: [], placement: .cardOn(.general, 0))
+        let other = GlassSectionSlot(id: "glass.card.other", title: "Other", filled: true, keys: [], placement: .cardOn(.privacy, 0))
+        let slots = [later, hidden, other, earlier]
+        let general = GlassSectionManifest.cards(on: .general, in: slots).map { $0.id }
+        #expect(general == ["glass.card.earlier", "glass.card.later"])
+        let privacy = GlassSectionManifest.cards(on: .privacy, in: slots).map { $0.id }
+        #expect(privacy == ["glass.card.other"])
     }
 
     @Test func topbarAuditFollowsFilledState() {
