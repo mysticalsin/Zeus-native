@@ -9,7 +9,10 @@ public struct VoiceFrame: Equatable, Sendable {
 
     public var samples: [Float]
 
-    public init(samples: [Float]) {
+    public init(samples: [Float]) throws {
+        guard samples.count == Self.sampleCount else {
+            throw DuplexVoiceError.wrongFrameSize(count: samples.count)
+        }
         self.samples = samples
     }
 }
@@ -28,16 +31,33 @@ public protocol DuplexVoiceBackend: Sendable {
 
 /// Canned frames for tests. Not a model and not a download.
 public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
-    public init(frames: [[Float]]) {}
+    private let frames: [VoiceFrame]
+    private var started = false
+    private var closed = false
+    private var nextReply = 1
+
+    public init(frames: [[Float]]) throws {
+        let built = try frames.map { try VoiceFrame(samples: $0) }
+        guard !built.isEmpty else { throw DuplexVoiceError.wrongFrameSize(count: 0) }
+        self.frames = built
+    }
 
     public func start() async throws -> VoiceFrame {
-        VoiceFrame(samples: [])
+        started = true
+        nextReply = 1
+        return frames[0]
     }
 
     public func push(userFrame: [Float]) async throws -> VoiceFrame {
-        _ = userFrame
-        return VoiceFrame(samples: [])
+        if closed { throw DuplexVoiceError.pushAfterClose }
+        if !started { throw DuplexVoiceError.pushBeforeStart }
+        _ = try VoiceFrame(samples: userFrame)
+        let reply = nextReply < frames.count ? frames[nextReply] : frames[frames.count - 1]
+        if nextReply < frames.count { nextReply += 1 }
+        return reply
     }
 
-    public func close() async {}
+    public func close() async {
+        closed = true
+    }
 }
