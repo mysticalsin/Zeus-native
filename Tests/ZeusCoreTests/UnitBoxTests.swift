@@ -230,8 +230,8 @@ struct UnitBoxTests {
             let a = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
             let b = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
             let c = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
-            #expect(near(a.union(b), b.union(a)))
-            #expect(near(a.union(b).union(c), a.union(b.union(c))))
+            #expect(a.union(b) == b.union(a))
+            #expect(a.union(b).union(c) == a.union(b.union(c)))
             #expect(a.union(.null) == a)
             #expect(UnitBox.null.union(a) == a)
             if a.width > 0, a.height > 0 {
