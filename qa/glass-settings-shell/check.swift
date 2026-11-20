@@ -80,6 +80,9 @@ struct GlassSettingsShellCheck {
         failures += GlassSettingsAudit.hungCheckFailures()
         failures += GlassSettingsAudit.registryFailures()
         failures += GlassSettingsAudit.inspectorDeltaFailures(windowSource: windows[0])
+        failures += GlassSettingsAudit.contributionFailures(
+            catalogIDs: SettingsKeyReachability.catalogIDs(in: try text("Sources/Zeus/App/SettingsCatalog.swift"))
+        )
         let settingsSources = root.appendingPathComponent("Sources/ZeusCore/Settings")
         if let enumerator = FileManager.default.enumerator(at: settingsSources, includingPropertiesForKeys: nil) {
             for case let url as URL in enumerator where url.pathExtension == "swift" {

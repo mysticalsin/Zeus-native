@@ -42,7 +42,17 @@ extension SettingsCatalog {
     static func search(_ query: String) -> [SettingOption] {
         let words = query.lowercased().split(separator: " ").map(String.init)
         guard !words.isEmpty else { return [] }
-        return all.filter { option in option.isShown && words.allSatisfy { option.haystack.contains($0) } }
+        let catalog = all.filter { option in option.isShown && words.allSatisfy { option.haystack.contains($0) } }
+        let known = Set(catalog.map(\.id))
+        let extra = SettingsKeyLedger.search(query, in: GlassSectionManifest.keyContributions).compactMap { item -> SettingOption? in
+            guard SettingsCatalog.option(item.id) == nil, !known.contains(item.id) else { return nil }
+            return SettingOption(
+                id: item.id, section: .general, group: "", title: item.id, note: "",
+                kind: SettingsStore.optionKind(item.kind), choices: [], range: nil,
+                defaultValue: item.defaultValue, state: .live, todo: ""
+            )
+        }
+        return catalog + extra
     }
 }
 
@@ -75,6 +85,19 @@ final class SettingsStore {
 
     static func key(_ id: String) -> String { "opt." + id }
 
+    static func contribution(_ id: String) -> SettingsKeyContribution? {
+        GlassSectionManifest.keyContributions.first { $0.id == id }
+    }
+
+    static func optionKind(_ kind: SettingsKeyKind) -> SettingOption.Kind {
+        switch kind {
+        case .toggle: .toggle
+        case .text: .text
+        case .choice: .choice
+        case .number: .slider
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         // `topBar.halo` (what the notch read) and `halo.style` (what the picker wrote) are one setting now.
@@ -85,6 +108,9 @@ final class SettingsStore {
         }
         for option in SettingsCatalog.all where option.state != .custom {
             values[option.id] = defaults.string(forKey: Self.key(option.id)) ?? option.defaultValue
+        }
+        for item in GlassSectionManifest.keyContributions where SettingsCatalog.option(item.id) == nil && SettingsKeyLedger.persists(item) {
+            values[item.id] = defaults.string(forKey: Self.key(item.id)) ?? item.defaultValue
         }
         // One shared request per key, so a double click raises one prompt.
         askForMicrophone = { [weak self] in
@@ -125,7 +151,12 @@ final class SettingsStore {
 
     static let launchAtLoginID = "general.launchAtLogin"
 
-    func string(_ id: String) -> String { values[id] ?? defaults.string(forKey: Self.key(id)) ?? SettingsCatalog.option(id)?.defaultValue ?? "" }
+    func string(_ id: String) -> String {
+        if let item = Self.contribution(id), item.policy == .secretNeverStored, SettingsCatalog.option(id) == nil {
+            return item.defaultValue
+        }
+        return values[id] ?? defaults.string(forKey: Self.key(id)) ?? SettingsCatalog.option(id)?.defaultValue ?? Self.contribution(id)?.defaultValue ?? ""
+    }
     func bool(_ id: String) -> Bool { string(id) == "true" }
     /// Never NaN, infinite or beyond a billion, so `Int(store.double(...))` cannot trap on a hand-edited value.
     func double(_ id: String) -> Double {
@@ -137,6 +168,7 @@ final class SettingsStore {
     }
 
     func set(_ id: String, _ value: String, origin: ChangeOrigin = .person) {
+        if SettingsCatalog.option(id) == nil, let item = Self.contribution(id), !SettingsKeyLedger.mayStore(item, value: value) { return }
         if id == ScribeAutoStartMode.settingID { applyAutoStartChoice(value, origin: origin) }
         guard values[id] != value else { return }
         values[id] = value
@@ -193,22 +225,22 @@ final class SettingsStore {
     ]
 
     func resettable(_ section: SettingsNavigation.Section) -> Bool {
-        Self.extraKeys[section] != nil || SettingsCatalog.options(in: section).contains { Self.resets($0) }
+        Self.extraKeys[section] != nil || SettingsCatalog.options(in: section).contains { $0.state != .custom && Self.isValue($0.kind) }
+            || (section == .topBar && GlassSectionManifest.keyContributions.contains { $0.id.hasPrefix("lockScreen.") })
     }
 
     func reset(_ section: SettingsNavigation.Section) {
-        for option in SettingsCatalog.options(in: section) where Self.resets(option) {
+        for option in SettingsCatalog.options(in: section) where option.state != .custom && Self.isValue(option.kind) {
             set(option.id, option.defaultValue, origin: .reset)
+        }
+        let prefix = section.rawValue + "."
+        for item in GlassSectionManifest.keyContributions where SettingsCatalog.option(item.id) == nil && (item.id == section.rawValue || item.id.hasPrefix(prefix) || (section == .topBar && item.id.hasPrefix("lockScreen."))) {
+            if let value = SettingsKeyLedger.resetValue(item) { set(item.id, value, origin: .reset) }
         }
         if let keys = Self.extraKeys[section] { ExtraPreferences.shared.reset(keys) }
     }
 
     private static func isValue(_ kind: SettingOption.Kind) -> Bool { kind != .action && kind != .status }
-
-    /// Custom rows stay out of a section reset, except the lock screen values, which have no other reset.
-    private static func resets(_ option: SettingOption) -> Bool {
-        isValue(option.kind) && (option.state != .custom || lockScreenResetIDs.contains(option.id))
-    }
 
     // MARK: Import and export
 
@@ -307,19 +339,9 @@ final class SettingsStore {
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
-        // A private call can place a card on the lock screen. Only the person at this Mac turns that on.
-        "lockScreen.playerCard",
     ]
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
-    static let neverChosenByImport: [String: Set<String>] = [
-        ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title],
-        "lockScreen.lockSound": ["Gentle", "Listening", "Stopped listening", "To-do"],
-        "lockScreen.unlockSound": ["Gentle", "Listening", "Stopped listening", "To-do"],
-        "lockScreen.soundLevel": ["Quiet", "Loud"],
-    ]
-    private static let lockScreenResetIDs: Set<String> = [
-        "lockScreen.playerCard", "lockScreen.lockSound", "lockScreen.unlockSound", "lockScreen.soundLevel",
-    ]
+    static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {
         [WakeWordController.defaultsKey, "dictation.engineForVoice"]
     }
@@ -370,6 +392,11 @@ final class SettingsStore {
             if let value = defaults.string(forKey: Self.key(option.id)) { optionValues[option.id] = value }
         }
         optionValues = optionValues.filter { Self.isExportable(id: $0.key, value: $0.value) }
+        let contributed = GlassSectionManifest.keyContributions.filter { SettingsCatalog.option($0.id) == nil }
+        for item in contributed { optionValues.removeValue(forKey: item.id) }
+        for (id, value) in SettingsKeyLedger.exportMap(stored: values, contributions: contributed) {
+            optionValues[id] = value
+        }
         let root: [String: Any] = ["format": "zeus.settings", "version": 1, "options": optionValues, "app": app]
         return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
     }
@@ -385,6 +412,13 @@ final class SettingsStore {
         }
         var optionChanges: [(id: String, value: String)] = []
         for (id, raw) in root["options"] as? [String: Any] ?? [:] {
+            if let item = Self.contribution(id), SettingsCatalog.option(id) == nil {
+                guard let incoming = raw as? String else { continue }
+                let current = values[id] ?? item.defaultValue
+                guard let applied = SettingsKeyLedger.imported(item, current: current, incoming: incoming) else { continue }
+                if values[id] != applied { optionChanges.append((id, applied)) }
+                continue
+            }
             guard let option = SettingsCatalog.option(id), option.state != .stub, let value = raw as? String,
                   Self.accepts(value, for: option) else { continue }
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }

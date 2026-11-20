@@ -109,6 +109,13 @@ public struct LockScreenSettings: Equatable, Sendable {
 
 /// The value table behind the lock screen settings. A second store on the same table reads what the first saved.
 public struct LockScreenSettingsStore: Equatable, Sendable {
+    public static let contributions: [SettingsKeyContribution] = [
+        SettingsKeyContribution(id: LockScreenSettingKey.playerCard, defaultValue: "false", kind: .toggle, policy: .importCannotEnable),
+        SettingsKeyContribution(id: LockScreenSettingKey.lockSound, defaultValue: LockScreenSoundOption.off.title, kind: .choice, policy: .importCannotEnable),
+        SettingsKeyContribution(id: LockScreenSettingKey.unlockSound, defaultValue: LockScreenSoundOption.off.title, kind: .choice, policy: .importCannotEnable),
+        SettingsKeyContribution(id: LockScreenSettingKey.soundLevel, defaultValue: LockScreenSoundLevel.off.rawValue, kind: .choice, policy: .importCannotEnable),
+    ]
+
     public private(set) var values: [String: String]
 
     public init(values: [String: String] = [:]) {
@@ -116,33 +123,42 @@ public struct LockScreenSettingsStore: Equatable, Sendable {
     }
 
     public var settings: LockScreenSettings {
-        LockScreenSettings.resolve(
-            playerCard: values[LockScreenSettingKey.playerCard].map { $0 == "true" },
-            lockSound: values[LockScreenSettingKey.lockSound],
-            unlockSound: values[LockScreenSettingKey.unlockSound],
-            soundLevel: values[LockScreenSettingKey.soundLevel],
+        func load(_ id: String) -> String {
+            guard let item = Self.contributions.first(where: { $0.id == id }) else { return "" }
+            return SettingsKeyLedger.load(item, stored: values[id])
+        }
+        let card = load(LockScreenSettingKey.playerCard)
+        return LockScreenSettings.resolve(
+            playerCard: card == "true",
+            lockSound: load(LockScreenSettingKey.lockSound),
+            unlockSound: load(LockScreenSettingKey.unlockSound),
+            soundLevel: load(LockScreenSettingKey.soundLevel),
             origin: .owner
         )
     }
 
     public mutating func save(_ settings: LockScreenSettings) {
-        values[LockScreenSettingKey.playerCard] = settings.playerCard ? "true" : "false"
-        values[LockScreenSettingKey.lockSound] = settings.lockSound.title
-        values[LockScreenSettingKey.unlockSound] = settings.unlockSound.title
-        values[LockScreenSettingKey.soundLevel] = settings.soundLevel.rawValue
+        let encoded = [
+            LockScreenSettingKey.playerCard: settings.playerCard ? "true" : "false",
+            LockScreenSettingKey.lockSound: settings.lockSound.title,
+            LockScreenSettingKey.unlockSound: settings.unlockSound.title,
+            LockScreenSettingKey.soundLevel: settings.soundLevel.rawValue,
+        ]
+        for item in Self.contributions {
+            guard let value = encoded[item.id] else { continue }
+            _ = SettingsKeyLedger.save(&values, item, value)
+        }
     }
 
     /// An import may turn a control off. It cannot turn the card on, choose a sound, or raise the level.
     public static func importing(_ incoming: [String: String], into existing: [String: String] = [:]) -> [String: String] {
         var result = existing
-        if let card = incoming[LockScreenSettingKey.playerCard], card != "true" {
-            result[LockScreenSettingKey.playerCard] = card
-        }
-        for key in [LockScreenSettingKey.lockSound, LockScreenSettingKey.unlockSound] where incoming[key] == LockScreenSoundOption.off.title {
-            result[key] = LockScreenSoundOption.off.title
-        }
-        if incoming[LockScreenSettingKey.soundLevel] == LockScreenSoundLevel.off.rawValue {
-            result[LockScreenSettingKey.soundLevel] = LockScreenSoundLevel.off.rawValue
+        for item in contributions {
+            guard let raw = incoming[item.id] else { continue }
+            let current = SettingsKeyLedger.load(item, stored: result[item.id])
+            if let applied = SettingsKeyLedger.imported(item, current: current, incoming: raw) {
+                result[item.id] = applied
+            }
         }
         return result
     }

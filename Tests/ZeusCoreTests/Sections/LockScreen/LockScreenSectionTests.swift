@@ -534,19 +534,21 @@ import Testing
         #expect(LockScreenSettingsStore(values: kept).settings.playerCard == false)
     }
 
-    @Test func theCatalogRegistersTheKeysForExportImportSearchAndReset() throws {
-        let root = try repositoryRoot()
-        let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
-        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
-        for key in LockScreenSettingKey.all {
-            #expect(catalog.contains("id: \"\(key)\""))
-        }
-        #expect(catalog.contains("id: \"lockScreen.playerCard\""))
-        #expect(catalog.contains("defaultValue: \"false\""))
-        #expect(store.contains("\"lockScreen.playerCard\""))
-        for key in [LockScreenSettingKey.lockSound, LockScreenSettingKey.unlockSound, LockScreenSettingKey.soundLevel] {
-            #expect(store.contains("\"\(key)\""))
-        }
+    @Test func theCatalogRegistersTheKeysForExportImportSearchAndReset() {
+        let items = LockScreenSectionSlot.keyContributions
+        #expect(items.map(\.id) == LockScreenSettingKey.all)
+        #expect(items.allSatisfy { $0.policy == .importCannotEnable })
+        #expect(items.allSatisfy { $0.defaultValue == "false" || $0.defaultValue == "Off" })
+        #expect(GlassSectionManifest.keyContributions.map(\.id).contains(LockScreenSettingKey.playerCard))
+        let problems = SettingsKeyLedger.problems(catalogIDs: ["general.language"], contributions: GlassSectionManifest.keyContributions)
+        #expect(problems.isEmpty)
+        let card = items[0]
+        var stored: [String: String] = [:]
+        #expect(SettingsKeyLedger.save(&stored, card, "true"))
+        #expect(SettingsKeyLedger.exportMap(stored: stored, contributions: items)[card.id] == "true")
+        #expect(SettingsKeyLedger.imported(card, current: "false", incoming: "true") == nil)
+        #expect(SettingsKeyLedger.resetValue(card) == "false")
+        #expect(SettingsKeyLedger.search("player", in: items).map(\.id) == [LockScreenSettingKey.playerCard])
     }
 
     // MARK: Helpers
