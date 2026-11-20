@@ -103,8 +103,42 @@ struct UpdatePersistenceTests {
         #expect(model.contains("UpdateSettingsStore.load"))
         #expect(model.contains("UpdateSettingsStore.save"))
         #expect(!model.contains("setFeed"))
-        let importer = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
-        #expect(importer.contains("UpdateImportPolicy"))
+    }
+
+    @Test func settingsStoreMatchesTheShellHead() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.currentDirectoryURL = Self.gitRoot
+        process.arguments = ["diff", "--exit-code", "origin/zeus-bot/glass-settings-shell", "--", "Sources/Zeus/App/SettingsStore.swift"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        #expect(process.terminationStatus == 0)
+        #expect(output.isEmpty)
+    }
+
+    @Test func autoUpdateContributionsUseTheShellPolicy() {
+        let items = AutoUpdateSectionSlot.keyContributions
+        func policy(_ id: String) -> SettingsKeyPolicy? { items.first { $0.id == id }?.policy }
+        #expect(policy("about.autoUpdate") == .importCannotEnable)
+        #expect(policy("about.autoInstall") == .importCannotEnable)
+        #expect(policy("about.lastChecked") == .localOnly)
+        #expect(policy("about.updateStatus") == .localOnly)
+        #expect(policy("about.updateNotes") == .localOnly)
+        #expect(items.allSatisfy { $0.id != "SUPublicEDKey" && $0.id != "about.updateFeedURL" && $0.id != "SUFeedURL" })
+        #expect(SettingsKeyLedger.problems(catalogIDs: ["general.language"], contributions: items).isEmpty)
+    }
+
+    private static var gitRoot: URL {
+        var url = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()
+        while url.path != "/" {
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent(".git").path) { return url }
+            url.deleteLastPathComponent()
+        }
+        return root
     }
 
     private static func freshDefaults() -> UserDefaults {

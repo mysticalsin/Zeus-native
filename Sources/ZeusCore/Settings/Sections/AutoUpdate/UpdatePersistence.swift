@@ -85,8 +85,9 @@ public enum UpdateImportPolicy {
 
     public static func allowsImportedOption(id: String, value: String) -> Bool {
         if rejectsImportedKey(id) { return false }
-        if id == UpdateSettingsStore.automaticChecksID && value == "true" { return false }
-        if id == UpdateSettingsStore.automaticInstallID && value == "true" { return false }
+        if let item = AutoUpdateSectionSlot.keyContributions.first(where: { $0.id == id }) {
+            return SettingsKeyLedger.imported(item, current: item.defaultValue, incoming: value) != nil
+        }
         if id == "updates.automaticInstall" && value == "true" { return false }
         return true
     }

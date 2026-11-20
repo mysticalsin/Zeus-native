@@ -11,4 +11,15 @@ public enum AutoUpdateSectionSlot: GlassSlotProviding {
         placement: .cardOn(.about, 1)
     )
     public static let cardTitle = "Updates"
+
+    /// Feed address and SUPublicEDKey are build configuration, not settings keys.
+    public static var keyContributions: [SettingsKeyContribution] {
+        [
+            SettingsKeyContribution(id: "about.autoUpdate", defaultValue: "false", kind: .toggle, policy: .importCannotEnable),
+            SettingsKeyContribution(id: "about.autoInstall", defaultValue: "false", kind: .toggle, policy: .importCannotEnable),
+            SettingsKeyContribution(id: "about.lastChecked", defaultValue: "", kind: .text, policy: .localOnly),
+            SettingsKeyContribution(id: "about.updateStatus", defaultValue: "", kind: .text, policy: .localOnly),
+            SettingsKeyContribution(id: "about.updateNotes", defaultValue: "", kind: .text, policy: .localOnly),
+        ]
+    }
 }
