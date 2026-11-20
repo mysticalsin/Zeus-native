@@ -5,7 +5,14 @@ import Testing
 private let optIn1 = Date(timeIntervalSince1970: 1_000)
 private let optIn2 = Date(timeIntervalSince1970: 2_000)
 
-@Suite("Scribe automatic start opt-in")
+enum ScribeTestSuites {
+    /// A suite name with a slash is not a private domain on this runtime: parallel tests then share one store.
+    static func name(_ prefix: String) -> String {
+        "app.zeus.tests.\(prefix).\(UUID().uuidString)"
+    }
+}
+
+@Suite("Scribe automatic start opt-in", .serialized)
 struct ScribeAutoStartOptInTests {
     @Test func theOptInDefaultsSuiteIsNotAFilePath() {
         let name = ScribeTestSuites.name("ScribeAutoStartOptIn")
@@ -14,7 +21,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     private func fresh() throws -> (UserDefaults, () -> Void) {
-        let name = NSTemporaryDirectory() + "ScribeAutoStartOptIn.\(UUID().uuidString)"
+        let name = ScribeTestSuites.name("ScribeAutoStartOptIn")
         let defaults = try #require(UserDefaults(suiteName: name))
         return (defaults, { defaults.removePersistentDomain(forName: name) })
     }
