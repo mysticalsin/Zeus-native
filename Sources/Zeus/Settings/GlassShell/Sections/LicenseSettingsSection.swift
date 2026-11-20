@@ -1,10 +1,14 @@
 import SwiftUI
 import ZeusCore
 
+extension LicenseSectionSlot: GlassSlotPage {
+    static func erasePage() -> AnyView { AnyView(LicenseSettingsSection()) }
+}
+
 struct LicenseSettingsSection: View {
     var body: some View {
-        Text(LicenseSectionSlot.slot.title)
+        Text(LicenseSectionSlot.descriptor.title)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel(LicenseSectionSlot.slot.title)
+            .accessibilityLabel(LicenseSectionSlot.descriptor.title)
     }
 }

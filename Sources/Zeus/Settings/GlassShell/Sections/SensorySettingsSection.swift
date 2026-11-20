@@ -1,10 +1,14 @@
 import SwiftUI
 import ZeusCore
 
+extension SensorySectionSlot: GlassSlotPage {
+    static func erasePage() -> AnyView { AnyView(SensorySettingsSection()) }
+}
+
 struct SensorySettingsSection: View {
     var body: some View {
-        Text(SensorySectionSlot.slot.title)
+        Text(SensorySectionSlot.descriptor.title)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel(SensorySectionSlot.slot.title)
+            .accessibilityLabel(SensorySectionSlot.descriptor.title)
     }
 }

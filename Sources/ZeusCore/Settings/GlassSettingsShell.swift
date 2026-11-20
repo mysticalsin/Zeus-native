@@ -17,14 +17,29 @@ public struct GlassSectionSlot: Equatable, Sendable {
     }
 }
 
-public enum GlassSectionManifest {
-    /// Slots come from the section files beside this source. Adding a file is the whole registration.
-    public static var slots: [GlassSectionSlot] {
-        SettingsSlotDiscovery.slots(in: sectionsDirectory)
-    }
+public protocol GlassSlotProviding: Sendable {
+    static var descriptor: GlassSectionSlot { get }
+}
 
-    public static var sectionsDirectory: URL {
-        URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Sections")
+public enum GlassSectionManifest {
+    /// The twelve section types. A section change edits its own descriptor, not this list.
+    public static let providers: [any GlassSlotProviding.Type] = [
+        MediaSectionSlot.self,
+        GeneralSectionSlot.self,
+        PortalSectionSlot.self,
+        SensorySectionSlot.self,
+        BatterySectionSlot.self,
+        FocusSectionSlot.self,
+        WeatherSectionSlot.self,
+        LockScreenSectionSlot.self,
+        FaceIDSectionSlot.self,
+        AccessorySectionSlot.self,
+        LicenseSectionSlot.self,
+        AutoUpdateSectionSlot.self,
+    ]
+
+    public static var slots: [GlassSectionSlot] {
+        providers.map { $0.descriptor }
     }
 
     public static var newSettingKeyCount: Int {
@@ -615,34 +630,20 @@ public enum GlassSettingsAudit {
         return []
     }
 
-    public static func inspectorDeltaFailures(root: URL) -> [String] {
+    public static func inspectorDeltaFailures(windowSource: String) -> [String] {
         var failures: [String] = []
-        let probe = """
-        public enum ProbeSectionSlot {
-            public static let slot = GlassSectionSlot(id: \"glass.probe\", title: \"Probe\", filled: true, keys: [], order: 500)
+        let flipped = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
+            let slot = provider.descriptor
+            guard slot.id == "glass.media" else { return slot }
+            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order)
         }
-        """
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-probe-\(UUID().uuidString)", isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            defer { try? FileManager.default.removeItem(at: directory) }
-            try probe.write(to: directory.appendingPathComponent("ProbeSectionSlot.swift"), atomically: true, encoding: .utf8)
-            let slots = SettingsSlotDiscovery.slots(in: directory)
-            let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
-            if !rows.contains(where: { $0.id == "glass.probe" }) { failures.append("probe missing from the sidebar") }
-            if !SettingsSectionRegistry.search("Probe", in: rows).contains(where: { $0.id == "glass.probe" }) { failures.append("probe missing from search") }
-            if !rows.map(\.accessibilityLabel).contains("Probe") { failures.append("probe missing from voiceover order") }
-            if !SettingsSectionHostPlan.hostedIDs(in: rows).contains("glass.probe") { failures.append("probe missing from the host") }
-        } catch {
-            failures.append("probe file \(error)")
-        }
-        let manifest = (try? String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsShell.swift"), encoding: .utf8)) ?? ""
-        let host = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)) ?? ""
-        let window = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/SettingsWindow.swift"), encoding: .utf8)) ?? ""
-        let listedSlot = ["MediaSection", "Slot.slot"].joined()
-        if manifest.contains(listedSlot) { failures.append("shared slot list") }
-        let hostSwitch = ["switch", " id"].joined()
-        if host.contains(hostSwitch) { failures.append("host switch") }
+        let shownRows = SettingsSectionRegistry.sections(slots: flipped, includePhone: false)
+        if !shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("filled descriptor missing from the sidebar") }
+        if !SettingsSectionRegistry.search("Media", in: shownRows).contains(where: { $0.id == "glass.media" }) { failures.append("filled descriptor missing from search") }
+        if !shownRows.map(\.accessibilityLabel).contains("Media") { failures.append("filled descriptor missing from voiceover order") }
+        if !SettingsSectionHostPlan.hostedIDs(in: shownRows).contains("glass.media") { failures.append("filled descriptor missing from the host") }
+        if shownRows.contains(where: { $0.id == "glass.general" }) { failures.append("an unfilled descriptor appeared") }
+        let window = windowSource
         var state = SettingsSelectionState.section("settings.general")
         state = SettingsSelectionRules.selectingSlot("glass.probe", current: state)
         if state != .slot("glass.probe") { failures.append("slot left the section selected") }

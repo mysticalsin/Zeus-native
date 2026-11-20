@@ -79,7 +79,15 @@ struct GlassSettingsShellCheck {
         failures += GlassSettingsAudit.accessibilityFailures()
         failures += GlassSettingsAudit.hungCheckFailures()
         failures += GlassSettingsAudit.registryFailures()
-        failures += GlassSettingsAudit.inspectorDeltaFailures(root: root)
+        failures += GlassSettingsAudit.inspectorDeltaFailures(windowSource: windows[0])
+        let settingsSources = root.appendingPathComponent("Sources/ZeusCore/Settings")
+        if let enumerator = FileManager.default.enumerator(at: settingsSources, includingPropertiesForKeys: nil) {
+            for case let url as URL in enumerator where url.pathExtension == "swift" {
+                let source = try String(contentsOf: url, encoding: .utf8)
+                if source.contains("FileManager") { failures.append("\(url.lastPathComponent) reads files") }
+                if source.contains("#filePath") { failures.append("\(url.lastPathComponent) uses the build path") }
+            }
+        }
         var sources = [
             try text("Sources/ZeusCore/Settings/GlassSettingsShell.swift"),
             try text("Sources/Zeus/Settings/GlassSettingsChrome.swift"),
