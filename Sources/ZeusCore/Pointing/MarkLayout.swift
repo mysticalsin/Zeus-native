@@ -25,7 +25,7 @@ public struct MarkPin: Equatable, Sendable {
 }
 
 /// Where one mark sits after the screens are read, in that screen's own view coordinates.
-public struct PlacedMark: Equatable, Sendable {
+public struct LaidOutMark: Equatable, Sendable {
     public var number: Int
     public var title: String
     public var screenID: String
@@ -41,11 +41,11 @@ public struct MarkLayout {
         self.screens = screens
     }
 
-    public func place(_ marks: [MarkPin]) -> [PlacedMark] {
+    public func place(_ marks: [MarkPin]) -> [LaidOutMark] {
         let current = screens()
         return marks.compactMap { mark in
             guard let screen = current.first(where: { Self.owns(mark.point, on: $0) }) else { return nil }
-            return PlacedMark(number: mark.number, title: mark.title, screenID: screen.id,
+            return LaidOutMark(number: mark.number, title: mark.title, screenID: screen.id,
                               local: Self.local(mark.point, on: screen),
                               accessibilityLabel: "Mark \(mark.number), \(mark.title)")
         }
