@@ -4,11 +4,6 @@ public enum LockScreenSectionSlot: GlassSlotProviding {
     public static var keyContributions: [SettingsKeyContribution] { LockScreenSettingsStore.contributions }
 
     public static let descriptor = GlassSectionSlot(
-        id: "glass.lockScreen",
-        title: "Lock Screen",
-        filled: true,
-        keys: LockScreenSettingKey.all,
-        order: 5,
-        placement: .topbarTab(5)
+        id: "glass.lockScreen", title: "Lock Screen", filled: true, keys: [], order: 4, placement: .topbarTab(4)
     )
 }
