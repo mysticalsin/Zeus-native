@@ -1,60 +1,32 @@
 import CoreGraphics
 import Foundation
 
-/// Window appearance stored in `general.windowTheme`.
-/// Dark, glass, and clear glass are the finishes this section offers.
-/// System and Light remain readable and resolve to dark.
-public enum GeneralWindowAppearance: String, CaseIterable, Sendable {
-    case dark = "Dark"
-    case glass = "Glass"
-    case clearGlass = "Clear glass"
-
-    public static let key = "general.windowTheme"
-
-    public static func resolve(_ stored: String?) -> GeneralWindowAppearance {
-        GeneralWindowAppearance(rawValue: stored ?? "") ?? .dark
-    }
-
-    public func preview(blur: Double, reduceMotion: Bool, reduceTransparency: Bool) -> GeneralWindowPreview {
-        let strength = GeneralBlurStrength.clamp(blur)
-        let solid = self == .dark || reduceTransparency
-        let opacity: Double
-        if solid {
-            opacity = 1
-        } else {
-            switch self {
-            case .dark: opacity = 1
-            case .glass: opacity = 0.72
-            case .clearGlass: opacity = 0.38
-            }
-        }
-        let radius = solid ? 0 : (strength / GeneralBlurStrength.maximum) * 32
-        return GeneralWindowPreview(
-            appearance: self,
-            fillOpacity: opacity,
-            blurRadius: radius,
-            solid: solid,
-            animationDuration: reduceMotion ? 0 : MotionTokens.crossfadeDuration,
-            accessibilityLabel: "Window appearance preview, \(rawValue)"
-        )
-    }
-}
-
+/// A live sample of the welcome guide's appearance plus the background blur.
 public struct GeneralWindowPreview: Equatable, Sendable {
-    public var appearance: GeneralWindowAppearance
-    public var fillOpacity: Double
+    public var appearance: WindowAppearance
+    public var finish: WindowAppearance.Finish
     public var blurRadius: Double
-    public var solid: Bool
     public var animationDuration: Double
     public var accessibilityLabel: String
 
-    public init(appearance: GeneralWindowAppearance, fillOpacity: Double, blurRadius: Double, solid: Bool, animationDuration: Double, accessibilityLabel: String) {
+    public init(appearance: WindowAppearance, finish: WindowAppearance.Finish, blurRadius: Double, animationDuration: Double, accessibilityLabel: String) {
         self.appearance = appearance
-        self.fillOpacity = fillOpacity
+        self.finish = finish
         self.blurRadius = blurRadius
-        self.solid = solid
         self.animationDuration = animationDuration
         self.accessibilityLabel = accessibilityLabel
+    }
+
+    public static func make(appearance: WindowAppearance, systemIsLight: Bool, blur: Double, reduceMotion: Bool, reduceTransparency: Bool) -> GeneralWindowPreview {
+        let strength = GeneralBlurStrength.clamp(blur)
+        let radius = reduceTransparency ? 0 : (strength / GeneralBlurStrength.maximum) * 32
+        return GeneralWindowPreview(
+            appearance: appearance,
+            finish: appearance.finish(systemIsLight: systemIsLight),
+            blurRadius: radius,
+            animationDuration: reduceMotion ? 0 : MotionTokens.crossfadeDuration,
+            accessibilityLabel: "Window appearance preview, \(appearance.rawValue)"
+        )
     }
 }
 
@@ -373,19 +345,14 @@ public enum GeneralBanner: Equatable, Sendable {
     case error(String)
 }
 
-public enum GeneralSettingsLayout {
-    public static let rowHeight = 52.0
-    public static let panelPadding = 32.0
-    public static let cardSpacing = 28.0
-}
-
 public enum GeneralSettingsSectionModel {
     public static let placementSection = "general"
     public static let placementOrder = 1
     public static let previewControlID = "settings.general.windowTheme"
+    public static let appearanceChoices = WindowAppearance.allCases.map(\.rawValue)
 
     public static let controls: [GeneralControlSpec] = [
-        GeneralControlSpec(id: "settings.general.windowTheme", keys: ["general.windowTheme"], title: "Window appearance", helper: "Dark, glass, or clear glass for Settings.", accessibilityLabel: "Window appearance", kind: .choice, placement: .card(1)),
+        GeneralControlSpec(id: "settings.general.windowTheme", keys: [WindowAppearance.key], title: "Window appearance", helper: "System, Light, or Dark. The welcome guide uses the same choice.", accessibilityLabel: "Window appearance", kind: .choice, placement: .card(1)),
         GeneralControlSpec(id: "settings.general.backgroundBlur", keys: ["general.backgroundBlur"], title: "Background blur", helper: "0 is no blur and 100 is the strongest.", accessibilityLabel: "Background blur strength", kind: .slider, placement: .card(2)),
         GeneralControlSpec(id: "settings.general.notchDisplays", keys: ["notch.displays"], title: "Show the notch on", helper: "Which screens carry the notch.", accessibilityLabel: "Show the notch on", kind: .choice, placement: .existingPage),
         GeneralControlSpec(id: "settings.general.hideInFullScreen", keys: ["general.hideInFullScreen"], title: "Hide in full-screen apps", helper: "Hides the notch while the front app is full screen.", accessibilityLabel: "Hide in full-screen apps", kind: .toggle, placement: .card(3)),
@@ -423,8 +390,9 @@ public struct GeneralSettingsInput: Equatable, Sendable {
     public var hapticFailure: String?
     public var reduceMotion: Bool
     public var reduceTransparency: Bool
+    public var systemIsLight: Bool
 
-    public init(values: [String: String], menuBarStored: Bool?, displaysLoaded: Bool, displays: [DisplayDescriptor], pointer: CGPoint, displayFailure: String?, frontmostIsFullScreen: Bool, meetingActive: Bool, teleprompterSessionHidden: Bool, hapticsLoaded: Bool, forceTouch: Bool, hapticFailure: String?, reduceMotion: Bool, reduceTransparency: Bool) {
+    public init(values: [String: String], menuBarStored: Bool?, displaysLoaded: Bool, displays: [DisplayDescriptor], pointer: CGPoint, displayFailure: String?, frontmostIsFullScreen: Bool, meetingActive: Bool, teleprompterSessionHidden: Bool, hapticsLoaded: Bool, forceTouch: Bool, hapticFailure: String?, reduceMotion: Bool, reduceTransparency: Bool, systemIsLight: Bool = false) {
         self.values = values
         self.menuBarStored = menuBarStored
         self.displaysLoaded = displaysLoaded
@@ -439,11 +407,12 @@ public struct GeneralSettingsInput: Equatable, Sendable {
         self.hapticFailure = hapticFailure
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
+        self.systemIsLight = systemIsLight
     }
 }
 
 public struct GeneralSettingsOutput: Equatable, Sendable {
-    public var appearance: GeneralWindowAppearance
+    public var appearance: WindowAppearance
     public var preview: GeneralWindowPreview
     public var blur: Double
     public var displays: GeneralDisplayReadout
@@ -456,7 +425,7 @@ public struct GeneralSettingsOutput: Equatable, Sendable {
     public var launchAtLogin: Bool
     public var banner: GeneralBanner?
 
-    public init(appearance: GeneralWindowAppearance, preview: GeneralWindowPreview, blur: Double, displays: GeneralDisplayReadout, notchVisible: Bool, visibleInScreenCapture: Bool, menuBarShown: Bool, menuBarHelper: String, haptics: GeneralHapticReadout, hapticsPlay: Bool, launchAtLogin: Bool, banner: GeneralBanner?) {
+    public init(appearance: WindowAppearance, preview: GeneralWindowPreview, blur: Double, displays: GeneralDisplayReadout, notchVisible: Bool, visibleInScreenCapture: Bool, menuBarShown: Bool, menuBarHelper: String, haptics: GeneralHapticReadout, hapticsPlay: Bool, launchAtLogin: Bool, banner: GeneralBanner?) {
         self.appearance = appearance
         self.preview = preview
         self.blur = blur
@@ -474,7 +443,7 @@ public struct GeneralSettingsOutput: Equatable, Sendable {
 
 public enum GeneralSettingsResolver {
     public static func resolve(_ input: GeneralSettingsInput) -> GeneralSettingsOutput {
-        let appearance = GeneralWindowAppearance.resolve(input.values[GeneralWindowAppearance.key])
+        let appearance = WindowAppearance.resolve(input.values[WindowAppearance.key])
         let blur = GeneralBlurStrength.parse(input.values[GeneralBlurStrength.key])
         let displays = GeneralNotchScreens.readout(
             loaded: input.displaysLoaded,
@@ -494,7 +463,7 @@ public enum GeneralSettingsResolver {
         let menuShown = GeneralMenuBarIcon.shown(input.menuBarStored)
         return GeneralSettingsOutput(
             appearance: appearance,
-            preview: appearance.preview(blur: blur, reduceMotion: input.reduceMotion, reduceTransparency: input.reduceTransparency),
+            preview: GeneralWindowPreview.make(appearance: appearance, systemIsLight: input.systemIsLight, blur: blur, reduceMotion: input.reduceMotion, reduceTransparency: input.reduceTransparency),
             blur: blur,
             displays: displays,
             notchVisible: GeneralFullScreenHiding.notchVisible(hideWhenFullScreen: hide, frontmostIsFullScreen: input.frontmostIsFullScreen),

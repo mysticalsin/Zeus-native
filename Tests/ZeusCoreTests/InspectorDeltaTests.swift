@@ -22,7 +22,7 @@ import ZeusCore
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
         #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
         #expect(GlassSectionManifest.topbarTabs(in: slots).map(\.id) == ["glass.media"])
-        #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
+        #expect(GlassSectionManifest.cards(on: .general, in: slots).map(\.id) == ["glass.general"])
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
         #expect(host.contains("as? any GlassSlotPage.Type"))
         #expect(!host.contains("switch id"))

@@ -248,16 +248,12 @@ struct OnboardingRoot: View {
     let services: any OnboardingServing
     let finish: () -> Void
     var options: OnboardingOptions = .live
-    private var theme: String { options.string("general.windowTheme") }
+    private var theme: WindowAppearance { WindowAppearance.resolve(options.string(WindowAppearance.key)) }
     @Environment(\.colorScheme) private var systemScheme
     private var reduceMotion: Bool { Motion.reduced }
 
     private var palette: OB.Palette {
-        switch theme {
-        case "Light": OB.light
-        case "Dark": OB.dark
-        default: systemScheme == .light ? OB.light : OB.dark
-        }
+        theme.finish(systemIsLight: systemScheme == .light) == .light ? OB.light : OB.dark
     }
 
     var body: some View {
@@ -275,7 +271,7 @@ struct OnboardingRoot: View {
                 .offset(x: 903.5, y: 68)
                 .accessibilityLabel("Window appearance")
                 .accessibilityIdentifier("onboarding.appearance")
-                .accessibilityValue(theme)
+                .accessibilityValue(theme.rawValue)
                 .accessibilityHint("Switches between System, Light and Dark.")
             }
             OnboardingProgressBar(step: flow.step)
@@ -325,8 +321,7 @@ struct OnboardingRoot: View {
     }
 
     private func cycleTheme() {
-        let next = switch theme { case "System": "Light"; case "Light": "Dark"; default: "System" }
-        options.set("general.windowTheme", next)
+        options.set(WindowAppearance.key, theme.next().rawValue)
     }
 
     private var footer: some View {

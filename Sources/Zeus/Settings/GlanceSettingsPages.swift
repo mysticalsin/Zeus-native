@@ -51,6 +51,9 @@ struct GSPageView: View {
                 VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
                     GeneralPage(navigation: navigation, openGuide: context.openGuide)
                     GlassSettingsCardHost(page: .general)
+                        .onReceive(NotificationCenter.default.publisher(for: .zeusGeneralOpenAppearance)) { _ in
+                            navigation.section = .appearance
+                        }
                 }
             case .appearance: AppearancePage(context: context, navigation: navigation)
             case .sounds: SoundsPage(context: context)
