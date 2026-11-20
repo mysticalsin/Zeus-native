@@ -144,7 +144,7 @@ struct BatteryPreviewTests {
             root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/Sections/Battery"),
             root.appendingPathComponent("Tests/ZeusCoreTests/Sections/Battery"),
         ]
-        let banned = ["AirPods", "AirPod", "Boring Notch", "BoringNotch"]
+        let banned = ["Air" + "Pods", "Air" + "Pod", "Boring" + " Notch", "Boring" + "Notch"]
         var hits: [String] = []
         for folder in folders {
             guard let enumerator = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil) else { continue }

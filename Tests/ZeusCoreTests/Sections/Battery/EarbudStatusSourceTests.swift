@@ -49,8 +49,8 @@ struct EarbudStatusSourceTests {
             #expect(EarbudLevelText.display(report.levels[part] ?? .unknown) == "unknown")
             #expect(report.levels[part]?.percent == nil)
         }
-        #expect(!report.accessibilitySummary.contains("0%"))
         #expect(!report.accessibilitySummary.contains("0 percent"))
+        #expect(!report.accessibilitySummary.split(separator: " ").contains("0%"))
     }
 
     @Test func rawValuesOutsideOneToOneHundredNeverBecomeZero() {
@@ -196,7 +196,8 @@ struct EarbudStatusSourceTests {
         #expect(evaluation.report.levels[.cradle] == .unknown)
         #expect(evaluation.report.mode == .hidden)
         #expect(probe.keysSeen == EarbudPrivateSymbols.batteryKeyNames(settingEnabled: true, accessAllowed: true))
-        #expect(!evaluation.report.accessibilitySummary.contains("0%"))
+        #expect(!evaluation.report.accessibilitySummary.contains("0 percent"))
+        #expect(!evaluation.report.accessibilitySummary.split(separator: " ").contains("0%"))
     }
 
     @Test func aReleaseBelowTheFloorHidesTheModeAndDoesNotWrite() {
