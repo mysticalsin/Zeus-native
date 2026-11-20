@@ -1,6 +1,8 @@
 import Foundation
 
 public enum FocusSectionSlot: GlassSlotProviding {
+    public static var keyContributions: [SettingsKeyContribution] { [] }
+
     public static let descriptor = GlassSectionSlot(
         id: "glass.focus",
         title: "Focus",
