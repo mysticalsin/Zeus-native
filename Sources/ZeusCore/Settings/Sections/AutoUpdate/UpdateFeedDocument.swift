@@ -153,7 +153,8 @@ public enum UpdateFeedTransport {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                  response.url.map(UpdateFeedPolicy.isSecure) == true else { return .failure(.network) }
+                  let final = response.url,
+                  UpdateFeedTrust.allows(proposed: final, pinned: url, appcastSignature: .missing) else { return .failure(.network) }
             guard data.count <= UpdateFeedPolicy.maximumFeedBytes else { return .failure(.unreadable) }
             return .success(data)
         } catch {

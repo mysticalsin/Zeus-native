@@ -75,17 +75,19 @@ struct AutoUpdateSessionTests {
         }
         let resolved = UpdateConfiguration.resolve(
             automaticChecks: false,
-            feedSetting: "",
             info: ["SUPublicEDKey": Self.publicKey, "SUFeedURL": "https://updates.example.com/appcast.xml"]
         )
         #expect(resolved.isConfigured)
         #expect(resolved.automaticChecks == false)
-        let override = UpdateConfiguration.resolve(
+        let pinned = UpdateConfiguration.resolve(
             automaticChecks: false,
-            feedSetting: "https://updates.example.com/chosen.xml",
-            info: ["SUPublicEDKey": Self.publicKey, "SUFeedURL": "https://updates.example.com/bundled.xml"]
+            info: [
+                "SUPublicEDKey": Self.publicKey,
+                "SUFeedURL": "https://updates.example.com/bundled.xml",
+                "about.updateFeedURL": "https://evil.example/appcast.xml",
+            ]
         )
-        #expect(override.secureFeedURL?.absoluteString == "https://updates.example.com/chosen.xml")
+        #expect(pinned.secureFeedURL?.absoluteString == "https://updates.example.com/bundled.xml")
     }
 
     @Test func networkDowngradeAndSkippedVerificationNeverInstall() {

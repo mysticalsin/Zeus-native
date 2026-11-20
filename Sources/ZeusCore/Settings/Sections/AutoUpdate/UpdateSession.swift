@@ -50,21 +50,20 @@ public struct UpdateConfiguration: Equatable, Sendable {
         self.publicKey = publicKey
     }
 
-    public static func resolve(automaticChecks: Bool, feedSetting: String?, info: [String: String]) -> UpdateConfiguration {
-        let setting = (feedSetting ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let bundled = info[bundledFeedInfoKey] ?? ""
-        return UpdateConfiguration(
+    /// The feed and the public key come from the build. A settings value cannot replace either.
+    public static func resolve(automaticChecks: Bool, info: [String: String]) -> UpdateConfiguration {
+        UpdateConfiguration(
             automaticChecks: automaticChecks,
-            feedURL: setting.isEmpty ? bundled : setting,
+            feedURL: info[bundledFeedInfoKey] ?? "",
             publicKey: info[publicKeyInfoKey] ?? ""
         )
     }
 
-    public static func resolve(automaticChecks: Bool, feedSetting: String?, bundleInfo: [String: Any]) -> UpdateConfiguration {
+    public static func resolve(automaticChecks: Bool, bundleInfo: [String: Any]) -> UpdateConfiguration {
         let info = bundleInfo.reduce(into: [String: String]()) { partial, pair in
             if let value = pair.value as? String { partial[pair.key] = value }
         }
-        return resolve(automaticChecks: automaticChecks, feedSetting: feedSetting, info: info)
+        return resolve(automaticChecks: automaticChecks, info: info)
     }
 
     /// 32-byte EdDSA public key. A longer value, including a private key, is ignored.
@@ -255,9 +254,17 @@ public enum UpdateHosts {
 public enum UpdateClock {
     public static func checkedLine(_ date: Date?) -> String {
         guard let date else { return "Not checked yet." }
+        return formatter().string(from: date)
+    }
+
+    public static func date(from line: String) -> Date? {
+        formatter().date(from: line)
+    }
+
+    private static func formatter() -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        return formatter.string(from: date)
+        return formatter
     }
 }
 

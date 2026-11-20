@@ -373,6 +373,7 @@ final class SettingsStore {
             guard let option = SettingsCatalog.option(id), option.state != .stub, let value = raw as? String,
                   Self.accepts(value, for: option) else { continue }
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
+            if UpdateImportPolicy.rejectsImportedKey(id) || !UpdateImportPolicy.allowsImportedOption(id: id, value: value) { continue }
             if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if Self.neverChosenByImport[id]?.contains(value) == true { continue }
             if values[id] != value { optionChanges.append((id, value)) }
@@ -381,6 +382,7 @@ final class SettingsStore {
         for (key, value) in root["app"] as? [String: Any] ?? [:] {
             let rule = Self.appRules[key] ?? (key == HaloMigration.legacyKey ? AppRule.text(64) : nil)
             guard let rule, rule.accepts(value), !Self.neverImportedAppKeys.contains(key) else { continue }
+            if UpdateImportPolicy.rejectsImportedKey(key) { continue }
             if Self.neverEnabledAppKeys.contains(key), (value as? NSNumber)?.boolValue == true { continue }
             // An import never moves speech to a cloud service: this Mac may already hold that service's key.
             if Self.importWouldSelectCloud(key: key, value: value) { continue }

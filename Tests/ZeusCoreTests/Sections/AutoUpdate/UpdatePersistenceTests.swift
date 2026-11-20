@@ -31,6 +31,8 @@ struct UpdatePersistenceTests {
         #expect(loaded.lastChecked == Self.checked)
         #expect(loaded.status == saved.status)
         #expect(loaded.notes == saved.notes)
+        #expect(defaults.string(forKey: "opt.about.autoUpdate") == "true")
+        #expect(defaults.string(forKey: "opt.about.autoInstall") == "false")
         #expect(defaults.string(forKey: "SUPublicEDKey") == nil)
         #expect(defaults.string(forKey: "opt.about.updateFeedURL") == nil)
     }

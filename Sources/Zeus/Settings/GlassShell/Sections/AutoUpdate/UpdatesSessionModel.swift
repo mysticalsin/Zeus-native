@@ -11,18 +11,15 @@ final class UpdatesSessionModel {
     var lastChecked: Date?
     var confirming = false
     var context: UpdateContext
+    private var restoredNotes: [String] = []
     private var schedule: Task<Void, Never>?
     private var fetchToken = UUID()
 
     init() {
         let info = Bundle.main.infoDictionary ?? [:]
         let version = UpdateVersions.release(info["CFBundleShortVersionString"] as? String ?? "")
-        let store = SettingsStore.shared
-        var configuration = UpdateConfiguration.resolve(
-            automaticChecks: store.bool(UpdateConfiguration.automaticChecksKey),
-            feedSetting: store.string(UpdateConfiguration.feedURLKey),
-            bundleInfo: info
-        )
+        let saved = UpdateSettingsStore.load(from: .standard)
+        var configuration = UpdateConfiguration.resolve(automaticChecks: saved.automaticChecks, bundleInfo: info)
         if version == nil { configuration.automaticChecks = false }
         context = UpdateContext(
             configuration: configuration,
@@ -34,11 +31,19 @@ final class UpdatesSessionModel {
             acceptsUpdates: version != nil
         )
         state = UpdateSession.initial(context)
+        lastChecked = saved.lastChecked
+        restoredNotes = saved.notes
     }
 
     var card: UpdatesCardModel {
         context.reduceMotion = Motion.reduced
-        return UpdatesCard.model(state: state, context: context, lastChecked: lastChecked, confirmingInstall: confirming)
+        return UpdatesCard.model(
+            state: state,
+            context: context,
+            lastChecked: lastChecked,
+            confirmingInstall: confirming,
+            rememberedNotes: restoredNotes
+        )
     }
 
     func appear() {
@@ -53,6 +58,7 @@ final class UpdatesSessionModel {
         guard context.canAct else { return }
         SettingsStore.shared.set(UpdateConfiguration.automaticChecksKey, enabled ? "true" : "false")
         context.configuration.automaticChecks = enabled
+        UpdateSettingsStore.save(currentRecord(), to: .standard)
         if !enabled {
             schedule?.cancel()
             schedule = nil
@@ -61,11 +67,6 @@ final class UpdatesSessionModel {
             apply(event)
         }
         if enabled { startSchedule() }
-    }
-
-    func setFeed(_ value: String) {
-        SettingsStore.shared.set(UpdateConfiguration.feedURLKey, value)
-        reloadConfiguration()
     }
 
     func checkNow() {
@@ -94,11 +95,10 @@ final class UpdatesSessionModel {
     private func reloadConfiguration() {
         let info = Bundle.main.infoDictionary ?? [:]
         let version = UpdateVersions.release(info["CFBundleShortVersionString"] as? String ?? "")
-        context.configuration = UpdateConfiguration.resolve(
-            automaticChecks: SettingsStore.shared.bool(UpdateConfiguration.automaticChecksKey),
-            feedSetting: SettingsStore.shared.string(UpdateConfiguration.feedURLKey),
-            bundleInfo: info
-        )
+        let saved = UpdateSettingsStore.load(from: .standard)
+        context.configuration = UpdateConfiguration.resolve(automaticChecks: saved.automaticChecks, bundleInfo: info)
+        lastChecked = saved.lastChecked
+        restoredNotes = saved.notes
         context.acceptsUpdates = version != nil
         context.duringTests = UpdateTestGuard.isRunningTests()
         if let version { context.currentVersion = version }
@@ -113,7 +113,12 @@ final class UpdatesSessionModel {
         context.reduceMotion = Motion.reduced
         let step = UpdateSession.reduce(state, event, context)
         state = step.state
-        if step.recordCheck { lastChecked = context.now }
+        if step.recordCheck {
+            lastChecked = context.now
+            if case .available(let item) = state { restoredNotes = item.notes }
+            if case .upToDate = state { restoredNotes = [] }
+            UpdateSettingsStore.save(currentRecord(), to: .standard)
+        }
         if case .failed = state { confirming = false }
         perform(step.effects)
     }
@@ -166,6 +171,16 @@ final class UpdatesSessionModel {
                 }
             }
         }
+    }
+
+    private func currentRecord() -> UpdatePersistedState {
+        UpdatePersistedState(
+            automaticChecks: context.configuration.automaticChecks,
+            automaticInstall: false,
+            lastChecked: lastChecked,
+            status: card.status,
+            notes: card.notes
+        )
     }
 
     private func startSchedule() {

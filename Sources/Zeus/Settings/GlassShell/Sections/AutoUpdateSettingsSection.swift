@@ -115,24 +115,11 @@ struct AutoUpdateSettingsSection: View {
                 .accessibilityLabel(row.accessibilityLabel)
                 .accessibilityHint(row.helper)
         case .text(let value):
-            if row.id == UpdateConfiguration.feedURLKey {
-                TextField("https://", text: Binding(
-                    get: { session.context.configuration.feedURL },
-                    set: { session.setFeed($0) }
-                ))
-                .textFieldStyle(.plain)
+            Text(value)
                 .font(GS.rowText)
                 .foregroundStyle(GS.text)
-                .frame(maxWidth: 280)
+                .monospacedDigit()
                 .accessibilityLabel(row.accessibilityLabel)
-                .accessibilityHint(row.helper)
-            } else {
-                Text(value)
-                    .font(GS.rowText)
-                    .foregroundStyle(GS.text)
-                    .monospacedDigit()
-                    .accessibilityLabel(row.accessibilityLabel)
-            }
         }
     }
 

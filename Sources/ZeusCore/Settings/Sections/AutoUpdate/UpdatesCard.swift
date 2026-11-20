@@ -97,7 +97,7 @@ public enum UpdatesCard {
     public static let cardSpacing = GlassSettingsMetrics.cardSpacing
     public static let rowHeight = GlassSettingsMetrics.controlRow
 
-    public static func model(state: UpdateSessionState, context: UpdateContext, lastChecked: Date?, confirmingInstall: Bool) -> UpdatesCardModel {
+    public static func model(state: UpdateSessionState, context: UpdateContext, lastChecked: Date?, confirmingInstall: Bool, rememberedNotes: [String] = []) -> UpdatesCardModel {
         let configured = context.canAct
         let phase = phase(state, configured: configured)
         let status = statusLine(state, context: context, configured: configured)
@@ -115,11 +115,11 @@ public enum UpdatesCard {
                 label: "Check for updates automatically"
             ),
             row(
-                id: UpdateConfiguration.feedURLKey,
+                id: "updates.feed",
                 title: "Update feed",
-                helper: "An https address. Empty leaves updates off.",
-                control: .text(context.configuration.feedURL.isEmpty ? "Not set" : context.configuration.feedURL),
-                label: "Update feed address"
+                helper: "Comes with this build. A settings file cannot change it.",
+                control: .text(context.configuration.feedURL.isEmpty ? "Not configured" : context.configuration.feedURL),
+                label: "Update feed from this build"
             ),
             row(
                 id: UpdateConfiguration.checkNowKey,
@@ -160,7 +160,7 @@ public enum UpdatesCard {
         return UpdatesCardModel(
             title: AutoUpdateSectionSlot.cardTitle,
             rows: rows,
-            notes: offer?.notes ?? [],
+            notes: offer?.notes ?? rememberedNotes,
             notesEmpty: "No release notes yet.",
             preview: UpdatesPreview(
                 versionLine: versionLine,
