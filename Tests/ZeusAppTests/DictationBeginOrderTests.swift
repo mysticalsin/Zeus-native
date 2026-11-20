@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+import ZeusCore
 @testable import Zeus
 
 /// Key down opens the microphone before any read of the focused field.
