@@ -179,23 +179,38 @@ public struct PlacedMark: Equatable, Sendable {
     public var box: CGRect
 }
 
+extension UnitBox {
+    init(_ rect: CGRect) {
+        if rect.isNull {
+            self = .null
+        } else {
+            self.init(x: Double(rect.origin.x), y: Double(rect.origin.y),
+                      width: Double(rect.size.width), height: Double(rect.size.height))
+        }
+    }
+
+    var cgRect: CGRect {
+        isNull ? .null : CGRect(x: CGFloat(x), y: CGFloat(y), width: CGFloat(width), height: CGFloat(height))
+    }
+}
+
 /// Places marks in unit space and nudges labels off arrows and lines.
 public enum DrawingLayout {
     public static func place(_ marks: [DrawingMark]) -> [PlacedMark] {
         var placed: [PlacedMark] = []
         var strokes: [DrawingMark] = []
         for mark in marks {
-            var box = bounds(of: mark)
+            let unit = boundsUnit(of: mark)
+            let resolved: UnitBox
             if isLabel(mark) {
-                var nudge = 0
-                while nudge < 8, strokes.contains(where: { overlaps(box, $0) }) {
-                    box.origin.y += 0.03
-                    nudge += 1
-                }
-            } else if isStroke(mark) {
-                strokes.append(mark)
+                resolved = LabelNudge.place(unit) { candidate in
+                    strokes.contains { overlaps(candidate, $0) }
+                }.box
+            } else {
+                if isStroke(mark) { strokes.append(mark) }
+                resolved = unit
             }
-            placed.append(PlacedMark(mark: mark, box: box))
+            placed.append(PlacedMark(mark: mark, box: resolved.cgRect))
         }
         return placed
     }
@@ -204,28 +219,26 @@ public enum DrawingLayout {
     public static func labelsOverlapStrokes(_ placed: [PlacedMark]) -> Bool {
         let labels = placed.filter { isLabel($0.mark) }
         let strokes = placed.filter { isStroke($0.mark) }
-        return labels.contains { label in strokes.contains { overlaps(label.box, $0.mark) } }
+        return labels.contains { label in strokes.contains { overlaps(UnitBox(label.box), $0.mark) } }
     }
 
-    private static func overlaps(_ box: CGRect, _ mark: DrawingMark) -> Bool {
+    private static func overlaps(_ box: UnitBox, _ mark: DrawingMark) -> Bool {
+        guard let stroke = stroke(of: mark) else { return false }
+        return box.overlaps(stroke)
+    }
+
+    private static func stroke(of mark: DrawingMark) -> UnitStroke? {
         switch mark {
         case .arrow(let from, let to), .line(let from, let to):
-            return segmentHits(box.insetBy(dx: -0.02, dy: -0.02), from: from, to: to)
+            return .segment(UnitSegment(x0: from.x, y0: from.y, x1: to.x, y1: to.y))
         case .path(let points):
-            return zip(points, points.dropFirst()).contains { segmentHits(box.insetBy(dx: -0.02, dy: -0.02), from: $0.0, to: $0.1) }
+            let segments = zip(points, points.dropFirst()).map {
+                UnitSegment(x0: $0.x, y0: $0.y, x1: $1.x, y1: $1.y)
+            }
+            return .path(segments)
         default:
-            return false
+            return nil
         }
-    }
-
-    private static func segmentHits(_ box: CGRect, from: UnitPoint, to: UnitPoint) -> Bool {
-        let samples = 16
-        for step in 0...samples {
-            let t = Double(step) / Double(samples)
-            let point = CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
-            if box.contains(point) { return true }
-        }
-        return false
     }
 
     private static func isLabel(_ mark: DrawingMark) -> Bool {
@@ -242,27 +255,21 @@ public enum DrawingLayout {
         }
     }
 
-    private static func bounds(of mark: DrawingMark) -> CGRect {
+    private static func boundsUnit(of mark: DrawingMark) -> UnitBox {
         switch mark {
         case .rect(let origin, let size):
-            return CGRect(x: origin.x, y: origin.y, width: size.x, height: size.y)
+            return .rect(x: origin.x, y: origin.y, width: size.x, height: size.y)
         case .circle(let center, let radius):
-            return CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+            return .circle(centerX: center.x, centerY: center.y, radius: radius)
         case .arrow(let from, let to), .line(let from, let to):
-            return CGRect(x: min(from.x, to.x), y: min(from.y, to.y), width: abs(to.x - from.x), height: abs(to.y - from.y)).insetBy(dx: -0.01, dy: -0.01)
+            return .segment(x0: from.x, y0: from.y, x1: to.x, y1: to.y)
         case .path(let points):
-            guard let first = points.first else { return .null }
-            var rect = CGRect(x: first.x, y: first.y, width: 0, height: 0)
-            for point in points.dropFirst() { rect = rect.union(CGRect(x: point.x, y: point.y, width: 0, height: 0)) }
-            return rect.insetBy(dx: -0.01, dy: -0.01)
+            return .path(points.map { UnitSample(x: $0.x, y: $0.y) }) ?? .null
         case .label(let text, let at):
-            let width = max(0.03, Double(text.count) * 0.018)
-            return CGRect(x: at.x - width / 2, y: at.y - 0.02, width: width, height: 0.04)
+            return .label(characterCount: text.count, x: at.x, y: at.y)
         case .math(let tex, let at):
             let rendered = MathTypeset.render(tex)
-            let width = max(0.08, Double(rendered.spoken.count) * 0.016)
-            let height = rendered.numerator == nil ? 0.05 : 0.09
-            return CGRect(x: at.x - width / 2, y: at.y - height / 2, width: width, height: height)
+            return .math(spokenCount: rendered.spoken.count, hasNumerator: rendered.numerator != nil, x: at.x, y: at.y)
         }
     }
 }

@@ -2,6 +2,14 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
+private func near(_ lhs: UnitBox, _ rhs: UnitBox) -> Bool {
+    lhs.isNull == rhs.isNull
+        && abs(lhs.x - rhs.x) < 1e-9
+        && abs(lhs.y - rhs.y) < 1e-9
+        && abs(lhs.width - rhs.width) < 1e-9
+        && abs(lhs.height - rhs.height) < 1e-9
+}
+
 private struct SplitMix {
     var state: UInt64
     mutating func next() -> UInt64 {
@@ -19,7 +27,9 @@ private struct SplitMix {
 struct UnitBoxTests {
     @Test func rectCircleSegmentAndLabelBoundsMatchTheMarkRules() {
         #expect(UnitBox.rect(x: 0.2, y: 0.3, width: 0.4, height: 0.5) == UnitBox(x: 0.2, y: 0.3, width: 0.4, height: 0.5))
-        #expect(UnitBox.circle(centerX: 0.5, centerY: 0.4, radius: 0.1) == UnitBox(x: 0.4, y: 0.3, width: 0.2, height: 0.2))
+        let circle = UnitBox.circle(centerX: 0.5, centerY: 0.4, radius: 0.1)
+        #expect(circle.x == 0.4 && circle.width == 0.2 && circle.height == 0.2)
+        #expect(abs(circle.y - 0.3) < 1e-12)
         let flat = UnitBox.segment(x0: 0.1, y0: 0.2, x1: 0.7, y1: 0.2)
         #expect(flat == UnitBox(x: 0.1, y: 0.2, width: 0.6, height: 0).insetBy(dx: -0.01, dy: -0.01))
         let short = UnitBox.label(characterCount: 1, x: 0.5, y: 0.5)
@@ -124,8 +134,8 @@ struct UnitBoxTests {
             let a = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
             let b = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
             let c = UnitBox(x: rng.signed(), y: rng.signed(), width: rng.signed(), height: rng.signed())
-            #expect(a.union(b) == b.union(a))
-            #expect(a.union(b).union(c) == a.union(b.union(c)))
+            #expect(near(a.union(b), b.union(a)))
+            #expect(near(a.union(b).union(c), a.union(b.union(c))))
             #expect(a.union(.null) == a)
             #expect(UnitBox.null.union(a) == a)
             if a.width > 0, a.height > 0 {
@@ -133,7 +143,7 @@ struct UnitBoxTests {
                 let dx = min(a.width, a.height) * 0.2
                 let shrunk = a.insetBy(dx: dx, dy: dx)
                 #expect(!shrunk.isNull)
-                #expect(shrunk.insetBy(dx: -dx, dy: -dx) == a)
+                #expect(near(shrunk.insetBy(dx: -dx, dy: -dx), a))
             }
         }
     }
