@@ -4,11 +4,6 @@ public enum FocusSectionSlot: GlassSlotProviding {
     public static var keyContributions: [SettingsKeyContribution] { [] }
 
     public static let descriptor = GlassSectionSlot(
-        id: "glass.focus",
-        title: "Focus",
-        filled: true,
-        keys: FocusSettingKey.optIn,
-        order: 4,
-        placement: .topbarTab(4)
+        id: "glass.focus", title: "Focus", filled: true, keys: [], order: 3, placement: .topbarTab(3)
     )
 }
