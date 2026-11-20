@@ -11,9 +11,9 @@ struct FaceVerificationSectionTests {
         #expect(slot.id == "glass.faceID")
         #expect(slot.filled)
         #expect(slot.keys.isEmpty)
-        #expect(FaceVerificationSectionModel.persistedKeys == ["face.presence", "face.lockAfter", "face.status"])
-        #expect(!FaceVerificationSectionModel.persistedKeys.contains("face.approval"))
-        #expect(FaceVerificationSectionModel.persistsApprovalSwitch == false)
+        #expect(FaceVerificationSectionModel.persistedKeys == ["face.approval", "face.presence", "face.lockAfter", "face.status"])
+        #expect(FaceVerificationSectionModel.persistedKeys.contains(FaceApprovalPreference.key))
+        #expect(FaceVerificationSectionModel.persistsApprovalSwitch)
     }
 
     @Test func onboardingSaysWhatThisIsAndIsNot() {

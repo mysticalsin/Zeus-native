@@ -26,6 +26,10 @@ enum FaceVision {
         let quality: Float?
         let alignment: AlignmentTier?
         let spoofFrame: SpoofFrame
+        /// Height of an eye outline divided by its width. Nil when the outline was not read. A low value is a blink.
+        var eyeAspect: Float? = nil
+        /// Nose shift from the line between the eyes, divided by the eye spacing. Nil when the points were not read.
+        var yaw: Float? = nil
     }
 
     /// The feature print revision this build asks Vision for. Recorded with every sample and every observation.
@@ -72,8 +76,10 @@ enum FaceVision {
         let glare = FaceSelection.paddedCrop(pixelBox, imageSize: size).flatMap { image.cropping(to: $0) }
             .flatMap { glareSample(of: $0) }
         let overlap = deviceOverlap(in: image, faceBox: pixelBox)
+        let motion = faceLandmarks.map { livenessNumbers(from: $0, imageSize: size) }
         return FrameAnalysis(faceCount: faces.count, faceBox: box, observation: observation, quality: faceQuality,
-                             alignment: aligned.tier, spoofFrame: SpoofFrame(glare: glare, deviceOverlapFraction: overlap))
+                             alignment: aligned.tier, spoofFrame: SpoofFrame(glare: glare, deviceOverlapFraction: overlap),
+                             eyeAspect: motion?.aspect, yaw: motion?.yaw)
     }
 
     // MARK: Feature print
@@ -174,6 +180,36 @@ enum FaceVision {
         else { return nil }
         return LandmarkMath.fivePoints(eyeA: first, eyeB: second, nose: nose,
                                        lips: points(landmarks.outerLips, imageSize: imageSize))
+    }
+
+    /// Eye openness and a horizontal turn, as two numbers. No image leaves this function.
+    private static func livenessNumbers(from landmarks: VNFaceLandmarks2D, imageSize: CGSize) -> (aspect: Float, yaw: Float)? {
+        func aspect(_ region: VNFaceLandmarkRegion2D?) -> Float? {
+            let pts = points(region, imageSize: imageSize)
+            guard pts.count >= 2 else { return nil }
+            let xs = pts.map(\.x), ys = pts.map(\.y)
+            guard let minX = xs.min(), let maxX = xs.max(), let minY = ys.min(), let maxY = ys.max() else { return nil }
+            let width = maxX - minX
+            guard width > 1 else { return nil }
+            return Float((maxY - minY) / width)
+        }
+        let left = aspect(landmarks.leftEye)
+        let right = aspect(landmarks.rightEye)
+        let openness: Float
+        switch (left, right) {
+        case let (lhs?, rhs?): openness = (lhs + rhs) / 2
+        case let (lhs?, nil): openness = lhs
+        case let (nil, rhs?): openness = rhs
+        default: return nil
+        }
+        guard let (eyeA, eyeB) = eyeCenters(from: landmarks, imageSize: imageSize),
+              let nose = LandmarkMath.centroid(points(landmarks.nose, imageSize: imageSize)) else {
+            return (openness, 0)
+        }
+        let span = eyeB.x - eyeA.x
+        guard abs(span) > 1 else { return (openness, 0) }
+        let mid = (eyeA.x + eyeB.x) / 2
+        return (openness, Float((nose.x - mid) / span))
     }
 
     private static func eyePoints(from landmarks: VNFaceLandmarks2D, imageSize: CGSize) -> [CGPoint]? {

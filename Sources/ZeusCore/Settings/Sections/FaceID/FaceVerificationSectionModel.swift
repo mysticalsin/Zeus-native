@@ -58,9 +58,9 @@ public struct FaceVerificationSectionModel: Equatable, Sendable {
         self.layout = layout
     }
 
-    /// The face keys that already exist. The approval switch is not one of them, so a relaunch starts off.
-    public static let persistedKeys = ["face.presence", "face.lockAfter", "face.status"]
-    public static let persistsApprovalSwitch = false
+    /// Settings that already have a home. `face.approval` is the opt-in and is stored with them.
+    public static let persistedKeys = ["face.approval", "face.presence", "face.lockAfter", "face.status"]
+    public static let persistsApprovalSwitch = true
 
     public static func make(machine: FaceVerificationMachine, presenceEnabled: Bool, reduceMotion: Bool, vaultReadable: Bool?) -> FaceVerificationSectionModel {
         let screen = screen(machine: machine, vaultReadable: vaultReadable)

@@ -91,10 +91,10 @@ struct FaceApprovalWiringTests {
         var camera = FakeApprovalCamera(access: .authorized)
         let action = ApprovalAction(id: "pay", nonce: "nonce-pay")
         _ = session.begin(action, camera: &camera, at: 10)
-        let seen = session.observe(cleanFace(blinked: false, turned: false), at: 11)
+        let seen = session.observe(cleanFace(blinked: false, turned: false), camera: &camera, at: 11)
         #expect(seen == .authenticateOwner)
         var auth = ScriptedAuthenticator(biometrics: .unavailable, password: .acceptedPassword)
-        let grant = session.authenticate(using: &auth, action: action, at: 12)
+        let grant = session.authenticate(using: &auth, action: action, camera: &camera, at: 12)
         #expect(auth.policies == [.biometrics, .deviceOwner])
         #expect(grant == FaceApprovalGrant(actionID: action.id, nonce: action.nonce, method: .localAuthentication))
         #expect(!camera.running)
@@ -105,9 +105,9 @@ struct FaceApprovalWiringTests {
         var camera = FakeApprovalCamera(access: .authorized)
         let action = ApprovalAction(id: "pay", nonce: "nonce-bio")
         _ = session.begin(action, camera: &camera, at: 3)
-        _ = session.observe(cleanFace(blinked: false, turned: false), at: 4)
+        _ = session.observe(cleanFace(blinked: false, turned: false), camera: &camera, at: 4)
         var auth = ScriptedAuthenticator(biometrics: .acceptedBiometrics, password: .refused)
-        let grant = session.authenticate(using: &auth, action: action, at: 5)
+        let grant = session.authenticate(using: &auth, action: action, camera: &camera, at: 5)
         #expect(auth.policies == [.biometrics])
         #expect(grant?.method == .localAuthentication)
     }
@@ -119,18 +119,18 @@ struct FaceApprovalWiringTests {
         for index in 0..<limit {
             let action = ApprovalAction(id: "try", nonce: "lock-\(index)")
             _ = session.begin(action, camera: &camera, at: 100)
-            let follow = session.observe(.failure(.timeout), at: 100)
+            let follow = session.observe(.failure(.timeout), camera: &camera, at: 100)
             if index + 1 == limit {
                 #expect(follow == .authenticateOwner)
                 #expect(session.machine.phase == .lockedOut)
             }
         }
         let locked = ApprovalAction(id: "try", nonce: "during")
-        let face = session.observe(cleanFace(blinked: true, turned: true), at: 101)
+        let face = session.observe(cleanFace(blinked: true, turned: true), camera: &camera, at: 101)
         #expect(face != .approved(FaceApprovalGrant(actionID: locked.id, nonce: locked.nonce, method: .face)))
         #expect(session.machine.grant == nil)
         var auth = ScriptedAuthenticator(biometrics: .unavailable, password: .acceptedPassword)
-        let grant = session.authenticate(using: &auth, action: ApprovalAction(id: "try", nonce: "lock-\(limit - 1)"), at: 102)
+        let grant = session.authenticate(using: &auth, action: ApprovalAction(id: "try", nonce: "lock-\(limit - 1)"), camera: &camera, at: 102)
         #expect(grant?.method == .localAuthentication)
         #expect(session.machine.phase != .matched)
     }
@@ -152,11 +152,8 @@ struct FaceApprovalWiringTests {
 private func repositoryRoot() -> URL {
     var url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     while url.path != "/" {
-        if FileManager.default.fileExists(atPath: url.appendingPathComponent("Package.swift").path) {
-            let text = (try? String(contentsOf: url.appendingPathComponent("Package.swift"), encoding: .utf8)) ?? ""
-            if text.contains("name: \"Zeus\"") || text.contains("name: \"ZeusPortableValidation\"") {
-                return url
-            }
+        if FileManager.default.fileExists(atPath: url.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift").path) {
+            return url
         }
         url.deleteLastPathComponent()
     }

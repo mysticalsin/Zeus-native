@@ -88,6 +88,9 @@ final class FacePresenceController {
     @ObservationIgnored private var enrollmentWatchdog: Task<Void, Never>?
     @ObservationIgnored private(set) var consentTask: Task<Void, Never>?
     @ObservationIgnored private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    /// Face approval borrows this camera. It does not open a second session.
+    @ObservationIgnored private var approvalCapture = false
+    @ObservationIgnored var onApprovalSample: (@MainActor (FaceApprovalObservation) -> Void)?
 
     private struct EnrollmentSession {
         let token: Int
@@ -166,6 +169,12 @@ final class FacePresenceController {
         commit(faces.filter { $0.id != id })
     }
 
+    /// One action removes every saved face and the key that sealed them.
+    func deleteAllFaces() {
+        guard !faces.isEmpty else { return }
+        commit([])
+    }
+
     /// Saves the new list and only then adopts it, so a refused or failed save leaves what the owner sees equal to what
     /// is stored. Deleting the last face removes the file and the Keychain key.
     private func commit(_ updated: [FaceRecord]) {
@@ -235,10 +244,46 @@ final class FacePresenceController {
         }
     }
 
+    /// Face approval asks for the same camera. Permission goes through the presence prompt, and no second session opens.
+    func prepareApprovalCamera() async -> FacePresenceMachine.CameraAccess {
+        loadVault()
+        if environment.permissions.cameraAccess() == .notDetermined {
+            await environment.permissions.askCamera()
+        }
+        return environment.permissions.cameraAccess()
+    }
+
+    /// One frame from the camera this controller already owns. The camera stops when the frame arrives or the wait ends.
+    func oneApprovalSample() async -> FaceApprovalObservation {
+        let box = ApprovalSampleBox()
+        return await withCheckedContinuation { continuation in
+            onApprovalSample = { sample in
+                guard box.take() else { return }
+                self.onApprovalSample = nil
+                self.setApprovalCapture(false)
+                continuation.resume(returning: sample)
+            }
+            setApprovalCapture(true)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(8))
+                guard box.take() else { return }
+                self.onApprovalSample = nil
+                self.setApprovalCapture(false)
+                continuation.resume(returning: .failure(.timeout))
+            }
+        }
+    }
+
+    func setApprovalCapture(_ on: Bool) {
+        approvalCapture = on
+        reconcile()
+    }
+
     /// Keeps the camera and the one second timer in step with the machine.
     private func reconcile() {
-        if machine.wantsCamera != cameraRunning {
-            cameraRunning = machine.wantsCamera
+        let wantsCamera = machine.wantsCamera || approvalCapture
+        if wantsCamera != cameraRunning {
+            cameraRunning = wantsCamera
             cameraRun += 1
             if cameraRunning {
                 spoofWindow.reset()
@@ -271,7 +316,7 @@ final class FacePresenceController {
     /// One admitted frame: analyzed off the main actor, then judged here. A frame that arrives after the camera was
     /// stopped, or after the run it belonged to ended, is dropped without being looked at.
     func process(_ frame: FaceFrame, run: Int) async {
-        guard run == cameraRun, machine.wantsCamera else {
+        guard run == cameraRun, machine.wantsCamera || approvalCapture else {
             environment.source.analysisFinished()
             return
         }
@@ -279,7 +324,7 @@ final class FacePresenceController {
         let previous = previousFace
         let result = await Task.detached(priority: .utility) { Result { try analyze(frame.image, previous) } }.value
         environment.source.analysisFinished()
-        guard run == cameraRun, machine.wantsCamera else { return }
+        guard run == cameraRun, machine.wantsCamera || approvalCapture else { return }
 
         switch result {
         case .failure:
@@ -299,7 +344,30 @@ final class FacePresenceController {
             default:
                 break
             }
+            if approvalCapture, let onApprovalSample {
+                onApprovalSample(approvalObservation(analysis, spoof: latched))
+            }
         }
+    }
+
+    private func approvalObservation(_ analysis: FaceVision.FrameAnalysis, spoof: Set<SpoofCue>) -> FaceApprovalObservation {
+        let distance: Float?
+        if let observation = analysis.observation {
+            distance = faces.filter(\.isEnabled).map(\.enrolledFace).compactMap {
+                FaceMatch.score(observation, against: $0)?.centroidDistance
+            }.min()
+        } else {
+            distance = nil
+        }
+        let virtual = (environment.source as? FaceCamera)?.openedExternal == true
+        return FaceApprovalObservation(
+            distance: distance,
+            spoof: spoof,
+            virtualCamera: virtual,
+            blinked: FaceLivenessSignals.blinked(eyeAspect: analysis.eyeAspect),
+            turnedHead: FaceLivenessSignals.turned(yaw: analysis.yaw),
+            failure: analysis.observation == nil ? .noFace : nil
+        )
     }
 
     // MARK: Enrollment
@@ -404,6 +472,17 @@ final class FacePresenceController {
         if (session["CGSSessionScreenIsLocked"] as? Bool) == true { return .locked }
         if (session["kCGSSessionOnConsoleKey"] as? Bool) == false { return .locked }
         return .unlocked
+    }
+}
+
+private final class ApprovalSampleBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var taken = false
+    func take() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if taken { return false }
+        taken = true
+        return true
     }
 }
 

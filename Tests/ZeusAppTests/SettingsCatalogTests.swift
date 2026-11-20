@@ -396,7 +396,8 @@ struct SettingsCatalogTests {
         // What it does hold about faces is the two stored settings.
         let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let options = try #require(root["options"] as? [String: String])
-        #expect(options.keys.filter { $0.hasPrefix("face.") }.sorted() == ["face.lockAfter", "face.presence"])
+        #expect(options.keys.filter { $0.hasPrefix("face.") }.sorted() == ["face.approval", "face.lockAfter", "face.presence"])
+        #expect(options["face.approval"] == "false")
         #expect(options["face.lockAfter"] == "1 minute")
         let app = try #require(root["app"] as? [String: Any])
         #expect(app.keys.allSatisfy { !$0.hasPrefix("face.") })

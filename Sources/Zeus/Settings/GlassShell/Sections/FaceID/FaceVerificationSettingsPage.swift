@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 import ZeusCore
 
@@ -8,6 +7,7 @@ struct FaceVerificationSettingsPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var machine = FaceVerificationMachine()
     @State private var confirmingDelete = false
+    @State private var checkResult = ""
 
     private var store: SettingsStore { SettingsStore.shared }
 
@@ -80,18 +80,37 @@ struct FaceVerificationSettingsPage: View {
 
     private func controls(_ model: FaceVerificationSectionModel) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Toggle(isOn: approvalBinding) {
+            Toggle(isOn: store.boolBinding(FaceApprovalPreference.key)) {
                 controlLabel(model, id: "face.approval")
             }
             .toggleStyle(.switch)
             .accessibilityLabel(label(model, id: "face.approval"))
+            .onChange(of: store.bool(FaceApprovalPreference.key)) { _, on in
+                FaceApprovalBridge.enabledChanged(on)
+            }
             helper(model, id: "face.approval")
-            Button("Save a face") { send(.beginEnrollment) }
+            Button("Check now") { Task { checkResult = await FaceApprovalBridge.checkNow() } }
+                .buttonStyle(GSButtonStyle())
+                .accessibilityLabel("Check now")
+            if !checkResult.isEmpty {
+                Text(checkResult)
+                    .font(GS.rowText)
+                    .foregroundStyle(GS.text)
+                    .accessibilityLabel(checkResult)
+            }
+            Text("The camera stays off until you turn this on, and it opens only for a check.")
+                .font(GS.rowText)
+                .foregroundStyle(GS.secondary)
+            Button("Save a face") {
+                FacePresenceController.shared.enroll()
+                send(.beginEnrollment)
+            }
                 .buttonStyle(GSButtonStyle())
                 .accessibilityLabel(label(model, id: "face.enroll"))
             helper(model, id: "face.enroll")
             Button(confirmingDelete ? "Delete saved face now" : "Delete saved face") {
                 if confirmingDelete {
+                    FacePresenceController.shared.deleteAllFaces()
                     send(.deleteTemplate)
                     confirmingDelete = false
                 } else {
@@ -123,40 +142,8 @@ struct FaceVerificationSettingsPage: View {
         .overlay(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).strokeBorder(GS.cardStroke, lineWidth: 1))
     }
 
-    private var approvalBinding: Binding<Bool> {
-        Binding(get: { machine.approvalEnabled }, set: { on in
-            if on {
-                let access = currentCamera()
-                send(.enable(enrolled: machine.enrolled, camera: access, uptime: ProcessInfo.processInfo.systemUptime))
-            } else {
-                send(.disable)
-            }
-        })
-    }
-
-    private func currentCamera() -> FaceCameraAccess {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized: return .authorized
-        case .notDetermined: return .notDetermined
-        case .denied, .restricted: return .denied
-        @unknown default: return .unavailable
-        }
-    }
-
     private func send(_ event: FaceVerificationEvent) {
-        let effects = machine.handle(event)
-        for effect in effects {
-            if case .askCameraConsent = effect { requestPermission() }
-        }
-    }
-
-    private func requestPermission() {
-        guard AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined else { return }
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            Task { @MainActor in
-                _ = machine.handle(.cameraAnswered(granted: granted))
-            }
-        }
+        _ = machine.handle(event)
     }
 
     private func controlLabel(_ model: FaceVerificationSectionModel, id: String) -> some View {

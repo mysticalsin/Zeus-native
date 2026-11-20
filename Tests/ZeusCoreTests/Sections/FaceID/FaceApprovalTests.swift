@@ -11,7 +11,8 @@ struct FaceApprovalTests {
         #expect(!fresh.wantsCamera)
         #expect(fresh.grant == nil)
         #expect(FacePresenceLink.defaultEnabled == false)
-        #expect(FaceVerificationSectionModel.persistsApprovalSwitch == false)
+        #expect(FaceVerificationSectionModel.persistsApprovalSwitch)
+        #expect(FaceVerificationSectionModel.persistedKeys.contains(FaceApprovalPreference.key))
 
         var live = FaceVerificationFixtures.capturing()
         #expect(live.wantsCamera)

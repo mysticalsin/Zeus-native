@@ -297,7 +297,7 @@ final class SettingsStore {
     static let neverEnabledByImport: Set<String> = [
         "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
-        "face.presence",
+        "face.presence", "face.approval",
         // It reads other apps' window frames and moves their windows.
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.

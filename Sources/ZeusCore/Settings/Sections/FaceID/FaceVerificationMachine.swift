@@ -209,9 +209,9 @@ public struct FaceVerificationMachine: Equatable, Sendable {
 
         case .fallbackResult(let succeeded, let action, let uptime):
             stamp(uptime)
-            guard phase == .fallback, !lockActive else { return [] }
+            guard phase == .fallback || phase == .rejected || phase == .lockedOut else { return [] }
             guard succeeded, action.isBound, action == openAction, !issuedNonces.contains(action.nonce) else {
-                if !succeeded { return fail(nil, at: uptime) }
+                if !succeeded, phase != .lockedOut, !lockActive { return fail(nil, at: uptime) }
                 return []
             }
             grant = FaceApprovalGrant(actionID: action.id, nonce: action.nonce, method: .localAuthentication)
