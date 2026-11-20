@@ -2,6 +2,34 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
+/// Old rectangle union, written from the rectangle rules rather than from `UnitBox.union`.
+/// A positive-infinity origin is null and is dropped. A NaN origin or size makes that edge NaN,
+/// and `min`/`max` then keep a NaN only when it is the first argument.
+private func referenceUnion(_ a: UnitBox, _ b: UnitBox) -> UnitBox {
+    func null(_ box: UnitBox) -> Bool { box.x == .infinity || box.y == .infinity }
+    if null(a) { return b }
+    if null(b) { return a }
+    func low(_ origin: Double, _ size: Double) -> Double {
+        if origin.isNaN || size.isNaN { return .nan }
+        return size < 0 ? origin + size : origin
+    }
+    func high(_ origin: Double, _ size: Double) -> Double {
+        if origin.isNaN || size.isNaN { return .nan }
+        return size < 0 ? origin : origin + size
+    }
+    let left = min(low(a.x, a.width), low(b.x, b.width))
+    let top = min(low(a.y, a.height), low(b.y, b.height))
+    let right = max(high(a.x, a.width), high(b.x, b.width))
+    let bottom = max(high(a.y, a.height), high(b.y, b.height))
+    return UnitBox(x: left, y: top, width: right - left, height: bottom - top)
+}
+
+private func sameBox(_ lhs: UnitBox, _ rhs: UnitBox) -> Bool {
+    if lhs.isNull || rhs.isNull { return lhs.isNull && rhs.isNull }
+    func same(_ a: Double, _ b: Double) -> Bool { (a.isNaN && b.isNaN) || a == b }
+    return same(lhs.x, rhs.x) && same(lhs.y, rhs.y) && same(lhs.width, rhs.width) && same(lhs.height, rhs.height)
+}
+
 private func near(_ lhs: UnitBox, _ rhs: UnitBox) -> Bool {
     lhs.isNull == rhs.isNull
         && abs(lhs.x - rhs.x) < 1e-9
@@ -140,6 +168,46 @@ struct UnitBoxTests {
         #expect(LabelNudge.reduce(settled, .clear) == settled)
         #expect(LabelNudge.reduce(capped, .clear) == capped)
         #expect(LabelNudge.reduce(capped, .overlapped) == capped)
+    }
+
+    @Test func unionMatchesTheOldRectangleOnNaNCorners() {
+        let samples: [Double] = [0, 1, -2, .nan, .infinity, -.infinity]
+        let sizes: [Double] = [0, 1, -1, .nan, .infinity]
+        var mismatch: String?
+        for x1 in samples {
+            for y1 in samples {
+                for w1 in sizes {
+                    for h1 in sizes {
+                        for x2 in samples {
+                            for y2 in samples {
+                                for w2 in sizes {
+                                    for h2 in sizes {
+                                        let left = UnitBox(x: x1, y: y1, width: w1, height: h1)
+                                        let right = UnitBox(x: x2, y: y2, width: w2, height: h2)
+                                        let got = left.union(right)
+                                        let want = referenceUnion(left, right)
+                                        if !sameBox(got, want) {
+                                            mismatch = "(\(x1),\(y1),\(w1),\(h1)) U (\(x2),\(y2),\(w2),\(h2))"
+                                        }
+                                        if mismatch != nil { break }
+                                    }
+                                    if mismatch != nil { break }
+                                }
+                                if mismatch != nil { break }
+                            }
+                            if mismatch != nil { break }
+                        }
+                        if mismatch != nil { break }
+                    }
+                    if mismatch != nil { break }
+                }
+                if mismatch != nil { break }
+            }
+            if mismatch != nil { break }
+        }
+        #expect(mismatch == nil, "union left the old rectangle at \(mismatch ?? "")")
+        let dropped = UnitBox.path([UnitSample(x: 1, y: 2), UnitSample(x: .nan, y: 4)])
+        #expect(dropped == UnitBox(x: 0.99, y: 1.99, width: 0.02, height: 2.02))
     }
 
     @Test func randomBoxesKeepUnionAndInsetInvariants() {
