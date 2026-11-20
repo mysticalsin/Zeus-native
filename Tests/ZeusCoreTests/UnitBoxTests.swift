@@ -103,6 +103,13 @@ struct UnitBoxTests {
         #expect(!box.contains(x: -0.001, y: 0))
         #expect(!UnitBox(x: 1, y: 2, width: 0, height: 0).contains(x: 1, y: 2))
         #expect(box.insetBy(dx: 0, dy: 0) == box)
+        let zeroWidth = box.insetBy(dx: 0.5, dy: 0)
+        #expect(!zeroWidth.isNull)
+        #expect(zeroWidth.width == 0)
+        #expect(zeroWidth.x == 0.5)
+        let zeroHeight = UnitBox(x: 0, y: 0, width: 2, height: 1).insetBy(dx: 0, dy: 0.5)
+        #expect(!zeroHeight.isNull)
+        #expect(zeroHeight.height == 0)
         #expect(box.insetBy(dx: 0.6, dy: 0.1).isNull)
         #expect(UnitBox.null.insetBy(dx: -0.01, dy: -0.01).isNull)
         #expect(UnitBox.null.union(box) == box)
@@ -123,6 +130,11 @@ struct UnitBoxTests {
         let stroke = UnitStroke.segment(UnitSegment(x0: 0, y0: 0, x1: 1, y1: 0))
         let label = UnitBox(x: 0, y: -0.02, width: 0.1, height: 0.04)
         #expect(label.overlaps(stroke))
+        // The t=1 sample sits in the 0.02 pad and outside a 0.01 pad. A smaller pad misses it.
+        let endpoint = UnitBox(x: 0.96, y: -0.01, width: 0.025, height: 0.02)
+        #expect(endpoint.overlaps(stroke))
+        #expect(!endpoint.insetBy(dx: -0.01, dy: -0.01).hitsSegment(UnitSegment(x0: 0, y0: 0, x1: 1, y1: 0)))
+        #expect(endpoint.insetBy(dx: -0.02, dy: -0.02).hitsSegment(UnitSegment(x0: 0, y0: 0, x1: 1, y1: 0)))
         #expect(!UnitBox.null.overlaps(stroke))
         #expect(!label.overlaps(.path([])))
     }
@@ -135,20 +147,22 @@ struct UnitBoxTests {
             Issue.record("expected a settled box, got \(cleared)")
             return
         }
-        #expect(box.y == start.y + LabelNudge.dy * 2)
+        #expect(LabelNudge.dy == 0.03)
+        #expect(LabelNudge.maxSteps == 8)
+        #expect(box.y == start.y + 0.03 + 0.03)
 
         var calls = 0
         let capped = LabelNudge.place(start) { _ in
             calls += 1
             return true
         }
-        #expect(calls == LabelNudge.maxSteps)
+        #expect(calls == 8)
         guard case .capped(let stuck) = capped else {
             Issue.record("expected a capped box, got \(capped)")
             return
         }
         var added = start.y
-        for _ in 0..<LabelNudge.maxSteps { added += LabelNudge.dy }
+        for _ in 0..<8 { added += 0.03 }
         #expect(stuck.y == added)
         #expect(stuck.x == start.x && stuck.width == start.width && stuck.height == start.height)
     }
@@ -157,9 +171,9 @@ struct UnitBoxTests {
         let box = UnitBox(x: 1, y: 2, width: 3, height: 4)
         #expect(LabelNudge.reduce(.checking(step: 0, box: box), .clear) == .settled(box))
         let once = LabelNudge.reduce(.checking(step: 0, box: box), .overlapped)
-        #expect(once == .checking(step: 1, box: box.offsetBy(dx: 0, dy: LabelNudge.dy)))
-        let atLimit = box.offsetBy(dx: 0, dy: LabelNudge.dy * 8)
-        let checkingLimit = LabelNudge.State.checking(step: LabelNudge.maxSteps, box: atLimit)
+        #expect(once == .checking(step: 1, box: box.offsetBy(dx: 0, dy: 0.03)))
+        let atLimit = box.offsetBy(dx: 0, dy: 0.03 * 8)
+        let checkingLimit = LabelNudge.State.checking(step: 8, box: atLimit)
         #expect(LabelNudge.reduce(checkingLimit, .overlapped) == .capped(atLimit))
         #expect(LabelNudge.reduce(checkingLimit, .clear) == .settled(atLimit))
         let settled = LabelNudge.State.settled(box)
@@ -245,7 +259,9 @@ struct UnitBoxTests {
             }
             let moves = min(budget, 8)
             #expect(seen == moves)
-            #expect(end.box.y == start.y + 0.03 * Double(moves))
+            var y = start.y
+            for _ in 0..<moves { y += 0.03 }
+            #expect(end.box.y == y)
             if budget < 8 {
                 guard case .settled = end else {
                     Issue.record("a clear answer before eight steps should settle")
