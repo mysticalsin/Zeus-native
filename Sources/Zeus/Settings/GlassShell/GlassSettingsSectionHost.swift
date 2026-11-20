@@ -20,6 +20,44 @@ enum GlassSettingsSectionHost {
     }
 }
 
+struct GlassSettingsCardHost: View {
+    let page: GlassCardPage
+
+    var body: some View {
+        let cards = GlassSectionManifest.cards(on: page)
+        if !cards.isEmpty {
+            VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
+                ForEach(cards, id: \.id) { slot in
+                    GlassSettingsSlotPage(slot: slot)
+                }
+            }
+        }
+    }
+}
+
+struct GlassTopbarPage: View {
+    let selected: String
+    let navigation: GSNavigation
+
+    var body: some View {
+        let tabs = GlassSectionManifest.topbarTabs()
+        VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
+            HStack(spacing: 8) {
+                ForEach(tabs, id: \.id) { tab in
+                    let on = tab.id == selected
+                    Button(tab.title) { navigation.selectTopbar(tab.id) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tab.title)
+                        .accessibilityAddTraits(on ? .isSelected : [])
+                }
+            }
+            if let slot = tabs.first(where: { $0.id == selected }) {
+                GlassSettingsSlotPage(slot: slot)
+            }
+        }
+    }
+}
+
 struct GlassSettingsSlotPage: View {
     let slot: GlassSectionSlot
 

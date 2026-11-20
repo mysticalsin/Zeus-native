@@ -47,7 +47,11 @@ struct GSPageView: View {
         VStack(alignment: .leading, spacing: GS.cardGap) {
             SettingsUpdateBadgeRow()
             switch section {
-            case .general: GeneralPage(navigation: navigation, openGuide: context.openGuide)
+            case .general:
+                VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
+                    GeneralPage(navigation: navigation, openGuide: context.openGuide)
+                    GlassSettingsCardHost(page: .general)
+                }
             case .appearance: AppearancePage(context: context, navigation: navigation)
             case .sounds: SoundsPage(context: context)
             case .notifications: GSNotificationsPage()
@@ -64,11 +68,23 @@ struct GSPageView: View {
             case .beamer: BeamerSettingsPage(context: context)
             case .tiling: TilingSettingsPage()
             case .shelf: ShelfSettingsPage()
-            case .license: LicensePage(navigation: navigation)
+            case .license:
+                VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
+                    LicensePage(navigation: navigation)
+                    GlassSettingsCardHost(page: .license)
+                }
             case .permissions: PermissionsPage(context: context)
-            case .privacy: PrivacyPage(context: context)
+            case .privacy:
+                VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
+                    PrivacyPage(context: context)
+                    GlassSettingsCardHost(page: .privacy)
+                }
             case .diagnostics: DiagnosticsPage(context: context)
-            case .about: AboutPage(navigation: navigation)
+            case .about:
+                VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
+                    AboutPage(navigation: navigation)
+                    GlassSettingsCardHost(page: .about)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

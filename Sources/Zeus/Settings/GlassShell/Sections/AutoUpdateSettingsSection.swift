@@ -89,6 +89,7 @@ struct AutoUpdateSettingsSection: View {
                 .font(GS.rowText)
                 .foregroundStyle(GS.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: CGFloat(GlassSettingsMetrics.helperLine), alignment: .leading)
         }
         .frame(maxWidth: .infinity, minHeight: height, alignment: .center)
         .padding(.vertical, 6)

@@ -323,11 +323,10 @@ struct AutoUpdateSessionTests {
     @Test func theUpdatesCardStaysOnAboutAndDoesNotOpenAWindow() throws {
         #expect(AutoUpdateSectionSlot.descriptor.id == "glass.autoUpdate")
         #expect(AutoUpdateSectionSlot.descriptor.title == "Auto-update")
-        #expect(AutoUpdateSectionSlot.descriptor.filled == false)
+        #expect(AutoUpdateSectionSlot.descriptor.filled)
         #expect(AutoUpdateSectionSlot.descriptor.keys.isEmpty)
+        #expect(AutoUpdateSectionSlot.descriptor.placement == .cardOn(.about, 1))
         #expect(AutoUpdateSectionSlot.cardTitle == "Updates")
-        #expect(AutoUpdateSectionSlot.aboutPageID == "about")
-        #expect(AutoUpdateSectionSlot.aboutCardOrder == 1)
         let section = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/Sections/AutoUpdateSettingsSection.swift"), encoding: .utf8)
         let folder = Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/Sections/AutoUpdate")
         var text = section

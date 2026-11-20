@@ -93,9 +93,9 @@ public struct UpdatesCardModel: Equatable, Sendable {
 }
 
 public enum UpdatesCard {
-    public static let panelPadding = 32.0
-    public static let cardSpacing = 28.0
-    public static let rowHeight = 52.0
+    public static let panelPadding = GlassSettingsMetrics.panelPadding
+    public static let cardSpacing = GlassSettingsMetrics.cardSpacing
+    public static let rowHeight = GlassSettingsMetrics.controlRow
 
     public static func model(state: UpdateSessionState, context: UpdateContext, lastChecked: Date?, confirmingInstall: Bool) -> UpdatesCardModel {
         let configured = context.canAct
