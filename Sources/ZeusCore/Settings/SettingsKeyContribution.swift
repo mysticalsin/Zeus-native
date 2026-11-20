@@ -117,11 +117,18 @@ public enum SettingsKeyLedger {
                 continue
             }
             if load(item, stored: nil) != item.defaultValue { problems.append("\(id) has no default") }
+            if !declaresPolicy(item) { problems.append("\(id) has no policy") }
             seen[id, default: 0] += 1
             if catalog.contains(id) { problems.append("duplicate id \(id)") }
         }
         for (id, count) in seen where count > 1 { problems.append("duplicate id \(id)") }
         return problems.sorted()
+    }
+
+    public static func declaresPolicy(_ item: SettingsKeyContribution) -> Bool {
+        switch item.policy {
+        case .exportable, .localOnly, .importCannotEnable, .secretNeverStored: return true
+        }
     }
 
     private static func isOn(_ value: String, _ item: SettingsKeyContribution) -> Bool {
