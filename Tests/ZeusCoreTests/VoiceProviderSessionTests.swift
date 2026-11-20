@@ -132,7 +132,7 @@ struct VoiceProviderSessionTests {
         await harness.session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: secret)
         await harness.session.select(.provider(ElevenLabsTTSAdapter.id))
         _ = await harness.session.speak(sentence)
-        try assertSecretIsAbsent(harness)
+        assertSecretIsAbsent(harness)
         let card = await harness.session.card()
         #expect(!card.publicText.contains(secret))
         #expect(card.keyIsMasked)
@@ -149,9 +149,10 @@ struct VoiceProviderSessionTests {
         await harness.session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: secret)
         await harness.session.select(.provider(ElevenLabsTTSAdapter.id))
         harness.transport.holdStreams = true
-        let task = Task { await harness.session.speak(sentence) }
+        let session = harness.session
+        let task = Task { await session.speak(sentence) }
         try await Task.sleep(for: .milliseconds(30))
-        await harness.session.cancel()
+        await session.cancel()
         let outcome = await task.value
         #expect(outcome.route == .cancelled)
         #expect(harness.local.calls == 0)
@@ -218,8 +219,11 @@ private final class FakeLocalVoice: LocalVoiceSpeaking, @unchecked Sendable {
     private(set) var spoken: [String] = []
     var calls: Int { lock.lock(); defer { lock.unlock() }; return spoken.count }
     func speak(_ text: String) async -> Data {
-        lock.lock(); spoken.append(text); lock.unlock()
+        remember(text)
         return Data("local-voice".utf8)
+    }
+    private func remember(_ text: String) {
+        lock.lock(); spoken.append(text); lock.unlock()
     }
 }
 
@@ -230,9 +234,13 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
     var streamError: ProviderFailure?
     var holdStreams = false
     var requests: [ProviderHTTPRequest] { lock.lock(); defer { lock.unlock() }; return seen }
+    private func remember(_ request: ProviderHTTPRequest) {
+        lock.lock(); seen.append(request); lock.unlock()
+    }
 
     func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse {
-        lock.lock(); seen.append(request); lock.unlock()
+        remember(request)
+        if let streamError { throw streamError }
         let path = request.url.path
         if path.hasSuffix("/user") { return ProviderHTTPResponse(status: 200, body: Data("{}".utf8)) }
         if path.hasSuffix("/voices") || path.hasSuffix("/v1/voices") {
@@ -253,7 +261,7 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
     }
 
     func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error> {
-        lock.lock(); seen.append(request); lock.unlock()
+        remember(request)
         let status = streamStatus
         let error = streamError
         let hold = holdStreams

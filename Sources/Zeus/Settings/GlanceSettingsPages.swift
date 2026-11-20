@@ -1009,6 +1009,7 @@ private struct VoicePage: View {
         GSPageHeading(section: .voice, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         ZeusVoiceCards(navigation: navigation)
+        VoiceProvidersCard()
         GSCard("Talk to Zeus") {
             ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
             GSDivider()

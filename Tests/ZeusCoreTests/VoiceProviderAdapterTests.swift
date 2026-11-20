@@ -1,8 +1,11 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Testing
 @testable import ZeusCore
 
-@Suite("Voice provider adapters")
+@Suite("Voice provider adapters", .serialized)
 struct VoiceProviderAdapterTests {
     private let elevenKey = "el-test-key-not-a-secret-4f91"
     private let googleKey = "goog-test-key-not-a-secret-4f91"

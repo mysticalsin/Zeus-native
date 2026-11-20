@@ -195,6 +195,27 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         lineOnStart = onStart
         lineBase = chain.ledger.scheduled
         defer { lineOnStart = nil }
+        switch await PluginVoiceBridge.speak(text) {
+        case .passthrough:
+            break
+        case .spoken(let engine, let voice, let reason, let firstAudioMs):
+            armLineStart()
+            if let firstAudioMs { settings.recordFirstAudio(engine, ms: firstAudioMs) }
+            logSpoken(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
+            return Played(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
+        case .localFallback(let reason):
+            for engine in [UltronEngine.kokoro, .chatterbox, .system] {
+                if Task.isCancelled { return nil }
+                audioReadyAt = nil
+                guard let voiceName = await attempt(engine, text, settings: settings, began: began) else { continue }
+                armLineStart()
+                let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
+                if let ms { settings.recordFirstAudio(engine, ms: ms) }
+                logSpoken(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
+                return Played(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
+            }
+            return nil
+        }
         for decision in settings.routeDecisions() {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
