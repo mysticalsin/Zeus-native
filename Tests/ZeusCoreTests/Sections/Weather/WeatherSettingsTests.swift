@@ -133,7 +133,7 @@ import Testing
 
     @Test func deniedAndRestrictedOpenSettingsWithoutAPrompt() {
         var denied = PreciseLocationMachine()
-        denied.send(.authorization(.denied))
+        _ = denied.send(.authorization(.denied))
         #expect(denied.send(.userEnabled) == .revealSystemSettings)
         #expect(denied.phase == .denied)
         #expect(denied.showsPrompt == false)
@@ -141,7 +141,7 @@ import Testing
         #expect(denied.send(.userEnabled) == .revealSystemSettings)
 
         var restricted = PreciseLocationMachine()
-        restricted.send(.authorization(.restricted))
+        _ = restricted.send(.authorization(.restricted))
         #expect(restricted.send(.userEnabled) == .revealSystemSettings)
         #expect(restricted.phase == .restricted)
         #expect(restricted.statusLabel == "No access")
@@ -162,13 +162,13 @@ import Testing
     @Test func turningItOffStopsReadingAndAllowsALaterPrompt() {
         var machine = PreciseLocationMachine()
         #expect(machine.send(.userDisabled) == nil)
-        machine.send(.userEnabled)
+        _ = machine.send(.userEnabled)
         #expect(machine.send(.userDisabled) == .stopReadingLocation)
         #expect(machine.phase == .off)
         #expect(machine.showsPrompt == false)
         #expect(machine.send(.userEnabled) == .requestPrompt)
 
-        machine.send(.authorization(.allowed))
+        _ = machine.send(.authorization(.allowed))
         #expect(machine.send(.userDisabled) == .stopReadingLocation)
         #expect(machine.readsCoordinates == false)
         #expect(machine.statusLabel == "Optional")
@@ -176,15 +176,15 @@ import Testing
 
     @Test func losingAccessWhileUsingFailsClosed() {
         var machine = PreciseLocationMachine()
-        machine.send(.userEnabled)
-        machine.send(.authorization(.allowed))
+        _ = machine.send(.userEnabled)
+        _ = machine.send(.authorization(.allowed))
         #expect(machine.send(.authorization(.denied)) == .stopReadingLocation)
         #expect(machine.readsCoordinates == false)
         #expect(machine.phase == .denied)
 
         var reset = PreciseLocationMachine()
-        reset.send(.userEnabled)
-        reset.send(.authorization(.allowed))
+        _ = reset.send(.userEnabled)
+        _ = reset.send(.authorization(.allowed))
         #expect(reset.send(.authorization(.notDetermined)) == .stopReadingLocation)
         #expect(reset.readsCoordinates == false)
         #expect(reset.showsPrompt == false)
@@ -228,7 +228,7 @@ import Testing
             }
             #expect(machine.readsCoordinates == (machine.wantsPreciseLocation && machine.authorization == .allowed))
             #expect(machine.showsPrompt == (machine.wantsPreciseLocation && machine.promptOutstanding && machine.authorization == .notDetermined))
-            #expect(machine.showsPrompt == outstanding && machine.wantsPreciseLocation && machine.authorization == .notDetermined)
+            #expect(machine.showsPrompt == (outstanding && machine.wantsPreciseLocation && machine.authorization == .notDetermined))
             if !machine.wantsPreciseLocation {
                 #expect(machine.readsCoordinates == false)
                 #expect(machine.showsPrompt == false)
@@ -546,6 +546,17 @@ import Testing
         #expect(WeatherPlaceDecoder.decode(Data("nope".utf8)) == nil)
     }
 
+    @Test func aCoordinateOutsideTheRangeDoesNotCallTheService() async {
+        let box = HitBox()
+        let loader = WeatherForecastLoader { _ in
+            box.hit = true
+            return Data()
+        }
+        let outside = await loader.fetch(latitude: 91, longitude: 0, place: "North")
+        #expect(box.hit == false)
+        #expect(outside == .failed("That location is outside the forecast range."))
+    }
+
     @Test func aMissingPlaceAndABrokenForecastStayVisible() async {
         let missing = WeatherForecastLoader { _ in Data(#"{"results":[]}"#.utf8) }
         let phase = await missing.load(city: "Nowhere", unit: .celsius, layout: .summary)
@@ -612,14 +623,14 @@ import Testing
 
     @Test func aTypedCityWinsAndARejectedNameDoesNotRequest() throws {
         var editor = WeatherSettingsEditor.fresh(localeUsesUSCustomary: false)
-        editor.enablePreciseLocation()
-        editor.noteAuthorization(.allowed)
+        _ = editor.enablePreciseLocation()
+        _ = editor.noteAuthorization(.allowed)
         editor.cityDraft = "Lisbon"
         #expect(editor.commitCity() == WeatherServiceEndpoints.geocodeURL(city: "Lisbon"))
         let fix = LocationFix(latitude: 10, longitude: 10, label: "Elsewhere")
         #expect(editor.apply(fix: fix) == nil)
         editor.apply(snapshot: try WeatherChipPreviewTestsFixture.make(), place: "Lisbon")
-        editor.noteAuthorization(.denied)
+        _ = editor.noteAuthorization(.denied)
         guard case .ready = editor.chip else {
             Issue.record("a city forecast stays up when location is denied")
             return
