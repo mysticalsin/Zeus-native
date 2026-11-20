@@ -80,10 +80,10 @@ struct OrbPersonaTests {
         for relative in required {
             let url = root.appendingPathComponent(relative)
             let text = try String(contentsOf: url, encoding: .utf8)
-            #expect(text.contains("16e37bd801eb797798e02540665f8b3804b0fe14"), relative)
-            #expect(text.contains("Ethan Rogers"), relative)
-            #expect(text.contains("jarvis2.0"), relative)
-            #expect(text.contains("LICENSES/jarvis2.0-LICENSE"), relative)
+            #expect(text.contains("16e37bd801eb797798e02540665f8b3804b0fe14"))
+            #expect(text.contains("Ethan Rogers"))
+            #expect(text.contains("jarvis2.0"))
+            #expect(text.contains("LICENSES/jarvis2.0-LICENSE"))
         }
     }
 

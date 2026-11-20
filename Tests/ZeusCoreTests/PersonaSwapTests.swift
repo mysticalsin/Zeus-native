@@ -85,10 +85,10 @@ struct PersonaSwapTests {
 
     @Test func personaDoesNotTouchTheExistingPersonalityKeyOrNonLLMPaths() throws {
         let defaults = try freshDefaults()
-        defaults.set(ZeusPersonality.plain.rawValue, forKey: ZeusPersonality.defaultsKey)
+        defaults.set("plain", forKey: "voice.personality")
         PersonaCatalog.select(id: OrbPersona.id, defaults: defaults)
-        #expect(defaults.string(forKey: ZeusPersonality.defaultsKey) == ZeusPersonality.plain.rawValue)
-        #expect(PersonaCatalog.defaultsKey != ZeusPersonality.defaultsKey)
+        #expect(defaults.string(forKey: "voice.personality") == "plain")
+        #expect(PersonaCatalog.defaultsKey != "voice.personality")
         #expect(PersonaScope.affectsFaceUnlock == false)
         #expect(PersonaScope.affectsInstantCommands == false)
         #expect(PersonaScope.affectsLLMSystemPrompt == true)

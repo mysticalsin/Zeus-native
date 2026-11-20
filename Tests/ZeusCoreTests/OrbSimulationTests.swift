@@ -193,9 +193,10 @@ struct OrbSimulationTests {
             samples[index] = sin(2 * .pi * 2 * Float(index) / Float(count))
         }
         let raw = OrbAnalyser.rawBands(samples: samples, sampleRate: 24_000)
+        // Bass is the mean of bins 0..<8, so one sine in bin 2 is about an eighth of full scale.
         #expect(raw.bass > raw.mid)
-        #expect(raw.bass > 0.2)
-        #expect(raw.mid < 0.2)
+        #expect(raw.bass > 0.05)
+        #expect(raw.mid < 0.05)
     }
 
     @Test func clearAndParticleColorsMatchTheSourceHexes() {
