@@ -1580,7 +1580,9 @@ struct ClosedWings: View {
             case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake: return 150
             case .permission: return 230
             case .shortcut, .rain: return 70
-            case .volume, .brightness, .keyboardBacklight: return 58
+            case .volume, .brightness:
+                return SensorySettings.read { SettingsStore.shared.string($0) }.label == .words ? 120 : 58
+            case .keyboardBacklight: return 58
             default: return 30
             }
         // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
@@ -1629,9 +1631,9 @@ struct ClosedWings: View {
     private func cueDetail(_ cue: NotchCue) -> some View {
         switch cue {
         case .volume(let level, let muted):
-            HUDSegmentBar(fraction: muted ? 0 : level, muted: muted).frame(width: 72)
+            levelReadout(kind: .volume, fraction: level, muted: muted)
         case .brightness(let level):
-            HUDSegmentBar(fraction: level, muted: false).frame(width: 72)
+            levelReadout(kind: .brightness, fraction: level, muted: false)
         case .keyboardBacklight(let level):
             HUDSegmentBar(fraction: level, muted: false).frame(width: 72)
         case .shortcut(let peek):
@@ -1676,6 +1678,27 @@ struct ClosedWings: View {
         case .trackChanged(let title, let artist, let source, let sourceChanged):
             Text(NowPlayingDisplay.cueText(title: title, artist: artist, source: source, sourceChanged: sourceChanged)).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
                 .lineLimit(1).frame(width: 190, alignment: .trailing)
+        }
+    }
+
+    /// Icon keeps the level marks. Words replace them with the spoken level. VoiceOver hears the level either way.
+    @ViewBuilder
+    private func levelReadout(kind: SystemHUDKind, fraction: Double, muted: Bool) -> some View {
+        let caption = SensoryHUDCaptioning.caption(
+            kind: kind, level: fraction, muted: muted,
+            style: SensorySettings.read { SettingsStore.shared.string($0) }.label
+        )
+        if let words = caption.words {
+            Text(words)
+                .font(TopBarStyle.label(11, .semibold).monospacedDigit())
+                .foregroundStyle(Theme.cloudPrimary)
+                .lineLimit(1)
+                .accessibilityLabel(caption.accessibilityLabel)
+        } else {
+            HUDSegmentBar(fraction: muted ? 0 : fraction, muted: muted)
+                .frame(width: 72)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(caption.accessibilityLabel)
         }
     }
 }

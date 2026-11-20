@@ -7,7 +7,7 @@ public enum SensoryHUDPhase: String, Equatable, Sendable, CaseIterable {
     case hidden, showing, extending, fading
 }
 
-public enum SensoryHUDLabel: String, Equatable, Sendable, CaseIterable {
+public enum SensoryHUDLabel: String, Equatable, Hashable, Sendable, CaseIterable {
     case icon
     case words
 
