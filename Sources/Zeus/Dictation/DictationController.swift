@@ -277,6 +277,8 @@ final class DictationController {
         var speechStart: (SpeechInput, UInt64) throws -> Int = { try $0.start(controllerGeneration: $1) }
         var speechStop: (SpeechInput, Bool) async -> String = { await $0.stop(waitForFinal: $1) }
         var pauseMedia: ((TopBarModel) -> NowPlayingSource?)?
+        /// The focused app and field, read after the microphone has opened. Tests replace it.
+        var contextRead: @MainActor (DictationController) -> FocusedContext = { $0.readFocusedContext() }
     }
     var seams = Seams()
     private let ownership = DictationTurnOwnership()
@@ -288,7 +290,24 @@ final class DictationController {
     private var selection: String?
     private var mode = DictationMode.builtIns[0]
     /// The running turn's immutable copy of mode, target, selection and engine.
-    private var turnContext: DictationTurnContext?
+    private(set) var turnContext: DictationTurnContext?
+
+    /// What begin reads once the microphone is open: the front app, the focused field, the mode and any selection.
+    struct FocusedContext {
+        var targetApp: NSRunningApplication?
+        var insertionField: DictationInsertionTracker.Field?
+        var mode: DictationMode
+        var selection: String?
+    }
+
+    func readFocusedContext() -> FocusedContext {
+        let app = NSWorkspace.shared.frontmostApplication
+        let field = insertionTracker.beginTurn()
+        let resolved = DictationMode.resolve(topBar.dictationModes, selectedKey: topBar.selectedModeKey,
+                                             frontmostBundleID: app?.bundleIdentifier, autoSwitch: settings.autoSwitch)
+        let selected = resolved.useSelectedText ? TextInserter.selectedText() : nil
+        return FocusedContext(targetApp: app, insertionField: field, mode: resolved, selection: selected)
+    }
     /// The chosen engine hears this turn (ready and chosen); Apple otherwise.
     private var useLocal = false
     /// The source dictation paused, so the same one is resumed afterwards and never another.
@@ -604,11 +623,6 @@ final class DictationController {
             }
         }
         useLocal = local
-        targetApp = NSWorkspace.shared.frontmostApplication
-        let insertionField = insertionTracker.beginTurn()
-        mode = DictationMode.resolve(topBar.dictationModes, selectedKey: topBar.selectedModeKey,
-                                     frontmostBundleID: targetApp?.bundleIdentifier, autoSwitch: settings.autoSwitch)
-        selection = mode.useSelectedText ? TextInserter.selectedText() : nil
         let turnHints = hints
         speech.contextualStrings = turnHints
         turnStream?.cancel()
@@ -619,14 +633,28 @@ final class DictationController {
             speech.onSamples = nil
         }
         let turnGeneration = ownership.beginTurn()
+        var readField: DictationInsertionTracker.Field?
+        var readMode = mode
+        var readApp: NSRunningApplication?
+        var readSelection: String?
         do {
-            // The start cue sounds first: on key down, before the microphone warms up.
-            let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
+            // The start cue sounds first, then the microphone, then the focused field.
+            let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }, open: {
                 try seams.speechStart(speech, turnGeneration)
-            }
+            }, afterOpen: {
+                let read = seams.contextRead(self)
+                readApp = read.targetApp
+                readField = read.insertionField
+                readMode = read.mode
+                readSelection = read.selection
+            })
+            targetApp = readApp
+            mode = readMode
+            selection = readSelection
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
-            turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
-                                               selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
+            turnContext = DictationTurnContext(generation: turnGeneration, mode: readMode, targetApp: readApp,
+                                               selection: readSelection, useLocal: local, engine: turnEngine,
+                                               insertionField: readField)
         } catch {
             speech.onCaptureFailure = nil
             ownership.invalidate()
