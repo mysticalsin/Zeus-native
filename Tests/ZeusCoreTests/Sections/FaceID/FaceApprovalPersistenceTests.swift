@@ -20,6 +20,16 @@ struct FaceApprovalPersistenceTests {
     }
 
     @Test func anImportCanNeverTurnTheSwitchOn() {
+        let item = FaceApprovalPreference.contribution
+        #expect(item == FaceIDSectionSlot.keyContributions.first)
+        #expect(item.policy == .importCannotEnable)
+        #expect(item.defaultValue == "false")
+        #expect(item.kind == .toggle)
+        #expect(SettingsKeyLedger.imported(item, current: "false", incoming: "true") == nil)
+        #expect(SettingsKeyLedger.imported(item, current: "true", incoming: "false") == "false")
+        #expect(SettingsKeyLedger.imported(item, current: "true", incoming: "true") == "true")
+        #expect(SettingsKeyLedger.load(item, stored: nil) == "false")
+
         var off = FaceApprovalMemory()
         off.importFile([FaceApprovalPreference.key: "true", "face.lockAfter": "5 minutes"])
         #expect(!off.isOn)
@@ -32,9 +42,6 @@ struct FaceApprovalPersistenceTests {
         #expect(on.isOn)
         on.importFile([FaceApprovalPreference.key: "false"])
         #expect(!on.isOn)
-        on.setOn(true)
-        on.importFile([FaceApprovalPreference.key: "yes"])
-        #expect(on.isOn)
     }
 
     @Test func anExportNeverCarriesATemplateOrEmbedding() {
@@ -43,25 +50,32 @@ struct FaceApprovalPersistenceTests {
         let samples: [[Float]] = [[0.123_456, 0.654_321], [0.222_222, 0.333_333]]
         let text = FaceApprovalPreference.exportDocument(settings: store.values, samples: samples)
         #expect(text.contains("\(FaceApprovalPreference.key)=true"))
+        let exported = SettingsKeyLedger.exportMap(stored: store.values, contributions: FaceIDSectionSlot.keyContributions)
+        #expect(exported[FaceApprovalPreference.key] == "true")
+        let blob = text + exported.values.joined(separator: "\n")
         for sample in samples.flatMap({ $0 }) {
-            #expect(!text.contains(String(sample)))
+            #expect(!blob.contains(String(sample)))
         }
         for word in ["samples", "embedding", "thumbnail", "template", "0.123456"] {
-            #expect(!text.contains(word))
+            #expect(!blob.contains(word))
         }
+        #expect(FaceIDSectionSlot.keyContributions.allSatisfy { $0.kind == .toggle })
     }
 
-    @Test func theSharedCatalogRegistersTheSwitchOffAndBlocksImport() throws {
+    @Test func theSwitchIsASlotContributionAndNotACatalogRow() throws {
+        let item = try #require(FaceIDSectionSlot.keyContributions.first { $0.id == FaceApprovalPreference.key })
+        #expect(item.defaultValue == "false")
+        #expect(item.policy == .importCannotEnable)
         let root = repositoryRoot()
         let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
-        let line = try #require(catalog.split(separator: "\n").first { $0.contains("\"face.approval\"") })
-        #expect(line.contains("defaultValue: \"false\""))
-        #expect(line.contains("kind: .toggle"))
-        let store = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
-        #expect(store.contains("\"face.approval\""))
         let generator = try String(contentsOf: root.appendingPathComponent("scripts/gen-settings-catalog.py"), encoding: .utf8)
-        #expect(generator.contains("'face.approval'"))
-        #expect(generator.contains("'face.approval'") && generator.contains("face.presence"))
+        #expect(!catalog.contains("\"face.approval\""))
+        #expect(!generator.contains("face.approval"))
+        let problems = SettingsKeyLedger.problems(
+            catalogIDs: SettingsKeyReachability.catalogIDs(in: catalog),
+            contributions: GlassSectionManifest.keyContributions
+        )
+        #expect(problems.isEmpty, "\(problems)")
     }
 }
 

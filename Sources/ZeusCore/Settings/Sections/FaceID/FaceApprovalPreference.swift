@@ -4,6 +4,9 @@ import Foundation
 public enum FaceApprovalPreference {
     public static let key = "face.approval"
     public static let storedDefault = "false"
+    public static let contribution = SettingsKeyContribution(
+        id: key, defaultValue: storedDefault, kind: .toggle, policy: .importCannotEnable
+    )
 
     public static func isOn(_ stored: String?) -> Bool { stored == "true" }
 

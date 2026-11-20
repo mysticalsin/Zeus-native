@@ -216,12 +216,12 @@ public enum GlassSettingsFocus {
 
 /// Keys the existing settings surface already stores. Catalog ids are read from the catalog source.
 public enum SettingsKeyReachability {
-    public static let catalogCount = 213
+    public static let catalogCount = 212
     public static let outsideCount = 77
     /// Union of the catalog and the outside-catalog keys. Contributions are not included.
     public static let baseCount = 285
     public static let sectionCount = 27
-    public static let requiredFingerprint = "a8f8563dcbcf48f1"
+    public static let requiredFingerprint = "42a6fb1152bb4c71"
 
     public static let outsideKeys: [String] = [
         "showCaptions",

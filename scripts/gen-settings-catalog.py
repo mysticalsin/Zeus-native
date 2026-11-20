@@ -169,7 +169,6 @@ o(S,'Music metadata','Synced lyrics (LRCLIB)','toggle','off','Sends title and ar
 o(S,'Music metadata','Show media playing in Chrome','toggle','off','Reads title, artist and position from Chrome tabs through the Zeus extension.','missing','music.browserMedia','toggle',[],'false','live','A3. Chrome tab media through the Zeus extension and bridge, shown like any source. Off by default and never turned on by an import. Covers load from the page\'s own image link and are not saved; calls, private windows and pages written to disk are never read.')
 o(S,'Music metadata','Chrome extension needs a reload','status','-','Press Reload on the Zeus card in Chrome\'s extensions page.','missing','music.browserMediaStatus','status',[],'','custom','A3. Present only while Chrome runs with a Zeus extension older than 0.5.0. Its button opens chrome://extensions in the running Chrome, never starts it.')
 o(S,'Face presence','Face presence','toggle','-','Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on.','missing','face.presence','toggle',[],'false','live','Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on.')
-o(S,'Face verification','Face verification','toggle','-','Checks your face before an approval. Off until you turn it on.','missing','face.approval','toggle',[],'false','live','On-device only. An import never turns it on. The saved face is not exported.')
 o(S,'Face presence','Lock after absent for','menu','-','How long no enrolled face may be missing before the Mac locks.','missing','face.lockAfter','choice',['30 seconds','1 minute','2 minutes','5 minutes','10 minutes'],'2 minutes','live','Zeus addition. Counted from the last time an enrolled face was seen.')
 o(S,'Face presence','Status','status','-','','missing','face.status','status',[],'','custom','Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away.')
 o(S,'Access','Open Accessibility settings','button','-','Jumps to System Settings.','has','privacy.openAccessibility','action',[],'','live','')
@@ -285,7 +284,7 @@ def validate_table():
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
-              'face.presence', 'face.approval', 'tiling.enabled', 'fling.enabled')
+              'face.presence', 'tiling.enabled', 'fling.enabled')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':
