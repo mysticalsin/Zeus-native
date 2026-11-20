@@ -1628,7 +1628,25 @@ private final class WalkLogCopyCount: @unchecked Sendable {
 private let walkLogEffectsCopied = WalkLogCopyCount()
 
 private enum VoiceKeyWalkOrder {
-    static let casesRunTogether = false
+    /// The twenty orders live in their own suite, so a four-wide run walks several at once.
+    static let casesRunTogether = true
+    /// States and moves printed by the exhaustive walk. Rules are one per state plus one per move.
+    static let sizes: [String: (states: Int, moves: Int)] = [
+        "A talk hold Control-Option confirm 0.15": (1_883_647, 28_473_473),
+        "A0 talk hold Control-Option confirm 0": (406_896, 6_524_802),
+        "B dictation Right Command hold toggle off": (734_915, 7_728_597),
+        "C dictation hold Control-Option confirm 0.15": (357_149, 5_044_016),
+        "D dictation shared Control-Option": (156_302, 2_206_734),
+        "E talk shared Control-Option": (29_843, 418_601),
+        "E2 talk shared Control-Option confirm 0.15": (44_455, 623_633),
+        "F dictation toggle Right Command": (11_511, 113_622),
+        "G toggle Control-Option-T": (108_306, 1_179_887),
+        "H pointing Control-Option confirm 0.15": (81_932, 726_566),
+        "I talk hold Fn": (30_968, 438_562),
+        "J dictation Right Command hold toggle off, changes ride on events": (222_639, 2_199_960),
+        "B2 dictation Right Command hold, late": (871_099, 12_882_265),
+        "A1 talk hold Control-Option confirm 0.15, no chord": (253_450, 3_581_849),
+    ]
 }
 
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
@@ -1637,7 +1655,7 @@ private enum VoiceKeyWalkOrder {
 /// The fast walk drops it before the next edge. Both visit the same states.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil,
                     stopAfterStates: Int? = nil, retainEffectLog: Bool = false, useCache: Bool = true,
-                    breadthFirst: Bool = false) -> Report {
+                    breadthFirst: Bool = false, countCopies: Bool = false) -> Report {
     let cacheable = useCache && !retainEffectLog && stopAfterStates == nil && !stopAtFirst && until == nil
     if cacheable, let cached = fullWalkCache.report(named: run.name), !searchHitItsBudget(cached) {
         return cached
@@ -1700,7 +1718,7 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         report.orders += offered.count
         record(restCheck(sim, run, memo: memo), at: 0, move: nil)
         for move in offered {
-            walkLogEffectsCopied.add(sim.log.count)
+            if countCopies { walkLogEffectsCopied.add(sim.log.count) }
             var next = sim
             next.found = []
             next.apply(move, run)
@@ -1769,10 +1787,11 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     return (out + restCheck(sim, run), effects)
 }
 
-// The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
-// socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
-@Suite(.serialized) struct VoiceKeyWalkTests {
-    @Test(.serialized, arguments: WalkRun.all.filter { run in
+/// The twenty orders are independent. They are not serialized, so `--jobs 4` walks several at once.
+/// Each case still visits the same states. The other walk tests stay serialized so they do not
+/// share the copy counter with these searches.
+@Suite struct VoiceKeyWalkOrderTests {
+    @Test(arguments: WalkRun.all.filter { run in
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
         return only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
     })
@@ -1782,8 +1801,16 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         #expect(report.violations.isEmpty, "\(run.name): \(report.violations.joined(separator: "\n"))")
         #expect(report.states > 100, "the search found too few states to be a search")
         #expect(report.orders == report.moves, "an offered move was not checked")
+        if let pinned = VoiceKeyWalkOrder.sizes[run.name] {
+            #expect(report.states == pinned.states, "\(run.name) states")
+            #expect(report.moves == pinned.moves, "\(run.name) moves")
+            #expect(report.ruleChecks == pinned.states + pinned.moves, "\(run.name) rules")
+        }
     }
+}
 
+// The other walks stay one at a time so they do not fill every core while the rest of Core is running.
+@Suite(.serialized) struct VoiceKeyWalkTests {
     @Test func theWalkKeepsEveryCase() {
         #expect(WalkRun.all.count == 20)
     }
@@ -2082,13 +2109,13 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     /// states, kept, copy more effects than they have states. Cleared before the copy, they do not.
     @Test func theSearchCopiesABoundedEffectLog() {
         walkLogEffectsCopied.reset()
-        let retained = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: true, useCache: false, breadthFirst: true)
+        let retained = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: true, useCache: false, breadthFirst: true, countCopies: true)
         let retainedCopies = walkLogEffectsCopied.read()
         #expect(retained.states > 1_000)
         #expect(retainedCopies >= retained.states, "retained \(retainedCopies) across \(retained.states)")
 
         walkLogEffectsCopied.reset()
-        let fast = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: false, useCache: false, breadthFirst: true)
+        let fast = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: false, useCache: false, breadthFirst: true, countCopies: true)
         let fastCopies = walkLogEffectsCopied.read()
         #expect(fast.states == retained.states)
         #expect(fastCopies < fast.states, "cleared \(fastCopies) across \(fast.states)")
