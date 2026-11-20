@@ -8,7 +8,7 @@ private let optIn2 = Date(timeIntervalSince1970: 2_000)
 enum ScribeTestSuites {
     /// A suite name with a slash is not a private domain on this runtime: parallel tests then share one store.
     static func name(_ prefix: String) -> String {
-        NSTemporaryDirectory() + "\(prefix).\(UUID().uuidString)"
+        "app.zeus.tests.\(prefix).\(UUID().uuidString)"
     }
 }
 
