@@ -15,4 +15,9 @@ enum LicenseSettingsBridge {
             notice: license.lastError
         )
     }
+
+    static func publish(phase: LicenseActivationPhase) {
+        let value = LicenseStatusRecord.sanitized(phase.rawValue)
+        SettingsStore.shared.set(LicenseStatusRecord.activationState.id, value)
+    }
 }

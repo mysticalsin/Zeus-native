@@ -157,6 +157,7 @@ struct LicenseSettingsSection: View {
     private func sync() {
         perform(.setReduceMotion(reduceMotion || Motion.reduced))
         perform(.replaceFacts(LicenseSettingsBridge.facts(from: license)))
+        LicenseSettingsBridge.publish(phase: machine.phase)
     }
 
     private func perform(_ event: LicenseActivationEvent) {

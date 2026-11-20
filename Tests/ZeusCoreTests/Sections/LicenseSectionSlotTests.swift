@@ -14,5 +14,8 @@ import ZeusCore
         let hosted = GlassSectionManifest.cards(on: .license)
         #expect(hosted.map(\.id) == ["glass.license"])
         #expect(hosted.first?.placement == .cardOn(.license, 1))
+        #expect(LicenseSectionSlot.keyContributions.map(\.id) == ["license.activationState", "license.lastValidated"])
+        #expect(LicenseSectionSlot.keyContributions.allSatisfy { $0.policy == .localOnly })
+        #expect(!LicenseSectionSlot.keyContributions.contains { $0.id == "license.key" })
     }
 }

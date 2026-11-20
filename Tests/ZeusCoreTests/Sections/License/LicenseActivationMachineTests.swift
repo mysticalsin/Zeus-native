@@ -449,6 +449,13 @@ import Testing
             #expect(!ids.contains(id))
         }
         #expect(!catalog.contains("ZEUS1."))
+        let contributed = LicenseSectionSlot.keyContributions
+        #expect(!contributed.contains { $0.id == LicenseSecretBoundary.keychainAccount })
+        #expect(SettingsKeyLedger.problems(catalogIDs: ids, contributions: contributed).isEmpty)
+        for item in contributed {
+            #expect(!ids.contains(item.id))
+            #expect(item.policy == .localOnly)
+        }
         let exported = LicenseSecretBoundary.exportable([
             "license": "",
             LicenseSecretBoundary.keychainAccount: secret,
@@ -461,6 +468,11 @@ import Testing
         #expect(exported["license"] == "")
         let joined = exported.values.joined(separator: "\n")
         expectClean(joined, key: secret)
+        let stuffed = [LicenseSecretBoundary.keychainAccount: secret, "license.activationState": secret]
+        let policyExport = SettingsKeyLedger.exportMap(stored: stuffed, contributions: contributed)
+        #expect(policyExport.isEmpty)
+        #expect(policyExport[LicenseSecretBoundary.keychainAccount] == nil)
+        expectClean(policyExport.values.joined(), key: secret)
         let directory = root.appendingPathComponent("Sources/ZeusCore/Settings/Sections/License")
         let sources = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
         let banned = ["print(", "debugPrint", "NSLog", "os.Logger", "Logger("]
@@ -471,6 +483,30 @@ import Testing
             }
             expectClean(text, key: secret)
         }
+    }
+
+    @Test func localLicenseStatusSurvivesRecreate() {
+        let secret = "ZEUS1.payloadsecret.sigVALUE"
+        var stored: [String: String] = [:]
+        #expect(LicenseStatusRecord.save(&stored, phase: "active", validatedAt: "1800000000"))
+        let recreated = LicenseStatusRecord.recreate(from: stored)
+        #expect(recreated["license.activationState"] == "active")
+        #expect(recreated["license.lastValidated"] == "1800000000")
+        #expect(recreated[LicenseSecretBoundary.keychainAccount] == nil)
+        let exported = SettingsKeyLedger.exportMap(stored: recreated, contributions: LicenseSectionSlot.keyContributions)
+        #expect(exported.isEmpty)
+        var poisoned: [String: String] = [:]
+        #expect(LicenseStatusRecord.save(&poisoned, phase: secret, validatedAt: secret))
+        #expect(poisoned["license.activationState"] == "")
+        #expect(poisoned["license.lastValidated"] == "")
+        #expect(poisoned[LicenseSecretBoundary.keychainAccount] == nil)
+        expectClean(poisoned.values.joined(), key: secret)
+        let again = LicenseStatusRecord.recreate(from: poisoned)
+        expectClean(again.values.joined(), key: secret)
+        let secretItem = SettingsKeyContribution(id: LicenseSecretBoundary.keychainAccount, defaultValue: "", kind: .text, policy: .secretNeverStored)
+        #expect(!SettingsKeyLedger.mayStore(secretItem, value: secret))
+        #expect(!SettingsKeyLedger.save(&stored, secretItem, secret))
+        #expect(stored[LicenseSecretBoundary.keychainAccount] == nil)
     }
 
     @Test func machineSourcesDoNotLogTheKeyOrAddAnEndpoint() throws {
