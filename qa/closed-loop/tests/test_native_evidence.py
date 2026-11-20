@@ -59,6 +59,19 @@ class NativeEventEvidenceTests(unittest.TestCase):
         self.payload.update(id=self.ident, name="example(_:)", isParameterized=True,
                             _testCases=[{"id": "argument-one"}, {"id": "argument-two"}])
 
+    def empty_run(self, symbol="pass", tests=0):
+        ended = self.event("runEnded", symbol=symbol)
+        ended["payload"]["messages"][0]["text"] = f"Test run with {tests} tests in 0 suites passed after 0.001 seconds."
+        return [self.event("runStarted"), ended]
+
+    def test_a_leading_empty_run_still_verifies_the_selected_tests(self):
+        try:
+            metrics = self.verify(self.empty_run() + self.events())
+        except Invalid as error:
+            self.fail(str(error))
+        self.assertEqual((metrics["tests"], metrics["suites"]), (1, 1))
+        n.case_passed({"file": "Tests/ZeusCoreTests/SampleTests.swift", "function": "example"}, metrics["passed_cases"])
+
     def test_complete_qualified_execution_binds_exact_file_and_function(self):
         metrics = self.verify(self.events())
         self.assertEqual((metrics["tests"], metrics["suites"]), (1, 1))
