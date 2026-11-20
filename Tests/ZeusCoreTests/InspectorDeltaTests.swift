@@ -16,12 +16,13 @@ import ZeusCore
             return slot
         }
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
-        let tabIDs = Set(Self.topbarDescriptors(filled: true).map(\.id))
+        let tabIDs = Set(Self.topbarDescriptors(filled: true).map { $0.id })
         #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
         #expect(rows.last?.title == "Topbar")
         #expect(!rows.contains { tabIDs.contains($0.id) })
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
-        #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
+        let labels = rows.map { $0.accessibilityLabel }
+        #expect(labels.contains("Topbar"))
         #expect(GlassSettingsAudit.topbarPresentationFailures(Self.topbarDescriptors(filled: true)).isEmpty)
         #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
@@ -55,18 +56,22 @@ import ZeusCore
         let license = GlassSectionSlot(id: "glass.license", title: "License", filled: true, keys: [], placement: .cardOn(.license, 1))
         let earlier = GlassSectionSlot(id: "glass.license", title: "Earlier", filled: true, keys: [], placement: .cardOn(.license, 0))
         let tabs = GlassSectionManifest.topbarTabs(in: [weather, disabled, media])
-        #expect(tabs.map(\.id) == ["glass.media"])
+        let tabIDs = tabs.map { $0.id }
+        #expect(tabIDs == ["glass.media"])
         var state = SettingsSelectionState.section("settings.general")
-        state = SettingsSelectionRules.selectingTopbar("glass.media", filledTabs: tabs.map(\.id), current: state)
+        state = SettingsSelectionRules.selectingTopbar("glass.media", filledTabs: tabIDs, current: state)
         #expect(state == .topbar(tab: "glass.media"))
-        let kept = SettingsSelectionRules.selectingTopbar("glass.hiddenTab", filledTabs: tabs.map(\.id), current: state)
+        let kept = SettingsSelectionRules.selectingTopbar("glass.hiddenTab", filledTabs: tabIDs, current: state)
         #expect(kept == state)
-        #expect(SettingsSelectionRules.selectingTopbar("  ", filledTabs: tabs.map(\.id), current: state) == state)
+        let blank = SettingsSelectionRules.selectingTopbar("  ", filledTabs: tabIDs, current: state)
+        #expect(blank == state)
         state = SettingsSelectionRules.selectingSection("settings.sounds", current: state)
         #expect(state == .section("settings.sounds"))
         let cards = GlassSectionManifest.cards(on: .license, in: [license, earlier, face])
-        #expect(cards.map(\.title) == ["Earlier"])
-        #expect(GlassSectionManifest.cards(on: .privacy, in: [license, earlier, face]).map(\.id) == ["glass.faceID"])
+        let cardTitles = cards.map { $0.title }
+        #expect(cardTitles == ["Earlier"])
+        let privacyIDs = GlassSectionManifest.cards(on: .privacy, in: [license, earlier, face]).map { $0.id }
+        #expect(privacyIDs == ["glass.faceID"])
         #expect(SettingsSectionRegistry.sections(slots: [weather, disabled]).last?.id != SettingsSectionRegistry.topbarID)
     }
 
@@ -144,8 +149,8 @@ import ZeusCore
     }
 
     @Test func phoneRowReturnsWhenPairingIsAvailable() {
-        let hidden = SettingsSectionRegistry.sections(slots: [], includePhone: false).map(\.title)
-        let shown = SettingsSectionRegistry.sections(slots: [], includePhone: true).map(\.title)
+        let hidden = SettingsSectionRegistry.sections(slots: [], includePhone: false).map { $0.title }
+        let shown = SettingsSectionRegistry.sections(slots: [], includePhone: true).map { $0.title }
         #expect(!hidden.contains("iPhone"))
         #expect(shown.contains("iPhone"))
         let engine = shown.firstIndex(of: "Engine")
@@ -165,7 +170,7 @@ import ZeusCore
         let duplicates = rows.filter { $0.id == "glass.dup" }
         #expect(duplicates.count == 1)
         #expect(duplicates.first?.title == "First")
-        let tail = rows.suffix(3).map(\.id)
+        let tail = rows.suffix(3).map { $0.id }
         #expect(tail == ["glass.earlier", "glass.dup", "glass.later"])
     }
 
