@@ -270,6 +270,11 @@ o(S,'Fling','Flick sensitivity','segmented','-','How fast a drag must be to coun
 o(S,'Fling','Open received links in the browser','toggle','-','A link from a paired Mac opens in your browser when it arrives. Only http and https links.','missing','fling.openLinks','toggle',[],'true','live','Zeus addition. A link from a Mac that is not paired is kept as a file and never opened.')
 o(S,'Fling','Paired Macs','button','-','The Macs you paired. Remove one and it must pair again before it can send.','missing','fling.pairedMacs','action',[],'','custom','Zeus addition. Hand-built list on the Shelf page; Remove deletes the key from the Keychain.')
 
+S='topBar'
+o(S,'Accessory','Overlay when earbuds connect','toggle','off','Shows a small overlay when earbuds connect. Off until you turn it on.','missing','accessory.earbudsOverlay','toggle',[],'false','live','Off by default. A settings import cannot turn it on. The overlay reads an injected snapshot.')
+o(S,'Accessory','Overlay style','menu','off','Off shows nothing. Compact is one line. Split shows each side.','missing','accessory.overlayStyle','choice',['off','compact','split'],'off','live','Off by default. A settings import cannot select compact or split.')
+o(S,'Accessory','Nearby speaker names','toggle','off','Shows speakers on your local network. Off until you turn it on. Permission is asked only after you confirm.','missing','accessory.speakerNames','toggle',[],'false','live','R-019. Off by default. A settings import cannot turn it on. Nothing is searched until you confirm.')
+
 SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents','tiling':'Tiling','shelf':'Shelf'}
 
 def swift_str(s): return json.dumps(s, ensure_ascii=False)
@@ -284,7 +289,8 @@ def validate_table():
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
-              'face.presence', 'tiling.enabled', 'fling.enabled')
+              'face.presence', 'tiling.enabled', 'fling.enabled',
+              'accessory.earbudsOverlay', 'accessory.speakerNames')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':

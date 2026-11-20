@@ -112,7 +112,7 @@ struct GlassSettingsShellCheck {
                 catalogIDs: SettingsKeyReachability.catalogIDs(in: try text("Sources/Zeus/App/SettingsCatalog.swift"))
             )
         )
-        if fingerprint != "42a6fb1152bb4c71" {
+        if fingerprint != "57201c750538cb29" {
             failures.append("checker fingerprint \(fingerprint)")
         }
         return failures

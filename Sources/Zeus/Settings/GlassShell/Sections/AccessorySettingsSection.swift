@@ -236,17 +236,17 @@ struct AccessorySettingsSection: View {
 final class AccessorySectionController: ObservableObject {
     @Published private(set) var model = AccessorySectionModel()
     private let browser = AccessorySpeakerBrowser()
-    private let defaults: UserDefaults
+    private let store: SettingsStore
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    init(store: SettingsStore = .shared) {
+        self.store = store
     }
 
     func restore() {
         apply(.restore(
-            overlay: defaults.string(forKey: AccessoryPreferenceKey.earbudsOverlay),
-            style: defaults.string(forKey: AccessoryPreferenceKey.overlayStyle),
-            speakers: defaults.string(forKey: AccessoryPreferenceKey.speakerNames)
+            overlay: store.string(AccessoryPreferenceKey.earbudsOverlay),
+            style: store.string(AccessoryPreferenceKey.overlayStyle),
+            speakers: store.string(AccessoryPreferenceKey.speakerNames)
         ))
     }
 
@@ -257,9 +257,9 @@ final class AccessorySectionController: ObservableObject {
         for effect in effects {
             switch effect {
             case .persist(let preferences):
-                defaults.set(preferences.earbudsOverlay ? "true" : "false", forKey: AccessoryPreferenceKey.earbudsOverlay)
-                defaults.set(preferences.overlayStyle.rawValue, forKey: AccessoryPreferenceKey.overlayStyle)
-                defaults.set(preferences.speakerNames ? "true" : "false", forKey: AccessoryPreferenceKey.speakerNames)
+                store.set(AccessoryPreferenceKey.earbudsOverlay, preferences.earbudsOverlay ? "true" : "false")
+                store.set(AccessoryPreferenceKey.overlayStyle, preferences.overlayStyle.rawValue)
+                store.set(AccessoryPreferenceKey.speakerNames, preferences.speakerNames ? "true" : "false")
             case .requestPermission, .startSearch:
                 browser.start { [weak self] signal in
                     Task { @MainActor in
