@@ -1,11 +1,5 @@
 import Foundation
 
-public enum LicenseCardLayout {
-    public static let rowHeight = 52.0
-    public static let panelPadding = 32.0
-    public static let cardSpacing = 28.0
-}
-
 public struct LicenseCardMotion: Equatable, Sendable {
     public var duration: Double
     public var pressScale: Double
@@ -52,6 +46,7 @@ public struct LicenseCardPresentation: Equatable, Sendable, CustomStringConverti
     public var panelPadding: Double
     public var cardSpacing: Double
     public var rowHeight: Double
+    public var helperLine: Double
     public var loading: Bool
     public var empty: Bool
     public var errorMessage: String?
@@ -74,9 +69,10 @@ public struct LicenseCardPresentation: Equatable, Sendable, CustomStringConverti
             preview: preview,
             controls: controls,
             motion: LicenseCardMotion(reduceMotion: state.reduceMotion),
-            panelPadding: LicenseCardLayout.panelPadding,
-            cardSpacing: LicenseCardLayout.cardSpacing,
-            rowHeight: LicenseCardLayout.rowHeight,
+            panelPadding: GlassSettingsMetrics.panelPadding,
+            cardSpacing: GlassSettingsMetrics.cardSpacing,
+            rowHeight: GlassSettingsMetrics.controlRow,
+            helperLine: GlassSettingsMetrics.helperLine,
             loading: loading,
             empty: empty,
             errorMessage: state.failure.map { scrub($0.message) }

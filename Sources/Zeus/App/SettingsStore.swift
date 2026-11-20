@@ -354,7 +354,12 @@ final class SettingsStore {
         for option in SettingsCatalog.all where option.state == .custom {
             if let value = defaults.string(forKey: Self.key(option.id)) { optionValues[option.id] = value }
         }
-        optionValues = optionValues.filter { Self.isExportable(id: $0.key, value: $0.value) }
+        optionValues = LicenseSecretBoundary.exportable(optionValues.filter { Self.isExportable(id: $0.key, value: $0.value) })
+        app = app.filter { key, value in
+            guard !LicenseSecretBoundary.holdsSecretID(key) else { return false }
+            guard let text = value as? String else { return true }
+            return LicenseSecretBoundary.exportable([key: text])[key] != nil
+        }
         let root: [String: Any] = ["format": "zeus.settings", "version": 1, "options": optionValues, "app": app]
         return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
     }

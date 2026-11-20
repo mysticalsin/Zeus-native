@@ -17,7 +17,8 @@ import Testing
         #expect(slot.id != "license")
         #expect(slot.id != "general")
         #expect(slot.keys.isEmpty)
-        #expect(slot.filled == false)
+        #expect(slot.filled == true)
+        #expect(slot.placement == .cardOn(.license, 1))
         let card = LicenseCardPresentation.make(state(.trialEnded))
         let ids = Set(card.controls.map(\.id))
         #expect(ids.contains("glass.license.key"))
@@ -431,6 +432,47 @@ import Testing
         }
     }
 
+    @Test func theLicenseKeyStaysOutOfTheCatalogExportsAndLogs() throws {
+        let secret = "ZEUS1.payloadsecret.sigVALUE"
+        #expect(LicenseSectionSlot.descriptor.keys.isEmpty)
+        #expect(!LicenseSectionSlot.descriptor.keys.contains(LicenseSecretBoundary.keychainAccount))
+        #expect(!SettingsKeyReachability.outsideKeys.contains(LicenseSecretBoundary.keychainAccount))
+        for id in LicenseSecretBoundary.secretIDs {
+            #expect(LicenseSecretBoundary.holdsSecretID(id))
+            #expect(!SettingsKeyReachability.outsideKeys.contains(id))
+        }
+        let root = try catalogRoot()
+        let catalog = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift"), encoding: .utf8)
+        let ids = SettingsKeyReachability.catalogIDs(in: catalog)
+        #expect(ids.contains("license"))
+        for id in LicenseSecretBoundary.secretIDs {
+            #expect(!ids.contains(id))
+        }
+        #expect(!catalog.contains("ZEUS1."))
+        let exported = LicenseSecretBoundary.exportable([
+            "license": "",
+            LicenseSecretBoundary.keychainAccount: secret,
+            "about.autoUpdate": "false",
+            "note": "see \(secret)",
+        ])
+        #expect(exported[LicenseSecretBoundary.keychainAccount] == nil)
+        #expect(exported["note"] == nil)
+        #expect(exported["about.autoUpdate"] == "false")
+        #expect(exported["license"] == "")
+        let joined = exported.values.joined(separator: "\n")
+        expectClean(joined, key: secret)
+        let directory = root.appendingPathComponent("Sources/ZeusCore/Settings/Sections/License")
+        let sources = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let banned = ["print(", "debugPrint", "NSLog", "os.Logger", "Logger("]
+        for file in sources where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            for token in banned {
+                #expect(!text.contains(token))
+            }
+            expectClean(text, key: secret)
+        }
+    }
+
     @Test func machineSourcesDoNotLogTheKeyOrAddAnEndpoint() throws {
         let root = try repoRoot()
         let directory = root.appendingPathComponent("Sources/ZeusCore/Settings/Sections/License").resolvingSymlinksInPath()
@@ -449,6 +491,17 @@ import Testing
         for path in LicenseActivationEndpoint.allCases.map(\.rawValue) {
             #expect(client.contains("\"\(path)\""))
         }
+    }
+
+    private func catalogRoot() throws -> URL {
+        var url = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath().deletingLastPathComponent()
+        for _ in 0..<12 {
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent("Sources/Zeus/App/SettingsCatalog.swift").path) {
+                return url
+            }
+            url.deleteLastPathComponent()
+        }
+        throw CocoaError(.fileNoSuchFile)
     }
 
     private func repoRoot() throws -> URL {
@@ -506,9 +559,10 @@ import Testing
     }
 
     private func expectControls(_ card: LicenseCardPresentation) {
-        #expect(card.rowHeight == LicenseCardLayout.rowHeight)
-        #expect(card.panelPadding == LicenseCardLayout.panelPadding)
-        #expect(card.cardSpacing == LicenseCardLayout.cardSpacing)
+        #expect(card.rowHeight == GlassSettingsMetrics.controlRow)
+        #expect(card.panelPadding == GlassSettingsMetrics.panelPadding)
+        #expect(card.cardSpacing == GlassSettingsMetrics.cardSpacing)
+        #expect(card.helperLine == GlassSettingsMetrics.helperLine)
         #expect(card.preview.accessibilityLabel.isEmpty == false)
         expectClean(card.preview.accessibilityLabel, key: secret)
         for control in card.controls {

@@ -6,7 +6,7 @@ extension LicenseSectionSlot: GlassSlotPage {
     static func erasePage() -> AnyView { AnyView(LicenseSettingsSection()) }
 }
 
-/// The license card. Placement on the existing License page waits for the shell's card hook.
+/// The license card hosted on the existing License page.
 struct LicenseSettingsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var machine = LicenseActivationState(phase: .unlicensed, facts: LicenseCardFacts(status: .trialEnded))
@@ -95,6 +95,7 @@ struct LicenseSettingsSection: View {
             }
             Text(control.helper)
                 .font(GS.rowText).foregroundStyle(GS.secondary)
+                .frame(minHeight: presentation.helperLine, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHidden(true)
         }
