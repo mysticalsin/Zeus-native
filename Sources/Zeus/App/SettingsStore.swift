@@ -226,7 +226,6 @@ final class SettingsStore {
 
     func resettable(_ section: SettingsNavigation.Section) -> Bool {
         Self.extraKeys[section] != nil || SettingsCatalog.options(in: section).contains { $0.state != .custom && Self.isValue($0.kind) }
-            || (section == .topBar && GlassSectionManifest.keyContributions.contains { $0.id.hasPrefix("lockScreen.") })
     }
 
     func reset(_ section: SettingsNavigation.Section) {
@@ -234,7 +233,7 @@ final class SettingsStore {
             set(option.id, option.defaultValue, origin: .reset)
         }
         let prefix = section.rawValue + "."
-        for item in GlassSectionManifest.keyContributions where SettingsCatalog.option(item.id) == nil && (item.id == section.rawValue || item.id.hasPrefix(prefix) || (section == .topBar && item.id.hasPrefix("lockScreen."))) {
+        for item in GlassSectionManifest.keyContributions where SettingsCatalog.option(item.id) == nil && (item.id == section.rawValue || item.id.hasPrefix(prefix)) {
             if let value = SettingsKeyLedger.resetValue(item) { set(item.id, value, origin: .reset) }
         }
         if let keys = Self.extraKeys[section] { ExtraPreferences.shared.reset(keys) }
