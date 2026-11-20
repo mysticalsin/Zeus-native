@@ -382,11 +382,11 @@ struct GeneralSettingsTests {
         for current in states {
             for event in events {
                 let next = GeneralResetConfirmation.transition(current, event)
-                if next == .applying {
+                if next == .applying, current != .applying {
                     #expect(current == .commit)
                     #expect(event == .commit)
                 }
-                if next == .finished {
+                if next == .finished, current != .finished {
                     #expect(current == .applying)
                     #expect(event == .succeeded)
                 }
