@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 214 of 214 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 214 in scope). 203 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 221 of 221 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 221 in scope). 210 are wired to real behaviour (95%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 163.
+**Before this round:** has 19, partial 27, missing 170.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -89,6 +89,13 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Everyday lights | Ignore mic conflicts (debug) | toggle | - | For QA environments where Core Audio keeps reporting a stale recorder. | has | stub | `wake.ignoreMicConflicts` | Item 6 (Hey Zeus). Never shown. Read only in DEBUG builds (WakeWordController); release builds always keep the call guard. |
 | Everyday lights | Incoming rain alert | toggle | on | "Rain in X min" pill before a shower. | partial | live | `lights.rain` | Uses hourly forecast timing; suppresses repeat alerts for three hours after a shower starts. |
 | Everyday lights | Timer light gauge | toggle | on | Outline counts down a focus session. | partial | live | `lights.timer` | Gates the closed focus wings. |
+| Focus | Overlay when a Focus turns on or off | toggle | - | Shows a short overlay when a Focus turns on or off. Off until you turn it on. | missing | live | `focus.transitionOverlay` | Zeus addition. Off by default. A settings import cannot turn it on. |
+| Focus | Overlays allowed during a Focus | toggle | - | While a Focus is on, only the overlays in the filter may appear. Off blocks every overlay. | missing | live | `focus.overlaysAllowed` | Zeus addition. Off by default. A settings import cannot turn it on. |
+| Focus | Show the Focus on the lock screen | toggle | - | Shows that a Focus is on at the lock screen. The name stays hidden. Off until you turn it on. | missing | live | `focus.lockScreen` | Zeus addition. Off by default. A settings import cannot turn it on. |
+| Focus | Read the Focus name | toggle | - | Uses the public filter. Off reads nothing. | missing | live | `focus.name.read` | Zeus addition. Off by default. A settings import cannot turn it on. |
+| Focus | Read the Focus store | toggle | - | A second path, only if you turn it on. It needs Full Disk Access. Off reads nothing. | missing | live | `focus.name.storeFile` | Zeus addition. Off by default. A settings import cannot turn it on. |
+| Focus | Find a name on the local network | toggle | - | Off does not browse. | missing | live | `focus.name.localNetwork` | Zeus addition. Off by default. A settings import cannot turn it on. |
+| Focus | Accept a name from a link | toggle | - | A plain link on shared Wi-Fi is refused. Off until you turn it on. | missing | live | `focus.name.sharedLink` | Zeus addition. Off by default. A settings import cannot turn it on. |
 | Everyday lights | Purple glow while the mic listens | toggle | on | Glows with your voice during a spoken answer. | partial | live | `lights.micGlow` | Gates the mic-listening glow while Zeus speaks. |
 | Everyday lights | Glow when a reminder is added | toggle | on | Blue crests after you add a reminder. | missing | live | `lights.reminderGlow` | Fires when ZEUS saves a reminder. |
 | Everyday lights | Glow when an event is added | toggle | on | Cyan ribbon after you add an event. | partial | live | `lights.eventGlow` | Fires when ZEUS adds an event: the Calendar page quick-add, or "add lunch with Ana tomorrow at 1 pm". |

@@ -14,6 +14,9 @@ public enum FocusSettingKey {
     public static let optIn = [
         transitionOverlay, overlaysAllowed, lockScreen, readName, storeFile, localNetwork, sharedLink,
     ]
+
+    /// An imported settings file may turn these off. It cannot turn them on.
+    public static let sensitive = optIn
 }
 
 /// The Focus section's stored choices. New choices start off and an imported file cannot turn them on.

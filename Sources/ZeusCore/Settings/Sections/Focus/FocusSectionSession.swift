@@ -43,8 +43,36 @@ public struct FocusSectionSession: Equatable, Sendable {
     public private(set) var timer = FocusTimerSnapshot.ready
     public private(set) var reduceMotion = false
     public private(set) var now: Double = 0
+    private var defaults: FocusDefaultsBox?
 
     public init() {}
+
+    /// Restores the switches last saved under `opt.<id>`. A missing key stays off.
+    public init(defaults: UserDefaults) {
+        self.defaults = FocusDefaultsBox(defaults)
+        let loaded = FocusSettingsPersistence.load(defaults)
+        if loaded.transitionOverlay { _ = handle(.setTransition(true)) }
+        if loaded.overlaysAllowed { _ = handle(.setOverlaysAllowed(true)) }
+        if loaded.lockScreen { _ = handle(.setLockScreen(true)) }
+        if loaded.readName { _ = handle(.setReadName(true)) }
+        if loaded.storeFile { _ = handle(.setStoreFile(true)) }
+        if loaded.localNetwork { _ = handle(.setLocalNetwork(true)) }
+        if loaded.sharedLink { _ = handle(.setSharedLink(true)) }
+        if loaded.homeWidget != settings.homeWidget { _ = handle(.setHomeWidget(loaded.homeWidget)) }
+    }
+
+    public static func == (lhs: FocusSectionSession, rhs: FocusSectionSession) -> Bool {
+        lhs.settings == rhs.settings
+            && lhs.name == rhs.name
+            && lhs.transition == rhs.transition
+            && lhs.focusPermission == rhs.focusPermission
+            && lhs.fullDisk == rhs.fullDisk
+            && lhs.localNetworkPermission == rhs.localNetworkPermission
+            && lhs.activity == rhs.activity
+            && lhs.timer == rhs.timer
+            && lhs.reduceMotion == rhs.reduceMotion
+            && lhs.now == rhs.now
+    }
 
     private var needsStatus: Bool {
         settings.transitionOverlay || settings.overlaysAllowed || settings.lockScreen || settings.readName
@@ -55,6 +83,7 @@ public struct FocusSectionSession: Equatable, Sendable {
         case .setTransition(let on):
             let wasNeeded = needsStatus
             settings.transitionOverlay = on
+            remember(FocusSettingKey.transitionOverlay, on)
             var effects: [Effect] = []
             if on {
                 effects += map(transition.handle(.setEnabled(true)))
@@ -70,26 +99,35 @@ public struct FocusSectionSession: Equatable, Sendable {
         case .setOverlaysAllowed(let on):
             let wasNeeded = needsStatus
             settings.overlaysAllowed = on
+            remember(FocusSettingKey.overlaysAllowed, on)
             return accessEffects(wasNeeded: wasNeeded)
         case .setLockScreen(let on):
             let wasNeeded = needsStatus
             settings.lockScreen = on
+            remember(FocusSettingKey.lockScreen, on)
             return accessEffects(wasNeeded: wasNeeded)
         case .setReadName(let on):
             let wasNeeded = needsStatus
             settings.readName = on
+            remember(FocusSettingKey.readName, on)
             return dedupe(map(name.handle(.setRead(on))) + accessEffects(wasNeeded: wasNeeded))
         case .setStoreFile(let on):
             settings.storeFile = on
+            remember(FocusSettingKey.storeFile, on)
             return map(name.handle(.setStoreFile(on)))
         case .setLocalNetwork(let on):
             settings.localNetwork = on
+            remember(FocusSettingKey.localNetwork, on)
             return map(name.handle(.setLocalNetwork(on)))
         case .setSharedLink(let on):
             settings.sharedLink = on
+            remember(FocusSettingKey.sharedLink, on)
             return map(name.handle(.setSharedLink(on)))
         case .setHomeWidget(let stored):
             settings.homeWidget = stored
+            if let defaults {
+                FocusSettingsPersistence.write(stored ?? "Focus", id: FocusSettingKey.homeWidget, to: defaults.defaults)
+            }
             return []
         case .permission(let kind, let answer):
             switch kind {
@@ -156,6 +194,16 @@ public struct FocusSectionSession: Equatable, Sendable {
             _ = name.handle(.setStoreFile(settings.storeFile))
             _ = name.handle(.setLocalNetwork(settings.localNetwork))
             _ = name.handle(.setSharedLink(settings.sharedLink))
+            remember(FocusSettingKey.transitionOverlay, settings.transitionOverlay)
+            remember(FocusSettingKey.overlaysAllowed, settings.overlaysAllowed)
+            remember(FocusSettingKey.lockScreen, settings.lockScreen)
+            remember(FocusSettingKey.readName, settings.readName)
+            remember(FocusSettingKey.storeFile, settings.storeFile)
+            remember(FocusSettingKey.localNetwork, settings.localNetwork)
+            remember(FocusSettingKey.sharedLink, settings.sharedLink)
+            if let defaults {
+                FocusSettingsPersistence.write(settings.homeWidget ?? "Focus", id: FocusSettingKey.homeWidget, to: defaults.defaults)
+            }
             return [.hideOverlay, .cancelReads]
         }
     }
@@ -189,6 +237,11 @@ public struct FocusSectionSession: Equatable, Sendable {
             cardGap: FocusSectionMetrics.cardGap, controls: controls(), status: status, preview: preview,
             filterSummary: filterSummary()
         )
+    }
+
+    private func remember(_ id: String, _ on: Bool) {
+        guard let defaults else { return }
+        FocusSettingsPersistence.write(on ? "true" : "false", id: id, to: defaults.defaults)
     }
 
     private func accessEffects(wasNeeded: Bool) -> [Effect] {
@@ -326,6 +379,11 @@ public struct FocusSectionSession: Equatable, Sendable {
         }
         return kept
     }
+}
+
+private final class FocusDefaultsBox: @unchecked Sendable {
+    let defaults: UserDefaults
+    init(_ defaults: UserDefaults) { self.defaults = defaults }
 }
 
 private extension FocusTransitionMachine.State {

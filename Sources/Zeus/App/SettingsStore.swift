@@ -294,7 +294,7 @@ final class SettingsStore {
 
     /// Switches an imported file may leave alone or turn off, never on: they open the microphone, send data or
     /// loosen what Zeus may do. A person turns these on, on the Mac they are using.
-    static let neverEnabledByImport: Set<String> = [
+    static let neverEnabledByImport: Set<String> = Set([
         "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
         "face.presence",
@@ -302,7 +302,8 @@ final class SettingsStore {
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
-    ]
+        // Focus switches stay off until a person turns them on. An import cannot turn them on.
+    ]).union(FocusSettingKey.sensitive)
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
     static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {

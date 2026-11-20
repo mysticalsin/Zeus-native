@@ -31,7 +31,9 @@ class SettingsGenerationTests(unittest.TestCase):
     def test_capture_and_input_default_regressions_fail_before_any_output(self):
         for key in ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts', 'lights.liveSpectrum',
                     'general.showInScreenSharing', 'present.physicalPointer', 'explanation.enabled',
-                    'tiling.enabled', 'fling.enabled'):
+                    'tiling.enabled', 'fling.enabled',
+                    'focus.transitionOverlay', 'focus.overlaysAllowed', 'focus.lockScreen',
+                    'focus.name.read', 'focus.name.storeFile', 'focus.name.localNetwork', 'focus.name.sharedLink'):
             with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
                 module = generator()
                 index = next(i for i, row in enumerate(module.R) if row[7] == key)
