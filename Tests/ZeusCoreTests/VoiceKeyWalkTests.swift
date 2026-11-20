@@ -1797,13 +1797,14 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         print("walk coverage prefix: \(fast.states) states, \(fast.orders) orders, \(fast.ruleChecks) rules, visited \(String(fast.coverageHash, radix: 16))")
     }
 
-    /// A machine that stamps a key with the time it handles it breaks the delay rule. The fast walk must still say so.
+    /// A machine that stamps a key with the time it handles it breaks the delay rule. The shallow search
+    /// is breadth-first, and the first break is the timer settled ahead of that key.
     @Test func theFastWalkCatchesARuleBreak() {
         let shipped = WalkRun.all[0]
         let broken = WalkRun("A mutant stamps keys when it handles them", keys: shipped.keys, own: shipped.ownCodes,
                              configs: shipped.configs, late: true, processingTime: true)
         let report = search(broken, stopAtFirst: true, useCache: false)
-        #expect(report.violations.contains { $0.contains("a turn was sent after something foreign was down") },
+        #expect(report.violations.contains { $0.contains("a timer was settled ahead of a key that came before it was due: the own set had not been down alone for the delay at the key's own time") },
                 "\(report.violations)")
     }
 
@@ -1814,7 +1815,7 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
         let old = WalkRun("A with processing time", keys: shipped.keys, own: shipped.ownCodes, configs: shipped.configs,
                           late: true, processingTime: true)
         let report = search(old, stopAtFirst: true)
-        #expect(report.violations.contains { $0.hasPrefix("I1:") },
+        #expect(report.violations.contains { $0.contains("a timer was settled ahead of a key that came before it was due: the own set had not been down alone for the delay at the key's own time") },
                 "\(report.violations)")
     }
 
@@ -2067,14 +2068,20 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
 
     /// The plain walk calls the same full search as run A. That search has to have a finite state budget, or a second
     /// walk of the same graph keeps running past the suite limit.
-    /// The effect log rides along on every edge of the pre-fix search. Five thousand states of that
-    /// breadth-first search copy more effects than they have states.
+    /// The effect log rides along on every edge until the search drops it. The same five thousand
+    /// states, kept, copy more effects than they have states. Cleared before the copy, they do not.
     @Test func theSearchCopiesABoundedEffectLog() {
         walkLogEffectsCopied.reset()
-        let report = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: true, useCache: false, breadthFirst: true)
-        let copied = walkLogEffectsCopied.read()
-        #expect(report.states > 1_000)
-        #expect(copied < report.states, "the retained log copied \(copied) effects across \(report.states) states")
+        let retained = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: true, useCache: false, breadthFirst: true)
+        let retainedCopies = walkLogEffectsCopied.read()
+        #expect(retained.states > 1_000)
+        #expect(retainedCopies >= retained.states, "retained \(retainedCopies) across \(retained.states)")
+
+        walkLogEffectsCopied.reset()
+        let fast = search(WalkRun.all[0], stopAfterStates: 5_000, retainEffectLog: false, useCache: false, breadthFirst: true)
+        let fastCopies = walkLogEffectsCopied.read()
+        #expect(fast.states == retained.states)
+        #expect(fastCopies < fast.states, "cleared \(fastCopies) across \(fast.states)")
     }
 
     @Test func thePlainWalkSearchHasAFiniteBudget() {
