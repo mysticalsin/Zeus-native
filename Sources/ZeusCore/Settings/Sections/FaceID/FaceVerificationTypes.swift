@@ -251,7 +251,13 @@ public struct FaceVerificationLayout: Equatable, Sendable {
         self.cardSpacing = cardSpacing
     }
 
-    public static let standard = FaceVerificationLayout(rowHeight: 52, panelPadding: 32, cardSpacing: 28)
+    public static var standard: FaceVerificationLayout {
+        FaceVerificationLayout(
+            rowHeight: GlassSettingsMetrics.controlRow,
+            panelPadding: GlassSettingsMetrics.panelPadding,
+            cardSpacing: GlassSettingsMetrics.cardSpacing
+        )
+    }
 }
 
 public enum FaceVerificationNativePlan {

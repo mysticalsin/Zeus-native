@@ -6,10 +6,10 @@ import Testing
 struct FaceVerificationSectionTests {
     @Test func theCardSitsOnThePrivacyPageAndKeepsThePresenceKey() {
         #expect(FaceVerificationPlacement.standard == .privacyCard(order: 1))
-        #expect(FaceIDSectionSlot.placement == .privacyCard(order: 1))
+        #expect(FaceIDSectionSlot.descriptor.placement == .cardOn(.privacy, 1))
         let slot = FaceIDSectionSlot.descriptor
         #expect(slot.id == "glass.faceID")
-        #expect(slot.filled == false)
+        #expect(slot.filled)
         #expect(slot.keys.isEmpty)
         #expect(FaceVerificationSectionModel.persistedKeys == ["face.presence", "face.lockAfter", "face.status"])
         #expect(!FaceVerificationSectionModel.persistedKeys.contains("face.approval"))

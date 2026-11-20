@@ -171,7 +171,7 @@ struct FaceVerificationSettingsPage: View {
             .font(GS.rowText)
             .foregroundStyle(GS.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: GlassSettingsMetrics.helperLine, alignment: .leading)
             .padding(.bottom, 8)
     }
 
