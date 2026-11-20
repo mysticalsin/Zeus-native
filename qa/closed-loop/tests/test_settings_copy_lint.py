@@ -77,6 +77,7 @@ class SettingsCopyLint(unittest.TestCase):
         self.assertTrue(any("microphone indicator" in value for value in helpers))
         self.assertTrue(any("audio" in value and "provider" in value for value in helpers))
         self.assertTrue(any("nothing is sent while" in value for value in helpers))
+        self.assertTrue(any("zeus command" in value and "microphone" in value for value in helpers))
         self.assertIn("noticePending", source)
         self.assertTrue(any("keychain" in value for value in helpers))
 
