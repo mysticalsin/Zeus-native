@@ -1,5 +1,5 @@
 import Foundation
 
-public enum WeatherSectionSlot {
-    public static let slot = GlassSectionSlot(id: "glass.weather", title: "Weather", filled: false, keys: [], order: 160)
+public enum WeatherSectionSlot: GlassSlotProviding {
+    public static let descriptor = GlassSectionSlot(id: "glass.weather", title: "Weather", filled: false, keys: [], order: 160)
 }

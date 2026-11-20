@@ -1,5 +1,5 @@
 import Foundation
 
-public enum MediaSectionSlot {
-    public static let slot = GlassSectionSlot(id: "glass.media", title: "Media", filled: false, keys: [], order: 100)
+public enum MediaSectionSlot: GlassSlotProviding {
+    public static let descriptor = GlassSectionSlot(id: "glass.media", title: "Media", filled: false, keys: [], order: 100)
 }
