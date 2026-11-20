@@ -634,8 +634,12 @@ final class DictationController {
         } else {
             speech.onSamples = nil
         }
-        let keyDownApp = DictationAppIdentity(processID: NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0,
-                                             bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let keyDownApp = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
+        // The mode is a settings read (selected key and auto-switch). It is taken before the microphone opens.
+        // The focused field and any selected text are Accessibility reads and stay after the open.
+        let modeBeforeMic = DictationMode.resolve(topBar.dictationModes, selectedKey: topBar.selectedModeKey,
+                                                 frontmostBundleID: frontmost?.bundleIdentifier, autoSwitch: settings.autoSwitch)
         let turnGeneration = ownership.beginTurn()
         var readField: DictationInsertionTracker.Field?
         var readMode = mode
@@ -649,7 +653,7 @@ final class DictationController {
                 let read = seams.contextRead(self)
                 readApp = read.targetApp
                 readField = read.insertionField
-                readMode = read.mode
+                readMode = modeBeforeMic
                 readSelection = read.selection
             })
             targetApp = readApp
@@ -1065,7 +1069,8 @@ final class DictationController {
         insertionTracker.invalidate()
         let frontmost = NSWorkspace.shared.frontmostApplication
         let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
-        if DictationFocusRule.choose(keyDown: context.keyDownApp, frontmost: live) == .copyInstead {
+        if InsertTargetDecision.decide(keyDown: context.keyDownApp, frontmost: live,
+                                      ownPid: NSRunningApplication.current.processIdentifier) == .copyOnly {
             if allowClipboardFallback {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
@@ -1131,9 +1136,18 @@ final class DictationController {
         -> (outcome: TextInserter.Outcome, message: String) {
         let isCurrent = { [ownership] in ownership.owns(generation: context.generation) }
         guard isCurrent() else { return (.copiedOnly, "Correction cancelled") }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let live = DictationAppIdentity(processID: frontmost?.processIdentifier ?? 0, bundleID: frontmost?.bundleIdentifier)
+        let decision = InsertTargetDecision.decide(keyDown: context.keyDownApp, frontmost: live,
+                                                  ownPid: NSRunningApplication.current.processIdentifier)
+        if decision == .copyOnly {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+            return (.copiedOnly, "Couldn't paste into a different app. Replacement copied; select the field, then press ⌘V.")
+        }
         // The optional preview can temporarily take focus. Restore only the original app; the
         // retained element and exact owned range still have to pass the replacement executor.
-        if restoreAfterPreview, let app = context.targetApp, app != NSWorkspace.shared.frontmostApplication {
+        if (decision == .reactivateThenPaste || restoreAfterPreview), let app = context.targetApp, app != frontmost {
             app.activate()
             _ = await FrontmostHandoff.waitUntilFrontmost(
                 target: app.bundleIdentifier, current: { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },

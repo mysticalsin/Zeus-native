@@ -23,3 +23,7 @@ Before the microphone opens, the turn stores only the frontmost app's process id
 1. Can reading focus after the microphone opens pick the wrong field, if the person clicks elsewhere while the device is still starting?
 
 ## Challenger: Devin the Dev
+
+The insert guard treated every frontmost app other than the key-down app as copy-only. That runs before the re-activate-and-paste branch. With preview-before-insert on, the preview card activates Zeus and its panel can become key, so the frontmost app is Zeus. A notch click does the same. Both are Zeus, not a third app, and both were refused.
+
+The fix holds because `InsertTargetDecision.decide` names three outcomes. Zeus in front, matched by this process id, is `reactivateThenPaste`: the existing branch activates the key-down app and pastes there. A third app, neither Zeus nor the key-down app, stays `copyOnly`. A key-down identity with pid 0 or no bundle id was not captured, so the decision is `paste` and the earlier target-app path remains. The correction path uses the same decision. The mode is a settings read taken before the microphone opens. The focused field and the selected text stay after the open, and no Accessibility call was added before it.

@@ -1,35 +1,11 @@
 import Foundation
 import Testing
-
-/// What 2d6760c2 does: any frontmost app other than the key-down app is copy-only.
-/// Zeus in front is treated as that other app. These expectations are the insert rule we want.
-private struct InsertApp: Equatable {
-    var processID: Int32
-    var bundleID: String?
-    func sameApp(as other: InsertApp) -> Bool {
-        if processID != 0, processID == other.processID { return true }
-        if let bundleID, let otherID = other.bundleID, bundleID == otherID { return true }
-        return false
-    }
-}
-
-private enum InsertChoice: Equatable {
-    case paste
-    case reactivateThenPaste
-    case copyOnly
-}
-
-private enum InsertTargetDecision {
-    static func decide(keyDown: InsertApp, frontmost: InsertApp, ownPid: Int32) -> InsertChoice {
-        _ = ownPid
-        return keyDown.sameApp(as: frontmost) ? .paste : .copyOnly
-    }
-}
+@testable import ZeusCore
 
 @Suite struct InsertTargetDecisionTests {
-    private let notes = InsertApp(processID: 10, bundleID: "app.notes")
-    private let zeus = InsertApp(processID: 1, bundleID: "app.zeus")
-    private let browser = InsertApp(processID: 44, bundleID: "app.browser")
+    private let notes = DictationAppIdentity(processID: 10, bundleID: "app.notes")
+    private let zeus = DictationAppIdentity(processID: 1, bundleID: "app.zeus")
+    private let browser = DictationAppIdentity(processID: 44, bundleID: "app.browser")
 
     @Test func aPreviewCardWithZeusFrontmostPastesIntoTheTarget() {
         let choice = InsertTargetDecision.decide(keyDown: notes, frontmost: zeus, ownPid: zeus.processID)
@@ -47,7 +23,7 @@ private enum InsertTargetDecision {
     }
 
     @Test func aMissingKeyDownAppFallsBackToPaste() {
-        let missing = InsertApp(processID: 0, bundleID: nil)
+        let missing = DictationAppIdentity(processID: 0, bundleID: nil)
         let choice = InsertTargetDecision.decide(keyDown: missing, frontmost: browser, ownPid: zeus.processID)
         #expect(choice == .paste)
     }
