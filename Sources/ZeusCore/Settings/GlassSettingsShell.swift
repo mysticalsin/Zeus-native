@@ -6,31 +6,26 @@ public struct GlassSectionSlot: Equatable, Sendable {
     public var title: String
     public var filled: Bool
     public var keys: [String]
+    public var order: Int
 
-    public init(id: String, title: String, filled: Bool, keys: [String]) {
+    public init(id: String, title: String, filled: Bool, keys: [String], order: Int = 0) {
         self.id = id
         self.title = title
         self.filled = filled
         self.keys = keys
+        self.order = order
     }
 }
 
 public enum GlassSectionManifest {
-    /// Fixed order. A section change edits its own slot file, not this list.
-    public static let slots: [GlassSectionSlot] = [
-        MediaSectionSlot.slot,
-        GeneralSectionSlot.slot,
-        PortalSectionSlot.slot,
-        SensorySectionSlot.slot,
-        BatterySectionSlot.slot,
-        FocusSectionSlot.slot,
-        WeatherSectionSlot.slot,
-        LockScreenSectionSlot.slot,
-        FaceIDSectionSlot.slot,
-        AccessorySectionSlot.slot,
-        LicenseSectionSlot.slot,
-        AutoUpdateSectionSlot.slot,
-    ]
+    /// Slots come from the section files beside this source. Adding a file is the whole registration.
+    public static var slots: [GlassSectionSlot] {
+        SettingsSlotDiscovery.slots(in: sectionsDirectory)
+    }
+
+    public static var sectionsDirectory: URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Sections")
+    }
 
     public static var newSettingKeyCount: Int {
         slots.reduce(0) { $0 + $1.keys.count }
@@ -618,6 +613,60 @@ public enum GlassSettingsAudit {
         let namespaced = SettingsKeyReachability.collidingSlotIDs(slotIDs: ["glass.general", "glass.license"], sectionIDs: sections)
         if !namespaced.isEmpty { return ["namespaced ids collided"] }
         return []
+    }
+
+    public static func inspectorDeltaFailures(root: URL) -> [String] {
+        var failures: [String] = []
+        let probe = """
+        public enum ProbeSectionSlot {
+            public static let slot = GlassSectionSlot(id: \"glass.probe\", title: \"Probe\", filled: true, keys: [], order: 500)
+        }
+        """
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-probe-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            try probe.write(to: directory.appendingPathComponent("ProbeSectionSlot.swift"), atomically: true, encoding: .utf8)
+            let slots = SettingsSlotDiscovery.slots(in: directory)
+            let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
+            if !rows.contains(where: { $0.id == "glass.probe" }) { failures.append("probe missing from the sidebar") }
+            if !SettingsSectionRegistry.search("Probe", in: rows).contains(where: { $0.id == "glass.probe" }) { failures.append("probe missing from search") }
+            if !rows.map(\.accessibilityLabel).contains("Probe") { failures.append("probe missing from voiceover order") }
+            if !SettingsSectionHostPlan.hostedIDs(in: rows).contains("glass.probe") { failures.append("probe missing from the host") }
+        } catch {
+            failures.append("probe file \(error)")
+        }
+        let manifest = (try? String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsShell.swift"), encoding: .utf8)) ?? ""
+        let host = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)) ?? ""
+        let window = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/SettingsWindow.swift"), encoding: .utf8)) ?? ""
+        let listedSlot = ["MediaSection", "Slot.slot"].joined()
+        if manifest.contains(listedSlot) { failures.append("shared slot list") }
+        let hostSwitch = ["switch", " id"].joined()
+        if host.contains(hostSwitch) { failures.append("host switch") }
+        var state = SettingsSelectionState.section("settings.general")
+        state = SettingsSelectionRules.selectingSlot("glass.probe", current: state)
+        if state != .slot("glass.probe") { failures.append("slot left the section selected") }
+        state = SettingsSelectionRules.selectingSection("settings.sounds", current: state)
+        if state != .section("settings.sounds") { failures.append("section left the slot selected") }
+        if SettingsSelectionRules.selectingSlot("  ", current: state) != state { failures.append("blank slot changed the selection") }
+        for count in [21, 22, 23, 34] where SettingsSidebarLayout.bottom(rowCount: count) > SettingsSidebarLayout.versionY {
+            failures.append("sidebar row \(count) crosses the version line")
+        }
+        if window.contains("rowMetrics(rowCount: GSSection.shown.count)") { failures.append("sidebar metrics ignore filled rows") }
+        if !window.contains("enum SettingsSelection") || !window.contains("case slot(SlotID)") || window.contains("var glassSlotID") {
+            failures.append("selection is not one value")
+        }
+        if !window.contains("includePhone: GSSection.iPhonePairingAvailable") { failures.append("phone row is not wired") }
+        let shown = SettingsSectionRegistry.sections(slots: [], includePhone: true).map(\.title)
+        if let engine = shown.firstIndex(of: "Engine"), shown[engine + 1] != "iPhone" { failures.append("phone row missing") }
+        let first = GlassSectionSlot(id: "glass.dup", title: "First", filled: true, keys: [], order: 10)
+        let second = GlassSectionSlot(id: "glass.dup", title: "Second", filled: true, keys: [], order: 11)
+        let later = GlassSectionSlot(id: "glass.later", title: "Later", filled: true, keys: [], order: 12)
+        let earlier = GlassSectionSlot(id: "glass.earlier", title: "Earlier", filled: true, keys: [], order: 9)
+        let rows = SettingsSectionRegistry.sections(slots: [later, second, first, earlier], includePhone: false)
+        if rows.filter({ $0.id == "glass.dup" }).count != 1 { failures.append("duplicate slot kept") }
+        if rows.suffix(3).map(\.id) != ["glass.earlier", "glass.dup", "glass.later"] { failures.append("slot order") }
+        return failures
     }
 
     public static func registryFailures() -> [String] {

@@ -49,11 +49,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
 
         /// The row height and the gap under it for `rowCount` rows: 26 and 2 while they fit, then a whole-point pitch that ends above the version line.
         static func rowMetrics(rowCount: Int) -> (height: Double, gap: Double) {
-            let full = rowHeight + rowGap
-            let room = versionY - top - headingsHeight
-            let pitch = min(full, (room / Double(max(rowCount, 1))).rounded(.down))
-            let gap = pitch >= full ? rowGap : 1
-            return (max(1, min(rowHeight, pitch - gap)), gap)
+            SettingsSidebarLayout.rowMetrics(rowCount: rowCount)
         }
     }
 
@@ -130,24 +126,66 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+typealias SlotID = String
+
+/// Exactly one sidebar row. Selecting a slot replaces the section, and selecting a section replaces the slot.
+enum SettingsSelection: Equatable {
+    case section(GSSection)
+    case slot(SlotID)
+
+    var rowID: String {
+        switch self {
+        case .section(let section): SettingsSectionRegistry.id(for: section.rawValue)
+        case .slot(let id): id
+        }
+    }
+
+    fileprivate var state: SettingsSelectionState {
+        switch self {
+        case .section(let section): .section(SettingsSectionRegistry.id(for: section.rawValue))
+        case .slot(let id): .slot(id)
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class GSNavigation {
-    var section: GSSection = .general
-    /// Set when a filled glass slot's sidebar row is selected. Existing rows clear it.
-    var glassSlotID: String?
+    var selection: SettingsSelection = .section(.general)
     var meetingOpen = false
+
+    var section: GSSection {
+        get {
+            if case .section(let section) = selection { return section }
+            return .general
+        }
+        set { selection = .section(newValue) }
+    }
 
     func select(_ descriptor: SettingsSectionDescriptor) {
         if let section = GSSection.allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == descriptor.id }) {
-            self.section = section
-            glassSlotID = nil
+            selectSection(section)
         } else {
-            glassSlotID = descriptor.id
+            selectSlot(descriptor.id)
         }
     }
+
+    func selectSection(_ section: GSSection) {
+        let next = SettingsSelectionRules.selectingSection(SettingsSectionRegistry.id(for: section.rawValue), current: selection.state)
+        if case .section = next { selection = .section(section) }
+    }
+
+    func selectSlot(_ id: SlotID) {
+        let next = SettingsSelectionRules.selectingSlot(id, current: selection.state)
+        if case .slot(let slot) = next { selection = .slot(slot) }
+    }
+
     var licenseKey = ""
     var licenseMessage: String?
+}
+
+func glassSettingsRows() -> [SettingsSectionDescriptor] {
+    SettingsSectionRegistry.live(includePhone: GSSection.iPhonePairingAvailable)
 }
 
 /// The Settings window: 1080 x 780, the sidebar and the page panel.
@@ -166,7 +204,7 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
     var debugWindow: NSWindow? { window }
 
     func show(_ section: GSSection? = nil) {
-        if let section { navigation.section = section }
+        if let section { navigation.selection = .section(section) }
         if window == nil {
             let window = NSWindow(contentRect: NSRect(origin: .zero, size: GS.size),
                                   styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
@@ -201,8 +239,8 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     func step(_ delta: Int) {
-        let rows = SettingsSectionRegistry.live
-        let current = navigation.glassSlotID ?? SettingsSectionRegistry.id(for: navigation.section.rawValue)
+        let rows = glassSettingsRows()
+        let current = navigation.selection.rowID
         let index = rows.firstIndex { $0.id == current } ?? 0
         navigation.select(rows[GlassSettingsFocus.index(after: index, delta: delta, count: rows.count)])
     }
@@ -216,8 +254,8 @@ struct GlanceSettingsRoot: View {
             GlassSettingsChrome()
             GSSidebar(navigation: navigation)
                 .onMoveCommand { direction in
-                    let rows = SettingsSectionRegistry.live
-                    let current = navigation.glassSlotID ?? SettingsSectionRegistry.id(for: navigation.section.rawValue)
+                    let rows = glassSettingsRows()
+                    let current = navigation.selection.rowID
                     guard let index = rows.firstIndex(where: { $0.id == current }) else { return }
                     let delta = direction == .down ? 1 : direction == .up ? -1 : 0
                     guard delta != 0 else { return }
@@ -246,7 +284,7 @@ struct GSSidebar: View {
             Text("Zeus").font(GS.wordmark).tracking(-1.6).foregroundStyle(GS.text).offset(x: 90, y: 51)
                 .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: 0) {
-                let rows = SettingsSectionRegistry.live
+                let rows = glassSettingsRows()
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, descriptor in
                     if let heading = SettingsSectionRegistry.heading(before: descriptor, previous: index > 0 ? rows[index - 1] : nil) {
                         Text(heading).font(GS.sidebarHead).foregroundStyle(GS.secondary)
@@ -273,11 +311,13 @@ struct GSSidebar: View {
     static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1" }
 
     private func item(_ section: GSSection) -> some View {
-        let selected = navigation.section == section
-        let metrics = GSSection.SidebarLayout.rowMetrics(rowCount: GSSection.shown.count)
+        let selected: Bool = {
+            if case .section(let current) = navigation.selection { return current == section }
+            return false
+        }()
+        let metrics = SettingsSidebarLayout.rowMetrics(rowCount: glassSettingsRows().count)
         return Button {
-            navigation.section = section
-            navigation.glassSlotID = nil
+            navigation.selectSection(section)
         } label: {
             HStack(spacing: 0) {
                 Image(systemName: section.symbol).font(.system(size: 15, weight: .regular))
@@ -299,9 +339,12 @@ struct GSSidebar: View {
     }
 
     private func glassItem(_ slot: GlassSectionSlot) -> some View {
-        let selected = navigation.glassSlotID == slot.id
-        let metrics = GSSection.SidebarLayout.rowMetrics(rowCount: GSSection.shown.count)
-        return Button { navigation.glassSlotID = slot.id } label: {
+        let selected: Bool = {
+            if case .slot(let id) = navigation.selection { return id == slot.id }
+            return false
+        }()
+        let metrics = SettingsSidebarLayout.rowMetrics(rowCount: glassSettingsRows().count)
+        return Button { navigation.selectSlot(slot.id) } label: {
             HStack(spacing: 0) {
                 Text(slot.title).font(GS.sidebarItem)
                 Spacer()
@@ -327,18 +370,20 @@ struct GSPanelHost: View {
 
     var body: some View {
         let page = Group {
-            if let id = navigation.glassSlotID,
-               let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.filled }) {
-                GlassSettingsSlotPage(slot: slot)
-            } else {
-                GSPageView(section: navigation.section, navigation: navigation, context: context)
+            switch navigation.selection {
+            case .slot(let id):
+                if let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.filled }) {
+                    GlassSettingsSlotPage(slot: slot)
+                }
+            case .section(let section):
+                GSPageView(section: section, navigation: navigation, context: context)
             }
         }
             .padding(.leading, GS.pagePadding)
             .padding(.trailing, 28)
             .padding(.top, 25)
             .padding(.bottom, 32)
-            .id(navigation.glassSlotID ?? navigation.section.rawValue)
+            .id(navigation.selection.rowID)
         ZStack {
             RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
             GlassSettingsPanelHighlight()

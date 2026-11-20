@@ -40,6 +40,11 @@ import Testing
         #expect(kept == state)
         #expect(SettingsSelectionRules.isExclusive(state))
         #expect(SettingsSelectionRules.isExclusive(.slot("glass.probe")))
+        let window = try! String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/SettingsWindow.swift"), encoding: .utf8)
+        #expect(window.contains("enum SettingsSelection"))
+        #expect(window.contains("case section(GSSection)"))
+        #expect(window.contains("case slot(SlotID)"))
+        #expect(!window.contains("var glassSlotID"))
     }
 
     @Test func sidebarFitsEveryVisibleRowCount() {
@@ -64,6 +69,8 @@ import Testing
         #expect(engine != nil)
         #expect(shown[(engine ?? 0) + 1] == "iPhone")
         #expect(shown[(engine ?? 0) + 2] == "Features")
+        let window = try! String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/SettingsWindow.swift"), encoding: .utf8)
+        #expect(window.contains("includePhone: GSSection.iPhonePairingAvailable"))
     }
 
     @Test func duplicateFilledIDsCollapseAndStayOrdered() {
