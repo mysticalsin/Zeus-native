@@ -17,10 +17,6 @@ public enum AccessoryOverlayStyle: String, Codable, CaseIterable, Sendable, Equa
     }
 }
 
-public enum AccessoryPlacement: Equatable, Sendable {
-    case topbarTab(Int)
-}
-
 public struct AccessoryPreferences: Equatable, Sendable, Codable {
     public var earbudsOverlay: Bool
     public var overlayStyle: AccessoryOverlayStyle
@@ -50,12 +46,6 @@ public struct AccessoryPreferences: Equatable, Sendable, Codable {
             speakerNames: speakerNames && imported.speakerNames
         )
     }
-}
-
-public enum AccessoryLayoutMetrics {
-    public static let rowHeight = 52.0
-    public static let panelPadding = 32.0
-    public static let cardSpacing = 28.0
 }
 
 public struct AccessoryControlCopy: Equatable, Sendable {

@@ -12,6 +12,6 @@ import ZeusCore
             "accessory.overlayStyle",
             "accessory.speakerNames",
         ])
-        #expect(AccessorySectionSlot.placement == .topbarTab(6))
+        #expect(slot.placement == .topbarTab(6))
     }
 }

@@ -18,13 +18,13 @@ struct AccessorySettingsSection: View {
     var body: some View {
         let motion = reduceMotion
         ScrollView {
-            VStack(alignment: .leading, spacing: AccessoryLayoutMetrics.cardSpacing) {
+            VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
                 overlayCard
                 styleCard
                 speakerCard
                 previewCard
             }
-            .padding(AccessoryLayoutMetrics.panelPadding)
+            .padding(CGFloat(GlassSettingsMetrics.panelPadding))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .onAppear {
@@ -120,7 +120,7 @@ struct AccessorySettingsSection: View {
                 Text(phase.status)
                     .foregroundStyle(GS.secondary)
             }
-            .frame(minHeight: AccessoryLayoutMetrics.rowHeight, alignment: .leading)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
             .accessibilityElement(children: .combine)
             .focusable(true)
         } else {
@@ -135,7 +135,7 @@ struct AccessorySettingsSection: View {
             ForEach(speakers) { speaker in
                 Text(speaker.displayName)
                     .foregroundStyle(GS.text)
-                    .frame(minHeight: AccessoryLayoutMetrics.rowHeight, alignment: .leading)
+                    .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
                     .accessibilityLabel(speaker.name)
                     .accessibilityHint("Nearby speaker.")
                     .focusable(true)
@@ -177,7 +177,7 @@ struct AccessorySettingsSection: View {
                         .foregroundStyle(GS.secondary)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: AccessoryLayoutMetrics.rowHeight, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: CGFloat(GlassSettingsMetrics.controlRow), alignment: .leading)
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -212,10 +212,11 @@ struct AccessorySettingsSection: View {
                 Spacer(minLength: 12)
                 control()
             }
-            .frame(minHeight: AccessoryLayoutMetrics.rowHeight)
+            .frame(minHeight: CGFloat(GlassSettingsMetrics.controlRow))
             Text(copy.helper)
                 .font(.callout)
                 .foregroundStyle(GS.secondary)
+                .frame(minHeight: CGFloat(GlassSettingsMetrics.helperLine), alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .contain)

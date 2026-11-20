@@ -9,13 +9,13 @@ struct AccessorySettingsTests {
         #expect(slot.id == "glass.accessory")
         #expect(slot.title == "Accessory")
         #expect(slot.filled == true)
-        #expect(slot.order == 190)
+        #expect(slot.order == 6)
         #expect(slot.keys == [
             "accessory.earbudsOverlay",
             "accessory.overlayStyle",
             "accessory.speakerNames",
         ])
-        #expect(AccessorySectionSlot.placement == .topbarTab(6))
+        #expect(slot.placement == .topbarTab(6))
         #expect(GlassSectionManifest.slotProblems([slot]).isEmpty)
     }
 
@@ -70,12 +70,10 @@ struct AccessorySettingsTests {
     }
 
     @Test func layoutUsesTheGlassRowPaddingAndCardSpacing() {
-        #expect(AccessoryLayoutMetrics.rowHeight == 52)
-        #expect(AccessoryLayoutMetrics.panelPadding == 32)
-        #expect(AccessoryLayoutMetrics.cardSpacing == 28)
-        #expect(AccessoryLayoutMetrics.rowHeight > 0)
-        #expect(AccessoryLayoutMetrics.panelPadding > 0)
-        #expect(AccessoryLayoutMetrics.cardSpacing > 0)
+        #expect(GlassSettingsMetrics.controlRow == 52)
+        #expect(GlassSettingsMetrics.helperLine == 16)
+        #expect(GlassSettingsMetrics.panelPadding == 32)
+        #expect(GlassSettingsMetrics.cardSpacing == 28)
     }
 
     @Test func everyControlHasAHelperAndAVoiceOverLabel() {
@@ -152,9 +150,10 @@ struct AccessorySettingsTests {
         let root = accessoryRepositoryRoot()
         let page = root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/Sections/AccessorySettingsSection.swift")
         let source = try String(contentsOf: page, encoding: .utf8)
-        #expect(source.contains("AccessoryLayoutMetrics.rowHeight"))
-        #expect(source.contains("AccessoryLayoutMetrics.panelPadding"))
-        #expect(source.contains("AccessoryLayoutMetrics.cardSpacing"))
+        #expect(source.contains("GlassSettingsMetrics.controlRow"))
+        #expect(source.contains("GlassSettingsMetrics.helperLine"))
+        #expect(source.contains("GlassSettingsMetrics.panelPadding"))
+        #expect(source.contains("GlassSettingsMetrics.cardSpacing"))
         #expect(source.contains("AccessoryConnectInput"))
         #expect(source.contains("accessibilityLabel"))
         #expect(source.contains("accessibilityHint"))
