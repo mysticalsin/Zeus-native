@@ -318,10 +318,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.cliInstall) { CLIInstaller.install() }
         if on(.assistantKeyImport) { AssistantKeyImporter.importDefaultIfNeeded() }
         if on(.talkHotkey) {
-            hotkey.onPress = { [weak self] in self?.talkKeyPressed() ?? false }
+            // The monitor plays the installed talk cues. This path does not also play listenStart.
+            hotkey.onPress = { [weak self] in self?.talkKeyPressed(builtinCue: false) ?? false }
             hotkey.onRelease = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
-                self?.voice?.release()
+                self?.voice?.release(builtinCue: false)
+            }
+            hotkey.onListenAccessMissing = { [weak self] in
+                if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
             // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one. Every event reads
@@ -653,7 +657,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Whether a turn opened: false tells the key machine nothing is listening, so no release or cancel is owed.
-    private func talkKeyPressed() -> Bool {
+    private func talkKeyPressed(builtinCue: Bool = true) -> Bool {
         guard on(.talkHotkey), voice != nil else { return false }
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
@@ -667,11 +671,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
             Task { @MainActor in
                 let access = await VoicePermissions.ensure(explicit: true)
-                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: press the talk key again")) }
+                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: hold Control + Option again")) }
             }
             return false
         }
-        let took = voice?.press() ?? false
+        let took = voice?.press(builtinCue: builtinCue) ?? false
         // No release follows a press that opened nothing, so the wake word listener must not stay held off.
         if !took { WakeWordController.shared.talkKeyHeld = false }
         return took
@@ -1146,9 +1150,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard SettingsStore.shared.bool("shortcut.answerKeys"), notch.model.approval != nil else { return [] }
         let mods = UInt32(controlKey | optionKey)
         func answer(_ verdict: HookDecision.Verdict) -> () -> Void {
-            { [weak self] in self?.notch.model.approval?.resolve(verdict) }
+            { [weak self] in
+                guard let approval = self?.notch.model.approval else { return }
+                guard ApprovalCard.inputOpen(now: Date(), appearedAt: approval.appearedAt) else { return }
+                if verdict == .allow {
+                    self?.notch.activateApproval(kind: .shortcut, cardID: approval.id)
+                    return
+                }
+                self?.notch.resolveDisplayed(verdict)
+            }
         }
-        return [(UInt32(kVK_ANSI_Y), mods, answer(.allow)), (UInt32(kVK_ANSI_N), mods, answer(.deny)), (UInt32(kVK_ANSI_O), mods, answer(.ask))]
+        func run(_ key: ApprovalCardKey, _ work: @escaping (NotchModel.Approval) -> Void) -> () -> Void {
+            { [weak self] in
+                guard let approval = self?.notch.model.approval else { return }
+                guard ApprovalCard.inputOpen(now: Date(), appearedAt: approval.appearedAt) else { return }
+                guard ApprovalCard.key(letter: ApprovalCard.keycap(key, risk: approval.risk, modifiersHeld: true) ?? "", risk: approval.risk) != nil || key == .previous || key == .next else { return }
+                work(approval)
+            }
+        }
+        return [
+            (UInt32(kVK_ANSI_Y), mods, answer(.allow)),
+            (UInt32(kVK_ANSI_N), mods, answer(.deny)),
+            (UInt32(kVK_ANSI_O), mods, answer(.ask)),
+            (UInt32(kVK_ANSI_J), mods, run(.jump) { $0.onJump?() }),
+            (UInt32(kVK_ANSI_A), mods, run(.allowChat) { approval in
+                guard ApprovalCard.key(letter: "A", risk: approval.risk) == .allowChat else { return }
+                approval.trustChat?()
+            }),
+            (UInt32(kVK_LeftArrow), mods, run(.previous) { [weak self] _ in self?.notch.browseApproval(by: -1) }),
+            (UInt32(kVK_RightArrow), mods, run(.next) { [weak self] _ in self?.notch.browseApproval(by: 1) }),
+        ]
     }
 
     private func openQuickTodo() {

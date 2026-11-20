@@ -4297,7 +4297,7 @@
     },
     {
       "id": "REG-404",
-      "failure": "The meeting card timed out under the pointer of the person about to tap it.",
+      "failure": "The meeting card timed out under the pointer of the person about to tap it. Jarvis on 2026-11-19 at 08:49 reversed the 2026-11-18 11:11 ruling that kept the 634b5b5 30 s hover cap. A card that disappears mid-read is worse than one that stays until the pointer leaves, and that is what ships. The offer and the failure card both stay up under a resting pointer and leave once the pointer does. The guard is the shipping meeting-start machine.",
       "features": [
         "F04"
       ],
@@ -4357,14 +4357,14 @@
     },
     {
       "id": "REG-409",
-      "failure": "A Start tap that arrived just after the banner question stopped pending started nothing.",
+      "failure": "A Start tap that arrived after the offer had left started a recording.",
       "features": [
         "F04"
       ],
       "check": "native-ZeusCoreTests",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
-        "function": "aTapThatArrivesJustAfterTheTimeoutStillStarts"
+        "function": "aTapThatArrivesJustAfterTheTimeoutDoesNotStart"
       }
     },
     {
@@ -8651,6 +8651,30 @@
       "guard": {
         "file": "qa/closed-loop/tests/test_contracts.py",
         "function": "test_xunit_testcase_must_sit_in_a_suite_and_paths_stay_closed"
+      }
+    },
+    {
+      "id": "REG-991",
+      "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_shipped_plist_is_an_agent_app"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A guide click test hard-coded the accessory policy instead of the function the shipped app uses, so it could pass while main.swift set a different policy. The test now calls ZeusActivation.configure and still checks that the click does not change activation.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_main_and_the_guide_test_use_the_shared_activation_function"
       }
     },
     {

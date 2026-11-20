@@ -36,15 +36,23 @@ final class PermissionSweepRunner {
     private static var now: Double { Date().timeIntervalSinceReferenceDate }
 
     var isRunning: Bool { state.isRunning }
-    var progressLine: String { PermissionSweep.progressLine(access) }
+    /// Empty means the read has not returned yet. "0 of 12 allowed" is only shown once every access
+    /// has actually been read, so a slow TCC check cannot look like nothing is granted.
+    var progressLine: String {
+        guard !access.isEmpty else { return "Checking permissions…" }
+        return PermissionSweep.progressLine(access)
+    }
+    /// Tests substitute this so Allow all can be exercised with no TCC prompt. Production leaves it nil.
+    @ObservationIgnored var testingAsk: ((Item) -> Void)?
     var allAllowed: Bool { PermissionSweep.allowedCount(access) == Item.allCases.count }
     var needsRestart: Bool { state.phase == .finished(needsRestart: true) }
 
     // MARK: Actions
 
-    /// The "Allow all" button.
+    /// The "Allow all" button. Uses the access already on screen. A fresh read is what the page polls;
+    /// waiting for it here is what made the click look like it did nothing.
     func start() {
-        Task { await send { .start(access: $0, resumed: nil, now: Self.now) } }
+        perform(apply(.start(access: access, resumed: nil, now: Self.now)))
     }
 
     func skip() {
@@ -114,14 +122,18 @@ final class PermissionSweepRunner {
                 Task { await ask(item) }
             case .openSettings(let item, let request):
                 openSettings(item, request: request)
-            case .showGuide:
+            case .showGuide(let item):
                 if guide == nil { guide = PermissionSweepGuide(runner: self) }
                 guide?.show()
+                if state.current != item {
+                    NSLog("[ZEUS] permissions: guide for %@ while the sweep is on %@",
+                          item.rawValue, state.current?.rawValue ?? "nothing")
+                }
             case .hideGuide:
                 guide?.close()
                 guide = nil
             case .startPolling:
-                startPolling()
+                if testingAsk == nil { startPolling() }
             case .stopPolling:
                 polling?.cancel()
                 polling = nil
@@ -153,6 +165,10 @@ final class PermissionSweepRunner {
     // MARK: Requests (the same calls as each row's Allow button)
 
     private func ask(_ item: Item) async {
+        if let testingAsk {
+            testingAsk(item)
+            return
+        }
         switch item {
         case .microphone, .speech:
             // One "voice" request asks for both; the second step joins it instead of asking again.
@@ -244,8 +260,9 @@ final class PermissionSweepRunner {
     }
 }
 
-/// The small floating guide shown while the sweep runs. It stays above System Settings and never
-/// takes focus from it.
+/// The small floating guide shown while the sweep runs. It stays above System Settings and does not
+/// activate Zeus. `show()` orders it front and does not take the keyboard. A click in the guide makes
+/// it key, and only then do Return, Escape, and Tab reach Done, Skip, and the focus order.
 @MainActor
 final class PermissionSweepGuide {
     private final class Panel: NSPanel {
@@ -264,7 +281,9 @@ final class PermissionSweepGuide {
         panel.level = .floating
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.becomesKeyOnlyIfNeeded = true
+        // False so a click makes this nonactivating panel key. show() never calls makeKey(), and
+        // orderFrontRegardless does not take the key window from System Settings.
+        panel.becomesKeyOnlyIfNeeded = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let host = NSHostingView(rootView: PermissionSweepGuideView(runner: runner))
         host.frame = NSRect(origin: .zero, size: Self.size)
@@ -284,6 +303,34 @@ final class PermissionSweepGuide {
     }
 }
 
+private struct PermissionSweepGuideLabel: ViewModifier {
+    var label: String
+    var order: Int
+
+    func body(content: Content) -> some View {
+        content
+            .accessibilityLabel(label)
+            .accessibilitySortPriority(Double(100 - order))
+    }
+}
+
+@ViewBuilder
+private func permissionSweepGuideButton(_ spec: PermissionSweep.GuideButton, action: @escaping () -> Void) -> some View {
+    switch spec.keyAction {
+    case .defaultAction:
+        Button(spec.title, action: action)
+            .keyboardShortcut(.defaultAction)
+            .modifier(PermissionSweepGuideLabel(label: spec.voiceOverLabel, order: spec.focusOrder))
+    case .cancelAction:
+        Button(spec.title, action: action)
+            .keyboardShortcut(.cancelAction)
+            .modifier(PermissionSweepGuideLabel(label: spec.voiceOverLabel, order: spec.focusOrder))
+    case nil:
+        Button(spec.title, action: action)
+            .modifier(PermissionSweepGuideLabel(label: spec.voiceOverLabel, order: spec.focusOrder))
+    }
+}
+
 private struct PermissionSweepGuideView: View {
     let runner: PermissionSweepRunner
 
@@ -297,11 +344,15 @@ private struct PermissionSweepGuideView: View {
                 Text(runner.progressLine).font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            if case .guiding(let item) = phase, item.mayNeedRestart {
-                Button("Done") { runner.done() }.accessibilityLabel("Done, \(item.title) is on")
+            ForEach(PermissionSweep.guideButtons(phase), id: \.role) { spec in
+                permissionSweepGuideButton(spec) {
+                    switch spec.role {
+                    case .done: runner.done()
+                    case .skip: runner.skip()
+                    case .stop: runner.cancel()
+                    }
+                }
             }
-            Button("Skip") { runner.skip() }.accessibilityLabel("Skip this one")
-            Button("Stop") { runner.cancel() }.accessibilityLabel("Stop allowing")
         }
         .padding(.horizontal, 16)
         .frame(width: PermissionSweepGuide.size.width, height: PermissionSweepGuide.size.height)

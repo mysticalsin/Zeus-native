@@ -234,8 +234,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case scribe(ScribePhase, now: TimeInterval)
         /// Deadlines only. Never advances a debounce or the call-ended timer: those need fresh evidence.
         case tick(now: TimeInterval, context: ScribeStartContext)
-        /// The primary button of the card the person saw. The machine reads only the card's case and meeting, so
-        /// a tap on a card that has since gone is still an answer (or ignored, by the late tap rules).
+        /// The primary button of the card the person saw. Record starts only when that offer is still the live
+        /// one and its time has not run out. A tap that names an offer which has left, or which a newer offer
+        /// replaced, starts nothing.
         case primary(on: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext)
         /// Cancel on the card the person saw.
         case cancel(on: ScribeMeetingCard, now: TimeInterval)
@@ -426,24 +427,28 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
 
     // MARK: Taps
 
+    /// The meeting behind a Record tap, when `key` is the offer still on screen. Nil once that offer has left,
+    /// once a different offer has replaced it, or while the card is hidden for the call check.
+    private func liveOffer(matching key: String, now: TimeInterval) -> ScribeMeeting? {
+        switch state {
+        case .prompting(let meeting, let deadline, _) where meeting.key == key:
+            return pointerInside || now < deadline ? meeting : nil
+        case .upcoming(let meeting, let deadline) where meeting.key == key:
+            return pointerInside || now < deadline ? meeting : nil
+        case .armed(let meeting, _, let offerUntil?) where meeting.key == key:
+            // The call began while the heads-up was up: the meeting in hand is the live one.
+            return pointerInside || now < offerUntil ? meeting : nil
+        default:
+            return nil
+        }
+    }
+
     private mutating func primary(_ card: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext) -> [Effect] {
         switch card {
         case .offer(let seen, _):
-            switch state {
-            case .prompting(let meeting, _, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .upcoming(let meeting, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .armed(let meeting, _, _) where meeting.key == seen.key:
-                // The call began while the heads-up was up: the meeting is the live one.
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .idle, .upcoming, .armed, .prompting:
-                // The offer ended in the same instant (or another one replaced it): the person asked to record.
-                return startRequest(seen, origin: .tap, now: now, context: context)
-            case .countingDown, .held, .starting, .recording, .failed:
-                // Something is already under way for a meeting: a second start would only cover it.
-                return []
-            }
+            // A tap starts only when this offer is still the one on screen and its time has not run out.
+            guard let meeting = liveOffer(matching: seen.key, now: now) else { return [] }
+            return startRequest(meeting, origin: .tap, now: now, context: context)
         case .failed(let seen, _):
             guard case .failed(let attempt, let failure, _) = state, attempt.meeting.key == seen.key else { return [] }
             if failure == .microphoneOff, context.microphone == .denied { return [.openMicrophoneSettings] }

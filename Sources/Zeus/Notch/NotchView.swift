@@ -660,6 +660,12 @@ private struct ApprovalBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
+            if !approval.position.isEmpty {
+                Text(approval.position)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .accessibilityLabel("Request \(approval.position)")
+            }
             if MeetingState.hideDetails, approval.detail?.hasOwnActions == true {
                 // The rich detail (questions, plans) is the content itself, so it stays out of view; Deny remains.
                 HStack(spacing: 8) {
@@ -668,12 +674,20 @@ private struct ApprovalBody: View {
                         .foregroundStyle(Theme.cloudSecondary)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
+                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
                         .accessibilityHint("Stops \(approval.agent) from running this.")
                 }
             } else if let detail = approval.detail, !MeetingState.hideDetails {
                 // Never built while details are hidden: a diff's file name and source text are the content too.
-                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: approval.resolve)
+                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: approval.resolve,
+                                    beginHold: { approval.beginHold() },
+                                    endHold: { approval.endHold(true) },
+                                    plainAllow: { approval.activateAllow() },
+                                    cancelHold: { approval.cancelHold() },
+                                    gesture: { approval.liveGesture() },
+                                    onPlan: { approval.releasePlan($0) },
+                                    onAnswers: { approval.commitAnswers($0) },
+                                    cardID: { approval.id })
             }
             if approval.detail?.hasOwnActions != true {
                 let preview = NotchModel.Approval.isChangePreview(approval.command) && !MeetingState.hideDetails
@@ -700,10 +714,32 @@ private struct ApprovalBody: View {
                             .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     // Neither button is the default: approving shouldn't be one reflexive keypress.
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
+                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.deny() }
                         .accessibilityHint("Stops \(approval.agent) from running this.")
-                    NotchButton(title: "Approve", tint: Theme.ember, filled: true) { approval.resolve(.allow) }
-                        .accessibilityHint("Lets \(approval.agent) run this once.")
+                    ApprovalAllowButton(
+                        title: approval.allowGate.confirmVisible ? "Confirm" : "Approve",
+                        tint: Theme.ember,
+                        fraction: approval.allowGate.holdFraction(now: ApprovalMonotonic.now()),
+                        cardID: { approval.id }
+                    ) {
+                        approval.beginHold()
+                    } release: { inside in
+                        switch ApprovalPress.outcome(inside: inside, gesture: approval.liveGesture()) {
+                        case .cancel:
+                            approval.detail?.withdraw()
+                            approval.cancelHold()
+                        case .endHold: approval.endHold(true)
+                        case .activate: approval.activateAllow()
+                        }
+                    } accessibility: {
+                        approval.activateAllow()
+                    } onCancel: {
+                        approval.cancelHold()
+                    } onDisappearAction: {
+                        approval.cancelHold()
+                    }
+                    NotchButton(title: "Deny all", tint: Theme.cloudSecondary, filled: false) { approval.denyAll() }
+                        .accessibilityHint("Denies this request and every request waiting behind it. Nothing is allowed.")
                 }
             }
             HStack(spacing: 6) {
@@ -729,6 +765,62 @@ private struct ApprovalBody: View {
             .font(.system(size: 10.5, design: .rounded))
             .foregroundStyle(Theme.cloudQuiet)
         }
+    }
+}
+
+/// Pointer presses begin and end a hold. A click, a key, or VoiceOver uses the plain activation,
+/// which cannot finish a high-risk hold.
+struct ApprovalAllowButton: View {
+    let title: String
+    let tint: Color
+    let fraction: Double
+    let press: () -> Void
+    let release: (Bool) -> Void
+    let accessibility: () -> Void
+    var cardID: () -> String = { "" }
+    var onCancel: () -> Void = {}
+    var onDisappearAction: () -> Void = {}
+    @GestureState private var tracking = false
+    @State private var hold = ApprovalHoldTracking()
+    @State private var pressedID = ""
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.storm)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 28)
+            .background {
+                GeometryReader { proxy in
+                    Capsule().fill(tint.opacity(0.35 + 0.65 * fraction))
+                        .gesture(DragGesture(minimumDistance: 0)
+                            .updating($tracking) { _, state, _ in state = true }
+                            .onChanged { _ in
+                                if !hold.down {
+                                    pressedID = cardID()
+                                    hold.press()
+                                    press()
+                                }
+                            }
+                            .onEnded { value in
+                                hold.release()
+                                guard ApprovalPressOrigin.releaseCounts(pressed: pressedID, displayed: cardID()) else { return }
+                                release(ApprovalButtonHit.contains(
+                                    width: proxy.size.width, height: proxy.size.height,
+                                    x: value.location.x, y: value.location.y))
+                            })
+                }
+            }
+            .onChange(of: tracking) { _, isDown in
+                if !isDown, hold.systemCancel() { onCancel() }
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(title == "Confirm" ? "Confirm. Press again after a short wait." : title)
+            .accessibilityAction { accessibility() }
+            .onDisappear {
+                if hold.systemCancel() { onCancel() }
+                onDisappearAction()
+            }
     }
 }
 

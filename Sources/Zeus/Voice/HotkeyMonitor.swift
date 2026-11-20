@@ -61,7 +61,7 @@ enum KeyListenAccess {
 /// invisible to them). Pure so the message and startup check are unit-testable.
 enum KeyAccessNotice {
     static func cue(granted: Bool) -> (text: String, pane: String)? {
-        granted ? nil : ("Hold-to-talk and dictation need Accessibility or Input Monitoring.", "Privacy_Accessibility")
+        granted ? nil : ("Hold Control + Option to talk. That needs Accessibility or Input Monitoring.", "Privacy_Accessibility")
     }
 }
 
@@ -77,6 +77,12 @@ final class HotkeyMonitor {
     /// start) tells the machine the turn never opened, so no release or cancel follows.
     var onPress: (() -> Bool)?
     var onRelease: (() -> Void)?
+    /// Control+Option hold, after the debounce. Separate from `onPress` so other shortcuts keep their path.
+    var onTalkBegin: (() -> Void)?
+    var onTalkEnd: (() -> Void)?
+    /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
+    var onListenAccessMissing: (() -> Void)?
+    var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
     /// A turn the key ended without sending it: a shortcut or a larger chord took the press over.
@@ -298,6 +304,10 @@ final class HotkeyMonitor {
                 ownerTurn = turn
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
+                if role == .talk {
+                    cues?.preload()
+                    cues?.playStart()
+                }
                 if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
                 // A launcher or another app may hold Option-Space (Carbon cannot see it): a Space the system reports down at the release
@@ -309,10 +319,12 @@ final class HotkeyMonitor {
                 } else {
                     onRelease?()
                 }
+                if role == .talk { cues?.playEnd() }
             case .cancel:
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut (\(heard.key?.title ?? "none")) became another shortcut: cancelled, nothing sent")
                 onCancel?()
+                if role == .talk { cues?.playEnd() }
             case .refused:
                 onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
             case .wake(let after):

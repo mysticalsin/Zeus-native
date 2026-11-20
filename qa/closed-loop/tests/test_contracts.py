@@ -789,5 +789,31 @@ class DeclaredTestCacheTests(unittest.TestCase):
             self.assertEqual(c.declared_tests(path), ("test_one",))
 
 
+class ApprovalQueueGuardTests(unittest.TestCase):
+    def test_a_spoken_yes_names_the_card_and_the_calendar_reader_does_not_ask(self):
+        voice = (c.ROOT / "Sources/Zeus/App/VoiceTurnController.swift").read_text()
+        self.assertIn("activateApproval(kind: .voice, cardID:", voice)
+        reader = (c.ROOT / "Sources/Zeus/Calendar/LocalCalendarReader.swift").read_text()
+        self.assertNotIn("requestFullAccessToEvents", reader)
+        controller = (c.ROOT / "Sources/Zeus/Notch/NotchController.swift").read_text()
+        self.assertIn("postApprovalAnnouncement(line)", controller)
+        self.assertIn("NSAccessibility.post", controller)
+
+
+class MeetingCardGuardTests(unittest.TestCase):
+    def test_reg_404_guards_the_shipping_meeting_card(self):
+        ledger = json.loads((c.ROOT / "qa/regressions.json").read_text())
+        guard = next(item for item in ledger["regressions"] if item["id"] == "REG-404")["guard"]
+        self.assertEqual(guard["file"], "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift")
+        self.assertEqual(guard["function"], "theCardNeverExpiresUnderThePointer")
+        text = (c.ROOT / guard["file"]).read_text()
+        self.assertIn("func theCardNeverExpiresUnderThePointer()", text)
+        definitions = [
+            path.name for path in (c.ROOT / "Tests/ZeusCoreTests").glob("Scribe*.swift")
+            if "func theCardNeverExpiresUnderThePointer(" in path.read_text()
+        ]
+        self.assertEqual(definitions, ["ScribeMeetingStartOutcomeTests.swift"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

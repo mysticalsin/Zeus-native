@@ -119,7 +119,7 @@ final class OnboardingOptions {
     private var revision = 0
     var haloDrawn = 1.0
 
-    init(values: [String: String] = [:], talkKey: String = "⌥ Space", preview: @escaping (ZeusSound.Event) -> Void = { _ in }) {
+    init(values: [String: String] = [:], talkKey: String = "Control + Option", preview: @escaping (ZeusSound.Event) -> Void = { _ in }) {
         access = nil
         self.values = values
         fixtureTalkKey = talkKey

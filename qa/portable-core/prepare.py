@@ -88,7 +88,7 @@ GROUPS = {
              "Scribe/ScribePresentation.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeSpeakerStats.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeMicrophoneIngress.swift", "Scribe/ScribeEndWorkflow.swift",
              "Scribe/ScribeMuteReadScheduler.swift", "Scribe/ScribeIncomingWordLayout.swift", "Scribe/MicInputOwnership.swift",
-             "Scribe/ScribeMeetingCard.swift", "Scribe/ScribeAutoStart.swift",
+             "Scribe/ScribeMeetingCard.swift", "Scribe/ScribeAutoStart.swift", "Scribe/ScribePopupLifecycle.swift",
              "Scribe/ScribeMeetingSignals.swift", "Scribe/ScribeMeetingLedger.swift", "Scribe/ScribeMeetingContext.swift",
              "Scribe/ScribeAutoStartOptIn.swift", "Scribe/ScribeDetectorPlan.swift", "Scribe/ScribeJoinApps.swift",
              "Alerts/AppBrandCatalog.swift"),

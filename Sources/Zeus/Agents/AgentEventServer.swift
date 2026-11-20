@@ -102,6 +102,7 @@ final class AgentEventServer {
             }
             // A chat the person trusted ("Allow this whole chat") runs without a card, unless it is risky.
             if TrustedChatStore.shared.autoApproves(session: sessionID, tool: event.tool, input: event.input, risk: risk) {
+                await ApprovalAuditLog.shared.recordTrustedApproval(session: sessionID, command: Self.command(tool: event.tool, input: event.input))
                 notch.upsertSession(id: sessionID, agent: agent, project: project,
                                     task: Self.describe(tool: event.tool ?? "Tool", input: event.input), status: .working)
                 return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .allow))
@@ -128,15 +129,7 @@ final class AgentEventServer {
             )
             notch.update(sessionID: sessionID, status: verdict == .deny ? .idle : .working)
             peekBriefly()
-            let decision: HookDecision
-            if let detail, detail.answered, verdict == .allow {
-                // Answers go the way this Claude Code is known to honour (learned, see QuestionAnswers).
-                decision = QuestionAnswers.shared.decision(id: event.id, session: sessionID, input: detail.input, answers: detail.choices)
-            } else {
-                decision = HookDecision(id: event.id, decision: verdict,
-                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
-                                        updatedInput: verdict == .allow ? detail?.updatedInput : nil)
-            }
+            let decision = Self.hookDecision(id: event.id, verdict: verdict, detail: detail, session: sessionID)
             return try? JSONEncoder().encode(decision)
 
         case "AgentResponse":
@@ -166,6 +159,19 @@ final class AgentEventServer {
             break
         }
         return nil
+    }
+
+    /// The hook reply. Only an allow may carry the typed answer.
+    static func hookDecision(id: String, verdict: HookDecision.Verdict, detail: ApprovalDetail?, session: String) -> HookDecision {
+        guard verdict == .allow, let detail else {
+            return HookDecision(id: id, decision: verdict,
+                                reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
+                                updatedInput: nil)
+        }
+        if detail.answered {
+            return QuestionAnswers.shared.decision(id: id, session: session, input: detail.input, answers: detail.choices)
+        }
+        return HookDecision(id: id, decision: .allow, updatedInput: detail.updatedInput)
     }
 
     /// The finished card with a sound, unless a full-screen app asks for quiet.

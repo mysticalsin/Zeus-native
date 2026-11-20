@@ -230,10 +230,15 @@ final class ApprovalDetail {
         questions.allSatisfy { !(choices[$0.question] ?? []).isEmpty }
     }
 
-    func answer(_ resolve: (HookDecision.Verdict) -> Void) {
+    func answer() {
         updatedInput = AgentQuestion.answeredInput(input, answers: choices)
         answered = true
-        resolve(.allow)
+    }
+
+    /// Drops a choice that must not ride along with a deny, a timeout, or a refused press.
+    func withdraw() {
+        updatedInput = nil
+        answered = false
     }
 }
 
@@ -242,6 +247,14 @@ struct ApprovalDetailView: View {
     let detail: ApprovalDetail
     let agent: String
     let resolve: (HookDecision.Verdict) -> Void
+    var beginHold: () -> Void
+    var endHold: () -> Void
+    var plainAllow: () -> Void
+    var cancelHold: () -> Void
+    var gesture: () -> ApprovalGesture
+    var onPlan: (Bool) -> Void
+    var onAnswers: (Bool) -> Void
+    var cardID: () -> String
 
     var body: some View {
         switch detail.kind {
@@ -266,10 +279,19 @@ struct ApprovalDetailView: View {
                 Spacer()
                 CardButton(title: "Keep Planning", tint: Theme.cloudSecondary, filled: false) {
                     detail.denyMessage = AgentPlan.feedbackMessage("")
+                    detail.withdraw()
                     resolve(.deny)
                 }
                 .accessibilityHint("Sends the plan back to \(agent) to keep working on it.")
-                CardButton(title: "Approve Plan", tint: Theme.leaf, filled: true) { resolve(.allow) }
+                ApprovalAllowButton(title: "Approve Plan", tint: Theme.leaf, fraction: 0, cardID: cardID) {
+                    beginHold()
+                } release: { inside in
+                    releasePlan(inside)
+                } accessibility: {
+                    releasePlan(true)
+                } onCancel: {
+                    cancelHold()
+                }
                     .accessibilityHint("Lets \(agent) start on this plan.")
             }
         }
@@ -296,10 +318,18 @@ struct ApprovalDetailView: View {
             HStack(spacing: 8) {
                 terminalButton(title: "Answer in Terminal")
                 Spacer()
-                if questions.count > 1 || questions.contains(where: \.multiSelect) {
-                    CardButton(title: "Send Answers", tint: Theme.accent, filled: true) { detail.answer(resolve) }
-                        .disabled(!detail.isComplete(questions))
-                        .opacity(detail.isComplete(questions) ? 1 : 0.5)
+                if questions.count > 1 || questions.contains(where: \.multiSelect) || !isTap {
+                    ApprovalAllowButton(title: "Send Answers", tint: Theme.accent, fraction: 0, cardID: cardID) {
+                        beginHold()
+                    } release: { inside in
+                        sendAnswers(inside)
+                    } accessibility: {
+                        sendAnswers(true)
+                    } onCancel: {
+                        cancelHold()
+                    }
+                    .disabled(!detail.isComplete(questions))
+                    .opacity(detail.isComplete(questions) ? 1 : 0.5)
                 }
             }
         }
@@ -309,8 +339,8 @@ struct ApprovalDetailView: View {
         let picked = detail.choices[question.question]?.contains(option.label) == true
         return Button {
             detail.toggle(option.label, in: question)
-            // One question, one choice: picking it is the answer.
-            if single { detail.answer(resolve) }
+            // One question, one choice, and a tap is enough: picking it sends the answer.
+            if single, isTap { sendAnswers(true) }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: question.multiSelect ? (picked ? "checkmark.square.fill" : "square") : (picked ? "largecircle.fill.circle" : "circle"))
@@ -334,13 +364,26 @@ struct ApprovalDetailView: View {
         .accessibilityAddTraits(picked ? .isSelected : [])
     }
 
+    private var isTap: Bool {
+        if case .tap = gesture() { return true }
+        return false
+    }
+
+    /// Send Answers and Approve Plan both call the controller's one release path.
+    private func sendAnswers(_ inside: Bool) { onAnswers(inside) }
+
+    private func releasePlan(_ inside: Bool) { onPlan(inside) }
+
     @ViewBuilder
     private func terminalButton(title: String) -> some View {
         // "ask" leaves the decision to the terminal's own prompt, where you can type. With no known
         // terminal there is nowhere to answer, so the button is absent and a failed jump keeps the card.
         if AgentTerminals.shared.canJump(to: detail.session) {
             CardButton(title: title, tint: Theme.cloudSecondary, filled: false) {
-                if AgentTerminals.shared.jump(to: detail.session) { resolve(.ask) }
+                if AgentTerminals.shared.jump(to: detail.session) {
+                    detail.withdraw()
+                    resolve(.ask)
+                }
             }
             .accessibilityHint("Brings the terminal forward and answers there.")
         }
