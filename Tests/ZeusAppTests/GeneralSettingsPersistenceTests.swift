@@ -16,16 +16,16 @@ struct GeneralSettingsPersistenceTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let first = SettingsStore(defaults: defaults)
-        for (key, value) in Self.added { first.set(key, value) }
+        for (key, value) in Self.added {
+            #expect(SettingsCatalog.option(key) == nil)
+            first.set(key, value)
+        }
         first.set("general.windowTheme", "Light")
 
         let second = SettingsStore(defaults: defaults)
         for (key, value) in Self.added {
             #expect(second.string(key) == value)
-            let option = try #require(SettingsCatalog.option(key))
-            #expect(option.isShown)
-            #expect(option.state == .live)
-            #expect(SettingsCatalog.search(option.title).contains { $0.id == key })
+            #expect(SettingsCatalog.search(key).contains { $0.id == key })
         }
         #expect(second.string("general.windowTheme") == "Light")
 

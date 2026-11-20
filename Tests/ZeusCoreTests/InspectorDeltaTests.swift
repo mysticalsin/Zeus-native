@@ -10,44 +10,68 @@ import ZeusCore
         .deletingLastPathComponent()
 
     @Test func fillingOneDescriptorShowsThatSlot() throws {
-        let slots = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
+        let slots = Self.topbarDescriptors(filled: true) + GlassSectionManifest.providers.compactMap { provider -> GlassSectionSlot? in
             let slot = provider.descriptor
-            guard slot.id == "glass.media" else { return slot }
-            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
+            if case .topbarTab = slot.placement { return nil }
+            return slot
         }
         let rows = SettingsSectionRegistry.sections(slots: slots, includePhone: false)
+        let tabIDs = Set(Self.topbarDescriptors(filled: true).map { $0.id })
         #expect(rows.last?.id == SettingsSectionRegistry.topbarID)
         #expect(rows.last?.title == "Topbar")
-        #expect(!rows.contains { $0.id == "glass.media" })
+        #expect(!rows.contains { tabIDs.contains($0.id) })
         #expect(SettingsSectionRegistry.search("Topbar", in: rows).contains { $0.id == SettingsSectionRegistry.topbarID })
-        #expect(rows.map(\.accessibilityLabel).contains("Topbar"))
-        #expect(GlassSectionManifest.topbarTabs(in: slots).map(\.id) == ["glass.media"])
-        #expect(GlassSectionManifest.cards(on: .general, in: slots).map(\.id) == ["glass.general"])
+        let labels = rows.map { $0.accessibilityLabel }
+        #expect(labels.contains("Topbar"))
+        #expect(GlassSettingsAudit.topbarPresentationFailures(Self.topbarDescriptors(filled: true)).isEmpty)
+        #expect(GlassSectionManifest.cards(on: .general, in: slots).isEmpty)
         let host = try String(contentsOf: Self.root.appendingPathComponent("Sources/Zeus/Settings/GlassShell/GlassSettingsSectionHost.swift"), encoding: .utf8)
         #expect(host.contains("as? any GlassSlotPage.Type"))
         #expect(!host.contains("switch id"))
     }
 
+    @Test func topbarAuditFollowsFilledState() {
+        let eight = Self.topbarDescriptors(filled: true)
+        #expect(eight.count == 8)
+        #expect(GlassSettingsAudit.topbarPresentationFailures(eight).isEmpty)
+        let hidden = GlassSectionSlot(id: "glass.syntheticHidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(80))
+        #expect(GlassSettingsAudit.topbarPresentationFailures(eight + [hidden]).isEmpty)
+        let leaked = GlassSectionManifest.topbarTabs(in: eight + [hidden]) + [hidden]
+        #expect(!GlassSettingsAudit.topbarPresentationFailures(eight + [hidden], shown: leaked).isEmpty)
+    }
+
+    private static func topbarDescriptors(filled: Bool) -> [GlassSectionSlot] {
+        GlassSectionManifest.providers.compactMap { provider in
+            let slot = provider.descriptor
+            guard case .topbarTab = slot.placement else { return nil }
+            return GlassSectionSlot(id: slot.id, title: slot.title, filled: filled, keys: slot.keys, order: slot.order, enabled: true, placement: slot.placement)
+        }
+    }
+
     @Test func topbarSelectionRejectsHiddenTabsAndCardsStayOnTheirPage() {
         let media = GlassSectionSlot(id: "glass.media", title: "Media", filled: true, keys: [], placement: .topbarTab(0))
-        let weather = GlassSectionSlot(id: "glass.weather", title: "Weather", filled: false, keys: [], placement: .topbarTab(1))
+        let weather = GlassSectionSlot(id: "glass.hiddenTab", title: "Hidden", filled: false, keys: [], placement: .topbarTab(1))
         let disabled = GlassSectionSlot(id: "glass.focus", title: "Focus", filled: true, keys: [], enabled: false, placement: .topbarTab(2))
         let face = GlassSectionSlot(id: "glass.faceID", title: "Face ID", filled: true, keys: [], placement: .cardOn(.privacy, 0))
         let license = GlassSectionSlot(id: "glass.license", title: "License", filled: true, keys: [], placement: .cardOn(.license, 1))
         let earlier = GlassSectionSlot(id: "glass.license", title: "Earlier", filled: true, keys: [], placement: .cardOn(.license, 0))
         let tabs = GlassSectionManifest.topbarTabs(in: [weather, disabled, media])
-        #expect(tabs.map(\.id) == ["glass.media"])
+        let tabIDs = tabs.map { $0.id }
+        #expect(tabIDs == ["glass.media"])
         var state = SettingsSelectionState.section("settings.general")
-        state = SettingsSelectionRules.selectingTopbar("glass.media", filledTabs: tabs.map(\.id), current: state)
+        state = SettingsSelectionRules.selectingTopbar("glass.media", filledTabs: tabIDs, current: state)
         #expect(state == .topbar(tab: "glass.media"))
-        let kept = SettingsSelectionRules.selectingTopbar("glass.weather", filledTabs: tabs.map(\.id), current: state)
+        let kept = SettingsSelectionRules.selectingTopbar("glass.hiddenTab", filledTabs: tabIDs, current: state)
         #expect(kept == state)
-        #expect(SettingsSelectionRules.selectingTopbar("  ", filledTabs: tabs.map(\.id), current: state) == state)
+        let blank = SettingsSelectionRules.selectingTopbar("  ", filledTabs: tabIDs, current: state)
+        #expect(blank == state)
         state = SettingsSelectionRules.selectingSection("settings.sounds", current: state)
         #expect(state == .section("settings.sounds"))
         let cards = GlassSectionManifest.cards(on: .license, in: [license, earlier, face])
-        #expect(cards.map(\.title) == ["Earlier"])
-        #expect(GlassSectionManifest.cards(on: .privacy, in: [license, earlier, face]).map(\.id) == ["glass.faceID"])
+        let cardTitles = cards.map { $0.title }
+        #expect(cardTitles == ["Earlier"])
+        let privacyIDs = GlassSectionManifest.cards(on: .privacy, in: [license, earlier, face]).map { $0.id }
+        #expect(privacyIDs == ["glass.faceID"])
         #expect(SettingsSectionRegistry.sections(slots: [weather, disabled]).last?.id != SettingsSectionRegistry.topbarID)
     }
 
@@ -59,16 +83,36 @@ import ZeusCore
             .sorted()
         let manifest = try String(contentsOf: Self.root.appendingPathComponent("Sources/ZeusCore/Settings/GlassSettingsShell.swift"), encoding: .utf8)
         guard let start = manifest.range(of: "static let providers"),
-              let open = manifest[start.upperBound...].firstIndex(of: "["),
-              let close = manifest[open...].firstIndex(of: "]") else {
+              let marker = manifest[start.upperBound...].range(of: "= [") else {
             Issue.record("provider list missing")
             return
         }
-        let registered = manifest[manifest.index(after: open)..<close]
+        var depth = 1
+        var index = marker.upperBound
+        var body = ""
+        while index < manifest.endIndex, depth > 0 {
+            let character = manifest[index]
+            if character == "[" { depth += 1 }
+            if character == "]" {
+                depth -= 1
+                if depth == 0 { break }
+            }
+            body.append(character)
+            index = manifest.index(after: index)
+        }
+        guard depth == 0 else {
+            Issue.record("provider list missing")
+            return
+        }
+        let registered = body
             .split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { $0.hasSuffix(".self") || $0.hasSuffix(".self,") }
-            .map { $0.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: ".self", with: "") }
+            .filter { $0.contains(".self") }
+            .map { line in
+                line.replacingOccurrences(of: ",", with: "")
+                    .replacingOccurrences(of: ".self", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+            }
         #expect(registered.sorted() == files)
         #expect(Set(registered).count == registered.count)
         #expect(GlassSectionManifest.providers.count == files.count)
@@ -105,8 +149,8 @@ import ZeusCore
     }
 
     @Test func phoneRowReturnsWhenPairingIsAvailable() {
-        let hidden = SettingsSectionRegistry.sections(slots: [], includePhone: false).map(\.title)
-        let shown = SettingsSectionRegistry.sections(slots: [], includePhone: true).map(\.title)
+        let hidden = SettingsSectionRegistry.sections(slots: [], includePhone: false).map { $0.title }
+        let shown = SettingsSectionRegistry.sections(slots: [], includePhone: true).map { $0.title }
         #expect(!hidden.contains("iPhone"))
         #expect(shown.contains("iPhone"))
         let engine = shown.firstIndex(of: "Engine")
@@ -126,7 +170,7 @@ import ZeusCore
         let duplicates = rows.filter { $0.id == "glass.dup" }
         #expect(duplicates.count == 1)
         #expect(duplicates.first?.title == "First")
-        let tail = rows.suffix(3).map(\.id)
+        let tail = rows.suffix(3).map { $0.id }
         #expect(tail == ["glass.earlier", "glass.dup", "glass.later"])
     }
 

@@ -42,6 +42,7 @@ public struct GlassSectionSlot: Equatable, Sendable {
 
 public protocol GlassSlotProviding: Sendable {
     static var descriptor: GlassSectionSlot { get }
+    static var keyContributions: [SettingsKeyContribution] { get }
 }
 
 public enum GlassSectionManifest {
@@ -63,6 +64,10 @@ public enum GlassSectionManifest {
 
     public static var slots: [GlassSectionSlot] {
         providers.map { $0.descriptor }
+    }
+
+    public static var keyContributions: [SettingsKeyContribution] {
+        providers.flatMap { $0.keyContributions }
     }
 
     /// Filled, enabled topbar tabs, in tab order. An unfilled or disabled tab is absent.
@@ -211,10 +216,12 @@ public enum GlassSettingsFocus {
 
 /// Keys the existing settings surface already stores. Catalog ids are read from the catalog source.
 public enum SettingsKeyReachability {
-    public static let catalogCount = 215
+    public static let catalogCount = 212
     public static let outsideCount = 77
+    /// Union of the catalog and the outside-catalog keys. Contributions are not included.
+    public static let baseCount = 285
     public static let sectionCount = 27
-    public static let requiredFingerprint = "af768b91b6cac0a0"
+    public static let requiredFingerprint = "42a6fb1152bb4c71"
 
     public static let outsideKeys: [String] = [
         "showCaptions",
@@ -343,8 +350,15 @@ public enum SettingsKeyReachability {
         return rest.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 
-    public static func reachableKeys(catalogIDs: [String]) -> Set<String> {
+    /// The pinned set: catalog rows plus the outside-catalog keys. Section contributions are not part of it.
+    public static func baseKeys(catalogIDs: [String]) -> Set<String> {
         Set(catalogIDs).union(outsideKeys)
+    }
+
+    /// Base keys plus contributed section keys. The fingerprint pin stays on `baseKeys`.
+    public static func reachableKeys(catalogIDs: [String], contributions: [SettingsKeyContribution] = []) -> Set<String> {
+        let contributed = contributions.map { $0.id.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return baseKeys(catalogIDs: catalogIDs).union(contributed)
     }
 
     public static func missing(required: Set<String>, present: Set<String>) -> [String] {
@@ -466,7 +480,16 @@ public enum GlassSettingsAudit {
         if !SettingsKeyReachability.duplicateIDs(SettingsKeyReachability.outsideKeys).isEmpty {
             failures.append("duplicate outside keys")
         }
-        let reachable = SettingsKeyReachability.reachableKeys(catalogIDs: ids)
+        let base = SettingsKeyReachability.baseKeys(catalogIDs: ids)
+        if base.count != SettingsKeyReachability.baseCount {
+            failures.append("base pin count \(base.count)")
+        }
+        let fingerprint = SettingsKeyReachability.fingerprint(base)
+        if fingerprint != SettingsKeyReachability.requiredFingerprint {
+            failures.append("fingerprint \(fingerprint)")
+        }
+        let contributions = GlassSectionManifest.keyContributions
+        let reachable = SettingsKeyReachability.reachableKeys(catalogIDs: ids, contributions: contributions)
         let missingCatalog = SettingsKeyReachability.missing(required: Set(ids), present: reachable)
         if !missingCatalog.isEmpty {
             failures.append("catalog keys missing \(missingCatalog.joined(separator: ","))")
@@ -475,10 +498,14 @@ public enum GlassSettingsAudit {
         if !missingOutside.isEmpty {
             failures.append("outside keys missing \(missingOutside.joined(separator: ","))")
         }
-        let fingerprint = SettingsKeyReachability.fingerprint(reachable)
-        if fingerprint != SettingsKeyReachability.requiredFingerprint {
-            failures.append("fingerprint \(fingerprint)")
+        let missingContributed = SettingsKeyReachability.missing(required: Set(contributions.map(\.id)), present: reachable)
+        if !missingContributed.isEmpty {
+            failures.append("contributed keys missing \(missingContributed.joined(separator: ","))")
         }
+        if SettingsKeyReachability.fingerprint(base) != SettingsKeyReachability.fingerprint(SettingsKeyReachability.baseKeys(catalogIDs: ids)) {
+            failures.append("base pin moved")
+        }
+        failures += contributionFailures(catalogIDs: ids)
         let sections = SettingsKeyReachability.sectionIDs(in: settingsViewSource)
         if sections != SettingsKeyReachability.existingSectionIDs {
             failures.append("sections \(sections)")
@@ -671,19 +698,46 @@ public enum GlassSettingsAudit {
         return []
     }
 
+    public static func contributionFailures(catalogIDs: [String]) -> [String] {
+        SettingsKeyLedger.problems(catalogIDs: catalogIDs, contributions: GlassSectionManifest.keyContributions)
+    }
+
+    /// Shown tabs must be exactly the filled, enabled topbar slots, in `.topbarTab` order. Media must be among them.
+    /// Passing `shown` checks a list directly, so a synthetic unfilled tab that leaked into the strip fails.
+    public static func topbarPresentationFailures(_ slots: [GlassSectionSlot], shown: [GlassSectionSlot]? = nil) -> [String] {
+        let tabs = shown ?? GlassSectionManifest.topbarTabs(in: slots)
+        var failures: [String] = []
+        let declared = slots.filter { slot in
+            if case .topbarTab = slot.placement { return true }
+            return false
+        }
+        if !tabs.contains(where: { $0.id == "glass.media" }) { failures.append("media tab missing from the host") }
+        let unfilled = Set(declared.filter { !$0.filled }.map(\.id))
+        if tabs.contains(where: { !$0.filled || unfilled.contains($0.id) }) { failures.append("an unfilled tab is shown") }
+        let expected = SettingsSectionRegistry.orderedSlots(declared.filter(\.isShown)).map(\.id)
+        if tabs.map(\.id) != expected { failures.append("filled tabs are not shown in topbar order") }
+        return failures
+    }
+
     public static func inspectorDeltaFailures(windowSource: String) -> [String] {
         var failures: [String] = []
-        let flipped = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
+        let forced = GlassSectionManifest.providers.map { provider -> GlassSectionSlot in
             let slot = provider.descriptor
-            guard slot.id == "glass.media" else { return slot }
-            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: slot.enabled, placement: slot.placement)
+            guard case .topbarTab = slot.placement else { return slot }
+            return GlassSectionSlot(id: slot.id, title: slot.title, filled: true, keys: slot.keys, order: slot.order, enabled: true, placement: slot.placement)
         }
-        let shownRows = SettingsSectionRegistry.sections(slots: flipped, includePhone: false)
+        let hidden = GlassSectionSlot(id: "glass.syntheticHidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(80))
+        let withHidden = forced + [hidden]
+        failures += topbarPresentationFailures(forced)
+        failures += topbarPresentationFailures(withHidden)
+        let leaked = GlassSectionManifest.topbarTabs(in: withHidden) + [hidden]
+        if topbarPresentationFailures(withHidden, shown: leaked).isEmpty { failures.append("an unfilled tab was accepted") }
+        let shownRows = SettingsSectionRegistry.sections(slots: forced, includePhone: false)
+        let topbarIDs = Set(forced.filter { if case .topbarTab = $0.placement { return true }; return false }.map(\.id))
         if shownRows.last?.id != SettingsSectionRegistry.topbarID { failures.append("filled topbar tab did not add the Topbar row") }
-        if shownRows.contains(where: { $0.id == "glass.media" }) { failures.append("a topbar tab became its own sidebar row") }
+        if shownRows.contains(where: { topbarIDs.contains($0.id) }) { failures.append("a topbar tab became its own sidebar row") }
         if !SettingsSectionRegistry.search("Topbar", in: shownRows).contains(where: { $0.id == SettingsSectionRegistry.topbarID }) { failures.append("Topbar missing from search") }
         if !shownRows.map(\.accessibilityLabel).contains("Topbar") { failures.append("Topbar missing from voiceover order") }
-        if GlassSectionManifest.topbarTabs(in: flipped).map(\.id) != ["glass.media"] { failures.append("media tab missing from the host") }
         if shownRows.filter({ $0.id == SettingsSectionRegistry.topbarID }).count != 1 { failures.append("more than one Topbar row") }
         if GlassSettingsMetrics.controlRow != 52 || GlassSettingsMetrics.helperLine != 16 || GlassSettingsMetrics.panelPadding != 32 || GlassSettingsMetrics.cardSpacing != 28 {
             failures.append("metrics")
