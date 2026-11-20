@@ -1,5 +1,4 @@
 import Testing
-import ZeusCore
 
 @Suite struct BatterySectionSlotTests {
     @Test func batterySlotStartsEmpty() {

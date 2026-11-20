@@ -1,5 +1,4 @@
 import Testing
-import ZeusCore
 
 @Suite struct MediaSectionSlotTests {
     @Test func mediaSlotStartsEmpty() {
