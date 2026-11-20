@@ -93,7 +93,7 @@ private func asIsCountingDown(_ state: ScribeAutoStartState) -> Bool {
     return false
 }
 
-@Suite("Scribe meeting start")
+@Suite("Scribe meeting start", .serialized)
 struct ScribeAutoStartTests {
     // MARK: Setting
 
@@ -106,7 +106,7 @@ struct ScribeAutoStartTests {
     }
 
     @Test func settingReadsTheStoredChoiceAndFreshDefaultsAreAskMe() throws {
-        let name = NSTemporaryDirectory() + "ScribeAutoStartTests.\(UUID().uuidString)"
+        let name = ScribeTestSuites.name("ScribeAutoStartTests")
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         #expect(ScribeAutoStartMode.current(defaults: defaults) == .ask)
