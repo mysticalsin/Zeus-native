@@ -566,6 +566,55 @@ final class DictationController {
         topBar.dictationPartial = ""
     }
 
+    private static func access(_ state: PermissionState) -> DictationAccess {
+        switch state {
+        case .notDetermined: .notDetermined
+        case .denied: .denied
+        case .authorized: .authorized
+        }
+    }
+
+    /// A refusal shows the Settings control. A first ask uses the system prompt, then tells the person to press again.
+    private func recover(_ decision: DictationPermissionRecovery, localEngineReady: Bool) {
+        switch decision {
+        case .start:
+            return
+        case .showSettings(let message, let pane):
+            apply(.startFailed(reason: message))
+            if let pane {
+                topBar.show(.permission(message, pane: pane))
+            } else {
+                topBar.show(.dictation(message))
+            }
+        case .prompt(let kind):
+            apply(.startFailed(reason: "Asking for access."))
+            Task { @MainActor in
+                switch kind {
+                case .microphone:
+                    _ = await AVCaptureDevice.requestAccess(for: .audio)
+                case .speech:
+                    _ = await SystemAuthorization.requestSpeechRecognition()
+                }
+                let after = DictationPermissionGate.decide(
+                    microphone: Self.access(VoicePermissions.mic),
+                    speech: Self.access(VoicePermissions.speech),
+                    localEngineReady: localEngineReady)
+                switch after {
+                case .start:
+                    self.topBar.show(.hint("Zeus can hear you now. Press the dictation key again."))
+                case .showSettings(let message, let pane):
+                    if let pane {
+                        self.topBar.show(.permission(message, pane: pane))
+                    } else {
+                        self.topBar.show(.dictation(message))
+                    }
+                case .prompt:
+                    self.topBar.show(.hint("Zeus is still waiting for access. Press the dictation key again."))
+                }
+            }
+        }
+    }
+
     func begin() {
         guard flow.canStartJob else { return }
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -577,6 +626,16 @@ final class DictationController {
         // Key down: start loading the speech model now so it is ready when the first chunk is.
         (turnEngine as? ParakeetEngine)?.prewarm()
         let local = turnEngine != nil
+        if real == nil {
+            let decision = DictationPermissionGate.decide(
+                microphone: Self.access(VoicePermissions.mic),
+                speech: Self.access(VoicePermissions.speech),
+                localEngineReady: local)
+            if decision != .start {
+                recover(decision, localEngineReady: local)
+                return
+            }
+        }
         // A local model only needs the microphone; Apple also needs Speech Recognition.
         let microphoneAllowed = real?.microphone ?? (AVCaptureDevice.authorizationStatus(for: .audio) == .authorized)
         // Apple recognition only runs on this Mac: a language without on-device support fails
