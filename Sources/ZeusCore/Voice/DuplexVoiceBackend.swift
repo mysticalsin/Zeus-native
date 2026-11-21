@@ -59,7 +59,9 @@ public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
 
     public func push(userFrame: [Float]) async throws -> VoiceFrame {
         let advanced = try session.next(on: .push)
-        _ = try VoiceFrame(samples: userFrame)
+        guard userFrame.count == VoiceFrame.sampleCount else {
+            throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: userFrame.count)
+        }
         session = advanced
         let reply = nextReply < frames.count ? frames[nextReply] : frames[frames.count - 1]
         if nextReply < frames.count { nextReply += 1 }
