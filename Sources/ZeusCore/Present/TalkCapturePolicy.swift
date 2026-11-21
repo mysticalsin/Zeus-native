@@ -2,13 +2,13 @@ import CoreGraphics
 import Foundation
 
 /// Which display a talk turn may capture, and whether a shot that is already ready
-/// may ride with speech. Pure: no capture session and no ScreenCaptureKit.
+/// may ride with speech. Pure: no capture session.
 public enum TalkCapturePolicy {
     /// Speech starts by this time even when the shot is not ready.
     public static let sttCapMs = 450
     /// A shot with this many milliseconds or fewer left before the cap is late.
-    /// 400 ms against a 450 ms cap is the first millisecond of that window.
-    static let lateWindowMs = 50
+    /// 399 ms is in time. 400 ms against a 450 ms cap is the first late millisecond.
+    public static let lateWindowMs = 50
 
     public struct Display: Equatable, Sendable {
         public var id: UInt32
@@ -34,7 +34,7 @@ public enum TalkCapturePolicy {
     }
 
     /// Seeing off captures nothing. Seeing on returns only the display id under the pointer.
-    /// A pointer on no display captures nothing. Other displays are not added.
+    /// Overlapping displays keep the later one. The shared edge belongs to the display that starts there.
     public static func displayIDs(seeing: Bool, pointer: CGPoint, displays: [Display]) -> [UInt32] {
         guard seeing, let hit = displays.last(where: { $0.frame.contains(pointer) }) else { return [] }
         return [hit.id]
@@ -65,14 +65,35 @@ public enum TalkCapturePolicy {
         }
     }
 
-    /// Red stub: waits out the shot and holds speech. The bound is ignored.
+    /// Speech waits at most until the bound. A shot that is still out then is dropped, and speech starts.
     public static func waitOutcome(shotReadyMs: Int?, sttFinalMs: Int? = nil, capMs: Int = sttCapMs) -> WaitOutcome {
-        _ = (sttFinalMs, capMs)
-        return WaitOutcome(includeShot: shotReadyMs != nil, waitedMs: shotReadyMs ?? 0, speechStarts: false)
+        let bound = max(0, capMs - lateWindowMs)
+        guard let shotReadyMs else {
+            return WaitOutcome(includeShot: false, waitedMs: bound, speechStarts: true)
+        }
+        let timing = decision(shotReadyMs: shotReadyMs, sttFinalMs: sttFinalMs, capMs: capMs)
+        if !timing.includeShot {
+            return WaitOutcome(includeShot: false, waitedMs: min(max(shotReadyMs, 0), bound), speechStarts: true)
+        }
+        return WaitOutcome(includeShot: true, waitedMs: max(0, shotReadyMs), speechStarts: true)
+    }
+
+    /// First result wins. The bound task returns nil, so a slow shot is dropped and the caller continues.
+    public static func collect<T: Sendable>(boundMs: Int, shot: @escaping @Sendable () async -> T) async -> T? {
+        await withTaskGroup(of: T?.self) { group in
+            group.addTask { await shot() }
+            group.addTask {
+                try? await Task.sleep(for: .milliseconds(max(0, boundMs)))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
     }
 }
 
-/// One talk turn's capture. Red stub: a frame stays included after seeing goes off, an unplug, or a new turn.
+/// One talk turn's capture. Seeing off, an unplug, or a frame from another turn drops the shot now.
 public struct TalkCaptureSession: Equatable, Sendable {
     public struct Offer: Equatable, Sendable {
         public var turnID: UUID
@@ -103,24 +124,49 @@ public struct TalkCaptureSession: Equatable, Sendable {
         self.seeing = seeing
         self.pointer = pointer
         self.displays = displays
-        frameID = UUID()
-        dropped = false
+        if displayIDs().isEmpty {
+            dropped = true
+            frameID = nil
+        } else {
+            dropped = false
+            frameID = UUID()
+        }
     }
 
     public func displayIDs() -> [UInt32] {
         TalkCapturePolicy.displayIDs(seeing: seeing, pointer: pointer, displays: displays)
     }
 
-    public mutating func setSeeing(_ on: Bool) { seeing = on }
-    public mutating func unplug(_ id: UInt32) { _ = id }
-    public mutating func sync(displays: [TalkCapturePolicy.Display], pointer: CGPoint) {
-        _ = displays
-        _ = pointer
+    public mutating func setSeeing(_ on: Bool) {
+        seeing = on
+        if displayIDs().isEmpty { dropFrame() }
     }
-    public mutating func dropFrame() {}
+
+    public mutating func unplug(_ id: UInt32) {
+        displays.removeAll { $0.id == id }
+        if displayIDs().isEmpty { dropFrame() }
+    }
+
+    public mutating func sync(displays next: [TalkCapturePolicy.Display], pointer: CGPoint) {
+        let armed = displayIDs().first
+        self.displays = next
+        self.pointer = pointer
+        if let armed, !displayIDs().contains(armed) { dropFrame() }
+        if displayIDs().isEmpty { dropFrame() }
+    }
+
+    public mutating func dropFrame() {
+        dropped = true
+        frameID = nil
+    }
 
     public func accept(_ offer: Offer) -> TalkCapturePolicy.Decision {
-        _ = offer
-        return TalkCapturePolicy.Decision(includeShot: true, speechStarts: false, lateRelativeToCap: false)
+        let timing = TalkCapturePolicy.decision(shotReadyMs: offer.shotReadyMs, sttFinalMs: offer.sttFinalMs)
+        let live = !dropped && frameID != nil && offer.turnID == turnID && offer.frameID == frameID
+            && displayIDs().contains(offer.displayID)
+        return TalkCapturePolicy.Decision(
+            includeShot: live && timing.includeShot,
+            speechStarts: true,
+            lateRelativeToCap: timing.lateRelativeToCap)
     }
 }
