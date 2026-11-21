@@ -358,6 +358,45 @@ import Testing
         #expect(store.remove("license.key") == false)
         #expect(backend.items["com.zeus.app|license.key"] == "secret")
     }
+
+    /// A canonical delete that fails must not lose the legacy secret when putting it back fails.
+    @Test func failedWriteBackDoesNotDropTheDeletedSecret() {
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        backend.failDelete = [AssistantKeyAccount.canonicalOpenAI]
+        backend.failWrite = [AssistantKeyAccount.aliasOpenAI]
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.remove(AssistantKeyAccount.canonicalOpenAI) == false)
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+    }
+
+    /// The alias removed at load has to come back if a later delete fails. A failed restore write is not success.
+    @Test func restoreOfTheAliasRemovedAtLoadDoesNotIgnoreAFailedWrite() {
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == nil)
+        backend.failDelete = [AssistantKeyAccount.canonicalOpenAI]
+        backend.failNextWrites = 1
+        #expect(store.remove(AssistantKeyAccount.aliasOpenAI) == false)
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+    }
+
+    /// The write is echoed by the other fakes, so this one stores a different value. Verify must fail.
+    @Test func migrationFailsWhenTheStoredCanonicalValueDoesNotMatchTheWrite() {
+        let backend = DivergentWriteKeychain(["com.zeus.app|assistant.key.openai": "sk-legacy"])
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == nil)
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] != "sk-legacy")
+    }
 }
 
 /// Lists nothing and refuses deletion, the way a locked keychain reports an error as an empty list
@@ -371,11 +410,33 @@ final class LockedListingKeychain: KeychainBackend, @unchecked Sendable {
     func delete(service: String, account: String) -> Bool { false }
 }
 
+/// Accepts a write and stores a different value, so a read-back does not match what was written.
+final class DivergentWriteKeychain: KeychainBackend, @unchecked Sendable {
+    var items: [String: String]
+    init(_ items: [String: String]) { self.items = items }
+    func accounts(service: String) -> [String] {
+        items.keys.filter { $0.hasPrefix(service + "|") }.map { String($0.dropFirst(service.count + 1)) }
+    }
+    func read(service: String, account: String) -> String? { items["\(service)|\(account)"] }
+    func write(_ value: String, service: String, account: String) -> Bool {
+        items["\(service)|\(account)"] = value + "-other"
+        return true
+    }
+    func delete(service: String, account: String) -> Bool {
+        items["\(service)|\(account)"] = nil
+        return true
+    }
+}
+
 /// A keychain whose deletes can fail while the item stays, and whose missing items can report failure.
 final class DeleteInjectionKeychain: KeychainBackend, @unchecked Sendable {
     private let lock = NSLock()
     var items: [String: String]
     var failDelete: Set<String> = []
+    /// Writes to these accounts return false and leave the stored bytes unchanged.
+    var failWrite: Set<String> = []
+    /// The next N writes fail, then writes store the value. Used when a retry must be able to succeed.
+    var failNextWrites = 0
     /// When set, deleting an account that is not stored returns false. That is `errSecItemNotFound` reported as failure.
     var absentDeleteReturnsFalse = false
     private(set) var deleteLog: [String] = []
@@ -394,6 +455,11 @@ final class DeleteInjectionKeychain: KeychainBackend, @unchecked Sendable {
 
     func write(_ value: String, service: String, account: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
+        if failWrite.contains(account) { return false }
+        if failNextWrites > 0 {
+            failNextWrites -= 1
+            return false
+        }
         items["\(service)|\(account)"] = value
         return true
     }
