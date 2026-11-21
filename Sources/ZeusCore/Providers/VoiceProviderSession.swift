@@ -6,7 +6,28 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
 
     public var choice: VoiceProviderChoice {
         get { VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: Self.selectionKey)) }
-        nonmutating set { defaults.set(VoiceProviderAccounts.ttsProviderRaw(for: newValue), forKey: Self.selectionKey) }
+        nonmutating set { storeChoice(newValue) }
+    }
+
+    /// A read never writes. Choosing local stores kokoro over every cloud engine and over an unknown string.
+    /// Another local engine, such as the on-device alternate, is left as it was.
+    private func storeChoice(_ choice: VoiceProviderChoice) {
+        let key = Self.selectionKey
+        let current = defaults.string(forKey: key)
+        switch choice {
+        case .local:
+            if Self.preserves(current) { return }
+            defaults.set(VoiceTTSProvider.kokoro.rawValue, forKey: key)
+        case .provider:
+            defaults.set(VoiceProviderAccounts.ttsProviderRaw(for: choice), forKey: key)
+        }
+    }
+
+    /// True only for a non-default local engine. Cloud engines and unknown strings are not preserved:
+    /// choosing local maps them to kokoro.
+    static func preserves(_ raw: String?) -> Bool {
+        guard let raw, !raw.isEmpty, let provider = VoiceTTSProvider(rawValue: raw) else { return false }
+        return !provider.needsKey && provider != .kokoro
     }
 
     public func voiceID(for providerID: String) -> String? {
@@ -54,6 +75,7 @@ public enum VoiceProviderAccounts {
         switch raw {
         case VoiceTTSProvider.elevenLabs.rawValue: .provider(ElevenLabsTTSAdapter.id)
         case VoiceTTSProvider.googleCloud.rawValue: .provider(GoogleCloudTTSAdapter.id)
+        case let raw? where VoiceTTSProvider(rawValue: raw)?.needsKey == true: .provider(raw)
         default: .local
         }
     }
@@ -63,6 +85,7 @@ public enum VoiceProviderAccounts {
         case .local: VoiceTTSProvider.kokoro.rawValue
         case .provider(let id) where id == ElevenLabsTTSAdapter.id: VoiceTTSProvider.elevenLabs.rawValue
         case .provider(let id) where id == GoogleCloudTTSAdapter.id: VoiceTTSProvider.googleCloud.rawValue
+        case .provider(let id) where VoiceTTSProvider(rawValue: id)?.needsKey == true: id
         case .provider: VoiceTTSProvider.kokoro.rawValue
         }
     }
