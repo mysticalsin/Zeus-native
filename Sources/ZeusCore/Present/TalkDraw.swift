@@ -3,6 +3,9 @@ import Foundation
 /// What a talk reply asks the screen to show: marks in screenshot pixels (top-left origin, as
 /// `[POINT]`), each tied to the spoken sentence it appears with. Wire form, leading in the reply:
 /// `[DRAW:{"s":1,"m":[{"k":"ring","x":412,"y":88,"r":24,"at":0}]}]`.
+/// The existing canvas paints five styles: ring, arrow, underline, label and path.
+/// Older tags still say "ink" for a path and "card" for a label. No image address, shader,
+/// script or photo is accepted.
 public struct TalkDraw: Equatable, Sendable {
     public struct Point: Equatable, Sendable {
         public var x: Double
@@ -10,11 +13,27 @@ public struct TalkDraw: Equatable, Sendable {
         public init(x: Double, y: Double) { self.x = x; self.y = y }
     }
 
+    /// Styles the existing canvas paints. A path may arrive as "ink" and a label as "card".
+    public enum Style: String, Equatable, Sendable, CaseIterable {
+        case ring, arrow, underline, label, path
+    }
+
     public enum Shape: Equatable, Sendable {
         case ring(center: Point, radius: Double)
         case arrow(from: Point, to: Point)
+        case underline(from: Point, to: Point)
         case ink([Point])
         case card(origin: Point, text: String)
+
+        public var style: Style {
+            switch self {
+            case .ring: .ring
+            case .arrow: .arrow
+            case .underline: .underline
+            case .ink: .path
+            case .card: .label
+            }
+        }
     }
 
     public struct Mark: Equatable, Sendable {
@@ -50,6 +69,8 @@ public struct TalkDraw: Equatable, Sendable {
                 object["k"] = "ring"; object["x"] = center.x; object["y"] = center.y; object["r"] = radius
             case .arrow(let from, let to):
                 object["k"] = "arrow"; object["from"] = pair(from); object["to"] = pair(to)
+            case .underline(let from, let to):
+                object["k"] = "underline"; object["from"] = pair(from); object["to"] = pair(to)
             case .ink(let points):
                 object["k"] = "ink"; object["pts"] = points.map(pair)
             case .card(let origin, let text):
@@ -79,7 +100,11 @@ public enum TalkDrawParser {
         return marks.isEmpty ? nil : TalkDraw(screen: screen, marks: marks)
     }
 
+    /// A mark that carries an address, a shader, a script or a photo is not a drawing style.
+    private static let refusedKeys: Set<String> = ["url", "src", "href", "shader", "script", "image", "photo"]
+
     private static func mark(from object: [String: Any]) -> TalkDraw.Mark? {
+        guard refusedKeys.isDisjoint(with: object.keys) else { return nil }
         let at = min(TalkDraw.maxSentenceIndex, max(0, number(object["at"]).map { Int($0) } ?? 0))
         switch object["k"] as? String {
         case "ring":
@@ -89,12 +114,15 @@ public enum TalkDrawParser {
         case "arrow":
             guard let from = point(object["from"]), let to = point(object["to"]) else { return nil }
             return .init(shape: .arrow(from: from, to: to), at: at)
-        case "ink":
+        case "underline":
+            guard let from = point(object["from"]), let to = point(object["to"]) else { return nil }
+            return .init(shape: .underline(from: from, to: to), at: at)
+        case "ink", "path":
             guard let raw = object["pts"] as? [Any] else { return nil }
             let points = raw.prefix(TalkDraw.maxInkPoints).compactMap(point)
             guard points.count >= 2 else { return nil }
             return .init(shape: .ink(points), at: at)
-        case "card":
+        case "card", "label":
             guard let x = number(object["x"]), let y = number(object["y"]),
                   let raw = object["t"] as? String else { return nil }
             let text = String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(TalkDraw.maxTextCharacters))
@@ -164,6 +192,13 @@ public enum TalkDrawScene {
                     transform: ExplanationTransform(position: vector(from)),
                     style: ExplanationStyle(fill: .clear, stroke: .orange, lineWidth: 4),
                     accessibleDescription: "An arrow pointing at a spot on the screen")
+            case .underline(let from, let to):
+                guard inside(from), inside(to), from != to else { continue }
+                object = ExplanationObject(id: id, space: .capture, captureID: captureID,
+                    geometry: ExplanationGeometry(kind: .underline, points: [.zero, relative(to, to: from)]),
+                    transform: ExplanationTransform(position: vector(from)),
+                    style: ExplanationStyle(fill: .clear, stroke: .orange, lineWidth: 3),
+                    accessibleDescription: "An underline on the screen")
             case .ink(let points):
                 guard points.allSatisfy(inside), let first = points.first else { continue }
                 let relativePoints = points.map { relative($0, to: first) }
@@ -187,6 +222,37 @@ public enum TalkDrawScene {
             result[mark.at, default: []].append(object)
         }
         return result
+    }
+
+    /// How long a stroke takes when motion is allowed. Reduced motion uses none of it.
+    /// The overlay paints the finished mark: this slice adds no animation clock.
+    public static let strokeDuration = 0.28
+
+    /// Marks for one spoken sentence. Reduced motion is fully shown and takes no time.
+    public static func frame(_ draw: TalkDraw, shot: ScreenShot, captureID: UUID,
+                             sentence: Int, reduceMotion: Bool) -> TalkDrawFrame {
+        let duration = reduceMotion ? 0.0 : strokeDuration
+        let objects = (self.objects(draw, shot: shot, captureID: captureID)[sentence] ?? []).map { object -> ExplanationObject in
+            var shown = object
+            shown.reveal = 1
+            return shown
+        }
+        return TalkDrawFrame(objects: objects, reveal: 1, duration: duration)
+    }
+}
+
+/// One sentence of a talk drawing, ready for the existing canvas.
+public struct TalkDrawFrame: Equatable, Sendable {
+    public var objects: [ExplanationObject]
+    /// 1 when the mark is fully shown. Reduced motion is fully shown.
+    public var reveal: Double
+    /// Seconds the stroke would take. Reduced motion takes none.
+    public var duration: Double
+
+    public init(objects: [ExplanationObject], reveal: Double, duration: Double) {
+        self.objects = objects
+        self.reveal = reveal
+        self.duration = duration
     }
 }
 

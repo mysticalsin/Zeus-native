@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "A talk drawing could not ask the existing overlay for an underline, a label or a path. A point outside the shot could still be drawn, an unknown style or an image address could be kept, a seventh mark could be kept, a card could sit outside the shot, a sentence 2 mark could appear in the sentence 0 frame, or reduced motion could still take time to reveal the mark.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+        "function": "underReducedMotionRevealIsOneAndDurationIsZero"
+      }
     }
-]
+  ]
 }
