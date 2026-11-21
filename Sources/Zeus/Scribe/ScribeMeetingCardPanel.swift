@@ -42,7 +42,10 @@ final class ScribeCardHostingView<Content: View>: NSHostingView<Content> {
 /// Same rule as the other Scribe cards: it never takes the keyboard from what the person is typing in. It can
 /// become key, so Return and Escape work once the person has clicked it.
 private final class ScribeMeetingCardWindow: NSPanel {
-    override var canBecomeKey: Bool { true }
+    /// While a dictation check is up, that card owns Return and Escape.
+    override var canBecomeKey: Bool {
+        ReturnEscapeClaim.meetingCardCanBecomeKey(dictationCheckVisible: DictationPreviewCard.isReviewing)
+    }
     override var canBecomeMain: Bool { false }
 }
 

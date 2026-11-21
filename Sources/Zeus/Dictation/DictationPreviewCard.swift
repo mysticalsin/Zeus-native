@@ -16,6 +16,9 @@ final class DictationPreviewCard {
         var modeName = ""
     }
 
+    /// True while the check card is waiting. The meeting card does not take Return or Escape during that time.
+    static var isReviewing = false
+
     private var panel: PreviewPanel?
     private let state = State()
     private var continuation: CheckedContinuation<String?, Never>?
@@ -26,6 +29,7 @@ final class DictationPreviewCard {
     /// Waits for the person: the edited text, or nil when they cancel.
     func review(_ text: String, modeName: String) async -> String? {
         finish(nil)
+        Self.isReviewing = true
         state.text = text
         state.modeName = modeName
         let panel = self.panel ?? makePanel()
@@ -51,6 +55,7 @@ final class DictationPreviewCard {
     }
 
     private func finish(_ result: String?) {
+        Self.isReviewing = false
         panel?.orderOut(nil)
         continuation?.resume(returning: result)
         continuation = nil
