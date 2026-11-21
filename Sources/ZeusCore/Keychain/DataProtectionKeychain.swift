@@ -62,6 +62,8 @@ public protocol CredentialKeychain: Sendable {
     func legacyCandidates(service: String, account: String) -> [LegacyCandidate]
     func writeProtected(_ data: Data, request: KeychainWriteRequest) -> Bool
     func writeLegacy(_ data: Data, service: String, account: String) -> Bool
+    /// Replaces one legacy item, then the caller reads that same reference back.
+    func updateLegacyItem(_ data: Data, persistentRef: Data) -> Bool
     func deleteLegacy(service: String, account: String) -> Bool
     /// Deletes one legacy item. Other matches for the same account stay.
     func deleteLegacyItem(persistentRef: Data) -> Bool
@@ -138,6 +140,9 @@ public enum CredentialKeychainPolicy {
     public static let zeusCreator = "ZEUS"
     /// Present means on. Never copy a legacy item into this account.
     public static let cliSwitchAccount = "cli.control.enabled"
+    public static let vaultKeyAccount = "face.presence.vaultKey"
+    /// Downgrade copy-back must never write these. User removal deletes them instead.
+    public static let neverCopyBack: Set<String> = [cliSwitchAccount, vaultKeyAccount]
     public static let bundleIdentifier = "app.zeus.mac"
     /// Accounts a scheduled or background job must read while the screen is locked. None.
     public static let whileLockedAccounts: Set<String> = []
@@ -313,10 +318,25 @@ public enum CredentialKeychainMigration {
         return importEligible(service: service, account: account, teamIdentifier: teamIdentifier, keychain: keychain)
     }
 
-    /// Puts the protected value back into the legacy store, then drops only the protected item.
-    /// A second legacy item is left as it is. Nothing is removed when the copy cannot be read back.
-    public static func removeKeepingLegacy(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
+    /// User removal. Deletes the protected item and every legacy match. Does not write a copy back.
+    public static func removeEverywhere(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
         guard CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier) != nil else {
+            return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+        }
+        guard keychain.deleteProtected(service: service, account: account),
+              keychain.deleteLegacy(service: service, account: account) else {
+            return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+        }
+        return MigrationAttempt(outcome: .absent, markMigrated: true)
+    }
+
+    /// Explicit downgrade only. Never for the command-line switch or the face vault key.
+    /// Updates an existing item only when its access list is Zeus alone, then reads that item back.
+    public static func copyBackForDowngrade(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
+        guard CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier) != nil else {
+            return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+        }
+        if CredentialKeychainPolicy.neverCopyBack.contains(account) {
             return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
         }
         switch keychain.readProtected(service: service, account: account) {
@@ -325,8 +345,26 @@ public enum CredentialKeychainMigration {
         case .absent:
             return MigrationAttempt(outcome: .absent, markMigrated: true)
         case .value(let data):
-            guard keychain.writeLegacy(data, service: service, account: account),
-                  case .value(let back) = keychain.readLegacy(service: service, account: account), back == data,
+            let candidates = keychain.legacyCandidates(service: service, account: account)
+            if let target = candidates.first(where: { CredentialKeychainPolicy.aclIsOnlyZeus($0.facts, teamIdentifier: teamIdentifier) }) {
+                guard keychain.updateLegacyItem(data, persistentRef: target.persistentRef) else {
+                    return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+                }
+                let after = keychain.legacyCandidates(service: service, account: account)
+                guard let found = after.first(where: { $0.persistentRef == target.persistentRef }), found.data == data,
+                      keychain.deleteProtected(service: service, account: account) else {
+                    return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+                }
+                return MigrationAttempt(outcome: .migrated, markMigrated: true)
+            }
+            if !candidates.isEmpty {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+            }
+            guard keychain.writeLegacy(data, service: service, account: account) else {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+            }
+            let after = keychain.legacyCandidates(service: service, account: account)
+            guard after.contains(where: { $0.data == data }),
                   keychain.deleteProtected(service: service, account: account) else {
                 return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
             }
