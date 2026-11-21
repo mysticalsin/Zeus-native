@@ -66,18 +66,20 @@ enum ClaudeHookInstaller {
     ]
 
     /// Re-checks the bundle helper. When an installed config still names another path, rewrites
-    /// Zeus's entries to the checked path. A failed check removes those entries.
+    /// Zeus's entries to the checked path. A failed check leaves those entries as they are.
     static func refreshHelper() throws {
+        let current = (try? String(contentsOf: settingsURL, encoding: .utf8)) ?? ""
         let path: String
         do {
             path = try referencedHookPath()
         } catch {
-            if isInstalled() { try? uninstall() }
+            let effect = HookRefreshPolicy.effect(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                                  current: current, publishedPath: bundledHook.path)
+            if effect == .rewriteToPublishedPath { _ = try install() }
             throw error
         }
-        guard isInstalled() else { return }
-        let text = (try? String(contentsOf: settingsURL, encoding: .utf8)) ?? ""
-        if !text.contains(path) { _ = try install() }
+        let effect = HookRefreshPolicy.effect(decision: .launch, current: current, publishedPath: path)
+        if effect == .rewriteToPublishedPath { _ = try install() }
     }
 
     static func isInstalled() -> Bool {

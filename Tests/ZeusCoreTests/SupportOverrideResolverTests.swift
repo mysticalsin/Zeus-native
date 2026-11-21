@@ -186,6 +186,14 @@ private enum TestWrite: Error { case failed }
                                               publishedPath: "/Applications/Zeus.app/Contents/Helpers/zeus-hook")
         #expect(effect == .leave)
     }
+
+    @Test func aPassingCheckRewritesOnlyWhenThePublishedPathIsMissing() {
+        let path = "/Applications/Zeus.app/Contents/Helpers/zeus-hook"
+        let stale = #"{"Stop":"/Users/tony/Library/Application Support/Zeus/bin/zeus-hook"}"#
+        let current = #"{"Stop":"\#(path)"}"#
+        #expect(HookRefreshPolicy.effect(decision: .launch, current: stale, publishedPath: path) == .rewriteToPublishedPath)
+        #expect(HookRefreshPolicy.effect(decision: .launch, current: current, publishedPath: path) == .leave)
+    }
 }
 
 @Suite struct NativeHostRegistrationTests {
@@ -209,10 +217,13 @@ private enum TestWrite: Error { case failed }
         defer { try? FileManager.default.removeItem(at: root) }
         let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
         try writeHosts(root, zeusPath: bundled)
+        let bridgeBinary = root.appendingPathComponent("zeus-bridge")
+        try Data("support-bridge".utf8).write(to: bridgeBinary)
         try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
                                               checkedPath: bundled, hostsDirectory: root)
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+        #expect(try Data(contentsOf: bridgeBinary) == Data("support-bridge".utf8))
     }
 
     @Test func aLegacyUserWritablePathIsRemovedOnRefusal() throws {

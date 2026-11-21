@@ -7,10 +7,12 @@ public enum HookRefreshEffect: Equatable, Sendable {
 }
 
 public enum HookRefreshPolicy {
-    /// A failed check currently drops the installed hook lines.
+    /// A failed check leaves the installed text alone. A passing check rewrites only when the
+    /// text already names `zeus-hook` and does not name `publishedPath`.
     public static func effect(decision: BundledHelperLaunchDecision, current: String, publishedPath: String) -> HookRefreshEffect {
-        _ = publishedPath
-        guard case .refuse = decision else { return .leave }
-        return current.contains("zeus-hook") ? .rewriteToPublishedPath : .leave
+        guard case .launch = decision else { return .leave }
+        let path = publishedPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, current.contains("zeus-hook"), !current.contains(path) else { return .leave }
+        return .rewriteToPublishedPath
     }
 }
