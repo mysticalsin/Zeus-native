@@ -21,26 +21,45 @@ struct OrbMascotView: NSViewRepresentable {
         view.colorPixelFormat = .bgra8Unorm
         view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         view.framebufferOnly = true
-        view.isPaused = paused
-        view.enableSetNeedsDisplay = false
-        view.preferredFramesPerSecond = 120
         view.isOpaque = false
         view.layer?.isOpaque = false
+        view.preferredFramesPerSecond = OrbRedrawPolicy.activeFramesPerSecond
         renderer.setVisualState(visualState)
         renderer.setReduceMotion(reduceMotion)
         view.delegate = renderer
-        context.coordinator.renderer = renderer
+        let coordinator = context.coordinator
+        coordinator.renderer = renderer
+        coordinator.holdStill = holdStill
+        coordinator.apply(view)
+        renderer.onPipelinesReady = { [weak view, weak coordinator] in
+            guard let view, let coordinator else { return }
+            coordinator.apply(view)
+        }
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {
         context.coordinator.renderer?.setVisualState(visualState)
         context.coordinator.renderer?.setReduceMotion(reduceMotion)
-        (view as? MTKView)?.isPaused = paused
+        context.coordinator.holdStill = holdStill
+        if let metal = view as? MTKView { context.coordinator.apply(metal) }
+    }
+
+    /// Caller pause, the quiet pose, or Reduce Motion. The Bool is the system setting the caller read.
+    private var holdStill: Bool {
+        paused || OrbRedrawPolicy.pausesRedraw(visualState: visualState, reduceMotion: reduceMotion)
     }
 
     final class Coordinator {
         var renderer: OrbMetalRenderer?
+        var holdStill = true
+
+        func apply(_ view: MTKView) {
+            view.preferredFramesPerSecond = OrbRedrawPolicy.activeFramesPerSecond
+            view.isPaused = holdStill
+            view.enableSetNeedsDisplay = holdStill
+            if holdStill { view.needsDisplay = true }
+        }
     }
 }
 

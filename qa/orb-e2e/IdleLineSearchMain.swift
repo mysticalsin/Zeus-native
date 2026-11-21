@@ -38,6 +38,10 @@ struct IdleLineSearchMain {
             speaking.integrateFixedStep(audio: .silent, reduceMotion: false)
         }
         expect(speaking.lineCount > 0, "speaking produced no lines")
+        expect(OrbRedrawPolicy.pausesRedraw(visualState: .idle, reduceMotion: false), "idle redraw stays scheduled")
+        expect(OrbRedrawPolicy.pausesRedraw(visualState: .speaking, reduceMotion: true), "Reduce Motion redraw stays scheduled")
+        expect(OrbRedrawPolicy.pausesRedraw(visualState: .speaking, reduceMotion: false) == false, "speaking redraw paused")
+        expect(OrbRedrawPolicy.activeFramesPerSecond == 120, "active frame rate changed")
 
         if failed { exit(1) }
     }

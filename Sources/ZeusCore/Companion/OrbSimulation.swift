@@ -327,7 +327,8 @@ public struct OrbSimulation: Equatable, Sendable {
             displayedOpacity = targets.bright * (0.92 + 0.08 * sin(time * 0.7))
             pointSize = targets.size
             lastAppliedState = visualState
-            rebuildLines(bass: 0)
+            // Reduce Motion keeps the opacity breathe and skips the neighbour search.
+            clearLinesWithoutSearch()
             simulatedTime += 1 / Self.fixedStepHz
             return
         }
@@ -398,36 +399,44 @@ public struct OrbSimulation: Equatable, Sendable {
     }
 
     private mutating func rebuildLines(bass: Double) {
+        // The quiet pose has no connections. Active poses keep the same search.
+        if visualState == .idle {
+            clearLinesWithoutSearch()
+            return
+        }
         // frontend/src/orb.ts:231-255. Opacity is lineAmount * 0.12.
         lineOpacity = lineAmount * 0.12
         guard lineAmount > 0.01 else {
-            lines = []
-            lineCount = 0
+            clearLinesWithoutSearch()
             return
         }
         let step = max(1, Self.particleCount / 600)
         let maxDist = Self.lineDistance * (1 + bass * 0.5)
         let maxDistSq = maxDist * maxDist
-        var built: [OrbLine] = []
-        built.reserveCapacity(256)
+        lines.removeAll(keepingCapacity: true)
         var i = 0
-        while i < particles.count, built.count < Self.maxLines {
+        while i < particles.count, lines.count < Self.maxLines {
             let a = particles[i]
             var j = i + step
-            while j < particles.count, built.count < Self.maxLines {
+            while j < particles.count, lines.count < Self.maxLines {
                 let b = particles[j]
                 let dx = b.x - a.x
                 let dy = b.y - a.y
                 let dz = b.z - a.z
                 if dx * dx + dy * dy + dz * dz < maxDistSq {
-                    built.append(OrbLine(x1: a.x, y1: a.y, z1: a.z, x2: b.x, y2: b.y, z2: b.z))
+                    lines.append(OrbLine(x1: a.x, y1: a.y, z1: a.z, x2: b.x, y2: b.y, z2: b.z))
                 }
                 j += step
             }
             i += step
         }
-        lines = built
-        lineCount = built.count
+        lineCount = lines.count
+    }
+
+    private mutating func clearLinesWithoutSearch() {
+        lineOpacity = 0
+        if !lines.isEmpty { lines.removeAll(keepingCapacity: true) }
+        lineCount = 0
     }
 
     private mutating func updateElectrons(time: Double) {

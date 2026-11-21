@@ -89,11 +89,35 @@ struct OrbMetalUniforms {
     var size: SIMD4<Float>
 }
 
+/// One compiled pair per device. The first compile runs off the main thread.
+private enum OrbPipelineStore {
+    private static let lock = NSLock()
+    private static var cached: [ObjectIdentifier: (MTLRenderPipelineState, MTLRenderPipelineState)] = [:]
+
+    static func cachedPipelines(for device: MTLDevice) -> (MTLRenderPipelineState, MTLRenderPipelineState)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return cached[ObjectIdentifier(device)]
+    }
+
+    static func compile(_ device: MTLDevice) throws -> (MTLRenderPipelineState, MTLRenderPipelineState) {
+        if let hit = cachedPipelines(for: device) { return hit }
+        let library = try device.makeLibrary(source: OrbMetalLibrary.source, options: nil)
+        let point = try OrbMetalRenderer.pipeline(device: device, library: library, vertex: "orb_point_vertex", fragment: "orb_point_fragment", points: true)
+        let line = try OrbMetalRenderer.pipeline(device: device, library: library, vertex: "orb_line_vertex", fragment: "orb_line_fragment", points: false)
+        lock.lock()
+        cached[ObjectIdentifier(device)] = (point, line)
+        lock.unlock()
+        return (point, line)
+    }
+}
+
 final class OrbMetalRenderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
     private let queue: MTLCommandQueue
-    private let pointPipeline: MTLRenderPipelineState
-    private let linePipeline: MTLRenderPipelineState
+    /// Filled on a background queue. Draw presents nothing until both exist.
+    private var pointPipeline: MTLRenderPipelineState?
+    private var linePipeline: MTLRenderPipelineState?
     private let positions: MTLBuffer
     private let linePositions: MTLBuffer
     private let electronPositions: MTLBuffer
@@ -102,10 +126,15 @@ final class OrbMetalRenderer: NSObject, MTKViewDelegate {
     private let lock = NSLock()
     private var lastTimestamp: CFTimeInterval = 0
     private var reduceMotion = false
+    /// One still frame has been uploaded for the current quiet or Reduce Motion pose.
+    private var presentedStill = false
+    var onPipelinesReady: (() -> Void)?
 
     func setReduceMotion(_ reduced: Bool) {
         lock.lock()
+        let changed = reduceMotion != reduced
         reduceMotion = reduced
+        if changed { presentedStill = false }
         lock.unlock()
     }
 
@@ -113,9 +142,6 @@ final class OrbMetalRenderer: NSObject, MTKViewDelegate {
         self.device = device
         guard let queue = device.makeCommandQueue() else { throw OrbMetalError.noQueue }
         self.queue = queue
-        let library = try device.makeLibrary(source: OrbMetalLibrary.source, options: nil)
-        pointPipeline = try Self.pipeline(device: device, library: library, vertex: "orb_point_vertex", fragment: "orb_point_fragment", points: true)
-        linePipeline = try Self.pipeline(device: device, library: library, vertex: "orb_line_vertex", fragment: "orb_line_fragment", points: false)
         guard let positions = device.makeBuffer(length: OrbSimulation.particleCount * 3 * MemoryLayout<Float>.stride, options: .storageModeShared),
               let linePositions = device.makeBuffer(length: OrbSimulation.maxLines * 2 * 3 * MemoryLayout<Float>.stride, options: .storageModeShared),
               let electronPositions = device.makeBuffer(length: OrbSimulation.maxLiveElectrons * 3 * MemoryLayout<Float>.stride, options: .storageModeShared)
@@ -126,35 +152,68 @@ final class OrbMetalRenderer: NSObject, MTKViewDelegate {
         simulation = OrbSimulation(seed: seed)
         self.bands = bands
         super.init()
+        if let ready = OrbPipelineStore.cachedPipelines(for: device) {
+            pointPipeline = ready.0
+            linePipeline = ready.1
+            return
+        }
+        // The shader compile stays off the main thread. The idle bar must not hitch on it.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let built = try? OrbPipelineStore.compile(device) else { return }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.pointPipeline = built.0
+                self.linePipeline = built.1
+                self.onPipelinesReady?()
+            }
+        }
     }
 
     func setVisualState(_ state: OrbVisualState) {
         lock.lock()
+        if simulation.visualState != state { presentedStill = false }
         simulation.setVisualState(state)
         lock.unlock()
     }
 
     func draw(in view: MTKView) {
+        guard pointPipeline != nil, linePipeline != nil else { return }
         let now = CACurrentMediaTime()
         let delta = lastTimestamp == 0 ? 1.0 / 60.0 : now - lastTimestamp
         lastTimestamp = now
         lock.lock()
-        simulation.renderFrame(delta: delta, audio: bands.playbackBands(), reduceMotion: reduceMotion)
-        let snapshot = simulation
+        let still = OrbRedrawPolicy.pausesRedraw(visualState: simulation.visualState, reduceMotion: reduceMotion)
+        if still {
+            if !presentedStill {
+                simulation.renderFrame(delta: 1.0 / 60.0, audio: .silent, reduceMotion: reduceMotion)
+                presentedStill = true
+            }
+        } else {
+            presentedStill = false
+            simulation.renderFrame(delta: delta, audio: bands.playbackBands(), reduceMotion: reduceMotion)
+        }
+        upload(simulation)
+        let frame = simulation
         lock.unlock()
         guard let drawable = view.currentDrawable, let pass = view.currentRenderPassDescriptor,
               let command = queue.makeCommandBuffer() else { return }
         pass.colorAttachments[0]?.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         pass.colorAttachments[0]?.loadAction = .clear
-        encode(snapshot: snapshot, pass: pass, command: command, drawableSize: view.drawableSize)
+        encode(snapshot: frame, pass: pass, command: command, drawableSize: view.drawableSize, alreadyUploaded: true)
         command.present(drawable)
         command.commit()
+        if still { view.isPaused = true }
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     /// Draws one already-stepped simulation into `texture`. The caller owns the clock.
     func draw(snapshot: OrbSimulation, into texture: MTLTexture) throws {
+        if pointPipeline == nil || linePipeline == nil {
+            let built = try OrbPipelineStore.compile(device)
+            pointPipeline = built.0
+            linePipeline = built.1
+        }
         guard let command = queue.makeCommandBuffer(),
               let pass = MTLRenderPassDescriptor() else { throw OrbMetalError.noCommand }
         pass.colorAttachments[0]?.texture = texture
@@ -169,9 +228,10 @@ final class OrbMetalRenderer: NSObject, MTKViewDelegate {
         if let error = command.error { throw error }
     }
 
-    private func encode(snapshot: OrbSimulation, pass: MTLRenderPassDescriptor, command: MTLCommandBuffer, drawableSize: CGSize) {
-        upload(snapshot)
-        guard let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
+    private func encode(snapshot: OrbSimulation, pass: MTLRenderPassDescriptor, command: MTLCommandBuffer, drawableSize: CGSize, alreadyUploaded: Bool = false) {
+        if !alreadyUploaded { upload(snapshot) }
+        guard let encoder = command.makeRenderCommandEncoder(descriptor: pass),
+              let pointPipeline, let linePipeline else { return }
         let aspect = Float(max(drawableSize.width, 1) / max(drawableSize.height, 1))
         let view = lookAt(eye: SIMD3(Float(snapshot.cameraX), Float(snapshot.cameraY), Float(snapshot.cameraZ)),
                           center: SIMD3(0, 0, Float(snapshot.lookAtZ)),

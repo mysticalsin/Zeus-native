@@ -28,6 +28,16 @@ struct OrbIdleCostTests {
         #expect(reduced.electrons.isEmpty)
     }
 
+    @Test func quietPoseAndReduceMotionPauseTheRedraw() {
+        #expect(OrbRedrawPolicy.pausesRedraw(visualState: .idle, reduceMotion: false))
+        #expect(OrbRedrawPolicy.pausesRedraw(visualState: .speaking, reduceMotion: true))
+        #expect(OrbRedrawPolicy.pausesRedraw(visualState: .thinking, reduceMotion: true))
+        #expect(OrbRedrawPolicy.pausesRedraw(visualState: .speaking, reduceMotion: false) == false)
+        #expect(OrbRedrawPolicy.pausesRedraw(visualState: .listening, reduceMotion: false) == false)
+        #expect(OrbRedrawPolicy.pausesRedraw(visualState: .compacting, reduceMotion: false) == false)
+        #expect(OrbRedrawPolicy.activeFramesPerSecond == 120)
+    }
+
     @Test func speakingStillBuildsLines() {
         var speaking = OrbSimulation(seed: 11, state: .speaking)
         for _ in 0..<30 {
