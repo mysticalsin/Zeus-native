@@ -336,11 +336,15 @@ struct UIUXContractTests {
         #expect(stillOpen)
     }
 
-    /// A closed catalog row stays closed. The row is counted. It is not skipped.
+    /// A closed catalog row is a site the current scan does not report. The case runs. It is not skipped.
+    /// Matching is file plus snippet, so a moved line is still the same site.
     @Test(arguments: UIUXFindingExpectations.closedIDs)
     func closedFindingsStayClosedInTheCatalog(id: String) throws {
+        let root = try #require(UIUXRepo.root())
         let finding = try #require(UIUXFindingExpectations.catalog?.findings.first { $0.id == id })
         #expect(finding.expect == "closed")
+        let stillPresent = UIUXScanCache.shared.findings(root: root).contains { UIUXAudit.sameSite($0, finding) }
+        #expect(stillPresent == false)
     }
 }
 
