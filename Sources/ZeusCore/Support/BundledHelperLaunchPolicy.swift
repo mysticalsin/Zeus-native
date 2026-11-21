@@ -137,6 +137,13 @@ public enum BundledHelperLaunchPolicy {
         publishedExecutable(checkedPath: bundlePath, helperName: bridgeSigningIdentifier, decision: decision) == bundlePath
     }
 
+    /// The installer stages `Application Support/Zeus/bin/zeus-bridge.new`. That path is not publishable.
+    /// This still requires the staged path itself to pass, which is the Connect Chrome failure.
+    public static func acceptsStagedBridge(bundlePath: String, stagedPath: String, bundleDecision: BundledHelperLaunchDecision) -> Bool {
+        _ = bundlePath
+        return publishedExecutable(checkedPath: stagedPath, helperName: bridgeSigningIdentifier, decision: bundleDecision) == stagedPath
+    }
+
     /// Lowercase hex using only the ASCII digits `0-9` and `a-f`.
     public static func asciiHex<S: Sequence>(_ bytes: S) -> String where S.Element == UInt8 {
         let digits = Array("0123456789abcdef".utf8)

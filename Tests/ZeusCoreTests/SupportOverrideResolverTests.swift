@@ -114,6 +114,16 @@ private struct FakeSignature: BundledHelperSignatureChecking {
                                                 signingIdentifier: "zeus-bridge", checker: checker) == .launch)
     }
 
+    @Test func theInstallersStagedBridgePathCanBeAcceptedAfterTheBundlePasses() {
+        let bundle = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        let staged = "/Users/tony/Library/Application Support/Zeus/bin/zeus-bridge.new"
+        #expect(BundledHelperLaunchPolicy.publishedExecutable(checkedPath: staged, helperName: "zeus-bridge", decision: .launch) == nil)
+        #expect(BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: bundle, stagedPath: staged, bundleDecision: .launch))
+        #expect(BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: bundle, stagedPath: staged,
+                                                              bundleDecision: .refuse(BundledHelperLaunchPolicy.refusalSentence)) == false)
+        #expect(BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: "/tmp/zeus-bridge", stagedPath: staged, bundleDecision: .launch) == false)
+    }
+
     @Test func aMismatchedLocalDevLeafRefuses() {
         let leaf = "0123456789abcdef0123456789abcdef01234567"
         let checker = AnchorFake(anchor: .localDev(leafSHA1: leaf), accepted: "certificate leaf = H\"ffffffffffffffffffffffffffffffffffffffff\" and identifier \"zeus-bridge\"")
