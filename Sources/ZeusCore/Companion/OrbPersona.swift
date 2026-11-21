@@ -11,6 +11,6 @@ public struct OrbPersona: Persona, Sendable {
     public var displayName: String { Self.displayName }
     public var systemPromptAddendum: String { JarvisPersona.addendum }
     public var mascotKind: MascotKind { .orb }
-    /// The cloud id stays behind `JarvisCloudVoice`, which defaults off.
-    public var voicePreference: PersonaVoicePreference { .jarvisCloudWhenConfigured }
+    /// Original synthetic voice. Zeus's local voice, with the existing AVSpeechSynthesizer fallback.
+    public var voicePreference: PersonaVoicePreference { .zeusDefault }
 }

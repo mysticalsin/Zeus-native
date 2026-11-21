@@ -85,7 +85,7 @@ That is 22 specific rows and 7 applications of the any-phase row, 29 legal appli
 - **Compacting.** Radius target 12, no lines, no electrons.
 - **Reduce Motion.** Tumble, camera drift, and electrons stay frozen. Particle positions do not move. The opacity breathe is the only motion.
 - **Multiple monitors.** One top bar per display and no extra window, for 1, 2, and 3 displays. `NotchController` still says one borderless window per display. The orb does not open a window.
-- **Voice flag.** `companion.jarvisCloudVoice.enabled` defaults off. Orb and Classic both resolve to the existing Zeus voice.
+- **Voice.** Orb and Classic both resolve to the original synthetic voice id `zeus.synthetic` (Zeus's local voice, existing AVSpeechSynthesizer fallback). A leftover third-party voice flag, including when it is on, does not select another id.
 - **LLM only.** The addendum is the system-prompt overlay. Face presence and `InstantTable` do not reference the persona, a URL session, or a model client. Instant time answers are chosen before `.brain`.
 
 ## Frames, CPU, attribution

@@ -53,8 +53,8 @@ struct OrbBench {
         check("orb_adds_addendum", persona["orb_adds"] as? Bool == true)
         check("persona_scope", PersonaScope.affectsFaceUnlock == false && PersonaScope.affectsInstantCommands == false && PersonaScope.affectsLLMSystemPrompt)
 
-        check("voice_flag_off", persona["voice_flag"] as? Bool == false)
-        check("voice_resolves_classic", persona["voice_resolved"] as? String == "zeusDefault")
+        check("voice_resolves_synthetic", persona["voice_id"] as? String == "zeus.synthetic")
+        check("classic_voice_resolves_synthetic", persona["classic_voice_id"] as? String == "zeus.synthetic")
 
         check("surface_two_displays", OrbTurnOracle.surface(displayCount: 2) == (2, 0))
         check("surface_three_displays", OrbTurnOracle.surface(displayCount: 3).extraWindows == 0)
@@ -105,13 +105,17 @@ struct OrbBench {
         let overlaid = CompanionPromptOverlay.applying(persona: relaunched, to: base)
         PersonaCatalog.select(id: MascotPersona.id, defaults: defaults)
         let classicAgain = PersonaCatalog.current(defaults).id == "classic"
+        defaults.set(true, forKey: "companion.jarvisCloudVoice.enabled")
+        defaults.set("preset-not-used", forKey: "companion.jarvisCloudVoice.id")
+        let orbVoice = PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults).voiceID
+        let classicVoice = PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults).voiceID
         return [
             "relaunch_orb": relaunched.id == "orb.jarvis",
             "relaunch_classic": classicAgain,
             "classic_identical": classicSame,
             "orb_adds": overlaid.hasPrefix(base + "\n\n") && overlaid.contains(JarvisPersona.addendum),
-            "voice_flag": JarvisCloudVoice.isEnabled(defaults),
-            "voice_resolved": "zeusDefault",
+            "voice_id": orbVoice,
+            "classic_voice_id": classicVoice,
         ]
     }
 

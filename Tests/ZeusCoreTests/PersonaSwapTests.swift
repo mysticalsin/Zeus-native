@@ -56,31 +56,78 @@ struct PersonaSwapTests {
         #expect(PersonaCatalog.current(defaults).id == "classic")
     }
 
-    @Test func voiceFlagDefaultsOffAndUnconfiguredFallsBack() throws {
-        let defaults = try freshDefaults()
-        #expect(JarvisCloudVoice.isEnabled(defaults) == false)
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .zeusDefault)
-        #expect(PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults) == .zeusDefault)
-
-        defaults.set(true, forKey: JarvisCloudVoice.enabledKey)
-        #expect(JarvisCloudVoice.isEnabled(defaults))
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .zeusDefault)
+    /// Devin's gate: no actor or film-character voice id, for every persona, with the
+    /// third-party-voice flag off and on, and in the shipped persona strings and resources.
+    @Test func noActorOrCharacterVoiceIdShipsUnderAnyFlag() throws {
+        let banned = [
+            "JARVIS (MCU)", "JARVIS MCU", "JARVIS voice", "Paul Bettany", "Bettany", "MCU",
+        ]
+        let personas: [any Persona] = [MascotPersona(), OrbPersona()]
+        let flags: [Bool?] = [nil, false, true]
+        let storedIDs: [String?] = [nil, "", "JARVIS (MCU)", "JARVIS MCU", "Paul Bettany", "Bettany", "MCU", "zeus.synthetic", "preset-not-used"]
+        for flag in flags {
+            for stored in storedIDs {
+                let defaults = try freshDefaults()
+                if let flag {
+                    defaults.set(flag, forKey: "companion.jarvisCloudVoice.enabled")
+                }
+                if let stored {
+                    defaults.set(stored, forKey: "companion.jarvisCloudVoice.id")
+                }
+                for persona in personas {
+                    #expect(persona.voicePreference == .zeusDefault)
+                    let id = PersonaVoiceResolver.resolve(persona, defaults: defaults).voiceID
+                    #expect(id == PersonaSyntheticVoice.voiceID)
+                    #expect(id == "zeus.synthetic")
+                    for token in banned {
+                        #expect(!id.localizedCaseInsensitiveContains(token))
+                    }
+                }
+            }
+        }
+        let hits = Self.characterVoiceHits(banned: banned)
+        #expect(hits == [])
     }
 
-    @Test func configuredCloudVoiceIdIsUsedOnlyWhenTheFlagIsOn() throws {
-        let defaults = try freshDefaults()
-        defaults.set(JarvisCloudVoice.cloudVoiceID, forKey: JarvisCloudVoice.configurationKey)
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
-
-        defaults.set(true, forKey: JarvisCloudVoice.enabledKey)
-        #expect(JarvisCloudVoice.selectedID(defaults) == "JARVIS (MCU)")
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .cloud(id: "JARVIS (MCU)"))
-        #expect(PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults) == .zeusDefault)
-
-        defaults.set("some-other-voice", forKey: JarvisCloudVoice.configurationKey)
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
+    private static func characterVoiceHits(banned: [String]) -> [String] {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let files = [
+            "Sources/ZeusCore/Companion",
+            "Sources/Zeus/Companion",
+            "specs/007-companion-parity",
+            "qa/orb-e2e",
+            "Sources/Zeus/Voice",
+            "Sources/ZeusCore/Voice",
+            "Resources/NOTICES.txt",
+            "LICENSES/jarvis2.0-LICENSE",
+        ].flatMap { relative -> [URL] in
+            let url = root.appendingPathComponent(relative)
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return [] }
+            if !isDir.boolValue { return [url] }
+            guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil) else { return [] }
+            return enumerator.compactMap { item in
+                let file = item as? URL
+                guard let file, file.pathExtension == "swift" || file.pathExtension == "md" || file.pathExtension == "py" || file.pathExtension == "txt" else { return nil }
+                return file
+            }
+        }
+        var hits: [String] = []
+        for url in files {
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, line) in lines.enumerated() {
+                let lineText = String(line)
+                if lineText == "JARVIS Voice AI Assistant" { continue }
+                for token in banned where lineText.localizedCaseInsensitiveContains(token) {
+                    hits.append("\(url.lastPathComponent):\(index + 1): \(token)")
+                }
+            }
+        }
+        return hits
     }
 
     @Test func personaDoesNotTouchTheExistingPersonalityKeyOrNonLLMPaths() throws {

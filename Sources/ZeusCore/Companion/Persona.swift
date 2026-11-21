@@ -17,15 +17,20 @@ public enum MascotKind: String, Sendable, Equatable {
 }
 
 public enum PersonaVoicePreference: String, Sendable, Equatable {
-    /// Zeus's existing voice stack. This is the default for every persona.
+    /// Zeus's local voice, with the existing AVSpeechSynthesizer fallback.
     case zeusDefault
-    /// Consulted only by `JarvisCloudVoice`. Off, or on without a configured id, keeps the existing stack.
-    case jarvisCloudWhenConfigured
+}
+
+/// Original synthetic voice. Not a third-party preset and not a film character.
+public enum PersonaSyntheticVoice {
+    public static let voiceID = "zeus.synthetic"
 }
 
 public enum ResolvedVoice: Sendable, Equatable {
     case zeusDefault
-    case cloud(id: String)
+
+    /// The only voice id a persona can resolve.
+    public var voiceID: String { PersonaSyntheticVoice.voiceID }
 }
 
 public enum CompanionPromptOverlay {
@@ -54,29 +59,15 @@ public enum PersonaCatalog {
     }
 }
 
-/// The third-party cloud voice id is inert unless this flag is on and an id was configured
-/// outside the repo. There is no key in source. An unconfigured flag falls back to Zeus's voice stack.
-public enum JarvisCloudVoice {
-    public static let enabledKey = "companion.jarvisCloudVoice.enabled"
-    public static let configurationKey = "companion.jarvisCloudVoice.id"
-    public static let cloudVoiceID = "JARVIS (MCU)"
-
-    public static func isEnabled(_ defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: enabledKey) as? Bool ?? false
-    }
-
-    public static func selectedID(_ defaults: UserDefaults = .standard) -> String? {
-        guard isEnabled(defaults) else { return nil }
-        guard defaults.string(forKey: configurationKey) == cloudVoiceID else { return nil }
-        return cloudVoiceID
-    }
-}
-
 public enum PersonaVoiceResolver {
+    /// Every persona resolves to the original synthetic voice. A leftover third-party
+    /// voice flag, including one that is on and stores a character id, is ignored.
     public static func resolve(_ persona: any Persona, defaults: UserDefaults = .standard) -> ResolvedVoice {
-        guard persona.voicePreference == .jarvisCloudWhenConfigured else { return .zeusDefault }
-        guard let id = JarvisCloudVoice.selectedID(defaults) else { return .zeusDefault }
-        return .cloud(id: id)
+        switch persona.voicePreference {
+        case .zeusDefault:
+            _ = defaults
+            return .zeusDefault
+        }
     }
 }
 
