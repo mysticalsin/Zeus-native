@@ -55,8 +55,10 @@ final class BuddyController: NSObject {
     private var ring = RingSession()
     private var landingTangent: CGPoint = .zero
     private var lastDisplays: [DisplayMap] = []
+    private var launch = StartGate()
 
     func start() {
+        guard launch.start() else { return }
         BuddyControllerBridge.shared = self
         model.onModeChange = { [weak self] mode in self?.modeChanged(mode) }
         model.onCaptionChange = { [weak self] shown in

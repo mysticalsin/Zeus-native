@@ -33,6 +33,8 @@ final class WakeWordController {
     @ObservationIgnored private weak var topBar: TopBarModel?
     @ObservationIgnored private var listener: WakeWordListener?
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var launch = StartGate()
+    @ObservationIgnored private var launch = StartGate()
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var screenLocked = false
     @ObservationIgnored private var cooldownUntil = Date.distantPast
@@ -56,6 +58,8 @@ final class WakeWordController {
 
     func start(voice: VoiceTurnController, topBar: TopBarModel) {
         guard !TopBarStyle.isSnapshot else { return }
+        guard launch.start() else { return }
+        guard launch.start() else { return }
         self.voice = voice
         self.topBar = topBar
         let distributed = DistributedNotificationCenter.default()

@@ -17,6 +17,8 @@ final class RoutineRunner {
     private let store: RoutineStore
     private var scheduler: NSBackgroundActivityScheduler?
     private var wakeObserver: NSObjectProtocol?
+    private var launch = StartGate()
+    private var launch = StartGate()
     private let card = RoutineCardWindow()
     private var relaunchGuard = RoutineRelaunchGuard()
 
@@ -43,6 +45,7 @@ final class RoutineRunner {
     }
 
     func start() {
+        guard launch.start() else { return }
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { RoutineRunner.shared.runDue() }
         }
