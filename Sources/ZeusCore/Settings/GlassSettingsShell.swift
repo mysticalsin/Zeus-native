@@ -174,9 +174,9 @@ public enum GlassSettingsMaterialRules {
 }
 
 public enum GlassSettingsSidebar {
-    /// Existing rows stay first. Filled slots follow, in manifest order.
-    public static func rowIDs(existing: [String], slots: [GlassSectionSlot]) -> [String] {
-        existing + slots.filter(\.filled).map(\.id)
+    /// Sidebar order is the registry's order. This does not keep a second list.
+    public static func rowIDs(sections: [SettingsSectionDescriptor]) -> [String] {
+        sections.map(\.id)
     }
 }
 
@@ -193,9 +193,11 @@ public struct GlassAccessibilityItem: Equatable, Sendable {
 }
 
 public enum GlassSettingsAccessibility {
-    /// A filled slot exposes its title as a heading. An unfilled slot exposes nothing.
-    public static func exposure(slots: [GlassSectionSlot]) -> [GlassAccessibilityItem] {
-        slots.filter(\.filled).map { GlassAccessibilityItem(label: $0.title, heading: true, hidden: false) }
+    /// VoiceOver follows the same registry rows as the sidebar. An unlisted section is not spoken here.
+    public static func exposure(sections: [SettingsSectionDescriptor]) -> [GlassAccessibilityItem] {
+        sections.map { section in
+            GlassAccessibilityItem(label: section.accessibilityLabel, heading: true, hidden: false)
+        }
     }
 }
 
@@ -889,23 +891,30 @@ public enum GlassSettingsAudit {
     }
 
     public static func sidebarFailures() -> [String] {
-        let existing = ["general", "appearance", "license"]
-        let slots = [
-            GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: []),
-            GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: []),
-        ]
-        let rows = GlassSettingsSidebar.rowIDs(existing: existing, slots: slots)
-        if rows != existing + ["glass.synthetic"] { return ["sidebar rows \(rows)"] }
+        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(1))
+        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [], placement: .topbarTab(0))
+        let sections = SettingsSectionRegistry.sections(slots: [hidden, synthetic])
+        let rows = GlassSettingsSidebar.rowIDs(sections: sections)
+        if rows != sections.map(\.id) { return ["sidebar rows drifted \(rows)"] }
+        let existing = SettingsSectionRegistry.existing.map(\.id)
         if Array(rows.prefix(existing.count)) != existing { return ["existing sidebar rows changed"] }
+        if !rows.contains(SettingsSectionRegistry.topbarID) { return ["filled topbar tab missing from sidebar"] }
+        if rows.contains("glass.hidden") || rows.contains("glass.synthetic") { return ["a tab appeared as its own row"] }
         return []
     }
 
     public static func accessibilityFailures() -> [String] {
-        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [])
-        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic title", filled: true, keys: [])
-        let items = GlassSettingsAccessibility.exposure(slots: [hidden, synthetic])
-        let expected = [GlassAccessibilityItem(label: "Synthetic title", heading: true, hidden: false)]
-        if items != expected { return ["accessibility exposure \(items)"] }
+        let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(1))
+        let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic title", filled: true, keys: [], placement: .topbarTab(0))
+        if SettingsSectionRegistry.pageHeading(for: hidden) != nil { return ["unfilled slot exposed"] }
+        guard let heading = SettingsSectionRegistry.pageHeading(for: synthetic) else { return ["filled slot had no heading"] }
+        let page = GlassSettingsAccessibility.exposure(sections: [heading])
+        let expectedPage = [GlassAccessibilityItem(label: "Synthetic title", heading: true, hidden: false)]
+        if page != expectedPage { return ["accessibility exposure \(page)"] }
+        let sections = SettingsSectionRegistry.sections(slots: [hidden, synthetic])
+        let spoken = GlassSettingsAccessibility.exposure(sections: sections)
+        if spoken.map(\.label) != sections.map(\.accessibilityLabel) { return ["exposure drifted from the registry"] }
+        if spoken.contains(where: { $0.label == "Hidden" }) { return ["unfilled title was spoken"] }
         return []
     }
 

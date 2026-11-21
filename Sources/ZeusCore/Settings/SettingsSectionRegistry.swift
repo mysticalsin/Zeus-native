@@ -100,6 +100,18 @@ public enum SettingsSectionRegistry {
         sections(slots: GlassSectionManifest.slots, includePhone: includePhone)
     }
 
+    /// The page heading for one shown slot. An unfilled or disabled slot has no heading.
+    public static func pageHeading(for slot: GlassSectionSlot) -> SettingsSectionDescriptor? {
+        guard slot.isShown else { return nil }
+        return SettingsSectionDescriptor(
+            id: slot.id,
+            title: slot.title,
+            order: slot.placement.order,
+            accessibilityLabel: slot.title,
+            placeholder: nil
+        )
+    }
+
     /// Case-insensitive match on title, id, or accessibility label. Results stay in registry order.
     public static func search(_ query: String, in sections: [SettingsSectionDescriptor]) -> [SettingsSectionDescriptor] {
         let key = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

@@ -62,7 +62,8 @@ struct GlassSettingsSlotPage: View {
     let slot: GlassSectionSlot
 
     var body: some View {
-        let exposed = GlassSettingsAccessibility.exposure(slots: [slot])
+        let heading = SettingsSectionRegistry.pageHeading(for: slot).map { [$0] } ?? []
+        let exposed = GlassSettingsAccessibility.exposure(sections: heading)
         VStack(alignment: .leading, spacing: 8) {
             if let item = exposed.first {
                 Text(item.label)
