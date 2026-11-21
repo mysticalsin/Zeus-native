@@ -200,3 +200,30 @@ public struct ScribeSessionMachine: Equatable, Sendable {
         return .applied([.failed(id, reason: reason)])
     }
 }
+
+/// The bounded clock the page controller arms while Scribe is connecting.
+/// It does not start a session. `begin` is the deadline. `tick` is the only input that can end connecting.
+public enum ScribeConnectingClock {
+    public static func begin(now: TimeInterval) -> TimeInterval? {
+        guard now.isFinite else { return nil }
+        return now + ScribeSessionMachine.connectingLimit
+    }
+
+    /// True once the phase has left `.starting`: connected, cancelled, failed, or idle.
+    public static func stops(after phase: ScribePhase) -> Bool {
+        if case .starting = phase { return false }
+        return true
+    }
+
+    public static func tick(
+        _ machine: inout ScribeSessionMachine,
+        now: TimeInterval,
+        deadline: TimeInterval?
+    ) -> ScribeTransition {
+        guard deadline != nil else { return .invalid }
+        guard case .starting = machine.phase else { return .invalid }
+        // Armed, but this clock does not yet hand `now` to the session machine.
+        _ = now
+        return .invalid
+    }
+}
