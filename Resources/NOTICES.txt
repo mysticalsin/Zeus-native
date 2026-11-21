@@ -12,6 +12,65 @@ never in the product UI.
   TypeSafe code or weights are included. Not used: openjev, typesafe-inc/JEV-27B-Desktop,
   TypeSafeAI/Open-Jev.
 
+## Speech to text (Murmure dictation and voice turns)
+Every engine below is optional. Local models are downloaded only when the person clicks Download
+in Settings › Murmure; cloud engines run only when chosen and only with the person's own key.
+
+### FluidAudio (Parakeet engines on the Neural Engine)
+- Code: https://github.com/FluidInference/FluidAudio, Apache License 2.0 (Swift package, 0.18.x).
+- Parakeet TDT 0.6B v3: weights https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3, CoreML
+  conversion https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml, CC-BY-4.0
+  (attribution: NVIDIA). Downloaded on request.
+- Parakeet Ultra: weights https://huggingface.co/moondream/parakeet-ultra (Moondream's
+  post-training of NVIDIA Parakeet TDT 0.6B v3), CoreML conversion
+  https://huggingface.co/FluidInference/parakeet-ultra-coreml, CC-BY-4.0 (attribution: NVIDIA,
+  Moondream). Downloaded on request.
+
+### Whisper (OpenAI model weights, MIT)
+- Whisper model weights: https://github.com/openai/whisper, MIT License.
+- whisper.cpp: https://github.com/ggml-org/whisper.cpp, MIT License. Used through a separately
+  installed `whisper-cli` (Homebrew); ggml weights from https://huggingface.co/ggerganov/whisper.cpp
+  (MIT), downloaded on request.
+- WhisperKit (Argmax): https://github.com/argmaxinc/argmax-oss-swift, MIT License. Compiled in
+  (Swift package argmax-oss-swift 1.1.1, product WhisperKit; swift-argument-parser 1.8.2 is also
+  pinned in Package.resolved and its license is included below). No swift-transformers package
+  pin appears in this project's Package.resolved; no version or license is asserted for it here.
+  CoreML weights https://huggingface.co/argmaxinc/whisperkit-coreml
+  (openai_whisper-large-v3-v20240930_turbo_632MB), MIT. Downloaded on request.
+- faster-whisper: https://github.com/SYSTRAN/faster-whisper, MIT License, installed on request
+  into a private Python environment with its dependencies (CTranslate2, MIT); its CTranslate2
+  Whisper weights come from Hugging Face (Systran, MIT).
+
+### Apple
+- Apple Speech framework (SFSpeechRecognizer, SpeechAnalyzer/SpeechTranscriber): part of macOS;
+  language assets are installed and managed by macOS.
+
+### Cloud services (no code or weights included; the person's own key and account terms)
+- ElevenLabs Scribe v2 Realtime (`scribe_v2_realtime`), https://elevenlabs.io, ElevenLabs terms.
+- OpenAI `gpt-transcribe`, https://platform.openai.com, OpenAI terms.
+
+## Text to speech (Settings › Voice, optional)
+### Kokoro (hexgrad/kokoro-onnx)
+- kokoro-onnx: Apache License 2.0. Model weights from Hugging Face, fetched only when set up.
+
+### Chatterbox Turbo (Resemble AI, MLX)
+- Chatterbox Turbo: MIT License. Outputs may carry an inaudible Resemble watermark. Model
+  downloaded manually into Application Support; not bundled.
+
+### Qwen3-TTS VoiceDesign (reference clip generation)
+- Qwen3-TTS: Apache License 2.0. Used only to synthesize an original Ultron-style reference clip
+  locally; no film or actor audio is cloned.
+
+### Cloud TTS (person's own key)
+- ElevenLabs voice library, ElevenLabs terms.
+- OpenAI-compatible `/v1/audio/speech` endpoints, provider terms.
+
+### Considered and not shipped
+- Cohere Transcribe 03-2026 (FluidAudio has a CoreML port): its model card lists CC-BY-NC-4.0
+  (non-commercial) while the repo metadata says Apache 2.0. Not offered until that is settled.
+- Parakeet realtime EOU 120M (NVIDIA Open Model License): English only and emits lowercase text
+  without punctuation, so not a dictation engine.
+
 ## Brand marks (Settings › Integrations, Chat agent rows)
 Shown only to identify each AI engine or product Zeus connects to. Each mark belongs to its owner
 and is used for nominative identification only (to show which engine a session uses), not as an
