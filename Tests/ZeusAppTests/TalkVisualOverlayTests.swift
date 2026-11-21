@@ -46,6 +46,8 @@ struct TalkVisualOverlayTests {
         #expect(layout.isValid)
         #expect(Set(layout.items.map(\.object.geometry.kind)) == [.ring, .arrow, .card])
         #expect(layout.items.first { $0.object.geometry.kind == .ring }?.object.style.stroke == .ink)
+        let ringBox = layout.items.first { $0.object.geometry.kind == .ring }?.path.boundingRect
+        #expect(ringBox.map { abs($0.width - $0.height) > 0.5 } == true)
         #expect(layout.hiddenLabelIDs.isEmpty, "the diagram card draws its text inside the rect")
 
         let overlay = ExplanationOverlay()

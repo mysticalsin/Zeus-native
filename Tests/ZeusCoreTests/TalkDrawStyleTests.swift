@@ -132,6 +132,8 @@ import Testing
         #expect(card?.geometry.size != nil)
         #expect(card?.style.stroke == .ink)
         #expect(objects.contains { $0.geometry.kind == .label } == false)
+        let ellipse = TalkDrawScene.ringEllipse(radius: 36)
+        #expect(ellipse.width > ellipse.height)
     }
 
     @Test func atMostSixMarks() {
