@@ -78,6 +78,21 @@ public struct AgentStore: Sendable {
         return byName.values.sorted { $0.name < $1.name }
     }
 
+    public enum MemoryLoad: Equatable, Sendable {
+        case ready(AgentMemory)
+        case damaged(String)
+        public static let notice = "This agent's memory file could not be read. It was left in place."
+    }
+
+    public enum MemoryError: Error, Equatable {
+        case damaged
+    }
+
+    /// Red: a file that will not decode is an empty memory, so the next save can replace it.
+    public func loadMemory(for agent: AgentProfile) -> MemoryLoad {
+        .ready(memory(for: agent))
+    }
+
     public func memory(for agent: AgentProfile) -> AgentMemory {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
