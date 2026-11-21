@@ -84,10 +84,9 @@ final class ExtraPreferences {
     var hideFromScreenShare = !ZeusScreenSharePolicy.showInScreenSharing(from: UserDefaults.standard) {
         didSet {
             guard !applyingReload else { return }
-            store(hideFromScreenShare, "interview.hide")
             if !TopBarStyle.isSnapshot {
                 let shown = hideFromScreenShare ? "false" : "true"
-                _ = ZeusScreenSharePolicy.commit(value: shown, origin: .person, defaults: defaults)
+                SettingsStore.shared.set(ZeusScreenSharePolicy.showInSharingKey, shown, origin: .person)
             }
         }
     }

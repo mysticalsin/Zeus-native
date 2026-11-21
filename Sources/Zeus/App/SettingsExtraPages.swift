@@ -142,10 +142,10 @@ struct InterviewSettings: View {
     var body: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Screen sharing") {
-                GlassRow(title: "Hide ZEUS from screen sharing and recordings",
-                         note: "The notch, cards, settings and the bolt stay visible to you but not to the people watching.",
+                GlassRow(title: "Show in screen sharing",
+                         note: "The same choice as General. Off keeps Zeus out of shares and recordings.",
                          icon: ("eye.slash.fill", Color(hex: 0x14B8A6))) {
-                    toggle({ prefs.hideFromScreenShare }, { prefs.hideFromScreenShare = $0 }, "Hide from sharing")
+                    toggle({ !prefs.hideFromScreenShare }, { prefs.hideFromScreenShare = !$0 }, "Show in screen sharing")
                 }
                 GlassDivider()
                 GlassRow(title: "Teleprompter", note: "Always hidden from shares while it runs.", icon: ("text.alignleft", Color(hex: 0x6366F1))) {

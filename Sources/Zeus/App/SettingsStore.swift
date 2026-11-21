@@ -72,7 +72,7 @@ final class SettingsStore {
 
     /// Where a change came from. Only the owner's own click may opt in to automatic recording
     /// or turn screen-share visibility on. There is no default: a caller has to name the origin.
-    enum ChangeOrigin: Sendable { case person, reset, importFile, agent }
+    enum ChangeOrigin: Sendable { case person, reset, importFile, agent, migration }
 
     static func key(_ id: String) -> String { "opt." + id }
 
@@ -159,6 +159,7 @@ final class SettingsStore {
         case .reset: .reset
         case .importFile: .importFile
         case .agent: .agent
+        case .migration: .migration
         }
     }
 

@@ -1007,6 +1007,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case MusicAwakeHold.settingID: MusicAwakeHold.shared.setEnabled(store.bool(id))
             case ScribeAutoStartMode.settingID: ScribeCallWatcher.shared.follow()
             case ZeusScreenSharePolicy.showInSharingKey:
+                ExtraPreferences.shared.reload()
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: self?.teleprompterPrivate ?? false)
             case FacePresenceController.switchID, FacePresenceController.lockAfterID:
                 FacePresenceController.shared.settingChanged(id)
