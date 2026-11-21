@@ -73,6 +73,8 @@ final class PresenterNotesController {
     private var deckNotesWatch: Task<Void, Never>?
     private var screenShareDetected = false
     private var recordingDetected = false
+    /// The stored recording flag. A same-named parameter must not hide it.
+    var notedRecording: Bool { recordingDetected }
     private var barExcludedForNotes = false
 
     /// The running presentation app, Keynote first.

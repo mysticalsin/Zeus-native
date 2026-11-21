@@ -503,7 +503,9 @@ struct DeckNotesReaderTests {
         }
         #expect(DeckNotesCapturePolicy.barSharing(
             notesVisible: true, screenShareDetected: false, recordingDetected: false, showInScreenSharing: true
-        ) == .unchanged)
+        ) == .none)
+        #expect(DeckNotesCapturePolicy.sharingAfterRefresh(notesVisible: true, requestedVisibleInShare: true) == .none)
+        #expect(DeckNotesCapturePolicy.sharingAfterRefresh(notesVisible: false, requestedVisibleInShare: true) == .unchanged)
         #expect(DeckNotesCapturePolicy.barSharing(
             notesVisible: false, screenShareDetected: true, recordingDetected: true, showInScreenSharing: true
         ) == .unchanged)
