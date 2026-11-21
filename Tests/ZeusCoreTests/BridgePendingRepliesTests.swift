@@ -130,4 +130,44 @@ struct BridgePendingRepliesTests {
         #expect(!pending.complete(.success("deadline"), token: token))
     }
 
+    @Test func finishBeforeAttachRemovesTheSocketFile() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-life-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("chrome.sock").path
+        let server = UnixSocketServer(path: path) { _, _ in }
+        try server.start()
+        defer { server.stop() }
+        let lifetime = BridgeHostLifetime(socketPath: path)
+        lifetime.finish()
+        #expect(!FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test func beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered() throws {
+        let ping = try JSONEncoder().encode(BridgeRequest(id: "p", type: "ping"))
+        guard case .reply(let pong) = BridgeChromeAdmission.action(for: ping, identityReady: false) else {
+            Issue.record("ping was not answered")
+            return
+        }
+        #expect(pong.ok && pong.result?["pong"]?.boolValue == true)
+
+        let read = try JSONEncoder().encode(BridgeRequest(id: "r", type: "page.read"))
+        guard case .reply(let refused) = BridgeChromeAdmission.action(for: read, identityReady: false) else {
+            Issue.record("page.read was not answered with a refusal")
+            return
+        }
+        #expect(!refused.ok && refused.error?.code == "unknown_type")
+
+        let done = try JSONEncoder().encode(BridgeResponse.success("pending-id", .bool(true)))
+        let early = BridgeChromeAdmission.action(for: done, identityReady: false)
+        if case .completePending = early {
+            Issue.record("a Chrome response settled a pending reply before identity was captured")
+        }
+        guard case .reply(let blocked) = early else {
+            Issue.record("a Chrome response before identity was not refused")
+            return
+        }
+        #expect(!blocked.ok && blocked.error?.code == "unknown_type")
+    }
+
 }

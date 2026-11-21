@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 /// A request from ZEUS to the Chrome extension (or back), relayed by `zeus-bridge`.
 public struct BridgeRequest: Codable, Equatable, Sendable {
@@ -177,5 +182,61 @@ public enum NativeMessagingFrame {
             body = Data()
             expectedLength = nil
         }
+    }
+}
+
+/// What one Chrome frame may do. Before our own identity is captured, the only answers are ping
+/// and `unknown_type`. A response must not settle a pending reply in that window.
+public enum BridgeChromeAdmission {
+    public enum Action: Equatable, Sendable {
+        case reply(BridgeResponse)
+        case completePending(BridgeResponse)
+        case close
+    }
+
+    public static func action(for message: Data, identityReady: Bool) -> Action {
+        _ = identityReady
+        if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message) {
+            guard response.id.utf8.count <= 256 else { return .close }
+            return .completePending(response)
+        }
+        guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message),
+              request.id.utf8.count <= 256 else { return .close }
+        if request.type == "ping" {
+            return .reply(.success(request.id, .object([
+                "pong": .bool(true), "host": .string(ZeusPaths.nativeHostName),
+                "version": .string(ZeusCoreVersion.string),
+            ])))
+        }
+        return .reply(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
+    }
+}
+
+/// Owns the bridge stdin reader and the local socket so a terminal frame can stop both.
+/// `finish` does not exit the process. The host calls `exit` after it returns.
+public final class BridgeHostLifetime: @unchecked Sendable {
+    private let lock = NSLock()
+    private let socketPath: String
+    private var stopped = false
+    private var input: NativeMessageInput?
+    private var server: UnixSocketServer?
+
+    public init(socketPath: String) { self.socketPath = socketPath }
+
+    public func attach(input: NativeMessageInput, server: UnixSocketServer) {
+        lock.withLock {
+            self.input = input
+            self.server = server
+        }
+    }
+
+    public func finish() {
+        let resources = lock.withLock { () -> (NativeMessageInput?, UnixSocketServer?) in
+            let current = (input, server)
+            stopped = true
+            return current
+        }
+        resources.0?.stop()
+        resources.1?.stop()
     }
 }
