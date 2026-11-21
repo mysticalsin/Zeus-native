@@ -369,6 +369,7 @@ private struct ScribeMeetingCardBody: View {
                 .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
                 .keyboardShortcut(.defaultAction)
                 .ownedJourneyControl("scribe.meetingCard.primary")
+                .accessibilityIdentifier("scribe.meetingCard.primary.2")
                 appsMenu
             }
             .modifier(CapsuleChrome(hovered: spec.hovered))
@@ -380,6 +381,7 @@ private struct ScribeMeetingCardBody: View {
             .keyboardShortcut(.defaultAction)
             .ownedJourneyControl("scribe.meetingCard.primary")
             .modifier(CapsuleChrome(hovered: spec.hovered))
+            .accessibilityIdentifier("scribe.meetingCard.primary")
         } else if let title = ScribeMeetingCardText.cancel(card) {
             Button { spec.onCancel(card) } label: {
                 CapsuleLabel(symbol: ScribeMeetingCardText.cancelSymbol, title: title)
@@ -389,6 +391,7 @@ private struct ScribeMeetingCardBody: View {
             .accessibilityValue(ScribeMeetingCardText.accessibilityValue(card) ?? "")
             .ownedJourneyControl("scribe.meetingCard.cancel")
             .modifier(CapsuleChrome(hovered: spec.hovered))
+            .accessibilityIdentifier("scribe.meetingCard.cancel")
         } else {
             Color.clear.frame(height: M.capsuleHeight)
         }
@@ -415,10 +418,14 @@ private struct ScribeMeetingCardBody: View {
         Menu {
             ForEach(Array(spec.joinApps.dropFirst()), id: \.bundleID) { app in
                 Button(ScribeMeetingCardText.join(app.name)) { spec.onJoin(card, app) }
+                    .accessibilityLabel(ScribeMeetingCardText.join(app.name))
+                    .accessibilityIdentifier("scribe.scribe-meeting-card-view.scribemeetingcardtext-join-app-name")
             }
             if spec.joinApps.count > 1, ScribeMeetingCardText.primary(card) != nil { Divider() }
             if let title = ScribeMeetingCardText.primary(card) {
                 Button(title) { spec.onPrimary(card) }
+                    .accessibilityLabel(title)
+                    .accessibilityIdentifier("scribe.scribe-meeting-card-view.title")
             }
         } label: {
             chevron.contentShape(Rectangle())
@@ -447,6 +454,7 @@ private struct ScribeMeetingCardBody: View {
             .ownedJourneyControl("scribe.meetingCard.dismiss")
             .opacity(spec.hovered ? 1 : 0)
             .animation(ScribeMeetingCardMotion.crossfade, value: spec.hovered)
+            .accessibilityIdentifier("scribe.meetingCard.dismiss")
         }
     }
 }

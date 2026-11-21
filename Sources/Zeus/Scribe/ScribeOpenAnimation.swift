@@ -67,7 +67,7 @@ private struct ScribeEntrance: ViewModifier {
         let delay = ScribeOpenSequence.delay(stage, closing: closing)
         let duration = ScribeOpenSequence.duration(stage, closing: closing)
         if closing { return .easeIn(duration: duration) }
-        return .spring(response: duration, dampingFraction: 0.82).delay(delay)
+        return .spring(response: duration, dampingFraction: MotionTokens.scribeOpenDamping).delay(delay)
     }
 }
 

@@ -130,6 +130,7 @@ private struct ScribeMemoryHeader: View {
                     .buttonStyle(.plain)
                     .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudSecondary)
                     .accessibilityHint("Opens the pages Zeus wrote from your meetings.")
+                    .accessibilityIdentifier("scribe.scribe-memory-window.what-zeus-learned")
             }
             if !filterPeople.isEmpty {
                 HStack(spacing: 6) {
@@ -151,12 +152,14 @@ private struct ScribeMemoryHeader: View {
                 .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudPrimary)
                 .focused($focused)
                 .accessibilityLabel("Search meetings")
+                .accessibilityIdentifier("scribe.scribe-memory-window.search-meetings")
             if !query.isEmpty {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 11)).foregroundStyle(Theme.cloudSecondary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
+                .accessibilityIdentifier("scribe.scribe-memory-window.clear-search")
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
@@ -170,6 +173,8 @@ private struct ScribeMemoryHeader: View {
             Menu {
                 ForEach(options, id: \.self) { name in
                     Button(name) { filterPeople.append(name) }
+                        .accessibilityLabel(name)
+                        .accessibilityIdentifier("scribe.scribe-memory-window.name")
                 }
             } label: {
                 Label("With", systemImage: "person.2")
@@ -193,6 +198,7 @@ private struct ScribeMemoryHeader: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Remove filter, with \(name)")
+        .accessibilityIdentifier("scribe.scribe-memory-window.remove-filter-with")
     }
 }
 
@@ -272,6 +278,7 @@ private struct ScribeMemoryListRow: View {
         .accessibilityLabel("\(row.recap.title), \(meta)")
         .accessibilityValue(row.outcome)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("scribe.scribe-memory-window.control")
     }
 
     private var meta: String {
@@ -390,7 +397,7 @@ private struct ScribeMemoryMeeting: View {
                             .font(.system(size: 13))
                             .foregroundStyle(item.done ? Theme.cloudSecondary : ScribeNotesStyle.accent)
                             .scaleEffect(item.done ? 1 : 0.92)
-                            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.5), value: item.done)
+                            .animation(reduceMotion ? nil : .spring(response: MotionTokens.windowFadeOutDuration, dampingFraction: MotionTokens.scribeActionDamping), value: item.done)
                         Text(item.text).font(TopBarStyle.label(12)).strikethrough(item.done)
                             .foregroundStyle(item.done ? Theme.cloudSecondary : Theme.cloudPrimary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -402,6 +409,7 @@ private struct ScribeMemoryMeeting: View {
                 .accessibilityLabel(item.text)
                 .accessibilityValue(item.done ? "Done" : "Not done")
                 .accessibilityHint("Toggles done.")
+                .accessibilityIdentifier("scribe.scribe-memory-window.square")
             }
         }
     }
@@ -427,6 +435,7 @@ private struct ScribeMemoryMeeting: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint("Folds the full transcript open or closed.")
+            .accessibilityIdentifier("scribe.scribe-memory-window.hide-transcript")
             if showTranscript {
                 if row.recap.transcript.isEmpty {
                     Text("No transcript was captured.").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary)

@@ -74,6 +74,7 @@ extension ScribePage {
 /// A warning that stays on the page: a readable sentence for VoiceOver plus a recovery action and Dismiss.
 private struct ScribeIssueBanner: View {
     let text: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var actionTitle: String?
     let action: () -> Void
     let dismiss: () -> Void
@@ -81,18 +82,20 @@ private struct ScribeIssueBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.ember)
+                .font(.system(size: ScribeDynamicType.points(11, dynamicTypeSize: dynamicTypeSize), weight: .bold)).foregroundStyle(Theme.ember)
                 .accessibilityHidden(true)
             Text(text)
-                .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                .font(TopBarStyle.label(ScribeDynamicType.points(10, dynamicTypeSize: dynamicTypeSize), .semibold)).foregroundStyle(Theme.cloudPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel("Warning: \(text)")
             Spacer(minLength: 0)
             if let actionTitle {
                 NotchActionButton(title: actionTitle, tint: TopBarStyle.rec) { action() }
+                    .accessibilityIdentifier("scribe.scribe-page.control.2")
             }
             NotchActionButton(title: "Dismiss", tint: Theme.cloudSecondary, filled: false) { dismiss() }
                 .accessibilityHint("Hides this warning.")
+                .accessibilityIdentifier("scribe.scribe-page.dismiss.2")
         }
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08)))
@@ -103,6 +106,7 @@ private struct ScribeIssueBanner: View {
 /// A meeting whose file couldn't be written. Retry, or discard it after an explicit confirmation.
 private struct ScribeUnsavedBanner: View {
     let scribe: ScribeController
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let meeting: ScribeUnsavedMeeting
 
     var body: some View {
@@ -112,25 +116,29 @@ private struct ScribeUnsavedBanner: View {
             : meeting.message
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.ember)
+                .font(.system(size: ScribeDynamicType.points(11, dynamicTypeSize: dynamicTypeSize), weight: .bold)).foregroundStyle(Theme.ember)
                 .accessibilityHidden(true)
             Text(text)
-                .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                .font(TopBarStyle.label(ScribeDynamicType.points(10, dynamicTypeSize: dynamicTypeSize), .semibold)).foregroundStyle(Theme.cloudPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel("Warning: \(text)")
             Spacer(minLength: 0)
             if confirming {
                 NotchActionButton(title: "Keep meeting", tint: TopBarStyle.rec) { scribe.keepUnsaved() }
+                    .accessibilityIdentifier("scribe.scribe-page.keep-meeting")
                 NotchActionButton(title: "Discard meeting", tint: Theme.cloudSecondary, filled: false) {
                     scribe.discardUnsaved(meeting.id)
                 }
                 .accessibilityHint("Permanently throws away this unsaved meeting.")
+                .accessibilityIdentifier("scribe.scribe-page.discard-meeting.2")
             } else {
                 NotchActionButton(title: "Retry save", tint: TopBarStyle.rec) { scribe.retrySave(meeting.id) }
+                    .accessibilityIdentifier("scribe.scribe-page.retry-save")
                 NotchActionButton(title: "Discard meeting", tint: Theme.cloudSecondary, filled: false) {
                     scribe.requestDiscardUnsaved(meeting.id)
                 }
                 .accessibilityHint("Asks before throwing away this unsaved meeting. It can't be recovered.")
+                .accessibilityIdentifier("scribe.scribe-page.discard-meeting")
             }
         }
         .padding(8)
@@ -425,7 +433,9 @@ struct ScribeDeleteConfirm: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 NotchActionButton(title: "Delete permanently", tint: TopBarStyle.rec) { scribe.deletePermanently(id) }
+                    .accessibilityIdentifier("scribe.scribe-page.delete-permanently.2")
                 NotchActionButton(title: "Keep", tint: Theme.cloudSecondary, filled: false) { scribe.cancelDelete() }
+                    .accessibilityIdentifier("scribe.scribe-page.keep")
             }
         }
         .accessibilityElement(children: .contain)
@@ -458,6 +468,7 @@ private struct ScribeRecapDetail: View {
                         NotchActionButton(title: "Delete permanently", tint: Theme.cloudSecondary, filled: false) {
                             scribe.requestDelete(recap.id)
                         }
+                            .accessibilityIdentifier("scribe.scribe-page.delete-permanently")
                     }
                 }
             )
@@ -481,6 +492,7 @@ private struct ScribeConnecting: View {
             .accessibilityValue(state.accessibilityValue)
             Spacer(minLength: 0)
             NotchActionButton(title: "Cancel", tint: Theme.cloudSecondary, filled: false) { scribe.cancel() }
+                .accessibilityIdentifier("scribe.scribe-page.cancel.2")
         }
     }
 }
@@ -508,7 +520,7 @@ struct ScribeMeterView: View {
             }
         }
         .frame(height: height)
-        .animation(reduceMotion ? nil : .linear(duration: 0.06), value: bars)
+        .animation(reduceMotion ? nil : .linear(duration: MotionTokens.scribeLevelDuration), value: bars)
         .accessibilityHidden(true)
     }
 }
@@ -552,6 +564,7 @@ private struct ScribeCircleButton: View {
         .help(label)
         .accessibilityLabel(label)
         .accessibilityHint(hint)
+        .accessibilityIdentifier("scribe.scribe-page.control")
     }
 }
 
@@ -595,9 +608,11 @@ private struct ScribeRecording: View {
                 Spacer(minLength: 0)
                 NotchActionButton(title: "Discard", tint: Theme.ember) { scribe.confirmDiscard() }
                     .accessibilityHint("Stops recording and permanently throws this meeting away.")
+                    .accessibilityIdentifier("scribe.scribe-page.discard")
                 NotchActionButton(title: "Keep recording", tint: Theme.cloudSecondary, filled: false) {
                     scribe.keepAfterDiscardRequest()
                 }
+                    .accessibilityIdentifier("scribe.scribe-page.keep-recording")
             }
             .frame(minHeight: 40)
         } else {
@@ -720,7 +735,7 @@ private struct ScribeLiveTranscriptContent: View {
                 // A page opened mid-meeting starts at the newest line, not the top.
                 .onAppear { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
                 .onChange(of: key) { _, _ in
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: MotionTokens.scribeCrossfade)) {
                         proxy.scrollTo(Self.bottomID, anchor: .bottom)
                     }
                 }
@@ -878,6 +893,7 @@ private struct ScribeWriting: View {
             }
             .accessibilityHint("Stops waiting for the notes and saves what was transcribed so far, without notes.")
             .padding(.bottom, 14)
+            .accessibilityIdentifier("scribe.scribe-page.stop-and-save-transcript")
         }
     }
 }
@@ -1002,6 +1018,7 @@ private struct ScribeSpeakerRow: View {
                     .buttonStyle(.plain)
                     .help("Rename this speaker")
                     .accessibilityLabel("\(entry.speaker.displayName), rename")
+                    .accessibilityIdentifier("scribe.scribe-page.rename")
                 } else {
                     Text(entry.speaker.displayName)
                         .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
@@ -1015,6 +1032,7 @@ private struct ScribeSpeakerRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Accept the name \(suggestion.name) for \(entry.speaker.displayName)")
+                    .accessibilityIdentifier("scribe.scribe-page.accept-the-name-for")
                 }
                 Spacer(minLength: 0)
                 Text(time).font(TopBarStyle.label(10).monospacedDigit()).foregroundStyle(Theme.cloudSecondary)
@@ -1068,10 +1086,12 @@ private struct ScribeSpeakerRow: View {
                         .buttonStyle(.plain)
                         .font(TopBarStyle.label(9, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
                         .accessibilityLabel("Confirm the name \(identity.name)")
+                        .accessibilityIdentifier("scribe.scribe-page.confirm-the-name")
                     Button("Not them") { tools?.notThem(entry.speaker) }
                         .buttonStyle(.plain)
                         .font(TopBarStyle.label(9, .semibold)).foregroundStyle(Theme.cloudSecondary)
                         .accessibilityLabel("\(identity.name) is not this speaker")
+                        .accessibilityIdentifier("scribe.scribe-page.is-not-this-speaker")
                 }
             }
         }
@@ -1089,6 +1109,7 @@ private struct ScribeSpeakerRow: View {
                     .buttonStyle(.plain)
                     .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
                     .accessibilityLabel("Play a short sample of \(entry.speaker.displayName)")
+                    .accessibilityIdentifier("scribe.scribe-page.play-a-short-sample-of")
             }
             TextField("Name", text: $draft)
                 .textFieldStyle(.plain)
@@ -1097,6 +1118,7 @@ private struct ScribeSpeakerRow: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.18)))
                 .onSubmit { commit() }
                 .accessibilityLabel("Name for \(entry.speaker.displayName)")
+                .accessibilityIdentifier("scribe.scribe-page.name-for")
             if !quickNames.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(quickNames.prefix(4), id: \.self) { name in
@@ -1105,6 +1127,8 @@ private struct ScribeSpeakerRow: View {
                             .font(TopBarStyle.label(10)).foregroundStyle(ScribeNotesStyle.accent).lineLimit(1)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Capsule().strokeBorder(ScribeNotesStyle.accent.opacity(0.4), lineWidth: 1))
+                            .accessibilityLabel(name)
+                            .accessibilityIdentifier("scribe.scribe-page.name")
                     }
                 }
             }
@@ -1113,13 +1137,16 @@ private struct ScribeSpeakerRow: View {
                     Text("Remember this voice on this Mac").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary)
                 }
                 .toggleStyle(.checkbox)
+                .accessibilityIdentifier("scribe.scribe-page.remember-this-voice-on-this-mac")
                 Text("Only save voices of people who agreed.")
                     .font(TopBarStyle.label(9)).foregroundStyle(Theme.cloudSecondary)
             }
             HStack(spacing: 6) {
                 NotchActionButton(title: "Save name", tint: TopBarStyle.rec) { commit() }
                     .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("scribe.scribe-page.save-name")
                 NotchActionButton(title: "Cancel", tint: Theme.cloudSecondary, filled: false) { editing = false }
+                    .accessibilityIdentifier("scribe.scribe-page.cancel")
             }
         }
         .padding(.top, 3)
@@ -1202,6 +1229,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                 actions
                 NotchActionButton(title: closeTitle, tint: Theme.cloudSecondary, filled: false) { close() }
                     .ownedJourneyControl("scribe.notes.close")
+                    .accessibilityIdentifier("scribe.notes.close")
             }
             HStack(alignment: .top, spacing: 12) {
                 ScrollView {
@@ -1291,12 +1319,15 @@ private struct ScribeMeetingBody<Actions: View>: View {
                         .buttonStyle(.plain)
                         .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
                         .accessibilityHint("Brings back the speakers as they were before the last change.")
+                        .accessibilityLabel(title)
+                        .accessibilityIdentifier("scribe.scribe-page.title")
                 }
                 if tools.hasPrunedVoices {
                     Button("Restore small voices") { tools.restorePruned() }
                         .buttonStyle(.plain)
                         .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
                         .accessibilityHint("Puts back the very short voices Zeus folded into other speakers.")
+                        .accessibilityIdentifier("scribe.scribe-page.restore-small-voices")
                 }
             }
         }
@@ -1331,6 +1362,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                 .accessibilityLabel(item.text)
                 .accessibilityValue(item.done ? "Done" : "Not done")
                 .accessibilityHint("Toggles done.")
+                .accessibilityIdentifier("scribe.scribe-page.square")
             }
         }
     }
@@ -1385,6 +1417,7 @@ private struct ScribeMeetingBody<Actions: View>: View {
                         .buttonStyle(.plain)
                         .font(TopBarStyle.label(10, .semibold)).foregroundStyle(ScribeNotesStyle.accent)
                         .accessibilityLabel("Copy the transcript with speaker names")
+                        .accessibilityIdentifier("scribe.scribe-page.copy-the-transcript-with-speaker-names")
                 }
             }
             if segments.isEmpty {
@@ -1422,7 +1455,9 @@ private struct ScribeFailed: View {
             Spacer(minLength: 0)
             HStack(spacing: 10) {
                 NotchActionButton(title: "Try again", tint: TopBarStyle.rec) { scribe.retry() }
+                    .accessibilityIdentifier("scribe.scribe-page.try-again")
                 NotchActionButton(title: "Dismiss", tint: Theme.cloudSecondary, filled: false) { scribe.closeNotes() }
+                    .accessibilityIdentifier("scribe.scribe-page.dismiss")
             }
         }
     }

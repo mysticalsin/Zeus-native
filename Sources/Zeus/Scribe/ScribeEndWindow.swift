@@ -57,6 +57,7 @@ private struct ScribeEndWindowView: View {
     let scribe: ScribeController
     let dismiss: () -> Void
     private var reduceMotion: Bool { Motion.reduced }
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -69,15 +70,22 @@ private struct ScribeEndWindowView: View {
                     .accessibilityLabel("Hide meeting window")
                     .accessibilityHint("The current recording or save operation continues.")
                     .ownedJourneyControl("scribe.endWindow.hide")
+                    .accessibilityIdentifier("scribe.endWindow.hide")
             }
             content
             Spacer(minLength: 0)
         }
         .padding(18)
         .frame(width: 380, height: 240, alignment: .topLeading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .background {
+            if reduceTransparency {
+                RoundedRectangle(cornerRadius: 18).fill(Color(nsColor: .windowBackgroundColor))
+            } else {
+                RoundedRectangle(cornerRadius: 18).fill(.regularMaterial)
+            }
+        }
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.12)))
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: scribe.phase)
+        .animation(reduceMotion ? nil : .easeInOut(duration: MotionTokens.windowFadeOutDuration), value: scribe.phase)
         .accessibilityElement(children: .contain)
     }
 
@@ -91,8 +99,10 @@ private struct ScribeEndWindowView: View {
             HStack {
                 Button("End meeting now") { scribe.confirmEnd() }.buttonStyle(.borderedProminent)
                     .ownedJourneyControl("scribe.endWindow.endNow")
+                    .accessibilityIdentifier("scribe.endWindow.endNow.2")
                 Button("Keep recording") { scribe.keepRecording() }.buttonStyle(.bordered)
                     .ownedJourneyControl("scribe.endWindow.keep")
+                    .accessibilityIdentifier("scribe.endWindow.keep.2")
             }
         case .ending:
             Text(scribe.endStopRequested ? "Finishing recording…" : "Meeting ending in \(scribe.endingRemaining ?? 9)s")
@@ -105,8 +115,10 @@ private struct ScribeEndWindowView: View {
             HStack {
                 Button("End meeting now") { scribe.confirmEnd() }.buttonStyle(.borderedProminent)
                     .ownedJourneyControl("scribe.endWindow.endNow")
+                    .accessibilityIdentifier("scribe.endWindow.endNow")
                 Button("Keep recording") { scribe.keepRecording() }.buttonStyle(.bordered)
                     .ownedJourneyControl("scribe.endWindow.keep")
+                    .accessibilityIdentifier("scribe.endWindow.keep")
             }
             .disabled(scribe.endStopRequested)
         case .processing:
@@ -116,6 +128,7 @@ private struct ScribeEndWindowView: View {
                 Text(issue).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(4)
                 Button("Retry save") { scribe.retrySave(id) }.buttonStyle(.borderedProminent)
                     .ownedJourneyControl("scribe.endWindow.retrySave")
+                    .accessibilityIdentifier("scribe.endWindow.retrySave")
             } else {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)

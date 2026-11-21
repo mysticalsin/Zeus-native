@@ -38,7 +38,7 @@ struct ScribeNowSpeakingPill: View {
         .padding(.leading, 3).padding(.trailing, 10)
         .frame(height: 24)
         .background(Capsule().fill(Color.white.opacity(0.08)))
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: current?.name)
+        .animation(reduceMotion ? nil : .easeInOut(duration: MotionTokens.scribeCrossfade), value: current?.name)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(current?.spoken ?? "Listening, nobody has spoken yet")
         .onChange(of: current?.spoken) { _, spoken in announce(spoken) }
@@ -101,7 +101,7 @@ struct ScribeLevelRibbon: View {
             }
         }
         .frame(height: 20)
-        .animation(reduceMotion ? nil : .linear(duration: 0.06), value: values)
+        .animation(reduceMotion ? nil : .linear(duration: MotionTokens.scribeLevelDuration), value: values)
         .accessibilityHidden(true)
     }
 }
