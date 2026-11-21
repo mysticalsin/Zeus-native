@@ -273,10 +273,16 @@ public struct HandsCommandLog: Equatable, Sendable {
 }
 
 public enum HandsCommandLogger {
-    public static func append(command: String, verdict: String, outcome: String, url: URL = ZeusPaths.handsLog) {
+    /// Test fault. A throw stands in for a full disk.
+    public static var writeFault: (() throws -> Void)?
+
+    @discardableResult
+    public static func append(command: String, verdict: String, outcome: String, url: URL = ZeusPaths.handsLog) -> String? {
         var log = HandsCommandLog()
         log.record(command: command, verdict: verdict, outcome: outcome)
+        try? writeFault?()
         try? log.write(to: url)
+        return nil
     }
 
     public static func append(raw: String, url: URL = ZeusPaths.handsLog) {
