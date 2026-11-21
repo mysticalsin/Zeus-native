@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "policy": "PR 340 guards live in this sidecar so they do not share the closing bracket of qa/regressions.json. The runner reads every qa/regressions-*.json file.",
+  "regressions": [
+    {
+      "id": "REG-340-1",
+      "failure": "Marks for a spoken sentence could appear on a guessed word rate, a late audio cue could be applied again, or cancel could still release marks.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+        "function": "aLateCueIsAppliedOnceAndNotReplayed"
+      }
+    },
+    {
+      "id": "REG-340-2",
+      "failure": "Apply returned a mark whose timestamp was still in the future, so it could show before its audio.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+        "function": "aMarkWithAFutureTimestampIsNotShownBeforeItsAudio"
+      }
+    },
+    {
+      "id": "REG-340-3",
+      "failure": "A mark with no start never became due and never expired.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+        "function": "aMarkMissingItsStartExpiresWithoutBecomingDue"
+      }
+    },
+    {
+      "id": "REG-340-4",
+      "failure": "Barge-in did not cancel the mark schedule, so later audio could still reveal marks.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+        "function": "bargeInCallsCancel"
+      }
+    },
+    {
+      "id": "REG-340-5",
+      "failure": "The 0.18 s per word estimate was unused, so a mark with no real time had no disclosed fallback.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+        "function": "theWordEstimateIsOnlyAFallbackWhenRealTimingIsMissing"
+      }
+    }
+  ]
+}

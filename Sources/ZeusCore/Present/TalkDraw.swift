@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 /// What a talk reply asks the screen to show: marks in screenshot pixels (top-left origin, as
@@ -21,7 +22,13 @@ public struct TalkDraw: Equatable, Sendable {
         public var shape: Shape
         /// 0-based index of the spoken sentence this mark appears with.
         public var at: Int
-        public init(shape: Shape, at: Int) { self.shape = shape; self.at = at }
+        /// Seconds on the real speech clock. Nil means the mark is due when its sentence's audio starts.
+        public var audioTime: Double?
+        public init(shape: Shape, at: Int, audioTime: Double? = nil) {
+            self.shape = shape
+            self.at = at
+            self.audioTime = audioTime
+        }
     }
 
     public static let maxMarks = 6
@@ -45,6 +52,7 @@ public struct TalkDraw: Equatable, Sendable {
         func pair(_ p: Point) -> [Double] { [p.x, p.y] }
         let marks: [[String: Any]] = self.marks.map { mark in
             var object: [String: Any] = ["at": mark.at]
+            if let due = mark.audioTime { object["due"] = due }
             switch mark.shape {
             case .ring(let center, let radius):
                 object["k"] = "ring"; object["x"] = center.x; object["y"] = center.y; object["r"] = radius
@@ -81,25 +89,26 @@ public enum TalkDrawParser {
 
     private static func mark(from object: [String: Any]) -> TalkDraw.Mark? {
         let at = min(TalkDraw.maxSentenceIndex, max(0, number(object["at"]).map { Int($0) } ?? 0))
+        let due = number(object["due"])
         switch object["k"] as? String {
         case "ring":
             guard let x = number(object["x"]), let y = number(object["y"]),
                   let r = number(object["r"]), r > 0 else { return nil }
-            return .init(shape: .ring(center: .init(x: x, y: y), radius: min(TalkDraw.maxRingRadius, max(TalkDraw.minRingRadius, r))), at: at)
+            return .init(shape: .ring(center: .init(x: x, y: y), radius: min(TalkDraw.maxRingRadius, max(TalkDraw.minRingRadius, r))), at: at, audioTime: due)
         case "arrow":
             guard let from = point(object["from"]), let to = point(object["to"]) else { return nil }
-            return .init(shape: .arrow(from: from, to: to), at: at)
+            return .init(shape: .arrow(from: from, to: to), at: at, audioTime: due)
         case "ink":
             guard let raw = object["pts"] as? [Any] else { return nil }
             let points = raw.prefix(TalkDraw.maxInkPoints).compactMap(point)
             guard points.count >= 2 else { return nil }
-            return .init(shape: .ink(points), at: at)
+            return .init(shape: .ink(points), at: at, audioTime: due)
         case "card":
             guard let x = number(object["x"]), let y = number(object["y"]),
                   let raw = object["t"] as? String else { return nil }
             let text = String(raw.trimmingCharacters(in: .whitespacesAndNewlines).prefix(TalkDraw.maxTextCharacters))
             guard !text.isEmpty else { return nil }
-            return .init(shape: .card(origin: .init(x: x, y: y), text: text), at: at)
+            return .init(shape: .card(origin: .init(x: x, y: y), text: text), at: at, audioTime: due)
         default:
             return nil
         }

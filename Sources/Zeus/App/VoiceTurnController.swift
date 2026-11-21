@@ -176,6 +176,11 @@ final class VoiceTurnController {
         presenter.clear()
     }
 
+    /// A press during a live answer. Marks waiting on the audio clock are cancelled.
+    func bargeIn() {
+        presenter.cancelScheduledMarks()
+    }
+
     /// Menu › Stop Speaking (pressing the talk key also interrupts).
     func stopSpeaking() {
         clearDrawingForNewTurn()
@@ -214,7 +219,9 @@ final class VoiceTurnController {
         handsFreeTask?.cancel()
         handsFreeTask = nil
         turnRun.invalidate()
-        // A barge-in stops generation now, then the key-down warm-up gives the next turn a ready process.
+        // A barge-in stops generation now, and stops marks that are not yet due.
+        bargeIn()
+        // The key-down warm-up gives the next turn a ready process.
         PersistentClaudeSession.shared.abortBusy()
         if seams.warmsOnPress {
             KeyDownWarmer.talkKeyDown()
