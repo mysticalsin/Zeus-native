@@ -9,7 +9,12 @@ public struct TalkLatencySample: Equatable, Sendable {
     public var firstTokenMs: Int
     public var ttsFirstMs: Int
     /// Speech-to-text final, first token, and first speech audio. Capture is not added.
-    public var firstAudioMs: Int { sttFinalMs + firstTokenMs + ttsFirstMs }
+    /// A negative stage is clamped to zero so it cannot pull the sum under the target.
+    public var firstAudioMs: Int {
+        Self.nonNegative(sttFinalMs) + Self.nonNegative(firstTokenMs) + Self.nonNegative(ttsFirstMs)
+    }
+
+    private static func nonNegative(_ milliseconds: Int) -> Int { max(0, milliseconds) }
     public var firstVisualMs: Int?
 
     public init(sttFinalMs: Int, captureReadyMs: Int? = nil, firstTokenMs: Int, ttsFirstMs: Int, firstVisualMs: Int? = nil) {

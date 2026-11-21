@@ -158,6 +158,14 @@ final class SpeechInput: @unchecked Sendable {
     // dropped so they never interleave with `injectFile`'s file-sourced buffers on the same
     // request.
     private var suppressLiveTap = false
+    /// Production timer for the key-up final cap. A test clock leaves this unset.
+    private var productionWaitItem: DispatchWorkItem?
+    /// Test seam: arms the key-up cap. Nil uses the session queue at `TalkLatencyBudget.sttFinalCapMs`.
+    var scheduleFinalWait: (@Sendable (Int, @escaping @Sendable () -> Void) -> Void)?
+    /// Test seam: drops an armed key-up cap so an earlier final can win.
+    var cancelFinalWait: (@Sendable () -> Void)?
+    /// True after the cap fires and the recognition task is cancelled.
+    private(set) var didCancelRecognitionForTesting = false
 
     /// Who a recognition task reports for: the session it belongs to and the controller turn
     /// that started that session. Carried through the restart after Apple ends an utterance early.
@@ -507,6 +515,7 @@ final class SpeechInput: @unchecked Sendable {
                         return effects
                     }
                     if effects.contains(.finishTurn) {
+                        self.disarmFinalWait()
                         self.finish(ifSession: turn.sessionID)
                     } else if effects.contains(.restart) {
                         self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
@@ -530,6 +539,7 @@ final class SpeechInput: @unchecked Sendable {
                     return effects
                 }
                 if effects.contains(.finishTurn) {
+                    self.disarmFinalWait()
                     self.finish(ifSession: turn.sessionID)
                 } else if effects.contains(.restart) {
                     self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
@@ -670,7 +680,9 @@ final class SpeechInput: @unchecked Sendable {
         }
     }
 
-    /// Stops listening and returns the final transcript (waits at most 1.5 s for it).
+    /// Stops listening and returns the transcript.
+    /// Key-up waits `TalkLatencyBudget.sttFinalCapMs` for a recognizer final. When that cap fires,
+    /// the recognition task is cancelled and the latest partial is returned.
     /// Without Apple recognition it returns at once with an empty transcript.
     /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
     /// final text, so release must not wait for Apple's second pass).
@@ -698,16 +710,72 @@ final class SpeechInput: @unchecked Sendable {
                 continuation.resume(returning: doneText)
                 return
             }
-            // QA7 round 10 (real E2E, flaky): a self-correction turn needs an extra recognition
-            // pass (the mid-hold-pause fix above opens a fresh request when Apple ends the first
-            // utterance early), so its true final result can take a little longer to land than a
-            // single-pass turn's -- 1.5 s cut one off before it arrived, returning a stale/garbage
-            // partial (e.g. "Yeah.") instead of waiting the extra few hundred ms for the real one.
-            DispatchQueue.global().asyncAfter(deadline: .now() + 2.5) { [weak self] in
-                guard let self else { return }
-                self.finish(ifSession: session)
+            let waitMs = TalkLatencyBudget.sttFinalCapMs
+            let fire: @Sendable () -> Void = { [weak self] in
+                self?.cancelRecognizerAfterFinalCap(session: session)
+            }
+            let schedule = lock.withLock { scheduleFinalWait }
+            if let schedule {
+                schedule(waitMs, fire)
+            } else {
+                armProductionFinalWait(afterMs: waitMs, fire: fire)
             }
         }
+    }
+
+    /// Test seam: words a fake recognizer would report. `isFinal` after key-up finishes the wait.
+    /// No permission prompt and no audio device.
+    func acceptTranscriptForTesting(_ text: String, isFinal: Bool) {
+        let session = lock.withLock { () -> Int in
+            let joined = finalizedText.isEmpty ? text : finalizedText + " " + text
+            latest = joined
+            return generation
+        }
+        guard isFinal else { return }
+        let effects = lock.withLock { () -> [SpeechRecorder.Effect] in
+            let (next, effects) = SpeechRecorder.reduce(recorder, .utteranceEnded(session: session))
+            recorder = next
+            return effects
+        }
+        guard effects.contains(.finishTurn) else { return }
+        disarmFinalWait()
+        finish(ifSession: session)
+    }
+
+    private func armProductionFinalWait(afterMs: Int, fire: @escaping @Sendable () -> Void) {
+        let item = DispatchWorkItem(block: fire)
+        let previous = lock.withLock { () -> DispatchWorkItem? in
+            let previous = productionWaitItem
+            productionWaitItem = item
+            return previous
+        }
+        previous?.cancel()
+        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(afterMs), execute: item)
+    }
+
+    private func disarmFinalWait() {
+        let cancel = lock.withLock { cancelFinalWait }
+        cancel?()
+        let item = lock.withLock { () -> DispatchWorkItem? in
+            defer { productionWaitItem = nil }
+            return productionWaitItem
+        }
+        item?.cancel()
+    }
+
+    /// The budget cap fired with no final. Cancel the recognition task and return the latest partial.
+    private func cancelRecognizerAfterFinalCap(session: Int) {
+        let taken: (task: SFSpeechRecognitionTask?, finish: Bool) = lock.withLock {
+            guard Self.shouldFinishAfterStopTimeout(session: session, current: generation), !finished else {
+                return (nil, false)
+            }
+            didCancelRecognitionForTesting = true
+            defer { task = nil }
+            return (task, true)
+        }
+        guard taken.finish else { return }
+        taken.task?.cancel()
+        finish(ifSession: session)
     }
 
     func cancel() { cancelTurn(ifSession: nil) }
