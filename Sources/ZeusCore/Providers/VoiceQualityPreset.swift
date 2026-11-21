@@ -45,14 +45,16 @@ public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertib
     }
 }
 
-/// A key is trimmed, then refused when a control character remains. The message is fixed.
+/// A key is trimmed, then refused when a control character remains or it is longer than 256 characters.
+/// The message is fixed. A longer key is never stored, logged, or placed in a header, so redaction stays bounded.
 /// Newline, carriage return, tab, and NUL cannot reach a header or the meter.
 public enum VoiceQualityKeyGate {
     public static let rejectedMessage = "The key is not valid."
+    public static let maxLength = 256
 
     public static func accepted(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 8 else { return nil }
+        guard trimmed.count >= 8, trimmed.count <= maxLength else { return nil }
         guard trimmed.unicodeScalars.allSatisfy({ scalar in
             scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
         }) else { return nil }
