@@ -18,6 +18,9 @@ public struct MirroredNotification: Equatable, Sendable, Identifiable {
 }
 
 public enum NotificationMirror {
+    /// Notification records larger than this are skipped before they are copied or parsed.
+    public static let maxRecordBytes = 64 * 1024
+
     public static var databaseURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2/db")
@@ -64,7 +67,7 @@ public enum NotificationMirror {
             let app = sqlite3_column_text(query, 1).map { String(cString: $0) } ?? ""
             guard !muted.contains(app) else { continue }
             let bytes = sqlite3_column_bytes(query, 2)
-            guard bytes > 0, let blob = sqlite3_column_blob(query, 2) else { continue }
+            guard bytes > 0, Int(bytes) <= maxRecordBytes, let blob = sqlite3_column_blob(query, 2) else { continue }
             let data = Data(bytes: blob, count: Int(bytes))
             let delivered = sqlite3_column_double(query, 3)
             if var note = parse(data, app: app) {
@@ -78,7 +81,8 @@ public enum NotificationMirror {
 
     /// The record's binary plist: `req` holds `titl`, `subt`, `body`.
     public static func parse(_ data: Data, app: String) -> MirroredNotification? {
-        guard let root = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+        guard data.count <= maxRecordBytes,
+              let root = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               let request = root["req"] as? [String: Any] else { return nil }
         let title = (request["titl"] as? String) ?? ""
         let body = (request["body"] as? String) ?? ""
