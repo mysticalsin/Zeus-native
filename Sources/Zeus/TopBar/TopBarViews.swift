@@ -1456,7 +1456,9 @@ struct IdleCharacterMark: View {
         case .zeus:
             MiniMascotView(state: .idle, size: NotchClosedBodyLayout.miniMascotSize)
         case .jarvis:
-            OrbMascotView(visualState: .idle, reduceMotion: Motion.reduced, paused: false)
+            OrbMascotView(visualState: .idle,
+                          reduceMotion: Motion.reduced,
+                          paused: OrbRedrawPolicy.pausesRedraw(visualState: .idle, reduceMotion: Motion.reduced))
                 .frame(width: NotchClosedBodyLayout.miniMascotSize, height: NotchClosedBodyLayout.miniMascotSize)
                 .accessibilityLabel("Jarvis")
         }
