@@ -311,7 +311,7 @@ public actor VoiceProviderSession {
         currentCancel = nil
     }
 
-    public func speak(_ text: String) async -> SpeakOutcome {
+    public func speak(_ text: String, onPlaybackChunk: (@Sendable (Data) async -> Void)? = nil) async -> SpeakOutcome {
         let started = ContinuousClock.now
         speakCancelled = false
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -346,6 +346,9 @@ public actor VoiceProviderSession {
                 let interval = signposter.begin()
                 for try await chunk in synthesis.chunks {
                     if speakCancelled { throw ProviderFailure.cancelled }
+                    let piece = chunk.data
+                    guard !piece.isEmpty else { continue }
+                    await onPlaybackChunk?(piece)
                     if audio.isEmpty {
                         first = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
                         if let first, first > firstAudioBudgetMs {
@@ -353,7 +356,7 @@ public actor VoiceProviderSession {
                             throw ProviderFailure.timedOut
                         }
                     }
-                    audio.append(chunk.data)
+                    audio.append(piece)
                 }
                 currentCancel = nil
                 guard !audio.isEmpty, let first else { throw ProviderFailure.invalidResponse }
