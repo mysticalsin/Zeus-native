@@ -105,10 +105,13 @@ final class MediaManualClock: MediaCommandClock, @unchecked Sendable {
             resumed = true
             self.continuation = nil
             lock.unlock()
-            if let error {
-                continuation.resume(throwing: error)
-            } else {
-                continuation.resume()
+            // Leave the caller's turn before resuming. A main-actor sleeper resumed inline deadlocks.
+            Task.detached {
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
             }
         }
     }
