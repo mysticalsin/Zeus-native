@@ -98,7 +98,7 @@ def main() -> int:
         lang = "fr-fr" if script.stem.endswith("french") or "Bonjour" in raw else "en-gb"
         try:
             audio, sample_rate, wall_s = _synthesize(engine, spoken, args.voice, args.speed, lang)
-        except Exception as error:  # noqa: BLE001 — one script must not hide the others
+        except Exception as error:  # noqa: BLE001. One script must not hide the others.
             failures.append({"script": script.stem, "lang": lang, "error": f"{type(error).__name__}: {error}"})
             _write_json(output, f"{script.stem}.error.json", failures[-1])
             continue
@@ -157,7 +157,7 @@ def _download(url: str, path: Path, min_bytes: int) -> None:
     if path.is_file() and path.stat().st_size >= min_bytes:
         return
     temporary = path.with_name(path.name + ".partial")
-    urllib.request.urlretrieve(url, temporary)  # noqa: S310 — the URL is the pinned model release
+    urllib.request.urlretrieve(url, temporary)  # noqa: S310. The URL is the pinned model release.
     if temporary.stat().st_size < min_bytes:
         temporary.unlink(missing_ok=True)
         raise SystemExit(f"{path.name} download is smaller than {min_bytes} bytes")
@@ -188,7 +188,7 @@ def _weights_license(cache: Path) -> dict:
             "bytes": size,
             "opens_with_apache_heading": text.lstrip().startswith("Apache License"),
         })
-    except Exception as error:  # noqa: BLE001 — a missing license page is reported, not invented
+    except Exception as error:  # noqa: BLE001. A missing license page is reported, not invented.
         record.update({"fetched": False, "error": f"{type(error).__name__}: {error}"})
     return record
 

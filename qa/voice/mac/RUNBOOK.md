@@ -16,7 +16,7 @@ Set `SAY_VOICE` to choose a voice, for example `SAY_VOICE=Daniel`. With it unset
 
 ## AVSpeechSynthesizer
 
-`render_avspeech.swift` calls `AVSpeechSynthesizer.write`, which is the same entry `SystemVoiceRender.render` uses. The rate is `AVSpeechUtteranceDefaultSpeechRate * 0.92` and the pitch multiplier is `0.82`, matching `UltronSystemVoicePick`. The voice is the first installed voice named Daniel, Alex, or Tom. The Ultron effect chain stays in the app, so this WAV is the raw system render.
+`render_avspeech.swift` calls `AVSpeechSynthesizer.write`, which is the same entry `SystemVoiceRender.render` uses. Rate and pitch come from `avspeech_plan.py`: 0.92 of `AVSpeechUtteranceDefaultSpeechRate`, and a pitch multiplier of 0.82, matching `UltronSystemVoicePick`. That file also exits 2 when the text is empty. The voice is the first installed voice named Daniel, Alex, or Tom. The Ultron effect chain stays in the app, so this WAV is the raw system render. Linux runs the plan. It does not run `AVSpeechSynthesizer`, because AVFoundation is not on Linux.
 
 The shell runs it only when `swift` is on `PATH`.
 

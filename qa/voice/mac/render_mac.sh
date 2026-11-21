@@ -108,9 +108,11 @@ render_swift() {
   started=$(python3 -c 'import time; print(f"{time.perf_counter():.6f}")')
   swift "$here/render_avspeech.swift" "$wav" "$textfile"
   ended=$(python3 -c 'import time; print(f"{time.perf_counter():.6f}")')
-  python3 - "$dir/$name.timing.json" "$name" "$textfile" "$started" "$ended" <<'PY'
+  python3 - "$dir/$name.timing.json" "$name" "$textfile" "$started" "$ended" "$here" <<'PY'
 import json, pathlib, sys
-path, name, textfile, started, ended = sys.argv[1:]
+path, name, textfile, started, ended, here = sys.argv[1:]
+sys.path.insert(0, here)
+import avspeech_plan
 text = pathlib.Path(textfile).read_text(encoding="utf-8").strip()
 payload = {
     "provider": "avspeech",
@@ -119,8 +121,8 @@ payload = {
     "request_start_s": 0.0,
     "wav_origin_s": 0.0,
     "first_audio_s": float(ended) - float(started),
-    "rate": "AVSpeechUtteranceDefaultSpeechRate * 0.92",
-    "pitch_multiplier": 0.82,
+    "rate": f"AVSpeechUtteranceDefaultSpeechRate * {avspeech_plan.RATE_SCALE}",
+    "pitch_multiplier": avspeech_plan.PITCH,
     "ttfa_note": "Wall clock of AVSpeechSynthesizer.write. The Ultron effect chain is not in this process.",
 }
 pathlib.Path(path).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

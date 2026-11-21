@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 
 // Renders one line with AVSpeechSynthesizer.write.
-// Rate and pitch match UltronSystemVoicePick (0.92 of the default rate, pitch 0.82).
+// Rate, pitch, and the empty-text exit come from avspeech_plan.py.
 // This process does not run Zeus's Ultron effect chain.
 // Usage: swift render_avspeech.swift OUTPUT.wav TEXTFILE
 
@@ -12,18 +12,47 @@ guard arguments.count == 3 else {
     exit(2)
 }
 
-let output = URL(fileURLWithPath: arguments[1])
-let text = (try? String(contentsOfFile: arguments[2], encoding: .utf8))?
-    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-guard !text.isEmpty else {
-    fputs("empty text\n", stderr)
+let planScript = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .appendingPathComponent("avspeech_plan.py")
+let planProcess = Process()
+planProcess.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+planProcess.arguments = ["python3", planScript.path, arguments[1], arguments[2]]
+let planOutput = Pipe()
+let planErrors = Pipe()
+planProcess.standardOutput = planOutput
+planProcess.standardError = planErrors
+do {
+    try planProcess.run()
+} catch {
+    fputs("avspeech plan failed\n", stderr)
+    exit(2)
+}
+planProcess.waitUntilExit()
+let planErrorData = planErrors.fileHandleForReading.readDataToEndOfFile()
+if !planErrorData.isEmpty {
+    FileHandle.standardError.write(planErrorData)
+}
+let planCode = planProcess.terminationStatus
+if planCode != 0 {
+    exit(planCode)
+}
+let planData = planOutput.fileHandleForReading.readDataToEndOfFile()
+guard let plan = try? JSONSerialization.jsonObject(with: planData) as? [String: Any],
+      let rateScale = plan["rate_scale"] as? Double,
+      let pitch = plan["pitch"] as? Double else {
+    fputs("avspeech plan failed\n", stderr)
     exit(2)
 }
 
+let output = URL(fileURLWithPath: arguments[1])
+let text = (try? String(contentsOfFile: arguments[2], encoding: .utf8))?
+    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
 let synthesizer = AVSpeechSynthesizer()
 let utterance = AVSpeechUtterance(string: text)
-utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.92
-utterance.pitchMultiplier = 0.82
+utterance.rate = AVSpeechUtteranceDefaultSpeechRate * Float(rateScale)
+utterance.pitchMultiplier = Float(pitch)
 if let voice = AVSpeechSynthesisVoice.speechVoices().first(where: { ["Daniel", "Alex", "Tom"].contains($0.name) }) {
     utterance.voice = voice
 }
