@@ -63,8 +63,15 @@ public struct ScribeTransition: Equatable, Sendable {
 }
 
 /// Pure session state machine. Capture is "recording" only after the provider acknowledged it,
-/// and capture ends only when the provider reports it ended. Countdown expiry alone ends nothing.
+/// and capture ends only when the provider reports it ended. End-countdown expiry alone ends nothing.
+/// The connecting deadline is a clock input on `.starting`: when it passes, the phase becomes a failure
+/// the person can retry. That input does not start a session.
 public struct ScribeSessionMachine: Equatable, Sendable {
+    /// How long `.starting` may stay on connecting before it becomes a failure.
+    /// Long enough for a system permission answer. This is the session machine's own limit.
+    public static let connectingLimit: TimeInterval = 45
+    public static let connectingExpiredReason = "Connecting took too long. Try again."
+
     public private(set) var phase: ScribePhase = .idle
     public private(set) var startedAt: TimeInterval?
     private var recordingSince: TimeInterval = 0
@@ -104,8 +111,18 @@ public struct ScribeSessionMachine: Equatable, Sendable {
         return .applied([.endingCountdown(id, remaining: window)])
     }
 
-    /// Reports countdown progress. Never changes phase, even after the deadline.
+    /// Clock input. While `.starting`, a finite `now` at or after `startedAt + connectingLimit`
+    /// moves the phase to a failure the person can retry by starting a new session. An earlier
+    /// clock, or a clock that is not finite, leaves `.starting` in place. While `.ending`, this
+    /// reports countdown progress and never changes phase. Nothing here starts a session.
     public mutating func tick(now: TimeInterval) -> ScribeTransition {
+        if case .starting(let id) = phase {
+            guard let startedAt, startedAt.isFinite, now.isFinite else { return .invalid }
+            guard now >= startedAt + Self.connectingLimit else { return .invalid }
+            let reason = Self.connectingExpiredReason
+            phase = .failed(id, reason: reason)
+            return .applied([.failed(id, reason: reason)])
+        }
         guard case .ending(let id, let deadline) = phase else { return .invalid }
         return .applied([.endingCountdown(id, remaining: max(0, deadline - now))])
     }
