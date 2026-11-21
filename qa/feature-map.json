@@ -7089,6 +7089,10 @@
               "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
             },
             {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+            },
+            {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
               "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
             }
@@ -7206,6 +7210,10 @@
             {
               "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
               "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
             },
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",

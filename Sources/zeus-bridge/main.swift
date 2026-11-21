@@ -141,13 +141,18 @@ final class Relay: @unchecked Sendable {
     private static func encode(_ response: BridgeResponse) -> Data? { try? JSONEncoder().encode(response) }
 }
 
-// Chrome keeps this process running while the app is rebuilt or updated and replaces the installed copy of the file.
-// Read what this program is now, before that can happen, so the app is still recognised afterwards.
-PeerSigning.captureOwnIdentity()
 let lifetime = HostLifetime()
 do {
     let relay = try Relay(lifetime: lifetime)
     let input = try NativeMessageInput(handle: .standardInput)
+    // Arm stdin before asking Security.framework who this binary is. That call can block the main
+    // thread, and Chrome's frame is larger than the pipe: FileHandle.write in the parent then never
+    // returns, so the pending-reply tests sit in the stdin write until the job is killed.
+    input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
+    // Chrome keeps this process running while the app is rebuilt and replaces the installed file.
+    // Read the identity now, before that happens, so a later peer is still recognised. The stdin
+    // source is already running on its own queue.
+    PeerSigning.captureOwnIdentity()
     let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path, peerPolicy: ChromeSocketPeers.policy(environment: ProcessInfo.processInfo.environment),
                                   peerVerifier: ChromeSocketPeers.verifier) { [relay] line, reply in
         relay.forward(line, reply: reply)
@@ -155,7 +160,6 @@ do {
     lifetime.attach(input: input, server: server)
     // Without a socket the extension still connects; the app reports Chrome as unreachable.
     try? server.start()
-    input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
     dispatchMain()
 } catch {
     exit(2)

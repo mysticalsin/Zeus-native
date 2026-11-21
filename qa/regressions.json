@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-975",
+      "failure": "The native-host fixture wrote Chrome's framed stdin with FileHandle.write. That call blocks until the pipe drains, so a bridge that had not armed its reader froze the pending-reply suite on the caller.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+        "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+      }
     }
 ]
 }
