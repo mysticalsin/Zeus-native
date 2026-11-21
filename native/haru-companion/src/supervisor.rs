@@ -422,28 +422,33 @@ impl<C: ChildControl> Supervisor<C> {
         if let Some(pid) = self.pid.take() {
             self.child.kill(pid);
         }
-        self.state = self
-            .state
-            .step(&ChildEvent::Exited { code })
-            .unwrap_or(ChildState::Unhealthy);
+        let Ok(next) = self.state.step(&ChildEvent::Exited { code }) else {
+            return &self.state;
+        };
+        self.state = next;
+        if !matches!(self.state, ChildState::Unhealthy) {
+            return &self.state;
+        }
         if self.budget.allow(self.now_ms) {
-            if let Ok(next) = self.state.step(&ChildEvent::Restart) {
-                self.state = next;
-                if let Ok(pid) = self.child.spawn(&self.argv) {
-                    self.pid = Some(pid);
-                    if let Ok(spawned) = self.state.step(&ChildEvent::Spawned) {
-                        self.state = spawned;
+            if let Ok(restarting) = self.state.step(&ChildEvent::Restart) {
+                self.state = restarting;
+                match self.child.spawn(&self.argv) {
+                    Ok(pid) => {
+                        self.pid = Some(pid);
+                        if let Ok(spawned) = self.state.step(&ChildEvent::Spawned) {
+                            self.state = spawned;
+                        }
+                        if let Ok(loaded) = self.state.step(&ChildEvent::Loaded) {
+                            self.state = loaded;
+                        }
                     }
-                    if let Ok(loaded) = self.state.step(&ChildEvent::Loaded) {
-                        self.state = loaded;
+                    Err(_) => {
+                        self.state = ChildState::Stopped { failed: true };
                     }
                 }
             }
-        } else {
-            self.state = self
-                .state
-                .step(&ChildEvent::BudgetExhausted)
-                .unwrap_or(ChildState::Stopped { failed: true });
+        } else if let Ok(stopped) = self.state.step(&ChildEvent::BudgetExhausted) {
+            self.state = stopped;
         }
         &self.state
     }

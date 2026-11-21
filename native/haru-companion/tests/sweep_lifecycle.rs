@@ -1,7 +1,7 @@
 //! Child processes must not become zombies, survive the supervisor, or ignore shutdown.
 
-use haru_companion::supervisor::StdLauncher;
 use haru_companion::session::ChildControl;
+use haru_companion::supervisor::StdLauncher;
 use std::path::Path;
 use std::time::{Duration, Instant};
 

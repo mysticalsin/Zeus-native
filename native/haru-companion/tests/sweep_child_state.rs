@@ -1,6 +1,6 @@
 //! An illegal child event must not be rewritten into a restart.
 
-use haru_companion::supervisor::{ChildState, Supervisor, SpyLauncher};
+use haru_companion::supervisor::{ChildState, SpyLauncher, Supervisor};
 
 #[test]
 fn a_stopped_supervisor_stays_stopped_after_the_budget_window() {

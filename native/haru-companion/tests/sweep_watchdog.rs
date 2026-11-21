@@ -45,7 +45,10 @@ fn a_memory_report_does_not_fill_the_latency_window() {
     );
     assert!(
         !engine.trace().iter().any(|state| {
-            matches!(state, SessionState::Failed(SessionError::WatchdogRestart { .. }))
+            matches!(
+                state,
+                SessionState::Failed(SessionError::WatchdogRestart { .. })
+            )
         }),
         "memory report tripped a watchdog restart: {:?}",
         engine.trace()

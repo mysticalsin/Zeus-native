@@ -12,10 +12,7 @@ fn oversized_frame_does_not_stick_or_drop_the_previous_frame() {
     header.extend_from_slice(&(8 * 1024 * 1024 + 1u32).to_le_bytes());
 
     let mut stuck = FrameBuf::default();
-    assert_eq!(
-        stuck.push(&header).unwrap_err(),
-        ProtocolError::Oversized
-    );
+    assert_eq!(stuck.push(&header).unwrap_err(), ProtocolError::Oversized);
     let recovered = stuck
         .push(&hello())
         .expect("framer must accept a new frame after an oversized one");
