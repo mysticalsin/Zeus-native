@@ -19,11 +19,11 @@ public struct PlaybackClipBook: Equatable, Sendable {
     }
 
     public mutating func replace() -> Int {
-        // Red: the previous clip stays live.
+        live.removeAll()
         return begin()
     }
 
     public mutating func interrupt() {
-        // Red: a missing completion leaves the clip live.
+        live.removeAll()
     }
 }
