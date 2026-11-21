@@ -177,3 +177,55 @@ private struct AnchorFake: BundledHelperAnchorChecking {
 }
 
 private enum TestWrite: Error { case failed }
+
+@Suite struct NativeHostRegistrationTests {
+    private func directory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-host-reg-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func writeHosts(_ directory: URL, zeusPath: String) throws {
+        let zeus: [String: String] = ["name": "com.zeus.bridge", "path": zeusPath, "type": "stdio"]
+        let other: [String: String] = ["name": "com.other.host", "path": "/Library/Application Support/Other/host", "type": "stdio"]
+        let zeusData = try JSONSerialization.data(withJSONObject: zeus, options: [.sortedKeys])
+        let otherData = try JSONSerialization.data(withJSONObject: other, options: [.sortedKeys])
+        try zeusData.write(to: directory.appendingPathComponent(NativeHostRegistration.zeusHostFileName))
+        try otherData.write(to: directory.appendingPathComponent("com.other.host.json"))
+    }
+
+    @Test func aRefusedBundledPathRemovesTheHostRegistration() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        try writeHosts(root, zeusPath: bundled)
+        try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                              checkedPath: bundled, hostsDirectory: root)
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+    }
+
+    @Test func aLegacyUserWritablePathIsRemovedOnRefusal() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        let legacy = "/Users/tony/Library/Application Support/Zeus/bin/zeus-bridge"
+        try writeHosts(root, zeusPath: legacy)
+        try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                              checkedPath: bundled, hostsDirectory: root)
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+    }
+
+    @Test func aValidSignatureKeepsTheHostRegistration() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        try writeHosts(root, zeusPath: bundled)
+        let zeusFile = root.appendingPathComponent(NativeHostRegistration.zeusHostFileName)
+        let before = try Data(contentsOf: zeusFile)
+        try NativeHostRegistration.reconcile(decision: .launch, checkedPath: bundled, hostsDirectory: root)
+        #expect(try Data(contentsOf: zeusFile) == before)
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+    }
+}
