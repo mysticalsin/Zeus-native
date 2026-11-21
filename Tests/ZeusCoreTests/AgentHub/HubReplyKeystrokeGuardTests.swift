@@ -180,6 +180,25 @@ struct HubReplyKeystrokeGuardTests {
         #expect(!written.contains("try"))
         #expect(!written.contains("last item"))
     }
+
+    /// AgentReply.swift:55-58 checks the front process before the first keystroke.
+    /// A long line must repeat that check. One check for the whole line is not enough.
+    @Test func theFrontProcessIsRecheckedThroughTheChunks() throws {
+        let check = "name of first application process whose frontmost is true) is not \"Terminal\" then return false"
+        let short = try #require(AgentReply.script(for: terminal, text: "hi"))
+        let first = try #require(short.range(of: "keystroke"))
+        let before = String(short[..<first.lowerBound])
+        #expect(before.contains("if frontmost is false then return false"))
+        #expect(before.contains("tty of selected tab of front window"))
+        #expect(before.contains(check))
+        let line = String(repeating: "a", count: 220)
+        let long = try #require(AgentReply.script(for: terminal, text: line))
+        #expect(HubReplyScriptGuard.mayRun(script: long, line: line, approved: true))
+        let checks = long.components(separatedBy: check).count - 1
+        #expect(checks >= 3)
+        let firstKey = try #require(long.range(of: "keystroke"))
+        #expect(long[firstKey.upperBound...].contains(check))
+    }
 }
 
 /// The tty foreground process group, not the last name in the process list.
