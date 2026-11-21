@@ -79,17 +79,18 @@ import Testing
     }
 
     @Test func theWordEstimateIsOnlyAFallbackWhenRealTimingIsMissing() {
-        var schedule = SpeechMarkSchedule(marks: [
+        let schedule = SpeechMarkSchedule(marks: [
             .init(id: "guessed", sentenceIndex: 0, wordIndex: 2),
             .init(id: "real", sentenceIndex: 1, dueSeconds: 1),
         ])
         #expect(schedule.due(at: 0.2).isEmpty)
-        let guessed = schedule.due(at: 2 * 0.18)
+        let guessed = schedule.due(at: 2 * SpeechMarkSchedule.estimatedSecondsPerWord)
         #expect(guessed.map(\.id) == ["guessed"])
-        #expect(guessed.allSatisfy(\.estimated))
-        #expect(guessed.allSatisfy { $0.timingDisclosure == "0.18 s per word" })
-        let real = schedule.due(at: 1)
-        #expect(real.map(\.id) == ["real"])
-        #expect(real.allSatisfy { !$0.estimated && $0.timingDisclosure.isEmpty })
+        #expect(guessed.allSatisfy { $0.estimated })
+        #expect(guessed.allSatisfy { $0.timingDisclosure == SpeechMarkSchedule.estimatedTimingDisclosure })
+        let atOne = schedule.due(at: 1)
+        let real = atOne.first { $0.id == "real" }
+        #expect(real?.estimated == false && real?.timingDisclosure.isEmpty == true)
+        #expect(atOne.first { $0.id == "guessed" }?.estimated == true)
     }
 }

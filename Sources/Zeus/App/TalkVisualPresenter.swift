@@ -15,6 +15,8 @@ protocol TalkVisualPresenting: AnyObject {
     func answerFinished(token: UUID)
     /// Hide everything now.
     func clear()
+    /// A barge-in stops marks that are still waiting for their audio time.
+    func cancelScheduledMarks()
 }
 
 /// Draws the marks of one talk answer on the display it was captured from. The marks of a sentence appear
@@ -35,6 +37,7 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     private var hideTask: Task<Void, Never>?
     private var token: UUID?
     private var identity: (session: UUID, scene: UUID, revision: Int)?
+    private var markSchedule = SpeechMarkSchedule(marks: [])
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 
     var isShowing: Bool { overlay.isVisible }
@@ -68,11 +71,19 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         capture = ExplanationCaptureContext(geometry: geometry, currentDisplay: geometry.display)
         self.token = token
         identity = (UUID(), UUID(), 0)
+        markSchedule = SpeechMarkSchedule(marks: draw.marks.enumerated().map {
+            .init(id: "td\($0.offset)", sentenceIndex: $0.element.at)
+        })
         pending = TalkDrawScene.objects(draw, shot: shot, captureID: geometry.captureID)
         watchForStaleScreen()
     }
 
+    func cancelScheduledMarks() {
+        markSchedule.bargeIn()
+    }
+
     func reveal(sentence: Int, token: UUID) {
+        guard !markSchedule.isCancelled else { return }
         guard token == self.token, let capture, var identity, let marks = pending.removeValue(forKey: sentence) else { return }
         hideTask?.cancel()
         hideTask = nil

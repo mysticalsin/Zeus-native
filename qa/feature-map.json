@@ -5543,6 +5543,10 @@
             },
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "bargeInCancelsScheduledMarks"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "consentOffSendsTheBaseRequestWithEveryShotAndNoDrawPrompt"
             },
             {
@@ -5653,25 +5657,6 @@
             {
               "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
               "function": "aRequestKeepsItsDrawImageFlagThroughWith"
-            }
-          ]
-        },
-        {
-          "id": "F11.speech-mark-schedule",
-          "check": "native-ZeusCoreTests",
-          "acceptance": "Marks for a spoken sentence become due at the audio start the caller reports. Sentence 0 at audio time zero does not release sentence 1. A late cue is applied once. Cancel returns nothing further. Does not prove a live speaker clock.",
-          "cases": [
-            {
-              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
-              "function": "sentenceZeroStartsAtAudioZeroSoItsMarksAreDueAndSentenceOnesAreNot"
-            },
-            {
-              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
-              "function": "aLateCueIsAppliedOnceAndNotReplayed"
-            },
-            {
-              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
-              "function": "cancelReturnsNoFurtherMarks"
             }
           ]
         },
@@ -6565,6 +6550,41 @@
             {
               "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift",
               "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
+            }
+          ]
+        },
+        {
+          "id": "F11.speech-mark-schedule",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Marks become due at the caller's audio time. A future timestamp stays hidden until then. A mark with no start expires. Barge-in cancels. The 0.18 s per word estimate is only the fallback when real timing is missing, and it is disclosed. Does not prove a live speaker clock.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "sentenceZeroStartsAtAudioZeroSoItsMarksAreDueAndSentenceOnesAreNot"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "aLateCueIsAppliedOnceAndNotReplayed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "cancelReturnsNoFurtherMarks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "aMarkWithAFutureTimestampIsNotShownBeforeItsAudio"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "aMarkMissingItsStartExpiresWithoutBecomingDue"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "bargeInCallsCancel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "theWordEstimateIsOnlyAFallbackWhenRealTimingIsMissing"
             }
           ]
         }

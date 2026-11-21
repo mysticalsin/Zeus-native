@@ -31,6 +31,7 @@ private final class FakePresenter: TalkVisualPresenting {
     func reveal(sentence: Int, token: UUID) { log.events.append("reveal \(sentence)") }
     func answerFinished(token: UUID) { log.events.append("finished") }
     func clear() { log.events.append("clear") }
+    func cancelScheduledMarks() { log.events.append("cancelMarks") }
 }
 
 /// A provider that follows a script: wait, then stream a reply or fail. Records every request it was sent.
@@ -148,6 +149,13 @@ struct TalkVisualTurnTests {
         #expect(one.count == 1)
         #expect(one.first?.label == "screen 1")
         #expect(TalkDrawPolicy.requestShots(consent: true, shots: []).isEmpty)
+    }
+
+    @Test func bargeInCancelsScheduledMarks() {
+        let log = TurnLog()
+        let turn = controller(consent: true, log: log)
+        turn.bargeIn()
+        #expect(log.events == ["cancelMarks"])
     }
 
     @Test func theNextKeyPressClearsADrawingAndANeverDrawnTurnClearsNothing() async {
