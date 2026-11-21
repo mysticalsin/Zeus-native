@@ -1,9 +1,13 @@
 # Echo voice tooling
 
 On-device voice tooling for Zeus, written by Echo. This tree is the Haru-4B
-host path: a dependency-free Rust audio pipeline (`haru-pipe`), a
-Python / Rust / Go benchmark of that pipeline, a long-run soak harness with
-session mitigations, and the research and Mac run plan that sit beside them.
+host path: a Python / Rust / Go benchmark of the audio pipeline, a long-run
+soak harness with session mitigations, and the research and Mac run plan that
+sit beside them.
+
+The canonical `haru-pipe` crate is [`native/haru-pipe`](../../native/haru-pipe)
+on branch `zeus-bot/haru-companion`. This tree keeps the benchmark's own
+Rust sources at `pipeline-bench/rust/`.
 
 Zeus stays a native macOS app. These files live only under `tools/echo-voice/`.
 `Package.swift` does not list them, and there is no `Package.swift`, `Sources/`,
@@ -16,8 +20,8 @@ downloaded and hash-checked separately (see Licences).
 
 | Path | What it is |
 |---|---|
-| `pipeline-bench/package/haru-pipe/` | Rust crate and `haru-pipe` CLI. No dependencies and no model code. WAV I/O, int16↔float32, polyphase resample to 24 kHz, 3200-sample frames, ring and jitter buffers, and the `haru-mlx-native` socket frame format. |
-| `pipeline-bench/rust/`, `pipeline-bench/go/`, `pipeline-bench/python/` | The three pipeline implementations the benchmark times. |
+| `native/haru-pipe` | Canonical Rust crate and `haru-pipe` CLI (branch `zeus-bot/haru-companion`). No dependencies and no model code. WAV I/O, int16↔float32, polyphase resample to 24 kHz, 3200-sample frames, ring and jitter buffers, and the `haru-mlx-native` socket frame format. |
+| `pipeline-bench/rust/`, `pipeline-bench/go/`, `pipeline-bench/python/` | The three pipeline implementations the benchmark times. `pipeline-bench/rust/` builds on its own; it is the bench copy, and `native/haru-pipe` is the crate Zeus links. |
 | `pipeline-bench/scripts/`, `pipeline-bench/results/`, `pipeline-bench/REPORT.md` | Workload, parity, and aggregate scripts, plus the measured pipeline report. |
 | `bench/` | Haru-4B MLX benchmark (`haru_bench.py`) and the M5 summary. |
 | `soak/` | Long-session harness (`haru_soak.py`), persona cards, hash-locked Mac requirements, and `MAC_RUN_PLAN.md`. |
@@ -26,7 +30,7 @@ downloaded and hash-checked separately (see Licences).
 ```mermaid
 flowchart TB
   mic["Zeus microphone<br/>48 kHz float32"]
-  pipe["haru-pipe<br/>Rust client library"]
+  pipe["native/haru-pipe<br/>canonical Rust client library"]
   frames["24 kHz mono frames<br/>3200 samples, 133 ms"]
   haru["Haru-4B MLX q8<br/>Apple GPU, weights not in this tree"]
   play["Zeus speakers"]
@@ -40,9 +44,9 @@ flowchart TB
   soak -->|"optional real backend"| haru
 ```
 
-`haru-pipe` is the host contract a Zeus client can link without Python. The
-model step stays in Haru's MLX runtime. The benchmark replaces that step with
-a stand-in (`frame t+1 = clip(0.5 · user frame t)`). The soak harness can
+`native/haru-pipe` is the host contract a Zeus client can link without Python.
+The model step stays in Haru's MLX runtime. The benchmark replaces that step
+with a stand-in (`frame t+1 = clip(0.5 · user frame t)`). The soak harness can
 drive the real `DuplexSession` on a Mac, or a fake backend that injects
 loops, drift, leaks, and garbage audio.
 
@@ -125,20 +129,18 @@ selftest` exercises the harness with the fake backend only.
 
 ### Rust pipeline
 
+The crate to build is [`native/haru-pipe`](../../native/haru-pipe) on branch
+`zeus-bot/haru-companion`.
+
+The benchmark's own copy at `pipeline-bench/rust/` builds standalone:
+
 ```sh
-cd tools/echo-voice/pipeline-bench/package/haru-pipe
-cargo test
+cd tools/echo-voice/pipeline-bench/rust
 cargo build --release
 ```
 
-`cargo test` is 11 tests: 5 frame and resampler invariants, and 6 parity and
-layout tests against the synthetic `tests/fixtures/*.f32` files. Those
-fixtures are little-endian float32 sines and chirps produced by scipy. They
-are not audio files and not weights. `cargo build` writes
-`target/release/haru-pipe`, which this tree ignores.
-
-The same sources exist under `pipeline-bench/rust/` for the benchmark
-driver. The packaged crate is `pipeline-bench/package/haru-pipe`.
+`cargo build` writes `target/release/haru-pipe`, which this tree ignores.
+`scripts/run_bench.py` expects that release binary.
 
 ### Go pipeline
 
@@ -222,8 +224,9 @@ not in this tree. The pinned file, if fetched separately, is
 10,540,113,510 bytes, sha256
 `ad2c3534ef6bd88525e22e5da3ac4fb739368406bf3b1c852cbafbade647c0fa`.
 
-`haru-pipe` is Apache-2.0, declared in its `Cargo.toml`. It contains no
-model code.
+`native/haru-pipe` is Apache-2.0, declared in that crate's `Cargo.toml`.
+The benchmark copy at `pipeline-bench/rust/Cargo.toml` carries the same
+licence line. Neither copy contains model code.
 
 Notes from `research/haru-research.md`, which are part of the licence
 picture and are not a substitute for the upstream notices:
