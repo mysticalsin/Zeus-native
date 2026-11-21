@@ -480,7 +480,8 @@ class VoiceLatencyLint(unittest.TestCase):
         init = text[text.index("init("):text.index("private func armAhead")]
         for forbidden in ("prewarm", "BrainLaunchWarm", "ClaudeFlags.warm", "warmSelectedVoice"):
             self.assertNotIn(forbidden, init, f"{forbidden} runs at launch")
-        press = text[text.index("func press()"):text.index("func release()")]
+        # Talk shortcut added the cue flag; press must still warm on key-down and abort a busy turn.
+        press = text[text.index("func press(builtinCue: Bool = true) -> Bool"):text.index("func release(builtinCue: Bool = true)")]
         self.assertIn("KeyDownWarmer.talkKeyDown()", press)
         self.assertIn("abortBusy()", press)
 
@@ -571,7 +572,8 @@ class Pass3VoiceTurnWiring(unittest.TestCase):
         self.assertNotRegex(self.TEXT, r"turnRunning\s*=\s*(true|false)")
 
     def test_press_stops_the_hands_free_timer(self):
-        body = pass3_function_body(self.TEXT, "func press() -> Bool")
+        # Talk shortcut added the cue flag; press must still cancel the hands-free timer.
+        body = pass3_function_body(self.TEXT, "func press(builtinCue: Bool = true) -> Bool")
         self.assertIn("handsFreeTask?.cancel()", body)
         self.assertIn("turnRun.invalidate()", body)
 
@@ -1624,6 +1626,31 @@ class ButtonDefaultActionLint(unittest.TestCase):
         # A plain read-only element is not a button.
         label = "VStack {\n    Text(\"x\")\n}\n.accessibilityElement(children: .ignore)\n.accessibilityLabel(\"x\")\n"
         self.assertFalse(button_without_default_action(label))
+
+
+class ZeusActivationTests(unittest.TestCase):
+    def test_shipped_plist_is_an_agent_app(self):
+        import plistlib
+        info = plistlib.loads((ROOT / "Resources/Info.plist").read_bytes())
+        self.assertIs(info.get("LSUIElement"), True)
+
+    def test_main_and_the_guide_test_use_the_shared_activation_function(self):
+        main = (ROOT / "Sources/Zeus/App/main.swift").read_text()
+        launch = main[main.index("let delegate = AppDelegate"):]
+        self.assertIn("ZeusActivation.configure(app)", launch)
+        self.assertNotIn("setActivationPolicy(.accessory)", launch)
+        source = (ROOT / "Sources/Zeus/App/ZeusActivation.swift").read_text()
+        self.assertIn("static func configure(_ app: NSApplication)", source)
+        self.assertIn("setActivationPolicy(.accessory)", source)
+        guide = (ROOT / "Tests/ZeusAppTests/PermissionSweepGuideTests.swift").read_text()
+        self.assertIn("ZeusActivation.configure(application)", guide)
+        self.assertNotIn(".accessory", guide)
+        self.assertLess(guide.index("let wasActive = application.isActive"),
+                        guide.index("ZeusActivation.configure(application)"))
+        self.assertLess(guide.index("ZeusActivation.configure(application)"),
+                        guide.index("let afterSetup = application.isActive"))
+        self.assertIn("application.isActive == wasActive", guide)
+        self.assertIn("application.isActive == afterSetup", guide)
 
 
 if __name__ == "__main__":

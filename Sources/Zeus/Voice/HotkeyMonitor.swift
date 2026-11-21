@@ -61,7 +61,7 @@ enum KeyListenAccess {
 /// invisible to them). Pure so the message and startup check are unit-testable.
 enum KeyAccessNotice {
     static func cue(granted: Bool) -> (text: String, pane: String)? {
-        granted ? nil : ("Hold-to-talk and dictation need Accessibility or Input Monitoring.", "Privacy_Accessibility")
+        granted ? nil : ("Hold Control + Option to talk. That needs Accessibility or Input Monitoring.", "Privacy_Accessibility")
     }
 }
 
@@ -77,6 +77,15 @@ final class HotkeyMonitor {
     /// start) tells the machine the turn never opened, so no release or cancel follows.
     var onPress: (() -> Bool)?
     var onRelease: (() -> Void)?
+    /// Control+Option hold, after the debounce. Separate from `onPress` so other shortcuts keep their path.
+    var onTalkBegin: (() -> Void)?
+    var onTalkEnd: (() -> Void)?
+    /// A solo right Command tap. Returns whether listening actually started. Nil leaves the tap inert,
+    /// so the dictation monitor does not also toggle.
+    var onRightCommandStart: (() -> Bool)?
+    /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
+    var onListenAccessMissing: (() -> Void)?
+    var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
     /// A turn the key ended without sending it: a shortcut or a larger chord took the press over.
@@ -125,6 +134,12 @@ final class HotkeyMonitor {
     private var launcherSpaceSeen = false
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
     private var ownerTurn = 0
+
+    private var rightCommand = RightCommandTap()
+    private var rightCommandDown = false
+    private var rightCommandHoldOwned = false
+    /// The keys the right Command tap saw, applied before the talk machine handles the same event.
+    private var rightCommandState = ShortcutState()
 
     /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
     /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
@@ -194,6 +209,8 @@ final class HotkeyMonitor {
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
         let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
+        rightCommandState.apply(event)
+        driveRightCommand(event, at: at)
         // The talk chord's Space may be held by Carbon, which hides its key-down from the monitors. On a flags event the
         // system is asked about it, and the machine hears the key-down it missed, on the flags it had before this event, so
         // a Space that came before the set spoils the hold and a Space that joined the set does not. It is read at the time
@@ -253,6 +270,61 @@ final class HotkeyMonitor {
         send(.tick(at: now(), live: liveModifiers()))
     }
 
+    /// A solo right Command tap toggles listening. It runs beside the talk machine and does not replace it.
+    /// While a talk turn is open the tap is discarded.
+    private func driveRightCommand(_ event: ShortcutEvent, at now: TimeInterval) {
+        guard onRightCommandStart != nil else { return }
+        let owns = pair.owner != nil
+        if owns, !rightCommandHoldOwned {
+            _ = rightCommand.holdOwnsKeyboard()
+        } else if !owns, rightCommandHoldOwned {
+            rightCommand.holdReleasedKeyboard()
+        }
+        rightCommandHoldOwned = owns
+        let keys = rightCommandState
+        switch event {
+        case .flags(let code, _):
+            if code != RightCommandTap.rightKeyCode, rightCommandDown, keys.deviceKeys.contains(code) {
+                _ = rightCommand.otherKey()
+            }
+            if code == RightCommandTap.leftKeyCode {
+                if keys.deviceKeys.contains(code) { _ = rightCommand.leftDown(at: now) }
+                else { _ = rightCommand.leftUp(at: now) }
+                return
+            }
+            guard code == RightCommandTap.rightKeyCode else { return }
+            let down = keys.deviceKeys.contains(code)
+            if down, !rightCommandDown {
+                rightCommandDown = true
+                let other = !keys.keysDown.isEmpty || !keys.modifiers.subtracting(.command).isEmpty
+                _ = rightCommand.rightDown(at: now, otherKeyDown: other)
+            } else if !down, rightCommandDown {
+                rightCommandDown = false
+                applyRightCommand(rightCommand.rightUp(at: now))
+            }
+        case .keyDown:
+            _ = rightCommand.otherKey()
+        case .keyUp:
+            break
+        }
+    }
+
+    private func applyRightCommand(_ signals: [RightCommandTap.Signal]) {
+        for signal in signals {
+            switch signal {
+            case .toggle(let listening, _):
+                if listening {
+                    cues?.playStart()
+                    let started = onRightCommandStart?() ?? false
+                    if !started { rightCommand.noteStartRejected() }
+                } else {
+                    onRelease?()
+                    cues?.playEnd()
+                }
+            }
+        }
+    }
+
     // MARK: Effects
 
     private var config: VoiceKeyMachine.Config {
@@ -298,6 +370,11 @@ final class HotkeyMonitor {
                 ownerTurn = turn
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
+                if role == .talk {
+                    rightCommand.noteSession(listening: true)
+                    cues?.preload()
+                    cues?.playStart()
+                }
                 if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
                 // A launcher or another app may hold Option-Space (Carbon cannot see it): a Space the system reports down at the release
@@ -309,10 +386,18 @@ final class HotkeyMonitor {
                 } else {
                     onRelease?()
                 }
+                if role == .talk {
+                    rightCommand.noteSession(listening: false)
+                    cues?.playEnd()
+                }
             case .cancel:
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut (\(heard.key?.title ?? "none")) became another shortcut: cancelled, nothing sent")
                 onCancel?()
+                if role == .talk {
+                    rightCommand.noteSession(listening: false)
+                    cues?.playEnd()
+                }
             case .refused:
                 onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
             case .wake(let after):
