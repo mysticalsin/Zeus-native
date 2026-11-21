@@ -1,0 +1,124 @@
+{
+  "python": {
+    "runs": 7,
+    "e2e_runs": 7,
+    "file_wall_s": 0.923856906,
+    "file_rtf": 0.00153976151,
+    "file_frame_p50_ms": 0.008475,
+    "file_frame_p95_ms": 0.012568200000000002,
+    "file_read_resample_ms_per_120s": {
+      "user_16k_mono.wav": 87.857119,
+      "user_44k1_mono.wav": 107.229204,
+      "user_48k_mono.wav": 102.501967,
+      "user_48k_stereo.wav": 216.410557,
+      "user_24k_mono.wav": 32.914811
+    },
+    "stream_wall_s": 0.594822143,
+    "stream_rtf": 0.0009913702383333334,
+    "stream_frame_p50_ms": 0.124581,
+    "stream_frame_p95_ms": 0.160699,
+    "stream_frame_p99_ms": 0.20319980000000004,
+    "total_rtf": 0.0012699714708333334,
+    "cpu_s": 3.9,
+    "peak_rss_mb": 431.41015625,
+    "e2e_first_audio_p50_ms": 86.9787875,
+    "e2e_first_audio_p95_ms": 87.05033734999999,
+    "e2e_overhead_p50_ms": 0.42878749999999854,
+    "cold_first_audio_ms": 202.75959200807847,
+    "cold_first_audio_min_max_ms": [
+      181.22054301784374,
+      241.13078298978508
+    ],
+    "e2e_peak_rss_mb": 38.5625,
+    "lazy_import_ms": 663.864423,
+    "stream_frame_pct_of_mac_frame": 0.15416532607350575
+  },
+  "rust": {
+    "runs": 7,
+    "e2e_runs": 7,
+    "file_wall_s": 0.540161002,
+    "file_rtf": 0.0009002683366666666,
+    "file_frame_p50_ms": 0.002947,
+    "file_frame_p95_ms": 0.006933,
+    "file_read_resample_ms_per_120s": {
+      "user_16k_mono.wav": 45.244386,
+      "user_44k1_mono.wav": 76.576568,
+      "user_48k_mono.wav": 83.338335,
+      "user_48k_stereo.wav": 91.349445,
+      "user_24k_mono.wav": 7.718859
+    },
+    "stream_wall_s": 0.085630379,
+    "stream_rtf": 0.00014271729833333335,
+    "stream_frame_p50_ms": 0.018127499999999998,
+    "stream_frame_p95_ms": 0.02150425,
+    "stream_frame_p99_ms": 0.026565300000000003,
+    "total_rtf": 0.0005214928175,
+    "cpu_s": 0.71,
+    "peak_rss_mb": 222.609375,
+    "e2e_first_audio_p50_ms": 86.5926555,
+    "e2e_first_audio_p95_ms": 86.61673805,
+    "e2e_overhead_p50_ms": 0.04265550000000928,
+    "cold_first_audio_ms": 89.97399802319705,
+    "cold_first_audio_min_max_ms": [
+      89.29166599409655,
+      91.53954399516806
+    ],
+    "e2e_peak_rss_mb": 5.48046875,
+    "lazy_import_ms": 0.0,
+    "stream_frame_pct_of_mac_frame": 0.0224322484840985,
+    "speedup_vs_python": {
+      "file_wall": 1.7103361823221739,
+      "stream_wall": 6.946391572084481,
+      "stream_frame_p50": 6.872486553578818,
+      "cpu": 5.492957746478873
+    },
+    "box_saving_per_frame_ms": 0.1064535,
+    "box_saving_pct_of_mac_frame": 0.13173307758940725,
+    "mac_projected_saving_upper_bound_ms": 0.04,
+    "mac_projected_saving_upper_bound_pct": 0.04949882440292043
+  },
+  "go": {
+    "runs": 7,
+    "e2e_runs": 7,
+    "file_wall_s": 0.679600858,
+    "file_rtf": 0.0011326680966666667,
+    "file_frame_p50_ms": 0.00495,
+    "file_frame_p95_ms": 0.0089993,
+    "file_read_resample_ms_per_120s": {
+      "user_16k_mono.wav": 71.249469,
+      "user_44k1_mono.wav": 104.148967,
+      "user_48k_mono.wav": 103.332265,
+      "user_48k_stereo.wav": 137.348389,
+      "user_24k_mono.wav": 11.90039
+    },
+    "stream_wall_s": 0.172305194,
+    "stream_rtf": 0.00028717532333333333,
+    "stream_frame_p50_ms": 0.035847,
+    "stream_frame_p95_ms": 0.044256149999999994,
+    "stream_frame_p99_ms": 0.05077862000000001,
+    "total_rtf": 0.0007074069041666667,
+    "cpu_s": 0.99,
+    "peak_rss_mb": 291.1484375,
+    "e2e_first_audio_p50_ms": 86.6083715,
+    "e2e_first_audio_p95_ms": 86.63264775,
+    "e2e_overhead_p50_ms": 0.058371500000006904,
+    "cold_first_audio_ms": 91.17448100005277,
+    "cold_first_audio_min_max_ms": [
+      90.39822698105127,
+      97.86886899382807
+    ],
+    "e2e_peak_rss_mb": 6.73046875,
+    "lazy_import_ms": 0.0,
+    "stream_frame_pct_of_mac_frame": 0.044359608959287214,
+    "speedup_vs_python": {
+      "file_wall": 1.3594110353521656,
+      "stream_wall": 3.4521428471854425,
+      "stream_frame_p50": 3.475353586074149,
+      "cpu": 3.9393939393939394
+    },
+    "box_saving_per_frame_ms": 0.08873400000000001,
+    "box_saving_pct_of_mac_frame": 0.10980571711421853,
+    "mac_projected_saving_upper_bound_ms": 0.04,
+    "mac_projected_saving_upper_bound_pct": 0.04949882440292043
+  }
+}

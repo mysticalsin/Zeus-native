@@ -1,0 +1,9 @@
+# Build outputs, local environments, and generated audio.
+# Model weights are never committed.
+target/
+dist/
+__pycache__/
+*.wav
+venv/
+.venv/
+pipeline-bench/go/haru-pipe

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "note": "Invented content only. No real people, brands or places beyond generic city names. Used as the USER side of a conversation (Haru is speech-to-speech): each text is synthesised locally with a built-in macOS system voice and fed to the model as user audio.",
+  "fr": [
+    {"id": "fr-s1", "length": "short", "text": "Le café est encore chaud."},
+    {"id": "fr-s2", "length": "short", "text": "On se voit demain matin ?"},
+    {"id": "fr-s3", "length": "short", "text": "J'ai perdu mon parapluie bleu."},
+    {"id": "fr-m1", "length": "medium", "text": "Hier soir, la bibliothèque du quartier a prolongé ses horaires, alors j'en ai profité pour finir mon roman policier avant la fermeture."},
+    {"id": "fr-m2", "length": "medium", "text": "Est-ce que tu pourrais m'expliquer comment régler le thermostat, parce que la cuisine reste glaciale même quand le chauffage tourne depuis des heures ?"},
+    {"id": "fr-m3", "length": "medium", "text": "Le train de dix-sept heures a été remplacé par un car, et personne n'a vraiment su nous dire combien de temps durerait le trajet."},
+    {"id": "fr-m4", "length": "medium", "text": "Ma voisine cultive des tomates sur son balcon et prétend que la musique classique les fait pousser deux fois plus vite que d'habitude."},
+    {"id": "fr-l1", "length": "long", "text": "Samedi dernier, nous sommes partis marcher le long de la rivière avec un pique-nique improvisé, mais le ciel s'est couvert vers midi et une averse soudaine nous a obligés à nous abriter sous un vieux pont de pierre, où nous avons fini par partager nos sandwichs avec deux cyclistes trempés qui cherchaient eux aussi un peu de répit avant de reprendre la route vers le village voisin."},
+    {"id": "fr-l2", "length": "long", "text": "Pour préparer la réunion de lundi, j'aimerais que chacun relise le compte rendu de la semaine passée, note les trois points qui lui semblent encore flous et propose au moins une solution concrète, même modeste, afin que nous puissions avancer sans répéter les mêmes discussions et terminer à l'heure, puisque la salle est réservée par une autre équipe juste après nous."},
+    {"id": "fr-l3", "length": "long", "text": "Quand j'étais petit, mon grand-père inventait chaque soir une histoire différente à propos d'un renard qui collectionnait les boutons perdus, et je me souviens encore de l'épisode où le renard échangeait toute sa collection contre une lanterne capable d'éclairer les rêves des enfants qui avaient peur du noir pendant les longues nuits d'hiver."}
+  ],
+  "en": [
+    {"id": "en-s1", "length": "short", "text": "The kettle just clicked off."},
+    {"id": "en-s2", "length": "short", "text": "Can we start a bit later?"},
+    {"id": "en-s3", "length": "short", "text": "My bike tire is flat again."},
+    {"id": "en-m1", "length": "medium", "text": "I finally repainted the hallway this weekend, but the color looks much greener in daylight than it did on the little sample card."},
+    {"id": "en-m2", "length": "medium", "text": "Could you walk me through how the new parking permits work, because the letter mentions zones and I honestly cannot tell which one we are in?"},
+    {"id": "en-m3", "length": "medium", "text": "The bakery on the corner now opens at six, so I picked up warm bread on my way to the station and still caught the early train."},
+    {"id": "en-m4", "length": "medium", "text": "My cousin claims his cat can open the fridge by itself, and after last night I am starting to think he might be telling the truth."},
+    {"id": "en-l1", "length": "long", "text": "Last spring we tried to plant a small vegetable garden behind the house, and although the carrots came up crooked and the lettuce was eaten by something we never managed to identify, the pumpkins grew so large that by October we had to borrow a wheelbarrow from the neighbors just to move them onto the porch for the harvest festival."},
+    {"id": "en-l2", "length": "long", "text": "Before we decide on the venue for the reunion, I would like everyone to check their calendars for the second and third weekends of June, think about how far they are willing to travel, and let me know whether a quiet lakeside cabin or a lively place in town would suit them better, so that we can book something before prices go up."},
+    {"id": "en-l3", "length": "long", "text": "When the power went out during the storm, the whole street gathered in the old community hall with candles and board games, and an elderly man none of us had met before turned out to be a wonderful storyteller who kept the children laughing for hours with tales about a lighthouse keeper and a very stubborn seagull."}
+  ]
+}
