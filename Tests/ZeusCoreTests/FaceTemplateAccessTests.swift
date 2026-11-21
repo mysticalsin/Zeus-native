@@ -191,6 +191,61 @@ struct FaceTemplateAccessTests {
         #expect(FaceTemplateCopy.enroll.contains("device passcode"))
         #expect(FaceTemplateCopy.reenrol.contains("Enroll"))
     }
+
+    @Test func saveAddsANewTemplateWithoutDeletingFirst() {
+        let items = ScriptedFaceTemplateItems()
+        let record = FaceTemplateRecord(account: "face.presence.templates",
+                                        protection: .biometryCurrentSetOrDevicePasscode, payload: secret)
+        #expect(FaceTemplateSecureSession.write(record, items: items) == .success(()))
+        #expect(items.operations == ["add"])
+        #expect(items.payload(account: record.account) == secret)
+    }
+
+    @Test func failedReplaceKeepsTheStoredTemplate() {
+        let items = ScriptedFaceTemplateItems()
+        let record = FaceTemplateRecord(account: "face.presence.templates",
+                                        protection: .biometryCurrentSetOrDevicePasscode, payload: secret)
+        #expect(FaceTemplateSecureSession.write(record, items: items) == .success(()))
+        items.failReplace = .unavailable
+        let next = FaceTemplateRecord(account: record.account, protection: record.protection, payload: Data("other-template".utf8))
+        #expect(FaceTemplateSecureSession.write(next, items: items) == .failure(.unavailable))
+        #expect(items.payload(account: record.account) == secret)
+        #expect(items.operations == ["add", "replace"])
+    }
+
+    @Test func readPresentsTheItemsAccessControl() {
+        let items = ScriptedFaceTemplateItems()
+        let record = FaceTemplateRecord(account: "face.presence.templates",
+                                        protection: .biometryCurrentSetOrDevicePasscode, payload: secret)
+        #expect(FaceTemplateSecureSession.write(record, items: items) == .success(()))
+        #expect(FaceTemplateSecureSession.read(account: record.account, requiring: record.protection, items: items) == .success(secret))
+        #expect(items.lastAuthentication?.presentsAccessControl == true)
+        #expect(items.lastAuthentication?.protection == .biometryCurrentSetOrDevicePasscode)
+        #expect(items.lastAuthentication?.operationPrompt == "Authenticate with Touch ID or the device passcode to read the face template.")
+    }
+
+    @Test func unprotectedTemplateIsNotReturned() {
+        let items = ScriptedFaceTemplateItems()
+        items.plantUnprotected(account: "face.presence.templates", payload: secret)
+        #expect(FaceTemplateSecureSession.read(account: "face.presence.templates",
+                                               requiring: .biometryCurrentSetOrDevicePasscode,
+                                               items: items) == .failure(.unavailable))
+        #expect(items.payload(account: "face.presence.templates") == secret)
+    }
+
+    @Test func promptsMatchUserPresenceOrBiometryCurrentSetAndDevicePasscode() {
+        let user = FaceTemplateSecureSession.authentication(for: .userPresence)
+        let biometry = FaceTemplateSecureSession.authentication(for: .biometryCurrentSetOrDevicePasscode)
+        #expect(user.protection == .userPresence)
+        #expect(user.presentsAccessControl)
+        #expect(user.operationPrompt == "Authenticate to read the face template.")
+        #expect(FaceTemplateAccessControl.flags(for: .userPresence) == ["WhenUnlockedThisDeviceOnly", "userPresence"])
+        #expect(biometry.protection == .biometryCurrentSetOrDevicePasscode)
+        #expect(biometry.presentsAccessControl)
+        #expect(biometry.operationPrompt == "Authenticate with Touch ID or the device passcode to read the face template.")
+        #expect(FaceTemplateAccessControl.flags(for: .biometryCurrentSetOrDevicePasscode)
+            == ["WhenUnlockedThisDeviceOnly", "biometryCurrentSet", "devicePasscode"])
+    }
 }
 
 private final class LockedLines: @unchecked Sendable {
@@ -207,5 +262,76 @@ private final class LockedData: @unchecked Sendable {
     var value: Data? {
         get { lock.lock(); defer { lock.unlock() }; return stored }
         set { lock.lock(); stored = newValue; lock.unlock() }
+    }
+}
+
+/// Records secure-item calls. A read that does not present access control returns the bytes,
+/// which is the system read this suite is replacing.
+private final class ScriptedFaceTemplateItems: FaceTemplateSecureItems, @unchecked Sendable {
+    private let lock = NSLock()
+    private var records: [String: FaceTemplateRecord] = [:]
+    private var unprotected: [String: Data] = [:]
+    var failReplace: FaceTemplateFailure?
+    private(set) var operations: [String] = []
+    private(set) var lastAuthentication: FaceTemplateAuthentication?
+
+    func plantUnprotected(account: String, payload: Data) {
+        lock.lock(); defer { lock.unlock() }
+        unprotected[account] = payload
+        records[account] = nil
+    }
+
+    func payload(account: String) -> Data? {
+        lock.lock(); defer { lock.unlock() }
+        return records[account]?.payload ?? unprotected[account]
+    }
+
+    func probe(account: String) -> FaceTemplateProbe {
+        lock.lock(); defer { lock.unlock() }
+        if let data = unprotected[account] { return .unprotected(data) }
+        if records[account] != nil { return .protected }
+        return .missing
+    }
+
+    func add(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        operations.append("add")
+        lastAuthentication = authentication
+        if records[record.account] != nil || unprotected[record.account] != nil { return .failure(.unavailable) }
+        records[record.account] = record
+        return .success(())
+    }
+
+    func replace(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        operations.append("replace")
+        lastAuthentication = authentication
+        guard records[record.account] != nil || unprotected[record.account] != nil else { return .failure(.missing) }
+        if let failReplace { return .failure(failReplace) }
+        records[record.account] = record
+        unprotected[record.account] = nil
+        return .success(())
+    }
+
+    func read(account: String, authentication: FaceTemplateAuthentication) -> Result<Data, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        lastAuthentication = authentication
+        if !authentication.presentsAccessControl || authentication.operationPrompt.isEmpty {
+            if let record = records[account] { return .success(record.payload) }
+            if let data = unprotected[account] { return .success(data) }
+            return .failure(.missing)
+        }
+        if unprotected[account] != nil { return .failure(.unavailable) }
+        guard let record = records[account] else { return .failure(.missing) }
+        guard record.protection == authentication.protection else { return .failure(.unavailable) }
+        return .success(record.payload)
+    }
+
+    func delete(account: String) -> Result<Void, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        operations.append("delete")
+        records[account] = nil
+        unprotected[account] = nil
+        return .success(())
     }
 }

@@ -230,3 +230,54 @@ public final class MemoryFaceTemplateKeychain: FaceTemplateKeychain, @unchecked 
         return items[account]?.protection
     }
 }
+
+/// What a read or save must present so the item's `SecAccessControl` is evaluated.
+/// `presentsAccessControl` is true only for an `LAContext` (`kSecUseAuthenticationContext`) or
+/// `kSecUseOperationPrompt` path. An empty prompt does not count.
+public struct FaceTemplateAuthentication: Equatable, Sendable {
+    public var protection: FaceTemplateProtection
+    public var operationPrompt: String
+    public var presentsAccessControl: Bool
+
+    public init(protection: FaceTemplateProtection, operationPrompt: String, presentsAccessControl: Bool) {
+        self.protection = protection
+        self.operationPrompt = operationPrompt
+        self.presentsAccessControl = presentsAccessControl
+    }
+}
+
+/// A UI-fail probe. Unprotected bytes must be discarded by the caller.
+public enum FaceTemplateProbe: Equatable, Sendable {
+    case missing
+    case unprotected(Data)
+    case protected
+}
+
+/// The secure-item operations behind `SystemFaceTemplateKeychain`. Tests use a fake.
+public protocol FaceTemplateSecureItems: Sendable {
+    func probe(account: String) -> FaceTemplateProbe
+    func add(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure>
+    func replace(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure>
+    func read(account: String, authentication: FaceTemplateAuthentication) -> Result<Data, FaceTemplateFailure>
+    func delete(account: String) -> Result<Void, FaceTemplateFailure>
+}
+
+/// Save and read sequencing for a face template. This copy still matches the system keychain:
+/// delete, then add, and a read that does not present the access control.
+public enum FaceTemplateSecureSession {
+    public static func authentication(for protection: FaceTemplateProtection) -> FaceTemplateAuthentication {
+        FaceTemplateAuthentication(protection: protection, operationPrompt: "", presentsAccessControl: false)
+    }
+
+    public static func write(_ record: FaceTemplateRecord, items: any FaceTemplateSecureItems) -> Result<Void, FaceTemplateFailure> {
+        let authentication = authentication(for: record.protection)
+        _ = items.delete(account: record.account)
+        return items.add(record, authentication: authentication)
+    }
+
+    public static func read(account: String, requiring protection: FaceTemplateProtection, items: any FaceTemplateSecureItems) -> Result<Data, FaceTemplateFailure> {
+        _ = protection
+        let authentication = FaceTemplateAuthentication(protection: protection, operationPrompt: "", presentsAccessControl: false)
+        return items.read(account: account, authentication: authentication)
+    }
+}
