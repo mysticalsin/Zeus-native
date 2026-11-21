@@ -71,7 +71,7 @@ extra (it is one face of several and enrolling again takes seconds).
 ## Source adapted
 
 Glance, https://github.com/jonnyoo/glance, commit `b97f521397ec1197ba17768ba797cae1e628848d`, MIT License, Copyright
-(c) 2026 Jonathan Zhou. The local copy at `~/AI-Brain-build/glance-src-dl/glance` is an untrusted download: read as
+(c) 2026 Jonathan Zhou. The local copy at `<models-dir>/glance-src-dl/glance` is an untrusted download: read as
 data, never built, no script run. Every adapted file starts with one line:
 `// Adapted from Glance (MIT, Copyright (c) 2026 Jonathan Zhou): <glance file names>.`
 
@@ -185,7 +185,7 @@ test and are tuned only by owner check 3. Fewer than 10 samples in 30 s saves no
 
 Every ticket: tests first, shown failing on the base (the build fails on the missing names); then the code; the
 adapted-file header line; its REG rows appended to `qa/regressions.json` with feature `F14`; a separate review.
-Builders run `swift build --build-tests` and `swift test --filter <suites>` on a Mac. No test opens a camera, touches
+`<suites>` is `the Swift Testing suite names for this plan`. Builders run `swift build --build-tests` and `swift test --filter "<suites>"` on a Mac. No test opens a camera, touches
 TCC, the real Keychain or the network.
 
 ### FP-1. Event-free lock call, lint, notices, feature row

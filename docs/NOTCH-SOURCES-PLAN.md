@@ -37,7 +37,7 @@ Build order: A1, then A4, then A3, one at a time. A2 is deferred and is not in t
 Only A1 edits routing in the hub; A3 and A4 call it. Every branch appends to `qa/regressions.json` (ids for this plan
 come only from REG-450 to REG-469: A1 takes 450 to 455, A4 456 to 459, A3 460 to 467, and 468 and 469 are held for
 A2 while it is deferred; REG-410 to REG-449 are held by other work and are never used here; with fixed blocks no clash
-is expected, and if `~/AI-Brain-build/zeus-merge-reg.py` does rename an id it numbers from the top of the tree and can
+is expected, and if `<models-dir>/zeus-merge-reg.py` does rename an id it numbers from the top of the tree and can
 land in another plan's block, so the id is put back inside this plan's block by hand; feature `F13`, as in
 `qa/extension-regressions.json`) and the generated settings files (re-run the generator on the merged table; never
 hand-merge `SettingsCatalog.swift` or the inventory).
@@ -440,7 +440,7 @@ Rows go in `scripts/gen-settings-catalog.py`; regenerate, never hand-edit; `scri
 4. The whole `ZeusCoreTests` module on the branch and the base, compared, with the known failures in "Native host
    process boundaries" counted again on the base first (4 at `47566d1`; the fixture changed in `9f2ffe4`). The
    settings generator and its check; `python3 -m unittest discover -s qa/closed-loop/tests`.
-5. `./tools/check.sh` development mode, from a worktree under `~/AI-Brain-build`. An independent review of each diff.
+5. `./tools/check.sh` development mode, from a worktree under `<models-dir>`. An independent review of each diff.
 6. Still owed on a real Mac: A2 step zero (deferred with A2); Music and Spotify in turn, both pins; Spotify shuffle
    and repeat set by script and read back; dictation pausing a tab and resuming that tab, never Music; the ISOLATED
    metadata spike; play, pause, seek on a tab; a reload then a tap changing nothing; a video call tab never shown or

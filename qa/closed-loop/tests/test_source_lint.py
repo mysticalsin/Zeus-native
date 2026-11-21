@@ -437,7 +437,7 @@ class LayaRemovedLint(unittest.TestCase):
         self.assertTrue(laya_offenders("// Laya answers on this Mac"))
         self.assertTrue(laya_offenders('exec("laya-serve")'))
         self.assertFalse(laya_offenders("let playback = overlayAnimation"))
-        self.assertFalse(laya_offenders('path("AI-Brain-build/jarvis-laya-backend/models")'))
+        self.assertFalse(laya_offenders('path("<models-dir>/jarvis-laya-backend/models")'))
 
 
 # "Talk to Zeus" latency (owner run of build 0405391: four engines tried one after another, 85 s of silence).

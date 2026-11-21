@@ -5,7 +5,7 @@
 #   bash scripts/human-qa.sh <path/to/Zeus.app> [--screenshots] [--only <journey>] [--allow-mic] [--yes]
 #
 # Journeys: launch topbar settings record scribe alerts talk (quit and the restart check run only on a full run).
-# Evidence: ~/AI-Brain-build/zeus-human-qa/<timestamp>/ (report.md, receipt.json, logs, freeze samples).
+# Evidence: $BASE/<timestamp>/ (report.md, receipt.json, logs, freeze samples). $BASE is assigned below.
 # It never requests a permission, never uses the microphone without --allow-mic, never starts a recording
 # (the Record countdown is cancelled with Esc) and refuses to run in CI. See docs/HUMAN-QA.md.
 set -euo pipefail

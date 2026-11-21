@@ -62,12 +62,11 @@ each real SwiftUI button with `AXPress`. It fails, never skips, when `AXIsProces
 
 The runner prints pass or fail by validating the Swift Testing event stream: every started test needs a
 terminal event and the run must end with zero issues. A zero exit status alone is not a pass. A receipt
-goes to `$HOME/AI-Brain-build/zeus-trusted-ax/run-<time>-<sha>/receipt.json` with the sha, timestamp, result
+goes to `"$HOME/AI-Brain-build/zeus-trusted-ax/run-STAMP-SHA/receipt.json"` with the sha, timestamp, result
 and test ids. It refuses to run off macOS or when `GITHUB_ACTIONS` is set.
 
 To satisfy the check in a full run, take the receipt on a clean checkout of the exact commit under test and pass
-it in: `python3 qa/closed-loop/run.py --mode full --output NEW --trusted-receipt
-~/AI-Brain-build/zeus-trusted-ax/run-<time>-<sha>/receipt.json`. The runner accepts it only when
+it in: `python3 qa/closed-loop/run.py --mode full --output NEW --trusted-receipt "$HOME/AI-Brain-build/zeus-trusted-ax/run-STAMP-SHA/receipt.json"`. STAMP is the UTC time and SHA is the short commit in that directory name. The runner accepts it only when
 `schema_version` is 1, `result` is `passed`, `sha` equals the tested HEAD, `dirty` is false, `exit_code` is 0,
 `problems` is empty, `test_ids` contains `realButtonsDriveStartKeepStopFailedSaveRetryAndClose` under
 `ZeusAppTests.ScribeTrustedAccessibilityJourneyTests/`, the `events.jsonl` next to the receipt re-validates

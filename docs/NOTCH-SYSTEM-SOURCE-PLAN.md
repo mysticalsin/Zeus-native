@@ -47,7 +47,7 @@ No file appears in two tickets of this plan, except the two append-only register
 suites need no row, because that module is bound whole (`qa/feature-map.json:398-402`). P1f shares
 `SettingsStore.swift`, `GlanceSettingsPages.swift` and the generator with A3; whichever merges second rebases. This
 plan reserves REG-470 to REG-489: P1a 470 to 472, P1b 473 to 478, P1c 479 and 480, P1d 481 to 483, P1e 484 to 487,
-P1f 488 and 489. Clashes go through `~/AI-Brain-build/zeus-merge-reg.py`. The highest id in the tree today is REG-409.
+P1f 488 and 489. Clashes go through `<models-dir>/zeus-merge-reg.py`. The highest id in the tree today is REG-409.
 
 ## Open source checked first
 
@@ -543,7 +543,7 @@ These are inputs and trade-offs, not verdicts. The writer is not a lawyer; licen
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared (known failures recounted after the
    earlier waves merge). `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`.
    `python3 qa/release-scripts/test_release_scripts.py` (P1d). The settings generator and its check.
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 4. A real compile on a Mac before any ticket is called done. An independent review of each diff, reading the
    reducer transitions, the launch arguments, the preflight and the helper's symbol table line by line.
 5. Still owed on a real Mac, by the owner, in a release-signed build. P1b closes none alone: its rules are seen
@@ -563,7 +563,7 @@ These are inputs and trade-offs, not verdicts. The writer is not a lawyer; licen
 | Force quit Zeus: the helper is gone within a second. Kill the helper: the item returns after the back-off. A command for an app that just lost the election is refused | P1c |
 | VoiceOver on the status row (the switch reads its status; "Check again" is its own element) and on the notch source line. Reduce Motion on. A shared screen with the default capture setting shows no title. An imported settings file cannot turn the switch on. Diagnostics copied while another app plays say "Another app" | P1f |
 | A build with the library removed, and one with an ad hoc library: "Unavailable", nothing shown, no child. `codesign -dv --verbose=2` on the library inside the built app: same team, hardened runtime, time stamp. On each older Mac of step zero item 10: the status word, the child's image path, the helper leaving with Zeus | P1d |
-| `PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh` with the switch on and nothing playing, run once for Zeus and once for the interpreter child; the two CPU figures and the two memory figures, added, stay inside the budget. Repeated in polling mode if step zero item 4 requires it | P1e |
+| `<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh` with the switch on and nothing playing, run once for Zeus and once for the interpreter child; the two CPU figures and the two memory figures, added, stay inside the budget. Repeated in polling mode if step zero item 4 requires it | P1e |
 
 ## Review notes
 

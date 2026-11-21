@@ -75,8 +75,8 @@ Tickets that run in parallel own no file in common, with one exception: O3 and O
 `qa/feature-map.json`, so O3 merges first and O4 rebases its entry (as equaliser B2b and B4 do). Step zero (below)
 comes before O5 and O6 are scheduled. O2 and O5 both append to `docs/STATE-MACHINES.md`: O2 merges first. Every
 branch appends to `qa/regressions.json` from the block REG-540 to REG-559 (clashes go through
-`~/AI-Brain-build/zeus-merge-reg.py`). Branch names `codex/output-<ticket>-YYYYMMDD`; builds in
-`~/AI-Brain-build/<name>-build`, never inside OneDrive.
+`<models-dir>/zeus-merge-reg.py`). Branch names `codex/output-<ticket>-YYYYMMDD`; builds in
+`<models-dir>/<name>-build`, never inside OneDrive.
 
 Overlap with waves in flight. Whichever branch merges second rebases, then repeats its Mac build.
 
@@ -472,7 +472,7 @@ appears on the first open of the part and at no other moment (launch, setting on
 onboarding); its wording; the order of browser states while the alert is up, written down; Allow shows names with no
 second press; Don't Allow shows "No access" and the button opens the right pane; allowing later in System Settings
 shows names; no computer and no output already listed appears; no browse runs after the list closes or the Mac
-sleeps (Console shows the browser cancelled); idle CPU (`PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh`).
+sleeps (Console shows the browser cancelled); idle CPU (`<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh`).
 
 ## Settings rows
 
@@ -561,7 +561,7 @@ Feature `F13`, as the sources plan binds its rows. Core guards bind to `native-Z
    six in `ZeusCoreTests`, six in `ZeusAppTests`.
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared, with the known failures recounted.
 4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`; the settings generator and its check;
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 5. A real compile on a Mac before any ticket is called done, and an independent review of each diff, reading the
    listener install and removal, the token checks, the deadlines and the browser lifetime line by line.
 6. Still owed on a real Mac by the owner: step zero, then the "Only at the Mac" lists of O0, O3, O4 and O6: above

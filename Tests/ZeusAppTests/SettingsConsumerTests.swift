@@ -124,9 +124,9 @@ struct SettingsConsumerTests {
     }
 
     @Test func researchReportsGoWhereTheyAreSent() {
-        let folder = URL(fileURLWithPath: "/Users/tony/Reports")
+        let folder = URL(fileURLWithPath: "/Users/example/Reports")
         let url = ResearchReport.destination(fileName: "a.md", connection: nil, chosenFolder: folder, exists: { _ in false })
-        #expect(url.path == "/Users/tony/Reports/a.md")
+        #expect(url.path == "/Users/example/Reports/a.md")
     }
 
     @Test func modelCapsAreDescribedAndNeverAboveSonnet() {
