@@ -19,6 +19,8 @@ public enum DiagnosticsRedactor {
     private static let patterns: [(NSRegularExpression, String)] = {
         func rx(_ pattern: String) -> NSRegularExpression { try! NSRegularExpression(pattern: pattern) }
         return [
+            // user:password@ in a URL. The scheme stays so the line still shows where it pointed.
+            (rx("(?i)([a-z][a-z0-9+.-]*://)[^\\s/:@]+:[^\\s/@]+@"), "$1" + mask + "@"),
             // key = value pairs keep the key so the log still reads. The key may carry an identifier prefix
             // (DUST_API_KEY, GITLAB_TOKEN, AWS_SECRET_ACCESS_KEY); the prefix is capped so a long run of word
             // characters stays cheap. A Bearer or Basic scheme word is consumed with its value.

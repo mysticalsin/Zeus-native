@@ -48,6 +48,13 @@ struct DiagnosticsRedactorTests {
         #expect(redact(once) == once)
     }
 
+    @Test func urlUserinfoIsMasked() {
+        let text = redact("https://user:example-secret@updates.example/feed")
+        #expect(!text.contains("example-secret"))
+        #expect(text.contains(DiagnosticsRedactor.mask))
+        #expect(text.hasPrefix("https://"))
+    }
+
     @Test func aLongRunOfWordCharactersIsMaskedQuickly() {
         let long = String(repeating: "a", count: 20_000)
         let cpuSeconds = ThreadCPUTime.measure { _ = redact(long) }
