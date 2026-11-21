@@ -4,7 +4,8 @@
 #
 #   bash scripts/human-qa.sh <path/to/Zeus.app> [--screenshots] [--only <journey>] [--allow-mic] [--yes]
 #
-# Journeys: launch topbar settings record scribe alerts talk (quit and the restart check run only on a full run).
+# Journeys: launch topbar settings record scribe alerts talk voice-providers voice-providers-fail
+# (quit and the restart check run only on a full run). voice-providers* require --from-clone.
 # Evidence: ~/AI-Brain-build/zeus-human-qa/<timestamp>/ (report.md, receipt.json, logs, freeze samples).
 # It never requests a permission, never uses the microphone without --allow-mic, never starts a recording
 # (the Record countdown is cancelled with Esc) and refuses to run in CI. See docs/HUMAN-QA.md.
@@ -22,12 +23,13 @@ die() { echo "human-qa: $*" >&2; exit "${2:-2}"; }
 [ "$(uname -s)" = "Darwin" ] || die "macOS only"
 [ -z "${CI:-}${GITHUB_ACTIONS:-}" ] || die "refusing to run in CI. It needs a logged-in Mac with a screen."
 
-APP=""; SHOTS=""; ONLY=""; MIC=""; YES=""
+APP=""; SHOTS=""; ONLY=""; MIC=""; YES=""; FROM_CLONE=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --screenshots) SHOTS="--screenshots" ;;
         --only) shift; ONLY="${1:-}"; [ -n "$ONLY" ] || die "--only needs a journey name" 64 ;;
         --allow-mic) MIC="--allow-mic" ;;
+        --from-clone) FROM_CLONE=1 ;;
         --yes) YES=1 ;;
         -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
         -*) die "unknown option $1" 64 ;;
@@ -36,10 +38,29 @@ while [ $# -gt 0 ]; do
     shift
 done
 [ -n "$APP" ] || die "usage: human-qa.sh <path/to/Zeus.app> [--screenshots] [--only <journey>] [--allow-mic] [--yes]" 64
-case "$ONLY" in ""|launch|topbar|settings|record|scribe|alerts|talk) ;; *) die "unknown journey '$ONLY'" 64 ;; esac
+case "$ONLY" in ""|launch|topbar|settings|record|scribe|alerts|talk|voice-providers|voice-providers-fail) ;; *) die "unknown journey '$ONLY'" 64 ;; esac
 
-# 1. The app must be a real bundle outside the repository (the check lives in human_qa.py, selftested).
-APP="$(python3 -I "$py" check-app "$APP")" || die "refusing: not a usable app bundle outside the repo" 2
+# 1. A normal run refuses a bundle inside the repo. --from-clone is only the voice-provider
+#    fake run, and it only accepts this clone's build/Zeus.app. Never /Applications.
+if [ "$FROM_CLONE" = 1 ]; then
+    case "$ONLY" in
+        voice-providers|voice-providers-fail) ;;
+        *) die "--from-clone is only for --only voice-providers or voice-providers-fail" 64 ;;
+    esac
+    case "$APP" in
+        /*) ;;
+        *) APP="$repo/$APP" ;;
+    esac
+    APP="$(cd "$(dirname "$APP")" && pwd)/$(basename "$APP")"
+    [ "$APP" = "$repo/build/Zeus.app" ] || die "--from-clone only launches $repo/build/Zeus.app" 2
+    [ -x "$APP/Contents/MacOS/Zeus" ] || die "missing $APP/Contents/MacOS/Zeus (run scripts/bundle.sh first)" 2
+    case "$ONLY" in
+        voice-providers) [ "${ZEUS_VOICE_PROVIDER_FAKE:-}" = 1 ] || die "export ZEUS_VOICE_PROVIDER_FAKE=1" 64 ;;
+        voice-providers-fail) [ "${ZEUS_VOICE_PROVIDER_FAKE:-}" = fail ] || die "export ZEUS_VOICE_PROVIDER_FAKE=fail" 64 ;;
+    esac
+else
+    APP="$(python3 -I "$py" check-app "$APP")" || die "refusing: not a usable app bundle outside the repo" 2
+fi
 
 # 2. Never share the single-instance guard with your own running Zeus.
 if pgrep -x Zeus >/dev/null 2>&1; then
@@ -47,9 +68,16 @@ if pgrep -x Zeus >/dev/null 2>&1; then
 fi
 
 # 3. Zeus has no throwaway settings domain for full GUI runs (--qa-startup is a probe only), so say so.
-echo "WARNING: this run uses your REAL Zeus settings ($BUNDLE_ID)."
-echo "It flips 'Show Zeus in screen shares' and moves the top bar position, then restores both at the end."
-echo "A copy of your settings is saved first. It moves your mouse to the top of the screen and types in Zeus."
+if [ "$FROM_CLONE" = 1 ]; then
+    echo "WARNING: this run uses your REAL Zeus settings domain ($BUNDLE_ID) for the provider selection only."
+    echo "The fake key is stored under Keychain service app.zeus.voice-provider.e2e.elevenlabs."
+    echo "The production service app.zeus.voice-provider.elevenlabs is not written and is not deleted."
+    echo "A copy of your settings is saved first. Leave the Mac alone while Accessibility drives Settings."
+else
+    echo "WARNING: this run uses your REAL Zeus settings ($BUNDLE_ID)."
+    echo "It flips 'Show Zeus in screen shares' and moves the top bar position, then restores both at the end."
+    echo "A copy of your settings is saved first. It moves your mouse to the top of the screen and types in Zeus."
+fi
 if [ -z "$YES" ]; then
     printf "Continue? [y/N] "
     read -r answer </dev/tty || answer=""
@@ -92,7 +120,13 @@ LOGPID=$!
 
 launch_app() {
     LAUNCHED_AT="$(python3 -c 'import time; print(time.time())')"
-    open -n "$APP"
+    if [ "$FROM_CLONE" = 1 ]; then
+        # `open` does not pass this shell's environment into a GUI app. The fake
+        # provider switch has to be in the process that actually runs.
+        "$APP/Contents/MacOS/Zeus" >>"$EV/app-stdout.txt" 2>&1 &
+    else
+        open -n "$APP"
+    fi
     APPPID=""
     for _ in $(seq 1 100); do
         APPPID="$(pgrep -x Zeus | head -n 1 || true)"

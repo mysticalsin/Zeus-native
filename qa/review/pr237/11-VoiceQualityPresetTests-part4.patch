@@ -1,0 +1,143 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+@@ -0,0 +347,138 @@
++            #expect(error as? ProviderFailure == failure)
++
++            let defaults = freshDefaults("voice-quality-fallback-\(status)")
++            let session = VoiceProviderSession(
++                store: MemoryCredentialStore(),
++                transport: URLSessionProviderTransport(timeout: 2),
++                local: ScriptedLocal(),
++                preferences: VoiceProviderPreferences(defaults: defaults),
++                adapters: [ScriptedFailureAdapter(failure: failure)]
++            )
++            await session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: "test-key-12345678")
++            await session.select(.provider(ElevenLabsTTSAdapter.id))
++            await session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: VoiceSpeakAllowlist.syntheticID)
++            let outcome = await session.speak("Hello")
++            #expect(outcome.route == .local(.failed(failure)))
++            let readiness = await session.readiness(for: ElevenLabsTTSAdapter.id)
++            if staysReady {
++                #expect(readiness == .ready)
++            } else {
++                #expect(readiness == .error(failure))
++            }
++        }
++        #expect(ProviderHTTPBudget.requestTimeout == 8)
++    }
++
++    private func elevenRequest(_ preset: VoiceQualityPreset) throws -> ProviderHTTPRequest {
++        try VoiceQualityRequestBuilder.make(
++            text: "Hold on... please",
++            preset: preset,
++            voiceID: preset.defaultVoiceID,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        )
++    }
++
++    private func googleRequest(_ preset: VoiceQualityPreset) throws -> ProviderHTTPRequest {
++        try VoiceQualityRequestBuilder.make(
++            text: "Hold on... please",
++            preset: preset,
++            voiceID: preset.defaultVoiceID,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey])
++        )
++    }
++
++    private func expectGoogleShape(_ request: ProviderHTTPRequest, voice: String, rate: Double?, pitch: Double?, sendsRate: Bool) {
++        #expect(request.method == "POST")
++        #expect(request.url.absoluteString == "https://texttospeech.googleapis.com/v1/text:synthesize")
++        #expect(request.header("X-Goog-Api-Key") == googleKey)
++        #expect(request.header("Content-Type") == "application/json")
++        #expect(request.url.query == nil)
++        #expect(!request.url.absoluteString.contains(googleKey))
++        let body = (try? jsonObject(request.body)) ?? [:]
++        let input = body["input"] as? [String: Any]
++        #expect(input?["text"] as? String == "Hold on, please")
++        #expect(input?["ssml"] == nil)
++        let voiceBody = body["voice"] as? [String: Any]
++        #expect(voiceBody?["name"] as? String == voice)
++        #expect(voiceBody?["languageCode"] as? String == "en-US")
++        let audio = body["audioConfig"] as? [String: Any]
++        #expect(audio?["audioEncoding"] as? String == "LINEAR16")
++        #expect(audio?["sampleRateHertz"] as? Int == 24_000)
++        if sendsRate {
++            #expect(close(audio?["speakingRate"], rate ?? -1))
++            #expect(close(audio?["pitch"], pitch ?? -1))
++        } else {
++            #expect(audio?["speakingRate"] == nil)
++            #expect(audio?["pitch"] == nil)
++        }
++        #expect(!jsonText(request.body).contains("<speak"))
++    }
++
++    private func jsonObject(_ data: Data?) throws -> [String: Any] {
++        try #require(JSONSerialization.jsonObject(with: data ?? Data()) as? [String: Any])
++    }
++
++    private func jsonText(_ data: Data?) -> String {
++        String(data: data ?? Data(), encoding: .utf8) ?? ""
++    }
++
++    private func close(_ value: Any?, _ expected: Double) -> Bool {
++        guard let number = value as? NSNumber else { return false }
++        return abs(number.doubleValue - expected) < 0.000_001
++    }
++
++    private func temporaryDirectory() throws -> URL {
++        let url = FileManager.default.temporaryDirectory.appendingPathComponent("voice-quality-\(UUID().uuidString)", isDirectory: true)
++        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
++        return url
++    }
++
++    private func freshDefaults(_ name: String) -> UserDefaults {
++        let defaults = UserDefaults(suiteName: name)!
++        defaults.removePersistentDomain(forName: name)
++        return defaults
++    }
++
++    private func grep(_ needle: String, in file: URL) throws -> Int32 {
++        let process = Process()
++        process.executableURL = URL(fileURLWithPath: "/usr/bin/grep")
++        process.arguments = ["-F", "-q", needle, file.path]
++        try process.run()
++        process.waitUntilExit()
++        return process.terminationStatus
++    }
++
++    private func firstError(_ synthesis: Synthesis) async -> Error? {
++        do {
++            for try await _ in synthesis.chunks {}
++            return nil
++        } catch {
++            return error
++        }
++    }
++}
++
++private final class QualityLog: @unchecked Sendable {
++    private let lock = NSLock()
++    private var lines: [String] = []
++    var text: String { lock.lock(); defer { lock.unlock() }; return lines.joined(separator: "\n") }
++    func add(_ line: String) { lock.lock(); lines.append(line); lock.unlock() }
++}
++
++final class QualityURLStub: URLProtocol, @unchecked Sendable {
++    struct Reply: Sendable {
++        var status: Int
++        var chunks: [Data] = []
++        var body: Data?
++    }
++
++    private static let lock = NSLock()
++    nonisolated(unsafe) private static var reply = Reply(status: 200)
++    nonisolated(unsafe) private static var seen: [URLRequest] = []
++
++    static var requests: [URLRequest] {
++        lock.lock(); defer { lock.unlock() }
++        return seen
++    }
++
++    static func reset(reply: Reply) {

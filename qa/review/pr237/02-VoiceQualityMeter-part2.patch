@@ -1,0 +1,12 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityMeter.swift b/Sources/ZeusCore/Providers/VoiceQualityMeter.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityMeter.swift
+@@ -0,0 +141,7 @@
++        if value is Bool { return nil }
++        guard let number = value as? NSNumber else { return nil }
++        let double = number.doubleValue
++        guard double >= 0, double <= Double(Int.max), double.rounded(.towardZero) == double else { return nil }
++        return Int(double)
++    }
++}

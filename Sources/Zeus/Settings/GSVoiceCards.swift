@@ -16,7 +16,7 @@ struct ZeusVoiceCards: View {
 
     var body: some View {
         GSCard {
-            GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus speaks with ElevenLabs first." : "Best Zeus voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain.") {
+            GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus uses ElevenLabs only when you pick it below." : "Optional cloud voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain. A saved key does not select this voice.") {
                 HStack(spacing: 10) {
                     SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
                         .textFieldStyle(.plain)
@@ -64,6 +64,8 @@ struct ZeusVoiceCards: View {
                     .accessibilityLabel("Effect intensity")
                     .accessibilityValue(String(format: "%.0f percent", UltronVoiceEffect.intensity * 100))
             }
+            GSDivider()
+            VoiceProviderPicker(embedded: true)
             GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
                 GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
@@ -306,6 +308,7 @@ struct ZeusVoiceCards: View {
             return "ElevenLabs"
         case .openAICompatible: return "OpenAI-compatible TTS"
         case .gemini: return "Google Gemini TTS"
+        case .googleCloud: return "Google Cloud Text-to-Speech"
         }
     }
 

@@ -1,0 +1,131 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +392,126 @@
++              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
++            throw VoiceQualityError.voiceRefused
++        }
++        components.queryItems = [URLQueryItem(name: "output_format", value: "pcm_24000")]
++        guard let streaming = components.url,
++              let body = ProviderJSON.data([
++                "text": text,
++                "model_id": delivery.modelID,
++                "voice_settings": [
++                    "stability": delivery.stability,
++                    "style": delivery.style,
++                ],
++              ]) else { throw VoiceQualityError.voiceRefused }
++        return ProviderHTTPRequest(
++            url: streaming,
++            method: "POST",
++            headers: [
++                "xi-api-key": key,
++                "Content-Type": "application/json",
++                "Accept": "audio/pcm",
++            ],
++            body: body
++        )
++    }
++
++    private static func google(_ text: String, voiceID: String, delivery: GoogleQualityDelivery, key: String) throws -> ProviderHTTPRequest {
++        guard let url = URL(string: "https://texttospeech.googleapis.com/v1/text:synthesize") else {
++            throw VoiceQualityError.voiceRefused
++        }
++        var audio: [String: Any] = [
++            "audioEncoding": delivery.audioEncoding,
++            "sampleRateHertz": delivery.sampleRateHertz,
++        ]
++        if delivery.sendsRateAndPitch {
++            audio["speakingRate"] = delivery.speakingRate
++            audio["pitch"] = delivery.pitch
++        }
++        let voice = ProviderVoice(id: voiceID, name: voiceID, language: nil)
++        guard let body = ProviderJSON.data([
++            "input": ["text": text],
++            "voice": [
++                "languageCode": GoogleCloudTTSAdapter.languageCode(for: voice),
++                "name": voiceID,
++            ],
++            "audioConfig": audio,
++        ]) else { throw VoiceQualityError.voiceRefused }
++        return ProviderHTTPRequest(
++            url: url,
++            method: "POST",
++            headers: [
++                "X-Goog-Api-Key": key,
++                "Content-Type": "application/json",
++            ],
++            body: body
++        )
++    }
++}
++
++/// Reads a provider key from the seam's credential store. On macOS that store is
++/// `KeychainCredentialStore` (generic password, this device only) under `com.zeus.app`.
++/// The key is not written to UserDefaults, the meter file, logs, or error text.
++public enum VoiceQualityKeychain {
++    public static func credential(providerID: String, store: any CredentialStore) -> ProviderCredential? {
++        guard let key = store.read(service: VoiceProviderAccounts.service, account: VoiceProviderAccounts.keyAccount(for: providerID)),
++              VoiceProviderKeyPolicy.accepts(key) else { return nil }
++        return ProviderCredential(fields: [ProviderCredentialLocation.account: key])
++    }
++}
++
++/// How `VoiceProviderSession.fallback` already treats these failures.
++/// Kokoro, then the Mac voice. A 401 or 429 leaves the provider in error. A 5xx leaves it ready.
++public struct VoiceQualityFallbackPlan: Equatable, Sendable {
++    public var engines: [String]
++    public var leavesProviderReady: Bool
++
++    public init(engines: [String], leavesProviderReady: Bool) {
++        self.engines = engines
++        self.leavesProviderReady = leavesProviderReady
++    }
++}
++
++public enum VoiceQualityFallback {
++    public static func plan(for failure: ProviderFailure) -> VoiceQualityFallbackPlan {
++        switch failure {
++        case .cancelled:
++            return VoiceQualityFallbackPlan(engines: [], leavesProviderReady: true)
++        case .unauthorized, .rateLimited, .creditsUsedUp, .badVoice:
++            return VoiceQualityFallbackPlan(engines: SyntheticFallbackOrder.engines, leavesProviderReady: false)
++        default:
++            return VoiceQualityFallbackPlan(engines: SyntheticFallbackOrder.engines, leavesProviderReady: true)
++        }
++    }
++}
++
++/// Speaks with one quality preset through the provider HTTP seam. URLSession only, via `ProviderHTTPTransport`.
++public struct VoiceQualitySpeaker: Sendable {
++    public var meter: VoiceQualityMeter
++    public var transport: any ProviderHTTPTransport
++    public var log: ProviderLog
++
++    public init(meter: VoiceQualityMeter, transport: any ProviderHTTPTransport, log: ProviderLog = ProviderLog()) {
++        self.meter = meter
++        self.transport = transport
++        self.log = log
++    }
++
++    public func synthesize(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
++        let meter = self.meter
++        let transport = self.transport
++        let log = self.log
++        let voice = voiceID ?? preset.defaultVoiceID
++        return Self.stream {
++            guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
++                throw VoiceQualityError.keyRejected
++            }
++            let spoken = VoiceQualityMarkup.spoken(text)
++            guard VoiceQualityRequestSize.allows(spoken.count) else { throw VoiceQualityError.requestTooLarge }
++            let clean = ProviderCredential(fields: [ProviderCredentialLocation.account: key])
++            let request = try VoiceQualityRequestBuilder.make(text: text, preset: preset, voiceID: voice, credential: clean)
++            guard VoiceQualityEndpoint.allows(request.url) else { throw VoiceQualityError.endpointRefused }
++            try meter.reserve(providerID: preset.providerID, characters: spoken.count)
++            let response = try await transport.send(request)
++            log.record(
++                "voice-quality \(VoiceQualityCall(request: request).description) status=\(response.status)",
++                secrets: [key]
++            )
