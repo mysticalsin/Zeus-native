@@ -251,7 +251,6 @@ private struct MediaGlassToggle: View {
         .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.85), value: isOn)
         .accessibilityLabel(label)
         .accessibilityValue(isOn ? "On" : "Off")
-        .accessibilityAddTraits(.isButton)
     }
 }
 

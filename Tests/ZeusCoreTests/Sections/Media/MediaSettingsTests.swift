@@ -187,7 +187,7 @@ import Testing
     }
 
     @Test func addedKeysSurviveTheExistingSettingsStore() throws {
-        let name = "zeus.media.persist.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.media.persist.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
         defaults.removePersistentDomain(forName: name)
         defer { defaults.removePersistentDomain(forName: name) }

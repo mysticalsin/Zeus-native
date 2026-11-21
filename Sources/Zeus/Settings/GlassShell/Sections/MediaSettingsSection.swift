@@ -7,7 +7,6 @@ extension MediaSectionSlot: GlassSlotPage {
 
 /// The Media page. The host asks the slot for this view.
 struct MediaSettingsSection: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -19,7 +18,7 @@ struct MediaSettingsSection: View {
         })
         MediaSettingsPage(
             settings: settings,
-            reduceMotion: reduceMotion,
+            reduceMotion: Motion.reduced,
             reduceTransparency: reduceTransparency,
             increaseContrast: contrast == .increased,
             write: { id, value in store.set(id, value) }
