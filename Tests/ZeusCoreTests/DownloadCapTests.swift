@@ -121,6 +121,82 @@ struct DownloadCapTests {
         #expect(clock.time == 0)
         #expect(try Data(contentsOf: partial) == Data("whole".utf8))
     }
+
+    @Test func aCapRemovesFilesInstalledDuringTheRunAndKeepsOlderOnes() async throws {
+        let clock = ManualClock(0)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-foot-\(UUID().uuidString)", isDirectory: true)
+        let tree = root.appendingPathComponent("venv", isDirectory: true)
+        let kept = tree.appendingPathComponent("lib/kokoro.txt")
+        try FileManager.default.createDirectory(at: kept.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: kept)
+        let before = InstallFootprint.snapshot(tree)
+        let task = Task {
+            await DownloadRunner.run(kind: .model, clock: { clock.time }, partials: {
+                InstallFootprint.removals(root: root, rootExisted: true, tree: tree, treeExisted: true, before: before)
+            }) {
+                let installed = tree.appendingPathComponent("lib/python3.12/site-packages/faster_whisper/model.bin")
+                try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data("new".utf8).write(to: installed)
+                let sibling = tree.appendingPathComponent("lib/new.txt")
+                try Data("sibling".utf8).write(to: sibling)
+                while !Task.isCancelled { try await Task.sleep(nanoseconds: 5_000_000) }
+            }
+        }
+        try await Task.sleep(nanoseconds: 40_000_000)
+        clock.time = 600
+        let result = await task.value
+        #expect(result == .tookTooLong)
+        #expect(try Data(contentsOf: kept) == Data("old".utf8))
+        #expect(!FileManager.default.fileExists(atPath: tree.appendingPathComponent("lib/python3.12/site-packages/faster_whisper").path))
+        #expect(!FileManager.default.fileExists(atPath: tree.appendingPathComponent("lib/new.txt").path))
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    @Test func cancelRemovesFilesInstalledDuringTheRun() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-foot-\(UUID().uuidString)", isDirectory: true)
+        let tree = root.appendingPathComponent("venv", isDirectory: true)
+        try FileManager.default.createDirectory(at: tree, withIntermediateDirectories: true)
+        let before = InstallFootprint.snapshot(tree)
+        let installed = tree.appendingPathComponent("lib/site-packages/faster_whisper/__init__.py")
+        let result = await DownloadRunner.run(kind: .model, clock: { 0 }, partials: {
+            InstallFootprint.removals(root: root, rootExisted: true, tree: tree, treeExisted: true, before: before)
+        }) {
+            try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("pkg".utf8).write(to: installed)
+            throw CancellationError()
+        }
+        #expect(result == .cancelled)
+        #expect(!FileManager.default.fileExists(atPath: installed.path))
+        #expect(FileManager.default.fileExists(atPath: tree.path))
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    @Test func aNewPythonRootIsTheOnlyRemovalWhenItDidNotExist() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-foot-\(UUID().uuidString)", isDirectory: true)
+        let tree = root.appendingPathComponent("venv", isDirectory: true)
+        let installed = tree.appendingPathComponent("lib/faster_whisper/model.bin")
+        try FileManager.default.createDirectory(at: installed.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("pkg".utf8).write(to: installed)
+        let urls = InstallFootprint.removals(root: root, rootExisted: false, tree: tree, treeExisted: false, before: [])
+        #expect(urls == [root])
+        #expect(PartialFiles.remove(urls).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+    }
+
+    @Test func anExistingRootLosesOnlyANewVirtualEnvironment() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-foot-\(UUID().uuidString)", isDirectory: true)
+        let note = root.appendingPathComponent("notes.txt")
+        let tree = root.appendingPathComponent("venv", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("keep".utf8).write(to: note)
+        try FileManager.default.createDirectory(at: tree.appendingPathComponent("lib"), withIntermediateDirectories: true)
+        let urls = InstallFootprint.removals(root: root, rootExisted: true, tree: tree, treeExisted: false, before: [])
+        #expect(urls == [tree])
+        #expect(PartialFiles.remove(urls).isEmpty)
+        #expect(try Data(contentsOf: note) == Data("keep".utf8))
+        #expect(!FileManager.default.fileExists(atPath: tree.path))
+        try? FileManager.default.removeItem(at: root)
+    }
 }
 
 private final class ManualClock: @unchecked Sendable {
