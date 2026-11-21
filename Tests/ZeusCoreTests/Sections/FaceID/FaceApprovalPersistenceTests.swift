@@ -126,7 +126,7 @@ struct FaceApprovalWiringTests {
         #expect(grant?.method == .localAuthentication)
     }
 
-    @Test func lockoutStillRefusesAFaceAndAcceptsOwnerAuthentication() {
+    @Test func lockoutRefusesAFaceAndTheOpenFallback() {
         var session = enabledSession()
         var camera = FakeApprovalCamera(access: .authorized)
         let limit = FaceVerificationPolicy.failureLimit
@@ -143,10 +143,13 @@ struct FaceApprovalWiringTests {
         let face = session.observe(cleanFace(blinked: true, turned: true), camera: &camera, at: 101)
         #expect(face != .approved(FaceApprovalGrant(actionID: locked.id, nonce: locked.nonce, method: .face)))
         #expect(session.machine.grant == nil)
+        let open = ApprovalAction(id: "try", nonce: "lock-\(limit - 1)")
+        let failures = session.machine.failures
         var auth = ScriptedAuthenticator(biometrics: .unavailable, password: .acceptedPassword)
-        let grant = session.authenticate(using: &auth, action: ApprovalAction(id: "try", nonce: "lock-\(limit - 1)"), camera: &camera, at: 102)
-        #expect(grant?.method == .localAuthentication)
-        #expect(session.machine.phase != .matched)
+        let grant = session.authenticate(using: &auth, action: open, camera: &camera, at: 102)
+        #expect(grant == nil)
+        #expect(session.machine.phase == .lockedOut)
+        #expect(session.machine.failures == failures)
     }
 
     @Test func aRestoredOnSwitchCanStartACheckWithoutAskingAgain() {

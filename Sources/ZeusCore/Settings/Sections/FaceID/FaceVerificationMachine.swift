@@ -208,10 +208,12 @@ public struct FaceVerificationMachine: Equatable, Sendable {
             return stop
 
         case .fallbackResult(let succeeded, let action, let uptime):
+            // ZB-001. A successful fallback for the open action must not clear a lock.
+            if phase == .lockedOut || lockActive { return [] }
             stamp(uptime)
-            guard phase == .fallback || phase == .rejected || phase == .lockedOut else { return [] }
+            guard phase == .fallback || phase == .rejected else { return [] }
             guard succeeded, action.isBound, action == openAction, !issuedNonces.contains(action.nonce) else {
-                if !succeeded, phase != .lockedOut, !lockActive { return fail(nil, at: uptime) }
+                if !succeeded { return fail(nil, at: uptime) }
                 return []
             }
             grant = FaceApprovalGrant(actionID: action.id, nonce: action.nonce, method: .localAuthentication)
