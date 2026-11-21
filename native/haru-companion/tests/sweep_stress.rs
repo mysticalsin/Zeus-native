@@ -2,6 +2,7 @@
 
 use haru_companion::serve::bind_socket;
 use std::io::{Read, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixStream;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -22,6 +23,9 @@ fn ten_thousand_connect_cycles_do_not_leak_fds() {
             .as_nanos()
     ));
     std::fs::create_dir_all(&root).unwrap();
+    let mut perms = std::fs::metadata(&root).unwrap().permissions();
+    perms.set_mode(0o700);
+    std::fs::set_permissions(&root, perms).unwrap();
     let path = root.join("zeus.sock");
     let before = fd_count();
     for _ in 0..10_000 {

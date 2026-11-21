@@ -27,6 +27,9 @@ fn requested_session_round_trips_on_a_private_socket() {
         .as_nanos();
     let root = std::env::temp_dir().join(format!("zeus-haru-test-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
+    let mut perms = std::fs::metadata(&root).unwrap().permissions();
+    perms.set_mode(0o700);
+    std::fs::set_permissions(&root, perms).unwrap();
     let path = root.join("zeus.sock");
     let listener = bind_socket(&path).unwrap();
     let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;

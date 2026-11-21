@@ -7,6 +7,7 @@ use haru_companion::serve::{bind_socket, serve_one};
 use haru_companion::session::{SessionError, SessionHost, SessionState};
 use haru_companion::supervisor::SpyLauncher;
 use std::io::{Read, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixStream;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -18,6 +19,9 @@ fn scratch(name: &str) -> std::path::PathBuf {
     let root =
         std::env::temp_dir().join(format!("zeus-haru-{name}-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
+    let mut perms = std::fs::metadata(&root).unwrap().permissions();
+    perms.set_mode(0o700);
+    std::fs::set_permissions(&root, perms).unwrap();
     root.join("zeus.sock")
 }
 

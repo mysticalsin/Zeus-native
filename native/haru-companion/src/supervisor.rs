@@ -121,14 +121,14 @@ pub fn private_socket(public: &Path) -> PathBuf {
 }
 
 /// Listen path handed to Python. It is not the socket the parent accepts on.
-/// Removes whatever is at `path`. The bind sweep replaces this so a
-/// non-socket left at the model listen path is kept.
+/// Removes a leftover model listen socket.
+///
+/// `haru_mlx.native` takes a filesystem path, not an inherited fd, so the
+/// parent cannot hand it a bound socket. The path stays inside the 0700
+/// directory that holds the gate. Other uids cannot connect. On the way out
+/// the parent unlinks the name only when it is still a socket.
 pub fn release_model_socket(path: &Path) -> std::io::Result<()> {
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error),
-    }
+    crate::serve::unlink_if_socket(path)
 }
 
 pub fn model_socket(gate: &Path) -> PathBuf {
@@ -609,6 +609,7 @@ fn terminate_child(child: &mut Child) {
 }
 
 fn arm_parent_death() {
+    // Linux only. On macOS a parent that dies from SIGKILL can leave the child running.
     #[cfg(target_os = "linux")]
     unsafe {
         let parent = getppid();

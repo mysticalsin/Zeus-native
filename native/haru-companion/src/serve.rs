@@ -2,9 +2,10 @@
 //!
 //! `fchmodat` with `AT_SYMLINK_NOFOLLOW` uses Linux `/proc/self/fd`. If that
 //! directory is missing, the call fails and `bind_socket` fails closed: it
-//! unlinks only the inode it created and returns the error. A parent that is
-//! group or world writable is refused, unless it is sticky and owned by the
-//! effective uid, in which case it is tightened to 0700 before the bind.
+//! unlinks only the inode it created and returns the error. An existing
+//! parent is accepted only when this process owns it and it is already mode
+//! 0700. This call never changes the mode of a directory it did not create.
+//! A directory created here is set to 0700 before the name is bound.
 
 use crate::backend::ModelBackend;
 use crate::engine::Engine;
@@ -18,10 +19,14 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::time::Duration;
 
+/// Directory-entry identity. `ctime` is included so a reused dev/ino after
+/// unlink is not treated as the socket this process bound.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct NodeId {
-    dev: u64,
-    ino: u64,
+pub struct SocketId {
+    pub dev: u64,
+    pub ino: u64,
+    pub ctime_sec: i64,
+    pub ctime_nsec: i64,
 }
 
 struct DirFd {
@@ -41,8 +46,7 @@ impl Drop for DirFd {
 /// replaced path is never connected.
 pub struct BoundWatch {
     fd: i32,
-    pub dev: u64,
-    pub ino: u64,
+    pub id: SocketId,
 }
 
 impl Drop for BoundWatch {
@@ -58,32 +62,30 @@ impl BoundWatch {
     pub fn watch(listener: &UnixListener, path: &Path) -> std::io::Result<Self> {
         // The listening fd and the directory entry do not share dev/ino here.
         // Remember the entry observed while this listener is still bound to it.
-        let node = path_node(path)?;
+        let id = path_id(path)?;
         let fd = unsafe { libc::dup(listener.as_raw_fd()) };
         if fd < 0 {
             return Err(std::io::Error::last_os_error());
         }
-        Ok(Self {
-            fd,
-            dev: node.dev,
-            ino: node.ino,
-        })
+        Ok(Self { fd, id })
     }
 
     pub fn still_ours(&self, path: &Path) -> bool {
-        match path_node(path) {
-            Ok(node) => node.dev == self.dev && node.ino == self.ino,
+        match path_id(path) {
+            Ok(id) => id == self.id,
             Err(_) => false,
         }
     }
 
-    /// Unblocks `accept` on the original inode. The directory path is used
-    /// only when `/proc/self/fd` cannot be connected and the inode still matches.
+    /// Unblocks `accept` on the original socket. Connecting through
+    /// `/proc/self/fd` fails once the directory entry is replaced, so
+    /// `shutdown` on this dup is what makes `accept` return.
     pub fn wake(&self, path: &Path) {
         let via_proc = std::path::PathBuf::from(format!("/proc/self/fd/{}", self.fd));
         if UnixStream::connect(&via_proc).is_err() && self.still_ours(path) {
             let _ = UnixStream::connect(path);
         }
+        unsafe { libc::shutdown(self.fd, libc::SHUT_RDWR) };
     }
 }
 
@@ -121,16 +123,16 @@ pub fn listener_matches(listener: &UnixListener, path: &Path) -> std::io::Result
     }
 }
 
-/// Unlinks the directory entry only when its dev/ino is the one we recorded.
-pub fn unlink_if_ours(path: &Path, dev: u64, ino: u64) -> std::io::Result<()> {
+/// Unlinks the directory entry only when dev, ino, and ctime still match.
+pub fn unlink_if_ours(path: &Path, id: SocketId) -> std::io::Result<()> {
     let dir = open_dir(parent_path(path))?;
     let name = file_name(path)?;
-    let at = match fstatat_name(dir.fd, &name) {
-        Ok(node) => node,
+    let at = match path_id_in(dir.fd, &name) {
+        Ok(found) => found,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     };
-    if at.dev != dev || at.ino != ino {
+    if at != id {
         return Ok(());
     }
     if unsafe { libc::unlinkat(dir.fd, name.as_ptr(), 0) } != 0 {
@@ -139,14 +141,35 @@ pub fn unlink_if_ours(path: &Path, dev: u64, ino: u64) -> std::io::Result<()> {
     Ok(())
 }
 
-/// `euid` is accepted so tests can stand in for another uid. The current
-/// implementation ignores it and uses the process euid.
+/// Removes `path` when it is a socket. A regular file or symlink is left in place.
+pub fn unlink_if_socket(path: &Path) -> std::io::Result<()> {
+    let dir = open_dir(parent_path(path))?;
+    let name = file_name(path)?;
+    let st = match fstatat_raw(dir.fd, &name) {
+        Ok(st) => st,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    if st.st_mode & libc::S_IFMT != libc::S_IFSOCK {
+        return Ok(());
+    }
+    if unsafe { libc::unlinkat(dir.fd, name.as_ptr(), 0) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+/// `euid` is the owner check for an existing parent. Tests pass another uid.
+/// Production [`bind_socket`] passes `current_uid()`.
 pub fn bind_socket_as(path: &Path, euid: u32) -> std::io::Result<UnixListener> {
-    let _ = euid;
-    bind_socket(path)
+    bind_socket_owned(path, euid)
 }
 
 pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
+    bind_socket_owned(path, current_uid())
+}
+
+fn bind_socket_owned(path: &Path, euid: u32) -> std::io::Result<UnixListener> {
     let parent = parent_path(path);
     let created = !parent.exists();
     if created {
@@ -156,11 +179,11 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     if created && unsafe { libc::fchmod(dir.fd, 0o700) } != 0 {
         return Err(std::io::Error::last_os_error());
     }
-    prepare_parent(&dir)?;
+    prepare_parent(&dir, euid, created)?;
     let name = file_name(path)?;
     clear_stale(dir.fd, &name, path)?;
     let listener = UnixListener::bind(path)?;
-    let ours = fstatat_name(dir.fd, &name)?;
+    let ours = path_id_in(dir.fd, &name)?;
     let chmod_rc =
         unsafe { libc::fchmodat(dir.fd, name.as_ptr(), 0o600, libc::AT_SYMLINK_NOFOLLOW) };
     if chmod_rc != 0 {
@@ -168,8 +191,9 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
         let _ = unlink_name_if(dir.fd, &name, ours);
         return Err(error);
     }
-    match fstatat_name(dir.fd, &name) {
-        Ok(node) if node == ours => Ok(listener),
+    match path_id_in(dir.fd, &name) {
+        // fchmodat updates ctime, so the post-bind check is dev/ino only.
+        Ok(node) if node.dev == ours.dev && node.ino == ours.ino => Ok(listener),
         Ok(_) => Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "socket replaced",
@@ -216,29 +240,16 @@ fn open_dir(path: &Path) -> std::io::Result<DirFd> {
     }
 }
 
-fn prepare_parent(dir: &DirFd) -> std::io::Result<()> {
+fn prepare_parent(dir: &DirFd, euid: u32, created: bool) -> std::io::Result<()> {
     let st = fstat_raw(dir.fd)?;
-    let uid = st.st_uid;
-    if uid != unsafe { libc::geteuid() } {
+    let owner = if created { current_uid() } else { euid };
+    if st.st_uid != owner {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "parent not owned by euid",
         ));
     }
-    let mode = st.st_mode;
-    let group_or_world_writable = mode & 0o022 != 0;
-    let sticky = mode & libc::S_ISVTX != 0;
-    if group_or_world_writable && !sticky {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            "parent is group or world writable",
-        ));
-    }
-    if mode & 0o077 != 0 && unsafe { libc::fchmod(dir.fd, 0o700) } != 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let again = fstat_raw(dir.fd)?;
-    if again.st_uid != uid || again.st_mode & 0o077 != 0 {
+    if st.st_mode & 0o777 != 0o700 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "parent is not mode 0700",
@@ -267,12 +278,12 @@ fn clear_stale(dirfd: i32, name: &CString, full: &Path) -> std::io::Result<()> {
             Err(error) => return Err(error),
         }
         let after = fstatat_raw(dirfd, name)?;
-        if node_of(&before) == node_of(&after) && after.st_mode & libc::S_IFMT == libc::S_IFSOCK {
-            unlink_name_if(dirfd, name, node_of(&before))?;
+        if id_of(&before) == id_of(&after) && after.st_mode & libc::S_IFMT == libc::S_IFSOCK {
+            unlink_name_if(dirfd, name, id_of(&before))?;
         }
         Ok(())
     } else if kind == libc::S_IFLNK {
-        unlink_name_if(dirfd, name, node_of(&before))
+        unlink_name_if(dirfd, name, id_of(&before))
     } else {
         Err(std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
@@ -281,13 +292,13 @@ fn clear_stale(dirfd: i32, name: &CString, full: &Path) -> std::io::Result<()> {
     }
 }
 
-fn unlink_name_if(dirfd: i32, name: &CString, expected: NodeId) -> std::io::Result<()> {
-    let now = match fstatat_name(dirfd, name) {
+fn unlink_name_if(dirfd: i32, name: &CString, expected: SocketId) -> std::io::Result<()> {
+    let now = match path_id_in(dirfd, name) {
         Ok(node) => node,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     };
-    if now != expected {
+    if now.dev != expected.dev || now.ino != expected.ino {
         return Ok(());
     }
     if unsafe { libc::unlinkat(dirfd, name.as_ptr(), 0) } != 0 {
@@ -297,10 +308,18 @@ fn unlink_name_if(dirfd: i32, name: &CString, expected: NodeId) -> std::io::Resu
     }
 }
 
-fn path_node(path: &Path) -> std::io::Result<NodeId> {
+pub fn socket_id(path: &Path) -> std::io::Result<SocketId> {
+    path_id(path)
+}
+
+fn path_id(path: &Path) -> std::io::Result<SocketId> {
     let dir = open_dir(parent_path(path))?;
     let name = file_name(path)?;
-    fstatat_name(dir.fd, &name)
+    path_id_in(dir.fd, &name)
+}
+
+fn path_id_in(dirfd: i32, name: &CString) -> std::io::Result<SocketId> {
+    Ok(id_of(&fstatat_raw(dirfd, name)?))
 }
 
 fn fstat_raw(fd: i32) -> std::io::Result<libc::stat> {
@@ -310,10 +329,6 @@ fn fstat_raw(fd: i32) -> std::io::Result<libc::stat> {
     } else {
         Ok(st)
     }
-}
-
-fn fstatat_name(dirfd: i32, name: &CString) -> std::io::Result<NodeId> {
-    Ok(node_of(&fstatat_raw(dirfd, name)?))
 }
 
 fn fstatat_raw(dirfd: i32, name: &CString) -> std::io::Result<libc::stat> {
@@ -327,18 +342,22 @@ fn fstatat_raw(dirfd: i32, name: &CString) -> std::io::Result<libc::stat> {
 }
 
 #[cfg(target_os = "linux")]
-fn node_of(st: &libc::stat) -> NodeId {
-    NodeId {
+fn id_of(st: &libc::stat) -> SocketId {
+    SocketId {
         dev: st.st_dev,
         ino: st.st_ino,
+        ctime_sec: st.st_ctime,
+        ctime_nsec: st.st_ctime_nsec,
     }
 }
 
 #[cfg(not(target_os = "linux"))]
-fn node_of(st: &libc::stat) -> NodeId {
-    NodeId {
+fn id_of(st: &libc::stat) -> SocketId {
+    SocketId {
         dev: st.st_dev as u64,
         ino: st.st_ino as u64,
+        ctime_sec: st.st_ctime as i64,
+        ctime_nsec: 0,
     }
 }
 
@@ -356,6 +375,8 @@ pub trait PeerCheck {
 }
 
 /// Real `SO_PEERCRED` / `getpeereid` compared with `geteuid`.
+/// FixedPeer is the foreign-uid seam: this process cannot open a socket as
+/// another uid, so a peer that is not the effective uid is injected there.
 pub struct OsPeer;
 
 impl PeerCheck for OsPeer {
@@ -480,10 +501,50 @@ pub(crate) fn accept_authorized<P: PeerCheck>(
     listener: UnixListener,
     peer: &P,
 ) -> std::io::Result<()> {
-    let (stream, _) = listener.accept()?;
-    peer.allow(&stream)?;
-    drop(stream);
-    Ok(())
+    let _ = arm_accept_timeout(listener.as_raw_fd());
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                peer.allow(&stream)?;
+                drop(stream);
+                return Ok(());
+            }
+            Err(error)
+                if error.kind() == std::io::ErrorKind::TimedOut
+                    || error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.kind() == std::io::ErrorKind::Interrupted =>
+            {
+                continue;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn arm_accept_timeout(fd: i32) -> std::io::Result<()> {
+    #[repr(C)]
+    struct Timeval {
+        tv_sec: i64,
+        tv_usec: i64,
+    }
+    let tv = Timeval {
+        tv_sec: 0,
+        tv_usec: 200_000,
+    };
+    let rc = unsafe {
+        libc::setsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_RCVTIMEO,
+            (&tv as *const Timeval).cast(),
+            std::mem::size_of::<Timeval>() as libc::socklen_t,
+        )
+    };
+    if rc != 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 fn finish_session<B, C>(engine: &mut Engine<B, C>)

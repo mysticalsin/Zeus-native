@@ -163,6 +163,14 @@ Each real defect was committed as a failing test, then the fix.
 - N-2: `serve` still uses `FakeBackend::quiet()`, and the probe child is dropped so `StdLauncher::drop` kills it. Not changed.
 - Counts: `cargo +stable test --locked` haru-companion 97 passed, 0 failed. haru-pipe 16 passed, 0 failed.
 
+## 19. Do not chmod an existing parent
+
+- Time: 2026-11-21T06:30:00Z. Hammer re-check at `7c8eaf5d` (report sha256 `906275cf`).
+- Lens: security. M1, M2, S-1, S-2, S-3.
+- Test: `4e19105` `tests/sweep_bind.rs`. Seven tests failed: owned 0755 was accepted, a sticky 1777 parent was chmodded, a seamed foreign uid was accepted, `release_model_socket` deleted a regular file, serve stayed blocked after the child entry was replaced (`recv` timed out at 2s), `cli.rs` still called `remove_file`, and the FixedPeer seam was not documented.
+- Fix: the commit after `4e19105`. An existing parent is accepted only when it is owned by the checked uid and already mode 0700. This call does not chmod a directory it did not create. `bind_socket_as` seams that uid. Replacing the child entry makes `serve` return: `wake` calls `shutdown` on the listening socket because a `/proc/self/fd` connect is refused (`ECONNREFUSED`) and `accept` otherwise stays blocked. `BoundWatch::still_ours` compares dev, ino, and ctime. The model path is not an inherited fd (`haru_mlx.native` takes a path); a leftover socket there is unlinked and a non-socket is kept. `run_serve` cleanup uses `unlink_if_ours`. A foreign socket uid cannot be created here, so `FixedPeer` remains that seam and `OsPeer` covers the same-uid `SO_PEERCRED` path.
+- Counts: `cargo +stable test --locked` haru-companion 103 passed, 0 failed. haru-pipe 16 passed, 0 failed. `cargo +stable fmt --check` and `cargo +stable clippy --locked --all-targets -- -D warnings` passed for both crates.
+
 ## Checked, not a new defect
 
 - Cross compile, stable 1.100, target `aarch64-apple-darwin`: `cargo check --locked` exits 0 for both crates. `cargo build --locked` compiles and fails at link. `xcrun --sdk macosx` is missing (`os error 2`) and the host `cc` rejects `-arch arm64` (`unsupported option '-arch' for target 'x86_64-pc-linux-gnu'`). No Mach-O was produced.

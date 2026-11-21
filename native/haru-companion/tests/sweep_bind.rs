@@ -121,20 +121,21 @@ fn a_foreign_euid_is_refused_without_chmod() {
 }
 
 #[test]
-fn a_sticky_directory_we_own_is_tightened_before_bind() {
-    let root = scratch("sticky");
-    let parent = root.join("tmpish");
+fn bound_watch_matches_until_the_entry_is_replaced() {
+    let root = scratch("watch");
+    let parent = root.join("priv");
     std::fs::create_dir(&parent).unwrap();
-    set_mode(&parent, 0o1777);
-    let socket = parent.join("zeus.sock");
-    let listener = bind_socket(&socket).unwrap();
-    assert_eq!(
-        mode(&parent) & 0o022,
-        0,
-        "parent stayed group or world writable"
+    set_mode(&parent, 0o700);
+    let path = parent.join("zeus.sock");
+    let listener = bind_socket(&path).unwrap();
+    let watch = haru_companion::serve::BoundWatch::watch(&listener, &path).unwrap();
+    assert!(watch.still_ours(&path), "fresh bind was not ours");
+    std::fs::remove_file(&path).unwrap();
+    let _other = UnixListener::bind(&path).unwrap();
+    assert!(
+        !watch.still_ours(&path),
+        "replaced entry still matched dev/ino/ctime"
     );
-    assert_eq!(mode(&parent), 0o700);
-    assert_eq!(mode(&socket), 0o600);
     drop(listener);
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -217,7 +218,16 @@ fn unlink_if_ours_keeps_a_different_inode() {
     let root = scratch("inode");
     let path = root.join("notes");
     std::fs::write(&path, b"keep").unwrap();
-    unlink_if_ours(&path, 0, 0).unwrap();
+    unlink_if_ours(
+        &path,
+        haru_companion::serve::SocketId {
+            dev: 0,
+            ino: 0,
+            ctime_sec: 0,
+            ctime_nsec: 0,
+        },
+    )
+    .unwrap();
     assert_eq!(std::fs::read(&path).unwrap(), b"keep");
     let _ = std::fs::remove_dir_all(&root);
 }

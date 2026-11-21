@@ -34,6 +34,9 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
             .as_nanos()
     ));
     std::fs::create_dir_all(&path).unwrap();
+    let mut perms = std::fs::metadata(&path).unwrap().permissions();
+    perms.set_mode(0o700);
+    std::fs::set_permissions(&path, perms).unwrap();
     path
 }
 

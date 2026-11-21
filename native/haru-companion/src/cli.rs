@@ -74,11 +74,18 @@ fn run_serve(
     watchdog: bool,
 ) -> std::io::Result<()> {
     let listener = bind_socket(socket)?;
+    let public_id = match crate::serve::socket_id(socket) {
+        Ok(id) => id,
+        Err(error) => {
+            drop(listener);
+            return Err(error);
+        }
+    };
     let public_watch = match BoundWatch::watch(&listener, socket) {
         Ok(watch) => watch,
         Err(error) => {
             drop(listener);
-            let _ = std::fs::remove_file(socket);
+            let _ = unlink_if_ours(socket, public_id);
             return Err(error);
         }
     };
@@ -86,7 +93,16 @@ fn run_serve(
         Ok(listener) => listener,
         Err(error) => {
             drop(listener);
-            let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
+            let _ = unlink_if_ours(socket, public_watch.id);
+            return Err(error);
+        }
+    };
+    let child_id = match crate::serve::socket_id(private_socket) {
+        Ok(id) => id,
+        Err(error) => {
+            drop(listener);
+            drop(child_listener);
+            let _ = unlink_if_ours(socket, public_watch.id);
             return Err(error);
         }
     };
@@ -95,8 +111,8 @@ fn run_serve(
         Err(error) => {
             drop(listener);
             drop(child_listener);
-            let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
-            let _ = std::fs::remove_file(private_socket);
+            let _ = unlink_if_ours(socket, public_watch.id);
+            let _ = unlink_if_ours(private_socket, child_id);
             return Err(error);
         }
     };
@@ -104,8 +120,8 @@ fn run_serve(
     if let Err(error) = probe.spawn(argv) {
         drop(listener);
         drop(child_listener);
-        let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
-        let _ = unlink_if_ours(private_socket, child_watch.dev, child_watch.ino);
+        let _ = unlink_if_ours(socket, public_watch.id);
+        let _ = unlink_if_ours(private_socket, child_watch.id);
         return Err(error);
     }
     // The probe proves the interpreter can be spawned. Dropping it kills that
@@ -126,8 +142,10 @@ fn run_serve(
     let child_same = child_watch.still_ours(private_socket);
     child_watch.wake(private_socket);
     let _ = child_gate.join();
-    let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
-    let _ = unlink_if_ours(private_socket, child_watch.dev, child_watch.ino);
+    let _ = unlink_if_ours(socket, public_watch.id);
+    let _ = unlink_if_ours(private_socket, child_watch.id);
+    let _ =
+        crate::supervisor::release_model_socket(&crate::supervisor::model_socket(private_socket));
     if !child_same {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,

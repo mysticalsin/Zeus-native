@@ -7,6 +7,7 @@ use haru_companion::serve::{bind_socket, serve_one_with, FixedPeer};
 use haru_companion::session::state_machine_svg;
 use haru_companion::supervisor::SpyLauncher;
 use std::io::Read;
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixStream;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -122,6 +123,9 @@ fn a_refused_peer_reads_an_error_frame_before_the_socket_closes() {
             .as_nanos()
     ));
     std::fs::create_dir_all(&root).unwrap();
+    let mut perms = std::fs::metadata(&root).unwrap().permissions();
+    perms.set_mode(0o700);
+    std::fs::set_permissions(&root, perms).unwrap();
     for round in 0..20 {
         let path = root.join(format!("zeus-{round}.sock"));
         let listener = bind_socket(&path).unwrap();

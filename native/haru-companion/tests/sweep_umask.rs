@@ -10,6 +10,9 @@ fn binding_a_socket_does_not_strip_execute_from_other_directories() {
     let root = std::env::temp_dir().join(format!("zeus-umask-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
+    let mut perms = std::fs::metadata(&root).unwrap().permissions();
+    perms.set_mode(0o700);
+    std::fs::set_permissions(&root, perms).unwrap();
     let stop = Arc::new(AtomicBool::new(false));
     let stop_bind = Arc::clone(&stop);
     let bind_root = root.clone();
