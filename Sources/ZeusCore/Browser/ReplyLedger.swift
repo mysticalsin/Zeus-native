@@ -33,7 +33,7 @@ public struct ReplyLedger: Equatable, Sendable {
 public final class ContinuationBag<Success: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var ledger = ReplyLedger()
-    private var continuations: [Int: CheckedContinuation<Success, Error>] = []
+    private var continuations: [Int: CheckedContinuation<Success, Error>] = [:]
 
     public init() {}
 
