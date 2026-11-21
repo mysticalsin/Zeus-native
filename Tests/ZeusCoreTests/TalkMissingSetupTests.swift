@@ -24,6 +24,8 @@ import Testing
         #expect(TalkMissingSetup.sentences(mic: true, screen: true, brainKey: true, cli: false) == [cli])
         #expect(TalkMissingSetup.sentences(mic: true, screen: true, brainKey: false, cli: false) == [key, cli])
         #expect(TalkMissingSetup.sentences(mic: false, screen: false, brainKey: true, cli: true) == [microphone, screen])
+        #expect(TalkMissingSetup.sentences(mic: true, screen: false, brainKey: false, cli: true) == [screen, key])
+        #expect(TalkMissingSetup.sentences(mic: false, screen: true, brainKey: false, cli: false) == [microphone, key, cli])
         let all = TalkMissingSetup.sentences(mic: false, screen: false, brainKey: false, cli: false)
         #expect(all == [microphone, screen, key, cli])
         for line in all {
