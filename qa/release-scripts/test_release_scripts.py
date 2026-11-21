@@ -40,7 +40,7 @@ def pinned(constant, fallback):
 
 if name == "codesign" and "--display" in args:
     state = os.environ.get("SIGNATURE_STATE", "valid")
-    team = "OTHERTEAM1" if state == "wrong-team" else pinned("EXPECTED_TEAM_ID", "TEST123456")
+    team = "OTHERTEAM1" if state == "wrong-team" else pinned("EXPECTED_TEAM_ID", "TESTTEAM01")
     bundle = "com.example.notzeus" if state == "wrong-bundle" else pinned("EXPECTED_BUNDLE_ID", "app.zeus.mac")
     print("Identifier=" + bundle)
     print("Authority=" + ("Developer ID Application: Test" if state != "adhoc" else "Zeus Local Dev"))
@@ -230,14 +230,56 @@ class ReleaseScripts(unittest.TestCase):
         self.assertIn("not been notarized", result.stdout)
         self.assertFalse(any(c[0] == "spctl" for c in self.commands()))
 
+    def use_synthetic_team(self, team="TESTTEAM01"):
+        # ZEUSTEAMID is a fail-closed placeholder. Acceptance tests replace it in the
+        # throwaway copy only. They never treat the placeholder as a good team.
+        path = self.root / "scripts/verify-release-signature.sh"
+        text = path.read_text()
+        needle = 'EXPECTED_TEAM_ID="ZEUSTEAMID"'
+        self.assertIn(needle, text)
+        path.write_text(text.replace(needle, f'EXPECTED_TEAM_ID="{team}"', 1))
+
+    def now_playing(self, app):
+        extra = app / "Contents/Resources/zeus-now-playing"
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_text("helper")
+        extra.chmod(0o755)
+        return extra
+
     def test_signature_checks_fail_closed(self):
         app = self.app(self.root / "build/Zeus.app", "new-app")
+        self.now_playing(app)
+        self.use_synthetic_team()
         for state in ("adhoc", "no-runtime", "no-timestamp"):
             with self.subTest(state=state):
                 self.assertNotEqual(self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state).returncode, 0)
         self.assertEqual(self.run_script("verify-release-signature.sh", app).returncode, 0)
 
+    def test_missing_now_playing_helper_fails_closed(self):
+        # The expected resource helper is absent. A sibling helper is present, so the
+        # failure is the missing zeus-now-playing binary and not an empty Helpers directory.
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        helper = app / "Contents/Helpers/zeus-bridge"
+        helper.parent.mkdir(parents=True)
+        helper.write_text("bridge")
+        helper.chmod(0o755)
+        self.use_synthetic_team()
+        self.assertFalse((app / "Contents/Resources/zeus-now-playing").exists())
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("zeus-now-playing", result.stderr)
+
+    def test_placeholder_team_id_refuses_the_release(self):
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        self.now_playing(app)
+        script = (self.root / "scripts/verify-release-signature.sh").read_text()
+        self.assertIn('EXPECTED_TEAM_ID="ZEUSTEAMID"', script)
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ZEUSTEAMID", result.stderr)
+
     def test_release_signature_checks_the_resource_helper(self):
+        self.use_synthetic_team()
         app = self.app(self.root / "build/Zeus.app", "new-app")
         extra = app / "Contents/Resources/zeus-now-playing"
         extra.parent.mkdir(parents=True)
@@ -249,6 +291,7 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(displayed, [["codesign", "--display", "--verbose=4", str(extra)]])
 
     def test_release_signature_pins_team_bundle_and_verifies_the_helper(self):
+        self.use_synthetic_team()
         app = self.app(self.root / "build/Zeus.app", "new-app")
         extra = app / "Contents/Resources/zeus-now-playing"
         extra.parent.mkdir(parents=True)
