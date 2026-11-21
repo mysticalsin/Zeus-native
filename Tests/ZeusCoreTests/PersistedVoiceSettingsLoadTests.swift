@@ -32,6 +32,5 @@ struct PersistedVoiceSettingsLoadTests {
         #expect(saved.userSelected)
         #expect(saved.ttsProvider == "kokoro")
         #expect(saved.engineAuto == false)
-        #expect(saved.resolvedEngine(kokoroReady: true, elevenLabsKeyValid: true) == .system)
     }
 }

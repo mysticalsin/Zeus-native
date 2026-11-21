@@ -24,9 +24,40 @@ public struct PersistedVoiceSettings: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         engine = try container.decodeIfPresent(String.self, forKey: .engine)
-        userSelected = try container.decodeIfPresent(Bool.self, forKey: .userSelected) ?? false
+        userSelected = Self.flexibleBool(container, .userSelected) ?? false
         ttsProvider = try container.decodeIfPresent(String.self, forKey: .ttsProvider)
-        engineAuto = try container.decodeIfPresent(Bool.self, forKey: .engineAuto)
+        engineAuto = Self.flexibleBool(container, .engineAuto)
+    }
+
+    /// The four keys `VoiceSettings` already writes. A string or number does not drop the engine.
+    public static func load(_ defaults: UserDefaults) -> PersistedVoiceSettings {
+        PersistedVoiceSettings(
+            engine: defaults.string(forKey: "voice.engine"),
+            userSelected: flexibleStoredBool(defaults, "voice.engine.userSelected") ?? false,
+            ttsProvider: defaults.string(forKey: "voice.ttsProvider"),
+            engineAuto: flexibleStoredBool(defaults, "voice.engine.auto")
+        )
+    }
+
+    private static func flexibleBool(_ container: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Bool? {
+        if let value = try? container.decodeIfPresent(Bool.self, forKey: key) { return value }
+        if let text = try? container.decodeIfPresent(String.self, forKey: key) {
+            if text == "true" || text == "1" { return true }
+            if text == "false" || text == "0" { return false }
+        }
+        if let number = try? container.decodeIfPresent(Int.self, forKey: key) { return number != 0 }
+        return nil
+    }
+
+    private static func flexibleStoredBool(_ defaults: UserDefaults, _ key: String) -> Bool? {
+        if defaults.object(forKey: key) == nil { return nil }
+        if let value = defaults.object(forKey: key) as? Bool { return value }
+        if let text = defaults.string(forKey: key) {
+            if text == "true" || text == "1" { return true }
+            if text == "false" || text == "0" { return false }
+        }
+        if let number = defaults.object(forKey: key) as? NSNumber { return number.boolValue }
+        return nil
     }
 
     /// The engine a launch already starts on. Local-voice flags are not an input.
