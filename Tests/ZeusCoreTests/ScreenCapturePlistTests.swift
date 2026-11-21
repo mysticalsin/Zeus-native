@@ -4,7 +4,7 @@ import Testing
 /// S04-05. Screen capture is called, and the purpose string the system shows was missing.
 @Suite("Screen capture purpose string")
 struct ScreenCapturePlistTests {
-    static let purpose = "ZEUS captures the screen when you talk with screen consent on, when desktop pointing places a mark, when you record, and for live captions of the sound this Mac is playing. Screenshots go to the assistant engine you chose and are not kept as files. A screen recording is saved on this Mac and stays after you stop."
+    static let purpose = "ZEUS captures the screen when you talk with screen consent on, when desktop pointing places a mark, when you record, and for live captions of the sound this Mac is playing. Screenshots go to the assistant engine you chose and are not kept as files. A screenshot stays in that session until the session is replaced. A screen recording is saved on this Mac and stays after you stop."
 
     private func plistFile() throws -> URL {
         var url = URL(fileURLWithPath: #filePath)
