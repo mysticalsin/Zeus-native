@@ -63,7 +63,7 @@ struct OpenAISpeechRetirementTests {
     @Test func routerNeverSelectsOpenAIAfterShutdownAndFallsThroughLikeNoKey() {
         let retired = UltronEngineAvailability(elevenLabsConfigured: true, openAIConfigured: true, kokoroReady: true, openAIRetired: true)
         let noKey = UltronEngineAvailability(elevenLabsConfigured: true, openAIConfigured: false, kokoroReady: true)
-        let expected: [UltronEngine] = [.elevenLabs, .kokoro, .system]
+        let expected: [UltronEngine] = [.kokoro, .system]
         #expect(UltronEngineRouter.chain(choice: .auto, availability: retired).map(\.engine) == expected)
         #expect(UltronEngineRouter.chain(choice: .auto, availability: noKey).map(\.engine) == expected)
         // A saved OpenAI choice is kept but not used: the chain is the one the no-key owner gets.
@@ -81,8 +81,8 @@ struct OpenAISpeechRetirementTests {
     @Test func routerBeforeShutdownIsUnchanged() {
         let live = UltronEngineAvailability(elevenLabsConfigured: true, openAIConfigured: true, kokoroReady: true,
                                             openAIRetired: OpenAISpeechRetirement.isRetired(model: "gpt-4o-mini-tts", at: before))
-        #expect(UltronEngineRouter.chain(choice: .auto, availability: live).map(\.engine) == [.elevenLabs, .openAI, .kokoro, .system])
-        #expect(UltronEngineRouter.chain(choice: .fixed(.openAI), availability: live).map(\.engine) == [.openAI, .elevenLabs, .kokoro, .system])
+        #expect(UltronEngineRouter.chain(choice: .auto, availability: live).map(\.engine) == [.kokoro, .system])
+        #expect(UltronEngineRouter.chain(choice: .fixed(.openAI), availability: live).map(\.engine) == [.openAI, .kokoro, .system])
     }
 
     @Test func catalogHidesOpenAIVoicesAfterShutdownOnly() {
