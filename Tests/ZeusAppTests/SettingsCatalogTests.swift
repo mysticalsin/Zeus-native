@@ -139,9 +139,9 @@ struct SettingsCatalogTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults)
-        store.set("assistant.provider", "Anthropic")
-        store.set("assistant.model", "claude-sonnet-4")
-        store.set("halo.style", "Crystal prism")
+        store.set("assistant.provider", "Anthropic", origin: .person)
+        store.set("assistant.model", "claude-sonnet-4", origin: .person)
+        store.set("halo.style", "Crystal prism", origin: .person)
 
         let root = try #require(JSONSerialization.jsonObject(with: store.exportJSON()) as? [String: Any])
         let options = try #require(root["options"] as? [String: String])
@@ -182,7 +182,7 @@ struct SettingsCatalogTests {
     @MainActor @Test func choosingStartAutomaticallyIsTheOptInAndAsksOnlyWhenMacOSHasNotAsked() throws {
         let fresh = AutoStartRig(access: .notAsked)
         defer { fresh.cleanup() }
-        fresh.store.set("scribe.autoStart", "Start automatically")
+        fresh.store.set("scribe.autoStart", "Start automatically", origin: .person)
         #expect(fresh.mode == "Start automatically")
         #expect(fresh.stamp != nil)
         #expect(fresh.prompts == 1)
@@ -190,7 +190,7 @@ struct SettingsCatalogTests {
         for access in [ScribeMicrophoneAccess.allowed, .denied] {
             let rig = AutoStartRig(access: access)
             defer { rig.cleanup() }
-            rig.store.set("scribe.autoStart", "Start automatically")
+            rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
             #expect(rig.stamp != nil, "\(access)")
             #expect(rig.prompts == 0, "\(access)")
         }
@@ -199,8 +199,8 @@ struct SettingsCatalogTests {
     @MainActor @Test func theOtherChoicesNeverAskMacOSAndNeverStamp() throws {
         let rig = AutoStartRig(access: .notAsked)
         defer { rig.cleanup() }
-        rig.store.set("scribe.autoStart", "Off")
-        rig.store.set("scribe.autoStart", "Ask me")
+        rig.store.set("scribe.autoStart", "Off", origin: .person)
+        rig.store.set("scribe.autoStart", "Ask me", origin: .person)
         #expect(rig.prompts == 0)
         #expect(rig.stamp == nil)
     }
@@ -209,9 +209,9 @@ struct SettingsCatalogTests {
         for other in ["Ask me", "Off"] {
             let rig = AutoStartRig()
             defer { rig.cleanup() }
-            rig.store.set("scribe.autoStart", "Start automatically")
+            rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
             #expect(rig.stamp != nil)
-            rig.store.set("scribe.autoStart", other)
+            rig.store.set("scribe.autoStart", other, origin: .person)
             #expect(rig.mode == other)
             #expect(rig.stamp == nil, "\(other)")
         }
@@ -222,7 +222,7 @@ struct SettingsCatalogTests {
         let rig = AutoStartRig(stored: "Start automatically")
         defer { rig.cleanup() }
         #expect(rig.stamp == nil)
-        rig.store.set("scribe.autoStart", "Start automatically")
+        rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
         #expect(rig.stamp != nil)
     }
 
@@ -240,7 +240,7 @@ struct SettingsCatalogTests {
     @MainActor @Test func anImportAskingForStartAutomaticallyLeavesAnExistingOptInAlone() throws {
         let rig = AutoStartRig()
         defer { rig.cleanup() }
-        rig.store.set("scribe.autoStart", "Start automatically")
+        rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
         let stamp = rig.stamp
         #expect(try rig.importFile("Start automatically") == 0)
         #expect(rig.mode == "Start automatically")
@@ -250,13 +250,13 @@ struct SettingsCatalogTests {
     @MainActor @Test func anImportWithOffAppliesAndRemovesTheStamp() throws {
         let rig = AutoStartRig()
         defer { rig.cleanup() }
-        rig.store.set("scribe.autoStart", "Start automatically")
+        rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
         #expect(try rig.importFile("Off") == 1)
         #expect(rig.mode == "Off")
         #expect(rig.stamp == nil)
         let other = AutoStartRig()
         defer { other.cleanup() }
-        other.store.set("scribe.autoStart", "Start automatically")
+        other.store.set("scribe.autoStart", "Start automatically", origin: .person)
         #expect(try other.importFile("Ask me") == 1)
         #expect(other.stamp == nil)
     }
@@ -271,12 +271,12 @@ struct SettingsCatalogTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SettingsStore(defaults: defaults)
-        store.set(TalkMicrophoneChoice.settingID, TalkMicrophoneChoice.device("AppleUSBAudioEngine:ACME:1234").stored)
+        store.set(TalkMicrophoneChoice.settingID, TalkMicrophoneChoice.device("AppleUSBAudioEngine:ACME:1234").stored, origin: .person)
         let text = String(decoding: try store.exportJSON(), as: UTF8.self)
         #expect(!text.contains("device:"), "a CoreAudio UID is from this Mac and stays here")
         #expect(!text.contains("AppleUSBAudioEngine"))
 
-        store.set(TalkMicrophoneChoice.settingID, TalkMicrophoneChoice.builtIn.stored)
+        store.set(TalkMicrophoneChoice.settingID, TalkMicrophoneChoice.builtIn.stored, origin: .person)
         let root = try #require(JSONSerialization.jsonObject(with: store.exportJSON()) as? [String: Any])
         let options = try #require(root["options"] as? [String: String])
         #expect(options[TalkMicrophoneChoice.settingID] == TalkMicrophoneChoice.builtInTitle, "a named choice still travels")
@@ -289,7 +289,7 @@ struct SettingsCatalogTests {
         }
         let rig = AutoStartRig()
         defer { rig.cleanup() }
-        rig.store.set("scribe.autoStart", "Start automatically")
+        rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
         let text = String(decoding: try rig.store.exportJSON(), as: UTF8.self)
         #expect(!text.contains("optInAt"))
         #expect(!text.contains("firstRecordingAt"))
@@ -298,7 +298,7 @@ struct SettingsCatalogTests {
     @MainActor @Test func aSectionResetWithdrawsTheOptIn() throws {
         let rig = AutoStartRig()
         defer { rig.cleanup() }
-        rig.store.set("scribe.autoStart", "Start automatically")
+        rig.store.set("scribe.autoStart", "Start automatically", origin: .person)
         #expect(rig.stamp != nil)
         rig.store.reset(.agents)
         #expect(rig.mode == "Ask me")
@@ -339,7 +339,7 @@ struct SettingsCatalogTests {
         #expect(applied == 1)
 
         // A person who turned it on here can have an import turn it off, never on.
-        store.set("face.presence", "true")
+        store.set("face.presence", "true", origin: .person)
         try store.importJSON(file(["face.presence": "false"]))
         #expect(!store.bool("face.presence"))
         try store.importJSON(file(["face.presence": "true"]))
@@ -360,7 +360,7 @@ struct SettingsCatalogTests {
         try store.importJSON(file(["fling.enabled": "true", "fling.flickSensitivity": "High"]))
         #expect(!store.bool("fling.enabled"))
         #expect(store.string("fling.flickSensitivity") == "High")
-        store.set("fling.enabled", "true")
+        store.set("fling.enabled", "true", origin: .person)
         try store.importJSON(file(["fling.enabled": "false"]))
         #expect(!store.bool("fling.enabled"))
     }
@@ -376,8 +376,8 @@ struct SettingsCatalogTests {
     @MainActor @Test func exportHoldsNoFaceData() throws {
         let (store, defaults, suiteName) = try Self.isolatedStore()
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        store.set("face.presence", "true")
-        store.set("face.lockAfter", "1 minute")
+        store.set("face.presence", "true", origin: .person)
+        store.set("face.lockAfter", "1 minute", origin: .person)
 
         // A vault with a face in it, so there is something that could leak.
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-export-\(UUID().uuidString)", isDirectory: true)

@@ -272,7 +272,7 @@ final class SystemNotificationService {
     static let shared = SystemNotificationService(
         client: TopBarStyle.isSnapshot ? NoopNotificationClient() : UserNotificationCenterClient(),
         isEnabled: { SettingsStore.shared.bool("notify.system") },
-        setEnabled: { SettingsStore.shared.set("notify.system", $0 ? "true" : "false") }
+        setEnabled: { SettingsStore.shared.set("notify.system", $0 ? "true" : "false", origin: .person) }
     )
 
     @ObservationIgnored private let client: any SystemNotificationClient

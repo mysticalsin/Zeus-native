@@ -131,7 +131,7 @@ struct SettingOptionRow: View {
         case .toggle:
             if option.id == "general.launchAtLogin" {
                 GlassToggle(isOn: Binding(get: { store.bool(option.id) },
-                                          set: { store.set(option.id, $0 ? "true" : "false") }), label: option.title)
+                                          set: { store.set(option.id, $0 ? "true" : "false", origin: .person) }), label: option.title)
             } else {
                 GlassToggle(isOn: store.boolBinding(option.id), label: option.title)
             }
@@ -152,7 +152,7 @@ struct SettingOptionRow: View {
         case .slider:
             if let range = option.range {
                 GlassStepper(value: Binding(get: { Int(store.double(option.id)) },
-                                            set: { store.set(option.id, String($0)) }),
+                                            set: { store.set(option.id, String($0), origin: .person) }),
                              range: Int(range.min)...Int(range.max), step: Int(range.step)) { "\($0) %" }
             }
         case .text:

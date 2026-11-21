@@ -15,8 +15,28 @@ public enum ZeusScreenSharePolicy {
     }
 
     /// True when this origin may persist `show == true`. A request to hide is always persisted.
+    /// An agent, including the command line, can turn showing off and cannot turn it on.
     public static func persistsShow(requestedTrue: Bool, origin: WriteOrigin) -> Bool {
         if requestedTrue { return origin == .person }
+        return true
+    }
+
+    /// `interview.hide` false means "do not hide", which is showing. An import must not do that.
+    public static func importedLegacyHideWouldShow(_ value: Any) -> Bool {
+        if let flag = value as? Bool { return !flag }
+        if let text = value as? String { return text == "false" }
+        return false
+    }
+
+    /// Writes a hidden legacy flag. A request to show is refused and writes nothing.
+    /// When the live string is absent, a successful hide also stores `"false"` so the read stays hidden.
+    @discardableResult
+    public static func applyImportedLegacyHide(_ hidden: Bool, defaults: UserDefaults) -> Bool {
+        guard hidden else { return false }
+        defaults.set(true, forKey: legacyHideKey)
+        if defaults.string(forKey: storedKey) == nil {
+            defaults.set("false", forKey: storedKey)
+        }
         return true
     }
 
@@ -60,6 +80,17 @@ public enum ZeusScreenSharePolicy {
         if forcesHidden { defaults.set("false", forKey: storedKey) }
     }
 
+    /// The write `SettingsStore.set` uses for the live show string. An origin that cannot enable
+    /// showing leaves the defaults untouched and returns false. A hide writes both keys.
+    @discardableResult
+    public static func commit(value: String, origin: WriteOrigin, defaults: UserDefaults) -> Bool {
+        guard value == "true" || value == "false" else { return false }
+        let requestedTrue = value == "true"
+        guard persistsShow(requestedTrue: requestedTrue, origin: origin) else { return false }
+        setShown(requestedTrue, defaults: defaults)
+        return true
+    }
+
     /// Writes the live string and the legacy hide flag to the same choice. Neither key is removed.
     public static func setShown(_ shown: Bool, defaults: UserDefaults) {
         defaults.set(shown ? "true" : "false", forKey: storedKey)
@@ -87,5 +118,33 @@ public enum ZeusScreenSharePolicy {
 
     public static func captureKind(visible: Bool) -> CaptureSharingKind {
         visible ? .visibleInShare : .hidden
+    }
+}
+
+/// `zeus debug screen-share`. The command line is an agent: `on` does not persist showing.
+public enum ScreenShareDebug {
+    public static let origin = ZeusScreenSharePolicy.WriteOrigin.agent
+
+    public enum Verb: Equatable, Sendable {
+        case on, off, state, unrecognized
+    }
+
+    public static func verb(_ text: String) -> Verb {
+        switch text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "on": .on
+        case "off": .off
+        case "state": .state
+        default: .unrecognized
+        }
+    }
+
+    /// Nil means the command must not write a shown value. `on` never writes true.
+    public static func persistedShown(_ verb: Verb, currentlyShown: Bool) -> Bool? {
+        _ = currentlyShown
+        switch verb {
+        case .on: return nil
+        case .off: return false
+        case .state, .unrecognized: return nil
+        }
     }
 }

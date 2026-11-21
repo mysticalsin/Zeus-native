@@ -41,7 +41,7 @@ extension SettingsStore {
             let value = shared.string(id)
             if value.isEmpty || (id.hasPrefix("sound.") && id.hasSuffix("Style") && value != "Off" && !isSoundStyle(id, value)) { return guideDefaults[id] ?? value }
             return value
-        }, set: { shared.set(id, $0) })
+        }, set: { shared.set(id, $0, origin: .person) })
     }
 
     /// Older Zeus builds saved a system sound name ("Glass") rather than a style.

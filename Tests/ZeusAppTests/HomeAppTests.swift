@@ -7,7 +7,7 @@ import ZeusCore
     @Test func catalogDefaultsMatchTodaysHome() {
         let store = SettingsStore.shared
         let saved = HomeSlots.settingIDs.map { ($0, store.string($0)) }
-        defer { for (id, value) in saved { store.set(id, value) } }
+        defer { for (id, value) in saved { store.set(id, value, origin: .person) } }
         for (index, id) in HomeSlots.settingIDs.enumerated() {
             #expect(SettingsCatalog.option(id)?.defaultValue == HomeSlots.defaults[index].title)
             #expect(SettingsCatalog.option(id)?.isShown == true)
@@ -24,7 +24,7 @@ import ZeusCore
         let store = SettingsStore.shared
         let ids = HomeSlots.settingIDs + [HomeBackdrop.settingID, "home.variant.clock"]
         let saved = ids.map { ($0, store.string($0)) }
-        defer { for (id, value) in saved { store.set(id, value) } }
+        defer { for (id, value) in saved { store.set(id, value, origin: .person) } }
         let topBar = TopBarModel()
         topBar.setHomeWidget(slot: 2, to: .clock)
         topBar.setHomeVariant(.clock, to: HomeWidgetKind.clock.variants[3])
@@ -81,17 +81,17 @@ import ZeusCore
     @Test func creatingAnEventFiresTheRibbonWhenTheLightIsOn() async {
         let store = SettingsStore.shared
         let saved = store.string("lights.eventGlow")
-        defer { store.set("lights.eventGlow", saved) }
+        defer { store.set("lights.eventGlow", saved, origin: .person) }
         let topBar = TopBarModel()
         topBar.createEvent = { _ in .created(id: "x") }
-        store.set("lights.eventGlow", "true")
+        store.set("lights.eventGlow", "true", origin: .person)
         let problem = await topBar.addEvent(from: "lunch with Ana tomorrow at 1 pm")
         #expect(problem == nil)
         #expect(topBar.lights.contains { $0.kind == .eventRibbon })
 
         let quiet = TopBarModel()
         quiet.createEvent = { _ in .created(id: "y") }
-        store.set("lights.eventGlow", "false")
+        store.set("lights.eventGlow", "false", origin: .person)
         _ = await quiet.addEvent(from: "lunch with Ana tomorrow at 1 pm")
         #expect(quiet.lights.isEmpty)
     }

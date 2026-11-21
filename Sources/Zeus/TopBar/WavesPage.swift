@@ -45,7 +45,7 @@ struct WavesPage: View {
                     Spacer(minLength: 0)
                     HStack(spacing: 4) {
                         ForEach(WaveStyle.allCases) { option in
-                            Button { store.set(AudioSpectrumService.styleKey, option.rawValue) } label: {
+                            Button { store.set(AudioSpectrumService.styleKey, option.rawValue, origin: .person) } label: {
                                 Text(option.rawValue).font(TopBarStyle.label(11, .semibold))
                                     .foregroundStyle(option == style ? Theme.storm : Theme.cloudSecondary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 5)

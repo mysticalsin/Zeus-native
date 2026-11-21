@@ -59,7 +59,7 @@ struct TilingSettingsPage: View {
         }
         let shown = Int(current())
         return GSRow(symbol: symbol, title: title, text: "\(shown) \(unit). \(text)") {
-            Slider(value: Binding(get: { current() }, set: { store.set(id, String(Int($0.rounded()))) }), in: bounds, step: range.step)
+            Slider(value: Binding(get: { current() }, set: { store.set(id, String(Int($0.rounded())), origin: .person) }), in: bounds, step: range.step)
                 .snapshotSafeSlider(value: current(), in: bounds)
                 .frame(width: 160)
                 .accessibilityLabel(title)

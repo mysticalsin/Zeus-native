@@ -79,7 +79,7 @@ struct FeaturesSettingsPage: View {
             GSRow(symbol: "folder", title: "Save reports in", text: folderText) {
                 HStack(spacing: 8) {
                     Button("Choose") { chooseFolder() }.buttonStyle(GSButtonStyle())
-                    if !store.string("research.folder").isEmpty { Button("Default") { store.set("research.folder", "") }.buttonStyle(GSButtonStyle()) }
+                    if !store.string("research.folder").isEmpty { Button("Default") { store.set("research.folder", "", origin: .person) }.buttonStyle(GSButtonStyle()) }
                 }
             }
         }
@@ -130,7 +130,7 @@ struct FeaturesSettingsPage: View {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.prompt = "Save here"
-        if panel.runModal() == .OK, let url = panel.url { store.set("research.folder", url.path) }
+        if panel.runModal() == .OK, let url = panel.url { store.set("research.folder", url.path, origin: .person) }
     }
 
     /// A prompter switch: written, then an open prompter and the slideshow watcher pick it up.

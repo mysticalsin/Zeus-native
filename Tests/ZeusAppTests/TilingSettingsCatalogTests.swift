@@ -153,7 +153,7 @@ struct TilingSettingsCatalogTests {
         let (defaults, cleanup) = try isolated()
         defer { cleanup() }
         let store = SettingsStore(defaults: defaults)
-        store.set("tiling.enabled", "true")
+        store.set("tiling.enabled", "true", origin: .person)
         #expect(try store.importJSON(file(["tiling.enabled": "false"])) == 1)
         #expect(store.bool("tiling.enabled") == false)
     }
@@ -163,8 +163,8 @@ struct TilingSettingsCatalogTests {
         let (targetDefaults, targetCleanup) = try isolated()
         defer { sourceCleanup(); targetCleanup() }
         let source = SettingsStore(defaults: sourceDefaults)
-        source.set("tiling.enabled", "true")
-        source.set("tiling.innerGap", "20")
+        source.set("tiling.enabled", "true", origin: .person)
+        source.set("tiling.innerGap", "20", origin: .person)
         let target = SettingsStore(defaults: targetDefaults)
         _ = try target.importJSON(source.exportJSON())
         #expect(target.bool("tiling.enabled") == false)
@@ -204,8 +204,8 @@ struct TilingSettingsCatalogTests {
         let (defaults, cleanup) = try isolated()
         defer { cleanup() }
         let store = SettingsStore(defaults: defaults)
-        store.set("tiling.enabled", "true")
-        store.set("tiling.innerGap", "30")
+        store.set("tiling.enabled", "true", origin: .person)
+        store.set("tiling.innerGap", "30", origin: .person)
         store.reset(.tiling)
         #expect(store.bool("tiling.enabled") == false)
         #expect(store.string("tiling.innerGap") == "8")

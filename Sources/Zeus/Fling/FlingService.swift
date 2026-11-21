@@ -186,7 +186,7 @@ final class FlingService: FlingSending {
 
     /// The Shelf's "Turn on" button. This is the explicit opt-in.
     func turnOn() {
-        SettingsStore.shared.set("fling.enabled", "true")
+        SettingsStore.shared.set("fling.enabled", "true", origin: .person)
         reconfigure()
     }
 

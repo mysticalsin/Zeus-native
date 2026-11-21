@@ -96,7 +96,7 @@ final class TilingController {
                 showSheet: { rows in
                     if let rows { TilingKeySheet.shared.show(rows: rows, on: nil) } else { TilingKeySheet.shared.hide() }
                 },
-                writeSetting: { id, value in SettingsStore.shared.set(id, value) },
+                writeSetting: { id, value in SettingsStore.shared.set(id, value, origin: .person) },
                 now: { ProcessInfo.processInfo.systemUptime })
         }
     }

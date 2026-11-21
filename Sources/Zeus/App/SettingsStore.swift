@@ -70,8 +70,9 @@ final class SettingsStore {
     /// Bumped when the microphone answer may have changed, so a row that shows it reads it again.
     private(set) var microphoneEpoch = 0
 
-    /// Where a change came from. Only the owner's own click may opt in to automatic recording.
-    enum ChangeOrigin: Sendable { case person, reset, importFile }
+    /// Where a change came from. Only the owner's own click may opt in to automatic recording
+    /// or turn screen-share visibility on. There is no default: a caller has to name the origin.
+    enum ChangeOrigin: Sendable { case person, reset, importFile, agent }
 
     static func key(_ id: String) -> String { "opt." + id }
 
@@ -136,16 +137,12 @@ final class SettingsStore {
         string(id).split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty }
     }
 
-    func set(_ id: String, _ value: String, origin: ChangeOrigin = .person) {
+    func set(_ id: String, _ value: String, origin: ChangeOrigin) {
         var blockedEnable = false
         if id == ZeusScreenSharePolicy.showInSharingKey, value == "true" || value == "false" {
-            let requestedTrue = value == "true"
-            if ZeusScreenSharePolicy.persistsShow(requestedTrue: requestedTrue, origin: Self.screenShareOrigin(origin)) {
-                if !TopBarStyle.isSnapshot { ZeusScreenSharePolicy.setShown(requestedTrue, defaults: defaults) }
-            } else {
-                // Import, reset, agent, and migration cannot enable showing. Leave the stored choice.
-                blockedEnable = true
-            }
+            let wrote = TopBarStyle.isSnapshot
+                || ZeusScreenSharePolicy.commit(value: value, origin: Self.screenShareOrigin(origin), defaults: defaults)
+            if !wrote { blockedEnable = true }
         }
         // This stays reachable for every id. The screen-share branch must not return before it.
         if id == ScribeAutoStartMode.settingID { applyAutoStartChoice(value, origin: origin) }
@@ -161,6 +158,7 @@ final class SettingsStore {
         case .person: .person
         case .reset: .reset
         case .importFile: .importFile
+        case .agent: .agent
         }
     }
 
@@ -180,7 +178,7 @@ final class SettingsStore {
             // The getter reads the cached value (see `refreshLaunchAtLogin`), never the service.
             return Binding(get: { self.bool(id) }, set: { on in self.applyLaunchAtLogin(on) })
         }
-        return Binding(get: { self.bool(id) }, set: { self.set(id, $0 ? "true" : "false") })
+        return Binding(get: { self.bool(id) }, set: { self.set(id, $0 ? "true" : "false", origin: .person) })
     }
 
     private func applyLaunchAtLogin(_ on: Bool) {
@@ -199,7 +197,7 @@ final class SettingsStore {
         }
     }
     func stringBinding(_ id: String) -> Binding<String> {
-        Binding(get: { self.string(id) }, set: { self.set(id, $0) })
+        Binding(get: { self.string(id) }, set: { self.set(id, $0, origin: .person) })
     }
 
     // MARK: Reset
@@ -402,6 +400,13 @@ final class SettingsStore {
             let rule = Self.appRules[key] ?? (key == HaloMigration.legacyKey ? AppRule.text(64) : nil)
             guard let rule, rule.accepts(value), !Self.neverImportedAppKeys.contains(key) else { continue }
             if Self.neverEnabledAppKeys.contains(key), (value as? NSNumber)?.boolValue == true { continue }
+            if key == ZeusScreenSharePolicy.legacyHideKey {
+                if ZeusScreenSharePolicy.importedLegacyHideWouldShow(value) { continue }
+                if !TopBarStyle.isSnapshot, let hidden = value as? Bool, hidden {
+                    _ = ZeusScreenSharePolicy.applyImportedLegacyHide(true, defaults: defaults)
+                }
+                continue
+            }
             // An import never moves speech to a cloud service: this Mac may already hold that service's key.
             if Self.importWouldSelectCloud(key: key, value: value) { continue }
             appChanges.append((key, value))

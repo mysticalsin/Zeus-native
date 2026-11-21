@@ -17,7 +17,7 @@ final class CursorPresenceController {
 
     static var isEnabled: Bool {
         get { SettingsStore.shared.bool(settingID) }
-        set { SettingsStore.shared.set(settingID, newValue ? "true" : "false") }
+        set { SettingsStore.shared.set(settingID, newValue ? "true" : "false", origin: .person) }
     }
 
     private weak var panel: NSPanel?

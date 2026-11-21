@@ -115,7 +115,7 @@ final class TopBarModel {
     /// The notch halo, read from and written to the single `halo.style` setting that every picker uses.
     var haloStyle: HaloStyle {
         get { snapshotHalo ?? HaloStyle.resolve(SettingsStore.shared.string("halo.style")) }
-        set { if TopBarStyle.isSnapshot { snapshotHalo = newValue } else { SettingsStore.shared.set("halo.style", newValue.rawValue) } }
+        set { if TopBarStyle.isSnapshot { snapshotHalo = newValue } else { SettingsStore.shared.set("halo.style", newValue.rawValue, origin: .person) } }
     }
     /// Short cues on the closed notch (copy, caps lock, volume, battery, track change).
     var cuesEnabled: Bool {
@@ -657,15 +657,15 @@ final class TopBarModel {
     }
 
     func setHomeWidget(slot: Int, to kind: HomeWidgetKind) {
-        SettingsStore.shared.set(HomeSlots.settingID(slot: slot), kind.title)
+        SettingsStore.shared.set(HomeSlots.settingID(slot: slot), kind.title, origin: .person)
     }
 
     func setHomeVariant(_ kind: HomeWidgetKind, to variant: HomeVariant) {
-        SettingsStore.shared.set(kind.variantSettingID, variant.title)
+        SettingsStore.shared.set(kind.variantSettingID, variant.title, origin: .person)
     }
 
     func setHomeBackdrop(_ backdrop: HomeBackdrop) {
-        SettingsStore.shared.set(HomeBackdrop.settingID, backdrop.title)
+        SettingsStore.shared.set(HomeBackdrop.settingID, backdrop.title, origin: .person)
     }
 
     // MARK: Tab editor

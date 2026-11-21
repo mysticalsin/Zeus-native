@@ -238,7 +238,7 @@ struct DrawnNotchCardTests {
         let suite = NSTemporaryDirectory() + "zeus.drawn.card.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         let store = SettingsStore(defaults: defaults)
-        for (id, value) in start { store.set(id, value) }
+        for (id, value) in start { store.set(id, value, origin: .person) }
         let file: [String: Any] = ["format": "zeus.settings", "version": 1, "options": options, "app": [String: String]()]
         try store.importJSON(JSONSerialization.data(withJSONObject: file))
         defaults.removePersistentDomain(forName: suite)
