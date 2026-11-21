@@ -21,6 +21,8 @@ private struct GlanceRow<Leading: View, Trailing: View>: View {
                 Button(action: action) { rowContent }
                     .buttonStyle(PressableStyle())
                     .accessibilityElement(children: .combine)
+                    .accessibilityLabel([title, detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
+                    .accessibilityIdentifier("topbar.today-pages.control.3")
             } else {
                 rowContent.accessibilityElement(children: .contain)
             }
@@ -74,6 +76,8 @@ private struct GlanceEmpty: View {
                     .font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.storm)
                     .padding(.horizontal, 12).padding(.vertical, 5)
                     .background(Capsule().fill(Theme.bolt))
+                    .accessibilityLabel(button)
+                    .accessibilityIdentifier("topbar.today-pages.button")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -149,6 +153,7 @@ struct TodayPage: View {
                                     Button { TodoController.shared.toggle(item.id) } label: {
                                         Image(systemName: "circle").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.cloudSecondary)
                                     }.buttonStyle(PressableStyle()).accessibilityLabel("Mark done")
+                                        .accessibilityIdentifier("topbar.today-pages.mark-done")
                                 } trailing: { if let due = item.due { DueChip(due: due, done: false) } }
                             }
                             ForEach(tasks) { task in
@@ -222,6 +227,7 @@ struct RemindersPage: View {
                             TextField("New reminder. Try \"pay rent friday at 5pm\"", text: $reminders.draft)
                                 .textFieldStyle(.plain).font(TopBarStyle.label(11.5)).foregroundStyle(Theme.cloudPrimary)
                                 .onSubmit { reminders.submitDraft() }
+                                .accessibilityIdentifier("topbar.today-pages.control.2")
                         }
                         if let quick = reminders.pendingDue {
                             Text("Due \(quick.rawValue.lowercased())").font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.glow)
@@ -240,6 +246,7 @@ struct RemindersPage: View {
                                         Button { reminders.complete(item.id) } label: {
                                             Image(systemName: "circle").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color(hex: item.colorHex))
                                         }.buttonStyle(PressableStyle()).accessibilityLabel("Complete \(item.title)")
+                                            .accessibilityIdentifier("topbar.today-pages.complete.2")
                                     } trailing: {
                                         HStack(spacing: 6) {
                                             if item.flagged { Image(systemName: "flag.fill").font(.system(size: 9)).foregroundStyle(Theme.ember).accessibilityLabel("Flagged") }
@@ -255,7 +262,10 @@ struct RemindersPage: View {
                                     .accessibilityAction(named: item.flagged ? "Unflag" : "Flag") { reminders.toggleFlag(item.id) }
                                     .contextMenu {
                                         Button(item.flagged ? "Unflag" : "Flag") { reminders.toggleFlag(item.id) }
+                                            .accessibilityLabel(item.flagged ? "Unflag" : "Flag")
+                                            .accessibilityIdentifier("topbar.today-pages.unflag")
                                         Button("Complete") { reminders.complete(item.id) }
+                                            .accessibilityIdentifier("topbar.today-pages.complete")
                                     }
                                 }
                             }
@@ -339,5 +349,6 @@ struct ReminderChip: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("topbar.today-pages.control")
     }
 }

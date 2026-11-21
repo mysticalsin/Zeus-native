@@ -59,8 +59,11 @@ struct TodoPage: View {
                 if todo.items.contains(where: \.done) {
                     Button(todo.showDone ? "Hide done" : "Show done") { todo.showDone.toggle() }
                         .buttonStyle(PressableStyle()).font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudSecondary)
+                        .accessibilityLabel(todo.showDone ? "Hide done" : "Show done")
+                        .accessibilityIdentifier("topbar.todo-page.hide-done")
                     Button("Clear done") { todo.clearDone() }
                         .buttonStyle(PressableStyle()).font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudSecondary)
+                        .accessibilityIdentifier("topbar.todo-page.clear-done")
                 }
             }
         }
@@ -118,6 +121,7 @@ struct TodoPage: View {
                         }
                         .buttonStyle(PressableStyle())
                         .accessibilityLabel("Suggestion: \(suggestion.reason)")
+                        .accessibilityIdentifier("topbar.todo-page.suggestion")
                 }
             }
         }
@@ -149,6 +153,7 @@ private struct TodoRow: View {
             }
             .buttonStyle(PressableStyle())
             .accessibilityLabel(item.done ? "Mark not done" : "Mark done")
+            .accessibilityIdentifier("topbar.todo-page.circle")
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
                     .font(TopBarStyle.label(11.5, .medium))
@@ -183,9 +188,13 @@ private struct TodoRow: View {
         .accessibilityAction(named: "Delete") { todo.remove(item.id) }
         .contextMenu {
             Button("Move up") { todo.move(item.id, by: -1) }
+                .accessibilityIdentifier("topbar.todo-page.move-up")
             Button("Move down") { todo.move(item.id, by: 1) }
+                .accessibilityIdentifier("topbar.todo-page.move-down")
             Button("Change due date") { todo.cycleDue(item.id) }
+                .accessibilityIdentifier("topbar.todo-page.change-due-date")
             Button("Delete", role: .destructive) { todo.remove(item.id) }
+                .accessibilityIdentifier("topbar.todo-page.delete")
         }
     }
 }

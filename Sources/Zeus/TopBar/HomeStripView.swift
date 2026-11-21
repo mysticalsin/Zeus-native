@@ -74,6 +74,7 @@ struct HomeStripView: View {
         .buttonStyle(PressableStyle())
         .help(label)
         .accessibilityLabel(label)
+        .accessibilityIdentifier("topbar.home-strip-view.control")
     }
 
     static func batterySymbol(_ level: Int) -> String {

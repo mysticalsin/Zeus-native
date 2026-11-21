@@ -107,6 +107,7 @@ struct GlanceRoundButton: View {
         .buttonStyle(PressableStyle())
         .accessibilityLabel(label)
         .help(label)
+        .accessibilityIdentifier("topbar.glance-home-cards.control.3")
     }
 }
 
@@ -138,7 +139,8 @@ struct GlanceHomeCards: View {
         .overlay(alignment: .topTrailing) { if !editing { BeamerHomeChip().padding(6) } }
         // The 0.7 s press is pointer-only: a right-click menu and a VoiceOver action reach customise mode too.
         .contextMenu {
-            if !editing { Button("Customize Home") { topBar.beginHomeCustomize() } }
+            if !editing { Button("Customize Home") { topBar.beginHomeCustomize() }
+                .accessibilityIdentifier("topbar.glance-home-cards.customize-home") }
         }
         .accessibilityAction(named: "Customize Home") {
             if !topBar.homeCustomizing { topBar.beginHomeCustomize() }
@@ -180,6 +182,7 @@ private struct SlotFrame: View {
                 .accessibilityLabel("Slot \(slot), \(kind.title)")
                 .accessibilityHint("Choose this slot to change its widget.")
                 .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier("topbar.glance-home-cards.slot")
                 // The card content is hidden in edit mode and the slot name sits alone in the middle,
                 // so the pill never lands on a title or a number.
                 HStack(spacing: 5) {
@@ -241,6 +244,7 @@ struct HomeCustomizeBar: View {
                     .help(option.title)
                     .accessibilityLabel(option.title)
                     .accessibilityAddTraits(option == kind ? .isSelected : [])
+                    .accessibilityIdentifier("topbar.glance-home-cards.control.2")
                 }
                 if !kind.variants.isEmpty {
                     Rectangle().fill(Color.white.opacity(0.15)).frame(width: 1, height: 16).padding(.horizontal, 2)
@@ -261,6 +265,7 @@ struct HomeCustomizeBar: View {
                     .help(option.title)
                     .accessibilityLabel("Backdrop \(option.title)")
                     .accessibilityAddTraits(option == backdrop ? .isSelected : [])
+                    .accessibilityIdentifier("topbar.glance-home-cards.backdrop")
                 }
                 Spacer(minLength: 0)
                 Button { topBar.endHomeCustomize() } label: {
@@ -287,6 +292,7 @@ struct HomeCustomizeBar: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("topbar.glance-home-cards.control")
     }
 }
 

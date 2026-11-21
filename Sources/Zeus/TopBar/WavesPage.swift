@@ -54,6 +54,7 @@ struct WavesPage: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(option.rawValue) style")
                             .accessibilityAddTraits(option == style ? .isSelected : [])
+                            .accessibilityIdentifier("topbar.waves-page.style")
                         }
                     }
                     HStack(spacing: 5) {
@@ -64,6 +65,7 @@ struct WavesPage: View {
                     if service.permission == .refused {
                         Button("Allow in System Settings") { service.allowPressed() }
                             .buttonStyle(.plain).font(TopBarStyle.label(10.5, .semibold)).foregroundStyle(Theme.ember)
+                            .accessibilityIdentifier("topbar.waves-page.allow-in-system-settings")
                     }
                 }
             }

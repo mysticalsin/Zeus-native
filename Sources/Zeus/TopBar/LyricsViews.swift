@@ -303,7 +303,7 @@ private struct LyricWindow: View {
         .frame(height: rowHeight * CGFloat(rows))
         .clipped()
         .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.22), .init(color: .black, location: 0.78), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
-        .animation(Motion.reduced ? nil : .easeInOut(duration: 0.45), value: index)
+        .animation(Motion.reduced ? nil : .easeInOut(duration: MotionTokens.lyricsLineMove), value: index)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(index >= 0 && index < lines.count ? lines[index].text : "Lyrics")
     }
@@ -356,7 +356,7 @@ private struct WordLitText: View {
         let lit = LyricWordTiming.index(words, at: playing.elapsed() + LyricTiming.lead)
         Text(runs(words, lit: lit))
             .contentTransition(Motion.reduced ? .identity : .opacity)
-            .animation(Motion.reduced ? nil : .easeOut(duration: 0.18), value: lit)
+            .animation(Motion.reduced ? nil : .easeOut(duration: MotionTokens.topBarLabelOut), value: lit)
             .task(id: WakeKey(tick: tick, isPlaying: playing.isPlaying, positionAt: playing.positionAt)) { await wake() }
     }
 
