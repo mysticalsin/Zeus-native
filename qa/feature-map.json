@@ -6854,7 +6854,7 @@
         {
           "id": "F13.credential-removal-contract",
           "check": "portable-keychain",
-          "acceptance": "Denied deletion preserves the saved cache/backend state across synthetic relaunch; confirmed retry removes the intended secret, and absent-item removal is idempotent without touching other accounts. Actual OS Keychain and credential-settings controls remain outside this fixture.",
+          "acceptance": "Denied deletion preserves the saved cache/backend state across synthetic relaunch; confirmed retry removes the intended secret, and absent-item removal is idempotent without touching other accounts. An OpenAI removal deletes assistant.key.openai before assistant.key.openAI, treats a missing item as success, and restores the legacy spelling when the canonical delete fails. A failed alias delete does not report the migration done. A launch that finds both spellings deletes the stale alias. Actual OS Keychain and credential-settings controls remain outside this fixture.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
@@ -6879,6 +6879,50 @@
             {
               "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
               "function": "removalOfAbsentSecretIsIdempotentAndDoesNotTouchOtherAccounts"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "legacyDeleteFailureKeepsTheCanonicalSecret"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "absentLegacyDeleteIsSuccessAndTheCanonicalSecretIsRemoved"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "canonicalDeleteFailureRestoresTheLegacyAccount"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "loadDropsAStaleAliasWhenBothOpenAIAccountsExist"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "migrateOpenAIDoesNotReportDoneWhenAliasDeleteKeepsFailing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "migrateOpenAIReturnsNilWhenTheCanonicalWriteFails"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "lockedKeychainDeleteDoesNotReportSuccessWhileTheItemStays"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "failedWriteBackDoesNotDropTheDeletedSecret"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "failedWriteBackDoesNotCacheASecretTheBackendNoLongerHolds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "restoreOfTheAliasRemovedAtLoadDoesNotIgnoreAFailedWrite"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "migrationFailsWhenTheStoredCanonicalValueDoesNotMatchTheWrite"
             }
           ]
         },

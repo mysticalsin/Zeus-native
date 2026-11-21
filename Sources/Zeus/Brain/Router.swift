@@ -371,7 +371,11 @@ final class RouterSettings {
     func brainEngineCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil,
                                preferAppClaude: Bool = false)
         -> [(engine: BrainEngineID, id: String, provider: BrainProvider)] {
-        _ = AssistantKeyAccount.migrateOpenAI(get: { Keychain.get($0) }, writeCanonical: { Keychain.set($0, for: AssistantKeyAccount.canonicalOpenAI) })
+        // Nil means assistant.key.openai is still stored. The key is read on the next line either way.
+        _ = AssistantKeyAccount.migrateOpenAI(
+            get: { Keychain.get($0) },
+            writeCanonical: { Keychain.set($0, for: AssistantKeyAccount.canonicalOpenAI) },
+            deleteAlias: { Keychain.store.deleteAccount(AssistantKeyAccount.aliasOpenAI) })
         let openAI = AssistantKeyAccount.readOpenAI({ Keychain.get($0) }) != nil
         var ordered = BrainRoute.order(hasAnthropicKey: hasAnthropicKey, hasOpenAIKey: openAI,
                                        installed: Set(installed.keys), exhausted: Set(exhaustedEngines()))

@@ -41,7 +41,8 @@ enum KeychainSelfTest {
         let fresh = SystemKeychain().read(service: KeychainStore.service, account: "selftest.probe")
         let report: [String: Any] = [
             "service": KeychainStore.service,
-            "accounts": SystemKeychain().accounts(service: KeychainStore.service).sorted(),
+            "accounts": ((try? SystemKeychain().accounts(service: KeychainStore.service)) ?? []).sorted(),
+            "listingFailed": (try? SystemKeychain().accounts(service: KeychainStore.service)) == nil,
             "probeWrote": wrote,
             "probeReadBack": fresh == probe,
             "hasJevKey": store.has(JevKey.account),

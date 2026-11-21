@@ -8676,6 +8676,42 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-995",
+      "failure": "Deleting the canonical OpenAI account before the legacy spelling dropped the canonical secret when the legacy delete failed.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "legacyDeleteFailureKeepsTheCanonicalSecret"
+      }
+    },
+    {
+      "id": "REG-996",
+      "failure": "A missing legacy OpenAI item was reported as a failed delete after the canonical secret had already been removed, or a partial delete left only one spelling.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "absentLegacyDeleteIsSuccessAndTheCanonicalSecretIsRemoved"
+      }
+    },
+    {
+      "id": "REG-997",
+      "failure": "Migration reported the OpenAI alias copy done when delete of assistant.key.openai failed, or a launch that already had both spellings left the stale alias in place.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "migrateOpenAIDoesNotReportDoneWhenAliasDeleteKeepsFailing"
+      }
     }
-]
+  ]
 }

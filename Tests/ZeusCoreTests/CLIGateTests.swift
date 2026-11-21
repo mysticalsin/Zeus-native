@@ -102,7 +102,7 @@ struct CLIGateTests {
 
     @Test func aFailedKeychainWriteLeavesTheSwitchOff() throws {
         final class Refusing: KeychainBackend, @unchecked Sendable {
-            func accounts(service: String) -> [String] { [] }
+            func accounts(service: String) throws -> [String] { [] }
             func read(service: String, account: String) -> String? { nil }
             func write(_ value: String, service: String, account: String) -> Bool { false }
             func delete(service: String, account: String) -> Bool { true }

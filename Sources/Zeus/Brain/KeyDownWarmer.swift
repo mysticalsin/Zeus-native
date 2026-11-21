@@ -24,7 +24,11 @@ enum KeyDownWarmer {
         func installed(_ tool: String) -> Bool {
             CLILocator.tools.first { $0.name == tool }.flatMap(CLILocator.locate) != nil
         }
-        _ = AssistantKeyAccount.migrateOpenAI(get: { Keychain.get($0) }, writeCanonical: { Keychain.set($0, for: AssistantKeyAccount.canonicalOpenAI) })
+        // Nil means assistant.key.openai is still stored. The key is read on the next line either way.
+        _ = AssistantKeyAccount.migrateOpenAI(
+            get: { Keychain.get($0) },
+            writeCanonical: { Keychain.set($0, for: AssistantKeyAccount.canonicalOpenAI) },
+            deleteAlias: { Keychain.store.deleteAccount(AssistantKeyAccount.aliasOpenAI) })
         return VoiceTurnKeys(anthropicKey: hasKey("assistant.key.anthropic"), openAIKey: AssistantKeyAccount.readOpenAI({ Keychain.get($0) }) != nil,
                              claudeCLI: installed("claude"), codexCLI: installed("codex"))
     }
