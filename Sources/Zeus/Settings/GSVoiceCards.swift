@@ -280,7 +280,7 @@ struct ZeusVoiceCards: View {
         }
     }
 
-    @MainActor static let previewSpeaker = Speaker(languageCode: Locale.current.identifier)
+    @MainActor static let previewSpeaker = Speaker(languageCode: Locale.current.identifier, observesTalkKey: false)
 
     private var isElevenLabsPaused: Bool {
         guard let until = voice.elevenLabsPausedUntil else { return false }

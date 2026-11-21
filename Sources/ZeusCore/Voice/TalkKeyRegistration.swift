@@ -17,7 +17,7 @@ public struct TalkKeyRegistration: Equatable, Sendable {
     }
 
     public mutating func unregister(_ token: Int?) {
-        // Red: the token stays, so every released speaker still hears the talk key.
-        _ = token
+        guard let token else { return }
+        tokens.removeAll { $0 == token }
     }
 }
