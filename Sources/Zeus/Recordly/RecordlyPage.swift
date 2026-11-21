@@ -1148,8 +1148,9 @@ private struct RecordlyControlRow: View {
             if let reason = disabledReason { return reason }
             let source = recordly.selectedSourceName ?? "the selected source"
             let capture = RecordlyDeviceCaptureController.shared
-            if RecordlyPrimaryRecord.startsDeviceCapture(phase: capture.phase) {
-                return "Records \(source) and the \(capture.selection.deviceName)"
+            let screenWillRecord = recordly.screenRecordingGranted && recordly.canStart
+            if RecordlyPrimaryRecord.startsDeviceCapture(phase: capture.phase), !screenWillRecord {
+                return "Records the \(capture.selection.deviceName)"
             }
             return "Records \(source)"
         case .countdown: return "Press Esc or the button to cancel"

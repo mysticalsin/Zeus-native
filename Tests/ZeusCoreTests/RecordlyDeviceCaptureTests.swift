@@ -341,6 +341,8 @@ struct RecordlyDeviceCaptureTests {
         let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
         let page = try repoSource("Sources/Zeus/Recordly/RecordlyPage.swift")
         #expect(controller.contains("audio.microphone = RecordlyPrimaryRecord.screenFileIncludesMicrophone"))
+        #expect(RecordlyPrimaryRecord.screenFileIncludesMicrophone == false)
+        #expect(RecordlyPrimaryRecord.screenFileIncludesCamera == false)
         #expect(!controller.contains("chipOn: false"))
         #expect(!controller.contains("chipOn: true"))
         if controller.contains("includeMicrophone") {
@@ -357,6 +359,10 @@ struct RecordlyDeviceCaptureTests {
         let body = press.components(separatedBy: "func cancelCountdown").first ?? press
         #expect(!body.contains("screenSessionActive: phase != .idle"))
         #expect(body.contains("blocksScreenStart"))
+        #expect(RecordlyPrimaryRecord.blocksScreenStart(devicePhase: .recording))
+        #expect(RecordlyPrimaryRecord.blocksScreenStart(devicePhase: .finishing))
+        #expect(!RecordlyPrimaryRecord.blocksScreenStart(devicePhase: .ready))
+        #expect(!RecordlyPrimaryRecord.blocksScreenStart(devicePhase: .idle))
     }
 
     /// One Record control. The status view does not grow a second Record button, and the primary
@@ -365,7 +371,8 @@ struct RecordlyDeviceCaptureTests {
         let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
         let status = try repoSource("Sources/Zeus/Recordly/RecordlyDeviceCaptureStatus.swift")
         let page = try repoSource("Sources/Zeus/Recordly/RecordlyPage.swift")
-        #expect(controller.contains("RecordlyPrimaryRecord.includeMicrophone"))
+        #expect(controller.contains("RecordlyPrimaryRecord.screenFileIncludesMicrophone"))
+        #expect(!controller.contains("chipOn: false"))
         #expect(!controller.contains("audio.microphone = false"))
         #expect(controller.contains("RecordlyDeviceCaptureController.shared.record()"))
         #expect(!status.contains("capture.record()"))

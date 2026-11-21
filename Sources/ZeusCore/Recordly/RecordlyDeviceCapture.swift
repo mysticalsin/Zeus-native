@@ -387,12 +387,25 @@ public struct RecordlyDeviceCaptureFailure: Equatable, Sendable {
     }
 }
 
-/// The existing Record control is the only start. The microphone flag follows the chip.
+/// The existing Record control is the only start.
 public enum RecordlyPrimaryRecord {
+    /// The screen writer drops microphone samples and never opens the camera, so the screen file
+    /// must not claim either track.
+    public static let screenFileIncludesMicrophone = false
+    public static let screenFileIncludesCamera = false
+
     /// True only when the microphone chip is on and permission was already granted.
     /// A chip that is off, or still waiting, stays off. Nothing here starts a device.
     public static func includeMicrophone(chipOn: Bool, permissionGranted: Bool) -> Bool {
         chipOn && permissionGranted
+    }
+
+    /// A device that is already writing blocks a screen session. Ready is not recording.
+    public static func blocksScreenStart(devicePhase: RecordlyDeviceCapturePhase) -> Bool {
+        switch devicePhase {
+        case .recording, .finishing: true
+        case .idle, .requestingPermission, .ready, .saved, .failed: false
+        }
     }
 
     /// Device capture starts from the primary Record, and only once the machine is ready.

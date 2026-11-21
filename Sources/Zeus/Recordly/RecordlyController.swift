@@ -437,9 +437,11 @@ final class RecordlyController {
     func pressRecord(topBar: TopBarModel?) {
         guard phase == .idle else { return }
         countdownTopBar = topBar
+        let devicePhase = RecordlyDeviceCaptureController.shared.phase
+        guard !RecordlyPrimaryRecord.blocksScreenStart(devicePhase: devicePhase) else { return }
         let devicesReady = RecordlyPrimaryRecord.mayStartDeviceRecorder(
-            phase: RecordlyDeviceCaptureController.shared.phase,
-            screenSessionActive: phase != .idle)
+            phase: devicePhase,
+            screenSessionActive: RecordlyPrimaryRecord.blocksScreenStart(devicePhase: devicePhase))
         if !isCountingDown {
             screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
             // No display to record: the same Record control starts the one device file.
@@ -587,11 +589,9 @@ final class RecordlyController {
         }
         actionNotice = nil
         let devices = RecordlyDeviceCaptureController.shared
-        // The microphone flag follows the chip once permission is granted.
-        audio.microphone = RecordlyPrimaryRecord.includeMicrophone(
-            chipOn: devices.selection.microphone,
-            permissionGranted: devices.permissionGranted(.microphone)
-        )
+        guard !RecordlyPrimaryRecord.blocksScreenStart(devicePhase: devices.phase) else { return }
+        // The screen file drops microphone samples and does not open the camera.
+        audio.microphone = RecordlyPrimaryRecord.screenFileIncludesMicrophone
         let request = RecordlyStartRequest(
             intent: selectionIntent,
             systemAudio: audio.systemAudio,
