@@ -236,7 +236,9 @@ public final class UnixSocketServer: @unchecked Sendable {
         try lock.withLock {
             guard listener == nil else { throw POSIXError(.EALREADY) }
             guard var address = UnixSocket.address(for: path) else { throw POSIXError(.ENAMETOOLONG) }
-            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            let directory = (path as NSString).deletingLastPathComponent
+            try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory)
             var existing = stat()
             if lstat(path, &existing) == 0 {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }
