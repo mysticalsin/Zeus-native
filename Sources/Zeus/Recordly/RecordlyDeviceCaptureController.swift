@@ -20,7 +20,9 @@ final class RecordlyDeviceCaptureController {
     /// Closed-notch wings use this. It is false until capture has actually started.
     var isRecording: Bool { showsRecordingIndicator }
     var statusText: String { machine.statusText }
-    var recordButtonTitle: String { machine.recordButtonTitle }
+    func permissionGranted(_ device: RecordlyDeviceCaptureDevice) -> Bool {
+        machine.permissionGranted(device)
+    }
     var failure: RecordlyDeviceCaptureFailure? {
         if case .failed(let failure) = machine.phase { return failure }
         return nil

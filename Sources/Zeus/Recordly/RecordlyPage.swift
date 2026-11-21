@@ -1103,7 +1103,12 @@ private struct RecordlyControlRow: View {
         }
     }
 
+    private var deviceReady: Bool {
+        RecordlyPrimaryRecord.startsDeviceCapture(phase: RecordlyDeviceCaptureController.shared.phase)
+    }
+
     private var disabledReason: String? {
+        if deviceReady { return nil }
         if !recordly.screenRecordingGranted { return "Allow Screen Recording in System Settings to record." }
         if recordly.canStart { return nil }
         return "Choose a display or window first."
@@ -1111,7 +1116,7 @@ private struct RecordlyControlRow: View {
 
     private func enabled(_ visual: RecordlyControlVisual) -> Bool {
         switch visual {
-        case .idle: recordly.canRecord
+        case .idle: recordly.canRecord || deviceReady
         case .countdown, .starting, .recording: true
         case .stopping: false
         }
@@ -1141,7 +1146,12 @@ private struct RecordlyControlRow: View {
         switch visual {
         case .idle:
             if let reason = disabledReason { return reason }
-            return "Records \(recordly.selectedSourceName ?? "the selected source")"
+            let source = recordly.selectedSourceName ?? "the selected source"
+            let capture = RecordlyDeviceCaptureController.shared
+            if RecordlyPrimaryRecord.startsDeviceCapture(phase: capture.phase) {
+                return "Records \(source) and the \(capture.selection.deviceName)"
+            }
+            return "Records \(source)"
         case .countdown: return "Press Esc or the button to cancel"
         case .starting: return "Checking the source"
         case .recording: return "Saves when you stop"

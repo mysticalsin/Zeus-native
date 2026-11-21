@@ -42,11 +42,7 @@ struct RecordlyDeviceCaptureStatus: View {
     private var buttons: some View {
         switch capture.phase {
         case .ready:
-            Button(capture.recordButtonTitle) { capture.record() }
-                .buttonStyle(.plain)
-                .font(TopBarStyle.label(10, .semibold))
-                .foregroundStyle(Theme.cloudPrimary)
-                .accessibilityIdentifier("recordly.device.record")
+            EmptyView()
         case .recording:
             HStack(spacing: 8) {
                 if capture.showsRecordingIndicator {

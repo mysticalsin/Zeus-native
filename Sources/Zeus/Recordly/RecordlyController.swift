@@ -437,8 +437,16 @@ final class RecordlyController {
     func pressRecord(topBar: TopBarModel?) {
         guard phase == .idle else { return }
         countdownTopBar = topBar
+        let devicesReady = RecordlyPrimaryRecord.startsDeviceCapture(
+            phase: RecordlyDeviceCaptureController.shared.phase)
         if !isCountingDown {
             screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
+            // No display to record: the same Record control starts the one device file.
+            if devicesReady, !screenRecordingGranted || !canStart {
+                actionNotice = nil
+                RecordlyDeviceCaptureController.shared.record()
+                return
+            }
             guard screenRecordingGranted else {
                 actionNotice = "Screen Recording is off for Zeus. Open Screen Recording settings to turn it on."
                 return
@@ -577,8 +585,12 @@ final class RecordlyController {
             return
         }
         actionNotice = nil
-        // Microphone capture is not implemented, so a project must never claim it.
-        audio.microphone = false
+        let devices = RecordlyDeviceCaptureController.shared
+        // The microphone flag follows the chip once permission is granted.
+        audio.microphone = RecordlyPrimaryRecord.includeMicrophone(
+            chipOn: devices.selection.microphone,
+            permissionGranted: devices.permissionGranted(.microphone)
+        )
         let request = RecordlyStartRequest(
             intent: selectionIntent,
             systemAudio: audio.systemAudio,
@@ -595,6 +607,9 @@ final class RecordlyController {
         timeout.cancel()
         switch outcome {
         case .started(let attempt, let resolved):
+            if RecordlyPrimaryRecord.startsDeviceCapture(phase: devices.phase) {
+                devices.record()
+            }
             let captureSource = RecordlySourceSelection.CaptureAdapter(resolved).source
             source = captureSource
             currentAttemptID = attempt.id
@@ -639,6 +654,8 @@ final class RecordlyController {
     }
 
     func stop() async {
+        // The same Stop ends the device file. Idle is a no-op inside the machine.
+        RecordlyDeviceCaptureController.shared.stop()
         switch phase {
         case .starting:
             await cancelStart()

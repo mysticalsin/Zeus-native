@@ -24,6 +24,10 @@ public struct RecordlyDeviceCaptureMachine: Equatable, Sendable {
         return nil
     }
 
+    public func permissionGranted(_ device: RecordlyDeviceCaptureDevice) -> Bool {
+        granted.contains(device)
+    }
+
     public var recordButtonTitle: String {
         switch (selection.microphone, selection.camera) {
         case (true, true): "Record microphone and camera"
@@ -305,7 +309,7 @@ public struct RecordlyDeviceCaptureSelection: Equatable, Sendable {
         return list
     }
 
-    var deviceName: String {
+    public var deviceName: String {
         switch (microphone, camera) {
         case (true, true): "microphone and camera"
         case (false, true): "camera"
@@ -380,6 +384,20 @@ public struct RecordlyDeviceCaptureFailure: Equatable, Sendable {
             message: unique.map(\.recoveryMessage).joined(separator: "\n"),
             settingsLinks: unique.map { RecordlyDeviceCaptureSettingsLink(device: $0, url: $0.settingsURL) }
         )
+    }
+}
+
+/// The existing Record control is the only start. The microphone flag follows the chip.
+public enum RecordlyPrimaryRecord {
+    /// True only when the microphone chip is on and permission was already granted.
+    /// A chip that is off, or still waiting, stays off. Nothing here starts a device.
+    public static func includeMicrophone(chipOn: Bool, permissionGranted: Bool) -> Bool {
+        chipOn && permissionGranted
+    }
+
+    /// Device capture starts from the primary Record, and only once the machine is ready.
+    public static func startsDeviceCapture(phase: RecordlyDeviceCapturePhase) -> Bool {
+        phase == .ready
     }
 }
 
