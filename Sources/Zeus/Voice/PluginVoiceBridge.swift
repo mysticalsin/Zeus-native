@@ -10,10 +10,34 @@ enum PluginAudioPlay {
 
     @discardableResult
     static func play(_ data: Data) -> Bool {
-        guard !data.isEmpty, let next = try? AVAudioPlayer(data: data) else { return false }
+        guard !data.isEmpty else { return false }
+        if data.starts(with: Data("RIFF".utf8)), playWithEngine(data) { return true }
+        guard let next = try? AVAudioPlayer(data: data) else { return false }
         player = next
         return next.play()
     }
+
+    /// Schedules a WAV on `AVAudioEngine`. MP3 from a cloud provider uses `AVAudioPlayer`.
+    private static func playWithEngine(_ wav: Data) -> Bool {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-voice-\(UUID().uuidString).wav")
+        do {
+            try wav.write(to: url)
+            let file = try AVAudioFile(forReading: url)
+            let engine = AVAudioEngine()
+            let node = AVAudioPlayerNode()
+            engine.attach(node)
+            engine.connect(node, to: engine.mainMixerNode, format: file.processingFormat)
+            try engine.start()
+            node.scheduleFile(file, at: nil)
+            node.play()
+            engines.append(engine)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private static var engines: [AVAudioEngine] = []
 
     static func speakLocally(_ text: String) {
         let utterance = AVSpeechUtterance(string: text)
@@ -26,6 +50,12 @@ enum PluginAudioPlay {
 /// asks it to fall back, so a turn is not spoken twice.
 struct MarkerLocalVoice: LocalVoiceSpeaking {
     func speak(_ text: String) async -> Data { Data([0x01]) }
+}
+
+/// Marks that the Mac voice is the second offline step. `Speaker` plays it with `AVSpeechSynthesizer`
+/// after the local voice. This value does not start audio by itself.
+struct MacSystemSpeech: SystemSpeechSpeaking {
+    func speak(_ text: String) async -> Data { Data("mac-voice".utf8) }
 }
 
 /// Uses a saved voice provider for a talk turn. The local voice, and every existing engine, is unchanged
@@ -51,7 +81,9 @@ enum PluginVoiceBridge {
             local: MarkerLocalVoice(),
             preferences: VoiceProviderPreferences(defaults: .standard),
             log: log,
-            serviceName: fake ? { VoiceProviderE2E.service(for: $0) } : { ProviderCredentialLocation.service(for: $0) }
+            serviceName: fake ? { VoiceProviderE2E.service(for: $0) } : { _ in VoiceProviderAccounts.service },
+            keyAccount: fake ? { _ in ProviderCredentialLocation.account } : { VoiceProviderAccounts.keyAccount(for: $0) },
+            system: MacSystemSpeech()
         )
         session = created
         return created

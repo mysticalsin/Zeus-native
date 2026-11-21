@@ -15,6 +15,25 @@ struct VoiceProviderFakeTests {
         #expect(VoiceProviderE2E.failsSynthesis([VoiceProviderE2E.environmentName: "fail"]))
         #expect(!VoiceProviderE2E.failsSynthesis([VoiceProviderE2E.environmentName: "1"]))
         #expect(VoiceProviderFakeAudio.wavSilence().prefix(4) == Data("RIFF".utf8))
+        #expect(VoiceProviderAccounts.keyAccount(for: ElevenLabsTTSAdapter.id) == "elevenlabs.api-key")
+        #expect(VoiceProviderAccounts.service == "com.zeus.app")
+        #expect(VoiceProviderAccounts.choice(fromTTSProvider: "elevenLabs") == .provider(ElevenLabsTTSAdapter.id))
+        #expect(VoiceProviderAccounts.choice(fromTTSProvider: "kokoro") == .local)
+        #expect(VoiceProviderPreferences.selectionKey == "voice.ttsProvider")
+    }
+
+    @Test func offlineFallbackTriesTheLocalVoiceThenTheMacVoice() async {
+        #expect(OfflineVoiceChain.route(localReady: true) == [.local, .systemSpeech])
+        #expect(OfflineVoiceChain.route(localReady: false) == [.systemSpeech])
+        #expect(!OfflineVoiceChain.route(localReady: false, systemReady: false).isEmpty)
+        let localFirst = await OfflineVoicePlayback.speak(text: "hi", localReady: true, local: { _ in Data("local".utf8) }, system: { _ in Data("mac".utf8) })
+        #expect(localFirst.step == .local)
+        #expect(localFirst.audio == Data("local".utf8))
+        let mac = await OfflineVoicePlayback.speak(text: "hi", localReady: true, local: { _ in Data() }, system: { _ in Data("mac".utf8) })
+        #expect(mac.step == .systemSpeech)
+        #expect(mac.audio == Data("mac".utf8))
+        let neverSilent = await OfflineVoicePlayback.speak(text: "hi", localReady: false, local: { _ in Data() }, system: { _ in Data() })
+        #expect(!neverSilent.audio.isEmpty)
     }
 
     @Test func theFakeAnswersOnlyTheDocumentedKeyAndCanFailSynthesis() async throws {

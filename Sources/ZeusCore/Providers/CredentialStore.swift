@@ -3,7 +3,9 @@ import Foundation
 public protocol CredentialStore: Sendable {
     func read(service: String, account: String) -> String?
     func write(_ value: String, service: String, account: String) -> Bool
+    /// Deletes every account under `service`. Do not use this for `com.zeus.app`.
     func delete(service: String) -> Bool
+    func delete(service: String, account: String) -> Bool
 }
 
 public final class MemoryCredentialStore: CredentialStore, @unchecked Sendable {
@@ -27,6 +29,12 @@ public final class MemoryCredentialStore: CredentialStore, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         let prefix = service + "|"
         for name in items.keys where name.hasPrefix(prefix) { items[name] = nil }
+        return true
+    }
+
+    public func delete(service: String, account: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        items[key(service, account)] = nil
         return true
     }
 
@@ -70,6 +78,11 @@ public struct KeychainCredentialStore: CredentialStore, Sendable {
 
     public func delete(service: String) -> Bool {
         let status = quietly { SecItemDelete(base(service, nil) as CFDictionary) }
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    public func delete(service: String, account: String) -> Bool {
+        let status = quietly { SecItemDelete(base(service, account) as CFDictionary) }
         return status == errSecSuccess || status == errSecItemNotFound
     }
 

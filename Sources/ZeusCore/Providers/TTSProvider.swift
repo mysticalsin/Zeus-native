@@ -27,6 +27,16 @@ public protocol LocalVoiceSpeaking: Sendable {
     func speak(_ text: String) async -> Data
 }
 
+/// The Mac voice (`AVSpeechSynthesizer`). Used only after Zeus's local voice is unavailable.
+public protocol SystemSpeechSpeaking: Sendable {
+    func speak(_ text: String) async -> Data
+}
+
+public struct SilentSystemSpeech: SystemSpeechSpeaking {
+    public init() {}
+    public func speak(_ text: String) async -> Data { Data() }
+}
+
 enum ProviderJSON {
     static func data(_ object: [String: Any]) -> Data? {
         try? JSONSerialization.data(withJSONObject: object)

@@ -204,7 +204,10 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             logSpoken(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
             return Played(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
         case .localFallback(let reason):
-            for engine in [UltronEngine.kokoro, .chatterbox, .system] {
+            let localReady = settings.kokoroReady || ChatterboxVoice.isReady
+            for step in OfflineVoiceChain.route(localReady: localReady) {
+                let engines: [UltronEngine] = step == .local ? [.kokoro, .chatterbox] : [.system]
+                for engine in engines {
                 if Task.isCancelled { return nil }
                 audioReadyAt = nil
                 guard let voiceName = await attempt(engine, text, settings: settings, began: began) else { continue }
@@ -213,6 +216,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
                 if let ms { settings.recordFirstAudio(engine, ms: ms) }
                 logSpoken(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
                 return Played(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
+                }
             }
             return nil
         }

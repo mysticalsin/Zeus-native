@@ -12,8 +12,9 @@ struct VoiceProviderSessionTests {
         await harness.session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: secret)
         let ready = await harness.session.readiness(for: ElevenLabsTTSAdapter.id)
         #expect(ready == .ready)
-        #expect(harness.store.read(service: ProviderCredentialLocation.service(for: ElevenLabsTTSAdapter.id), account: ProviderCredentialLocation.account) == secret)
+        #expect(harness.store.read(service: VoiceProviderAccounts.service, account: VoiceProviderAccounts.keyAccount(for: ElevenLabsTTSAdapter.id)) == secret)
         await harness.session.select(.provider(ElevenLabsTTSAdapter.id))
+        #expect(harness.defaults.string(forKey: "voice.ttsProvider") == VoiceTTSProvider.elevenLabs.rawValue)
         let outcome = await harness.session.speak(sentence)
         guard case .cloud(let id, let voice) = outcome.route else {
             Issue.record("expected the cloud route, got \(outcome.route)")
@@ -114,8 +115,8 @@ struct VoiceProviderSessionTests {
         await harness.session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: secret)
         await harness.session.select(.provider(ElevenLabsTTSAdapter.id))
         await harness.session.remove(providerID: ElevenLabsTTSAdapter.id)
-        let service = ProviderCredentialLocation.service(for: ElevenLabsTTSAdapter.id)
-        #expect(harness.store.read(service: service, account: ProviderCredentialLocation.account) == nil)
+        let service = VoiceProviderAccounts.service
+        #expect(harness.store.read(service: service, account: VoiceProviderAccounts.keyAccount(for: ElevenLabsTTSAdapter.id)) == nil)
         #expect(await harness.session.choice == .local)
         #expect(await harness.session.readiness(for: ElevenLabsTTSAdapter.id) == .unset)
         let outcome = await harness.session.speak(sentence)

@@ -5,12 +5,8 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
     public init(defaults: UserDefaults) { self.defaults = defaults }
 
     public var choice: VoiceProviderChoice {
-        get {
-            let raw = defaults.string(forKey: Self.selectionKey) ?? VoiceProviderChoice.localID
-            if raw.isEmpty || raw == VoiceProviderChoice.localID { return .local }
-            return .provider(raw)
-        }
-        nonmutating set { defaults.set(newValue.id, forKey: Self.selectionKey) }
+        get { VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: Self.selectionKey)) }
+        nonmutating set { defaults.set(VoiceProviderAccounts.ttsProviderRaw(for: newValue), forKey: Self.selectionKey) }
     }
 
     public func voiceID(for providerID: String) -> String? {
@@ -23,8 +19,81 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
         else { defaults.removeObject(forKey: key) }
     }
 
-    public static let selectionKey = "voice.providers.selection"
-    public static func voiceKey(_ providerID: String) -> String { "voice.providers.voice.\(providerID)" }
+    /// The existing Settings key `voice.ttsProvider`. Local stays `kokoro`.
+    public static let selectionKey = "voice.ttsProvider"
+    public static func voiceKey(_ providerID: String) -> String { VoiceProviderAccounts.voiceDefaultsKey(for: providerID) }
+}
+
+/// Existing Keychain accounts and settings keys. ElevenLabs reuses `elevenlabs.api-key` and
+/// `elevenlabs.voice-id` on `com.zeus.app`. Google Cloud has no older account, so it uses the
+/// same service and the same `voice.*` shape as `voice.gemini.voice`.
+public enum VoiceProviderAccounts {
+    public static let service = VoiceProviderKeychain.service
+
+    public static func keyAccount(for providerID: String) -> String {
+        switch providerID {
+        case ElevenLabsTTSAdapter.id: VoiceTTSProvider.elevenLabs.keychainAccount
+        case GoogleCloudTTSAdapter.id: VoiceTTSProvider.googleCloud.keychainAccount
+        default: ProviderCredentialLocation.account
+        }
+    }
+
+    public static func voiceAccount(for providerID: String) -> String? {
+        providerID == ElevenLabsTTSAdapter.id ? "elevenlabs.voice-id" : nil
+    }
+
+    public static func voiceDefaultsKey(for providerID: String) -> String {
+        switch providerID {
+        case GoogleCloudTTSAdapter.id: "voice.googleCloud.voice"
+        case ElevenLabsTTSAdapter.id: "voice.elevenlabs.voice"
+        default: "voice.providers.voice.\(providerID)"
+        }
+    }
+
+    public static func choice(fromTTSProvider raw: String?) -> VoiceProviderChoice {
+        switch raw {
+        case VoiceTTSProvider.elevenLabs.rawValue: .provider(ElevenLabsTTSAdapter.id)
+        case VoiceTTSProvider.googleCloud.rawValue: .provider(GoogleCloudTTSAdapter.id)
+        default: .local
+        }
+    }
+
+    public static func ttsProviderRaw(for choice: VoiceProviderChoice) -> String {
+        switch choice {
+        case .local: VoiceTTSProvider.kokoro.rawValue
+        case .provider(let id) where id == ElevenLabsTTSAdapter.id: VoiceTTSProvider.elevenLabs.rawValue
+        case .provider(let id) where id == GoogleCloudTTSAdapter.id: VoiceTTSProvider.googleCloud.rawValue
+        case .provider: VoiceTTSProvider.kokoro.rawValue
+        }
+    }
+}
+
+/// Offline speech order: Zeus's existing local voice, then the Mac voice. The list is never empty.
+public enum OfflineVoiceStep: String, Equatable, Sendable {
+    case local
+    case systemSpeech
+}
+
+public enum OfflineVoiceChain {
+    public static func route(localReady: Bool, systemReady: Bool = true) -> [OfflineVoiceStep] {
+        var steps: [OfflineVoiceStep] = []
+        if localReady { steps.append(.local) }
+        if systemReady || steps.isEmpty { steps.append(.systemSpeech) }
+        return steps
+    }
+}
+
+public enum OfflineVoicePlayback {
+    public static func speak(text: String, localReady: Bool,
+                              local: (String) async -> Data,
+                              system: (String) async -> Data) async -> (step: OfflineVoiceStep, audio: Data) {
+        for step in OfflineVoiceChain.route(localReady: localReady) {
+            let audio = step == .local ? await local(text) : await system(text)
+            if !audio.isEmpty { return (step, audio) }
+        }
+        let audio = await system(text)
+        return (.systemSpeech, audio.isEmpty ? Data([0x00]) : audio)
+    }
 }
 
 public struct VoiceProviderMetrics: Equatable, Sendable {
@@ -112,6 +181,8 @@ public actor VoiceProviderSession {
     private let signposter: ProviderSignposter
     private let adapters: [any TTSProvider]
     private let serviceName: @Sendable (String) -> String
+    private let keyAccount: @Sendable (String) -> String
+    private let system: any SystemSpeechSpeaking
     private var selection: VoiceProviderSelectionMachine
     private var readiness: [String: ProviderReadiness] = [:]
     private var catalog: [String: [ProviderVoice]] = [:]
@@ -123,7 +194,9 @@ public actor VoiceProviderSession {
     public init(store: any CredentialStore, transport: any ProviderHTTPTransport, local: any LocalVoiceSpeaking,
                 preferences: VoiceProviderPreferences, log: ProviderLog = ProviderLog(), signposter: ProviderSignposter = ProviderSignposter(),
                 adapters: [any TTSProvider]? = nil,
-                serviceName: @escaping @Sendable (String) -> String = ProviderCredentialLocation.service(for:)) {
+                serviceName: @escaping @Sendable (String) -> String = { _ in VoiceProviderAccounts.service },
+                keyAccount: @escaping @Sendable (String) -> String = VoiceProviderAccounts.keyAccount(for:),
+                system: any SystemSpeechSpeaking = SilentSystemSpeech()) {
         self.store = store
         self.transport = transport
         self.local = local
@@ -132,10 +205,16 @@ public actor VoiceProviderSession {
         self.signposter = signposter
         self.adapters = adapters ?? ProviderRegistry.entries.map { $0.make() }
         self.serviceName = serviceName
+        self.keyAccount = keyAccount
+        self.system = system
         var machine = VoiceProviderSelectionMachine(choice: preferences.choice)
         for entry in ProviderRegistry.entries {
-            if let voice = preferences.voiceID(for: entry.descriptor.id) {
-                machine.reduce(.chooseVoice(providerID: entry.descriptor.id, voiceID: voice))
+            let id = entry.descriptor.id
+            if let account = VoiceProviderAccounts.voiceAccount(for: id),
+               let voice = store.read(service: serviceName(id), account: account), !voice.isEmpty {
+                machine.reduce(.chooseVoice(providerID: id, voiceID: voice))
+            } else if let voice = preferences.voiceID(for: id) {
+                machine.reduce(.chooseVoice(providerID: id, voiceID: voice))
             }
         }
         self.selection = machine
@@ -155,14 +234,20 @@ public actor VoiceProviderSession {
 
     public func chooseVoice(providerID: String, voiceID: String) {
         selection.reduce(.chooseVoice(providerID: providerID, voiceID: voiceID))
+        if let account = VoiceProviderAccounts.voiceAccount(for: providerID), let voice = selection.voiceID(for: providerID) {
+            _ = store.write(voice, service: serviceName(providerID), account: account)
+        }
         preferences.setVoiceID(selection.voiceID(for: providerID), for: providerID)
     }
 
     public func remove(providerID: String) {
         let service = serviceName(providerID)
-        guard store.delete(service: service) else {
+        guard store.delete(service: service, account: keyAccount(providerID)) else {
             log.record("provider=\(providerID) remove failed")
             return
+        }
+        if let account = VoiceProviderAccounts.voiceAccount(for: providerID) {
+            _ = store.delete(service: service, account: account)
         }
         preferences.setVoiceID(nil, for: providerID)
         var machine = ProviderReadinessMachine(state: readiness[providerID] ?? .unset)
@@ -182,7 +267,7 @@ public actor VoiceProviderSession {
         }
         guard !trimmed.isEmpty else { return }
         let service = serviceName(providerID)
-        guard store.write(trimmed, service: service, account: ProviderCredentialLocation.account) else { return }
+        guard store.write(trimmed, service: service, account: keyAccount(providerID)) else { return }
         var machine = ProviderReadinessMachine(state: readiness[providerID] ?? .unset)
         _ = machine.reduce(.saveCredential)
         readiness[providerID] = machine.state
@@ -237,7 +322,7 @@ public actor VoiceProviderSession {
             guard let voiceID = selection.voiceID(for: id), !voiceID.isEmpty else {
                 return await finishLocal(.missingVoice, text: trimmed, providerID: id, started: started, routeName: "local-fallback")
             }
-            guard let key = store.read(service: serviceName(id), account: ProviderCredentialLocation.account),
+            guard let key = store.read(service: serviceName(id), account: keyAccount(id)),
                   !key.isEmpty,
                   let adapter = adapters.first(where: { $0.descriptor.id == id }),
                   let synthesis = adapter.synthesize(text: trimmed, voice: ProviderVoice(id: voiceID, name: voiceID, language: catalog[id]?.first { $0.id == voiceID }?.language), credential: ProviderCredential(fields: [ProviderCredentialLocation.account: key]), using: transport) else {
@@ -290,7 +375,7 @@ public actor VoiceProviderSession {
                 isSelected: selection.choice == .provider(id),
                 voices: catalog[id] ?? [],
                 selectedVoiceID: selection.voiceID(for: id),
-                hasKey: store.read(service: serviceName(id), account: ProviderCredentialLocation.account) != nil
+                hasKey: store.read(service: serviceName(id), account: keyAccount(id)) != nil
             ))
         }
         return VoiceProvidersCardModel(rows: rows, keyIsMasked: true, onboarding: VoiceProviderCopy.onboarding,
@@ -323,16 +408,26 @@ public actor VoiceProviderSession {
 
     private func finishLocal(_ reason: SpeakOutcome.LocalFallback, text: String, providerID: String, started: ContinuousClock.Instant, routeName: String) async -> SpeakOutcome {
         let interval = signposter.begin()
-        let audio = text.isEmpty ? Data() : await local.speak(text)
-        let milliseconds = signposter.end(interval, metadata: ["provider": providerID, "route": routeName])
+        var audio = Data()
+        var spokeWithMac = false
+        if !text.isEmpty {
+            audio = await local.speak(text)
+            if audio.isEmpty {
+                spokeWithMac = true
+                audio = await system.speak(text)
+                if audio.isEmpty { audio = Data([0x00]) }
+            }
+        }
+        let milliseconds = signposter.end(interval, metadata: ["provider": providerID, "route": spokeWithMac ? "system-speech" : routeName])
         let name = providerID == VoiceProviderChoice.localID ? "Local voice" : (ProviderRegistry.descriptor(providerID)?.displayName ?? providerID)
+        let voiceName = spokeWithMac ? "Mac voice" : "local voice"
         let line: String
         switch reason {
-        case .selected: line = "Speaking with the local voice."
-        case .notReady: line = "\(name) is not ready. Speaking with the local voice."
-        case .missingVoice: line = "\(name) has no voice yet. Speaking with the local voice."
-        case .timedOut: line = "\(name) timed out. Speaking with the local voice."
-        case .failed: line = "\(name) could not speak. Speaking with the local voice."
+        case .selected: line = "Speaking with the \(voiceName)."
+        case .notReady: line = "\(name) is not ready. Speaking with the \(voiceName)."
+        case .missingVoice: line = "\(name) has no voice yet. Speaking with the \(voiceName)."
+        case .timedOut: line = "\(name) timed out. Speaking with the \(voiceName)."
+        case .failed: line = "\(name) could not speak. Speaking with the \(voiceName)."
         }
         statusLine = line
         log.record("speak route=\(routeName) provider=\(providerID) bytes=\(audio.count) first_audio_ms=\(milliseconds)")

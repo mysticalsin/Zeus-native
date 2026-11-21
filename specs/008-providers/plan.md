@@ -55,8 +55,36 @@ on the local voice's return. The verdict compares that interval with 600 ms, 900
 1,400 ms. Those numbers are the existing voice-leg budget and the direct-stream percentiles.
 This slice does not loosen them and does not claim a live percentile.
 
+## Built in
+
+The picker is `VoiceProviderPicker` in `Sources/Zeus/Settings/VoiceProvidersCard.swift`.
+It is mounted inside the existing Voice card (`GSVoiceCards.swift`), on the same page as
+"Speaks with". It uses SwiftUI `Picker`, `SecureField`, `Toggle`, `ProgressView`, and
+`Button`, and the glass material from the settings shell (translucent, solid when Reduce
+Transparency is on). It does not open a window.
+
+ElevenLabs uses the existing Keychain account `elevenlabs.api-key` and voice account
+`elevenlabs.voice-id` on `com.zeus.app`. The choice is the existing `voice.ttsProvider`
+key (`elevenLabs`, `googleCloud`, or `kokoro` for the local voice). Google Cloud has no
+older account, so its key is `google-cloud-tts.api-key` on that same service and its voice
+id is `voice.googleCloud.voice`, the same shape as `voice.gemini.voice`.
+
+Offline order is Zeus's existing local voice, then `AVSpeechSynthesizer`. The chain is
+`OfflineVoiceChain`. A turn does not stop with no step.
+
+Playback is AVFoundation: `AVAudioEngine` for a WAV buffer, `AVAudioPlayer` for the MP3
+a cloud provider returns. Requests are `URLSession`. Keys are Security.framework. There
+is no web view and no added package.
+
+## Hook for the companion persona
+
+`VoiceProviderQuickSwitch` in `Sources/Zeus/Settings/VoiceProvidersCard.swift` is the
+SwiftUI entry another surface can embed. It is the same picker, compact, and it does not
+open a window. The persona slice owns `Sources/Zeus/Companion/PersonaSetting.swift` and
+can place `VoiceProviderQuickSwitch()` next to the persona control. This branch does not
+edit that file, the orb files, or the turn machine.
+
 ## Out of scope
 
-Speech-to-text and language-model adapters. A Fish Audio client. A proxy. Changing the
-existing Kokoro, OpenAI, and Gemini chain that runs when the plug-in selection is still
-`local`.
+Speech-to-text and language-model adapters. A Fish Audio client. A proxy. Editing
+`Sources/Zeus/Companion/PersonaSetting.swift`.

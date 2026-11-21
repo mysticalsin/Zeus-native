@@ -1,93 +1,93 @@
 import SwiftUI
 import ZeusCore
 
-/// Settings card for adding a voice provider. The shell around this card is owned by the settings redesign.
+/// The voice choice inside Settings. Native controls, glass material, no extra window.
 struct VoiceProvidersCard: View {
+    var body: some View { VoiceProviderPicker() }
+}
+
+/// Pick a provider, paste a key, validate, then Test. Three interactions when the first voice is kept.
+struct VoiceProviderPicker: View {
+    var embedded = false
+    var compact = false
     @State private var controller = VoiceProvidersController()
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        VStack(alignment: .leading, spacing: VoiceProviderMetrics.standard.cardGap) {
-            Text("Voice providers")
-                .font(GS.cardTitle)
-                .foregroundStyle(GS.text)
-                .accessibilityAddTraits(.isHeader)
-            Text(controller.model.onboarding)
-                .font(GS.rowText)
-                .foregroundStyle(GS.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(controller.model.helper)
-                .font(GS.rowText)
-                .foregroundStyle(GS.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(controller.model.maskingNote)
-                .font(GS.rowText)
-                .foregroundStyle(GS.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(controller.model.rows) { row in
-                providerRow(row)
+        let selected = controller.configuringID
+            ?? controller.model.rows.first { $0.isSelected }?.id
+            ?? VoiceProviderChoice.localID
+        VStack(alignment: .leading, spacing: compact ? 12 : VoiceProviderMetrics.standard.cardGap) {
+            if !compact {
+                Text("Voice providers")
+                    .font(GS.cardTitle)
+                    .foregroundStyle(GS.text)
+                    .accessibilityAddTraits(.isHeader)
+                Text(controller.model.helper)
+                    .font(GS.rowText)
+                    .foregroundStyle(GS.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if let id = controller.configuringID, id != VoiceProviderChoice.localID {
-                keyRow(id)
-                if let voices = controller.model.rows.first(where: { $0.id == id })?.voices, !voices.isEmpty {
-                    voiceRow(id, voices)
+            HStack(spacing: 12) {
+                Text("Provider").font(GS.rowTitle).foregroundStyle(GS.text)
+                Spacer(minLength: 12)
+                Picker("Provider", selection: Binding(
+                    get: { selected },
+                    set: { controller.use($0) }
+                )) {
+                    Text("Local voice").tag(VoiceProviderChoice.localID)
+                    ForEach(controller.model.rows.filter { $0.id != VoiceProviderChoice.localID }) { row in
+                        Text(row.title).tag(row.id)
+                    }
+                }
+                .labelsHidden()
+                .accessibilityIdentifier("settings.voiceProviders.provider")
+                .accessibilityLabel("Provider")
+            }
+            .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)
+            if selected != VoiceProviderChoice.localID {
+                Toggle("Use for replies", isOn: Binding(
+                    get: { controller.model.rows.first { $0.id == selected }?.isSelected ?? false },
+                    set: { controller.use($0 ? selected : VoiceProviderChoice.localID) }
+                ))
+                .toggleStyle(.switch)
+                .font(GS.rowText)
+                .foregroundStyle(GS.text)
+                .accessibilityIdentifier("settings.voiceProviders.enabled")
+                keyRow(selected)
+                if let voices = controller.model.rows.first(where: { $0.id == selected })?.voices, !voices.isEmpty {
+                    voiceRow(selected, voices)
                 }
             }
-            Text(controller.model.statusLine)
-                .font(GS.rowText)
-                .foregroundStyle(GS.text)
-                .accessibilityIdentifier("settings.voiceProviders.status")
-                .accessibilityLabel("Provider status")
-                .accessibilityValue(controller.model.statusLine)
+            HStack(spacing: 8) {
+                if controller.busy { ProgressView().controlSize(.small) }
+                Text(controller.model.statusLine)
+                    .font(GS.rowText)
+                    .foregroundStyle(GS.text)
+                    .accessibilityIdentifier("settings.voiceProviders.status")
+                    .accessibilityLabel("Provider status")
+                    .accessibilityValue(controller.model.statusLine)
+            }
         }
-        .padding(VoiceProviderMetrics.standard.padding)
+        .padding(embedded ? 0 : VoiceProviderMetrics.standard.padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous)
-                .fill(GS.card.opacity(0.92))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous))
-        )
-        .overlay(RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous).strokeBorder(GS.cardStroke, lineWidth: 1))
+        .background { if !embedded { glass } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settings.voiceProviders")
         .task { await controller.reload() }
     }
 
-    private func providerRow(_ row: VoiceProviderRow) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.title).font(GS.rowTitle).foregroundStyle(GS.text)
-                Text(row.isSelected ? "Selected" : "Available").font(GS.rowText).foregroundStyle(GS.secondary)
-            }
-            Spacer(minLength: 12)
-            Text(row.status)
-                .font(GS.rowText)
-                .foregroundStyle(row.status == "Ready" ? GS.selectedText : GS.secondary)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(Capsule().fill(GS.window))
-                .accessibilityIdentifier("settings.voiceProviders.status.\(row.id)")
-                .accessibilityLabel("\(row.title) status")
-                .accessibilityValue(row.status)
-            Button(row.isSelected ? "Selected" : "Use") { controller.use(row.id) }
-                .buttonStyle(GSButtonStyle(prominent: row.isSelected))
-                .disabled(row.id != VoiceProviderChoice.localID && !row.hasKey)
-                .accessibilityIdentifier("settings.voiceProviders.use.\(row.id)")
-                .accessibilityLabel("Use \(row.title)")
-            if row.id != VoiceProviderChoice.localID {
-                Button("Key") { controller.configure(row.id) }
-                    .buttonStyle(GSButtonStyle())
-                    .accessibilityIdentifier("settings.voiceProviders.add.\(row.id)")
-                    .accessibilityLabel("Add \(row.title)")
-                if row.hasKey {
-                    Button("Remove") { controller.remove(row.id) }
-                        .buttonStyle(GSButtonStyle())
-                        .accessibilityIdentifier("settings.voiceProviders.remove.\(row.id)")
-                        .accessibilityLabel("Remove \(row.title)")
-                }
-            }
-        }
-        .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)
+    /// Same material as the glass settings shell: translucency, solid when Reduce Transparency is on.
+    private var glass: some View {
+        let solid = reduceTransparency || TopBarStyle.isSnapshot
+        return RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous)
+            .fill(solid ? AnyShapeStyle(GS.window) : AnyShapeStyle(.ultraThinMaterial))
+            .overlay(
+                RoundedRectangle(cornerRadius: GS.cardRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(solid ? 0 : 0.18), lineWidth: 1)
+            )
     }
+
 
     private func keyRow(_ id: String) -> some View {
         HStack(spacing: 10) {
@@ -110,6 +110,12 @@ struct VoiceProvidersCard: View {
                 .buttonStyle(GSButtonStyle())
                 .disabled(controller.busy)
                 .accessibilityIdentifier("settings.voiceProviders.test")
+            if controller.model.rows.first(where: { $0.id == id })?.hasKey == true {
+                Button("Remove") { controller.remove(id) }
+                    .buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.voiceProviders.remove.\(id)")
+                    .accessibilityLabel("Remove \(controller.model.rows.first { $0.id == id }?.title ?? "provider")")
+            }
         }
         .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)
     }
@@ -134,6 +140,11 @@ struct VoiceProvidersCard: View {
     }
 }
 
+/// Compact provider switch for a later companion or persona surface. It does not open a window.
+struct VoiceProviderQuickSwitch: View {
+    var body: some View { VoiceProviderPicker(embedded: true, compact: true) }
+}
+
 @MainActor
 @Observable
 final class VoiceProvidersController {
@@ -154,6 +165,7 @@ final class VoiceProvidersController {
     }
 
     func use(_ id: String) {
+        configuringID = id == VoiceProviderChoice.localID ? nil : id
         if id == VoiceProviderChoice.localID { sessionSelect(.local) }
         else { sessionSelect(.provider(id)) }
     }

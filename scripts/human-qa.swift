@@ -1216,10 +1216,17 @@ func journeyVoiceProviders(expectFailure: Bool) {
     }
     runStep(journey, "\(prefix).key", "The fake key is entered and is not written into this step") { c in
         guard let w = win ?? settingsWindow() else { return fail("Settings window is gone") }
-        guard let add = axButton(w, ident: "settings.voiceProviders.add.elevenlabs", label: "Add ElevenLabs") else {
-            return fail("Add ElevenLabs was not found")
+        guard let popup = first([w], { $0.ident == "settings.voiceProviders.provider" || $0.desc == "Provider" }) else {
+            return fail("provider picker was not found")
         }
-        _ = add.press()
+        _ = popup.press(patient: true)
+        guard let item = waitFor(c, 2.5, { () -> AXN? in
+            menuItems().first { menuTitle($0) == "ElevenLabs" }
+        }) else {
+            closeOpenMenu()
+            return fail("ElevenLabs was not in the provider picker")
+        }
+        guard item.press() else { return fail("ElevenLabs could not be chosen") }
         guard let field = waitFor(c, 2.0, { () -> AXN? in
             first([w]) { $0.ident == "settings.voiceProviders.key" || $0.desc == "API key" }
         }) else { return fail("API key field did not appear") }
