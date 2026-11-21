@@ -1,0 +1,44 @@
+{
+ "files": {
+  "reply_user_16k_mono.wav": {
+   "header_identical": true,
+   "same_len": true,
+   "bit_identical": false,
+   "max_lsb_diff": 1,
+   "frac_samples_differing": 0.001737326388888889
+  },
+  "reply_user_24k_mono.wav": {
+   "header_identical": true,
+   "same_len": true,
+   "bit_identical": true,
+   "max_lsb_diff": 0,
+   "frac_samples_differing": 0.0
+  },
+  "reply_user_44k1_mono.wav": {
+   "header_identical": true,
+   "same_len": true,
+   "bit_identical": false,
+   "max_lsb_diff": 1,
+   "frac_samples_differing": 9.756944444444445e-05
+  },
+  "reply_user_48k_mono.wav": {
+   "header_identical": true,
+   "same_len": true,
+   "bit_identical": false,
+   "max_lsb_diff": 1,
+   "frac_samples_differing": 0.00014114583333333335
+  },
+  "reply_user_48k_stereo.wav": {
+   "header_identical": true,
+   "same_len": true,
+   "bit_identical": false,
+   "max_lsb_diff": 1,
+   "frac_samples_differing": 0.00012239583333333332
+  }
+ },
+ "stream": {
+  "sha256_ref": "ed99f3664f10e9546ea695aa75321092a4a762ba93c8a06324b87501bc9052ab",
+  "sha256_other": "ed99f3664f10e9546ea695aa75321092a4a762ba93c8a06324b87501bc9052ab",
+  "bit_identical": true
+ }
+}

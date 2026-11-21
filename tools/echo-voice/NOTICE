@@ -1,0 +1,21 @@
+Echo voice tooling
+Copyright 2026 the Zeus contributors
+
+This directory is original code, Apache-2.0, written to match the published
+Haru host audio path. It does not vendor model weights.
+
+Haru
+  Code and published weights: Apache-2.0
+  https://github.com/higurashi-ai/Haru
+  https://huggingface.co/higurashi-ai/Haru-4B
+  The weights are not in this tree.
+
+Kokoro-82M
+  Code and weights: Apache-2.0
+  https://huggingface.co/hexgrad/Kokoro-82M
+  Not vendored here. French voice data is a separate licence; see
+  research/dessa-and-tts.md.
+
+The Rust benchmark crate states `license = "Apache-2.0"` in
+pipeline-bench/rust/Cargo.toml. The Go and Python ports in this directory
+are the same licence.
