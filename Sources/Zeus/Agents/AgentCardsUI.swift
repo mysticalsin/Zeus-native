@@ -31,8 +31,11 @@ struct AgentSettingsSection: View {
     var body: some View {
         Section("Agents") {
             Toggle("Show a card when an agent finishes", isOn: Binding(get: { settings.completionCards }, set: { settings.completionCards = $0 }))
+                .accessibilityIdentifier("agents.agent-cards-ui.show-a-card-when-an-agent-finishes")
             Toggle("Play a sound when an agent finishes", isOn: Binding(get: { settings.completionSound }, set: { settings.completionSound = $0 }))
+                .accessibilityIdentifier("agents.agent-cards-ui.play-a-sound-when-an-agent-finishes")
             Toggle("Stay quiet while an app is full screen", isOn: Binding(get: { settings.quietInFullScreen }, set: { settings.quietInFullScreen = $0 }))
+                .accessibilityIdentifier("agents.agent-cards-ui.stay-quiet-while-an-app-is-full-screen")
             Text("In full screen only questions and approvals appear, without sound, because the agent is waiting on them.")
                 .font(.callout).foregroundStyle(.secondary)
             LabeledContent("Question answers") {
@@ -42,6 +45,7 @@ struct AgentSettingsSection: View {
                     if answers.tracker.path == .denyWithAnswer {
                         Button("Try Again") { answers.reset() }
                             .help("Try filling answers into the question again, e.g. after updating Claude Code.")
+                            .accessibilityIdentifier("agents.agent-cards-ui.try-again")
                     }
                 }
             }
@@ -332,6 +336,7 @@ struct ApprovalDetailView: View {
         .buttonStyle(PressableStyle())
         .accessibilityLabel(option.detail.map { "\(option.label), \($0)" } ?? option.label)
         .accessibilityAddTraits(picked ? .isSelected : [])
+        .accessibilityIdentifier("agents.agent-cards-ui.square")
     }
 
     @ViewBuilder
@@ -459,11 +464,12 @@ enum AgentCardKind: Equatable {
 /// Small status capsule: glyph and word in the card's tint.
 struct AgentStatusChip: View {
     let kind: AgentCardKind
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         HStack(spacing: 3) {
-            Image(systemName: kind.symbol).font(.system(size: 8.5, weight: .bold))
-            Text(kind.label).font(.system(size: 10, weight: .semibold, design: .rounded))
+            Image(systemName: kind.symbol).font(.system(size: AgentsDynamicType.points(8.5, dynamicTypeSize: dynamicTypeSize), weight: .bold))
+            Text(kind.label).font(.system(size: AgentsDynamicType.points(10, dynamicTypeSize: dynamicTypeSize), weight: .semibold, design: .rounded))
         }
         .foregroundStyle(kind.tint)
         .padding(.horizontal, 7)
@@ -486,6 +492,7 @@ struct AgentCardDismissButton: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel("Dismiss")
+        .accessibilityIdentifier("agents.agent-cards-ui.dismiss")
     }
 }
 
@@ -620,5 +627,6 @@ struct CardButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityIdentifier("agents.agent-cards-ui.control")
     }
 }
