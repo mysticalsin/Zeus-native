@@ -88,10 +88,12 @@ fn flags_off_spawns_nothing_binds_nothing_and_uses_no_network() {
 #[test]
 fn an_explicit_request_binds_and_spawns_without_a_reference() {
     let mut world = effects();
+    let model = std::env::temp_dir().join(format!("zeus-haru-model-{}", std::process::id()));
+    std::fs::create_dir_all(&model).unwrap();
     let request = LaunchRequest {
         conversation_mode: true,
         python: Some(PathBuf::from("python3")),
-        model: Some(PathBuf::from("/model")),
+        model: Some(model.clone()),
         socket: Some(PathBuf::from("/tmp/zeus-haru.sock")),
         quantize: 8,
     };
@@ -112,6 +114,7 @@ fn an_explicit_request_binds_and_spawns_without_a_reference() {
         8,
     );
     assert!(!argv.iter().any(|part| part.contains("reference")));
+    let _ = std::fs::remove_dir_all(&model);
 }
 
 #[test]
@@ -144,7 +147,7 @@ fn restart_leaves_no_orphan_child() {
 }
 
 #[test]
-fn restart_budget_expires_after_ten_minutes() {
+fn synthetic_advance_does_not_refresh_the_restart_budget() {
     let mut supervisor = Supervisor::new(SpyLauncher::default(), vec!["python3".into()]);
     supervisor.start().unwrap();
     supervisor.on_exit(1);
@@ -152,6 +155,6 @@ fn restart_budget_expires_after_ten_minutes() {
     supervisor.on_exit(1);
     supervisor.advance(10 * 60 * 1000);
     supervisor.on_exit(1);
-    assert_eq!(supervisor.state(), &ChildState::Ready);
-    assert_eq!(supervisor.alive().len(), 1);
+    assert_eq!(supervisor.state(), &ChildState::Stopped { failed: true });
+    assert!(supervisor.alive().is_empty());
 }

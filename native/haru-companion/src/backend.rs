@@ -5,6 +5,22 @@ use crate::session::FRAME_SAMPLES;
 use crate::upstream::{self, StartRequest, UpstreamMessage};
 use std::collections::VecDeque;
 use std::io::{Read, Write};
+use std::os::unix::io::AsRawFd;
+use std::os::unix::net::UnixStream;
+use std::time::Duration;
+
+const UPSTREAM_STALL_MS: u64 = 2_000;
+
+/// Arms a read deadline. Sockets use `SO_RCVTIMEO`. Other readers no-op.
+pub trait ReadDeadline {
+    fn arm_read_timeout(&self, timeout: Duration) -> std::io::Result<()>;
+}
+
+impl ReadDeadline for UnixStream {
+    fn arm_read_timeout(&self, timeout: Duration) -> std::io::Result<()> {
+        arm_fd_timeout(self.as_raw_fd(), timeout)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BackendEvent {
@@ -133,9 +149,12 @@ impl<S> UpstreamBackend<S> {
     }
 }
 
-impl<S: Read + Write> ModelBackend for UpstreamBackend<S> {
+impl<S: Read + Write + ReadDeadline> ModelBackend for UpstreamBackend<S> {
     fn exchange(&mut self, samples: &[f32]) -> BackendEvent {
         self.exchanges = self.exchanges.saturating_add(1);
+        let _ = self
+            .stream
+            .arm_read_timeout(Duration::from_millis(UPSTREAM_STALL_MS));
         if !self.started {
             let bytes = upstream::encode_start(&self.request);
             if self.stream.write_all(&bytes).is_err() {
@@ -148,14 +167,29 @@ impl<S: Read + Write> ModelBackend for UpstreamBackend<S> {
             return BackendEvent::SocketClosed;
         }
         match read_upstream(&mut self.stream, &mut self.pending) {
-            Ok(UpstreamMessage::Frame { pcm48, step_ms, .. }) => BackendEvent::Frame {
-                samples: upstream::downsample_48k(&pcm48),
-                text: String::new(),
+            Ok(UpstreamMessage::Frame { pcm48, step_ms, .. }) => {
+                let samples = upstream::downsample_48k(&pcm48);
+                if samples.len() != FRAME_SAMPLES {
+                    return BackendEvent::Exited { code: -1 };
+                }
+                BackendEvent::Frame {
+                    samples,
+                    text: String::new(),
+                    delay_ms: 0,
+                    step_ms,
+                }
+            }
+            Ok(UpstreamMessage::Text(text)) => BackendEvent::Frame {
+                samples: vec![0.0; FRAME_SAMPLES],
+                text,
                 delay_ms: 0,
-                step_ms,
+                step_ms: 0.0,
             },
             Ok(UpstreamMessage::Error(_)) => BackendEvent::Exited { code: -1 },
             Ok(_) => BackendEvent::Stall { delay_ms: 0 },
+            Err(ReadFault::Timeout) => BackendEvent::Stall {
+                delay_ms: UPSTREAM_STALL_MS,
+            },
             Err(ReadFault::Closed) => BackendEvent::SocketClosed,
             Err(ReadFault::Exited) => BackendEvent::Exited { code: -1 },
         }
@@ -169,6 +203,7 @@ impl<S: Read + Write> ModelBackend for UpstreamBackend<S> {
 enum ReadFault {
     Closed,
     Exited,
+    Timeout,
 }
 
 fn read_upstream<S: Read>(
@@ -195,7 +230,49 @@ fn read_upstream<S: Read>(
         match stream.read(&mut buf) {
             Ok(0) => return Err(ReadFault::Closed),
             Ok(n) => pending.extend(&buf[..n]),
+            Err(error)
+                if error.kind() == std::io::ErrorKind::TimedOut
+                    || error.kind() == std::io::ErrorKind::WouldBlock =>
+            {
+                return Err(ReadFault::Timeout);
+            }
             Err(_) => return Err(ReadFault::Exited),
         }
     }
+}
+
+fn arm_fd_timeout(fd: i32, timeout: Duration) -> std::io::Result<()> {
+    #[repr(C)]
+    struct Timeval {
+        tv_sec: i64,
+        tv_usec: i64,
+    }
+    let tv = Timeval {
+        tv_sec: timeout.as_secs() as i64,
+        tv_usec: timeout.subsec_micros() as i64,
+    };
+    let rc = unsafe {
+        setsockopt(
+            fd,
+            1,
+            20,
+            (&tv as *const Timeval).cast(),
+            std::mem::size_of::<Timeval>() as u32,
+        )
+    };
+    if rc != 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+extern "C" {
+    fn setsockopt(
+        sockfd: i32,
+        level: i32,
+        optname: i32,
+        optval: *const core::ffi::c_void,
+        optlen: u32,
+    ) -> i32;
 }

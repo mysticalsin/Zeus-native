@@ -56,10 +56,6 @@ fn serve_command(config: &ServeConfig) -> i32 {
                 config.watchdog, config.kv_window, config.reanchor_minutes
             );
             let argv = child_argv(&python, &model, &private_socket, quantize);
-            if argv.iter().any(|part| part.contains("reference")) {
-                eprintln!("haru-companion: reference_path is not allowed");
-                return 2;
-            }
             match run_serve(&socket, &argv, config.watchdog) {
                 Ok(()) => 0,
                 Err(error) => {

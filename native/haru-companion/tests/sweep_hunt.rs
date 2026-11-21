@@ -123,20 +123,21 @@ fn hc03_a_quiet_client_stays_connected_and_disconnect_kills_the_child() {
     drop(client);
     let (state, alive) = done_rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert!(state.is_terminal(), "disconnect left {state:?}");
-    assert!(alive.is_empty(), "child still alive after disconnect: {alive:?}");
+    assert!(
+        alive.is_empty(),
+        "child still alive after disconnect: {alive:?}"
+    );
     server.join().unwrap();
     let _ = std::fs::remove_file(&path);
 }
 
 #[test]
 fn hc04_sigkill_is_reaped_and_finish_does_not_stream() {
-    let mut host = SessionHost::new(
-        StdLauncher::new(),
-        vec!["/bin/sleep".into(), "30".into()],
-    );
+    let mut host = SessionHost::new(StdLauncher::new(), vec!["/bin/sleep".into(), "30".into()]);
     host.begin_model_load().unwrap();
     let pid = host.pid().unwrap();
     unsafe { kill(pid as i32, 9) };
+    std::thread::sleep(Duration::from_millis(20));
     let error = host.finish_model_load().unwrap_err();
     assert_eq!(error, SessionError::ProcessExited { code: -1 });
     assert_ne!(host.state(), &SessionState::Streaming);
@@ -149,10 +150,12 @@ fn hc04_sigkill_is_reaped_and_finish_does_not_stream() {
         "zombie stayed in alive(): {:?}",
         host.alive()
     );
-    assert!(!proc_alive(pid) || {
-        let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).unwrap_or_default();
-        !stat.contains(" Z ")
-    });
+    assert!(
+        !proc_alive(pid) || {
+            let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).unwrap_or_default();
+            !stat.contains(" Z ")
+        }
+    );
 }
 
 #[test]
@@ -172,9 +175,7 @@ fn hc05_kill_reaps_the_process_group() {
     mode.set_mode(0o755);
     std::fs::set_permissions(&script, mode).unwrap();
     let mut launcher = StdLauncher::new();
-    let pid = launcher
-        .spawn(&[script.display().to_string()])
-        .unwrap();
+    let pid = launcher.spawn(&[script.display().to_string()]).unwrap();
     let deadline = Instant::now() + Duration::from_secs(2);
     while Instant::now() < deadline && !child_pid.exists() {
         std::thread::sleep(Duration::from_millis(10));
@@ -336,6 +337,12 @@ impl Write for FixedRead {
     }
 }
 
+impl haru_companion::backend::ReadDeadline for FixedRead {
+    fn arm_read_timeout(&self, _timeout: Duration) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[test]
 fn hc10_upstream_frame_is_capped_at_3200_samples() {
     let samples = 10_000usize;
@@ -409,14 +416,8 @@ fn hc13_a_live_listener_is_not_unlinked() {
     let path = temp_dir("live").join("z.sock");
     let listener = bind_socket(&path).unwrap();
     let second = bind_socket(&path);
-    assert!(
-        second.is_err(),
-        "second bind stole a live listener"
-    );
-    assert_eq!(
-        second.unwrap_err().kind(),
-        std::io::ErrorKind::AddrInUse
-    );
+    assert!(second.is_err(), "second bind stole a live listener");
+    assert_eq!(second.unwrap_err().kind(), std::io::ErrorKind::AddrInUse);
     let client = UnixStream::connect(&path).unwrap();
     let accepted = listener.accept();
     assert!(accepted.is_ok(), "original listener could not accept");
@@ -452,7 +453,11 @@ fn hc15_binding_does_not_chmod_a_different_file() {
     }
     stop.store(true, std::sync::atomic::Ordering::Relaxed);
     racer.join().unwrap();
-    let mode = std::fs::symlink_metadata(&victim).unwrap().permissions().mode() & 0o777;
+    let mode = std::fs::symlink_metadata(&victim)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
     assert_eq!(std::fs::read(&victim).unwrap(), b"VICTIM");
     assert_eq!(mode, 0o644, "bind_socket changed the victim mode");
     let _ = std::fs::remove_dir_all(&root);

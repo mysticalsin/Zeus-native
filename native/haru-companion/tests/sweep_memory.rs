@@ -39,6 +39,12 @@ impl Write for Flood {
     }
 }
 
+impl haru_companion::backend::ReadDeadline for Flood {
+    fn arm_read_timeout(&self, _timeout: std::time::Duration) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 #[test]
 fn upstream_frame_over_8_mib_is_rejected_without_buffering_it() {
     let reads = Rc::new(Cell::new(0));

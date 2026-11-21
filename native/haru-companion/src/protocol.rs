@@ -520,7 +520,9 @@ pub fn json_string(value: &str) -> String {
 enum Json {
     Null,
     Bool(bool),
-    Number(f64),
+    /// The bool is true when the token was a canonical integer (`0`, `1`, `42`),
+    /// not `1.0`, `01`, or `1e1`.
+    Number(f64, bool),
     String(String),
     Object(Vec<(String, Json)>),
 }
@@ -532,27 +534,27 @@ impl Json {
                 .iter()
                 .find(|(name, _)| name == key)
                 .map(|(_, value)| value),
-            Json::Null | Json::Bool(_) | Json::Number(_) | Json::String(_) => None,
+            Json::Null | Json::Bool(_) | Json::Number(_, _) | Json::String(_) => None,
         }
     }
 
     fn as_str(&self) -> Option<&str> {
         match self {
             Json::String(value) => Some(value),
-            Json::Null | Json::Bool(_) | Json::Number(_) | Json::Object(_) => None,
+            Json::Null | Json::Bool(_) | Json::Number(_, _) | Json::Object(_) => None,
         }
     }
 
     fn as_bool(&self) -> Option<bool> {
         match self {
             Json::Bool(value) => Some(*value),
-            Json::Null | Json::Number(_) | Json::String(_) | Json::Object(_) => None,
+            Json::Null | Json::Number(_, _) | Json::String(_) | Json::Object(_) => None,
         }
     }
 
     fn as_u32(&self) -> Option<u32> {
         match self {
-            Json::Number(value)
+            Json::Number(value, true)
                 if value.is_finite()
                     && *value >= 0.0
                     && *value <= f64::from(u32::MAX)
@@ -560,7 +562,7 @@ impl Json {
             {
                 Some(*value as u32)
             }
-            Json::Number(_) | Json::Null | Json::Bool(_) | Json::String(_) | Json::Object(_) => {
+            Json::Number(_, _) | Json::Null | Json::Bool(_) | Json::String(_) | Json::Object(_) => {
                 None
             }
         }
@@ -568,6 +570,14 @@ impl Json {
 }
 
 const MAX_JSON_DEPTH: usize = 16;
+
+fn canonical_integer(text: &str) -> bool {
+    let digits = text.strip_prefix('-').unwrap_or(text);
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    !(digits.len() > 1 && digits.starts_with('0'))
+}
 
 fn parse_json(bytes: &[u8]) -> Result<Json, ProtocolError> {
     let text = std::str::from_utf8(bytes).map_err(|_| ProtocolError::BadJson)?;
@@ -686,7 +696,7 @@ impl Parser<'_> {
         }
         let text = &self.s[start..self.i];
         let value: f64 = text.parse().map_err(|_| ())?;
-        Ok(Json::Number(value))
+        Ok(Json::Number(value, canonical_integer(text)))
     }
 
     fn eat(&mut self, word: &str) -> Result<(), ()> {

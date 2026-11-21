@@ -377,6 +377,123 @@ impl fmt::Display for WatchdogReason {
 
 impl std::error::Error for SessionError {}
 
+/// SVG of the legal transitions. Node positions are fixed; every edge is an
+/// `Ok` result from [`SessionState::next`], and the moving dot walks
+/// idle → starting → streaming → closing → closed by calling `next`.
+pub fn state_machine_svg() -> String {
+    let nodes = [
+        (SessionState::Idle, 90.0, 70.0),
+        (SessionState::Starting, 280.0, 70.0),
+        (SessionState::Streaming, 490.0, 70.0),
+        (SessionState::Closing, 490.0, 230.0),
+        (SessionState::Closed, 280.0, 230.0),
+        (
+            SessionState::Failed(SessionError::SocketClosed),
+            90.0,
+            230.0,
+        ),
+    ];
+    let events = [
+        SessionEvent::Start,
+        SessionEvent::Started,
+        SessionEvent::Push,
+        SessionEvent::Close,
+        SessionEvent::Closed,
+        SessionEvent::Fail(SessionError::SocketClosed),
+    ];
+    let mut edges: Vec<(String, String, String, bool)> = Vec::new();
+    for (state, _, _) in &nodes {
+        for event in &events {
+            if let Ok(next) = state.next(event) {
+                let fail = matches!(event, SessionEvent::Fail(_));
+                edges.push((
+                    state.wire_name().to_string(),
+                    event.to_string(),
+                    next.wire_name().to_string(),
+                    fail,
+                ));
+            }
+        }
+    }
+    edges.sort();
+    let pos = |name: &str| -> (f64, f64) {
+        nodes
+            .iter()
+            .find(|(state, _, _)| state.wire_name() == name)
+            .map(|(_, x, y)| (*x, *y))
+            .unwrap_or((0.0, 0.0))
+    };
+    let mut walk = SessionState::Idle;
+    let mut walk_points = vec![pos(walk.wire_name())];
+    for event in [
+        SessionEvent::Start,
+        SessionEvent::Started,
+        SessionEvent::Close,
+        SessionEvent::Closed,
+    ] {
+        if let Ok(next) = walk.next(&event) {
+            walk = next;
+            walk_points.push(pos(walk.wire_name()));
+        }
+    }
+    let mut path = format!("M {} {}", walk_points[0].0, walk_points[0].1 + 28.0);
+    for (x, y) in walk_points.iter().skip(1) {
+        path.push_str(&format!(" L {x} {}", y + 28.0));
+    }
+    let mut lines = String::new();
+    for (from, event, to, fail) in &edges {
+        let (x1, y1) = pos(from);
+        let (x2, y2) = pos(to);
+        let color = if *fail { "#9a3412" } else { "#44403c" };
+        if from == to {
+            lines.push_str(&format!(
+                "<path d=\"M {x1} {y1} m 28 -18 a 18 18 0 1 1 -1 0\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.4\"/>"
+            ));
+            lines.push_str(&format!(
+                "<text x=\"{x1}\" y=\"{}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{color}\">{event}</text>",
+                y1 - 46.0
+            ));
+            continue;
+        }
+        let mx = (x1 + x2) / 2.0;
+        let my = (y1 + y2) / 2.0 - 8.0;
+        lines.push_str(&format!(
+            "<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{color}\" stroke-width=\"1.4\" marker-end=\"url(#arrow)\"/>"
+        ));
+        lines.push_str(&format!(
+            "<text x=\"{mx}\" y=\"{my}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{color}\">{event}</text>"
+        ));
+    }
+    let mut circles = String::new();
+    for (state, x, y) in &nodes {
+        let name = state.wire_name();
+        let fill = if state.is_terminal() {
+            "#e7e5e4"
+        } else {
+            "#fff7ed"
+        };
+        circles.push_str(&format!(
+            "<g><rect x=\"{}\" y=\"{}\" width=\"120\" height=\"36\" rx=\"8\" fill=\"{fill}\" stroke=\"#292524\"/><text x=\"{x}\" y=\"{}\" text-anchor=\"middle\" font-size=\"14\" font-family=\"ui-sans-serif, system-ui, sans-serif\" fill=\"#1c1917\">{name}</text></g>",
+            x - 60.0,
+            y - 18.0,
+            y + 5.0
+        ));
+    }
+    format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="640" height="340" viewBox="0 0 640 340" role="img" aria-label="Haru session state machine">
+<title>Haru session state machine</title>
+<desc>Legal edges come from SessionState::next. The dot walks idle, starting, streaming, closing, closed.</desc>
+<style>text {{ font-family: ui-sans-serif, system-ui, sans-serif; }}</style>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#44403c"/></marker></defs>
+<rect width="640" height="340" fill="#fafaf9"/>
+{lines}
+{circles}
+<circle r="5" fill="#c2410c"><animateMotion dur="8s" repeatCount="indefinite" path="{path}"/></circle>
+</svg>
+"##
+    )
+}
+
 /// Spawn and kill the model child. Tests use a spy; `serve` uses a process.
 pub trait ChildControl {
     fn spawn(&mut self, argv: &[String]) -> std::io::Result<u32>;
@@ -454,10 +571,28 @@ impl<C: ChildControl> SessionHost<C> {
     }
 
     /// Started is legal only from Starting. Closing or Closed refuses it.
+    /// A child that has already exited becomes `process_exited` and is reaped.
     pub fn finish_model_load(&mut self) -> Result<(), SessionError> {
+        if self.child_exited() {
+            let error = SessionError::ProcessExited { code: -1 };
+            self.fail(error.clone())?;
+            return Err(error);
+        }
         let next = self.state.next(&SessionEvent::Started)?;
         self.apply(next);
         Ok(())
+    }
+
+    /// True when the recorded pid has exited. The pid is reaped and forgotten.
+    pub fn child_exited(&mut self) -> bool {
+        let Some(pid) = self.pid else {
+            return false;
+        };
+        if self.child.alive().contains(&pid) {
+            return false;
+        }
+        self.pid = None;
+        true
     }
 
     /// Close. Starting becomes Closing, the child is killed, then Closed.

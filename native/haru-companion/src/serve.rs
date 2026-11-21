@@ -5,7 +5,7 @@ use crate::engine::Engine;
 use crate::protocol::FrameBuf;
 use crate::session::ChildControl;
 use std::io::{Read, Write};
-use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+use std::os::unix::fs::FileTypeExt;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
@@ -22,7 +22,21 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     }
     if let Ok(meta) = std::fs::symlink_metadata(path) {
         let kind = meta.file_type();
-        if kind.is_symlink() || kind.is_socket() {
+        if kind.is_socket() {
+            match UnixStream::connect(path) {
+                Ok(live) => {
+                    drop(live);
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::AddrInUse,
+                        "socket is live",
+                    ));
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+                    std::fs::remove_file(path)?;
+                }
+                Err(error) => return Err(error),
+            }
+        } else if kind.is_symlink() {
             std::fs::remove_file(path)?;
         } else {
             return Err(std::io::Error::new(
@@ -35,7 +49,9 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
         let _guard = BIND_UMASK
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        let old = unsafe { umask(0o077) };
+        // 0777 & ~0177 = 0600, so the directory entry is created private
+        // and a later chmod of the path cannot follow a swapped symlink.
+        let old = unsafe { umask(0o177) };
         let bound = UnixListener::bind(path);
         unsafe { umask(old) };
         bound?
@@ -43,18 +59,6 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     if unsafe { fchmod(listener.as_raw_fd(), 0o600) } != 0 {
         return Err(std::io::Error::last_os_error());
     }
-    // fchmod on a listening socket fd does not change the directory entry on
-    // Linux. chmod the path only after it is the socket we just bound.
-    let meta = std::fs::symlink_metadata(path)?;
-    if !meta.file_type().is_socket() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::AlreadyExists,
-            "socket path changed during bind",
-        ));
-    }
-    let mut permissions = meta.permissions();
-    permissions.set_mode(0o600);
-    std::fs::set_permissions(path, permissions)?;
     Ok(listener)
 }
 
@@ -95,7 +99,7 @@ where
                 if error.kind() == std::io::ErrorKind::WouldBlock
                     || error.kind() == std::io::ErrorKind::TimedOut =>
             {
-                break
+                continue
             }
             Err(error) => {
                 outcome = Err(error);
@@ -208,6 +212,7 @@ fn peer_uid_fd(_fd: i32) -> std::io::Result<u32> {
     ))
 }
 
+#[cfg(target_os = "linux")]
 const SOL_SOCKET: i32 = 1;
 #[cfg(target_os = "linux")]
 const SO_PEERCRED: i32 = 17;

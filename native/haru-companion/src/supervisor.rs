@@ -75,7 +75,7 @@ pub fn decide(request: &LaunchRequest) -> LaunchDecision {
             reason: NoLaunchReason::MissingPython,
         };
     };
-    let Some(model) = present(&request.model) else {
+    let Some(model) = directory(&request.model) else {
         return LaunchDecision::NoLaunch {
             reason: NoLaunchReason::MissingModel,
         };
@@ -100,6 +100,16 @@ fn present(path: &Option<PathBuf>) -> Option<PathBuf> {
             None
         } else {
             Some(value.clone())
+        }
+    })
+}
+
+fn directory(path: &Option<PathBuf>) -> Option<PathBuf> {
+    path.as_ref().and_then(|value| {
+        if value.is_dir() {
+            Some(value.clone())
+        } else {
+            None
         }
     })
 }
@@ -278,27 +288,33 @@ pub enum ChildEvent {
 #[derive(Debug)]
 pub struct RestartBudget {
     max: u32,
-    window_ms: u64,
-    stamps: Vec<u64>,
+    window: std::time::Duration,
+    stamps: Vec<std::time::Instant>,
 }
 
 impl RestartBudget {
     pub fn standard() -> Self {
         Self {
             max: RESTART_LIMIT,
-            window_ms: RESTART_WINDOW_MS,
+            window: std::time::Duration::from_millis(RESTART_WINDOW_MS),
             stamps: Vec::new(),
         }
     }
 
-    pub fn allow(&mut self, now_ms: u64) -> bool {
-        let window = self.window_ms;
-        self.stamps
-            .retain(|stamp| now_ms.saturating_sub(*stamp) < window);
+    /// `now_ms` is ignored. The window is wall time, so `advance` cannot
+    /// grant another restart before ten real minutes have passed.
+    pub fn allow(&mut self, _now_ms: u64) -> bool {
+        let now = std::time::Instant::now();
+        let window = self.window;
+        self.stamps.retain(|stamp| {
+            now.checked_duration_since(*stamp)
+                .map(|age| age < window)
+                .unwrap_or(true)
+        });
         if self.stamps.len() as u32 >= self.max {
             return false;
         }
-        self.stamps.push(now_ms);
+        self.stamps.push(now);
         true
     }
 }
@@ -499,6 +515,9 @@ impl ChildControl for StdLauncher {
         // prctl/getppid/raise sequence. It does not allocate or touch locks.
         unsafe {
             command.pre_exec(|| {
+                if setpgid(0, 0) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
                 arm_parent_death();
                 Ok(())
             });
@@ -541,9 +560,17 @@ const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_millis(200
 const SIGTERM: i32 = 15;
 const SIGKILL: i32 = 9;
 
+fn signal_group(pid: i32, sig: i32) {
+    unsafe {
+        if kill(-pid, sig) != 0 {
+            kill(pid, sig);
+        }
+    }
+}
+
 fn terminate_child(child: &mut Child) {
     let pid = child.id() as i32;
-    unsafe { kill(pid, SIGTERM) };
+    signal_group(pid, SIGTERM);
     let deadline = std::time::Instant::now() + SHUTDOWN_GRACE;
     loop {
         match child.try_wait() {
@@ -553,6 +580,7 @@ fn terminate_child(child: &mut Child) {
             Err(_) => break,
         }
     }
+    signal_group(pid, SIGKILL);
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -570,6 +598,7 @@ fn arm_parent_death() {
 
 extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
+    fn setpgid(pid: i32, pgid: i32) -> i32;
     #[cfg(target_os = "linux")]
     fn prctl(option: i32, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32;
     #[cfg(target_os = "linux")]
