@@ -118,7 +118,7 @@ final class LicenseManager {
         status = evaluator.evaluate(.init(key: key, activation: credentials.get("license.activation"),
                                           revocations: defaults.string(forKey: "license.revocations"),
                                           trialStart: trialStart(), now: now,
-                                          activationRejected: defaults.bool(forKey: "license.activationRejected") || defaults.bool(forKey: "license.cleanupPending")))
+                                          activationRejected: activationIsRefused(key: key)))
         if let payload = status.payload, let token = credentials.get("license.activation"),
            case .success(let proof) = evaluator.checkActivation(token, licenseID: payload.id) {
             activation = proof
@@ -151,6 +151,7 @@ final class LicenseManager {
             return lastError
         }
         var pending = false
+        var acceptedProof: String?
         if let server = serverURL {
             let response = await serverFactory(server).activate(key: key, device: deviceID, name: deviceName())
             guard revision == credentialRevision else { return "License settings changed. Review them and try again." }
@@ -160,10 +161,7 @@ final class LicenseManager {
                     lastError = "The license server sent a proof Zeus can't check."
                     return lastError
                 }
-                guard credentials.set(token, for: "license.activation") else {
-                    lastError = "Couldn't save the activation proof. Check Keychain access and try again."
-                    return lastError
-                }
+                acceptedProof = token
             case .failure(let error) where LicenseServerClient.isOffline(error):
                 pending = true // Offline: the key is genuine, so keep going and claim the seat later.
             case .failure(let error):
@@ -172,17 +170,41 @@ final class LicenseManager {
             }
         }
         let previousKey = credentials.get("license.key")
-        if pending, previousKey == key, defaults.bool(forKey: "license.activationRejected") {
+        if pending, previousKey == key, activationIsRefused(key: key) {
+            let licenseID = License.read(key, publicKeys: evaluator.publicKeys)?.id ?? LicenseCredentialCommit.blockAll
+            _ = credentials.set(licenseID, for: LicenseCredentialCommit.refusalAccount)
             defaults.set(true, forKey: "license.activationPending")
+            defaults.set(true, forKey: "license.activationRejected")
             lastError = "This key was previously refused. The license server is unreachable, so Zeus has not reactivated it. Try again when connected."
             refresh()
             return lastError
         }
-        guard credentials.set(key, for: "license.key") else {
+        switch LicenseCredentialCommit.store(
+            key: key,
+            proof: acceptedProof,
+            previousProof: credentials.get("license.activation"),
+            write: { value, account in credentials.set(value, for: account) },
+            delete: { account in credentials.remove(account) }
+        ) {
+        case .stored:
+            break
+        case .proofNotSaved:
+            lastError = "Couldn't save the activation proof. Check Keychain access and try again."
+            return lastError
+        case .keyNotSaved:
             lastError = "Couldn't save the license key. Check Keychain access and try again."
+            refresh()
+            return lastError
+        case .blocked:
+            defaults.set(true, forKey: "license.activationRejected")
+            lastError = "Couldn't save the license key. Check Keychain access and try again."
+            refresh()
             return lastError
         }
-        if !pending || previousKey != key { defaults.removeObject(forKey: "license.activationRejected") }
+        if !pending || previousKey != key {
+            defaults.removeObject(forKey: "license.activationRejected")
+            _ = credentials.remove(LicenseCredentialCommit.refusalAccount)
+        }
         defaults.set(pending, forKey: "license.activationPending")
         lastError = nil
         deactivationError = nil
@@ -226,6 +248,7 @@ final class LicenseManager {
         }
         defaults.removeObject(forKey: "license.activationPending")
         defaults.removeObject(forKey: "license.activationRejected")
+        _ = credentials.remove(LicenseCredentialCommit.refusalAccount)
         defaults.removeObject(forKey: "license.cleanupPending")
         lastError = nil
         deactivationError = nil
@@ -257,12 +280,20 @@ final class LicenseManager {
                 }
                 defaults.set(false, forKey: "license.activationPending")
                 defaults.removeObject(forKey: "license.activationRejected")
+                _ = credentials.remove(LicenseCredentialCommit.refusalAccount)
             case .failure(let error) where !LicenseServerClient.isOffline(error):
                 // The server refused (seats full, turned off): stop treating this Mac as licensed.
+                // The refusal is stored beside the key, so clearing defaults cannot license it again.
+                let licenseID = License.read(key, publicKeys: evaluator.publicKeys)?.id ?? LicenseCredentialCommit.blockAll
+                let refusal = LicenseCredentialCommit.refuse(
+                    licenseID: licenseID,
+                    write: { value, account in credentials.set(value, for: account) },
+                    deleteKey: { credentials.remove("license.key") }
+                )
                 defaults.set(true, forKey: "license.activationRejected")
-                let removed = credentials.remove("license.key")
-                defaults.set(!removed, forKey: "license.activationPending")
-                lastError = removed ? error.message : "\(error.message) Couldn't remove the local key. Check Keychain access and retry."
+                if refusal.needsCleanup { defaults.set(true, forKey: "license.cleanupPending") }
+                defaults.set(!refusal.keyRemoved, forKey: "license.activationPending")
+                lastError = refusal.keyRemoved ? error.message : "\(error.message) Couldn't remove the local key. Check Keychain access and retry."
             case .failure:
                 break
             }
@@ -279,6 +310,16 @@ final class LicenseManager {
     }
 
     func setStatusForSnapshot(_ status: LicenseStatus) { self.status = status }
+
+    /// A refused key stays refused when the defaults flag is gone. The Keychain copy is the one that travels with the key.
+    private func activationIsRefused(key: String?) -> Bool {
+        if defaults.bool(forKey: "license.activationRejected") || defaults.bool(forKey: "license.cleanupPending") {
+            return true
+        }
+        let licenseID = key.flatMap { License.read($0, publicKeys: evaluator.publicKeys)?.id }
+        return LicenseCredentialCommit.covers(refusal: credentials.get(LicenseCredentialCommit.refusalAccount),
+                                              licenseID: licenseID, hasKey: key != nil)
+    }
 
     /// First launch, kept in the Keychain so reinstalling does not restart the trial.
     private func trialStart() -> Date {

@@ -138,4 +138,138 @@ struct LicenseCredentialCleanupTests {
         #expect(!manager.isLicensed && manager.activationPending)
         #expect(defaults.bool(forKey: "license.activationRejected"))
     }
+
+    @Test func failedKeyWriteRollsTheProofBackAndDoesNotKeepTheNewProof() async throws {
+        let name = NSTemporaryDirectory() + "zeus.license-commit.\(UUID().uuidString)"
+        let (defaults, backend, key, proof) = try commitFixture(name)
+        defer { defaults.removePersistentDomain(forName: name) }
+        backend.items["com.zeus.app|license.key"] = "previous-key"
+        backend.items["com.zeus.app|license.activation"] = "previous-proof"
+        backend.failWrites = ["license.key"]
+        let holder = try signedManager(defaults, backend, Server(response: .success(proof)))
+        let message = await holder.manager.activate(key)
+        #expect(message != nil)
+        #expect(holder.backend.items["com.zeus.app|license.activation"] == "previous-proof")
+        #expect(holder.backend.items["com.zeus.app|license.key"] == "previous-key")
+    }
+
+    @Test func failedRollbackBlocksTheKeyThatRemains() async throws {
+        let name = NSTemporaryDirectory() + "zeus.license-commit.\(UUID().uuidString)"
+        let (defaults, backend, key, proof) = try commitFixture(name)
+        defer { defaults.removePersistentDomain(forName: name) }
+        backend.items["com.zeus.app|license.key"] = key
+        backend.items["com.zeus.app|license.activation"] = "previous-proof"
+        backend.failWrites = ["license.key"]
+        backend.writesLeft["license.activation"] = 1
+        let holder = try signedManager(defaults, backend, Server(response: .success(proof)))
+        #expect(holder.manager.isLicensed)
+        let message = await holder.manager.activate(key)
+        #expect(message != nil)
+        #expect(!holder.manager.isLicensed)
+        #expect(holder.backend.items["com.zeus.app|license.key"] == key)
+        #expect(holder.backend.items["com.zeus.app|license.activationRejected"] == LicenseCredentialCommit.blockAll)
+    }
+
+    @Test func serverRefusalStaysWithTheKeyAfterTheDefaultsFlagIsCleared() async throws {
+        let name = NSTemporaryDirectory() + "zeus.license-commit.\(UUID().uuidString)"
+        let (defaults, backend, key, _) = try commitFixture(name)
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(true, forKey: "license.activationPending")
+        backend.items["com.zeus.app|license.key"] = key
+        backend.failDeletes = ["license.key"]
+        let holder = try signedManager(defaults, backend, Server(response: .failure(.seatsFull)))
+        #expect(holder.manager.isLicensed)
+        await holder.manager.syncWithServer(force: true)
+        #expect(!holder.manager.isLicensed)
+        #expect(holder.manager.activationPending)
+        #expect(!defaults.bool(forKey: "license.cleanupPending"))
+        #expect(holder.backend.items["com.zeus.app|license.key"] == key)
+        #expect(holder.backend.items["com.zeus.app|license.activationRejected"] == "synthetic-license")
+        defaults.removeObject(forKey: "license.activationRejected")
+        let relaunched = try signedManager(defaults, backend, Server(response: .failure(.seatsFull)))
+        #expect(!relaunched.manager.isLicensed)
+        #expect(relaunched.backend.items["com.zeus.app|license.key"] == key)
+    }
+
+    @Test func aRefusalThatCannotBeStoredStillFailsClosedUntilCleanup() async throws {
+        let name = NSTemporaryDirectory() + "zeus.license-commit.\(UUID().uuidString)"
+        let (defaults, backend, key, _) = try commitFixture(name)
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(true, forKey: "license.activationPending")
+        backend.items["com.zeus.app|license.key"] = key
+        backend.failDeletes = ["license.key"]
+        backend.failWrites = [LicenseCredentialCommit.refusalAccount]
+        let holder = try signedManager(defaults, backend, Server(response: .failure(.revoked)))
+        await holder.manager.syncWithServer(force: true)
+        #expect(!holder.manager.isLicensed)
+        #expect(defaults.bool(forKey: "license.cleanupPending"))
+        #expect(holder.backend.items["com.zeus.app|license.key"] == key)
+        defaults.removeObject(forKey: "license.activationRejected")
+        let relaunched = try signedManager(defaults, backend, Server(response: .failure(.revoked)))
+        #expect(!relaunched.manager.isLicensed)
+    }
+
+    private func commitFixture(_ name: String) throws -> (UserDefaults, WriteGate, String, String) {
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defaults.set("https://synthetic-license.invalid", forKey: "license.server")
+        let signer = Curve25519.Signing.PrivateKey()
+        let key = try License.encode(.init(id: "synthetic-license", email: "fixture@example.invalid",
+                                           plan: "lifetime", issued: 1), signingKey: signer)
+        let proof = try SignedBlob.encode(ActivationPayload(license: "synthetic-license", device: "synthetic-device",
+                                                            issued: 1, seat: 1, seats: 1),
+                                         prefix: ActivationPayload.prefix, signingKey: signer)
+        let backend = WriteGate(["com.zeus.app|\(LicenseManager.serverOriginAccount)": "https://synthetic-license.invalid:443"])
+        backend.signer = signer
+        return (defaults, backend, key, proof)
+    }
+
+    private func signedManager(_ defaults: UserDefaults, _ backend: WriteGate, _ server: Server) throws -> (manager: LicenseManager, backend: WriteGate) {
+        let signer = try #require(backend.signer)
+        let manager = LicenseManager(defaults: defaults, credentials: KeychainStore(backend: backend, defaults: defaults),
+                                     deviceID: "synthetic-device", trustedKeys: [signer.publicKey], synchronizeAtLaunch: false,
+                                     serverFactory: { _ in server }, deviceName: { "Synthetic Mac" })
+        return (manager, backend)
+    }
+}
+
+/// Writes fail or run out on named accounts. Reads stay available, matching a Keychain item that will not update.
+private final class WriteGate: KeychainBackend, @unchecked Sendable {
+    private let lock = NSLock()
+    var items: [String: String]
+    var failWrites: Set<String> = []
+    var failDeletes: Set<String> = []
+    var writesLeft: [String: Int] = [:]
+    var signer: Curve25519.Signing.PrivateKey?
+    init(_ items: [String: String] = [:]) { self.items = items }
+
+    private static func key(_ service: String, _ account: String) -> String { "\(service)|\(account)" }
+
+    func accounts(service: String) -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        let prefix = service + "|"
+        return items.keys.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+    }
+
+    func read(service: String, account: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return items[Self.key(service, account)]
+    }
+
+    func write(_ value: String, service: String, account: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if failWrites.contains(account) { return false }
+        if let left = writesLeft[account] {
+            guard left > 0 else { return false }
+            writesLeft[account] = left - 1
+        }
+        items[Self.key(service, account)] = value
+        return true
+    }
+
+    func delete(service: String, account: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if failDeletes.contains(account) { return false }
+        items[Self.key(service, account)] = nil
+        return true
+    }
 }
