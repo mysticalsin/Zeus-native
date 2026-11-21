@@ -145,7 +145,7 @@ public struct VoiceProvidersCardModel: Equatable, Sendable {
     }
 }
 
-public struct SpeakOutcome: Equatable, Sendable {
+public struct ProviderSpeakOutcome: Equatable, Sendable {
     public enum LocalFallback: Equatable, Sendable {
         case selected
         case notReady
@@ -311,7 +311,7 @@ public actor VoiceProviderSession {
         currentCancel = nil
     }
 
-    public func speak(_ text: String) async -> SpeakOutcome {
+    public func speak(_ text: String) async -> ProviderSpeakOutcome {
         let started = ContinuousClock.now
         speakCancelled = false
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -362,7 +362,7 @@ public actor VoiceProviderSession {
                 let line = "\(name) is speaking."
                 statusLine = line
                 log.record("speak route=cloud provider=\(id) bytes=\(audio.count) first_audio_ms=\(first)", secrets: [key])
-                return SpeakOutcome(route: .cloud(providerID: id, voiceID: voiceID), audio: audio, firstAudioMs: first,
+                return ProviderSpeakOutcome(route: .cloud(providerID: id, voiceID: voiceID), audio: audio, firstAudioMs: first,
                                     metVoiceLegBudget: ProviderLatencyVerdict.meetsVoiceLeg(first),
                                     metDirectStreamP95: ProviderLatencyVerdict.meetsDirectStreamP95(first),
                                     signpostName: ProviderSignpostName.firstAudio, statusLine: line)
@@ -395,7 +395,7 @@ public actor VoiceProviderSession {
                                        metrics: .standard, statusLine: statusLine)
     }
 
-    private func fallback(_ failure: ProviderFailure, providerID: String, text: String, started: ContinuousClock.Instant, secret: String) async -> SpeakOutcome {
+    private func fallback(_ failure: ProviderFailure, providerID: String, text: String, started: ContinuousClock.Instant, secret: String) async -> ProviderSpeakOutcome {
         log.record("speak fallback provider=\(providerID) failure=\(failure.logName)", secrets: [secret])
         if failure == .cancelled || speakCancelled {
             return cancelled(started: started, providerID: providerID)
@@ -418,7 +418,7 @@ public actor VoiceProviderSession {
         readiness[providerID] = machine.state
     }
 
-    private func finishLocal(_ reason: SpeakOutcome.LocalFallback, text: String, providerID: String, started: ContinuousClock.Instant, routeName: String) async -> SpeakOutcome {
+    private func finishLocal(_ reason: ProviderSpeakOutcome.LocalFallback, text: String, providerID: String, started: ContinuousClock.Instant, routeName: String) async -> ProviderSpeakOutcome {
         let interval = signposter.begin()
         var audio = Data()
         var spokeWithMac = false
@@ -443,18 +443,18 @@ public actor VoiceProviderSession {
         }
         statusLine = line
         log.record("speak route=\(routeName) provider=\(providerID) bytes=\(audio.count) first_audio_ms=\(milliseconds)")
-        return SpeakOutcome(route: .local(reason), audio: audio, firstAudioMs: milliseconds,
+        return ProviderSpeakOutcome(route: .local(reason), audio: audio, firstAudioMs: milliseconds,
                             metVoiceLegBudget: ProviderLatencyVerdict.meetsVoiceLeg(milliseconds),
                             metDirectStreamP95: ProviderLatencyVerdict.meetsDirectStreamP95(milliseconds),
                             signpostName: ProviderSignpostName.firstAudio, statusLine: line)
     }
 
-    private func cancelled(started: ContinuousClock.Instant, providerID: String) -> SpeakOutcome {
+    private func cancelled(started: ContinuousClock.Instant, providerID: String) -> ProviderSpeakOutcome {
         let milliseconds = ProviderClock.milliseconds(since: started)
         let line = "Speaking cancelled."
         statusLine = line
         log.record("speak route=cancelled provider=\(providerID)")
-        return SpeakOutcome(route: .cancelled, audio: Data(), firstAudioMs: milliseconds,
+        return ProviderSpeakOutcome(route: .cancelled, audio: Data(), firstAudioMs: milliseconds,
                             metVoiceLegBudget: ProviderLatencyVerdict.meetsVoiceLeg(milliseconds),
                             metDirectStreamP95: ProviderLatencyVerdict.meetsDirectStreamP95(milliseconds),
                             signpostName: ProviderSignpostName.firstAudio, statusLine: line)

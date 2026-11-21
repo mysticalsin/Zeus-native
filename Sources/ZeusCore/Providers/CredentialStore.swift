@@ -54,9 +54,7 @@ public struct KeychainCredentialStore: CredentialStore, Sendable {
             var query = base(service, account)
             query[kSecReturnData as String] = true
             query[kSecMatchLimit as String] = kSecMatchLimitOne
-            var result: CFTypeRef?
-            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-            return String(data: data, encoding: .utf8)
+            return KeychainPasswordQuery.copyPassword(query)
         }
     }
 
