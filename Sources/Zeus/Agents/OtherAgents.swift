@@ -6,9 +6,10 @@ import ZeusCore
 /// Connects Codex, Gemini CLI and cursor-agent to the notch by adding ZEUS's hook to each
 /// tool's own config, with a timestamped backup first. Only ZEUS's entries are ever removed.
 enum AgentHookInstaller {
-    /// `ZEUS_AGENT_CONFIG_HOME` points the installer at a fake home, for tests and scripts.
+    /// Debug and test builds honour `ZEUS_AGENT_CONFIG_HOME` (a fake home, for tests and scripts).
+    /// Release builds ignore it.
     static var home: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_AGENT_CONFIG_HOME"], !override.isEmpty {
+        if let override = SupportOverride.resolved("ZEUS_AGENT_CONFIG_HOME") {
             return URL(fileURLWithPath: override)
         }
         return FileManager.default.homeDirectoryForCurrentUser

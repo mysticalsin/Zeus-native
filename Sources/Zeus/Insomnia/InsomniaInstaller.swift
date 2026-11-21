@@ -44,6 +44,7 @@ struct InsomniaInstaller: Sendable {
     let cliPath: String
     let logPath: String
     let fileExists: @Sendable (String) -> Bool
+    let authorizeHelper: @Sendable (String) -> BundledHelperLaunchDecision
 
     init(runner: any InsomniaCommandRunner = ProcessCommandRunner(timeout: 300),
          user: String = NSUserName(),
@@ -52,7 +53,10 @@ struct InsomniaInstaller: Sendable {
          temporaryDirectory: URL = FileManager.default.temporaryDirectory,
          cliPath: String = InsomniaInstaller.defaultCLIPath(),
          logPath: String = ZeusPaths.supportDirectory.appendingPathComponent("insomnia-guard.log").path,
-         fileExists: @escaping @Sendable (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) {
+         fileExists: @escaping @Sendable (String) -> Bool = { FileManager.default.fileExists(atPath: $0) },
+         authorizeHelper: @escaping @Sendable (String) -> BundledHelperLaunchDecision = { path in
+             BundledHelperLaunch.decide(path: path, signingIdentifier: BundledHelperLaunchPolicy.signingIdentifier(forExecutablePath: path))
+         }) {
         self.runner = runner
         self.user = user
         self.uid = uid
@@ -61,6 +65,7 @@ struct InsomniaInstaller: Sendable {
         self.cliPath = cliPath
         self.logPath = logPath
         self.fileExists = fileExists
+        self.authorizeHelper = authorizeHelper
     }
 
     /// The `zeus` CLI copy in Zeus's bin folder, else the one in the bundle, else next to this binary (dev).
@@ -85,6 +90,13 @@ struct InsomniaInstaller: Sendable {
     }
 
     func install() -> Outcome {
+        switch authorizeHelper(cliPath) {
+        case .launch:
+            break
+        case .refuse(let sentence):
+            BundledHelperLaunchLog.refused(path: cliPath)
+            return .failed(sentence)
+        }
         let rule: String
         do { rule = try InsomniaSudoers.rule(user: user) } catch {
             return .failed("Your account name \(user) cannot go into a sudoers rule.")

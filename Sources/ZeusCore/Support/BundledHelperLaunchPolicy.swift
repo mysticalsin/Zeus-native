@@ -29,11 +29,22 @@ public enum BundledHelperLaunchPolicy {
     /// Nil when either value cannot be placed in a requirement.
     public static func requirementText(teamIdentifier: String, signingIdentifier: String) -> String? {
         guard isToken(teamIdentifier, allowing: ""), isToken(signingIdentifier, allowing: "._-") else { return nil }
-        return "anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
+        return "anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\" and identifier \"\(signingIdentifier)\""
     }
 
+    /// Launch only when the helper's file name is its signing identifier, that identifier is one of
+    /// the bundled helpers, and `checker` reports that a designated requirement pinning the running
+    /// app's team and that identifier succeeded. Every other case refuses.
     public static func decide(helperPath: String, signingIdentifier: String, checker: some BundledHelperSignatureChecking) -> BundledHelperLaunchDecision {
-        _ = (helperPath, signingIdentifier, checker)
+        let path = helperPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let identifier = signingIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, knownSigningIdentifiers.contains(identifier),
+              Self.signingIdentifier(forExecutablePath: path) == identifier,
+              let team = checker.mainAppTeamIdentifier()?.trimmingCharacters(in: .whitespacesAndNewlines), !team.isEmpty,
+              requirementText(teamIdentifier: team, signingIdentifier: identifier) != nil,
+              checker.helperSatisfiesRequirement(at: path, teamIdentifier: team, signingIdentifier: identifier) else {
+            return .refuse(refusalSentence)
+        }
         return .launch
     }
 

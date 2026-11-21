@@ -706,7 +706,7 @@ final class VoiceTurnController {
         if let path = TodoController.shared.connection?.source.path {
             return URL(fileURLWithPath: path)
         }
-        if let env = ProcessInfo.processInfo.environment["ZEUS_BRAIN_FIXTURE"], !env.isEmpty {
+        if let env = SupportOverride.resolved("ZEUS_BRAIN_FIXTURE") {
             return URL(fileURLWithPath: env)
         }
         return BrainToday.defaultRoot()

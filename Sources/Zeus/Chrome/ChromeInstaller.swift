@@ -7,10 +7,12 @@ import ZeusCore
 enum ChromeInstaller {
     enum InstallError: LocalizedError {
         case extensionMissing(String)
+        case helperRefused(String)
 
         var errorDescription: String? {
             switch self {
             case .extensionMissing(let path): "The Zeus extension wasn't found at \(path). Rebuild with scripts/bundle.sh."
+            case .helperRefused(let sentence): sentence
             }
         }
     }
@@ -24,8 +26,29 @@ enum ChromeInstaller {
         return object["path"] as? String == installedBridge.path
     }
 
+    /// Refuses to leave `zeus-bridge` installed unless its signature pins this app's team and the
+    /// bridge signing identifier. On failure the installed copy and the Chrome host registration
+    /// are removed, so Chrome is not left a path to launch.
+    static func authorizeInstalledBridge() -> Result<Void, InstallError> {
+        switch BundledHelperLaunch.decide(path: installedBridge.path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier) {
+        case .launch:
+            return .success(())
+        case .refuse(let sentence):
+            BundledHelperLaunchLog.refused(path: installedBridge.path)
+            try? FileManager.default.removeItem(at: installedBridge)
+            try? uninstall()
+            return .failure(.helperRefused(sentence))
+        }
+    }
+
     static func install() throws {
         try HelperInstaller.refresh("zeus-bridge")
+        switch authorizeInstalledBridge() {
+        case .success:
+            break
+        case .failure(let error):
+            throw error
+        }
         try refreshExtension()
 
         let manifest: [String: Any] = [

@@ -43,8 +43,10 @@ public enum SupportOverride {
         "ZEUS_DEBUG_SCREENSHOT_DIR",
     ]
 
-    /// Non-empty override when this build may use it. Empty and whitespace-only values are absent.
+    /// Non-empty override when this build may use it. Release builds ignore every override.
+    /// Empty and whitespace-only values are absent.
     public static func value(_ name: String, environment: some SupportOverrideEnvironment, build: SupportOverrideBuild) -> String? {
+        guard build == .debug else { return nil }
         guard let raw = environment.value(name) else { return nil }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

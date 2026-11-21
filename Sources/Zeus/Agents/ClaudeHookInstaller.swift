@@ -15,9 +15,10 @@ enum ClaudeHookInstaller {
         }
     }
 
-    /// ZEUS_CLAUDE_SETTINGS points the installer at a copy, for scripts/e2e.sh.
+    /// Debug and test builds honour `ZEUS_CLAUDE_SETTINGS` (a copy, for scripts/e2e.sh).
+    /// Release builds ignore it.
     static var settingsURL: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_CLAUDE_SETTINGS"] {
+        if let override = SupportOverride.resolved("ZEUS_CLAUDE_SETTINGS") {
             return URL(fileURLWithPath: override)
         }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")

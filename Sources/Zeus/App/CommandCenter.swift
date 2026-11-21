@@ -584,7 +584,7 @@ final class CommandCenter {
             text = String(tail[space...]).trimmingCharacters(in: .whitespacesAndNewlines)
             vault = URL(fileURLWithPath: path)
         }
-        if vault == nil, let env = ProcessInfo.processInfo.environment["ZEUS_BRAIN_FIXTURE"], !env.isEmpty {
+        if vault == nil, let env = SupportOverride.resolved("ZEUS_BRAIN_FIXTURE") {
             vault = URL(fileURLWithPath: env)
         }
         if vault == nil, let root = BrainToday.defaultRoot() { vault = root }
