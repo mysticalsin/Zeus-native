@@ -31,6 +31,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     private let overlay = ExplanationOverlay()
     private let screens: @MainActor () -> [Screen]
     private let reduceMotion: @MainActor () -> Bool
+    /// Seconds since this answer's audio started. Nil uses the real clock, never a word-rate guess.
+    private let speechClock: (@MainActor () -> TimeInterval)?
     private var capture: ExplanationCaptureContext?
     private var pending: [Int: [ExplanationObject]] = [:]
     private var shown: [ExplanationObject] = []
@@ -38,17 +40,22 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     private var token: UUID?
     private var identity: (session: UUID, scene: UUID, revision: Int)?
     private var markSchedule = SpeechMarkSchedule(marks: [])
+    private var speechAnchor: Date?
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 
     var isShowing: Bool { overlay.isVisible }
+    /// Marks already released onto the overlay. A future mark stays out of this count.
+    var visibleMarkCount: Int { shown.count }
     var hideIsArmed: Bool { hideTask != nil }
     /// One scene per turn: its marks keep their identity while later sentences add to it.
     var sceneIdentity: (session: UUID, scene: UUID, revision: Int)? { identity }
 
     init(screens: @escaping @MainActor () -> [Screen] = TalkVisualPresenter.currentScreens,
-         reduceMotion: @escaping @MainActor () -> Bool = { Motion.reduced }) {
+         reduceMotion: @escaping @MainActor () -> Bool = { Motion.reduced },
+         speechClock: (@MainActor () -> TimeInterval)? = nil) {
         self.screens = screens
         self.reduceMotion = reduceMotion
+        self.speechClock = speechClock
     }
 
     static func currentScreens() -> [Screen] {
@@ -72,7 +79,7 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         self.token = token
         identity = (UUID(), UUID(), 0)
         markSchedule = SpeechMarkSchedule(marks: draw.marks.enumerated().map {
-            .init(id: "td\($0.offset)", sentenceIndex: $0.element.at)
+            .init(id: "td\($0.offset)", sentenceIndex: $0.element.at, dueSeconds: $0.element.audioTime)
         })
         pending = TalkDrawScene.objects(draw, shot: shot, captureID: geometry.captureID)
         watchForStaleScreen()
@@ -83,11 +90,42 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     }
 
     func reveal(sentence: Int, token: UUID) {
-        guard !markSchedule.isCancelled else { return }
-        guard token == self.token, let capture, var identity, let marks = pending.removeValue(forKey: sentence) else { return }
+        guard !markSchedule.isCancelled, token == self.token else { return }
+        let audioTime = currentSpeechTime()
+        _ = markSchedule.apply(sentenceIndex: sentence, audioStartSeconds: audioTime)
+        releaseDueMarks(at: audioTime)
+    }
+
+    /// A later sample of the real speech clock. This is not the 0.18 s per word estimate.
+    func sampleSpeechClock(token: UUID) {
+        guard !markSchedule.isCancelled, token == self.token else { return }
+        releaseDueMarks(at: currentSpeechTime())
+    }
+
+    private func currentSpeechTime() -> TimeInterval {
+        if let speechClock { return speechClock() }
+        let now = Date()
+        if speechAnchor == nil { speechAnchor = now }
+        return now.timeIntervalSince(speechAnchor!)
+    }
+
+    private func releaseDueMarks(at audioTime: TimeInterval) {
+        guard let capture, var identity else { return }
+        let due = Set(markSchedule.due(at: audioTime).map(\.id))
+        var ready: [ExplanationObject] = []
+        for key in pending.keys.sorted() {
+            var keep: [ExplanationObject] = []
+            for object in pending[key] ?? [] {
+                if due.contains(object.id) { ready.append(object) }
+                else { keep.append(object) }
+            }
+            if keep.isEmpty { pending.removeValue(forKey: key) }
+            else { pending[key] = keep }
+        }
+        guard !ready.isEmpty else { return }
         hideTask?.cancel()
         hideTask = nil
-        shown += marks
+        shown += ready
         identity.revision += 1
         self.identity = identity
         let scene = ExplanationScene(sessionID: identity.session, sceneID: identity.scene, revision: identity.revision,
@@ -120,6 +158,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         identity = nil
         pending = [:]
         shown = []
+        speechAnchor = nil
+        markSchedule = SpeechMarkSchedule(marks: [])
     }
 
     private func watchForStaleScreen() {
