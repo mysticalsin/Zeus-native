@@ -59,6 +59,9 @@ final class NotchController {
     private var dragMonitors: [Any] = []
     private var dragChangeCount = 0
     private var hoverTask: Task<Void, Never>?
+    /// Click-to-open waits on this. Mouse-down arms it; the panel opens after 0.35 s.
+    private var clickSettle = NotchClickSettle()
+    private var clickSettleTask: Task<Void, Never>?
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
     /// The pin rules live in ZeusCore; this only reports the current facts.
@@ -464,19 +467,47 @@ final class NotchController {
         show(.closed)
     }
 
-    /// Click mode: a left click on the click zone opens the panel from the closed notch or a peek, like a
-    /// completed hover. The click is only observed; the closed window stays click-through. Returns true when
-    /// it opened the panel.
+    /// Click mode: a left click on the click zone may open the panel from the closed notch or a peek.
+    /// Mouse-down does not open it. The panel opens when the pointer has settled for 0.35 s. The click is
+    /// only observed; the closed window stays click-through. Returns true when the click is in the zone.
     private func openOnClick() -> Bool {
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
         guard !drawnNotch.isCalibrating else { return false }
+        let point = pointer()
         let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
         guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
-                                          point: NSEvent.mouseLocation, zone: zone) else { return false }
+                                          point: point, zone: zone) else { return false }
+        let step = clickSettle.pointerDown(at: now(), point: NotchClickPoint(x: Double(point.x), y: Double(point.y)))
+        switch step {
+        case .wait(let until):
+            armClickSettle(until: until)
+            return true
+        case .open:
+            finishSettledClick()
+            return true
+        case .ignore:
+            return false
+        }
+    }
+
+    /// Sleeps until the settle date the machine returned. The decision uses `now()`, which tests replace.
+    private func armClickSettle(until: Date) {
+        clickSettleTask?.cancel()
+        let delay = until.timeIntervalSince(now())
+        clickSettleTask = Task { @MainActor [weak self] in
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard let self, !Task.isCancelled else { return }
+            self.clickSettleTask = nil
+            let point = self.pointer()
+            let step = self.clickSettle.tick(at: self.now(), point: NotchClickPoint(x: Double(point.x), y: Double(point.y)))
+            if step == .open { self.finishSettledClick() }
+        }
+    }
+
+    private func finishSettledClick() {
         hoverTask?.cancel()
         hoverTask = nil
         show(.panel)
-        return true
     }
 
     /// The accessibility "Open Zeus panel" action on the notch: the same result as a completed hover or click.
