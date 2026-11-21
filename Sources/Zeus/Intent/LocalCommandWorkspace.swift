@@ -1,17 +1,21 @@
 import AppKit
+import Carbon
 import ZeusCore
 
 /// Performs a local command with NSWorkspace for apps, and with the helpers Zeus already
 /// uses for media keys and output volume. No new permission, prompt, or entitlement.
 @MainActor
 enum LocalCommandWorkspace {
-    /// Installed apps from the in-memory index, with running state from NSWorkspace.
+    /// Installed apps from the in-memory index whose path is `/Applications` or the user's
+    /// Applications folder, with running state from NSWorkspace. System and other folders stay out.
     /// Unsaved documents are unknown: NSWorkspace does not report them, so quit asks.
     static func installedApps() -> [LocalApp] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
         let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        return AppIndex.shared.snapshot().map { entry in
-            LocalApp(name: entry.name, bundleID: entry.bundleID, path: entry.path, aliases: entry.aliases,
-                     isRunning: running.contains(entry.bundleID), hasUnsavedState: nil)
+        return AppIndex.shared.snapshot().compactMap { entry in
+            guard LocalAppCatalog.included(entry.path, home: home) else { return nil }
+            return LocalApp(name: entry.name, bundleID: entry.bundleID, path: entry.path, aliases: entry.aliases,
+                            isRunning: running.contains(entry.bundleID), hasUnsavedState: nil)
         }
     }
 
@@ -20,7 +24,9 @@ enum LocalCommandWorkspace {
         case .open(let app), .switchTo(let app):
             bringForward(app)
         case .quit(let app):
-            NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == app.bundleID }?.terminate()
+            if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == app.bundleID }) {
+                quitAllowingSavePrompt(running)
+            }
         case .media(let command):
             switch command {
             case .play, .pause: MediaKeys.post(.play)
@@ -46,6 +52,20 @@ enum LocalCommandWorkspace {
             case .set(let value): "volume \(value)"
             }
         }
+    }
+
+    /// The ordinary Quit path. The app may bring itself forward and show a save dialog.
+    /// `terminate()` does not, and `forceTerminate()` discards unsaved work.
+    private static func quitAllowingSavePrompt(_ running: NSRunningApplication) {
+        let target = NSAppleEventDescriptor(processIdentifier: running.processIdentifier)
+        let event = NSAppleEventDescriptor(
+            eventClass: AEEventClass(kCoreEventClass),
+            eventID: AEEventID(kAEQuitApplication),
+            targetDescriptor: target,
+            returnID: AEReturnID(kAutoGenerateReturnID),
+            transactionID: AETransactionID(kAnyTransactionID)
+        )
+        try? event.sendEvent(options: [.noReply, .canInteract, .canSwitchLayer, .dontRecord], timeout: 0)
     }
 
     private static func bringForward(_ app: LocalApp) {

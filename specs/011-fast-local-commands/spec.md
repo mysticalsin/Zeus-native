@@ -36,6 +36,18 @@ index and `NSWorkspace`’s running applications. It does not scan the disk on t
 transcript path, and it does not know whether a document is dirty, so it passes
 `nil`. Quit therefore asks on a real Mac.
 
+The spoken catalog is not every installed app. A row is kept only when its path
+is `/Applications` or the user's Applications folder (`~/Applications`), or a
+path inside one of those two roots. The path must equal the root or continue
+with `/`. These are left out:
+
+- `/System/Applications` and anything under it
+- `/System/Library/CoreServices`
+- a folder that only begins with the same letters, such as `/ApplicationsExtra`
+- any other location the index may have scanned for a different feature
+
+The index itself is unchanged. This catalog is the filter in front of it.
+
 Matching, after the same normalisation the parser uses:
 
 - Exact equality with the display name or an alias wins.
@@ -152,18 +164,30 @@ Otherwise:
 Quit asks whenever unsaved state is anything other than a known clean. That is
 the default.
 
+A quit confirmation does not wait forever. It expires **10 seconds** after the
+clock reading that asked the question, or at the end of the next turn, whichever
+comes first. The same single clock reading that enforces the 150 millisecond
+budget also measures those 10 seconds. At 10 seconds the pending quit is dropped
+and the transcript is read as a fresh command, so a late “yes” does not quit and
+a late “pause” is pause. `endTurn` drops a confirmation that was already pending
+when the turn began. A confirmation created during the turn is armed for the
+following turn and is not dropped by that same `endTurn`.
+
 ### From confirmingQuit
 
 Still subject to the 150 millisecond budget, measured from this reply’s final
-instant. Over budget: drop the confirmation, go idle, fall through. The late
-“yes” must not quit the app.
+instant, and to the 10 second lifetime above. Over the 150 millisecond budget:
+drop the confirmation, go idle, fall through. The late “yes” must not quit the app.
+
+Confirmation is an explicit phrase. “ok”, “sure”, and a bare “quit” are not
+confirmation.
 
 | Reply | Next state | Effects |
 | --- | --- | --- |
-| yes, yeah, yep, yah, confirm, do it, go ahead, quit it, please do, sure, ok, okay, quit | acted | perform quit, “Quitting NAME.” |
+| yes, yeah, yep, yah, confirm, do it, go ahead, quit it, please do, okay | acted | perform quit, “Quitting NAME.” |
 | no, nope, nah, cancel, dont, do not, stop, never mind, leave it, leave it open | idle | “Leaving it open.” |
 | Another row of the intent table | as if idle | that row’s effects |
-| Anything else | idle | fallThrough |
+| ok, sure, quit, or anything else | idle | fallThrough |
 
 ### From confirmingChoice
 
@@ -186,8 +210,10 @@ The hook performs with `NSWorkspace` only for apps:
 
 - Open and switch activate a running application, or open its bundle with
   `NSWorkspace.openApplication` and activation on.
-- Quit calls `terminate()` on the running application from
-  `NSWorkspace.runningApplications`. It never calls `forceTerminate()`.
+- Quit sends the Quit Apple event (`kAEQuitApplication`) to that running
+  application’s process, with interaction and layer switching allowed, and does
+  not wait for a reply. That is the normal Quit path: the app may show its own
+  save dialog. This path does not call `terminate()` or `forceTerminate()`.
 
 Play, pause, next, and volume are the actions Zeus already uses for those words:
 the existing media-key event and the existing output-volume helper. This path
@@ -216,6 +242,8 @@ The acceptance tests are pure. They do not import AppKit.
 - The exhaustive parser table: every row above, including filler, case, and punctuation that normalise onto a row.
 - Fall-through: the rejected phrases, plus an app name that is not in the injected list.
 - Latency: an injected clock at 149 milliseconds acts; a clock at 150 milliseconds falls through and does not perform. A confirmation that arrives at 150 milliseconds does not quit.
+- Quit confirmation: “yes” and “quit it” quit. “ok”, “sure”, and a bare “quit” do not. A “yes” at 9.999 seconds quits. A “yes” at 10 seconds does not, and “pause” at 10 seconds is pause. `endTurn` after the question drops the confirmation, so a later “yes” does not quit.
+- Catalog roots: a path under `/Applications` or `~/Applications` is included. System locations and prefix lookalikes are not.
 - Ambiguous names: two installed apps that share an alias ask, a later reply that names one acts, and “yes” or “no” does not guess.
 
 Linux cannot build the macOS application target. The pure files are executed in

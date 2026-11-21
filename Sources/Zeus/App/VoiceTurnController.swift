@@ -77,7 +77,7 @@ final class VoiceTurnController {
     private var fastRace: FastRaceRun?
     /// When the talk key was released, for the per-stage timing log.
     private var turnReleasedAt: ContinuousClock.Instant?
-    /// Open, quit, media, and volume decided locally. Confirmation survives until the next final transcript.
+    /// Open, quit, media, and volume decided locally. A quit confirmation lasts until the next turn ends, or 10 seconds.
     private var localCommands = LocalCommandMachine()
     /// When the last fast answer finished: the deep follow-up is spoken only inside the conversation window.
     private var lastAnswerAt: Date?
@@ -465,6 +465,15 @@ final class VoiceTurnController {
 
     /// A finished transcript: approval answers, walkthrough steering, the fast path, then the LLM.
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
+        // A quit question asked on the previous turn dies here if this turn did not confirm it.
+        // A question asked during this turn is armed for the turn after it.
+        defer {
+            if localCommands.quitExpiresAtEndOfNextTurn {
+                localCommands.endTurn()
+            } else if localCommands.isConfirmingQuit {
+                localCommands.armQuitExpiryAtEndOfNextTurn()
+            }
+        }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
         guard !transcript.isEmpty else {
             VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")

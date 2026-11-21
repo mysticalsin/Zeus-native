@@ -70,67 +70,132 @@ public struct LocalCommandClock: Sendable {
     public static let system = LocalCommandClock { ContinuousClock.now }
 }
 
+/// Paths the spoken catalog may name. The index can see more; this list does not.
+public enum LocalAppCatalog {
+    /// `/Applications` and the user's Applications folder, including anything inside them.
+    /// A path that only shares a prefix with those roots is left out.
+    public static func included(_ path: String, home: String) -> Bool {
+        guard !path.isEmpty, !home.isEmpty else { return false }
+        return inside(path, root: "/Applications") || inside(path, root: userApplications(home))
+    }
+
+    public static func userApplications(_ home: String) -> String {
+        let trimmed = home.count > 1 && home.hasSuffix("/") ? String(home.dropLast()) : home
+        return trimmed == "/" ? "/Applications" : trimmed + "/Applications"
+    }
+
+    private static func inside(_ path: String, root: String) -> Bool {
+        let root = root.hasSuffix("/") ? String(root.dropLast()) : root
+        return path == root || path.hasPrefix(root + "/")
+    }
+}
+
 /// Deterministic local commands. One state, one clock reading, no I/O.
 public struct LocalCommandMachine: Equatable, Sendable {
     public static let latencyBudgetMilliseconds = 150
+    /// A quit confirmation dies at this age, or sooner if the next turn ends first.
+    public static let quitConfirmationLifetimeMilliseconds = 10_000
 
     public private(set) var state: LocalCommandState
+    private var quitAskedAt: ContinuousClock.Instant?
+    /// Armed at the end of the turn that asked, so the following turn can drop the question.
+    public private(set) var quitExpiresAtEndOfNextTurn = false
 
     public init() {
         state = .idle
     }
 
+    public var isConfirmingQuit: Bool {
+        if case .confirmingQuit = state { return true }
+        return false
+    }
+
     public mutating func reset() {
         state = .idle
+        quitAskedAt = nil
+        quitExpiresAtEndOfNextTurn = false
+    }
+
+    /// Call at the end of a turn that began with a quit confirmation already pending.
+    /// A confirmation created during this turn is left for the turn after it.
+    public mutating func endTurn() {
+        if quitExpiresAtEndOfNextTurn, case .confirmingQuit = state {
+            state = .idle
+            quitAskedAt = nil
+        }
+        quitExpiresAtEndOfNextTurn = false
+    }
+
+    /// The question was asked on this turn. The next turn's `endTurn` drops it if it is still waiting.
+    public mutating func armQuitExpiryAtEndOfNextTurn() {
+        quitExpiresAtEndOfNextTurn = isConfirmingQuit
     }
 
     public mutating func receive(_ transcript: String, finalAt: ContinuousClock.Instant,
                                  clock: LocalCommandClock, apps: [LocalApp]) -> LocalCommandDecision {
-        let elapsed = Self.elapsedMilliseconds(from: finalAt, to: clock.now())
+        let now = clock.now()
+        let elapsed = Self.elapsedMilliseconds(from: finalAt, to: now)
         guard elapsed < Self.latencyBudgetMilliseconds else {
             state = .idle
+            quitAskedAt = nil
+            quitExpiresAtEndOfNextTurn = false
             return decision(.idle, [.fallThrough], elapsed)
+        }
+        if case .confirmingQuit = state, let asked = quitAskedAt,
+           Self.elapsedMilliseconds(from: asked, to: now) >= Self.quitConfirmationLifetimeMilliseconds {
+            state = .idle
+            quitAskedAt = nil
+            quitExpiresAtEndOfNextTurn = false
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps, now: now)
         }
         switch state {
         case .confirmingQuit(let app):
-            return receiveQuitReply(transcript, app: app, elapsed: elapsed, apps: apps)
+            return receiveQuitReply(transcript, app: app, elapsed: elapsed, apps: apps, now: now)
         case .confirmingChoice(let verb, let candidates):
-            return receiveChoiceReply(transcript, verb: verb, candidates: candidates, elapsed: elapsed, apps: apps)
+            return receiveChoiceReply(transcript, verb: verb, candidates: candidates, elapsed: elapsed, apps: apps, now: now)
         case .idle, .acted:
             state = .idle
-            return receiveFresh(transcript, elapsed: elapsed, apps: apps)
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps, now: now)
         }
     }
 
     // MARK: Replies
 
+    /// An explicit confirm. "ok", "sure", and a bare "quit" are not in this set.
     private static let yesWords: Set<String> = [
-        "yes", "yeah", "yep", "yah", "confirm", "do it", "go ahead", "quit it", "please do", "sure", "ok", "okay", "quit",
+        "yes", "yeah", "yep", "yah", "confirm", "do it", "go ahead", "quit it", "please do", "okay",
     ]
 
     private static let noWords: Set<String> = [
         "no", "nope", "nah", "cancel", "dont", "do not", "stop", "never mind", "leave it", "leave it open",
     ]
 
-    private mutating func receiveQuitReply(_ transcript: String, app: LocalApp, elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+    private mutating func receiveQuitReply(_ transcript: String, app: LocalApp, elapsed: Int, apps: [LocalApp],
+                                           now: ContinuousClock.Instant) -> LocalCommandDecision {
         let words = LocalCommandParser.normalize(transcript)
         if Self.yesWords.contains(words) {
             return act(.quit(app), line: "Quitting \(app.name).", elapsed: elapsed)
         }
         if Self.noWords.contains(words) {
             state = .idle
+            quitAskedAt = nil
+            quitExpiresAtEndOfNextTurn = false
             return decision(.idle, [.speak("Leaving it open.")], elapsed)
         }
         if LocalCommandParser.parse(transcript) != nil {
             state = .idle
-            return receiveFresh(transcript, elapsed: elapsed, apps: apps)
+            quitAskedAt = nil
+            quitExpiresAtEndOfNextTurn = false
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps, now: now)
         }
         state = .idle
+        quitAskedAt = nil
+        quitExpiresAtEndOfNextTurn = false
         return decision(.idle, [.fallThrough], elapsed)
     }
 
     private mutating func receiveChoiceReply(_ transcript: String, verb: LocalAppVerb, candidates: [LocalApp],
-                                             elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+                                             elapsed: Int, apps: [LocalApp], now: ContinuousClock.Instant) -> LocalCommandDecision {
         let words = LocalCommandParser.normalize(transcript)
         if Self.noWords.contains(words) {
             state = .idle
@@ -138,7 +203,7 @@ public struct LocalCommandMachine: Equatable, Sendable {
         }
         if LocalCommandParser.parse(transcript) != nil {
             state = .idle
-            return receiveFresh(transcript, elapsed: elapsed, apps: apps)
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps, now: now)
         }
         let hits = Self.match(words, in: candidates)
         switch hits.count {
@@ -146,15 +211,16 @@ public struct LocalCommandMachine: Equatable, Sendable {
             state = .idle
             return decision(.idle, [.fallThrough], elapsed)
         case 1:
-            return resolve(hits[0], verb: verb, elapsed: elapsed)
+            return resolve(hits[0], verb: verb, elapsed: elapsed, now: now)
         default:
-            return askChoice(verb, hits, elapsed: elapsed)
+            return askChoice(verb, hits, elapsed: elapsed, now: now)
         }
     }
 
     // MARK: Fresh transcript
 
-    private mutating func receiveFresh(_ transcript: String, elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+    private mutating func receiveFresh(_ transcript: String, elapsed: Int, apps: [LocalApp],
+                                       now: ContinuousClock.Instant) -> LocalCommandDecision {
         guard let command = LocalCommandParser.parse(transcript) else {
             return decision(.idle, [.fallThrough], elapsed)
         }
@@ -176,27 +242,29 @@ public struct LocalCommandMachine: Equatable, Sendable {
             }
             return act(.volume(volume), line: line, elapsed: elapsed)
         case .open(let query):
-            return resolveQuery(query, verb: .open, elapsed: elapsed, apps: apps)
+            return resolveQuery(query, verb: .open, elapsed: elapsed, apps: apps, now: now)
         case .quit(let query):
-            return resolveQuery(query, verb: .quit, elapsed: elapsed, apps: apps)
+            return resolveQuery(query, verb: .quit, elapsed: elapsed, apps: apps, now: now)
         case .switchTo(let query):
-            return resolveQuery(query, verb: .switchTo, elapsed: elapsed, apps: apps)
+            return resolveQuery(query, verb: .switchTo, elapsed: elapsed, apps: apps, now: now)
         }
     }
 
-    private mutating func resolveQuery(_ query: String, verb: LocalAppVerb, elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+    private mutating func resolveQuery(_ query: String, verb: LocalAppVerb, elapsed: Int, apps: [LocalApp],
+                                       now: ContinuousClock.Instant) -> LocalCommandDecision {
         let hits = Self.match(query, in: apps)
         switch hits.count {
         case 0:
             return decision(.idle, [.fallThrough], elapsed)
         case 1:
-            return resolve(hits[0], verb: verb, elapsed: elapsed)
+            return resolve(hits[0], verb: verb, elapsed: elapsed, now: now)
         default:
-            return askChoice(verb, hits, elapsed: elapsed)
+            return askChoice(verb, hits, elapsed: elapsed, now: now)
         }
     }
 
-    private mutating func resolve(_ app: LocalApp, verb: LocalAppVerb, elapsed: Int) -> LocalCommandDecision {
+    private mutating func resolve(_ app: LocalApp, verb: LocalAppVerb, elapsed: Int,
+                                  now: ContinuousClock.Instant) -> LocalCommandDecision {
         switch verb {
         case .open:
             return act(.open(app), line: "Opening \(app.name).", elapsed: elapsed)
@@ -205,23 +273,33 @@ public struct LocalCommandMachine: Equatable, Sendable {
         case .quit:
             guard app.isRunning else {
                 state = .idle
+                quitAskedAt = nil
+                quitExpiresAtEndOfNextTurn = false
                 return decision(.idle, [.speak("\(app.name) isn't open.")], elapsed)
             }
             guard app.hasUnsavedState == false else {
                 state = .confirmingQuit(app)
+                quitAskedAt = now
+                quitExpiresAtEndOfNextTurn = false
                 return decision(state, [.speak("Quit \(app.name)? It may have unsaved changes.")], elapsed)
             }
             return act(.quit(app), line: "Quitting \(app.name).", elapsed: elapsed)
         }
     }
 
-    private mutating func askChoice(_ verb: LocalAppVerb, _ apps: [LocalApp], elapsed: Int) -> LocalCommandDecision {
+    private mutating func askChoice(_ verb: LocalAppVerb, _ apps: [LocalApp], elapsed: Int,
+                                    now: ContinuousClock.Instant) -> LocalCommandDecision {
+        _ = now
         state = .confirmingChoice(verb, apps)
+        quitAskedAt = nil
+        quitExpiresAtEndOfNextTurn = false
         return decision(state, [.speak(Self.choicePrompt(apps.map(\.name)))], elapsed)
     }
 
     private mutating func act(_ action: LocalCommandAction, line: String, elapsed: Int) -> LocalCommandDecision {
         state = .acted(action)
+        quitAskedAt = nil
+        quitExpiresAtEndOfNextTurn = false
         return decision(state, [.perform(action), .speak(line)], elapsed)
     }
 
