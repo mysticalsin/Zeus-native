@@ -290,6 +290,61 @@ struct DownloadCapTests {
         #expect(!FileManager.default.fileExists(atPath: partial.path))
         #expect(try Data(contentsOf: finished) == Data("finished".utf8))
     }
+
+    @Test func aFailedCleanupIsNotReportedAsCancelledOrTookTooLong() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-stuck-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let partial = directory.appendingPathComponent("model.partial")
+        try Data("partial".utf8).write(to: partial)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directory.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let cancelled = await DownloadRunner.run(kind: .model, clock: { 0 }, partials: { [partial] }) {
+            throw CancellationError()
+        }
+        guard case .failed = cancelled else {
+            Issue.record("cleanup failure was reported as \(cancelled)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: partial.path))
+
+        let clock = ManualClock(0)
+        let task = Task {
+            await DownloadRunner.run(kind: .model, clock: { clock.time }, partials: { [partial] }) {
+                while !Task.isCancelled { try await Task.sleep(nanoseconds: 5_000_000) }
+            }
+        }
+        try await Task.sleep(nanoseconds: 20_000_000)
+        clock.time = 600
+        let timed = await task.value
+        guard case .failed = timed else {
+            Issue.record("cleanup failure was reported as \(timed)")
+            return
+        }
+    }
+
+    @Test func fasterWhisperUnpackStopsPastThePinnedWheelBytes() throws {
+        #expect(FasterWhisperUnpack.knownBytes == 294_567_673)
+        #expect(FasterWhisperUnpack.maximumBytes == 368_209_591)
+        #expect(ArchiveUnpackCap.exceeds(producedBytes: FasterWhisperUnpack.maximumBytes, maximumBytes: FasterWhisperUnpack.maximumBytes) == false)
+        #expect(ArchiveUnpackCap.exceeds(producedBytes: FasterWhisperUnpack.maximumBytes + 1, maximumBytes: FasterWhisperUnpack.maximumBytes))
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-unpack-\(UUID().uuidString)", isDirectory: true)
+        let tree = root.appendingPathComponent("venv", isDirectory: true)
+        let kept = tree.appendingPathComponent("lib/old.txt")
+        try FileManager.default.createDirectory(at: kept.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: kept)
+        let before = InstallFootprint.snapshot(tree)
+        let added = tree.appendingPathComponent("lib/site-packages/faster_whisper/pkg.py")
+        try FileManager.default.createDirectory(at: added.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(Data(count: 40)).write(to: added)
+        #expect(InstallFootprint.producedBytes(tree: tree, treeExisted: true, before: before) == 40)
+        #expect(ArchiveUnpackCap.exceeds(producedBytes: 40, maximumBytes: 40) == false)
+        #expect(ArchiveUnpackCap.exceeds(producedBytes: 41, maximumBytes: 40))
+        try? FileManager.default.removeItem(at: root)
+    }
 }
 
 private final class ManualClock: @unchecked Sendable {
