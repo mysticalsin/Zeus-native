@@ -336,7 +336,8 @@ struct RecordlyDeviceCaptureTests {
     /// The screen file drops microphone samples and has no camera. Copy must not say otherwise.
     /// A literal `chipOn: false` is not a substitute for the chip.
     @Test func theScreenCopyDoesNotOverClaimAndTheChipIsLive() throws {
-        #expect(RecordlySampleRoute.track(for: .microphone) == .drop)
+        let route = try repoSource("Sources/ZeusCore/Recordly/RecordlyCaptureSource.swift")
+        #expect(route.contains("case .microphone: .drop"))
         let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
         let page = try repoSource("Sources/Zeus/Recordly/RecordlyPage.swift")
         #expect(controller.contains("audio.microphone = RecordlyPrimaryRecord.screenFileIncludesMicrophone"))
