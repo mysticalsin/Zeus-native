@@ -23,6 +23,12 @@ import Testing
         #expect(route == .reactivate(notes))
     }
 
+    @Test func aKeyDownAppWithoutABundleIdDoesNotPasteIntoTheNextApp() {
+        let unnamed = DictationAppIdentity(processID: 10, bundleID: nil)
+        let route = InsertTargetDecision.route(keyDown: unnamed, postOpen: nil, frontmost: browser, ownPid: zeus.processID)
+        #expect(route == .copyOnly)
+    }
+
     @Test func aThirdAppFrontmostIsCopyOnly() {
         let planned = InsertTargetDecision.plan(keyDown: notes, postOpen: notes, frontmost: browser, ownPid: zeus.processID)
         #expect(planned.action == .copyOnly)

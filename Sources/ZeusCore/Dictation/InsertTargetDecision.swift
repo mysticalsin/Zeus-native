@@ -31,7 +31,7 @@ public enum InsertRoute: Equatable, Sendable {
 
 public enum InsertTargetDecision {
     /// `ownPid` is this process. A frontmost Zeus window is not a third app.
-    /// A key-down identity with pid 0 or no bundle id was not captured, so the caller keeps the earlier insert path.
+    /// A key-down identity with pid 0 was not captured, so the caller keeps the earlier insert path. A process id with no bundle id is still that process.
     public static func decide(keyDown: DictationAppIdentity, frontmost: DictationAppIdentity, ownPid: Int32) -> InsertTarget {
         switch route(keyDown: keyDown, postOpen: nil, frontmost: frontmost, ownPid: ownPid) {
         case .paste: return .paste
@@ -40,11 +40,15 @@ public enum InsertTargetDecision {
         }
     }
 
+    /// A process id is enough. A missing bundle id is still that process.
+    private static func captured(_ id: DictationAppIdentity) -> Bool {
+        id.processID != 0
+    }
+
     /// `postOpen` is the app read after the microphone opens. When Zeus is frontmost, the app to
     /// bring back is the key-down app, not `postOpen`.
     public static func route(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity?, frontmost: DictationAppIdentity, ownPid: Int32) -> InsertRoute {
-        let captured = keyDown.processID != 0 && keyDown.bundleID?.isEmpty == false
-        if !captured {
+        if !captured(keyDown) {
             if let postOpen, !postOpen.sameApp(as: frontmost) {
                 return .reactivate(postOpen)
             }
@@ -61,10 +65,9 @@ public enum InsertTargetDecision {
 
     /// What `deliver()` and `deliverCorrection()` execute. A paste uses the key-down app.
     public static func plan(keyDown: DictationAppIdentity, postOpen: DictationAppIdentity?, frontmost: DictationAppIdentity, ownPid: Int32) -> InsertPlan {
-        let captured = keyDown.processID != 0 && keyDown.bundleID?.isEmpty == false
         switch route(keyDown: keyDown, postOpen: postOpen, frontmost: frontmost, ownPid: ownPid) {
         case .paste:
-            return InsertPlan(action: .paste, app: captured ? keyDown : (postOpen ?? keyDown))
+            return InsertPlan(action: .paste, app: captured(keyDown) ? keyDown : (postOpen ?? keyDown))
         case .copyOnly:
             return InsertPlan(action: .copyOnly, app: nil)
         case .reactivate(let id):
