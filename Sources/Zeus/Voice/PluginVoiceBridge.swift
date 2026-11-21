@@ -25,6 +25,11 @@ enum PluginAudioPlay {
     static func stop() {
         player?.stop()
         player = nil
+        for engine in engines { engine.stop() }
+        engines.removeAll()
+        for file in ProviderEngineTracker.shared.stopAll() {
+            try? FileManager.default.removeItem(at: file)
+        }
         ProviderPlaybackGate.shared.reset()
     }
 
@@ -39,14 +44,15 @@ enum PluginAudioPlay {
             engine.attach(node)
             engine.connect(node, to: engine.mainMixerNode, format: file.processingFormat)
             try engine.start()
+            ProviderEngineTracker.shared.started(url)
             let token = ProviderPlaybackGate.shared.begin()
-            node.scheduleFile(file, at: nil) {
-                Task { @MainActor in ProviderPlaybackGate.shared.end(token) }
-            }
+            let finish = WavFinish(engine: engine, url: url, token: token)
+            node.scheduleFile(file, at: nil) { finish.complete() }
             node.play()
             engines.append(engine)
             return true
         } catch {
+            try? FileManager.default.removeItem(at: url)
             return false
         }
     }
@@ -57,7 +63,34 @@ enum PluginAudioPlay {
         synthesizer.speak(utterance)
     }
 
+    fileprivate static func drop(_ engine: AVAudioEngine) {
+        engines.removeAll { $0 === engine }
+    }
+
     private static var engines: [AVAudioEngine] = []
+}
+
+private final class WavFinish: @unchecked Sendable {
+    let engine: AVAudioEngine
+    let url: URL
+    let token: Int
+    init(engine: AVAudioEngine, url: URL, token: Int) {
+        self.engine = engine
+        self.url = url
+        self.token = token
+    }
+
+    func complete() {
+        let remove = ProviderEngineTracker.shared.finished(url)
+        let engine = self.engine
+        let token = self.token
+        Task { @MainActor in
+            engine.stop()
+            PluginAudioPlay.drop(engine)
+            if let remove { try? FileManager.default.removeItem(at: remove) }
+            ProviderPlaybackGate.shared.end(token)
+        }
+    }
 }
 
 @MainActor
