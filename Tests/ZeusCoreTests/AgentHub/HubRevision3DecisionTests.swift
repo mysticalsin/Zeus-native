@@ -133,6 +133,16 @@ struct HubRevision3DecisionTests {
         #expect(expired.announcement == "Deny. Undo.")
         #expect(expired.state.pending?.action != .allowOnce)
         #expect(expired.state.pending?.action != .allowForThisSession)
+
+        let timedOut = HubRevision3Decision.step(show(.low), .advance(to: 12_000)).state
+        let restored = HubRevision3Decision.step(timedOut, .key(.undo, command: false))
+        #expect(restored.state.pending == nil)
+        #expect(restored.state.executed.isEmpty)
+        #expect(restored.state.remainingMilliseconds == 12_000)
+        #expect(restored.state.showing?.tier == .low)
+        let continued = HubRevision3Decision.step(restored.state, .advance(to: restored.state.clock + 1_000))
+        #expect(continued.state.pending == nil)
+        #expect(continued.state.remainingMilliseconds == 11_000)
     }
 
     @Test func eachPauseReasonHoldsTheCountdownOnItsOwn() {
@@ -442,9 +452,12 @@ struct HubRevision3DecisionTests {
             if case .key(_, true) = event {
                 #expect(outcome.state == state)
             }
-            if let pending = outcome.state.pending, outcome.state.clock < pending.undoUntil {
-                #expect(outcome.state.executed.count == before)
-            }
+        if let pending = outcome.state.pending {
+            #expect(outcome.state.clock < pending.undoUntil)
+        }
+        for execution in outcome.state.executed {
+            #expect(execution.atMilliseconds <= outcome.state.clock)
+        }
             for execution in outcome.state.executed where execution.fromCountdown {
                 #expect(execution.action == .deny)
                 #expect(execution.action.isApproval == false)
