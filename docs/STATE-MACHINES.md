@@ -14,6 +14,14 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 
 ## Added after the audit
 
+### 29. Media command router. EXPLICIT from the start
+- Where: `ZeusCore/TopBar/MediaCommandRouter.swift` (`MediaCommandRouter`), driven by `Zeus/TopBar/MediaCommandCoordinator.swift`. The home and music transport call it. Shuffle, repeat and open stay on the older music command.
+- States: unknown, playing, paused, noSource, commandPending(command), failed(permissionDenied or unavailable).
+- Events: info(sample or none), press(play, pause, next, previous, seek), result(accepted, permissionDenied, unavailable, failed), recover.
+- Effects: send(command, route), resync(route, after 0.12 s), openRecovery. A press with no source sends nothing. A second press within 0.25 s, a press while one is in flight, and any illegal transition are rejected and leave the state as it was.
+- Route: a scripted player by bundle id, or a browser tab by tab and document. The private media-remote gate is off and fails closed. The coordinator performs a send with the existing Apple Event runner, or with the browser feed already attached to the hub, then reads the real sample back.
+- Tests: `MediaCommandRouterTests` (play, pause, next, previous, seek, no source, permission denied and recovery, double-tap, resync, illegal transitions, Reduce Motion, VoiceOver labels, the private gate).
+
 ### 23. Scribe meeting start and call end. EXPLICIT from the start (2026-11-11), one machine from sighting to result (2026-11-14)
 - Where: `ZeusCore/Scribe/ScribeAutoStart.swift` (`ScribeAutoStartMachine`), driven by `Zeus/Scribe/ScribeAutoStartController.swift` through the ports `ScribeStartPort` (Scribe), `ScribeOneShotScheduling`, `ScribeMeetingCardRendering` and a microphone answer, fed by `ScribeCallWatcher` (Core Audio wake-ups in `ScribeMicActivity.swift`, one calendar reader `ScribeCalendarReader`, a plan from `ZeusCore/Scribe/ScribeDetectorPlan.swift`), drawn by `ScribeMeetingCardPanel.swift`. Setting `scribe.autoStart`: Off, Ask me (default), Start automatically.
 - States: idle, upcoming (the heads-up: a calendar meeting starts within 2 min, one card for 20 s, longer under the pointer), armed (seen, debouncing 3 s; `offerUntil` keeps a standing heads-up on screen through the check), prompting (the offer, 20 s, with the reason an automatic start is blocked), countingDown (5 s, Cancel), held (Scribe is still ending or saving the last meeting; `startOwed` is a tap or Switch that starts when Scribe is free), starting (one `ScribeStartAttempt`: meeting, origin tap or automatic, previous session, session), recording (Recording confirmed for 1.5 s, then watched until Scribe is idle), failed (60 s, longer under the pointer). The memory of what was done about each meeting is `ScribeMeetingLedger`, not a state.

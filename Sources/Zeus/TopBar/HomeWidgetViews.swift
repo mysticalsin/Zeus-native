@@ -73,21 +73,51 @@ struct HomeWidgetCard: View {
             default: musicArt(playing)
             }
         }
+        .modifier(MediaRecoveryAction(shown: MediaControlPresentation.showsRecovery(topBar.mediaPlayback)) { topBar.mediaRecovery() })
     }
 
     /// Previous and Next are drawn only where the shown source can honour them; Play stays centred without them.
     private func transport(_ playing: NowPlaying?, size: CGFloat = 26) -> some View {
         let shown = NowPlayingDisplay.visibleControls(for: playing)
+        let access = mediaAccess
         return HStack {
             if shown.contains(.previous) {
-                GlanceRoundButton(symbol: "backward.fill", size: size, label: "Previous track") { topBar.musicCommand(.previous) }
+                GlanceRoundButton(symbol: "backward.fill", size: size, label: access.previousLabel, hint: access.previousHint,
+                                  reduceMotion: Motion.reduced) { topBar.homeMediaPress(.previous) }
             }
             Spacer()
-            GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 2, filled: true,
-                              label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
+            playControl(size: size + 2)
             Spacer()
             if shown.contains(.next) {
-                GlanceRoundButton(symbol: "forward.fill", size: size, label: "Next track") { topBar.musicCommand(.next) }
+                GlanceRoundButton(symbol: "forward.fill", size: size, label: access.nextLabel, hint: access.nextHint,
+                                  reduceMotion: Motion.reduced) { topBar.homeMediaPress(.next) }
+            }
+        }
+    }
+
+    private var mediaAccess: MediaControlAccessibility {
+        MediaControlPresentation.accessibility(for: topBar.mediaPlayback, fallbackPlaying: topBar.nowPlaying?.isPlaying == true)
+    }
+
+    @ViewBuilder private var mediaGuidance: some View {
+        if let text = MediaControlPresentation.guidance(for: topBar.mediaPlayback) {
+            Text(text).font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55)).lineLimit(2)
+        }
+    }
+
+    private func playControl(size: CGFloat) -> some View {
+        let state = topBar.mediaPlayback
+        let playing = topBar.nowPlaying?.isPlaying == true
+        let access = mediaAccess
+        let pause = MediaControlPresentation.showsPause(state, fallbackPlaying: playing)
+        let recovery = MediaControlPresentation.showsRecovery(state)
+        return GlanceRoundButton(symbol: pause ? "pause.fill" : "play.fill", size: size, filled: true,
+                                  label: recovery ? access.recoveryLabel : (pause ? access.pauseLabel : access.playLabel),
+                                  hint: recovery ? access.recoveryHint : (pause ? access.pauseHint : access.playHint),
+                                  value: access.value, reduceMotion: Motion.reduced) {
+            switch MediaControlPresentation.activation(state, fallbackPlaying: playing) {
+            case .recover: topBar.mediaRecovery()
+            case .press(let command): topBar.homeMediaPress(command)
             }
         }
     }
@@ -98,6 +128,7 @@ struct HomeWidgetCard: View {
             if let artist = playing?.artist, !artist.isEmpty {
                 Text(artist).font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55)).lineLimit(1)
             }
+            mediaGuidance
         }
     }
 
@@ -124,10 +155,10 @@ struct HomeWidgetCard: View {
                 titles(playing)
                 Spacer(minLength: 0)
                 HStack(spacing: 8) {
-                    GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: 28, filled: true,
-                                      label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
+                    playControl(size: 28)
                     if NowPlayingDisplay.visibleControls(for: playing).contains(.next) {
-                        GlanceRoundButton(symbol: "forward.fill", size: 26, label: "Next track") { topBar.musicCommand(.next) }
+                        GlanceRoundButton(symbol: "forward.fill", size: 26, label: mediaAccess.nextLabel, hint: mediaAccess.nextHint,
+                                          reduceMotion: Motion.reduced) { topBar.homeMediaPress(.next) }
                     }
                 }
             }
@@ -142,6 +173,7 @@ struct HomeWidgetCard: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(playing.map { "\($0.title), \($0.artist)" } ?? "Nothing playing")
+            mediaGuidance
             transport(playing, size: 22)
         }
     }
@@ -150,12 +182,12 @@ struct HomeWidgetCard: View {
         VStack(alignment: .leading, spacing: 4) {
             Text([playing?.title ?? "Nothing playing", playing?.artist].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " \u{00B7} "))
                 .font(GlanceType.title).foregroundStyle(Color.white.opacity(0.7)).lineLimit(1).padding(.trailing, 30)
+            mediaGuidance
             LyricsView(playing: playing, rows: 3, rowHeight: 24, fontSize: 11.5)
             Spacer(minLength: 0)
         }
         .overlay(alignment: .topTrailing) {
-            GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: 22, filled: true,
-                              label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
+            playControl(size: 22)
         }
     }
 

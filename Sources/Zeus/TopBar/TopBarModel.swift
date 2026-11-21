@@ -232,6 +232,12 @@ final class TopBarModel {
 
     // Actions the views call; wired by the services so views stay free of system calls.
     var musicCommand: (MusicCommand) -> Void = { _ in }
+    /// Play, pause, next, previous and seek. `unknown` until a sample arrives, so a snapshot keeps today's glyphs.
+    var mediaPlayback: MediaCommandState = .unknown
+    @ObservationIgnored var homeMediaPress: (MediaControlCommand) -> Void = { _ in }
+    @ObservationIgnored var mediaRecovery: () -> Void = {}
+    /// The hub calls this with the sample it just published.
+    @ObservationIgnored var resyncHomeMedia: (NowPlaying?) -> Void = { _ in }
     /// Pauses the shown source if it plays and returns it; dictation resumes that same source afterwards.
     var pauseForDictation: () -> NowPlayingSource? = { nil }
     var resumeAfterDictation: (NowPlayingSource) -> Void = { _ in }
