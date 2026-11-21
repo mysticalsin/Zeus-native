@@ -48,7 +48,7 @@ struct LocalTodoAgendaSurfaceTests {
         #expect(page.left.kicker == "To-do")
         #expect(page.left.head == "Kept on this Mac")
         #expect(page.left.note == "Microsoft tasks stay off.")
-        #expect(page.left.groups.map(\.rows.map(\.title)) == [["Write the brief"]])
+        #expect(page.left.groups.map { $0.rows.map(\.title) } == [["Write the brief"]])
         #expect(page.left.groups.first?.rows.first?.meta == "Today")
         #expect(page.left.grantsAccess == false)
         #expect(page.right.kicker == "Agenda")
@@ -218,7 +218,7 @@ struct LocalTodoAgendaSurfaceTests {
     }
 
     @Test func aReadWhileAlreadyAllowedHoldsTheReaderUntilTheSwitchGoesOff() {
-        var session = LocalTodoAgendaSession()
+        let session = LocalTodoAgendaSession()
         let allowed = LocalAccessPair(events: .allowed, reminders: .denied)
         let primed = session.reduce(.refresh(allowed), now: now, timeZone: zone)
         #expect(primed.1.isEmpty)
@@ -278,7 +278,7 @@ struct LocalTodoAgendaSurfaceTests {
         ]
         for relative in files {
             let text = try repoText(relative)
-            #expect(text.contains(LocalTodoAgendaPrivacy.staysLocal), relative)
+            #expect(text.contains(LocalTodoAgendaPrivacy.staysLocal))
         }
     }
 

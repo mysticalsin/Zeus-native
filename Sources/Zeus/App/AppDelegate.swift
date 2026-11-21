@@ -1009,6 +1009,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: self?.teleprompterPrivate ?? false)
             case FacePresenceController.switchID, FacePresenceController.lockAfterID:
                 FacePresenceController.shared.settingChanged(id)
+            case LocalTodoAgendaSetting.id:
+                LocalTodoAgendaController.shared.syncFromSettings()
             case "about.autoUpdate", "about.updateFeedURL":
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))

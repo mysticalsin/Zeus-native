@@ -302,6 +302,8 @@ final class SettingsStore {
         "tiling.enabled",
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
+        // It reads calendars and reminders already on this Mac.
+        "todo.microsoftLocal",
     ]
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
     static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
@@ -372,7 +374,8 @@ final class SettingsStore {
         for (id, raw) in root["options"] as? [String: Any] ?? [:] {
             guard let option = SettingsCatalog.option(id), option.state != .stub, let value = raw as? String,
                   Self.accepts(value, for: option) else { continue }
-            if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
+            if option.kind == .toggle, value == "true",
+               Self.neverEnabledByImport.contains(id) || LocalTodoAgendaImport.blocksEnable(id: id, value: value) { continue }
             if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if Self.neverChosenByImport[id]?.contains(value) == true { continue }
             if values[id] != value { optionChanges.append((id, value)) }

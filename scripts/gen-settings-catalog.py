@@ -171,7 +171,6 @@ o(S,'Music metadata','Chrome extension needs a reload','status','-','Press Reloa
 o(S,'Face presence','Face presence','toggle','-','Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on.','missing','face.presence','toggle',[],'false','live','Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on.')
 o(S,'Face presence','Lock after absent for','menu','-','How long no enrolled face may be missing before the Mac locks.','missing','face.lockAfter','choice',['30 seconds','1 minute','2 minutes','5 minutes','10 minutes'],'2 minutes','live','Zeus addition. Counted from the last time an enrolled face was seen.')
 o(S,'Face presence','Status','status','-','','missing','face.status','status',[],'','custom','Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away.')
-o(S,'Tasks and agenda','Tasks and agenda from this Mac','toggle','-','Shows tasks and the day\'s agenda from Microsoft accounts already on this Mac. Off until you turn it on. Read only.','missing','todo.microsoftLocal','toggle',[],'false','stub','Zeus addition. Off by default. Stored, not shown, until the top bar wiring is approved. Reads calendars and reminders the Mac already has. No sign-in.')
 o(S,'Access','Open Accessibility settings','button','-','Jumps to System Settings.','has','privacy.openAccessibility','action',[],'','live','')
 
 S='interview'
@@ -271,7 +270,10 @@ o(S,'Fling','Flick sensitivity','segmented','-','How fast a drag must be to coun
 o(S,'Fling','Open received links in the browser','toggle','-','A link from a paired Mac opens in your browser when it arrives. Only http and https links.','missing','fling.openLinks','toggle',[],'true','live','Zeus addition. A link from a Mac that is not paired is kept as a file and never opened.')
 o(S,'Fling','Paired Macs','button','-','The Macs you paired. Remove one and it must pair again before it can send.','missing','fling.pairedMacs','action',[],'','custom','Zeus addition. Hand-built list on the Shelf page; Remove deletes the key from the Keychain.')
 
-SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents','tiling':'Tiling','shelf':'Shelf'}
+S='todo'
+o(S,'Tasks and agenda','Tasks and agenda from this Mac','toggle','-','Shows tasks and the day\'s agenda from the calendars and reminders already on this Mac. Off until you turn it on. Read only. Zeus does not sign in.','missing','todo.microsoftLocal','toggle',[],'false','live','Zeus addition. Off by default. The switch is on the To-do settings page. A settings import never turns it on. Reads calendars and reminders the Mac already has. Agenda data is never sent to an LLM or the network unless the user explicitly asks. No sign-in. No Full Disk Access.')
+
+SECTION_TITLES={'general':'General','appearance':'Appearance','notifications':'Notifications','sounds':'Sounds','voice':'Voice','dictation':'Dictation','shortcuts':'Shortcut','topBar':'Top Bar','integrations':'Integrations','permissions':'Permissions','privacy':'Privacy','interview':'Interview','iPhone':'iPhone','diagnostics':'Diagnostics','about':'About','license':'License','assistant':'Assistant','keepAwake':'Keep awake','teleprompter':'Prompter','agents':'Agents','tiling':'Tiling','shelf':'Shelf','todo':'To-do'}
 
 def swift_str(s): return json.dumps(s, ensure_ascii=False)
 
@@ -293,8 +295,8 @@ def validate_table():
     if by_id['wake.ignoreMicConflicts'][11] != 'stub':
         raise ValueError('wake.ignoreMicConflicts must remain hidden from release settings')
     row = by_id.get('todo.microsoftLocal')
-    if row is None or row[8] != 'toggle' or row[10] != 'false' or row[11] != 'stub':
-        raise ValueError('todo.microsoftLocal stays off and hidden until the top bar is approved')
+    if row is None or row[0] != 'todo' or row[8] != 'toggle' or row[10] != 'false' or row[11] != 'live':
+        raise ValueError('todo.microsoftLocal stays off until turned on, and the switch lives on the To-do page')
 
 def write_swift(path):
     validate_table()
