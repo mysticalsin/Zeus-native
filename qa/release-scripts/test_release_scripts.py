@@ -15,17 +15,48 @@ import unittest
 
 REPO = Path(__file__).resolve().parents[2]
 MOCK = r'''
-import json, os, pathlib, shutil, sys
+import json, os, pathlib, re, shutil, sys
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
+logged = []
+redact = False
+for arg in args:
+    if redact:
+        logged.append("REDACTED")
+        redact = False
+    elif name == "security" and arg == "-p":
+        logged.append(arg)
+        redact = True
+    else:
+        logged.append(arg)
 with open(os.environ["ZEUS_TEST_LOG"], "a") as log:
-    log.write(json.dumps([name] + args) + "\n")
+    log.write(json.dumps([name] + logged) + "\n")
+
+def pinned(constant, fallback):
+    script = pathlib.Path(os.environ["ZEUS_TEST_ROOT"]) / "scripts/verify-release-signature.sh"
+    text = script.read_text() if script.exists() else ""
+    match = re.search(r'^' + constant + r'="([^"]*)"', text, re.M)
+    return match.group(1) if match else fallback
+
 if name == "codesign" and "--display" in args:
     state = os.environ.get("SIGNATURE_STATE", "valid")
+    special = {
+        "wrong-team": "OTHERTEAM1",
+        "empty-team": "",
+        "short-team": "TEAMID123",
+        "long-team": "TEAMID12345",
+        "lower-team": "testteam01",
+        "symbol-team": "TEST-TEAM1",
+    }
+    team = special[state] if state in special else pinned("EXPECTED_TEAM_ID", "TESTTEAM01")
+    bundle = "com.example.notzeus" if state == "wrong-bundle" else pinned("EXPECTED_BUNDLE_ID", "app.zeus.mac")
+    print("Identifier=" + bundle)
     print("Authority=" + ("Developer ID Application: Test" if state != "adhoc" else "Zeus Local Dev"))
-    print("TeamIdentifier=TEST123456")
+    print("TeamIdentifier=" + team)
     print("CodeDirectory v=20500 size=1 flags=" + ("0x10000(runtime)" if state != "no-runtime" else "0x0(none)"))
     if state != "no-timestamp": print("Timestamp=Nov 9, 2026")
+elif name == "security" and args[:2] == ["find-identity", "-p"] and "codesigning" in args:
+    print('  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "Zeus Local Dev"')
 elif name == "ditto":
     if os.environ.get("FAIL_BACKUP") == "1" and "Rollbacks" in args[-1]: sys.exit(1)
     if "-c" in args: pathlib.Path(args[-1]).write_text("zip")
@@ -68,7 +99,7 @@ class ReleaseScripts(unittest.TestCase):
         self.log = self.root / "commands.jsonl"
         self.bin = self.root / "bin"
         self.bin.mkdir()
-        for command in ("codesign", "ditto", "hdiutil", "xcrun", "spctl", "plutil", "pgrep", "mv", "rm", "defaults", "xcode-select", "swift", "npm", "plistbuddy"):
+        for command in ("codesign", "ditto", "hdiutil", "xcrun", "spctl", "plutil", "pgrep", "mv", "rm", "defaults", "xcode-select", "swift", "npm", "plistbuddy", "security"):
             path = self.bin / command
             path.write_text(f"#!{sys.executable}\n" + MOCK)
             path.chmod(0o755)
@@ -122,7 +153,10 @@ class ReleaseScripts(unittest.TestCase):
     def test_developer_id_bundle_uses_secure_timestamps(self):
         self.bundle_fixture()
         result = self.run_script("bundle.sh", RELEASE="1", SIGN_IDENTITY="Developer ID Application: Test")
-        self.assertEqual(result.returncode, 0, result.stderr)
+        # The binaries are signed with a secure timestamp, then verify-release-signature.sh
+        # refuses the release because EXPECTED_TEAM_ID is still the ZEUSTEAMID placeholder.
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ZEUSTEAMID", result.stderr)
         signatures = [c for c in self.commands() if c[:2] == ["codesign", "--force"]]
         self.assertEqual(len(signatures), 4)
         self.assertTrue(all("--timestamp" in c and "--timestamp=none" not in c for c in signatures))
@@ -207,12 +241,129 @@ class ReleaseScripts(unittest.TestCase):
         self.assertIn("not been notarized", result.stdout)
         self.assertFalse(any(c[0] == "spctl" for c in self.commands()))
 
+    def use_synthetic_team(self, team="TESTTEAM01"):
+        # ZEUSTEAMID is a fail-closed placeholder. Acceptance tests replace it in the
+        # throwaway copy only. They never treat the placeholder as a good team.
+        path = self.root / "scripts/verify-release-signature.sh"
+        text = path.read_text()
+        needle = 'EXPECTED_TEAM_ID="ZEUSTEAMID"'
+        self.assertIn(needle, text)
+        path.write_text(text.replace(needle, f'EXPECTED_TEAM_ID="{team}"', 1))
+
+    def now_playing(self, app):
+        extra = app / "Contents/Resources/zeus-now-playing"
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_text("helper")
+        extra.chmod(0o755)
+        return extra
+
     def test_signature_checks_fail_closed(self):
         app = self.app(self.root / "build/Zeus.app", "new-app")
+        self.now_playing(app)
+        self.use_synthetic_team()
         for state in ("adhoc", "no-runtime", "no-timestamp"):
             with self.subTest(state=state):
                 self.assertNotEqual(self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state).returncode, 0)
         self.assertEqual(self.run_script("verify-release-signature.sh", app).returncode, 0)
+
+    def test_missing_now_playing_helper_fails_closed(self):
+        # The expected resource helper is absent. A sibling helper is present, so the
+        # failure is the missing zeus-now-playing binary and not an empty Helpers directory.
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        helper = app / "Contents/Helpers/zeus-bridge"
+        helper.parent.mkdir(parents=True)
+        helper.write_text("bridge")
+        helper.chmod(0o755)
+        self.use_synthetic_team()
+        self.assertFalse((app / "Contents/Resources/zeus-now-playing").exists())
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("zeus-now-playing", result.stderr)
+
+    def test_placeholder_team_id_refuses_the_release(self):
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        self.now_playing(app)
+        script = (self.root / "scripts/verify-release-signature.sh").read_text()
+        self.assertIn('EXPECTED_TEAM_ID="ZEUSTEAMID"', script)
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ZEUSTEAMID", result.stderr)
+
+    def test_release_signature_checks_the_resource_helper(self):
+        self.use_synthetic_team()
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        extra = app / "Contents/Resources/zeus-now-playing"
+        extra.parent.mkdir(parents=True)
+        extra.write_text("helper")
+        extra.chmod(0o755)
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        displayed = [c for c in self.commands() if c[:2] == ["codesign", "--display"] and c[-1] == str(extra)]
+        self.assertEqual(displayed, [["codesign", "--display", "--verbose=4", str(extra)]])
+
+    def test_release_signature_pins_team_bundle_and_verifies_the_helper(self):
+        self.use_synthetic_team()
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        extra = app / "Contents/Resources/zeus-now-playing"
+        extra.parent.mkdir(parents=True)
+        extra.write_text("helper")
+        extra.chmod(0o755)
+        for state in ("wrong-team", "wrong-bundle"):
+            with self.subTest(state=state):
+                self.log.write_text("")
+                result = self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state)
+                self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.log.write_text("")
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        requirement = '=anchor apple generic and certificate leaf[subject.OU] = "TESTTEAM01"'
+        self.assertIn(["codesign", "--verify", "--strict", "-R", requirement, str(extra)], self.commands())
+
+    def test_team_id_must_be_ten_uppercase_characters(self):
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        self.now_playing(app)
+        path = self.root / "scripts/verify-release-signature.sh"
+        original = path.read_text()
+        cases = (
+            ("empty-team", ""),
+            ("short-team", "TEAMID123"),
+            ("long-team", "TEAMID12345"),
+            ("lower-team", "testteam01"),
+            ("symbol-team", "TEST-TEAM1"),
+        )
+        for state, team in cases:
+            with self.subTest(state=state):
+                path.write_text(original.replace('EXPECTED_TEAM_ID="ZEUSTEAMID"', f'EXPECTED_TEAM_ID="{team}"', 1))
+                result = self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state)
+                self.assertNotEqual(result.returncode, 0, result.stderr)
+        path.write_text(original)
+
+    def test_cdhash_loop_does_not_name_the_resource_helper(self):
+        text = (REPO / "scripts/bundle.sh").read_text()
+        loops = [line for line in text.splitlines() if line.strip().startswith("for bin in")]
+        self.assertTrue(loops)
+        self.assertFalse(any("zeus-now-playing" in line for line in loops))
+
+    def test_real_entitlements_have_no_unexpanded_team_prefix(self):
+        text = (REPO / "Resources/Zeus.entitlements").read_text()
+        self.assertNotIn("$(AppIdentifierPrefix)", text)
+
+    def test_dev_partition_list_omits_the_resource_helper_cdhash(self):
+        # The helper reads MediaRemote and prints text. It does not open the Keychain, so its cdhash
+        # must not be added to the dev partition list. The keychain file below is an empty fixture.
+        self.bundle_fixture()
+        home = self.root / "home"
+        keychain = home / "Library/Keychains"
+        keychain.mkdir(parents=True)
+        (keychain / "zeus-dev.keychain-db").write_text("fixture-keychain")
+        (home / ".zeus").mkdir()
+        (home / ".zeus/devkeychain.pass").write_text("fixture-pass\n")
+        (home / ".zeus-dev/codesign").mkdir(parents=True)
+        result = self.run_script("bundle.sh", HOME=str(home))
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        targets = [Path(c[-1]).name for c in self.commands() if c[:2] == ["codesign", "-dvvv"]]
+        self.assertIn("Zeus", targets)
+        self.assertNotIn("zeus-now-playing", targets)
 
     def test_installer_keeps_verified_rollback(self):
         source, target = self.install_fixture()
