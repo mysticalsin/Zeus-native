@@ -5,7 +5,7 @@
 #
 #   bash scripts/pointing-selftest.sh [<path to Zeus.app>] [--live] [--receipt <absolute path>]
 #
-# Default app: the latest ~/AI-Brain-build/zeus-qa-*/app*/Zeus.app.
+# Default app: the latest build matched by the $HOME glob below.
 # Exit: 0 every required check passed; 3 valid with permission blocks; anything else is a failure.
 set -euo pipefail
 umask 077

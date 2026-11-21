@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # O38: fake-Mac silent eval gate. No real Mac actions, no AI spend.
-# Run through the swarm lock from repo root, for example:
-#   ~/dev/zeus-wt/glance-clone-proof/tools/swarm-lock.sh bash scripts/silent-eval.sh
+# Run from the repo root, for example:
+#   bash scripts/silent-eval.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
