@@ -224,8 +224,7 @@ public enum BridgeHostStartup {
         case markIdentityReady
     }
 
-    /// Wrong on purpose until the host uses this list. Identity currently sits before stdin.
-    public static let steps: [Step] = [.bindSocket, .captureIdentity, .armStdin, .markIdentityReady]
+    public static let steps: [Step] = [.bindSocket, .armStdin, .captureIdentity, .markIdentityReady]
 
     public static func identityIsCapturedImmediatelyAfterStdin(_ steps: [Step] = steps) -> Bool {
         guard steps.first == .bindSocket, steps.last == .markIdentityReady, steps.count == 4,

@@ -257,9 +257,10 @@ public final class UnixSocketServer: @unchecked Sendable {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
             }
             guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            rememberBoundNode()
             let listenAccepted = Self.rejectListenLock.withLock { Self.rejectListenAfterBind?(path) ?? true }
             guard listenAccepted, chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
-                unlink(path)
+                unlinkIfStillBound()
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
             let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: acceptQueue)

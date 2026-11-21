@@ -8724,6 +8724,30 @@
         "file": "Tests/ZeusCoreTests/PeerBinaryRuleTests.swift",
         "function": "nilOwnSignatureFromCaptureOwnIdentityRefusesThePeer"
       }
+    },
+    {
+      "id": "REG-979",
+      "failure": "Moving captureOwnIdentity before or after the stdin reader did not fail a test, because nothing executed the startup list. Identity must be the step immediately after stdin is armed.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+      }
+    },
+    {
+      "id": "REG-980",
+      "failure": "chmod or listen failing after bind unlinked the path by name, so a socket that had replaced that path was deleted.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "failedListenAfterBindLeavesAReplacementSocket"
+      }
     }
   ]
 }

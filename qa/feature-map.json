@@ -7114,6 +7114,18 @@
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "failedListenAfterBindLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
               "function": "aPeerIsRefusedBeforeOwnIdentityIsCaptured"
             },
             {
@@ -7258,6 +7270,18 @@
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
               "function": "socketIsBoundBeforeStdinAndIdentityFollowsTheReader"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "failedListenAfterBindLeavesAReplacementSocket"
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",

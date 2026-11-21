@@ -121,16 +121,24 @@ do {
         relay.forward(line, reply: reply)
     }
     // Attach before the reader starts, so EOF or a bad frame can stop the socket instead of
-    // exiting with the file still on disk.
+    // exiting with the file still on disk. The step list is the order the tests lock.
     lifetime.attach(input: input, server: server)
-    try? server.start()
-    // Arm stdin before asking Security.framework who this binary is. That call can block the main
-    // thread, and Chrome's frame is larger than the pipe.
-    input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
-    // Chrome keeps this process running while the app is rebuilt and replaces the installed file.
-    // Read the identity now, before that happens, so a later peer is still recognised.
-    PeerSigning.captureOwnIdentity()
-    relay.noteIdentityReady()
+    for step in BridgeHostStartup.steps {
+        switch step {
+        case .bindSocket:
+            try? server.start()
+        case .armStdin:
+            // Arm stdin before the signature read. That call can block the main thread, and
+            // Chrome's frame is larger than the pipe.
+            input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
+        case .captureIdentity:
+            // Chrome keeps this process running while the app is rebuilt and replaces the installed file.
+            // Read the identity now, before that happens, so a later peer is still recognised.
+            PeerSigning.captureOwnIdentity()
+        case .markIdentityReady:
+            relay.noteIdentityReady()
+        }
+    }
     dispatchMain()
 } catch {
     lifetime.finish()
