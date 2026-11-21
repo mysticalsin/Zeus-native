@@ -165,6 +165,62 @@ struct HubExperienceTests {
         ) == "Agent C, Announced, 1 session, collapsed")
     }
 
+    /// Revision 3 decision contract. The row matches these labels, keys, windows, and identifiers.
+    /// ZB-UIUX-A11Y-030, 032, 033, 034, ZB-UIUX-ESCAPE-001, and ZB-UIUX-DECISION-001.
+    @Test func revision3NamesTheDecisionActionsKeysAndIdentifiers() {
+        #expect(HubExperience.revision3DecisionOrder() == [
+            "Allow once", "Allow for this session", "Deny", "Deny with note",
+        ])
+        #expect(HubExperience.revision3CountdownExpiresByApproving == false)
+        #expect(HubExperience.revision3CountdownSeconds == 12)
+        #expect(HubExperience.revision3UndoSeconds == 2)
+        #expect(HubExperience.revision3DestructiveHoldSeconds == 1.2)
+        #expect(HubExperience.revision3NoteCharacterLimit == 280)
+        #expect(HubExperience.revision3CountdownAnimates(reduceMotion: true) == false)
+        #expect(HubExperience.revision3CountdownAnimates(reduceMotion: false))
+        #expect(HubExperience.revision3CountdownTextRemains(reduceMotion: true))
+        let still = HubExperience.revision3Motion(reduceMotion: true)
+        #expect(still.offset == 0)
+        #expect(still.scale == 1)
+        let moving = HubExperience.revision3Motion(reduceMotion: false)
+        #expect(moving.offset == HubExperience.pageRisePoints)
+        #expect(moving.scale == HubExperience.pageScale)
+        #expect(HubExperience.revision3CommandKeyIsShortcut == false)
+        #expect(HubExperience.revision3KeysActive(decisionShowing: false) == false)
+        #expect(HubExperience.revision3KeysActive(decisionShowing: true))
+        #expect(HubExperience.revision3Key("return", command: false, decisionShowing: true) == "Allow once")
+        #expect(HubExperience.revision3Key("2", command: false, decisionShowing: true) == "Allow for this session")
+        #expect(HubExperience.revision3Key("escape", command: false, decisionShowing: true) == "Deny")
+        #expect(HubExperience.revision3Key("3", command: false, decisionShowing: true) == "Deny")
+        #expect(HubExperience.revision3Key("4", command: false, decisionShowing: true) == "Deny with note")
+        #expect(HubExperience.revision3Key("shiftEscape", command: false, decisionShowing: true) == "Deny all queued")
+        #expect(HubExperience.revision3Key("u", command: false, decisionShowing: true) == nil)
+        #expect(HubExperience.revision3Key("u", command: false, undoShowing: true) == "Undo")
+        #expect(HubExperience.revision3Key("return", command: true, decisionShowing: true) == nil)
+        #expect(HubExperience.revision3Key("escape", command: true, decisionShowing: true) == nil)
+        #expect(HubExperience.revision3Key("escape", command: false, decisionShowing: false) == nil)
+        #expect(HubExperience.revision3PauseReasons == ["hover", "focus", "VoiceOver focus"])
+        #expect(HubExperience.revision3QueueCount(1) == "1 waiting")
+        #expect(HubExperience.revision3QueueCount(2) == "2 waiting")
+        #expect(HubExperience.revision3CountdownSentence(seconds: 12, paused: false) == "12 s left, then it's denied.")
+        let paused = HubExperience.revision3CountdownSentence(seconds: 12, paused: true)
+        #expect(paused.contains("paused"))
+        #expect(paused.contains("denied."))
+        #expect(paused.contains("approv") == false)
+        #expect(HubExperience.revision3Identifier(forFinding: "ZB-UIUX-DECISION-001") == "hub.decision.row")
+        #expect(HubExperience.revision3Identifier(forFinding: "ZB-UIUX-A11Y-030") == "hub.decision.allow-once")
+        #expect(HubExperience.revision3Identifier(forFinding: "ZB-UIUX-A11Y-034") == "hub.decision.allow-once")
+        #expect(HubExperience.revision3Identifier(forFinding: "ZB-UIUX-A11Y-032") == "hub.decision.deny.hidden")
+        #expect(HubExperience.revision3Identifier(forFinding: "ZB-UIUX-A11Y-033") == "hub.decision.deny")
+        #expect(HubExperience.revision3Identifier(forFinding: "ZB-UIUX-ESCAPE-001") == "hub.decision.deny")
+        #expect(HubExperience.revision3VoiceOverLabel(forIdentifier: "hub.decision.allow-once") == "Allow once")
+        #expect(HubExperience.revision3VoiceOverLabel(forIdentifier: "hub.decision.allow-session") == "Allow for this session")
+        #expect(HubExperience.revision3VoiceOverLabel(forIdentifier: "hub.decision.deny") == "Deny")
+        #expect(HubExperience.revision3VoiceOverLabel(forIdentifier: "hub.decision.deny.hidden") == "Deny")
+        #expect(HubExperience.revision3VoiceOverLabel(forIdentifier: "hub.decision.deny-note") == "Deny with note")
+        #expect(HubExperience.revision3VoiceOverLabel(forIdentifier: "hub.decision.row") == "Decision")
+    }
+
     private func closedPanel(
         percentOfOneCore: Double,
         oneSecondTimerScheduled: Bool = false,
