@@ -448,12 +448,21 @@ public struct OrbSimulation: Equatable, Sendable {
         }
 
         var alive: [OrbElectron] = []
+        var aliveTimes: [Double] = []
+        var aliveSpeeds: [Double] = []
         alive.reserveCapacity(electrons.count)
-        for var electron in electrons {
+        for index in electrons.indices {
+            var electron = electrons[index]
             electron.travel += electron.speed
-            if electron.travel < 1 { alive.append(electron) }
+            if electron.travel < 1 {
+                alive.append(electron)
+                if index < electronSpawnTimes.count { aliveTimes.append(electronSpawnTimes[index]) }
+                if index < electronSpawnSpeeds.count { aliveSpeeds.append(electronSpawnSpeeds[index]) }
+            }
         }
         electrons = alive
+        electronSpawnTimes = aliveTimes
+        electronSpawnSpeeds = aliveSpeeds
     }
 
     private static func colorTarget(_ state: OrbVisualState) -> OrbRGB {
