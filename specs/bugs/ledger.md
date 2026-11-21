@@ -65,16 +65,26 @@ Journeys reviewed: top bar gestures, Murmur / Right Command, Right Option talk, 
 | ZB-013 | P2 | Updates | #49 `10bf928d56f6` | `Sources/ZeusCore/Settings/Sections/AutoUpdate/UpdateSession.swift:302-304` and `SignedUpdateBridge.swift:87-89` | Static. `verifyFinished` is ignored unless the state is already `.verifying`. The bridge posts `downloadFinished` and `verifyFinished(.valid)` as two unstructured tasks. If verify is applied first, the later download step stays in `.verifying` and `.verify` is a no-op. Not executed as a reorder on this VM. | LIKELY | Apply both results in one event, or queue them in order on the session actor. | #49 |
 | ZB-014 | P3 | Companion | #51 `709f8b077cb5` `zeus-bot/companion-turn-machine` | `Sources/ZeusCore/Companion/CompanionTurnMachine.swift:10` | Static. `CompanionSystemClock.now` is `Date().timeIntervalSinceReferenceDate`. `exceededDeepSpokenCeiling` (`:148-152`) subtracts that from `phaseEnteredAt`. A forward wall-clock jump makes the ceiling look exceeded. Face presence documents the opposite choice (`FacePresenceMachine.swift:31-34`). | LIKELY | Pass a monotonic clock. The manual clock already covers tests. | #51 |
 | ZB-015 | P3 | Top bar approvals | integration `2722dcb7` | `Sources/Zeus/Notch/NotchController.swift:352-355` | Static. The timeout `Task` is not stored. `finish` is idempotent (`:319-324`), so a late timeout does not resume twice. The task still holds the continuation until the full timeout after the person has answered. | macOS-ONLY | Keep the task and cancel it inside `finish`. Needs the AppKit approval card to execute. | new-PR |
+| ZB-016 | P1 | Voice providers | #53 `30253774620e` | `Sources/Zeus/Voice/Speaker.swift:119-123` and `:201-205`; `Sources/Zeus/Voice/PluginVoiceBridge.swift:97-100` | Static. After a provider returns `.spoken`, `speakLine` returns at once. The sentence pump waits only while `chain.isPlaying` or `systemRendering`. Provider audio is an `AVAudioPlayer` outside that chain, so the next sentence can start while the previous one is still playing. `isSpeaking` (`Speaker.swift:91`) also omits that player. | macOS-ONLY | Track provider playback in the pump and in `isSpeaking`, and do not start the next line until it ends. Needs the Mac playback path to execute. | #53 |
+| ZB-017 | P1 | Murmur / top bar | integration `2722dcb7` | `Sources/Zeus/App/AppDelegate.swift:174-176`; `Sources/Zeus/TopBar/TopBarModel.swift:366-370` | Static. `toggleDictation` calls `finish()` only in `.listening`, and `begin()` only when `isDictating` is false. `isDictating` is true for `.transcribing` and `.rewriting`, so the button and its accessibility action do nothing during those phases. The visible title at `TopBarViews.swift:1951` says "Typing" while the VoiceOver label at `:1968-1969` still says "Start dictation". | LIKELY | Route a press during transcribe or rewrite to `cancel()`. Match the accessibility label to the visible phase. | new-PR |
+| ZB-018 | P2 | Top bar | integration `2722dcb7` | `Sources/ZeusCore/TopBar/NotchLights.swift:231-243`; `Sources/Zeus/TopBar/TopBarServices.swift:192-198` | `tests/bug-repros/ShiftPeekOnce.sh` exits 1. `fire` sets `revealed` and never clears it. `shift(down: false)` only clears `downAt`. `Sources/Zeus` has no `shiftGate.release()` call, so a second lone Shift hold cannot arm the crest. | PROVEN | Call `shiftGate.release()` when Shift goes up, and fade from that release. | new-PR |
+| ZB-019 | P2 | Top bar | integration `2722dcb7` | `Sources/ZeusCore/TopBar/NotchLights.swift:246-250` | `tests/bug-repros/TabHoldUnwired.sh` exits 1. `TabHoldGate` is tested in `Tests/ZeusCoreTests/NotchLightsTests.swift` and has no reference under `Sources/Zeus`. | PROVEN | Connect Tab-down, modifiers, and release to `TabHoldGate` the way Shift is connected, or drop the unused gate. | new-PR |
+| ZB-020 | P2 | Updates | #49 `10bf928d56f6` | `Sources/Zeus/Settings/GlassShell/Sections/AutoUpdate/UpdatesSessionModel.swift:49-54` and `:72-74` | Static. `appear()` calls `checkNow()` whenever automatic checks are on. `checkNow` applies `.checkRequested`. From `.downloading`, `UpdateSession.requestCheck` (`UpdateSession.swift:345-346`) emits `.cancelNetwork`, and `perform` calls `SignedUpdateBridge.cancel()` (`UpdatesSessionModel.swift:134-136`). Reopening the card during a download aborts it. | LIKELY | Do not start a new check from `appear()` while a download, verify, or install is in progress. | #49 |
+| ZB-021 | P2 | Settings | #39 `4fe1e8edb158` `zeus-bot/settings-general` | `Sources/Zeus/Settings/GlassShell/Sections/GeneralSettingsSection.swift:243-251` | Static. Reset walks `SettingsCatalog.all` only. `general.backgroundBlur` is a `GeneralSectionSlot` contribution (`GeneralSectionSlot.swift:5`) and is not in `SettingsCatalog.swift` on that commit. | LIKELY | Include the section's own key contributions in the reset, or say on the card which keys stay. | #39 |
+| ZB-022 | P2 | Companion orb | #52 `762d5e474965` | `Sources/ZeusCore/Companion/OrbSimulation.swift:445-456` | Static. Each spawn appends `electronSpawnTimes` and `electronSpawnSpeeds`. `electrons` is replaced with the ones still travelling (`:450-456`). The two metadata arrays are cleared only in `init` (`:247-248`) and are never trimmed. | LIKELY | Drop metadata for electrons that have finished, or stop keeping a parallel log. | #52 |
+| ZB-023 | P2 | Voice providers | #53 `30253774620e` | `Sources/Zeus/Voice/PluginVoiceBridge.swift:21-40` | Static. Each WAV playback appends a started `AVAudioEngine` to `engines` and writes a temp file. Nothing stops the engine, removes it, or deletes the file. | macOS-ONLY | Stop and drop the engine when the file finishes, and remove the temp file. Needs AVFoundation on a Mac to execute. | #53 |
+| ZB-024 | P2 | License | integration `2722dcb7` | `Sources/Zeus/App/LicenseManager.swift:163-165` and `:181-183`; `:260-265` | Static. Activation writes `license.activation` before `license.key`. A failed key write returns an error and leaves the proof in place. On a server refusal, a failed `credentials.remove("license.key")` keeps the key; `license.activationRejected` is only a `UserDefaults` flag (`LicenseEngine.swift:53-54`). | macOS-ONLY | Write the key and the proof together, or roll back the proof when the key write fails. Keep the refusal flag with the key, not only in defaults. Needs Keychain to execute. | new-PR |
+| ZB-025 | P2 | License | integration `2722dcb7` | `Sources/ZeusCore/License/LicenseEngine.swift:69-72` | Static. `isRevoked` returns false when the stored list is missing or `SignedBlob.decode` fails. A revoked key then evaluates as licensed until a later fetch writes a list that decodes. | LIKELY | Treat an undecodable list as unknown and keep the last good revocation result, or fail closed for a key that already has a revocation record. | new-PR |
 
 ## Counts
 
 | Severity | PROVEN | LIKELY | macOS-ONLY | Total |
 | --- | ---: | ---: | ---: | ---: |
 | P0 | 1 | 0 | 0 | 1 |
-| P1 | 3 | 1 | 2 | 6 |
-| P2 | 3 | 3 | 0 | 6 |
+| P1 | 3 | 2 | 3 | 8 |
+| P2 | 5 | 7 | 2 | 14 |
 | P3 | 0 | 1 | 1 | 2 |
-| Total | 7 | 5 | 3 | 15 |
+| Total | 9 | 10 | 6 | 25 |
 
 ZB-010 is PROVEN as a gate failure. The Darwin import it trips on is not, by itself, a product defect.
 
@@ -88,6 +98,8 @@ tests/bug-repros/WeatherTemperatureOverflow.sh
 tests/bug-repros/TopBarGesturesUnwired.sh
 tests/bug-repros/LinuxPeerIdentify.sh
 tests/bug-repros/VersionPrereleaseParse.sh
+tests/bug-repros/ShiftPeekOnce.sh
+tests/bug-repros/TabHoldUnwired.sh
 ```
 
 Each exits 1 while its bug is present. They are not part of `swift test`.
