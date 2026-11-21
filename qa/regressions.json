@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "ZeusCore declared PlacedMark twice, so the macOS compile stopped on an invalid redeclaration. A declaration split across lines, hidden beside a block comment, or prefixed by an attribute or package was not counted, and the place signature matched with or without its argument label.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-placed-mark",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PlacedMarkSignatureTests.swift",
+        "function": "theCompiledPlaceSignaturesAreTheScreenAndDrawingForms"
+      }
     }
-]
+  ]
 }

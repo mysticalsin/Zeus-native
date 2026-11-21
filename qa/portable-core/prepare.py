@@ -111,6 +111,10 @@ GROUPS = {
              "Recordly/RecordlyExportSettings.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
     ),
+    "placed-mark": (
+        core("Pointing/MarkLayout.swift", "Present/DrawingScene.swift", "Present/CoordinateMapper.swift"),
+        tests("PlacedMarkSignatureTests"),
+    ),
     "pointing": (
         core("Explanation/ExplanationProtocol.swift", "Explanation/ExplanationReducer.swift",
              "Explanation/ExplanationModel3D.swift", "Explanation/ExplanationModelReducer.swift",
@@ -274,7 +278,7 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe", "placed-mark") and platform_name == "linux"
     extra_target = ''
     products = ''
     core_dependencies = '[]'

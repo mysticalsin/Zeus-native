@@ -51,6 +51,13 @@
       "scope": "Fake signing/notary/install tools and throwaway bundles; no Developer ID, real notarization, Gatekeeper or installation."
     },
     {
+      "id": "portable-placed-mark",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Compiled MarkLayout.place and DrawingLayout.place signatures. Strings, raw strings, and #if false copies are not the compiled API. Linux uses the Foundation geometry shim, not Apple CoreGraphics.",
+      "group": "placed-mark"
+    },
+    {
       "id": "native-DictationOwnershipIntegrationTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -8166,6 +8173,17 @@
             {
               "file": "Tests/ZeusAppTests/UIPolishSourceTests.swift",
               "function": "theOpenPanelIgnoresThePointerLeavingWhileVoiceOverDrives"
+            }
+          ]
+        },
+        {
+          "id": "F13.placed-mark",
+          "check": "portable-placed-mark",
+          "acceptance": "The compiled MarkLayout.place takes unlabeled MarkPin values and returns LaidOutMark. The compiled DrawingLayout.place returns PlacedMark. A second module-level PlacedMark is a Swift redeclaration error.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PlacedMarkSignatureTests.swift",
+              "function": "theCompiledPlaceSignaturesAreTheScreenAndDrawingForms"
             }
           ]
         },

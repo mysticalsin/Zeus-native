@@ -217,6 +217,10 @@ def validate_map(data, portable, root=ROOT):
                     "only audited ZeusCoreTests may run as a complete native module")
         elif check["kind"] == "release-mocks":
             require(set(check) == {"id", "kind", "tier", "scope"} and check["tier"] == "contract", "release mocks are contract evidence only")
+        elif check["kind"] == "selftests":
+            require(set(check) == {"id", "kind", "tier", "scope", "file"}, "invalid selftest fields")
+            require(check["tier"] == "contract" and check["file"].startswith("qa/closed-loop/tests/test_"),
+                    "selftests are one closed-loop test module")
         elif check["kind"] == "unimplemented":
             require(set(check) == {"id", "kind", "tier", "scope", "reason"}, "invalid unimplemented fields")
             nonempty(check["reason"])
@@ -254,6 +258,8 @@ def validate_map(data, portable, root=ROOT):
                 elif check["kind"] == "portable":
                     # Exact excerpt membership is checked against the prepared manifest.
                     require(case["file"].startswith(("Tests/ZeusCoreTests/", "Tests/ZeusAppTests/")), "portable case must be selected real repository test")
+                elif check["kind"] == "selftests":
+                    require(case["file"] == check["file"], "selftest case is not the selected module")
                 else:
                     require(case["file"] == "qa/release-scripts/test_release_scripts.py", "release case not in mock suite")
         require(TIERS <= tiers, f"{feature['id']} needs contract, native integration, and device proof obligations")
