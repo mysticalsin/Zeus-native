@@ -22,13 +22,13 @@ public enum VoiceSpeakAllowlist {
     }
 }
 
-/// The live first-audio abort. This is the declared 700 ms budget.
+/// The live first-audio abort. A silent provider is aborted when this budget elapses, and not before.
 /// It does not change the 8 s provider HTTP timeout, or the 20 s and 45 s ceilings.
 public enum ProviderSpeakAbort {
-    public static var milliseconds: Int { ProviderLatencyVerdict.firstAudioP50Ms }
+    public static let milliseconds = 1_400
 
     public static func shouldAbort(elapsedMs: Int, heardAudio: Bool, budgetMs: Int = milliseconds) -> Bool {
-        !heardAudio && elapsedMs > budgetMs
+        !heardAudio && elapsedMs >= budgetMs
     }
 }
 

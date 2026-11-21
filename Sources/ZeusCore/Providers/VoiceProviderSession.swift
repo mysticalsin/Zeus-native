@@ -349,7 +349,7 @@ public actor VoiceProviderSession {
                 let budget = firstAudioBudgetMs
                 let heard = AbortFlag()
                 let watchdog = Task {
-                    try? await Task.sleep(for: .milliseconds(budget + 1))
+                    try? await Task.sleep(for: .milliseconds(budget))
                     if !heard.value {
                         heard.fired = true
                         synthesis.cancel()

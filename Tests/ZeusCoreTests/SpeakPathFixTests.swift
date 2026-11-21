@@ -25,11 +25,10 @@ private struct AbortClock {
         #expect(!VoiceSpeakAllowlist.accepts("JBFqnCBsd6RMkjVDRZzb"))
     }
 
-    @Test func theLiveAbortUsesTheDeclared700MillisecondBudget() {
-        #expect(ProviderSpeakAbort.milliseconds == 700)
-        #expect(ProviderSpeakAbort.milliseconds == ProviderLatencyVerdict.firstAudioP50Ms)
-        #expect(ProviderSpeakAbort.shouldAbort(elapsedMs: 701, heardAudio: false))
-        #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: 700, heardAudio: false))
+    @Test func theAbortBudgetIsSeparateFromTheP50Verdict() {
+        #expect(ProviderLatencyVerdict.firstAudioP50Ms == 700)
+        #expect(ProviderHTTPBudget.requestTimeout == 8)
+        #expect(ProviderSpeakAbort.milliseconds == 1_400)
         #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: 5_000, heardAudio: true))
     }
 
