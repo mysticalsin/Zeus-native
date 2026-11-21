@@ -6,7 +6,6 @@ extension PortalSectionSlot: GlassSlotPage {
 }
 
 struct PortalSettingsSection: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var store: SettingsStore { .shared }
     @State private var flow = PortalDropFlow()
     @State private var removal = PortalRemovalFlow()
@@ -14,7 +13,7 @@ struct PortalSettingsSection: View {
 
     var body: some View {
         let board = PortalDeviceBoardBuilder.make(reading)
-        let motion = reduceMotion || Motion.reduced
+        let motion = Motion.reduced
         let preview = PortalSectionModel.preview(flow.phase, reduceMotion: motion)
         let controls = PortalSectionModel.controls(for: board, flow: flow)
         ScrollView {
