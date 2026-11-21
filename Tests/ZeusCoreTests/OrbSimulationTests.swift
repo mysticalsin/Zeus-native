@@ -115,7 +115,10 @@ struct OrbSimulationTests {
         }
         #expect(maxAlive >= 1)
         #expect(maxAlive <= 3)
-        #expect(sim.electronSpawnTimes.count >= 3)
+        #expect(sim.electronSpawnTimes.count == sim.electrons.count)
+        #expect(sim.electronSpawnSpeeds.count == sim.electrons.count)
+        #expect(sim.electronSpawnTimes.count <= OrbSimulation.maxLiveElectrons)
+        #expect(sim.electronSpawnTimes.count >= 1)
         for pair in zip(sim.electronSpawnTimes, sim.electronSpawnTimes.dropFirst()) {
             #expect(pair.1 - pair.0 > 1)
         }
