@@ -46,11 +46,14 @@ public struct MeetingHeadsUpPlan: Equatable, Sendable {
     public var phase: MeetingHeadsUpPhase
     public var cues: [HeadsUpCue]
     public var createdEvents: [String]
+    /// Title of the first cue that is due now. A later cue can sit first in `cues`.
+    public var firstDueTitle: String?
 
-    public init(phase: MeetingHeadsUpPhase, cues: [HeadsUpCue], createdEvents: [String]) {
+    public init(phase: MeetingHeadsUpPhase, cues: [HeadsUpCue], createdEvents: [String], firstDueTitle: String? = nil) {
         self.phase = phase
         self.cues = cues
         self.createdEvents = createdEvents
+        self.firstDueTitle = firstDueTitle
     }
 }
 
@@ -110,7 +113,21 @@ public enum MeetingHeadsUpScheduler {
             guard let fireAt = fireDate(settings: settings, occasion: occasion) else { continue }
             cues.append(HeadsUpCue(occasionID: occasion.id, title: occasion.title, kind: occasion.kind, fireAt: fireAt))
         }
-        return MeetingHeadsUpPlan(phase: phase(cues: cues, occasions: occasions, now: now), cues: cues, createdEvents: [])
+        return MeetingHeadsUpPlan(
+            phase: phase(cues: cues, occasions: occasions, now: now),
+            cues: cues,
+            createdEvents: [],
+            firstDueTitle: firstDueTitle(cues: cues, occasions: occasions, now: now)
+        )
+    }
+
+    /// The first cue whose fire time has arrived and whose occasion has not ended.
+    public static func firstDueTitle(cues: [HeadsUpCue], occasions: [InAppOccasion], now: Date) -> String? {
+        let starts = Dictionary(uniqueKeysWithValues: occasions.map { ($0.id, $0.start) })
+        return cues.first { cue in
+            guard let start = starts[cue.occasionID] else { return false }
+            return cue.fireAt <= now && now <= start
+        }?.title
     }
 
     /// Meeting ids Scribe already covers inside its lead window. Reminders and focus are not included.

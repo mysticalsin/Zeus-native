@@ -109,7 +109,7 @@ final class NotchModel {
     /// Title of a heads-up that is due now, for the existing peek status line.
     var meetingHeadsUpTitle: String? {
         guard let meetingHeadsUp, meetingHeadsUp.phase == .showing else { return nil }
-        return meetingHeadsUp.cues.first?.title
+        return meetingHeadsUp.firstDueTitle
     }
     /// The front alert, as the line the open action understands.
     var notificationLine: NotificationLine? {
