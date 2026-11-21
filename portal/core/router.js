@@ -12,6 +12,20 @@ const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(b
 });
 const fail = (code, message, status = 400) => json({ ok: false, error: code, message }, status);
 
+const socketPeers = new WeakMap();
+
+/** The local server records the socket's peer address. A client header cannot set this. */
+export function bindSocketPeer(request, address) {
+  if (typeof address !== 'string') return;
+  const peer = address.trim();
+  if (!peer || peer.length > 128) return;
+  socketPeers.set(request, peer);
+}
+
+function peerAddress(request) {
+  return socketPeers.get(request) ?? 'local';
+}
+
 /** Small fixed-window limiter. Per process. The portal listens on 127.0.0.1 only. */
 export class Limiter {
   constructor(limit, windowSeconds) { this.limit = limit; this.window = windowSeconds * 1000; this.hits = new Map(); }
@@ -51,7 +65,6 @@ async function readJSON(request) {
 export function createRouter({ portal, secrets, config, serveStatic = null, publicBase = '' }) {
   const loginLimiter = new Limiter(8, 300);
   const publicLimiter = new Limiter(60, 60);
-  const ip = (request) => request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for') ?? 'local';
 
   async function sessionKey() {
     let key = await secrets.get('session.key');
@@ -138,7 +151,7 @@ export function createRouter({ portal, secrets, config, serveStatic = null, publ
 
       // App-facing API (no admin session).
       if (url.pathname.startsWith('/api/v1/')) {
-        if (!publicLimiter.allow(ip(request))) return fail('rate_limited', 'Slow down.', 429);
+        if (!publicLimiter.allow(peerAddress(request))) return fail('rate_limited', 'Slow down.', 429);
         if (url.pathname === '/api/v1/activate' && request.method === 'POST') {
           const body = await readJSON(request);
           return json({ ok: true, ...(await portal.activate({ key: body.key, device: body.device, name: body.name })) });
@@ -174,7 +187,7 @@ export function createRouter({ portal, secrets, config, serveStatic = null, publ
       }
       if (url.pathname === '/api/login' && request.method === 'POST') {
         if (request.headers.get('x-zeus-portal') !== '1') return fail('csrf', 'Missing portal header.', 403);
-        if (!loginLimiter.allow(ip(request))) return fail('rate_limited', 'Too many tries. Wait five minutes.', 429);
+        if (!loginLimiter.allow(peerAddress(request))) return fail('rate_limited', 'Too many tries. Wait five minutes.', 429);
         const { passphrase } = await readJSON(request);
         const stored = await secrets.get('admin.passphrase');
         if (!stored || !(await checkPassphrase(passphrase, stored))) {
