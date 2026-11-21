@@ -8691,14 +8691,14 @@
     },
     {
       "id": "REG-976",
-      "failure": "stdin EOF or a bad frame before the host lifetime was attached called exit without stopping the socket, so the socket file could stay behind.",
+      "failure": "finish unlinked the socket path even when this process had not bound it, so a pre-existing file or a replaced inode could be removed. Unlink only the dev/inode from a successful bind, and only while lstat still shows that socket.",
       "features": [
         "F13"
       ],
       "check": "portable-bridge-transport",
       "guard": {
         "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
-        "function": "finishBeforeAttachRemovesTheSocketFile"
+        "function": "finishBeforeAttachLeavesAFileThisProcessDidNotBind"
       }
     },
     {

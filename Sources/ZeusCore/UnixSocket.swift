@@ -211,6 +211,9 @@ public final class UnixSocketServer: @unchecked Sendable {
     private var listener: DispatchSourceRead?
     private var listenFD: Int32 = -1
     private var connections: [UUID: Connection] = [:]
+    /// dev/inode of the socket created by a successful bind. A later file at the same path is left alone.
+    private var boundDevice: UInt64?
+    private var boundInode: UInt64?
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
 
@@ -261,8 +264,34 @@ public final class UnixSocketServer: @unchecked Sendable {
             listener = source
             listenFD = fd
             started = true
+            rememberBoundNode()
             source.resume()
         }
+    }
+
+    /// `lstat` of the socket we just bound. A symlink is not recorded, so finish cannot follow it.
+    private func rememberBoundNode() {
+        var info = stat()
+        guard lstat(path, &info) == 0, (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK) else {
+            boundDevice = nil
+            boundInode = nil
+            return
+        }
+        boundDevice = UInt64(info.st_dev)
+        boundInode = UInt64(info.st_ino)
+    }
+
+    /// Unlink only the inode from a successful bind. A replacement or a symlink stays.
+    private func unlinkIfStillBound() {
+        guard let boundDevice, let boundInode else { return }
+        var info = stat()
+        guard lstat(path, &info) == 0,
+              (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK),
+              UInt64(info.st_dev) == boundDevice,
+              UInt64(info.st_ino) == boundInode else { return }
+        unlink(path)
+        self.boundDevice = nil
+        self.boundInode = nil
     }
 
     public func stop() {
@@ -271,7 +300,7 @@ public final class UnixSocketServer: @unchecked Sendable {
                 self.listener = nil
                 listenFD = -1
                 listener.cancel()
-                unlink(path)
+                unlinkIfStillBound()
             }
             return Array(connections.values)
         }

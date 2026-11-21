@@ -153,7 +153,7 @@ struct BridgePendingRepliesTests {
         let url = root.appendingPathComponent("chrome.sock")
         let marker = Data("keep-me".utf8)
         try marker.write(to: url)
-        let lifetime = BridgeHostLifetime(socketPath: url.path)
+        let lifetime = BridgeHostLifetime()
         lifetime.finish()
         #expect(FileManager.default.fileExists(atPath: url.path))
         #expect(try Data(contentsOf: url) == marker)
@@ -167,7 +167,7 @@ struct BridgePendingRepliesTests {
         defer { input.stop(); try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close() }
         let server = UnixSocketServer(path: path) { _, _ in }
         try server.start()
-        let lifetime = BridgeHostLifetime(socketPath: path)
+        let lifetime = BridgeHostLifetime()
         lifetime.attach(input: input, server: server)
         lifetime.finish()
         #expect(!FileManager.default.fileExists(atPath: path))
@@ -183,7 +183,7 @@ struct BridgePendingRepliesTests {
         defer { input.stop(); try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close() }
         let server = UnixSocketServer(path: url.path) { _, _ in }
         try server.start()
-        let lifetime = BridgeHostLifetime(socketPath: url.path)
+        let lifetime = BridgeHostLifetime()
         lifetime.attach(input: input, server: server)
         #expect(unlink(url.path) == 0)
         let replacement = Data("replaced".utf8)
@@ -194,7 +194,7 @@ struct BridgePendingRepliesTests {
         let second = root.appendingPathComponent("fresh.sock")
         let server2 = UnixSocketServer(path: second.path) { _, _ in }
         try server2.start()
-        let lifetime2 = BridgeHostLifetime(socketPath: second.path)
+        let lifetime2 = BridgeHostLifetime()
         lifetime2.attach(input: input, server: server2)
         #expect(unlink(second.path) == 0)
         #expect(symlink(elsewhere.path, second.path) == 0)

@@ -210,9 +210,6 @@ public enum BridgeChromeAdmission {
                 "version": .string(ZeusCoreVersion.string),
             ])))
         }
-        guard identityReady else {
-            return .reply(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
-        }
         return .reply(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
     }
 }
@@ -221,12 +218,11 @@ public enum BridgeChromeAdmission {
 /// `finish` does not exit the process. The host calls `exit` after it returns.
 public final class BridgeHostLifetime: @unchecked Sendable {
     private let lock = NSLock()
-    private let socketPath: String
     private var stopped = false
     private var input: NativeMessageInput?
     private var server: UnixSocketServer?
 
-    public init(socketPath: String) { self.socketPath = socketPath }
+    public init() {}
 
     public func attach(input: NativeMessageInput, server: UnixSocketServer) {
         let alreadyStopped = lock.withLock { () -> Bool in
@@ -237,7 +233,6 @@ public final class BridgeHostLifetime: @unchecked Sendable {
         if alreadyStopped {
             input.stop()
             server.stop()
-            unlink(socketPath)
         }
     }
 
@@ -249,6 +244,5 @@ public final class BridgeHostLifetime: @unchecked Sendable {
         }
         resources.0?.stop()
         resources.1?.stop()
-        unlink(socketPath)
     }
 }

@@ -7098,7 +7098,23 @@
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
-              "function": "finishBeforeAttachRemovesTheSocketFile"
+              "function": "finishBeforeAttachLeavesAFileThisProcessDidNotBind"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishAfterASuccessfulBindUnlinksTheSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAPathReplacedByAnotherInodeOrASymlink"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "socketIsBoundBeforeStdinAndIdentityFollowsTheReader"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "aPeerIsRefusedBeforeOwnIdentityIsCaptured"
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
@@ -7229,7 +7245,23 @@
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
-              "function": "finishBeforeAttachRemovesTheSocketFile"
+              "function": "finishBeforeAttachLeavesAFileThisProcessDidNotBind"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishAfterASuccessfulBindUnlinksTheSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAPathReplacedByAnotherInodeOrASymlink"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "socketIsBoundBeforeStdinAndIdentityFollowsTheReader"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "aPeerIsRefusedBeforeOwnIdentityIsCaptured"
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",

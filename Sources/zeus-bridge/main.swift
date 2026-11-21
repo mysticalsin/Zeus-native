@@ -112,7 +112,7 @@ final class Relay: @unchecked Sendable {
     private static func encode(_ response: BridgeResponse) -> Data? { try? JSONEncoder().encode(response) }
 }
 
-let lifetime = BridgeHostLifetime(socketPath: ZeusPaths.chromeSocket.path)
+let lifetime = BridgeHostLifetime()
 do {
     let relay = try Relay(lifetime: lifetime)
     let input = try NativeMessageInput(handle: .standardInput)
