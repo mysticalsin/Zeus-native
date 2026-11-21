@@ -6584,6 +6584,50 @@
             {
               "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
               "function": "flagsDefaultToOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "theTransitionSwitchHasNoDefault"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "closeDuringStartEndsClosedAndNeverStreams"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "closeFromIdleRefusesALaterStart"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aSecondCloseStaysClosed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "anEmptyFrameListIsNotAFrameSizeError"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "flagsOffDoNotUseTheNetworkOrAProcess"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "theEngineRouterIsUnchangedWhenLocalFlagsAreOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "frameSizeBoundariesFollowThe3200SampleRule"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aSavedEngineStaysThatEngineForEveryStoredChoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aTimeoutIsAnInfrastructureErrorAfterOneRetry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "thisSuiteAddsNoSkipOrXfail"
             }
           ]
         }
