@@ -1,5 +1,15 @@
+import Foundation
 import Testing
 @testable import ZeusCore
+
+/// Elapsed time the abort reads. The test moves it; nothing sleeps for the budget.
+private struct AbortClock {
+    private(set) var milliseconds = 0
+
+    mutating func advance(by delta: Int) {
+        milliseconds += delta
+    }
+}
 
 @Suite struct SpeakPathFixTests {
     @Test func identitySpeechOutputLeavesSamplesUnchanged() {
@@ -21,6 +31,21 @@ import Testing
         #expect(ProviderSpeakAbort.shouldAbort(elapsedMs: 701, heardAudio: false))
         #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: 700, heardAudio: false))
         #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: 5_000, heardAudio: true))
+    }
+
+    /// Tony's S10 decision: a silent provider aborts when the clock reaches 1,400 ms, and not before.
+    @Test func silentProviderAbortsAt1400MillisecondsNotBefore() {
+        var clock = AbortClock()
+        #expect(ProviderSpeakAbort.milliseconds == 1_400)
+        clock.advance(by: 700)
+        #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: clock.milliseconds, heardAudio: false))
+        clock.advance(by: 699)
+        #expect(clock.milliseconds == 1_399)
+        #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: clock.milliseconds, heardAudio: false))
+        clock.advance(by: 1)
+        #expect(clock.milliseconds == 1_400)
+        #expect(ProviderSpeakAbort.shouldAbort(elapsedMs: clock.milliseconds, heardAudio: false))
+        #expect(!ProviderSpeakAbort.shouldAbort(elapsedMs: clock.milliseconds, heardAudio: true))
     }
 
     @Test func providerErrorsStayDistinct() {
