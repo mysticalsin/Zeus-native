@@ -8,9 +8,16 @@ private let optIn2 = Date(timeIntervalSince1970: 2_000)
 @Suite("Scribe automatic start opt-in")
 struct ScribeAutoStartOptInTests {
     private func fresh() throws -> (UserDefaults, () -> Void) {
-        let name = NSTemporaryDirectory() + "ScribeAutoStartOptIn.\(UUID().uuidString)"
+        // A suite name that contains a slash is not private when these tests run together, and
+        // removePersistentDomain synchronizes every domain in the process. A bundle id keeps
+        // this test's keys to itself; cleanup removes those keys and does not synchronize.
+        let name = "app.zeus.tests.ScribeAutoStartOptIn.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
-        return (defaults, { defaults.removePersistentDomain(forName: name) })
+        let keys = [
+            ScribeAutoStartOptIn.key, ScribeAutoStartOptIn.legacyKey, ScribeAutoStartOptIn.firstRecordingKey,
+            FeatureSettings.key(ScribeAutoStartMode.settingID),
+        ]
+        return (defaults, { for key in keys { defaults.removeObject(forKey: key) } })
     }
 
     // MARK: The stamp follows the choice
@@ -60,6 +67,26 @@ struct ScribeAutoStartOptInTests {
         defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
         ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: false, defaults: defaults)
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
+    }
+
+    /// The same steps as `aStaleStampWithAskMeIsRemovedAtLaunch`, on many suites at once.
+    /// A shared defaults domain lets one task's stamp survive another's removal.
+    @Test func parallelFreshSuitesDoNotKeepAStaleStamp() async {
+        let missed = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<48 {
+                group.addTask {
+                    guard let (defaults, cleanup) = try? fresh() else { return false }
+                    defer { cleanup() }
+                    defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
+                    ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: false, defaults: defaults)
+                    return ScribeAutoStartOptIn.date(defaults: defaults) == nil
+                }
+            }
+            var failures = 0
+            for await removed in group where !removed { failures += 1 }
+            return failures
+        }
+        #expect(missed == 0)
     }
 
     @Test func anOldStampWithAutomaticCarriesOver() throws {
