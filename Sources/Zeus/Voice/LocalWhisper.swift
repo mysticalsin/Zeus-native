@@ -176,8 +176,23 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
 
     func prepare(progress: (@Sendable (Double) -> Void)?) async throws {
         progress?(0.05)
-        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [] }) {
-            let failure = await Task.detached { LocalPython.install(["faster-whisper"]) }.value
+        let pythonRoot = LocalPython.root
+        let tree = LocalPython.venv
+        let rootExisted = FileManager.default.fileExists(atPath: pythonRoot.path)
+        let treeExisted = FileManager.default.fileExists(atPath: tree.path)
+        let before = treeExisted ? InstallFootprint.snapshot(tree) : []
+        let gate = InstallSettlement()
+        let worker = Task.detached {
+            let failure = LocalPython.install(["faster-whisper"])
+            gate.settle(failure)
+            return failure
+        }
+        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: {
+            // Wait until pip has exited, then delete every path this setup added.
+            _ = gate.wait()
+            return InstallFootprint.removals(root: pythonRoot, rootExisted: rootExisted, tree: tree, treeExisted: treeExisted, before: before)
+        }) {
+            let failure = await worker.value
             if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
         }
         switch outcome {
@@ -202,5 +217,29 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
             guard result.status == 0 else { throw TranscriptionError.notReady(.fasterWhisper) }
             return result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+    }
+}
+
+/// Pip finishes on a detached task. Cleanup waits here so a cap cannot delete files before they exist,
+/// and cannot return while pip is still writing them.
+private final class InstallSettlement: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var ready = false
+    private var failure: String?
+
+    func settle(_ failure: String?) {
+        condition.lock()
+        self.failure = failure
+        ready = true
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    func wait() -> String? {
+        condition.lock()
+        while !ready { condition.wait() }
+        let failure = self.failure
+        condition.unlock()
+        return failure
     }
 }

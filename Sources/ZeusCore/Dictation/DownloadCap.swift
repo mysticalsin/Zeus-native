@@ -89,6 +89,45 @@ public struct DownloadSession: Equatable, Sendable {
     }
 }
 
+/// Files a setup wrote, so a cap or a cancel can delete those and leave older files.
+public enum InstallFootprint {
+    /// Every file and directory under `root`, as a path relative to `root`. Ancestors are included.
+    public static func snapshot(_ root: URL) -> Set<String> {
+        let rootPath = root.path
+        guard !rootPath.isEmpty else { return [] }
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil, options: []) else {
+            return []
+        }
+        var paths = Set<String>()
+        for case let url as URL in walker {
+            let path = url.path
+            guard path.hasPrefix(prefix) else { continue }
+            var relative = String(path.dropFirst(prefix.count))
+            while !relative.isEmpty {
+                paths.insert(relative)
+                guard let slash = relative.lastIndex(of: "/") else { break }
+                relative = String(relative[..<slash])
+            }
+        }
+        return paths
+    }
+
+    /// What to delete after a setup stops.
+    /// A root that this run created is removed whole. A virtual environment that this run created is removed whole.
+    /// When both were already there, only paths that were not in `before` are removed, and a new directory covers its children.
+    public static func removals(root: URL, rootExisted: Bool, tree: URL, treeExisted: Bool, before: Set<String>) -> [URL] {
+        if !rootExisted { return [root] }
+        if !treeExisted { return [tree] }
+        let added = snapshot(tree).subtracting(before)
+        let tops = added.filter { relative in
+            guard let slash = relative.lastIndex(of: "/") else { return true }
+            return !added.contains(String(relative[..<slash]))
+        }
+        return tops.sorted().map { tree.appendingPathComponent($0) }
+    }
+}
+
 public enum PartialFiles {
     /// Deletes each file or folder. A path that is already gone is success. Returns paths still present.
     @discardableResult
