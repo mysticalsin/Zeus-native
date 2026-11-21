@@ -16,6 +16,14 @@ import Testing
         #expect(stack.hiddenCount == 2)
     }
 
+    @Test func theQueueDropsTheOldestPastForty() {
+        var stack = AlertStack()
+        for index in 1...41 { stack.post(alert("a\(index)", title: "T\(index)"), now: t0) }
+        #expect(stack.items.count == AlertStack.maxQueued)
+        #expect(stack.items.first?.id == "a41")
+        #expect(stack.items.last?.id == "a2")
+    }
+
     @Test func identicalAlertsWithinFiveSecondsCoalesce() {
         var stack = AlertStack()
         #expect(stack.post(alert("a"), now: t0) == .added("a"))
