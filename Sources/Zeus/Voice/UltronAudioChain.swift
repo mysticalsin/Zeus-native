@@ -92,6 +92,11 @@ final class UltronEffectGraph {
         return "audio engine refused the chain (\(failure))"
     }
 
+    func disconnect(from engine: AVAudioEngine, player: AVAudioNode) {
+        engine.disconnectNodeOutput(player)
+        for node in nodes { engine.disconnectNodeOutput(node) }
+    }
+
     func apply(_ p: UltronEffectParameters) {
         timePitch.pitch = p.pitchCents
         timePitch.bypass = p.pitchCents == 0
@@ -190,7 +195,7 @@ final class UltronAudioChain {
         // re-validates the output and restarts. The wiring uses the fixed chain format, so it stays.
         configObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.player.stop(); self?.pending.reset(); self?.ledger.reset() }
+            MainActor.assumeIsolated { self?.outputRouteChanged() }
         }
     }
 
@@ -199,6 +204,20 @@ final class UltronAudioChain {
     }
 
     var isPlaying: Bool { pending.value > 0 }
+
+    /// The output device changed. Drop buffers that belonged to the old format and leave the graph
+    /// unwired so the next `prepare` connects it at the new rate. The route change itself is not a
+    /// finished line; the sentence pump schedules the next buffer only after `wire` runs again.
+    private func outputRouteChanged() {
+        let decision = PlaybackGraphRecovery.afterConfigurationChange()
+        player.stop()
+        pending.reset()
+        if decision.reportLineFinished { ledger.reset() }
+        guard decision.rewire else { return }
+        ledger.reset()
+        wired = false
+        graph.disconnect(from: engine, player: player)
+    }
 
     /// Connects the graph on first use, once an output device exists (never at construction, so a Mac
     /// without one cannot crash the app). False, with a logged reason, when nothing can be wired; the

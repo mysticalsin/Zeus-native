@@ -149,6 +149,8 @@ private final class ScribeCaptureRun: @unchecked Sendable {
     private var engine: AVAudioEngine?
     private var configurationObserver: NSObjectProtocol?
     private var systemSource: (any ScribeSystemSource)?
+    private var outputUID: String?
+    private var outputListener: AudioObjectPropertyListenerBlock?
 
     // Touched only on `worker`.
     /// Host-clock boundary after both sources have started. Earlier buffered samples are never delivered.
@@ -301,7 +303,31 @@ private final class ScribeCaptureRun: @unchecked Sendable {
             return true
         }
         guard acknowledged else { teardown(); return }
+        watchOutput()
         startDrainTimer()
+    }
+
+    /// The default output changed (a headset connected or disconnected). Rebuild the system tap on the
+    /// output the person is hearing. The microphone path already restarts from its own configuration notice.
+    private func watchOutput() {
+        guard outputListener == nil else { return }
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.queue.async { self?.outputChanged() }
+        }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        let status = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, block)
+        if status == noErr { outputListener = block }
+    }
+
+    private func outputChanged() {
+        guard !lock.withLock({ stopRequested }) else { return }
+        let current = try? ScribeSystemTap.currentOutputUID()
+        guard ScribeOutputRoute.shouldRebuild(capturedUID: outputUID, currentUID: current) else { return }
+        systemSource?.stop()
+        systemSource = nil
+        do { try startSystem() } catch { fail(error) }
     }
 
     /// A start or runtime failure: stop everything, deliver nothing more, report once.
@@ -320,8 +346,19 @@ private final class ScribeCaptureRun: @unchecked Sendable {
 
     /// Stops the producers, then clears the worker's state after anything it was running. Delivery is already
     /// off when this runs from `fail` or `abandon`, so leftover samples are discarded, not delivered.
+    private func removeOutputWatch() {
+        if let outputListener {
+            var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                     mScope: kAudioObjectPropertyScopeGlobal,
+                                                     mElement: kAudioObjectPropertyElementMain)
+            AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, outputListener)
+            self.outputListener = nil
+        }
+    }
+
     private func teardown() {
         stopMic()
+        removeOutputWatch()
         systemSource?.stop()
         systemSource = nil
         worker.sync {
@@ -339,7 +376,7 @@ private final class ScribeCaptureRun: @unchecked Sendable {
         let engine = AVAudioEngine()
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0, format.commonFormat == .pcmFormatFloat32 else {
+        guard !ScribeOutputRoute.rejectsZeroSampleRate(format.sampleRate), format.channelCount > 0, format.commonFormat == .pcmFormatFloat32 else {
             throw ScribeCaptureFailure(message: "No microphone input is available. Check the input device in System Settings → Sound.")
         }
         let ring = ScribeSampleRing(
@@ -423,6 +460,7 @@ private final class ScribeCaptureRun: @unchecked Sendable {
     private func startSystem() throws {
         let source = ScribeSystemTap()
         try source.start()
+        outputUID = try ScribeSystemTap.currentOutputUID()
         systemSource = source
         guard let ring = source.ring else { return }
         let pipe = Pipe(ring: ring, inputRate: source.sampleRate)
@@ -617,7 +655,10 @@ private final class ScribeSystemTap: ScribeSystemSource, @unchecked Sendable {
         var address = AudioObjectPropertyAddress(mSelector: kAudioTapPropertyFormat, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         status = AudioObjectGetPropertyData(tapID, &address, 0, nil, &size, &format)
         guard status == noErr else { throw Failure(stage: "format", status: status) }
-        if format.mSampleRate > 0 { sampleRate = format.mSampleRate }
+        if ScribeOutputRoute.rejectsZeroSampleRate(format.mSampleRate) {
+            throw Failure(stage: "format", status: -50)
+        }
+        sampleRate = format.mSampleRate
         let tapRing = ScribeSampleRing(
             capacityFrames: Int(sampleRate * Self.ringSeconds),
             channels: max(1, min(8, Int(format.mChannelsPerFrame))),
@@ -695,6 +736,8 @@ private final class ScribeSystemTap: ScribeSystemSource, @unchecked Sendable {
             }
         }
     }
+
+    static func currentOutputUID() throws -> String { Self.defaultOutputUID() }
 
     private static func defaultOutputUID() throws -> String {
         var device = AudioObjectID(kAudioObjectUnknown)
