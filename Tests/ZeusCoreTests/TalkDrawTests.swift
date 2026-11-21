@@ -85,11 +85,11 @@ import Testing
         let cards = TalkDrawScene.objects(draw, shot: shot, captureID: UUID())[0] ?? []
         #expect(cards.count == 2)
         for card in cards {
-            #expect(card.geometry.kind == .label)
+            #expect(card.geometry.kind == .card)
             let size = TalkDrawScene.estimatedLabelSize(text: card.text ?? "")
             let p = card.transform.position
             #expect(p.x >= 0 && p.x + size.width <= 1280)
-            #expect(p.y - size.height / 2 >= 0 && p.y + size.height / 2 <= 800)
+            #expect(p.y >= 0 && p.y + size.height <= 800)
         }
     }
 

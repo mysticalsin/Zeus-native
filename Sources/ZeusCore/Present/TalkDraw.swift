@@ -180,11 +180,12 @@ public enum TalkDrawScene {
             switch mark.shape {
             case .ring(let center, let radius):
                 guard inside(center) else { continue }
+                // The canvas draws a ring as an ellipse. Ink, so it is not an orange circle.
                 object = ExplanationObject(id: id, space: .capture, captureID: captureID,
                     geometry: ExplanationGeometry(kind: .ring, radius: radius),
                     transform: ExplanationTransform(position: vector(center)),
-                    style: ExplanationStyle(fill: .clear, stroke: .orange, lineWidth: 4),
-                    accessibleDescription: "A ring around a spot on the screen")
+                    style: ExplanationStyle(fill: .clear, stroke: .ink, lineWidth: 4),
+                    accessibleDescription: "An ellipse around a spot on the screen")
             case .arrow(let from, let to):
                 guard inside(from), inside(to), from != to else { continue }
                 object = ExplanationObject(id: id, space: .capture, captureID: captureID,
@@ -209,15 +210,17 @@ public enum TalkDrawScene {
                     style: ExplanationStyle(fill: .clear, stroke: .cyan, lineWidth: 3),
                     accessibleDescription: "A line drawn on the screen")
             case .card(let origin, let text):
-                // A label, not a card geometry: a label renders in capture space and the renderer
-                // places it beside its anchor. The anchor is moved so the whole box stays on the image.
-                let size = estimatedLabelSize(text: text)
-                let x = min(max(0, origin.x), max(0, width - size.width - 14))
-                let y = min(max(size.height / 2 + 4, origin.y), max(size.height / 2 + 4, height - size.height / 2 - 4))
+                // A diagram card: the canvas fills the rounded rect and draws the text inside it.
+                // The origin is the top-left of that rect, moved so the whole card stays on the shot.
+                let box = estimatedLabelSize(text: text)
+                let boxWidth = Double(box.width), boxHeight = Double(box.height)
+                let x = min(max(0, origin.x), max(0, width - boxWidth))
+                let y = min(max(0, origin.y), max(0, height - boxHeight))
                 object = ExplanationObject(id: id, space: .capture, captureID: captureID,
-                    geometry: ExplanationGeometry(kind: .label),
+                    geometry: ExplanationGeometry(kind: .card, size: .init(x: boxWidth, y: boxHeight)),
                     transform: ExplanationTransform(position: .init(x: x, y: y)),
-                    text: text, accessibleDescription: "A label on the screen")
+                    style: ExplanationStyle(fill: .white, stroke: .ink, lineWidth: 2),
+                    text: text, accessibleDescription: "A diagram card on the screen")
             }
             result[mark.at, default: []].append(object)
         }

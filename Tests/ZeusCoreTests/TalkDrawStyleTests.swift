@@ -56,11 +56,11 @@ import Testing
         let cards = TalkDrawScene.frame(draw, shot: Self.shot(), captureID: UUID(), sentence: 0, reduceMotion: true).objects
         #expect(cards.count == 2)
         for card in cards {
-            #expect(card.geometry.kind == .label)
+            #expect(card.geometry.kind == .card)
             let size = TalkDrawScene.estimatedLabelSize(text: card.text ?? "")
             let p = card.transform.position
             #expect(p.x >= 0 && p.x + size.width <= 1280)
-            #expect(p.y - size.height / 2 >= 0 && p.y + size.height / 2 <= 800)
+            #expect(p.y >= 0 && p.y + size.height <= 800)
         }
     }
 
@@ -78,7 +78,7 @@ import Testing
         let id = UUID()
         let sentenceZero = TalkDrawScene.frame(draw, shot: shot, captureID: id, sentence: 0, reduceMotion: true)
         let kinds = Set(sentenceZero.objects.map(\.geometry.kind))
-        #expect(kinds == [.ring, .arrow, .underline, .label])
+        #expect(kinds == [.ring, .arrow, .underline, .card])
         #expect(!kinds.contains(.path))
         let sentenceTwo = TalkDrawScene.frame(draw, shot: shot, captureID: id, sentence: 2, reduceMotion: true)
         #expect(sentenceTwo.objects.map(\.geometry.kind) == [.path])

@@ -5681,6 +5681,10 @@
             {
               "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
               "function": "atMostSixMarks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "figureThreeIsAnInkEllipseAndADiagramCard"
             }
           ]
         },
