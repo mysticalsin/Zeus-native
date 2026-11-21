@@ -241,7 +241,7 @@ public enum SpeechClauseChunker {
             if index > 0, index + 1 < chars.count, isDigit(chars[index - 1]), isDigit(chars[index + 1]) { return false }
             if index + 1 < chars.count, isDigit(chars[index + 1]), index > 0, chars[index - 1] == "." { return false }
             let word = wordBefore(chars, index)
-            if isAbbreviation(word) || isInitial(word) { return false }
+            if isAbbreviation(word) || isInitial(word) || isListMarker(word) { return false }
         } else if character == "…" {
             if index > 0, index + 1 < chars.count, isDigit(chars[index - 1]), isDigit(chars[index + 1]) { return false }
         } else if character != "!" && character != "?" {
@@ -286,6 +286,11 @@ public enum SpeechClauseChunker {
     private static func isInitial(_ word: String) -> Bool {
         guard word.count == 1, let character = word.first, character.isUppercase, character != "I" else { return false }
         return true
+    }
+
+    /// "1." and "12." are list markers. A period after a bare number does not end the sentence.
+    private static func isListMarker(_ word: String) -> Bool {
+        !word.isEmpty && word.allSatisfy(isDigit)
     }
 
     private static func clauseBreak(in sentence: String) -> Int? {
@@ -338,8 +343,12 @@ public enum SpeechClauseChunker {
             if matched > 0 {
                 var end = index
                 while end < chars.count && !chars[end].isWhitespace { end += 1 }
+                // A period that closes the sentence sits after the URL, not inside it.
+                if end > index + matched, ".!?".contains(chars[end - 1]) {
+                    end -= 1
+                }
                 for cursor in index..<end { indices.insert(cursor) }
-                index = end
+                index = max(end, index + matched)
             } else {
                 index += 1
             }
@@ -385,8 +394,10 @@ public enum EqualPowerCrossfade {
     }
 
     public static func join(_ left: [Float], _ right: [Float], sampleRate: Double) -> [Float] {
-        let fade = fadeSamples(sampleRate: sampleRate)
-        guard fade > 1, left.count > fade, right.count > fade else { return left + right }
+        let requested = fadeSamples(sampleRate: sampleRate)
+        // A buffer shorter than 20 ms still crossfades over the overlap it has, so the splice does not click.
+        let fade = min(requested, left.count / 2, right.count / 2)
+        guard fade > 1 else { return left + right }
         var mixed = [Float]()
         mixed.reserveCapacity(fade)
         let tailStart = left.count - fade
