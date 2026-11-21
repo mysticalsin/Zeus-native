@@ -93,11 +93,18 @@ final class FaceCamera: NSObject, FaceFrameSource, @unchecked Sendable {
     /// The output does not keep its delegate alive, so this does.
     private var delegate: FrameDelegate?
     private var observers: [NSObjectProtocol] = []
+    private var boundDevice: AVCaptureDevice?
+    private var runs = CameraRun()
 
     func start(deliver: @escaping @Sendable (FaceFrame) -> Void, report: @escaping @Sendable (FaceCameraEvent) -> Void) {
         let run = gate.open(deliver: deliver)
+        _ = runs.start()
         queue.async { [self] in
-            guard gate.isCurrent(run), session == nil else { return }
+            guard gate.isCurrent(run) else { return }
+            if session != nil {
+                rebind(run: run, report: report)
+                return
+            }
             open(run: run, report: report)
         }
     }
@@ -134,7 +141,21 @@ final class FaceCamera: NSObject, FaceFrameSource, @unchecked Sendable {
         session.commitConfiguration()
         self.session = session
         self.delegate = delegate
+        self.boundDevice = device
+        installObservers(run: run, session: session, device: device, report: report)
+        session.startRunning()
+    }
 
+    /// A second start keeps the session and points interruption events at the new run.
+    private func rebind(run: Int, report: @escaping @Sendable (FaceCameraEvent) -> Void) {
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
+        observers = []
+        guard let session, let device = boundDevice else { return }
+        installObservers(run: run, session: session, device: device, report: report)
+    }
+
+    private func installObservers(run: Int, session: AVCaptureSession, device: AVCaptureDevice,
+                                  report: @escaping @Sendable (FaceCameraEvent) -> Void) {
         let center = NotificationCenter.default
         let pairs: [(Notification.Name, AnyObject?, FaceCameraEvent)] = [
             (AVCaptureSession.runtimeErrorNotification, session, .runtimeError),
@@ -148,7 +169,6 @@ final class FaceCamera: NSObject, FaceFrameSource, @unchecked Sendable {
                 if gate.isCurrent(run) { report(event) }
             }
         }
-        session.startRunning()
     }
 
     private func tearDown() {
@@ -156,6 +176,7 @@ final class FaceCamera: NSObject, FaceFrameSource, @unchecked Sendable {
         observers = []
         guard let session else { return }
         self.session = nil
+        boundDevice = nil
         delegate = nil
         session.stopRunning()
         session.beginConfiguration()

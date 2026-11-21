@@ -9,7 +9,6 @@ public struct CameraRun: Equatable, Sendable {
     public init() {}
 
     public mutating func start() -> Int {
-        if session { return bound }
         next += 1
         session = true
         bound = next
