@@ -100,7 +100,7 @@ def prepare(head, home, repo, usage, run, platform_name="Darwin", assemble=None)
     dest = desktop_app(home, head)
     refuse_if_installed(dest)
     for command in build_commands():
-        run(command)
+        run(command, cwd=repo)
     if assemble is not None:
         assemble(repo, dest)
     return blank_receipt(head, str(dest))
@@ -218,6 +218,16 @@ def _screenshot_problem(step_id, value, base_dir):
     return None
 
 
+def _log_problem(receipt):
+    """An empty log, or one torn off before its final newline, is not evidence."""
+    log = receipt.get("log")
+    if not isinstance(log, str) or not log.strip():
+        return "log is empty"
+    if not log.endswith("\n"):
+        return "log is truncated"
+    return None
+
+
 def _runtime_problem(receipt):
     """FAIL, a harness launch, or no captured pid or bundle path."""
     if receipt.get("verdict") == "FAIL":
@@ -304,6 +314,9 @@ def judge(receipt, base_dir):
     runtime = _runtime_problem(receipt)
     if runtime:
         reasons.append(runtime)
+    log_problem = _log_problem(receipt)
+    if log_problem:
+        reasons.append(log_problem)
     if reasons:
         return "fail", reasons
     return "pass", []

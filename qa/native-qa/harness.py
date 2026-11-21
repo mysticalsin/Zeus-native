@@ -35,8 +35,8 @@ refuse_if_installed = _validate.refuse_if_installed
 INSTALLED = "/Applications/Zeus.app"
 
 
-def _run(command):
-    subprocess.run(command, check=True)
+def _run(command, cwd=None):
+    subprocess.run(command, cwd=cwd, check=True)
 
 
 def real_assemble(repo, dest, bin_dir=None):
