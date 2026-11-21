@@ -281,6 +281,23 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  # Compile-only check with a stable name. The app job still builds, tests, and
+  # bundles; this job is the one branch protection can require on its own.
+  # It is not a required-checks prerequisite: that aggregate's evidence set is fixed.
+  macos-build:
+    name: macos-build
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Select Xcode 26.3
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+      - name: Build ZeusCore and the Zeus app
+        run: |
+          { xcodebuild -version && swift --version && swift build --product ZeusCore && swift build --product Zeus; }
+
   required-checks:
     name: required-checks
     if: always()
