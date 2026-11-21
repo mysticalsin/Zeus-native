@@ -40,7 +40,7 @@ import Testing
         let exported = SettingsKeyLedger.exportMap(stored: stored, contributions: SensorySectionSlot.keyContributions)
         #expect(exported[hold.id] == "2.5")
         #expect(exported[label.id] == "words")
-        let suite = "zeus.sensory.persist.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.sensory.persist.\(UUID().uuidString)"
         let first = try #require(UserDefaults(suiteName: suite))
         defer { first.removePersistentDomain(forName: suite) }
         for (id, value) in stored { first.set(value, forKey: "opt." + id) }

@@ -7,7 +7,7 @@ extension SensorySectionSlot: GlassSlotPage {
 
 /// Volume and brightness overlay, placed on the Topbar tab strip.
 struct SensorySettingsSection: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var reading = true
     @State private var snapshot = SensoryHUDSnapshot.hidden
     @State private var now = Date()
