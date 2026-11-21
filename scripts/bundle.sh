@@ -42,7 +42,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :ZeusBuildStamp string $(date +%Y%m%d%H%M%S)-$$" "$APP/Contents/Info.plist" >/dev/null
 cp Resources/AppIcon.icns Resources/Logo.png Resources/Logo.pdf Resources/MenuBarTemplate.png Resources/MenuBarTemplate@2x.png \
-  Resources/NOTICES.txt \
+  Resources/NOTICES.txt Resources/PrivacyInfo.xcprivacy \
   "$APP/Contents/Resources/"
 cp "$BIN/Zeus" "$APP/Contents/MacOS/Zeus"
 cp "$BIN/zeus-hook" "$BIN/zeus-bridge" "$APP/Contents/Helpers/"

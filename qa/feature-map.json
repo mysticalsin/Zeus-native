@@ -3298,6 +3298,14 @@
               "function": "cardPlacementAvoidsReservedMenuBarAndDockBands"
             },
             {
+              "file": "Tests/ZeusCoreTests/DockClearanceTests.swift",
+              "function": "onePointOfFrameSlopIsNotADockAndTwoPointsIs"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DockClearanceTests.swift",
+              "function": "screenGeometryUsesTheVisibleFrameAndTheDockBands"
+            },
+            {
               "file": "Tests/ZeusCoreTests/ExplanationCardPlacementTests.swift",
               "function": "cardPlacementShiftsAwayFromAScreenEdge"
             },
@@ -8490,6 +8498,10 @@
             {
               "file": "qa/release-scripts/test_release_scripts.py",
               "function": "test_failed_backup_does_not_replace_installed_copy"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_disk_space_apis_require_the_privacy_manifest_category"
             }
           ],
           "id": "S06.1"

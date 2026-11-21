@@ -295,14 +295,8 @@ final class ExplanationDesktopCard {
             ?? pointer.flatMap { point in screens.first { $0.frame.contains(point) } } ?? NSScreen.main
         guard let screen else { return nil }
         let full = screen.frame, visible = screen.visibleFrame
-        var reserved = [ExplanationRect(x: full.minX, y: full.maxY - 40, width: full.width, height: 40)] // menu bar
-        if let defaults = UserDefaults(suiteName: "com.apple.dock"), defaults.bool(forKey: "autohide") {
-            switch defaults.string(forKey: "orientation") ?? "bottom" {
-            case "left": reserved.append(ExplanationRect(x: full.minX, y: full.minY, width: 96, height: full.height))
-            case "right": reserved.append(ExplanationRect(x: full.maxX - 96, y: full.minY, width: 96, height: full.height))
-            default: reserved.append(ExplanationRect(x: full.minX, y: full.minY, width: full.width, height: 96))
-            }
-        }
-        return (ExplanationRect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height), reserved)
+        return DockClearance.geometry(
+            frame: DockClearanceRect(x: full.minX, y: full.minY, width: full.width, height: full.height),
+            visible: DockClearanceRect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height))
     }
 }

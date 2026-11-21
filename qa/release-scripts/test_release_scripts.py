@@ -6,6 +6,7 @@ Run: python3 qa/release-scripts/test_release_scripts.py
 import json
 import os
 from pathlib import Path
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -107,7 +108,7 @@ class ReleaseScripts(unittest.TestCase):
         # Only substitute the macOS-only absolute PlistBuddy path; all shell control flow is original.
         bundle = self.root / "scripts/bundle.sh"
         bundle.write_text(bundle.read_text().replace("/usr/libexec/PlistBuddy", "plistbuddy"))
-        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements"):
+        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements", "PrivacyInfo.xcprivacy"):
             (self.root / "Resources" / name).write_text("fixture")
         for name in ("dist", "icons", "node_modules"):
             (self.root / "extension" / name).mkdir(parents=True)
@@ -247,6 +248,74 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         deletes = [c[2] for c in self.commands() if c[:2] == ["defaults", "delete"]]
         self.assertEqual(deletes, ["zeus.tests.example.12345678-ABCD-1234-ABCD-123456789ABC", "zeus.tests.onboarding.Skip"])
+
+    def test_disk_space_apis_require_the_privacy_manifest_category(self):
+        """Sources that call a disk-space API need NSPrivacyAccessedAPICategoryDiskSpace.
+
+        The only call is FileManager.attributesOfFileSystem systemFreeSize, read to decide
+        whether a Fling can be written. That is reason E174.1. The byte count is not shown,
+        so 85F4.1 is not a reason for this call. A family that Sources actually call must be
+        declared. File timestamps of the app's own logs are C617.1. User defaults are CA92.1.
+        """
+        hits = required_reason_hits(REPO / "Sources")
+        self.assertTrue(hits["NSPrivacyAccessedAPICategoryDiskSpace"], "disk-space grep found nothing")
+        self.assertIn("systemFreeSize", "\n".join(hits["NSPrivacyAccessedAPICategoryDiskSpace"]))
+        manifest = REPO / "Resources" / "PrivacyInfo.xcprivacy"
+        self.assertTrue(manifest.is_file(), "disk-space APIs require Resources/PrivacyInfo.xcprivacy")
+        declared = privacy_reasons(manifest)
+        for family, found in hits.items():
+            if found:
+                self.assertIn(family, declared, f"{family} is used and must be declared")
+            else:
+                self.assertNotIn(family, declared, f"{family} is unused and must not be declared")
+        self.assertEqual(declared["NSPrivacyAccessedAPICategoryDiskSpace"], {"E174.1"})
+        self.assertEqual(declared["NSPrivacyAccessedAPICategoryFileTimestamp"], {"C617.1", "3B52.1"})
+        self.assertEqual(declared["NSPrivacyAccessedAPICategorySystemBootTime"], {"35F9.1"})
+        self.assertEqual(declared["NSPrivacyAccessedAPICategoryUserDefaults"], {"CA92.1"})
+        self.bundle_fixture()
+        (self.root / "Resources" / "PrivacyInfo.xcprivacy").write_text(manifest.read_text())
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        shipped = self.root / "build/Zeus.app/Contents/Resources/PrivacyInfo.xcprivacy"
+        self.assertTrue(shipped.is_file(), "bundle.sh must put the privacy manifest in the app")
+        self.assertEqual(privacy_reasons(shipped).get("NSPrivacyAccessedAPICategoryDiskSpace"), {"E174.1"})
+
+
+def required_reason_hits(sources):
+    """Grep Sources for the required-reason API families Apple lists."""
+    families = {
+        "NSPrivacyAccessedAPICategoryDiskSpace": (
+            "systemFreeSize", "systemSize", "NSFileSystemFreeSize", "NSFileSystemSize",
+            "volumeAvailableCapacity", "volumeTotalCapacity", "statfs(", "statvfs(",
+            "fstatfs(", "fstatvfs(", "getattrlist(", "fgetattrlist(", "getattrlistat(",
+        ),
+        "NSPrivacyAccessedAPICategoryFileTimestamp": (
+            ".modificationDate", ".creationDate", "contentModificationDateKey",
+            "NSFileModificationDate", "NSFileCreationDate", "NSURLContentModificationDateKey",
+            "NSURLCreationDateKey", "fstat(", "lstat(", "getattrlist(", "fgetattrlist(",
+            "getattrlistat(",
+        ),
+        "NSPrivacyAccessedAPICategorySystemBootTime": (
+            "systemUptime", "mach_absolute_time", "mach_continuous_time", "kern.boottime",
+        ),
+        "NSPrivacyAccessedAPICategoryUserDefaults": ("UserDefaults",),
+        "NSPrivacyAccessedAPICategoryActiveKeyboards": ("activeInputModes", "GCKeyboard"),
+    }
+    hits = {family: [] for family in families}
+    for path in sorted(sources.rglob("*.swift")):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for family, needles in families.items():
+                if any(needle in line for needle in needles):
+                    hits[family].append(f"{path}:{number}:{line.strip()}")
+    return hits
+
+
+def privacy_reasons(path):
+    data = plistlib.loads(Path(path).read_bytes())
+    declared = {}
+    for entry in data.get("NSPrivacyAccessedAPITypes", []):
+        declared[entry["NSPrivacyAccessedAPIType"]] = set(entry["NSPrivacyAccessedAPITypeReasons"])
+    return declared
 
 
 if __name__ == "__main__":
