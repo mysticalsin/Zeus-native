@@ -104,6 +104,8 @@ final class NotchModel {
     var picker: AgentPicker?
     /// Incoming alerts from other apps: the glass capsule under the notch (see `AlertStack`).
     var alerts = AlertStack()
+    /// Scaled peek title, 12 at the standard size. The hit test reads it so the taller peek still takes the mouse.
+    var peekTitlePoints: CGFloat = 12
     /// The front alert, as the line the open action understands.
     var notificationLine: NotificationLine? {
         alerts.visible.first.map { NotificationLine(id: Int64($0.id) ?? 0, app: $0.appID, title: $0.title, detail: $0.body) }

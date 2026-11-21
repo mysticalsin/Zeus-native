@@ -90,6 +90,7 @@ struct NotchView: View {
     /// What the notch's accessibility action does: open the panel. The closed notch is click-through and opens on
     /// the pointer, which a VoiceOver or Switch Control user does not have. Nil (previews, snapshots) does nothing.
     var openPanel: (() -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// The layers the body draws now: Transparent drops fill, outline and glow of the closed island only.
     private var layers: NotchBodyLayers {
@@ -121,7 +122,16 @@ struct NotchView: View {
     /// The hardware size (width 0 for the pill).
     private var notch: CGSize { footprint.layoutSize }
     private var slimPill: Bool { footprint.isPill }
-    private var barHeight: CGFloat { max(notch.height, 30) }
+    private var scaledTitle: CGFloat { NotchDynamicType.points(12, dynamicTypeSize: dynamicTypeSize) }
+
+    /// Closed and open keep the 30 pt floor. A peek grows with the scaled title.
+    private var barHeight: CGFloat {
+        CGFloat(NotchPeekFit.barHeight(
+            notchHeight: Double(notch.height),
+            scaledFont: Double(scaledTitle),
+            peeking: model.presentation == .peek
+        ))
+    }
     /// The closed body is taller than the bar on a hardware notch (it hangs below the notch). The peek, the open
     /// panel and the tab row keep `barHeight`.
     private var closedBodyHeight: CGFloat { NotchFootprintRules.closedHeight(footprint, wings: closedWings) }
@@ -191,9 +201,10 @@ struct NotchView: View {
     }
 
     /// The peek card as drawn (the peek always has the 8 pt shoulders). The window's click-through rule reads it too.
-    static func peekSize(model: NotchModel, footprint: NotchFootprint) -> CGSize {
+    static func peekSize(model: NotchModel, footprint: NotchFootprint, scaledFont: CGFloat = 12) -> CGSize {
         let notch = footprint.layoutSize
-        let barHeight = max(notch.height, 30)
+        let barHeight = CGFloat(NotchPeekFit.barHeight(
+            notchHeight: Double(notch.height), scaledFont: Double(scaledFont), peeking: true))
         let shoulder: CGFloat = 8
         if let approval = model.approval {
             let wide = (approval.detail?.height ?? 0) > 0
@@ -267,14 +278,15 @@ struct NotchView: View {
             if hasNotch { return CGSize(width: notch.width + 2 * shoulder, height: closedBodyHeight) }
             return footprint.idleSize
         case .peek:
-            return Self.peekSize(model: model, footprint: footprint)
+            return Self.peekSize(model: model, footprint: footprint, scaledFont: scaledTitle)
         case .panel:
+            let panelBar = CGFloat(NotchPeekFit.barHeight(notchHeight: Double(notch.height), scaledFont: 12, peeking: false))
             if let topBar {
-                return Self.topBarPanelSize(barHeight: barHeight, hasApproval: model.approval != nil, extra: model.approval?.extraHeight ?? 0,
+                return Self.topBarPanelSize(barHeight: panelBar, hasApproval: model.approval != nil, extra: model.approval?.extraHeight ?? 0,
                                             home: topBar.selectedTab == .home, homeStrip: topBar.homeExtraHeight)
             }
             let rows = CGFloat(max(model.sessions.count, 1))
-            return CGSize(width: 540, height: barHeight + 20 + rows * 62 + (model.approval != nil ? 110 : 0) + 14)
+            return CGSize(width: 540, height: panelBar + 20 + rows * 62 + (model.approval != nil ? 110 : 0) + 14)
         }
     }
 
@@ -398,6 +410,9 @@ struct NotchView: View {
         .frame(width: size.width, height: size.height)
         // One labelled element for the whole notch (its children stay reachable), so a closed notch that draws only
         // marks still has a name and something to press.
+        .onChange(of: dynamicTypeSize, initial: true) { _, size in
+            model.peekTitlePoints = NotchDynamicType.points(12, dynamicTypeSize: size)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Zeus")
         .accessibilityAction { openPanel?() }
@@ -504,18 +519,20 @@ struct NotchView: View {
                     .frame(width: 11, height: 13)
                     .shadow(color: status.color.opacity(0.9), radius: 4)
                 Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: scaledTitle, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cloudPrimary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Color.clear.frame(width: hasNotch ? notch.width + 8 : 12, height: 1)
             HStack(spacing: 7) {
                 if !peekStatusText.isEmpty {
                     Text(peekStatusText)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.system(size: scaledTitle, weight: .semibold, design: .rounded))
                         .foregroundStyle(status.color)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 if let session = model.peekSession, model.approval == nil, session.status == .working {
                     ElapsedText(since: session.startedAt)

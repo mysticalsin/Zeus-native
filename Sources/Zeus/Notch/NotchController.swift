@@ -577,7 +577,7 @@ final class NotchController {
     /// Whether a peek card takes the mouse at `pointer`: only over the card and a little slack around it.
     static func peekTakesMouse(model: NotchModel, footprint: NotchFootprint, pointer: CGPoint, screenFrame: CGRect,
                                topOffset: CGFloat) -> Bool {
-        NotchPeekHitRules.takesMouse(pointer, size: NotchView.peekSize(model: model, footprint: footprint),
+        NotchPeekHitRules.takesMouse(pointer, size: NotchView.peekSize(model: model, footprint: footprint, scaledFont: model.peekTitlePoints),
                                      screenFrame: screenFrame, topOffset: topOffset)
     }
 
