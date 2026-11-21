@@ -29,7 +29,7 @@
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>ZEUS listens to the sound your Mac is playing to draw the live audio bars in the notch, to make live captions and meeting transcripts, and, if you choose, to include it in screen recordings (Recordly), and, if you turn on per-app sound, to adjust the sound of the apps you choose. That sound is changed as it plays and never saved. Recordings and transcripts are saved only when you record, and stay on this Mac unless you choose a cloud engine.</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>ZEUS captures the screen when you talk with screen consent on, when desktop pointing places a mark, when you record, and for live captions of the sound this Mac is playing. Screenshots go to the assistant engine you chose and are not kept as files. A screen recording is saved on this Mac and stays after you stop.</string>
+	<string>ZEUS captures the screen when you talk with screen consent on, when desktop pointing places a mark, when you record, and for live captions of the sound this Mac is playing. Screenshots go to the assistant engine you chose and are not kept as files. A screenshot stays in that session until the session is replaced. A screen recording is saved on this Mac and stays after you stop.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>ZEUS uses the camera while you read from the teleprompter, only when you press Record, and for Face presence, only after you turn it on, to lock your Mac when you step away. No image is saved.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
