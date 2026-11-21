@@ -51,13 +51,13 @@ public enum ScribeMeetingCardMetrics {
     /// The longest fixed detail wording that fits beside the widest action capsule ("Try again", or "Join" with its
     /// menu) at the detail size. `ScribeMeetingCardFitTests` measures the real card.
     public static let detailMaxCharacters = 15
-    /// The glass slab.
-    public static let width: CGFloat = 340
-    public static let height: CGFloat = 96
+    /// The glass slab. One row, the same height as the compact meeting alert.
+    public static let width: CGFloat = 420
+    public static let height: CGFloat = 44
     public static let cornerRadius: CGFloat = 22
     public static let rim: CGFloat = 1.25
     /// Padding inside the slab.
-    public static let padding: CGFloat = 12
+    public static let padding: CGFloat = 6
     /// Room the window adds on every side so the shadow is not cut off.
     public static let shadowRoom: CGFloat = 16
     /// The slab's soft shadow.
@@ -66,42 +66,42 @@ public enum ScribeMeetingCardMetrics {
     /// The slab's distance from the top and right edges of the visible frame.
     public static let margin: CGFloat = 24
 
-    /// The left column: the orb with its ring, then the app tiles. A narrow fixed column, no split and no divider.
-    public static let leftColumnWidth: CGFloat = 64
-    public static let orb: CGFloat = 40
-    public static let orbSymbolSize: CGFloat = 18
-    public static let ringInset: CGFloat = 4
+    /// The symbol at the leading edge. The app tiles sit in the row, not under the symbol.
+    public static let leftColumnWidth: CGFloat = 22
+    public static let orb: CGFloat = 16
+    public static let orbSymbolSize: CGFloat = 10
+    public static let ringInset: CGFloat = 3
     public static var ringDiameter: CGFloat { orb + 2 * ringInset }
     public static let ringWidth: CGFloat = 2
-    public static let tile: CGFloat = 16
-    public static let tileSpacing: CGFloat = 4
-    public static let tileSymbolSize: CGFloat = 9
+    public static let tile: CGFloat = 14
+    public static let tileSpacing: CGFloat = 2
+    public static let tileSymbolSize: CGFloat = 8
     /// The tile row's cap. The Join menu has its own, `ScribeJoinApps.maxApps`.
     public static let maxApps = 3
-    /// The gap between the ring and the tile row.
-    public static let orbTileGap: CGFloat = 6
-    public static var orbGroupHeight: CGFloat { ringDiameter + orbTileGap + tile }
+    /// Tiles sit in the row, so the symbol's group is only the ring.
+    public static let orbTileGap: CGFloat = 0
+    public static var orbGroupHeight: CGFloat { ringDiameter }
 
     /// The right column, three rows: the title (with the close button), the status, and the bottom row that holds
     /// the third line and the action capsule.
-    public static let titleSize: CGFloat = 15
-    public static let titleRowHeight: CGFloat = 20
-    public static let closeSize: CGFloat = 20
-    public static let closeSymbolSize: CGFloat = 9
+    public static let titleSize: CGFloat = 12
+    public static let titleRowHeight: CGFloat = 16
+    public static let closeSize: CGFloat = 16
+    public static let closeSymbolSize: CGFloat = 8
     public static let pillTextSize: CGFloat = 10
-    public static let pillHeight: CGFloat = 16
-    public static let timeSize: CGFloat = 12
-    public static let statusRowHeight: CGFloat = 16
+    public static let pillHeight: CGFloat = 14
+    public static let timeSize: CGFloat = 11
+    public static let statusRowHeight: CGFloat = 14
     public static let detailSize: CGFloat = 11
-    public static let capsuleHeight: CGFloat = 26
-    public static let capsuleLabelSize: CGFloat = 12
-    public static let capsuleSymbolSize: CGFloat = 11
-    /// The gaps between the rows. The second is a minimum: the bottom row sits at the bottom of the slab.
-    public static let titleGap: CGFloat = 3
-    public static let bottomGap: CGFloat = 4
-    /// The three rows and their gaps, which must fit inside the padding.
+    public static let capsuleHeight: CGFloat = 22
+    public static let capsuleLabelSize: CGFloat = 11
+    public static let capsuleSymbolSize: CGFloat = 10
+    /// The gap between the title and the status inside the text stack.
+    public static let titleGap: CGFloat = 0
+    public static let bottomGap: CGFloat = 0
+    /// The title and the status, stacked. The action sits beside them, so it is not added here.
     public static var contentHeight: CGFloat {
-        titleRowHeight + titleGap + statusRowHeight + bottomGap + capsuleHeight
+        titleRowHeight + titleGap + statusRowHeight
     }
 
     /// The window around the slab.

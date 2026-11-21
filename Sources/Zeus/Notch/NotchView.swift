@@ -449,7 +449,7 @@ struct NotchView: View {
             VStack(spacing: 10) {
                 peekBar
                 if let approval = model.approval {
-                    ApprovalBody(approval: approval, compact: true)
+                    ApprovalBody(approval: approval, compact: true, macLocked: model.macLocked, screenShared: model.screenShared)
                         .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.12)))
                 } else if let completion = model.completion {
                     CompletionCardView(completion: completion) { model.completion = nil }
@@ -616,6 +616,10 @@ private struct ElapsedText: View {
 private struct ApprovalBody: View {
     let approval: NotchModel.Approval
     let compact: Bool
+    var macLocked = false
+    var screenShared = false
+    @State private var expanded = false
+    @State private var allowStep: ApprovalAllowStep = .idle
 
     private var cardKind: AgentCardKind {
         if case .questions? = approval.detail?.kind { return .question }
@@ -624,111 +628,184 @@ private struct ApprovalBody: View {
 
     /// Shared card grammar: avatar (in the peek), agent and project, the tool, danger flag, status chip.
     private var header: some View {
-        let hidden = MeetingState.hideDetails
         return HStack(spacing: 6) {
             if compact {
                 // The peek bar above already names the agent and says "Needs you"; the card shows each once.
                 BotAvatarView.forAgent(approval.agent, state: cardKind.avatarState, size: 22)
                     .accessibilityLabel(approval.agent)
             }
-            if !hidden {
-                Text(approval.project)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(compact ? Theme.cloudQuiet : Theme.cloudSecondary)
-                    .lineLimit(1)
-                Text("·").foregroundStyle(Theme.cloudQuiet)
-            }
-            Text(approval.tool.uppercased())
-                .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                .foregroundStyle(Theme.cloudSecondary)
+            Text(card.header)
+                .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                .foregroundStyle(compact ? Theme.cloudQuiet : Theme.cloudSecondary)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            if approval.risk == .high {
-                Label("DANGER", systemImage: "exclamationmark.triangle.fill")
-                    .labelStyle(.titleAndIcon)
+            if card.highRisk {
+                Text("High risk")
                     .font(.system(size: 9, weight: .heavy, design: .rounded))
-                    .padding(.horizontal, 6).padding(.vertical, 2)
                     .foregroundStyle(Theme.danger)
-                    .background(Theme.danger.opacity(0.15), in: Capsule())
             }
-            if !compact { AgentStatusChip(kind: cardKind) }
         }
         .frame(minHeight: compact ? 22 : 18)
         .accessibilityElement(children: .combine)
     }
 
+    private var card: ApprovalCard.Model {
+        ApprovalCard.make(ApprovalCard.Input(
+            tool: approval.tool, command: approval.command, file: approval.changedFile, added: approval.addedLines, removed: approval.removedLines, host: approval.fetchHost,
+            why: approval.why, sessionTitle: approval.sessionTitle, agent: approval.agent, project: approval.project,
+            risk: approval.risk, reasons: approval.reasons, queueIndex: approval.queueIndex, queueCount: max(approval.queueCount, 1),
+            modifiersHeld: approval.modifiersHeld, expanded: expanded || approval.expandedCommand, holdElapsed: approval.holdElapsed,
+            reduceMotion: Motion.reduced, phase: approval.phase))
+    }
+
+    private func guarded(_ work: @escaping () -> Void) {
+        guard ApprovalCard.inputOpen(now: Date(), appearedAt: approval.appearedAt) else { return }
+        work()
+    }
+
     var body: some View {
+        let facts = card
         VStack(alignment: .leading, spacing: 8) {
             header
-            if MeetingState.hideDetails, approval.detail?.hasOwnActions == true {
-                // The rich detail (questions, plans) is the content itself, so it stays out of view; Deny remains.
-                HStack(spacing: 8) {
-                    Text("Details hidden (Settings > Privacy). Answer in the terminal.")
+            Text(facts.headline)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(Theme.cloudPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !facts.position.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(0..<max(approval.queueCount, 1), id: \.self) { index in
+                        Circle().fill(index == approval.queueIndex ? Theme.cloudPrimary : Theme.cloudQuiet)
+                            .frame(width: 5, height: 5)
+                    }
+                    Text(facts.position)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.cloudSecondary)
+                }
+                .accessibilityLabel(ApprovalCard.announcement(risk: approval.risk, position: facts.position, outcome: facts.phase == .asking ? nil : ApprovalCard.timeout(risk: approval.risk)))
+            }
+            if let reason = ApprovalCard.hiddenReason(locked: macLocked, screenShared: screenShared) {
+                Text(reason)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                if let detail = approval.detail {
+                    ApprovalDetailView(detail: detail, agent: approval.agent, resolve: { verdict in
+                        if verdict == .deny { approval.deny() } else if verdict != .allow { approval.resolve(verdict) }
+                    }, beginHold: { approval.beginHold() }, endHold: {
+                        if case .hold = approval.allowGate.gesture { approval.endHold() } else { approval.activateAllow() }
+                    }, plainAllow: { approval.activateAllow() })
+                }
+                if let file = approval.changedFile, !file.isEmpty {
+                    Text(file)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.cloudSecondary)
+                        .lineLimit(1)
+                }
+                Text(CommandDisplay.plain(facts.command))
+                    .textSelection(.enabled)
+                    .accessibilityLabel(approval.command)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit((expanded || approval.expandedCommand) ? nil : ApprovalCard.collapsedLines)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            if ApprovalCard.showsCommand(locked: macLocked, screenShared: screenShared) {
+                if let why = facts.why {
+                    Text(why)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.cloudSecondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
-                        .accessibilityHint("Stops \(approval.agent) from running this.")
+                        .lineLimit(1)
                 }
-            } else if let detail = approval.detail, !MeetingState.hideDetails {
-                // Never built while details are hidden: a diff's file name and source text are the content too.
-                ApprovalDetailView(detail: detail, agent: approval.agent, resolve: approval.resolve)
-            }
-            if approval.detail?.hasOwnActions != true {
-                let preview = NotchModel.Approval.isChangePreview(approval.command) && !MeetingState.hideDetails
-                if preview {
-                    Text(CommandDisplay.plain(approval.command))
-                        .accessibilityLabel(approval.command)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Theme.cloudPrimary)
-                        .lineLimit(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10).padding(.vertical, 7)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                HStack(spacing: 8) {
-                    if !preview {
-                        Text(MeetingState.hideDetails ? "Details hidden (Settings > Privacy)" : CommandDisplay.plain(approval.command))
-                            .accessibilityLabel(MeetingState.hideDetails ? "Details hidden" : approval.command)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Theme.cloudPrimary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    }
-                    // Neither button is the default: approving shouldn't be one reflexive keypress.
-                    NotchButton(title: "Deny", tint: Theme.cloudSecondary, filled: false) { approval.resolve(.deny) }
-                        .accessibilityHint("Stops \(approval.agent) from running this.")
-                    NotchButton(title: "Approve", tint: Theme.ember, filled: true) { approval.resolve(.allow) }
-                        .accessibilityHint("Lets \(approval.agent) run this once.")
-                }
-            }
-            HStack(spacing: 6) {
-                if let deadline = approval.deadline {
-                    TickingView(interval: 1) { context in
-                        let left = max(Int(deadline.timeIntervalSince(context.date).rounded(.up)), 0)
-                        Text("\(left) s left, \(approval.timeoutNote)")
-                            .monospacedDigit()
+                if facts.highRisk {
+                    ForEach(facts.reasons, id: \.self) { reason in
+                        Text(reason)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(Theme.danger)
+                            .lineLimit(2)
                     }
                 }
-                Spacer(minLength: 8)
-                if let trust = approval.trustChat, approval.detail?.hasOwnActions != true {
-                    Button(action: trust) {
-                        Text("Allow this whole chat")
-                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Theme.cloudSecondary)
-                            .underline()
+                if facts.canExpand {
+                    Button(expanded || approval.expandedCommand ? "Show less" : "Show the rest") {
+                        expanded.toggle()
                     }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityHint("Approves this and later requests from \(approval.agent) in this chat, except risky commands, until Zeus quits.")
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
                 }
             }
-            .font(.system(size: 10.5, design: .rounded))
-            .foregroundStyle(Theme.cloudQuiet)
+            if let deadline = approval.deadline {
+                TickingView(interval: 1) { context in
+                    let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
+                    Text("\(left) s left, \(approval.timeoutNote)")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.cloudSecondary)
+                }
+            }
+            let buttons = ApprovalCard.buttons(risk: approval.risk, detailsHidden: !ApprovalCard.showsCommand(locked: macLocked, screenShared: screenShared), detailHasOwnActions: approval.detail?.hasOwnActions == true)
+            HStack(spacing: 8) {
+                NotchButton(title: buttons.deny, tint: Theme.cloudSecondary, filled: false) {
+                    guarded { approval.deny() }
+                }
+                .accessibilityLabel(buttons.deny)
+                ApprovalAllowButton(title: buttons.allow, tint: Theme.ember, fraction: buttons.allowHolds ? max(facts.holdFraction, approval.allowGate.holdFraction(now: Date())) : 1) {
+                    guarded { approval.beginHold() }
+                } release: {
+                    if buttons.allowHolds { approval.endHold() }
+                    else { guarded { approval.activateAllow() } }
+                } accessibility: {
+                    guarded { approval.activateAllow() }
+                }
+                .accessibilityLabel(buttons.allowHolds ? "Allow. Press and hold." : buttons.allow)
+                .accessibilityHint(buttons.allowHolds ? "Hold the button until it fills." : "Lets \(approval.agent) run this once.")
+            }
+            if let trust = approval.trustChat, facts.allowChat, approval.detail?.hasOwnActions != true {
+                Button(action: { guarded { trust() } }) {
+                    Text(facts.keycaps ? (ApprovalCard.keycap(.allowChat, risk: approval.risk, modifiersHeld: true) ?? "") : "")
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Theme.cloudSecondary)
+                        .frame(minWidth: 28, minHeight: 18)
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityLabel("Allow this chat")
+            }
+            if facts.showsNextEdge {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 8)
+                    .padding(.horizontal, 12)
+                    .accessibilityHidden(true)
+            }
         }
+    }
+}
+
+/// Pointer presses begin and end a hold. A click, a key, or VoiceOver uses the plain activation,
+/// which cannot finish a high-risk hold.
+struct ApprovalAllowButton: View {
+    let title: String
+    let tint: Color
+    let fraction: Double
+    let press: () -> Void
+    let release: () -> Void
+    let accessibility: () -> Void
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.storm)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 28)
+            .background(Capsule().fill(tint.opacity(0.35 + 0.65 * fraction)))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(title)
+            .accessibilityAction { accessibility() }
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in press() }
+                .onEnded { _ in release() })
     }
 }
 
@@ -736,6 +813,7 @@ private struct NotchButton: View {
     let title: String
     let tint: Color
     let filled: Bool
+    var progress: Double = 0
     let action: () -> Void
 
     var body: some View {
@@ -746,7 +824,7 @@ private struct NotchButton: View {
                 .padding(.horizontal, 14)
                 .frame(minHeight: 28)
                 .background(
-                    Capsule().fill(filled ? tint : Color.white.opacity(0.12))
+                    Capsule().fill(filled ? tint.opacity(0.35 + 0.65 * progress) : Color.white.opacity(0.12))
                 )
                 .shadow(color: filled ? tint.opacity(0.6) : .clear, radius: 6)
                 .contentShape(Capsule())
@@ -780,10 +858,10 @@ private struct PanelBody: View {
             .frame(height: barHeight)
 
             if let approval = model.approval {
-                ApprovalBody(approval: approval, compact: false)
+                ApprovalBody(approval: approval, compact: false, macLocked: model.macLocked, screenShared: model.screenShared)
                     .padding(12)
                     .background(Theme.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder(Theme.ember.opacity(0.35)))
+                    .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder((approval.risk == .high ? Theme.danger : Theme.ember).opacity(0.55), lineWidth: approval.risk == .high ? 2 : 1))
             }
 
             ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
@@ -816,10 +894,10 @@ private struct TopBarPanelBody: View {
                 Color.clear.frame(height: GlanceTopBar.cardTop - GlanceTopBar.tabRowTop - GlanceTopBar.tabRowHeight)
                 VStack(alignment: .leading, spacing: 8) {
                     if let approval = model.approval {
-                        ApprovalBody(approval: approval, compact: false)
+                        ApprovalBody(approval: approval, compact: false, macLocked: model.macLocked, screenShared: model.screenShared)
                             .padding(12)
                             .background(Theme.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder(Theme.ember.opacity(0.35)))
+                            .overlay(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous).strokeBorder((approval.risk == .high ? Theme.danger : Theme.ember).opacity(0.55), lineWidth: approval.risk == .high ? 2 : 1))
                     }
                     TopBarPage(topBar: topBar, agentSummary: summary, agents: AnyView(agents))
                 }

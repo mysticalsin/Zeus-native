@@ -23,48 +23,53 @@ private func bareCall() -> ScribeMeeting {
 struct ScribeMeetingCardDesignTests {
     // MARK: Metrics
 
+    /// Tony, 19 Nov 2026: the live card is the compact row, 44 pt tall.
+    @Test func theLiveCardIsTheCompactRow() {
+        #expect(ScribeMeetingCardMetrics.height == MeetingAlert.height)
+        #expect(ScribeMeetingCardMetrics.height == 44)
+        #expect(ScribeMeetingCardMetrics.width == MeetingAlert.width)
+    }
+
     @Test func theSlabIsACompactGlassCardOfThreeHundredAndFortyByNinetySix() {
         typealias M = ScribeMeetingCardMetrics
-        #expect(M.width == 340)
-        #expect((90...100).contains(M.height))
-        #expect(M.height == 96)
+        #expect(M.width == 420)
+        #expect(M.height == 44)
         #expect(M.cornerRadius == 22)
-        #expect(M.padding == 12)
-        #expect(M.orb == 40)
-        #expect(M.ringDiameter == 48)
+        #expect(M.padding == 6)
+        #expect(M.orb == 16)
+        #expect(M.ringDiameter == 22)
         #expect(M.ringWidth == 2)
-        #expect(M.orbSymbolSize == 18)
-        #expect(M.tile == 16)
+        #expect(M.orbSymbolSize == 10)
+        #expect(M.tile == 14)
         #expect(M.maxApps == 3)
         #expect((1...1.5).contains(M.rim))
-        #expect(M.titleSize == 15)
+        #expect(M.titleSize == 12)
         #expect(M.pillTextSize == 10)
-        #expect(M.pillHeight == 16)
-        #expect(M.timeSize == 12)
+        #expect(M.pillHeight == 14)
+        #expect(M.timeSize == 11)
         #expect(M.detailSize == 11)
-        #expect(M.capsuleHeight == 26)
-        #expect(M.capsuleLabelSize == 12)
-        #expect(M.closeSize == 20)
+        #expect(M.capsuleHeight == 22)
+        #expect(M.capsuleLabelSize == 11)
+        #expect(M.closeSize == 16)
         #expect(M.shadowRadius == 12)
         #expect(M.shadowY == 6)
     }
 
     @Test func theOrbColumnIsANarrowSixtyFourAndHoldsTheOrbTheRingAndThreeTiles() {
         typealias M = ScribeMeetingCardMetrics
-        #expect(M.leftColumnWidth == 64)
+        #expect(M.leftColumnWidth == M.ringDiameter)
         #expect(M.orb + 2 * M.ringInset <= M.leftColumnWidth)
-        let row = CGFloat(M.maxApps) * M.tile + CGFloat(M.maxApps - 1) * M.tileSpacing
-        #expect(row <= M.leftColumnWidth)
+        #expect(M.ringDiameter <= M.height - 2 * M.padding)
     }
 
     @Test func theWindowAddsTheShadowRoomOnEverySideAndTheOrbSitsInTheLeftColumn() {
         typealias M = ScribeMeetingCardMetrics
         #expect(M.shadowRoom == 16)
         #expect(M.windowSize == CGSize(width: M.width + 2 * M.shadowRoom, height: M.height + 2 * M.shadowRoom))
-        #expect(M.windowSize == CGSize(width: 372, height: 128))
+        #expect(M.windowSize == CGSize(width: 452, height: 76))
         let center = M.orbCenter
         #expect(center.x == M.padding + M.leftColumnWidth / 2)
-        #expect(center.y > M.orb / 2 && center.y < M.height / 2)
+        #expect(abs(center.y - M.height / 2) < 0.5)
         #expect(center.y - M.ringDiameter / 2 >= M.padding)
     }
 
@@ -78,10 +83,11 @@ struct ScribeMeetingCardDesignTests {
         #expect(M.statusRowHeight >= M.timeSize * 1.25, "the time text fits the status row")
         #expect(M.capsuleHeight >= M.detailSize * 1.25, "the third line fits beside the capsule")
         #expect(M.capsuleHeight >= M.capsuleLabelSize * 1.25)
-        #expect(M.contentHeight == M.titleRowHeight + M.titleGap + M.statusRowHeight + M.bottomGap + M.capsuleHeight)
-        #expect(M.contentHeight <= inner, "title, status and capsule rows fit the \(inner) pt inside the padding")
-        #expect(M.orbGroupHeight <= inner, "the ring and the tiles fit the same height")
-        #expect(M.orbGroupHeight == M.ringDiameter + M.orbTileGap + M.tile)
+        #expect(M.contentHeight == M.titleRowHeight + M.titleGap + M.statusRowHeight)
+        #expect(M.contentHeight <= inner, "title and status fit the \(inner) pt inside the padding")
+        #expect(M.capsuleHeight <= inner, "the action sits beside the text and fits the row")
+        #expect(M.orbGroupHeight <= inner, "the ring fits the same height")
+        #expect(M.orbGroupHeight == M.ringDiameter)
         let textWidth = M.width - 2 * M.padding - M.leftColumnWidth
         #expect(textWidth >= 240, "the text column keeps room for the status row")
     }
