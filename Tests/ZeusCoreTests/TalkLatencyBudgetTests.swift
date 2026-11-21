@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import ZeusCore
 
@@ -31,4 +32,32 @@ struct TalkLatencyBudgetTests {
         #expect(over.firstAudioMs > TalkLatencyBudget.firstAudioTargetMs)
         #expect(over.firstVisualMs == 1_400)
     }
+
+    @Test func aNegativeStageDoesNotShrinkTheSumUnderTheTarget() {
+        let sample = TalkLatencySample(sttFinalMs: -200, firstTokenMs: 800, ttsFirstMs: 500)
+        #expect(sample.firstAudioMs == 1_300)
+        #expect(sample.firstAudioMs > TalkLatencyBudget.firstAudioTargetMs)
+        let allNegative = TalkLatencySample(sttFinalMs: -5, firstTokenMs: -1, ttsFirstMs: -2)
+        #expect(allNegative.firstAudioMs == 0)
+    }
+
+    @Test func speechInputArmsTheBudgetInsteadOfTwoAndAHalfSeconds() throws {
+        let source = try speechInputSource()
+        #expect(source.contains("TalkLatencyBudget.sttFinalCapMs"))
+        #expect(source.contains("cancelRecognizerAfterFinalCap"))
+        #expect(!source.contains("deadline: .now() + 2.5"))
+    }
+}
+
+private func speechInputSource() throws -> String {
+    var url = URL(fileURLWithPath: #filePath)
+    while url.path != "/" {
+        let candidate = url.appendingPathComponent("Sources/Zeus/Voice/SpeechInput.swift")
+        if FileManager.default.fileExists(atPath: candidate.path) {
+            return try String(contentsOf: candidate, encoding: .utf8)
+        }
+        url.deleteLastPathComponent()
+    }
+    struct Missing: Error {}
+    throw Missing()
 }
