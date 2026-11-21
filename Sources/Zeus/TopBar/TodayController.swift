@@ -219,12 +219,15 @@ final class NotificationsController {
     var visibleItems: [MirroredNotification] { items.filter { $0.id > clearedThrough && !dismissed.contains($0.id) } }
     var enabled: Bool {
         didSet {
-            if !TopBarStyle.isSnapshot { UserDefaults.standard.set(enabled, forKey: "notifications.mirror") }
+            if !TopBarStyle.isSnapshot { NotificationMirrorPreference.set(enabled, defaults: .standard) }
             refresh()
         }
     }
 
-    init() { enabled = UserDefaults.standard.bool(forKey: "notifications.mirror") }
+    init() {
+        NotificationMirrorPreference.migrate(.standard)
+        enabled = NotificationMirrorPreference.isOn(.standard)
+    }
 
     private var seeded = false
     func seedForSnapshot(_ items: [MirroredNotification]) { seeded = true; enabled = true; self.items = items; failure = nil; clearedThrough = 0; dismissed = [] }
