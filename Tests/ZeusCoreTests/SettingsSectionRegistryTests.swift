@@ -38,9 +38,8 @@ import ZeusCore
             accessibilityLabel: "Fixture",
             placeholder: nil
         )
-        let sections = SettingsSectionRegistry.sections(slots: []) + [added]
-        let rows = GlassSettingsSidebar.rowIDs(sections: sections)
-        let spoken = GlassSettingsAccessibility.exposure(sections: sections)
+        let rows = GlassSettingsSidebar.rowIDs(adding: added)
+        let spoken = GlassSettingsAccessibility.exposure(adding: added)
         #expect(rows.last == "settings.fixture")
         let last = spoken.last
         #expect(last?.label == "Fixture")

@@ -59,18 +59,25 @@ public enum SettingsSectionRegistry {
     public static let topbarTitle = "Topbar"
 
     /// One Topbar row follows the existing rows when any topbar tab is filled and enabled.
-    public static func sections(slots: [GlassSectionSlot], includePhone: Bool = false) -> [SettingsSectionDescriptor] {
+    /// `adding` appends one more section. Sidebar and VoiceOver read this list; they do not keep their own.
+    public static func sections(slots: [GlassSectionSlot], includePhone: Bool = false, adding extra: SettingsSectionDescriptor? = nil) -> [SettingsSectionDescriptor] {
         let base = existing(includePhone: includePhone)
-        guard !GlassSectionManifest.topbarTabs(in: slots).isEmpty else { return base }
-        return base + [
-            SettingsSectionDescriptor(
-                id: topbarID,
-                title: topbarTitle,
-                order: base.count,
-                accessibilityLabel: topbarTitle,
-                placeholder: nil
-            ),
-        ]
+        let listed: [SettingsSectionDescriptor]
+        if GlassSectionManifest.topbarTabs(in: slots).isEmpty {
+            listed = base
+        } else {
+            listed = base + [
+                SettingsSectionDescriptor(
+                    id: topbarID,
+                    title: topbarTitle,
+                    order: base.count,
+                    accessibilityLabel: topbarTitle,
+                    placeholder: nil
+                ),
+            ]
+        }
+        guard let extra else { return listed }
+        return listed + [extra]
     }
 
     /// First id wins. Order is placement order, then the descriptor order. The final sort is load-bearing.

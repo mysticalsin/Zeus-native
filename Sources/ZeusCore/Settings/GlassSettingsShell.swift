@@ -174,9 +174,9 @@ public enum GlassSettingsMaterialRules {
 }
 
 public enum GlassSettingsSidebar {
-    /// Sidebar order is the registry's order. This does not keep a second list.
-    public static func rowIDs(sections: [SettingsSectionDescriptor]) -> [String] {
-        sections.map(\.id)
+    /// Ids come from SettingsSectionRegistry. Adding a section there updates this list.
+    public static func rowIDs(slots: [GlassSectionSlot] = [], includePhone: Bool = false, adding extra: SettingsSectionDescriptor? = nil) -> [String] {
+        SettingsSectionRegistry.sections(slots: slots, includePhone: includePhone, adding: extra).map(\.id)
     }
 }
 
@@ -193,11 +193,17 @@ public struct GlassAccessibilityItem: Equatable, Sendable {
 }
 
 public enum GlassSettingsAccessibility {
-    /// VoiceOver follows the same registry rows as the sidebar. An unlisted section is not spoken here.
-    public static func exposure(sections: [SettingsSectionDescriptor]) -> [GlassAccessibilityItem] {
-        sections.map { section in
+    /// VoiceOver follows SettingsSectionRegistry, in the same order as the sidebar.
+    public static func exposure(slots: [GlassSectionSlot] = [], includePhone: Bool = false, adding extra: SettingsSectionDescriptor? = nil) -> [GlassAccessibilityItem] {
+        SettingsSectionRegistry.sections(slots: slots, includePhone: includePhone, adding: extra).map { section in
             GlassAccessibilityItem(label: section.accessibilityLabel, heading: true, hidden: false)
         }
+    }
+
+    /// One heading SettingsSectionRegistry already built. A slot with no heading is not spoken.
+    public static func exposure(heading: SettingsSectionDescriptor?) -> [GlassAccessibilityItem] {
+        guard let heading else { return [] }
+        return [GlassAccessibilityItem(label: heading.accessibilityLabel, heading: true, hidden: false)]
     }
 }
 
@@ -894,7 +900,7 @@ public enum GlassSettingsAudit {
         let hidden = GlassSectionSlot(id: "glass.hidden", title: "Hidden", filled: false, keys: [], placement: .topbarTab(1))
         let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [], placement: .topbarTab(0))
         let sections = SettingsSectionRegistry.sections(slots: [hidden, synthetic])
-        let rows = GlassSettingsSidebar.rowIDs(sections: sections)
+        let rows = GlassSettingsSidebar.rowIDs(slots: [hidden, synthetic])
         if rows != sections.map(\.id) { return ["sidebar rows drifted \(rows)"] }
         let existing = SettingsSectionRegistry.existing.map(\.id)
         if Array(rows.prefix(existing.count)) != existing { return ["existing sidebar rows changed"] }
@@ -908,11 +914,11 @@ public enum GlassSettingsAudit {
         let synthetic = GlassSectionSlot(id: "glass.synthetic", title: "Synthetic title", filled: true, keys: [], placement: .topbarTab(0))
         if SettingsSectionRegistry.pageHeading(for: hidden) != nil { return ["unfilled slot exposed"] }
         guard let heading = SettingsSectionRegistry.pageHeading(for: synthetic) else { return ["filled slot had no heading"] }
-        let page = GlassSettingsAccessibility.exposure(sections: [heading])
+        let page = GlassSettingsAccessibility.exposure(heading: heading)
         let expectedPage = [GlassAccessibilityItem(label: "Synthetic title", heading: true, hidden: false)]
         if page != expectedPage { return ["accessibility exposure \(page)"] }
         let sections = SettingsSectionRegistry.sections(slots: [hidden, synthetic])
-        let spoken = GlassSettingsAccessibility.exposure(sections: sections)
+        let spoken = GlassSettingsAccessibility.exposure(slots: [hidden, synthetic])
         if spoken.map(\.label) != sections.map(\.accessibilityLabel) { return ["exposure drifted from the registry"] }
         if spoken.contains(where: { $0.label == "Hidden" }) { return ["unfilled title was spoken"] }
         return []
