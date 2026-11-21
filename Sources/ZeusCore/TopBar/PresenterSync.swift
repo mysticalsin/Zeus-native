@@ -220,7 +220,7 @@ public struct GoogleSlidesNotesProvider: PresenterNotesProvider {
 
     /// The deck URL predicate. Visible page text is not a stand-in for speaker notes, and `load` still refuses to turn a browser deck into the floating script.
     public static func isPresentation(url: String) -> Bool {
-        DeckURL.isPresentation(url)
+        DeckNotesURL.isDeck(url)
     }
 }
 
@@ -348,43 +348,16 @@ public enum DeckNotesURL {
     public static func allowsExecuteScript(_ url: String) -> Bool { matches(url) }
 
     private static func matches(_ raw: String) -> Bool {
-        guard !raw.isEmpty else { return false }
-        if raw.unicodeScalars.contains(where: { $0.value < 0x20 || $0 == "\\" || $0 == " " || $0 == "\u{7F}" }) {
+        guard DeckURL.isPresentation(raw) else { return false }
+        if raw.unicodeScalars.contains(where: { $0.value < 0x20 || $0 == " " || $0 == "\u{7F}" }) {
             return false
         }
         guard let schemeSep = raw.range(of: "://") else { return false }
-        guard raw[..<schemeSep.lowerBound].lowercased() == "https" else { return false }
         let rest = raw[schemeSep.upperBound...]
         let authorityEnd = rest.firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) ?? rest.endIndex
-        let authority = String(rest[..<authorityEnd])
-        guard !authority.isEmpty, !authority.contains("@"), !authority.contains("%"), !authority.contains("\\") else { return false }
-        let host: String
-        let port: String?
-        if let colon = authority.lastIndex(of: ":") {
-            let digits = authority[authority.index(after: colon)...]
-            if digits.isEmpty || digits.allSatisfy(\.isNumber) {
-                host = String(authority[..<colon])
-                port = String(digits)
-            } else {
-                return false
-            }
-        } else {
-            host = authority
-            port = nil
-        }
-        guard !host.isEmpty, !host.hasSuffix("."), host.lowercased() == "docs.google.com" else { return false }
-        if let port, !port.isEmpty, port != "443" { return false }
-        let tail = rest[authorityEnd...]
-        let path: String
-        if tail.isEmpty {
-            path = ""
-        } else if tail.hasPrefix("/") {
-            let end = tail.firstIndex(where: { $0 == "?" || $0 == "#" }) ?? tail.endIndex
-            path = String(tail[..<end])
-        } else {
-            return false
-        }
-        return path.hasPrefix("/presentation/")
+        let authority = rest[..<authorityEnd]
+        if authority.hasSuffix(".") || authority.contains("%") || authority.contains("\\") { return false }
+        return true
     }
 }
 
@@ -941,7 +914,7 @@ public struct DeckNotesMotion: Equatable, Sendable {
     }
 }
 
-/// Capture exclusion is per window. Notes stay in the existing bar, and a detected share or recording sets that whole window to `sharingType` `.none`.
+/// Capture exclusion is per window. While notes are showing or following, the whole bar stays at `sharingType` `.none`. A share detector is not required.
 public enum DeckNotesCapturePolicy {
     public enum Surface: Equatable, Sendable { case existingBar }
     public enum BarSharing: Equatable, Sendable {
@@ -956,8 +929,21 @@ public enum DeckNotesCapturePolicy {
     public static let canHideOneViewInsideTheBar = false
 
     public static func barSharing(notesVisible: Bool, screenShareDetected: Bool, recordingDetected: Bool, showInScreenSharing: Bool) -> BarSharing {
-        _ = showInScreenSharing
-        if notesVisible && (screenShareDetected || recordingDetected) { return .none }
-        return .unchanged
+        _ = (screenShareDetected, recordingDetected, showInScreenSharing)
+        return notesVisible ? .none : .unchanged
     }
+
+    /// Another refresh asked to show or hide the bar. Notes that are up keep the whole bar at `.none`.
+    public static func sharingAfterRefresh(notesVisible: Bool, requestedVisibleInShare: Bool) -> BarSharing {
+        _ = requestedVisibleInShare
+        return notesVisible ? .none : .unchanged
+    }
+}
+
+/// The bar window reads this when some other caller applies the share policy.
+@MainActor
+public enum DeckNotesCaptureHold {
+    public private(set) static var notesAreUp = false
+
+    public static func setNotesAreUp(_ up: Bool) { notesAreUp = up }
 }

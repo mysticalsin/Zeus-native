@@ -96,7 +96,11 @@ final class PresenterNotesController {
     /// `PresenterNotesError`s, ready for `PresenterEmptyState.from`.
     func load() async throws -> PresenterDeck {
         guard let running = Self.runningApp() else {
-            // Google Slides in Chrome: say so plainly instead of "nothing open".
+            // The person asked, and no presentation app is running. Notes stay out of the floating script.
+            await readDeckNotes()
+            if UserDefaults.standard.bool(forKey: PrompterHub.followKey) {
+                await followDeckNotes()
+            }
             if await Self.googleSlidesOpen() { throw PresenterNotesError.googleSlidesNotYet }
             throw PresenterNotesError.noApp
         }
@@ -196,10 +200,10 @@ final class PresenterNotesController {
 
     func dismissDeckNotes() async { await drive(.dismiss) }
 
-    /// A share or a recording was detected, or it ended. When notes are up, the whole bar window's sharing type becomes `.none`.
+    /// Stores a reported share or recording. Exclusion does not wait for this: notes that are up keep the bar at `.none`.
     func noteScreenCapture(shareDetected: Bool, recordingDetected: Bool) {
         screenShareDetected = shareDetected
-        recordingDetected = recordingDetected
+        self.recordingDetected = recordingDetected
         applyBarCapture()
     }
 
@@ -339,6 +343,7 @@ final class PresenterNotesController {
         case .showing, .following: notesVisible = true
         default: notesVisible = false
         }
+        DeckNotesCaptureHold.setNotesAreUp(notesVisible)
         let decision = DeckNotesCapturePolicy.barSharing(
             notesVisible: notesVisible,
             screenShareDetected: screenShareDetected,
