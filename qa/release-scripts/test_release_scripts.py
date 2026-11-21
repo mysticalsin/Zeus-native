@@ -40,7 +40,15 @@ def pinned(constant, fallback):
 
 if name == "codesign" and "--display" in args:
     state = os.environ.get("SIGNATURE_STATE", "valid")
-    team = "OTHERTEAM1" if state == "wrong-team" else pinned("EXPECTED_TEAM_ID", "TESTTEAM01")
+    special = {
+        "wrong-team": "OTHERTEAM1",
+        "empty-team": "",
+        "short-team": "TEAMID123",
+        "long-team": "TEAMID12345",
+        "lower-team": "testteam01",
+        "symbol-team": "TEST-TEAM1",
+    }
+    team = special[state] if state in special else pinned("EXPECTED_TEAM_ID", "TESTTEAM01")
     bundle = "com.example.notzeus" if state == "wrong-bundle" else pinned("EXPECTED_BUNDLE_ID", "app.zeus.mac")
     print("Identifier=" + bundle)
     print("Authority=" + ("Developer ID Application: Test" if state != "adhoc" else "Zeus Local Dev"))
@@ -308,7 +316,37 @@ class ReleaseScripts(unittest.TestCase):
         self.log.write_text("")
         result = self.run_script("verify-release-signature.sh", app)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(["codesign", "--verify", "--strict", str(extra)], self.commands())
+        requirement = "certificate leaf[subject.OU] = TESTTEAM01"
+        self.assertIn(["codesign", "--verify", "--strict", "-R", requirement, str(extra)], self.commands())
+
+    def test_team_id_must_be_ten_uppercase_characters(self):
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        self.now_playing(app)
+        path = self.root / "scripts/verify-release-signature.sh"
+        original = path.read_text()
+        cases = (
+            ("empty-team", ""),
+            ("short-team", "TEAMID123"),
+            ("long-team", "TEAMID12345"),
+            ("lower-team", "testteam01"),
+            ("symbol-team", "TEST-TEAM1"),
+        )
+        for state, team in cases:
+            with self.subTest(state=state):
+                path.write_text(original.replace('EXPECTED_TEAM_ID="ZEUSTEAMID"', f'EXPECTED_TEAM_ID="{team}"', 1))
+                result = self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state)
+                self.assertNotEqual(result.returncode, 0, result.stderr)
+        path.write_text(original)
+
+    def test_cdhash_loop_does_not_name_the_resource_helper(self):
+        text = (REPO / "scripts/bundle.sh").read_text()
+        loops = [line for line in text.splitlines() if line.strip().startswith("for bin in")]
+        self.assertTrue(loops)
+        self.assertFalse(any("zeus-now-playing" in line for line in loops))
+
+    def test_real_entitlements_have_no_unexpanded_team_prefix(self):
+        text = (REPO / "Resources/Zeus.entitlements").read_text()
+        self.assertNotIn("$(AppIdentifierPrefix)", text)
 
     def test_dev_partition_list_omits_the_resource_helper_cdhash(self):
         # The helper reads MediaRemote and prints text. It does not open the Keychain, so its cdhash
