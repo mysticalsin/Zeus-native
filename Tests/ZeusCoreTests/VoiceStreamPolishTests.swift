@@ -358,6 +358,107 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(!OriginalSyntheticVoice.accepts("am_michael"))
     }
 
+    @Test func speakerPathPausesAndFadesInEveryLaterClause() {
+        let text = "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too."
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-gap-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var clock = SpeechManualClock()
+        var captured: [[Float]] = []
+        let receipt = KokoroClausePlayback.play(
+            text: text,
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            render: { _, _ in toneFile(in: directory, sampleRate: 24_000) },
+            play: { url in
+                if let decoded = PCMWav.readFloats(from: url) { captured.append(decoded.samples) }
+                return true
+            })
+        #expect(receipt.succeeded)
+        #expect(captured.count == 3)
+        let pause = Int((24_000 * ClauseSpeechScheduler.clausePauseSeconds).rounded())
+        for clause in captured.dropLast() {
+            #expect(clause.suffix(pause).allSatisfy { abs($0) < 1e-3 })
+        }
+        let fade = Int((24_000 * ClauseSpeechScheduler.edgeFadeSeconds).rounded())
+        for clause in captured.dropFirst() {
+            #expect(abs(clause[0]) < 1e-3)
+            #expect(abs(clause[fade - 1]) > abs(clause[0]))
+        }
+        #expect(directoryIsClean(directory))
+    }
+
+    @Test func aLaterClauseRenderFailureIsNotSuccess() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-fail-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var clock = SpeechManualClock()
+        var renders = 0
+        let receipt = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            render: { _, _ in
+                renders += 1
+                if renders == 2 { return nil }
+                return toneFile(in: directory, sampleRate: 24_000)
+            },
+            play: { _ in true })
+        #expect(receipt.succeeded == false)
+        #expect(receipt.scheduledCount == 1)
+        #expect(renders == 2)
+        #expect(directoryIsClean(directory))
+    }
+
+    @Test func cancelDuringTheFirstRenderPlaysNothing() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-cancel-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var clock = SpeechManualClock()
+        let token = SpeechCancelToken()
+        var renders = 0
+        var played = 0
+        let receipt = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: token,
+            directory: directory,
+            render: { _, _ in
+                renders += 1
+                token.cancel()
+                return toneFile(in: directory, sampleRate: 24_000)
+            },
+            play: { _ in
+                played += 1
+                return true
+            })
+        #expect(receipt.succeeded == false)
+        #expect(receipt.scheduledCount == 0)
+        #expect(played == 0)
+        #expect(renders == 1)
+        #expect(directoryIsClean(directory))
+    }
+
+    @Test func abbreviationsInitialismsAndTheIdeographicStop() {
+        let usa = SpeechClauseChunker.chunks(of: "The U.S.A. team signed the note yesterday afternoon. The next sentence stays whole.")
+        #expect(usa[0].contains("U.S.A. team"))
+        #expect(usa.count == 2)
+        let number = SpeechClauseChunker.chunks(of: "See No. 12 in the index before you ship. The next sentence stays whole.")
+        #expect(number[0].hasPrefix("See No. 12"))
+        #expect(number.count == 2)
+        let ideographic = SpeechClauseChunker.chunks(of: "準備ができました。次の文は別です。")
+        #expect(ideographic.count == 2)
+        #expect(ideographic[0].hasSuffix("。"))
+    }
+
     @Test func pipelineNamesEveryStageWithoutADefault() {
         #expect(VoiceStreamPolish.pipeline == [.clauseChunk, .loudness, .crossfade, .primer, .limiter])
         var seen: [String] = []
@@ -411,6 +512,17 @@ private func kokoroCrestReply(sampleRate: Double) -> [Float] {
         index += 250
     }
     return samples
+}
+
+private func toneFile(in directory: URL, sampleRate: Double) -> URL? {
+    let url = directory.appendingPathComponent("render-\(UUID().uuidString).wav")
+    let samples = [Float](repeating: 0.4, count: Int(sampleRate / 10))
+    return PCMWav.write(samples, sampleRate: sampleRate, to: url) ? url : nil
+}
+
+private func directoryIsClean(_ directory: URL) -> Bool {
+    let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [URL(fileURLWithPath: "/missing")]
+    return files.isEmpty
 }
 
 private func tone(count: Int, frequency: Double, amplitude: Float, sampleRate: Double, phase: Double) -> [Float] {
