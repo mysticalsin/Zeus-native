@@ -313,14 +313,7 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         }])
     }
 
-    fn observe(
-        &mut self,
-        played: &[f32],
-        model: &[f32],
-        text: &str,
-        step_ms: f32,
-        stall_ms: u64,
-    ) {
+    fn observe(&mut self, played: &[f32], model: &[f32], text: &str, step_ms: f32, stall_ms: u64) {
         if !self.watchdog_on {
             return;
         }
@@ -480,6 +473,43 @@ fn percentile(values: &[f64], q: f64) -> f64 {
     let hi = rank.ceil() as usize;
     let frac = rank - lo as f64;
     sorted[lo] * (1.0 - frac) + sorted[hi] * frac
+}
+
+#[cfg(test)]
+mod text_bound {
+    use super::Engine;
+    use crate::backend::{FakeBackend, ScriptStep};
+    use crate::supervisor::SpyLauncher;
+
+    #[test]
+    fn text_tokens_do_not_grow_without_bound() {
+        let script = (0..2_000)
+            .map(|index| ScriptStep::Frame {
+                fill: 0.1,
+                text: format!("w{index} x{index} y{index} z{index}"),
+                delay_ms: 0,
+                step_ms: 1.0,
+            })
+            .collect();
+        let mut engine = Engine::new(
+            FakeBackend::new(script),
+            SpyLauncher::default(),
+            vec!["fake".into()],
+            true,
+        );
+        engine.begin_model_load().unwrap();
+        engine.finish_model_load().unwrap();
+        for index in 0..2_000u32 {
+            engine
+                .push(&vec![0.0; crate::session::FRAME_SAMPLES], index)
+                .unwrap();
+        }
+        assert!(
+            engine.text_tokens.len() <= 4_096,
+            "token buffer grew to {}",
+            engine.text_tokens.len()
+        );
+    }
 }
 
 pub fn rss_bytes() -> u64 {
