@@ -50,6 +50,7 @@ Journeys reviewed: top bar gestures, Murmur / Right Command, Right Option talk, 
 
 | ID | Severity | Area | Branch / PR | File:line | Repro or failing test | Evidence | Suggested fix scope | Owning PR |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ZB-026 | P0 | Top bar music | integration `2722dcb7` | `Sources/Zeus/TopBar/HomeWidgetViews.swift:86-87`; `Sources/Zeus/TopBar/MusicPlayerFeed.swift:127-138` | Home Play calls `musicCommand(.playPause)`. `MusicPlayerFeed.send` returns false unless that player is already running, and the comment says a tap never launches one. The command closure is a no-op until `NowPlayingHub.attach` (`NowPlayingHub.swift:73`, default `TopBarModel.swift:234`). Device playback was not run on this VM. | PROVEN | Make Play start playback, or show a recoverable error when the player is not running. Owner branch `zeus-bot/media-playback-control`. | `zeus-bot/media-playback-control` |
 | ZB-001 | P0 | Face approval | #48 `1ba23ae66127` `zeus-bot/settings-faceid` | `Sources/ZeusCore/Settings/Sections/FaceID/FaceVerificationMachine.swift:210-224` | `tests/bug-repros/FaceLockoutBypass.sh` exits 1. After 5 failures the machine is `.lockedOut` with grant nil; `fallbackResult(succeeded: true)` for the action already open sets phase `.idle`, writes a local-auth grant, and zeroes `failures`. | PROVEN | Reject `fallbackResult` while `lockActive` or phase is `.lockedOut`. Keep the open action from approving during lockout. The existing test uses a different action, so it stays locked. | #48 |
 | ZB-002 | P1 | Weather | #42 `08e09710f41b` `zeus-bot/settings-weather` | `Sources/ZeusCore/Settings/Sections/Weather/WeatherTemperatureUnit.swift:23` and `:31` | `tests/bug-repros/WeatherTemperatureOverflow.sh` exits 1. `degrees(celsius: 1e20)` traps: `Double value cannot be converted to Int because the result would be greater than Int.max` (signal 132). Same `Int(value.rounded())` on wind. | PROVEN | Use `Int(exactly:)` and return nil when the rounded value is out of range. Finite external forecast numbers must not trap. | #42 |
 | ZB-003 | P1 | Top bar | #42 `08e09710f41b` | `Sources/Zeus/Settings/GlassShell/Sections/WeatherSettingsSection.swift:54-74` and `Sources/ZeusCore/Settings/Sections/Weather/TopBarGestureRouter.swift:14-20` | `tests/bug-repros/TopBarGesturesUnwired.sh` exits 1. The only `TopBarPointerSample` built under `Sources/Zeus` is `.trackpad` at line 74. Click, hold, and right-swipe are never sent. On integration, `NotchController.openOnClick` (`Sources/Zeus/Notch/NotchController.swift:470-479`) is a single click; `mouseDragged` (`:521-537`) is a file drag. | PROVEN | Feed down, up, hold, settle, and swipe samples from the real top bar, or stop describing those routes on the settings preview. | #42 |
@@ -80,11 +81,11 @@ Journeys reviewed: top bar gestures, Murmur / Right Command, Right Option talk, 
 
 | Severity | PROVEN | LIKELY | macOS-ONLY | Total |
 | --- | ---: | ---: | ---: | ---: |
-| P0 | 1 | 0 | 0 | 1 |
+| P0 | 2 | 0 | 0 | 2 |
 | P1 | 3 | 2 | 3 | 8 |
 | P2 | 5 | 7 | 2 | 14 |
 | P3 | 0 | 1 | 1 | 2 |
-| Total | 9 | 10 | 6 | 25 |
+| Total | 10 | 10 | 6 | 26 |
 
 ZB-010 is PROVEN as a gate failure. The Darwin import it trips on is not, by itself, a product defect.
 
