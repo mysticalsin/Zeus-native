@@ -109,6 +109,13 @@ import Testing
         let bridge = try #require(files["Sources/Zeus/Chrome/ChromeInstaller.swift"])
         #expect(bridge.contains("Contents/Helpers/zeus-bridge"))
         #expect(!bridge.contains("appendingPathComponent(\"zeus-bridge\")"))
+        #expect(bridge.contains("BundledHelperPublish.replaceIfAccepted"))
+        #expect(!bridge.contains("try? NativeHostRegistration.reconcile"))
+        let refusal = refusalFunction(bridge)
+        #expect(refusal.contains("authorizeInstalledBridge"))
+        #expect(!refusal.contains("uninstall("))
+        #expect(!appDelegate.contains("_ = ChromeInstaller.authorizeInstalledBridge()"))
+        #expect(appDelegate.contains("registrationRemovalFailed"))
         let hook = try #require(files["Sources/Zeus/Agents/ClaudeHookInstaller.swift"])
         #expect(hook.contains("Contents/Helpers/zeus-hook"))
         #expect(!hook.contains("Application Support/Zeus/bin/zeus-hook"))
@@ -150,6 +157,13 @@ struct BundledHelperLaunchSite: Hashable, Sendable {
     var kind: String
 
     var key: String { "\(file)|\(kind)|\(helper)" }
+}
+
+private func refusalFunction(_ source: String) -> String {
+    guard let start = source.range(of: "static func authorizeInstalledBridge") else { return "" }
+    let rest = source[start.lowerBound...]
+    guard let end = rest.dropFirst().range(of: "\n    static func ") else { return String(rest) }
+    return String(rest[..<end.lowerBound])
 }
 
 enum BundledHelperLaunchScan {

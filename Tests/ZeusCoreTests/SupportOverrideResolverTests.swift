@@ -109,12 +109,62 @@ private struct FakeSignature: BundledHelperSignatureChecking {
                                                 signingIdentifier: "zeus-bridge", checker: checker) == .launch)
     }
 
+    @Test func aMismatchedLocalDevLeafRefuses() {
+        let leaf = "0123456789abcdef0123456789abcdef01234567"
+        let checker = AnchorFake(anchor: .localDev(leafSHA1: leaf), accepted: "certificate leaf = H\"ffffffffffffffffffffffffffffffffffffffff\" and identifier \"zeus-bridge\"")
+        #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
+                                                signingIdentifier: "zeus-bridge", checker: checker)
+                == .refuse(BundledHelperLaunchPolicy.refusalSentence))
+    }
+
+    @Test func aNonHashLeafNeverEntersTheRequirement() {
+        for leaf in ["not-a-leaf", "abc", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "0123456789abcdef0123456789abcdef0123456"] {
+            let text = BundledHelperLaunchPolicy.requirementText(anchor: .localDev(leafSHA1: leaf), signingIdentifier: "zeus-bridge")
+            #expect(text == nil, "\(leaf)")
+            #expect(BundledHelperLaunchPolicy.isLeafSHA1(leaf) == false)
+        }
+    }
+
+    @Test func releaseIgnoresTheSupportDirectoryEvenThroughTheCurrentBuild() throws {
+        let home = "/Users/owner/Library/Application Support/Zeus"
+        let env = SupportOverrideMap(["ZEUS_SUPPORT_DIR": "/tmp/not-zeus-support"])
+        #expect(SupportOverride.value("ZEUS_SUPPORT_DIR", environment: env, build: .release) == nil)
+        #expect(SupportOverride.supportDirectory(environment: env, build: .release, defaultDirectory: home) == home)
+        let source = try gateSource("Sources/ZeusCore/Support/SupportOverride.swift")
+        guard let start = source.range(of: "public static var current"),
+              let end = source.range(of: "public protocol SupportOverrideEnvironment") else {
+            Issue.record("current build selector missing")
+            return
+        }
+        let body = source[start.lowerBound..<end.lowerBound]
+        #expect(body.contains("#if !DEBUG"))
+        #expect(body.contains(".release"))
+        #expect(body.contains("#else"))
+        #expect(body.contains(".debug"))
+    }
+
     @Test func aMissingAnchorStillRefuses() {
         let checker = AnchorFake(anchor: nil, accepted: "")
         #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
                                                 signingIdentifier: "zeus-bridge", checker: checker)
                 == .refuse(BundledHelperLaunchPolicy.refusalSentence))
     }
+}
+
+private func gateSource(_ relative: String) throws -> String {
+    if let root = ProcessInfo.processInfo.environment["ZEUS_SOURCE_ROOT"], !root.isEmpty {
+        return try String(contentsOf: URL(fileURLWithPath: root).appendingPathComponent(relative), encoding: .utf8)
+    }
+    var url = URL(fileURLWithPath: #filePath)
+    let files = FileManager.default
+    while url.path != "/" {
+        url.deleteLastPathComponent()
+        let candidate = url.appendingPathComponent(relative)
+        if files.fileExists(atPath: candidate.path) {
+            return try String(contentsOf: candidate, encoding: .utf8)
+        }
+    }
+    throw CocoaError(.fileNoSuchFile)
 }
 
 private struct AnchorFake: BundledHelperAnchorChecking {
@@ -174,6 +224,55 @@ private struct AnchorFake: BundledHelperAnchorChecking {
         #expect(try Data(contentsOf: registration) == Data("new-registration".utf8))
         #expect(!FileManager.default.fileExists(atPath: staged.path))
     }
+
+    @Test func aRegistrationWriteThatThrowsRestoresThePreviousRegistration() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let destination = root.appendingPathComponent("zeus-bridge")
+        let registration = root.appendingPathComponent("com.zeus.bridge.json")
+        let staged = root.appendingPathComponent("zeus-bridge.new")
+        try Data("previous-bridge".utf8).write(to: destination)
+        try Data("previous-registration".utf8).write(to: registration)
+        try Data("new-bridge".utf8).write(to: staged)
+        let outcome = BundledHelperPublish.replaceIfAccepted(staged: staged, destination: destination, registration: registration,
+                                                             accept: { _ in true }, writeRegistration: {
+                                                                 try Data("new-registration".utf8).write(to: registration)
+                                                                 throw TestWrite.failed
+                                                             })
+        guard case .failure(.swapFailed) = outcome else {
+            Issue.record("expected the registration write to roll back")
+            return
+        }
+        #expect(try Data(contentsOf: destination) == Data("previous-bridge".utf8))
+        #expect(try Data(contentsOf: registration) == Data("previous-registration".utf8))
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+        #expect(!FileManager.default.fileExists(atPath: destination.appendingPathExtension("bak").path))
+    }
+
+    @Test func anEarlyFailureRemovesTheStagedBridge() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let blocker = root.appendingPathComponent("not-a-directory")
+        try Data("block".utf8).write(to: blocker)
+        let destination = blocker.appendingPathComponent("zeus-bridge")
+        let registration = root.appendingPathComponent("com.zeus.bridge.json")
+        let staged = root.appendingPathComponent("zeus-bridge.new")
+        try Data("previous-registration".utf8).write(to: registration)
+        try Data("new-bridge".utf8).write(to: staged)
+        let outcome = BundledHelperPublish.replaceIfAccepted(staged: staged, destination: destination, registration: registration,
+                                                             accept: { _ in true }, writeRegistration: {})
+        guard case .failure = outcome else {
+            Issue.record("expected the blocked directory to fail")
+            return
+        }
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+    }
+
+    @Test func theSwapReplacesTheOldBridgeWithoutParkingItFirst() throws {
+        let source = try gateSource("Sources/ZeusCore/Support/BundledHelperPublish.swift")
+        #expect(source.contains("replaceItemAt"))
+        #expect(!source.contains("moveItem(at: destination, to:"))
+    }
 }
 
 private enum TestWrite: Error { case failed }
@@ -219,7 +318,7 @@ private enum TestWrite: Error { case failed }
         try writeHosts(root, zeusPath: bundled)
         let bridgeBinary = root.appendingPathComponent("zeus-bridge")
         try Data("support-bridge".utf8).write(to: bridgeBinary)
-        try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+        _ = NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
                                               checkedPath: bundled, hostsDirectory: root)
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
@@ -232,22 +331,21 @@ private enum TestWrite: Error { case failed }
         let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
         let legacy = "/Users/tony/Library/Application Support/Zeus/bin/zeus-bridge"
         try writeHosts(root, zeusPath: legacy)
-        try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+        _ = NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
                                               checkedPath: bundled, hostsDirectory: root)
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
     }
 
-    @Test func aRefusalLeavesARegistrationThatNamesNeitherPath() throws {
+    @Test func aRefusalRemovesAZeusManifestThatDidNotPass() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
         let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
         try writeHosts(root, zeusPath: "/usr/local/libexec/zeus-bridge")
-        let zeusFile = root.appendingPathComponent(NativeHostRegistration.zeusHostFileName)
-        let before = try Data(contentsOf: zeusFile)
-        try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
-                                              checkedPath: bundled, hostsDirectory: root)
-        #expect(try Data(contentsOf: zeusFile) == before)
+        let outcome = NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                                        checkedPath: bundled, hostsDirectory: root)
+        #expect(outcome == .removed)
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
     }
 
@@ -258,8 +356,23 @@ private enum TestWrite: Error { case failed }
         try writeHosts(root, zeusPath: bundled)
         let zeusFile = root.appendingPathComponent(NativeHostRegistration.zeusHostFileName)
         let before = try Data(contentsOf: zeusFile)
-        try NativeHostRegistration.reconcile(decision: .launch, checkedPath: bundled, hostsDirectory: root)
+        _ = NativeHostRegistration.reconcile(decision: .launch, checkedPath: bundled, hostsDirectory: root)
         #expect(try Data(contentsOf: zeusFile) == before)
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+    }
+
+    @Test func aFailedManifestDeleteIsReportedWithoutAPath() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        try writeHosts(root, zeusPath: bundled)
+        struct DeleteFailed: Error {}
+        let outcome = NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                                        checkedPath: bundled, hostsDirectory: root,
+                                                        remove: { _ in throw DeleteFailed() })
+        #expect(outcome == .removalFailed)
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
+        #expect(!NativeHostRegistration.removalFailedMessage.contains("/"))
+        #expect(!NativeHostRegistration.removalFailedMessage.contains("zeus-bridge"))
     }
 }
