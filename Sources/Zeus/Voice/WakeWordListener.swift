@@ -13,6 +13,9 @@ import ZeusCore
 final class WakeWordListener: @unchecked Sendable {
     /// Called once per wake phrase, on an arbitrary thread.
     var onWake: (@Sendable (String) -> Void)?
+    /// The input route changed and this listener has released the tap. The owner should drop it and start again.
+    var onConfigurationChange: (@Sendable () -> Void)?
+    private var configurationObserver: NSObjectProtocol?
 
     private let engine = AVAudioEngine()
     private let recognizer: SFSpeechRecognizer?
@@ -67,19 +70,33 @@ final class WakeWordListener: @unchecked Sendable {
         }
         engine.prepare()
         try engine.start()
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
+        ) { [weak self] _ in
+            self?.routeChanged()
+        }
     }
 
     func stop() {
-        if engine.isRunning {
-            engine.stop()
-            engine.inputNode.removeTap(onBus: 0)
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+            self.configurationObserver = nil
         }
+        let decision = WakeListenerRecovery.stopRemovesTap(engineRunning: engine.isRunning)
+        if engine.isRunning { engine.stop() }
+        if decision { engine.inputNode.removeTap(onBus: 0) }
         let (request, task) = lock.withLock { () -> (SFSpeechAudioBufferRecognitionRequest?, SFSpeechRecognitionTask?) in
             defer { endWindowLocked() }
             return (self.request, self.task)
         }
         request?.endAudio()
         task?.cancel()
+    }
+
+    private func routeChanged() {
+        let decision = WakeListenerRecovery.afterConfigurationChange()
+        guard decision.dropListener else { return }
+        onConfigurationChange?()
     }
 
     // MARK: Audio thread
