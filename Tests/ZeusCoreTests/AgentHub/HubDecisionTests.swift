@@ -334,6 +334,32 @@ struct HubDecisionTests {
         }
     }
 
+    /// ZB-031. A typed reply waiting on approval has no cancel, so the draft stays stuck.
+    @Test func aPendingTypedReplyCanBeCancelled() {
+        let waiting = HubReplyState(status: .awaitingDecision, draft: "  keep   going\n")
+        let context = HubReplyContext(destinationCanTakeText: true, trusted: true)
+        let cancelled = HubDecision.reply(waiting, HubReplyCancel.cancel, context: context)
+        #expect(cancelled.state.status == .drafting)
+        #expect(cancelled.state.draft == "  keep   going\n")
+        #expect(cancelled.state.receipt == nil)
+        #expect(cancelled.state.script == nil)
+        #expect(cancelled.script == nil)
+        #expect(cancelled.asksApproval == false)
+        #expect(cancelled != HubDecision.reply(waiting, .denied, context: context))
+        #expect(cancelled != HubDecision.reply(waiting, .timedOut, context: context))
+        #expect(cancelled != HubDecision.reply(waiting, .approved, context: context))
+
+        let again = HubDecision.reply(cancelled.state, HubReplyCancel.cancel, context: context)
+        #expect(again == cancelled)
+
+        let resent = HubDecision.reply(cancelled.state, .send, context: context)
+        #expect(resent.state.status == .awaitingDecision)
+        #expect(resent.state.draft == "  keep   going\n")
+        #expect(resent.asksApproval)
+        #expect(resent.script == nil)
+        #expect(resent.state.script == nil)
+    }
+
     private func queue(showing id: String, allowsAsk: Bool = false, then next: String) -> HubApprovalQueue {
         let first = HubDecision.approval(
             HubApprovalQueue(),
