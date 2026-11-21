@@ -139,7 +139,9 @@ struct DrawnNotchCard: View {
             HStack(spacing: 10) {
                 Spacer(minLength: 0)
                 Button("Reset", action: model.reset).buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.gsdrawn-notch-card.reset")
                 Button("Cancel", action: model.cancel).buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.gsdrawn-notch-card.cancel")
                 Button("Done", action: model.done).buttonStyle(GSButtonStyle(prominent: true))
                     .accessibilityIdentifier("settings.appearance.drawnNotchDone")
             }
@@ -148,6 +150,8 @@ struct DrawnNotchCard: View {
             GSRow(symbol: DrawnNotchCardModel.statusSymbol, title: DrawnNotchCardModel.statusText(.notShown)) {
                 Button(DrawnNotchCardModel.statusButtonTitle, action: model.showTheNotchOnGeneral)
                     .buttonStyle(GSButtonStyle())
+                    .accessibilityLabel(DrawnNotchCardModel.statusButtonTitle)
+                    .accessibilityIdentifier("settings.gsdrawn-notch-card.drawnnotchcardmodel-statusbuttontitle")
             }
         case .noDisplay:
             GSRow(symbol: DrawnNotchCardModel.statusSymbol, title: DrawnNotchCardModel.statusText(.noDisplay))
@@ -255,6 +259,7 @@ struct GSSegmentedChoice<Value: Equatable>: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(option.title)
                 .accessibilityAddTraits(chosen ? [.isSelected] : [])
+                .accessibilityIdentifier("settings.gsdrawn-notch-card.checkmark")
             }
         }
         .padding(2)

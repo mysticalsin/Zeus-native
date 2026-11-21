@@ -62,6 +62,8 @@ struct GSOtherAppsCards: View {
                             ))
                             .toggleStyle(GSToggleStyle())
                             .labelsHidden()
+                            .accessibilityLabel(notifications.appName(appID))
+                            .accessibilityIdentifier("settings.gsagent-hub-cards.notifications-appname-appid")
                         }
                         }
                         .help(appID)
@@ -89,7 +91,10 @@ struct GSOtherAppsCards: View {
                             }
                             .buttonStyle(GSButtonStyle())
                             .accessibilityLabel("Open macOS notification settings for \(notifications.appName(id))")
+                            .accessibilityIdentifier("settings.gsagent-hub-cards.open-macos-notification-settings-for")
                             Button(isMuted ? "Unmute" : "Mute") { toggle(id, muted: muted) }.buttonStyle(GSButtonStyle())
+                                .accessibilityLabel(isMuted ? "Unmute" : "Mute")
+                                .accessibilityIdentifier("settings.gsagent-hub-cards.unmute")
                         }
                     }
                 }
@@ -130,6 +135,7 @@ struct GSTrustedChatsCard: View {
             GSRow(symbol: "checkmark.shield", title: "Chats you allowed", text: "\u{201C}Allow this whole chat\u{201D} approves a chat's requests without a card, except risky commands. Cleared when Zeus quits.") {
                 if !trusted.entries.isEmpty {
                     Button("Clear all") { trusted.clear() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsagent-hub-cards.clear-all")
                 } else {
                     GSStatus(ok: false, text: trusted.summary)
                 }
@@ -138,6 +144,7 @@ struct GSTrustedChatsCard: View {
                 GSDivider()
                 GSRow(symbol: "bubble.left", title: entry.agent, text: MeetingState.hideDetails ? nil : entry.project) {
                     Button("Stop trusting") { trusted.revoke(session: entry.id) }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsagent-hub-cards.stop-trusting")
                 }
             }
         }

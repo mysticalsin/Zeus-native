@@ -169,6 +169,7 @@ private struct GeneralPage: View {
         .buttonStyle(.plain)
         .accessibilityLabel(name)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .accessibilityIdentifier("settings.glance-settings-pages.codex")
     }
 }
 
@@ -182,6 +183,7 @@ struct GSSetupCard: View {
                 Button("Open guide", action: openGuide)
                     .buttonStyle(GSButtonStyle())
                     .ownedJourneyControl("settings.general.openGuide")
+                    .accessibilityIdentifier("settings.general.openGuide")
             }
         }
     }
@@ -258,6 +260,7 @@ private struct AppearancePage: View {
                 Button("Reset") { TopBarPositionModel.shared.reset() }
                     .buttonStyle(GSButtonStyle())
                     .ownedJourneyControl("settings.appearance.topBarPositionReset")
+                    .accessibilityIdentifier("settings.appearance.topBarPositionReset")
             }
             GSDivider()
             GSToggleRow(symbol: store.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash",
@@ -535,6 +538,7 @@ private struct TopBarTabsCard: View {
                             Toggle(tab.title, isOn: Binding(get: { shown }, set: { _ in if !blocked, tab != .home { topBar.layout.toggle(tab) } }))
                                 .toggleStyle(GSToggleStyle()).labelsHidden().accessibilityLabel("Show the \(tab.title) tab")
                                 .disabled(tab == .home || blocked).opacity(tab == .home || blocked ? 0.5 : 1)
+                                .accessibilityIdentifier("settings.glance-settings-pages.show-the-tab")
                         }
                     }
                 }
@@ -551,6 +555,7 @@ private struct TopBarTabsCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .onSubmit { topBar.refreshWeather() }
                         .accessibilityLabel("Weather city")
+                        .accessibilityIdentifier("settings.glance-settings-pages.weather-city")
                 }
                 GSDivider()
                 GSRow(symbol: "thermometer.medium", title: "Units") {
@@ -569,6 +574,7 @@ private struct TopBarTabsCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
         }
         .buttonStyle(.plain).help(label).accessibilityLabel(label)
+        .accessibilityIdentifier("settings.glance-settings-pages.control.2")
     }
 }
 
@@ -650,6 +656,7 @@ private struct SoundsPage: View {
                 preview(event, title)
                 Toggle(title, isOn: Binding(get: { ExtraPreferences.shared[keyPath: key] }, set: { ExtraPreferences.shared[keyPath: key] = $0 }))
                     .toggleStyle(GSToggleStyle()).labelsHidden().accessibilityLabel(title)
+                    .accessibilityIdentifier("settings.glance-settings-pages.control")
             }
         }
     }
@@ -661,6 +668,7 @@ private struct SoundsPage: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play the \(title.lowercased()) sound")
+        .accessibilityIdentifier("settings.glance-settings-pages.play-the-sound")
     }
 }
 
@@ -715,9 +723,11 @@ private struct GSNotificationsPage: View {
                     .toggleStyle(GSToggleStyle())
                     .labelsHidden()
                     .accessibilityLabel("Show system notifications")
+                    .accessibilityIdentifier("settings.glance-settings-pages.show-system-notifications")
                     if systemNotifications.authorization == .denied {
                         Button("Open System Settings") { systemNotifications.openSystemSettingsAfterUserAction() }
                             .buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.glance-settings-pages.open-system-settings.3")
                     }
                 }
             }
@@ -859,6 +869,8 @@ private struct ShortcutsPage: View {
                         chatProblem = ChatHotkeyMonitor.shared.problem
                     }
                     .buttonStyle(GSButtonStyle())
+                    .accessibilityLabel(clash.fix == .off ? "Turn Chat off" : "Move Chat to \(Self.title(clash.fix))")
+                    .accessibilityIdentifier("settings.glance-settings-pages.turn-chat-off")
                 }
                 .foregroundStyle(Theme.ember)
                 .padding(.vertical, 6)
@@ -907,6 +919,7 @@ private struct LearnedShortcutsCard: View {
                                 model.reload()
                             }
                             .buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.glance-settings-pages.undo")
                         }
                     }
                 }
@@ -950,7 +963,10 @@ private struct IntegrationsPage: View {
             HStack(spacing: 10) {
                 if connected { GSStatus(ok: true, text: "Connected") }
                 Button(connected ? "Repair" : "Connect") { context.services.connect(agent) }.buttonStyle(GSButtonStyle(prominent: !connected))
+                    .accessibilityLabel(connected ? "Repair" : "Connect")
+                    .accessibilityIdentifier("settings.glance-settings-pages.repair")
                 Button("Check again") { context.refresh() }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.check-again")
             }
         }
     }
@@ -992,10 +1008,12 @@ private struct MurmurePage: View {
             GSDivider()
             GSRow(symbol: "doc.on.clipboard", title: "Copy last dictation") {
                 Button("Copy") { context.copyLastDictation() }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.copy")
             }
             GSDivider()
             GSRow(symbol: "doc.text", title: "Third-party licenses") {
                 Button("Show") { context.showLicenses() }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.show")
             }
         }
     }
@@ -1032,6 +1050,7 @@ private struct VoicePage: View {
             GSDivider()
             words("arrow.up.forward.app", "Open the app", "voice.openWords")
             Button("Reset the default words") { store.actions["voice.resetWords"]?() }.buttonStyle(GSButtonStyle()).padding(.bottom, 6)
+                .accessibilityIdentifier("settings.glance-settings-pages.reset-the-default-words")
         }
     }
 
@@ -1045,6 +1064,7 @@ private struct VoicePage: View {
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                 .accessibilityLabel("\(title) keywords")
+                .accessibilityIdentifier("settings.glance-settings-pages.keywords")
         }
     }
 }
@@ -1121,6 +1141,7 @@ private struct LicensePage: View {
                         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(GS.window))
                         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("License key")
+                        .accessibilityIdentifier("settings.glance-settings-pages.license-key")
                     Button("Activate a license") {
                         let key = navigation.licenseKey
                         Task {
@@ -1130,6 +1151,7 @@ private struct LicensePage: View {
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))
                     .disabled(license.busy || navigation.licenseKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityIdentifier("settings.glance-settings-pages.activate-a-license")
                 }
                 .padding(.vertical, 12)
                 if let message = navigation.licenseMessage { GSInfo(text: message) }
@@ -1194,6 +1216,7 @@ private struct PermissionsPage: View {
                     GSStatus(ok: KeyListenAccess.granted, text: KeyListenAccess.granted ? (KeyListenAccess.accessibility ? "Accessibility" : "Input Monitoring") : "Not allowed")
                     if !KeyListenAccess.granted {
                         Button("Allow Input Monitoring") { KeyListenAccess.requestInputMonitoring() }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.glance-settings-pages.allow-input-monitoring")
                     }
                 }
             }
@@ -1212,11 +1235,13 @@ private struct PermissionsPage: View {
                         if Automation.allowedTargets.count < Automation.players.count {
                             Button("Allow more") { context.permissions.request(.automation) }.buttonStyle(GSButtonStyle())
                                 .accessibilityLabel("Allow Automation for another app")
+                                .accessibilityIdentifier("settings.glance-settings-pages.allow-automation-for-another-app")
                         }
                     }
                 } else {
                     Button("Allow") { context.permissions.request(.automation) }.buttonStyle(GSButtonStyle())
                         .accessibilityLabel("Allow Automation")
+                        .accessibilityIdentifier("settings.glance-settings-pages.allow-automation")
                 }
             }
         }
@@ -1239,11 +1264,14 @@ private struct PermissionsPage: View {
             GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text) {
                 if sweep.needsRestart {
                     Button("Restart Zeus now") { sweep.restartZeus() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityIdentifier("settings.glance-settings-pages.restart-zeus-now")
                 } else if sweep.isRunning {
                     Button("Stop") { sweep.cancel() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Stop allowing")
+                        .accessibilityIdentifier("settings.glance-settings-pages.stop-allowing")
                 } else if !sweep.allAllowed {
                     Button("Allow all") { sweep.start() }.buttonStyle(GSButtonStyle(prominent: true))
                         .accessibilityHint("Asks macOS for each access in turn and opens System Settings where a switch is needed.")
+                        .accessibilityIdentifier("settings.glance-settings-pages.allow-all")
                 }
             }
         }
@@ -1263,10 +1291,12 @@ private struct PermissionsPage: View {
             case .notDetermined:
                 Button("Allow") { Task { await VoicePermissions.ensure(explicit: true); context.refresh() } }.buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Allow \(title)")
+                    .accessibilityIdentifier("settings.glance-settings-pages.allow.5")
             case .denied:
                 HStack(spacing: 10) {
                     GSStatus(ok: false, text: "Denied")
                     Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+                        .accessibilityIdentifier("settings.glance-settings-pages.open-settings.2")
                 }
             }
         }
@@ -1279,10 +1309,12 @@ private struct PermissionsPage: View {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
                 Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
+                    .accessibilityIdentifier("settings.glance-settings-pages.allow.4")
             case .denied:
                 HStack(spacing: 10) {
                     GSStatus(ok: false, text: "Denied")
                     Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+                        .accessibilityIdentifier("settings.glance-settings-pages.open-settings")
                 }
             }
         }
@@ -1292,6 +1324,7 @@ private struct PermissionsPage: View {
         GSRow(symbol: symbol, title: title, text: text) {
             if granted { GSStatus(ok: true, text: "Allowed") } else {
                 Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
+                    .accessibilityIdentifier("settings.glance-settings-pages.allow.3")
             }
         }
     }
@@ -1329,6 +1362,7 @@ private struct PrivacyPage: View {
                 GSDivider()
                 GSRow(symbol: "arrow.clockwise", title: "Zeus extension", text: reload.1) {
                     Button("Open extensions") { store.actions["music.openExtensions"]?() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.glance-settings-pages.open-extensions")
                 }
             }
         }
@@ -1336,6 +1370,7 @@ private struct PrivacyPage: View {
         GSCard("Control from the notch") {
             GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.open-accessibility-settings")
             }
             GSDivider()
             GSRow(symbol: "cursorarrow.motionlines", title: "When Zeus may drive your Mac",
@@ -1348,6 +1383,7 @@ private struct PrivacyPage: View {
                 GSRow(symbol: "info.circle", title: "Command-line control was reset",
                       text: "This setting now lives in your Keychain, not in a preferences file, so editing preferences cannot switch it on. Zeus turned it off once; turn it on again below if you use the zeus command.") {
                     Button("Got it") { cliAccess.dismissNotice() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.glance-settings-pages.got-it")
                 }
                 GSDivider()
             }
@@ -1379,6 +1415,7 @@ private struct DiagnosticsPage: View {
         GSCard("Restart the local connection") {
             GSRow(symbol: "arrow.clockwise", title: "Restart the connection", text: "Agents and running tasks keep going in their own apps.") {
                 Button("Restart") { context.restartConnection() }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.restart")
             }
         }
     }
@@ -1394,10 +1431,12 @@ private struct SpectrumPermissionRow: View {
             case .allowed: GSStatus(ok: true, text: "Allowed")
             case .notAsked:
                 Button("Allow") { service.allowPressed() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Allow system audio")
+                    .accessibilityIdentifier("settings.glance-settings-pages.allow-system-audio")
             case .refused:
                 HStack(spacing: 10) {
                     GSStatus(ok: false, text: "Denied")
                     Button("Open System Settings") { service.openSystemSettings() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open system audio settings")
+                        .accessibilityIdentifier("settings.glance-settings-pages.open-system-audio-settings")
                 }
             }
         }
@@ -1446,6 +1485,7 @@ private struct AirDropPermissionRow: View {
                     ))
                     .toggleStyle(GSToggleStyle())
                     .labelsHidden()
+                    .accessibilityIdentifier("settings.glance-settings-pages.glow-when-airdrop-arrives")
                 } else if status == .notDetermined {
                     Button("Allow") {
                         if FolderAccess.request(for: .downloads) == .granted {
@@ -1453,11 +1493,13 @@ private struct AirDropPermissionRow: View {
                         }
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))
+                    .accessibilityIdentifier("settings.glance-settings-pages.allow.2")
                 } else {
                     Button("Open System Settings") {
                         FolderAccess.openSettings()
                     }
                     .buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.open-system-settings.2")
                 }
             }
         }
@@ -1478,6 +1520,7 @@ private struct ScreenshotPermissionRow: View {
                     ))
                     .toggleStyle(GSToggleStyle())
                     .labelsHidden()
+                    .accessibilityIdentifier("settings.glance-settings-pages.screenshot-cue")
                 } else if status == .notDetermined {
                     Button("Allow") {
                         if FolderAccess.request(for: .desktop) == .granted {
@@ -1485,11 +1528,13 @@ private struct ScreenshotPermissionRow: View {
                         }
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))
+                    .accessibilityIdentifier("settings.glance-settings-pages.allow")
                 } else {
                     Button("Open System Settings") {
                         FolderAccess.openSettings()
                     }
                     .buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.glance-settings-pages.open-system-settings")
                 }
             }
         }

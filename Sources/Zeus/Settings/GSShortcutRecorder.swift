@@ -115,6 +115,7 @@ struct ShortcutRecorderButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(accessibilityName): \(shortcut?.title ?? "Off"). Click, then press the shortcut you want.")
         .onDisappear { model.end() }
+        .accessibilityIdentifier("settings.gsshortcut-recorder.control")
     }
 
     private var label: String {
@@ -193,9 +194,11 @@ struct KeyAccessRow: View {
                          text: KeyListenAccess.granted ? (KeyListenAccess.accessibility ? "Accessibility on" : "Input Monitoring on") : "Not allowed")
                 if !KeyListenAccess.granted {
                     Button("Input Monitoring") { KeyListenAccess.requestInputMonitoring() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityIdentifier("settings.gsshortcut-recorder.input-monitoring")
                     Button("Accessibility") {
                         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
                     }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsshortcut-recorder.accessibility")
                 }
             }
         }
@@ -217,8 +220,10 @@ struct ShortcutOptionsMenu: View {
             glyph
         } else {
             Menu {
-                if canTurnOff { Button("Turn off") { off() } }
-                if canReset { Button("Reset to \(defaultTitle)") { reset() } }
+                if canTurnOff { Button("Turn off") { off() }
+                    .accessibilityIdentifier("settings.gsshortcut-recorder.turn-off") }
+                if canReset { Button("Reset to \(defaultTitle)") { reset() }
+                    .accessibilityIdentifier("settings.gsshortcut-recorder.reset-to") }
             } label: { glyph }
             .menuStyle(.button)
             .buttonStyle(.plain)

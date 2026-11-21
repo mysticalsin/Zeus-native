@@ -21,6 +21,7 @@ struct ShelfSettingsPage: View {
                       text: "macOS is blocking Zeus from finding nearby Macs. Turn Zeus on in System Settings, Privacy and Security, Local Network.") {
                     Button("Open System Settings") { NSWorkspace.shared.open(FlingService.localNetworkSettingsURL) }
                         .buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsshelf-page.open-system-settings")
                 }
             }
             GSDivider()
@@ -77,6 +78,7 @@ struct ShelfSettingsPage: View {
                         Button("Remove") { _ = fling?.removePairedMac(id: mac.id) }
                             .buttonStyle(GSButtonStyle())
                             .accessibilityLabel("Remove \(mac.name)")
+                            .accessibilityIdentifier("settings.gsshelf-page.remove")
                     }
                 }
                 GSInfo(text: "Remove deletes the key from the Keychain. That Mac must pair again before it can send.")

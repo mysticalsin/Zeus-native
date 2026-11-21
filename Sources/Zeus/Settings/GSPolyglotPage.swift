@@ -45,6 +45,8 @@ struct PolyglotSettingsPage: View {
             GSRow(symbol: "pip.enter", title: "Floating captions",
                   text: "A strip that stays on top on every desktop and is hidden from screen sharing and recordings.") {
                 Button(polyglot.isPoppedOut ? "Close" : "Pop out") { polyglot.togglePopOut() }.buttonStyle(GSButtonStyle())
+                    .accessibilityLabel(polyglot.isPoppedOut ? "Close" : "Pop out")
+                    .accessibilityIdentifier("settings.gspolyglot-page.close")
             }
         }
         GSCard("Shortcut") {
@@ -69,6 +71,7 @@ struct PolyglotSettingsPage: View {
                 GSRow(symbol: "arrow.up.forward.app", title: "Polyglot.app is installed",
                       text: "Your Python-engine Polyglot, with the call modes and reply helper.") {
                     Button("Open Polyglot.app") { NSWorkspace.shared.open(app) }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gspolyglot-page.control")
                 }
             }
         }

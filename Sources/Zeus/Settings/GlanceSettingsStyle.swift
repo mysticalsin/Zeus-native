@@ -48,6 +48,11 @@ enum GS {
     static let rowText = OB.font(13.5)
     static let sidebarItem = OB.font(15, .medium)
     static let sidebarHead = OB.font(12.5, .medium)
+
+    /// Sidebar row at a Dynamic Type step. `.large` is 15 pt, the size `sidebarItem` already draws.
+    static func sidebarItem(dynamicTypeSize: DynamicTypeSize) -> Font {
+        OB.font(SettingsDynamicType.points(15, dynamicTypeSize: dynamicTypeSize), .medium)
+    }
 }
 
 // MARK: Cards and rows
@@ -123,6 +128,8 @@ struct GSToggleRow: View {
     var body: some View {
         GSRow(symbol: symbol, title: title, text: text) {
             Toggle(title, isOn: $isOn).toggleStyle(GSToggleStyle()).labelsHidden()
+                .accessibilityLabel(title)
+                .accessibilityIdentifier("settings.glance-settings-style.title")
         }
     }
 }
@@ -145,6 +152,7 @@ struct GSLinkRow: View {
             }
             .buttonStyle(GSButtonStyle())
             .accessibilityLabel("\(title): set in \(destination.title)")
+            .accessibilityIdentifier("settings.glance-settings-style.set-in")
         }
     }
 }
@@ -210,6 +218,7 @@ struct GSDetails: View {
         }
         .tint(GS.controlText)
         .padding(.vertical, 10)
+        .accessibilityIdentifier("settings.glance-settings-style.control.2")
     }
 }
 
@@ -305,6 +314,8 @@ struct GSDeactivateLicenseControl: View {
             }
             .buttonStyle(GSButtonStyle())
             .disabled(license.busy)
+            .accessibilityLabel(license.deactivationError == nil ? "Use another license" : "Try again")
+            .accessibilityIdentifier("settings.glance-settings-style.use-another-license")
             if let message = license.deactivationError {
                 Text(message).font(GS.rowText).foregroundStyle(GS.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -317,16 +328,20 @@ struct GSDeactivateLicenseControl: View {
 
 /// Glance's switch: 44 x 20, grey off, blue on.
 struct GSToggleStyle: ToggleStyle {
+    /// Reads `accessibilityReduceMotion`. The setting is never written.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {
             ZStack(alignment: configuration.isOn ? .trailing : .leading) {
                 Capsule().fill(configuration.isOn ? OB.toggleOn : GS.toggleOff).frame(width: 44, height: 20)
                 Capsule().fill(configuration.isOn ? Color(rgb: 225, 235, 254) : GS.knob).frame(width: 27, height: 16).padding(.horizontal, 2)
             }
-            .animation(.spring(response: 0.28, dampingFraction: 0.85), value: configuration.isOn)
+            .animation(reduceMotion ? nil : .spring(response: MotionTokens.settingsToggleResponse, dampingFraction: MotionTokens.settingsToggleDamping), value: configuration.isOn)
         }
         .buttonStyle(.plain)
         .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
+        .accessibilityIdentifier("settings.glance-settings-style.control")
     }
 }
 
@@ -408,6 +423,7 @@ struct GSPictureChoice<Art: View>: View {
         .buttonStyle(.plain)
         .accessibilityLabel(caption.map { "\(title), \($0)" } ?? title)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .accessibilityIdentifier("settings.glance-settings-style.circle")
     }
 }
 

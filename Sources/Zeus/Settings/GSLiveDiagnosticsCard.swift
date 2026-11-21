@@ -37,6 +37,7 @@ struct LiveDiagnosticsCard: View {
                 }
                 .buttonStyle(GSButtonStyle())
                 .accessibilityLabel(copied ? Self.copiedAnnouncement : "Copy the diagnostics summary")
+                .accessibilityIdentifier("settings.gslive-diagnostics-card.copied")
             }
         }
         // The probe is an NSView; ImageRenderer (snapshots) would draw it as a yellow placeholder.

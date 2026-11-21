@@ -25,11 +25,15 @@ struct BeamerSettingsPage: View {
                         // here -- see `installNote` below for why.
                         Button("Install Beamer") { Task { await beamer.install() } }
                             .buttonStyle(GSButtonStyle(prominent: true)).disabled(beamer.busy)
+                            .accessibilityIdentifier("settings.gsbeamer-page.install-beamer")
                     case .notRunning:
                         Button("Start Beamer") { Task { await beamer.perform(.start) } }.buttonStyle(GSButtonStyle(prominent: true)).disabled(beamer.busy)
+                            .accessibilityIdentifier("settings.gsbeamer-page.start-beamer")
                         Button("Open window") { Task { await beamer.perform(.showWindow) } }.buttonStyle(GSButtonStyle()).disabled(beamer.busy)
+                            .accessibilityIdentifier("settings.gsbeamer-page.open-window")
                     case .needsPermission, .ready:
                         Button("Machines panel") { Task { await beamer.perform(.showWindow) } }.buttonStyle(GSButtonStyle(prominent: true)).disabled(beamer.busy)
+                            .accessibilityIdentifier("settings.gsbeamer-page.machines-panel")
                     }
                 }
             }
@@ -40,16 +44,20 @@ struct BeamerSettingsPage: View {
                   text: status.availability == .ready ? status.link.summary : "Needs Beamer running and Accessibility for Zeus.") {
                 Button(status.paused == true ? "Resume" : "Pause") { Task { await beamer.perform(status.paused == true ? .resume : .pause) } }
                     .buttonStyle(GSButtonStyle()).disabled(status.availability != .ready || beamer.busy)
+                    .accessibilityLabel(status.paused == true ? "Resume" : "Pause")
+                    .accessibilityIdentifier("settings.gsbeamer-page.resume")
             }
             GSDivider()
             GSRow(symbol: "house", title: "Bring input back to this Mac", text: "When your keyboard and mouse are on another machine.") {
                 Button("Bring back") { Task { await beamer.perform(.returnHome) } }
                     .buttonStyle(GSButtonStyle()).disabled(status.availability != .ready || !status.isCrossed || beamer.busy)
+                    .accessibilityIdentifier("settings.gsbeamer-page.bring-back")
             }
             if status.availability == .needsPermission {
                 GSDivider()
                 GSRow(symbol: "accessibility", title: "Accessibility", text: "Beamer has no remote control, so Zeus presses its menu bar menu. macOS also asks once to let Zeus control System Events.") {
                     Button("Allow") { context.permissions.request(.accessibility) }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsbeamer-page.allow")
                 }
             }
         }
@@ -66,6 +74,7 @@ struct BeamerSettingsPage: View {
                         GSStatus(ok: true, text: status.link == .driving(machine.name) ? "Has your keyboard" : "Driving this Mac")
                     } else if status.availability == .ready, machine.inUse {
                         Button("Switch to") { Task { await beamer.perform(.switchTo(machine.name)) } }.buttonStyle(GSButtonStyle()).disabled(beamer.busy)
+                            .accessibilityIdentifier("settings.gsbeamer-page.switch-to")
                     }
                 }
             }

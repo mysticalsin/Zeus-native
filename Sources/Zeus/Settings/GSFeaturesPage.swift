@@ -79,7 +79,9 @@ struct FeaturesSettingsPage: View {
             GSRow(symbol: "folder", title: "Save reports in", text: folderText) {
                 HStack(spacing: 8) {
                     Button("Choose") { chooseFolder() }.buttonStyle(GSButtonStyle())
-                    if !store.string("research.folder").isEmpty { Button("Default") { store.set("research.folder", "") }.buttonStyle(GSButtonStyle()) }
+                        .accessibilityIdentifier("settings.gsfeatures-page.choose")
+                    if !store.string("research.folder").isEmpty { Button("Default") { store.set("research.folder", "") }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsfeatures-page.default") }
                 }
             }
         }
@@ -154,6 +156,7 @@ struct GSTextInput: View {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
             .accessibilityLabel(label)
+            .accessibilityIdentifier("settings.gsfeatures-page.control")
     }
 }
 
@@ -182,6 +185,7 @@ struct ScribeAutoStartCard: View {
                             .buttonStyle(GSButtonStyle())
                             .accessibilityLabel("Allow microphone")
                             .padding(.trailing, 13.5)
+                            .accessibilityIdentifier("settings.gsfeatures-page.allow-microphone")
                     }
                 }
             }

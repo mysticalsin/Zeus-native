@@ -93,8 +93,11 @@ struct DiagnosticsLogsCard: View {
             GSRow(symbol: "square.and.arrow.up", title: "Export diagnostics", text: "") {
                 HStack(spacing: 8) {
                     Button("Copy log") { model.copyVisible() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsdiagnostics-logs.copy-log")
                     Button("Choose folder") { model.chooseFolder() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsdiagnostics-logs.choose-folder")
                     Button("Export") { model.exportToDesktop() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityIdentifier("settings.gsdiagnostics-logs.export")
                 }
             }
             if let message = model.message {
@@ -102,6 +105,7 @@ struct DiagnosticsLogsCard: View {
                     Text(message).font(GS.rowText).foregroundStyle(GS.secondary)
                     if let zip = model.exported {
                         Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([zip]) }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsdiagnostics-logs.show-in-finder")
                     }
                 }
                 .padding(.top, 6)

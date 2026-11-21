@@ -23,16 +23,19 @@ struct LanguagePacksCard: View {
                         Button("Install now") { packs.installNow() }
                             .buttonStyle(GSButtonStyle(prominent: true))
                             .accessibilityLabel("Install language packs now, even in Low Power Mode")
+                            .accessibilityIdentifier("settings.gslanguage-packs-card.install-language-packs-now-even-in-low-pow")
                     }
                     if state.isBusy {
                         Button("Cancel") { packs.cancel() }
                             .buttonStyle(GSButtonStyle())
                             .accessibilityLabel("Cancel the language pack installs")
+                            .accessibilityIdentifier("settings.gslanguage-packs-card.cancel-the-language-pack-installs")
                     } else {
                         Button("Install all four") { packs.installAll() }
                             .buttonStyle(GSButtonStyle(prominent: true))
                             .disabled(!state.analyzerSupported)
                             .accessibilityLabel("Install all four language packs")
+                            .accessibilityIdentifier("settings.gslanguage-packs-card.install-all-four-language-packs")
                     }
                 }
             }
@@ -42,6 +45,7 @@ struct LanguagePacksCard: View {
                 Button("Open System Settings") { packs.openDictationSystemSettings() }
                     .buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Open the Dictation languages in System Settings")
+                    .accessibilityIdentifier("settings.gslanguage-packs-card.open-the-dictation-languages-in-system-set")
             }
             GSInfo(text: "Best accuracy for every language at once is the Parakeet model in Speech engine below. It is a separate, optional download.")
         }
@@ -67,6 +71,7 @@ struct LanguagePacksCard: View {
                 Button("Remove") { packs.remove(pack) }
                     .buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Remove the \(pack.title) language pack")
+                    .accessibilityIdentifier("settings.gslanguage-packs-card.remove-the-language-pack")
             }
         case .installing(let progress):
             GSStatus(ok: false, text: "\(Int((progress * 100).rounded()))%")
@@ -76,12 +81,14 @@ struct LanguagePacksCard: View {
             Button("Try again") { packs.install(pack) }
                 .buttonStyle(GSButtonStyle(prominent: true))
                 .accessibilityLabel("Try the \(pack.title) language pack again")
+                .accessibilityIdentifier("settings.gslanguage-packs-card.try-the-language-pack-again")
         case .unsupportedOnThisMac:
             GSStatus(ok: false, text: "Not available")
         case .notInstalled:
             Button("Install") { packs.install(pack) }
                 .buttonStyle(GSButtonStyle(prominent: true))
                 .accessibilityLabel("Install the \(pack.title) language pack")
+                .accessibilityIdentifier("settings.gslanguage-packs-card.install-the-language-pack")
         }
     }
 }

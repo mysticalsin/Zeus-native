@@ -70,9 +70,12 @@ struct GSFacePresenceCard: View {
                     HStack(spacing: 14) {
                         Toggle(face.name, isOn: Binding(get: { face.isEnabled }, set: { setFace(face.id, $0) }))
                             .toggleStyle(GSToggleStyle()).labelsHidden()
+                            .accessibilityLabel(face.name)
+                            .accessibilityIdentifier("settings.gsface-presence-card.face-name")
                         Button { deleteFace(face.id) } label: { Image(systemName: "trash") }
                             .buttonStyle(GSButtonStyle())
                             .accessibilityLabel("Delete \(face.name)")
+                            .accessibilityIdentifier("settings.gsface-presence-card.delete")
                     }
                 }
             }
@@ -81,6 +84,7 @@ struct GSFacePresenceCard: View {
                 Button("Enroll", action: enroll)
                     .buttonStyle(GSButtonStyle())
                     .disabled(!model.enrollEnabled)
+                    .accessibilityIdentifier("settings.gsface-presence-card.enroll")
             }
             GSDivider()
             GSRow(symbol: "timer", title: "Lock after absent for") {
