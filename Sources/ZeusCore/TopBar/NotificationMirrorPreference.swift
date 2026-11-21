@@ -17,9 +17,13 @@ public enum NotificationMirrorPreference {
     @discardableResult
     public static func migrate(_ defaults: UserDefaults) -> Bool {
         guard defaults.object(forKey: key) == nil else { return false }
-        guard defaults.string(forKey: legacyKey) == "false" else { return false }
-        defaults.set(false, forKey: key)
-        return true
+        switch defaults.string(forKey: legacyKey) {
+        case "false", "true":
+            set(false, defaults: defaults)
+            return true
+        default:
+            return false
+        }
     }
 
     /// An imported value enables the mirror when it is boolean true or the string `"true"`.

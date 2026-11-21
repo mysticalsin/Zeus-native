@@ -372,6 +372,12 @@ final class SettingsStore {
         for (id, raw) in root["options"] as? [String: Any] ?? [:] {
             guard let option = SettingsCatalog.option(id), option.state != .stub, let value = raw as? String,
                   Self.accepts(value, for: option) else { continue }
+            if id == "notify.mirror" {
+                if !TopBarStyle.isSnapshot {
+                    _ = NotificationMirrorPreference.applyImport(value, defaults: defaults)
+                }
+                continue
+            }
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
             if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if Self.neverChosenByImport[id]?.contains(value) == true { continue }
@@ -382,9 +388,12 @@ final class SettingsStore {
             let rule = Self.appRules[key] ?? (key == HaloMigration.legacyKey ? AppRule.text(64) : nil)
             guard let rule, rule.accepts(value), !Self.neverImportedAppKeys.contains(key) else { continue }
             if Self.neverEnabledAppKeys.contains(key), (value as? NSNumber)?.boolValue == true { continue }
-            // An import cannot enable the notch mirror, whether the file says true or "true".
-            if (key == NotificationMirrorPreference.key || key == NotificationMirrorPreference.legacyKey),
-               NotificationMirrorPreference.importWouldEnable(value) { continue }
+            if key == NotificationMirrorPreference.key || key == NotificationMirrorPreference.legacyKey {
+                if !TopBarStyle.isSnapshot {
+                    _ = NotificationMirrorPreference.applyImport(value, defaults: defaults)
+                }
+                continue
+            }
             // An import never moves speech to a cloud service: this Mac may already hold that service's key.
             if Self.importWouldSelectCloud(key: key, value: value) { continue }
             appChanges.append((key, value))
