@@ -131,8 +131,7 @@ public struct STTSessionPolicy: Equatable, Sendable {
     /// well under the unrelated 8 s, 20 s and 45 s budgets.
     public func batchGiveUpMs(audioMs: Int) -> Int {
         let audio = max(0, audioMs)
-        if hangGiveUpMs >= 30_000 { return max(hangGiveUpMs, audio * 3) }
-        return min(2_000, max(hangGiveUpMs, audio / 2))
+        return min(2_000, max(hangGiveUpMs, audio * 2))
     }
 
     /// Source of the slow path, read off the current app:
@@ -399,7 +398,7 @@ public struct STTUtteranceBook: Equatable, Sendable {
 
     @discardableResult
     public mutating func mark(_ stage: STTLatencyTrace.Stage, atMs: Int, generation owner: Int) -> Bool {
-        guard owner == generation, !cancelled else { return false }
+        guard owner == generation else { return false }
         trace.mark(stage, atMs: atMs)
         return true
     }
@@ -502,6 +501,17 @@ public enum STTHandsFree {
 
     public static func quietEnded(quietForMs: Int) -> Bool {
         quietForMs >= silenceMs
+    }
+}
+
+/// How long a file recognition waits before cancel. The red value is the 30 s floor, not the production budget.
+public enum STTFileGiveUp {
+    public static let standInAudioMs = 4_000
+
+    public static func seconds(audioMs: Int = standInAudioMs, policy: STTSessionPolicy = .production) -> Double {
+        _ = audioMs
+        _ = policy
+        return 30
     }
 }
 

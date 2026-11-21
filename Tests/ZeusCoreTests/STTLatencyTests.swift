@@ -69,6 +69,36 @@ struct STTLatencyTests {
         #expect(!STTSessionPolicy.production.allowsServerRoundTrip)
     }
 
+    @Test func batchGiveUpPinsTheExactFormula() {
+        let policy = STTSessionPolicy.production
+        let oneSecond = policy.batchGiveUpMs(audioMs: 1_000)
+        let mid = policy.batchGiveUpMs(audioMs: 2_400)
+        let capped = policy.batchGiveUpMs(audioMs: 10_000)
+        #expect(policy.hangGiveUpMs == 800)
+        #expect(oneSecond == 800)
+        #expect(oneSecond != 2_000)
+        #expect(mid == 1_200)
+        #expect(capped == 2_000)
+        #expect(STTSessionPolicy.production.endpointToFinalMs == 450)
+    }
+
+    @Test func legacyBatchGiveUpKeepsTheThirtySecondFloor() {
+        let legacy = STTSessionPolicy.legacy
+        let short = legacy.batchGiveUpMs(audioMs: 1_000)
+        let long = legacy.batchGiveUpMs(audioMs: 12_000)
+        #expect(legacy.hangGiveUpMs == 30_000)
+        #expect(short == 30_000)
+        #expect(long == 36_000)
+    }
+
+    @Test func fileRecognitionGiveUpUsesTheProductionBudget() {
+        let file = STTFileGiveUp.seconds(audioMs: STTFileGiveUp.standInAudioMs)
+        let oneSecond = STTFileGiveUp.seconds(audioMs: 1_000)
+        #expect(STTFileGiveUp.standInAudioMs == 4_000)
+        #expect(file == 2)
+        #expect(oneSecond == 0.8)
+    }
+
     @Test func failureRateIsZeroWhenAPartialWasAlreadyHeard() {
         let lines = STTLatencyHarness.failureReport(policy: .production, turns: 4)
         #expect(lines.count == 2)
@@ -213,6 +243,7 @@ struct STTLatencyTests {
         let crossing = 100 + STTSessionPolicy.production.silenceToEndpointMs
         #expect(silence == 100)
         #expect(endpoint == crossing)
+        #expect(endpoint == 500)
         #expect(endpoint != 10_000)
     }
 
@@ -239,6 +270,17 @@ struct STTLatencyTests {
         #expect(exact == silenceAt + budget)
         #expect(late == silenceAt + budget)
         #expect(late != silenceAt + budget + 1)
+    }
+
+    @Test func aCancelledMarkDoesNotWriteTheOpenUtterance() {
+        var book = STTUtteranceBook()
+        let id = book.begin(path: .talkHold, atMs: 0)
+        book.cancel(generation: id)
+        let wrote = book.mark(.speechStart, atMs: 40, generation: id)
+        let speech = book.trace.offset(.speechStart)
+        #expect(book.cancelled)
+        #expect(!wrote)
+        #expect(speech == nil)
     }
 
     @Test func aStaleMarkDoesNotWriteTheOpenUtterance() {
