@@ -40,6 +40,9 @@ final class ResearchRunner {
         guard !isRunning else { return nil }
         let question = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty else { return finish(Outcome(spoken: "What should I look into?", problem: "no question"), question: question, depth: depth, speak: speak, engine: nil) }
+        if !RestrictedTurn.mayUseProvider(restricted: restricted) {
+            return Outcome(spoken: Self.restrictedBrowserRefusal, problem: Self.restrictedBrowserRefusal)
+        }
         isRunning = true
         stopped = false
         showCard(question: question, task: depth == .deep ? "Researching in depth" : "Researching")
