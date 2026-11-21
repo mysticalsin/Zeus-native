@@ -32,6 +32,26 @@ import Testing
         #expect(!decision.lateRelativeToCap)
     }
 
+    @Test func the50msBoundaryIncludes399AndDrops400() {
+        let inside = TalkCapturePolicy.decision(shotReadyMs: 399, sttFinalMs: nil, capMs: 450)
+        #expect(TalkCapturePolicy.speechWaitBoundMs == 400)
+        #expect(!inside.lateRelativeToCap)
+        #expect(inside.includeShot)
+        #expect(inside.speechStarts)
+        let edge = TalkCapturePolicy.decision(shotReadyMs: 400, sttFinalMs: 450, capMs: 450)
+        #expect(edge.lateRelativeToCap)
+        #expect(!edge.includeShot)
+    }
+
+    @Test func aShotAfterTheTranscriptFinalIsLeftOut() {
+        let after = TalkCapturePolicy.decision(shotReadyMs: 300, sttFinalMs: 200, capMs: 450)
+        #expect(!after.includeShot)
+        #expect(after.speechStarts)
+        let before = TalkCapturePolicy.decision(shotReadyMs: 150, sttFinalMs: 200, capMs: 450)
+        #expect(before.includeShot)
+        #expect(!before.lateRelativeToCap)
+    }
+
     @Test func aShotReadyAt400msAgainstThe450msCapIsLeftOutAndSpeechStillStarts() {
         let decision = TalkCapturePolicy.decision(shotReadyMs: 400, sttFinalMs: nil, capMs: 450)
         #expect(decision.lateRelativeToCap)
