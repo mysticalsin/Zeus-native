@@ -48,7 +48,8 @@ public enum GuidedPresent {
         )
     }
 
-    public static func clickHits(_ click: CGPoint, target: ResolvedTarget) -> Bool {
+    public static func clickHits(_ click: CGPoint, target: ResolvedTarget, scale: CGFloat = 1) -> Bool {
+        _ = scale
         if let rect = target.hitRect { return rect.contains(click) }
         return hypot(click.x - target.screenPoint.x, click.y - target.screenPoint.y) <= 60
     }

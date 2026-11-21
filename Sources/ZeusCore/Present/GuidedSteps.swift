@@ -33,17 +33,37 @@ public struct GuidedSteps: Equatable, Sendable {
         self.cancelled = false
     }
 
-    /// A click outside the target stays on this step. A click inside advances.
-    /// Hit testing is `GuidedPresent.clickHits`.
+    /// Red stub: every press advances two steps, hit testing included.
     public mutating func click(at point: CGPoint) {
-        guard !cancelled, let current = target else { return }
-        guard GuidedPresent.clickHits(point, target: current) else { return }
-        guard index + 1 < steps.count else {
+        _ = point
+        guard !cancelled else { return }
+        guard index + 2 < steps.count else {
             target = nil
             return
         }
-        index += 1
+        index += 2
         target = steps[index].target
+    }
+
+    public static let dragThreshold: CGFloat = 8
+
+    /// Red stub: ignores the drag, repeats the click for every count, and keeps the rect from init.
+    public mutating func click(at point: CGPoint, count: Int, pressedAt: CGPoint) {
+        _ = pressedAt
+        let times = max(count, 1)
+        for _ in 0..<times { click(at: point) }
+    }
+
+    public mutating func setRect(_ rect: CGRect, forStep step: Int, label: String? = nil) {
+        _ = (rect, step, label)
+    }
+
+    public var accessibilityLabel: String { progress }
+
+    public mutating func move(to newIndex: Int) {
+        guard steps.indices.contains(newIndex) else { return }
+        index = newIndex
+        target = steps[newIndex].target
     }
 
     public mutating func cancel() {
