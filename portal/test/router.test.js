@@ -43,3 +43,16 @@ test('app API: activate, revocations, public key need no session', async () => {
   const bad = await router.handle(req('/api/v1/activate', { method: 'POST', body: { key: 'ZEUS1.x.y', device } }));
   assert.equal(bad.status, 400);
 });
+
+test('ninth login is still limited when the forwarding headers change', async () => {
+  const { router } = await setup();
+  const portalHeader = { 'x-zeus-portal': '1' };
+  assert.equal((await router.handle(req('/api/setup', { method: 'POST', body: { passphrase: 'correct horse battery' }, headers: portalHeader }))).status, 200);
+  const forwarded = (address) => ({ ...portalHeader, 'cf-connecting-ip': address, 'x-forwarded-for': address });
+  for (let i = 0; i < 8; i += 1) {
+    const res = await router.handle(req('/api/login', { method: 'POST', body: { passphrase: 'wrong wrong wrong' }, headers: forwarded('203.0.113.8') }));
+    assert.equal(res.status, 401);
+  }
+  const ninth = await router.handle(req('/api/login', { method: 'POST', body: { passphrase: 'wrong wrong wrong' }, headers: forwarded('203.0.113.9') }));
+  assert.equal(ninth.status, 429);
+});
