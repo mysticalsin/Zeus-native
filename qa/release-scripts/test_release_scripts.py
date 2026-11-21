@@ -108,7 +108,7 @@ class ReleaseScripts(unittest.TestCase):
         # Only substitute the macOS-only absolute PlistBuddy path; all shell control flow is original.
         bundle = self.root / "scripts/bundle.sh"
         bundle.write_text(bundle.read_text().replace("/usr/libexec/PlistBuddy", "plistbuddy"))
-        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements"):
+        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements", "PrivacyInfo.xcprivacy"):
             (self.root / "Resources" / name).write_text("fixture")
         for name in ("dist", "icons", "node_modules"):
             (self.root / "extension" / name).mkdir(parents=True)
