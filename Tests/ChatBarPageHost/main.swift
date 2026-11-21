@@ -309,6 +309,20 @@ struct ChatBarPageHost {
         let tapped = ChatBarPage.reduce(forming, .transcriptTap, lineID: fresh)
         check(tapped.opensWindow == false && tapped.state.composerFocused, "a transcript click focuses the composer")
         check(sameLines(tapped.state.transcript.lines, forming.transcript.lines), "a transcript click does not change the lines")
+
+        let waitingMessages = [
+            ChatMessage(id: person, role: .user, text: "Stop this"),
+            ChatMessage(id: fresh, role: .assistant, text: ""),
+        ]
+        let stored = ChatBarPage.transcript(messages: waitingMessages, sending: true)
+        check(stored.status == .streaming, "a live empty reply is streaming")
+        let fromModel = ChatBarPage.reduce(
+            ChatBarState(transcript: stored, selectedID: nil, showsNewChatForm: false, draft: "", composerFocused: false),
+            .stop,
+            lineID: fresh
+        )
+        check(fromModel.stopModel && fromModel.state.transcript.lines.last?.text == "Stopped", "Stop on the live transcript says Stopped")
+        check(fromModel.state.transcript.lines.last?.id == fresh, "Stop keeps the waiting line’s id")
     }
 
     struct Want {
