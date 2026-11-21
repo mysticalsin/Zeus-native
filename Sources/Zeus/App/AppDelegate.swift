@@ -318,10 +318,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.cliInstall) { CLIInstaller.install() }
         if on(.assistantKeyImport) { AssistantKeyImporter.importDefaultIfNeeded() }
         if on(.talkHotkey) {
-            hotkey.onPress = { [weak self] in self?.talkKeyPressed() ?? false }
+            // The monitor plays the installed talk cues. This path does not also play listenStart.
+            hotkey.onPress = { [weak self] in self?.talkKeyPressed(builtinCue: false) ?? false }
             hotkey.onRelease = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
-                self?.voice?.release()
+                self?.voice?.release(builtinCue: false)
+            }
+            // Right Command is Murmur, owned by the dictation monitor. This talk monitor must not start a second session.
+            hotkey.onListenAccessMissing = { [weak self] in
+                if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
             // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one. Every event reads
@@ -653,7 +658,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Whether a turn opened: false tells the key machine nothing is listening, so no release or cancel is owed.
-    private func talkKeyPressed() -> Bool {
+    private func talkKeyPressed(builtinCue: Bool = true) -> Bool {
         guard on(.talkHotkey), voice != nil else { return false }
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
@@ -667,11 +672,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.talkKeyHeld = false
             Task { @MainActor in
                 let access = await VoicePermissions.ensure(explicit: true)
-                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: press the talk key again")) }
+                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: hold Control + Option again")) }
             }
             return false
         }
-        let took = voice?.press() ?? false
+        let took = voice?.press(builtinCue: builtinCue) ?? false
         // No release follows a press that opened nothing, so the wake word listener must not stay held off.
         if !took { WakeWordController.shared.talkKeyHeld = false }
         return took

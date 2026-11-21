@@ -122,7 +122,7 @@ public enum PermissionSweep {
         public var phase: Phase = .idle
         /// Steps still to come after the current one.
         public var queue: [Step] = []
-        /// Items asked or guided in this sweep: never again.
+        /// Steps this sweep has finished. The open step is not included, so a relaunch continues there.
         public var visited: [Item] = []
         public var needsRestart = false
         public init() {}
@@ -192,6 +192,39 @@ public enum PermissionSweep {
     public static func shouldResume(_ progress: Progress?, now: Double) -> Bool {
         guard let progress else { return false }
         return now - progress.savedAt >= 0 && now - progress.savedAt < resumeWindow
+    }
+
+    /// Buttons on the floating guide, in keyboard focus order.
+    /// Done is Return. Skip is Escape. Stop follows them for VoiceOver and Full Keyboard Access.
+    public struct GuideButton: Equatable, Sendable {
+        public enum Role: String, Hashable, Sendable { case done, skip, stop }
+        /// Return (default) or Escape (cancel). Nil is pointer-only.
+        public enum KeyAction: Equatable, Sendable { case defaultAction, cancelAction }
+        public var role: Role
+        public var title: String
+        public var voiceOverLabel: String
+        public var keyAction: KeyAction?
+        public var focusOrder: Int
+        public init(role: Role, title: String, voiceOverLabel: String, keyAction: KeyAction?, focusOrder: Int) {
+            self.role = role
+            self.title = title
+            self.voiceOverLabel = voiceOverLabel
+            self.keyAction = keyAction
+            self.focusOrder = focusOrder
+        }
+    }
+
+    public static func guideButtons(_ phase: Phase) -> [GuideButton] {
+        var buttons: [GuideButton] = []
+        if case .guiding(let item) = phase, item.mayNeedRestart {
+            buttons.append(.init(role: .done, title: "Done", voiceOverLabel: "Done, \(item.title) is on",
+                                  keyAction: .defaultAction, focusOrder: buttons.count))
+        }
+        buttons.append(.init(role: .skip, title: "Skip", voiceOverLabel: "Skip this one",
+                              keyAction: .cancelAction, focusOrder: buttons.count))
+        buttons.append(.init(role: .stop, title: "Stop", voiceOverLabel: "Stop allowing",
+                              keyAction: nil, focusOrder: buttons.count))
+        return buttons
     }
 
     /// The guide's one line for the current step.
@@ -266,6 +299,11 @@ public enum PermissionSweep {
         var next = state
         var effects = effects
         let wasRunning = state.isRunning
+        // The step being left is finished. The step about to open is not, or a relaunch
+        // (Screen Recording quits Zeus) would skip the switch the person was on.
+        if let leaving = state.current, !next.visited.contains(leaving) {
+            next.visited.append(leaving)
+        }
         while !next.queue.isEmpty {
             let step = next.queue.removeFirst()
             if next.visited.contains(step.item) { continue }
@@ -273,7 +311,6 @@ public enum PermissionSweep {
             if current == .allowed { continue }
             // Answered by an earlier prompt in this sweep (Microphone also asks Speech): never ask again.
             if step.route == .prompt, current != .notAsked { continue }
-            next.visited.append(step.item)
             effects.append(.save(Progress(visited: next.visited, needsRestart: next.needsRestart, savedAt: now)))
             switch step.route {
             case .prompt:
