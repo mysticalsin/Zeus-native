@@ -8683,10 +8683,10 @@
       "features": [
         "F13"
       ],
-      "check": "closed-loop-selftests",
+      "check": "portable-placed-mark",
       "guard": {
-        "file": "qa/closed-loop/tests/test_placed_mark.py",
-        "function": "test_zeuscore_declares_placed_mark_once"
+        "file": "Tests/ZeusCoreTests/PlacedMarkSignatureTests.swift",
+        "function": "theCompiledPlaceSignaturesAreTheScreenAndDrawingForms"
       }
     }
   ]
