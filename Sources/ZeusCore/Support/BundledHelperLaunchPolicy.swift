@@ -137,11 +137,15 @@ public enum BundledHelperLaunchPolicy {
         publishedExecutable(checkedPath: bundlePath, helperName: bridgeSigningIdentifier, decision: decision) == bundlePath
     }
 
-    /// The installer stages `Application Support/Zeus/bin/zeus-bridge.new`. That path is not publishable.
-    /// This still requires the staged path itself to pass, which is the Connect Chrome failure.
+    /// Connect Chrome copies the helper to `Application Support/Zeus/bin/zeus-bridge.new`.
+    /// That staged path is not publishable: the file name is not `zeus-bridge`, and the directory is user-writable.
+    /// Staging is allowed only after the bundle path itself passed, and only for that staged name.
     public static func acceptsStagedBridge(bundlePath: String, stagedPath: String, bundleDecision: BundledHelperLaunchDecision) -> Bool {
-        _ = bundlePath
-        return publishedExecutable(checkedPath: stagedPath, helperName: bridgeSigningIdentifier, decision: bundleDecision) == stagedPath
+        guard mayStage(bundlePath: bundlePath, decision: bundleDecision) else { return false }
+        let staged = stagedPath.replacingOccurrences(of: "\\", with: "/")
+        guard URL(fileURLWithPath: staged).lastPathComponent == "zeus-bridge.new" else { return false }
+        guard isUserWritableHelperCopy(staged) else { return false }
+        return publishedExecutable(checkedPath: staged, helperName: bridgeSigningIdentifier, decision: bundleDecision) == nil
     }
 
     /// Lowercase hex using only the ASCII digits `0-9` and `a-f`.

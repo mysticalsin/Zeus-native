@@ -93,8 +93,8 @@ enum ChromeInstaller {
                 staged: staged,
                 destination: directory.appendingPathComponent(BundledHelperLaunchPolicy.bridgeSigningIdentifier),
                 registration: registration,
-                accept: { _ in
-                    BundledHelperLaunchPolicy.mayStage(bundlePath: path, decision: decision)
+                accept: { url in
+                    BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: path, stagedPath: url.path, bundleDecision: decision)
                 },
                 writeRegistration: {
                     try FileManager.default.createDirectory(at: registration.deletingLastPathComponent(), withIntermediateDirectories: true)
