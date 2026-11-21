@@ -81,6 +81,8 @@ public enum MediaCommandEvent: Equatable, Sendable {
     case sourceReady
     /// Asks whether a launch has run out of time. At `launchTimeout` it is still open. One second later it fails.
     case launchClock
+    /// Zeus is speaking. Play is refused until this is false. Pause and the other commands are unchanged.
+    case speech(Bool)
 }
 
 public enum MediaCommandEffect: Equatable, Sendable {
@@ -104,6 +106,11 @@ public struct MediaCommandRejection: Error, Equatable, Sendable {
     public var reason: Reason
 
     public init(_ reason: Reason) { self.reason = reason }
+}
+
+/// Set while Zeus is listening or speaking. The music transport reads it before Play.
+public enum ZeusSpeechHold {
+    public static var active = false
 }
 
 /// One router for play, pause, next, previous and seek. Illegal transitions throw and change nothing.
@@ -141,6 +148,7 @@ public struct MediaCommandRouter: Equatable, Sendable {
     private var holdContradictionsUntil: Double?
     private var lastLaunchBundleID = MediaCommandRouter.defaultLaunchBundleID
     private var launchStartedAt: Double?
+    private var speechHeld = false
 
     public init() {
         state = .unknown
@@ -163,6 +171,9 @@ public struct MediaCommandRouter: Equatable, Sendable {
             return ready(now: now)
         case .launchClock:
             return launchClock(now: now)
+        case .speech(let active):
+            speechHeld = active
+            return []
         }
     }
 
@@ -216,6 +227,7 @@ public struct MediaCommandRouter: Equatable, Sendable {
         if let last = lastCommandAt, now - last < Self.debounceWindow {
             throw MediaCommandRejection(.duplicate)
         }
+        if command == .play, speechHeld { throw MediaCommandRejection(.blocked) }
         switch state {
         case .unknown:
             throw MediaCommandRejection(.illegalTransition)

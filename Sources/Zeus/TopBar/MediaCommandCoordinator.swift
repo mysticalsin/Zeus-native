@@ -67,6 +67,7 @@ final class MediaCommandCoordinator {
     private func press(_ command: MediaControlCommand) {
         let effects: [MediaCommandEffect]
         do {
+            _ = try router.reduce(.speech(ZeusSpeechHold.active), now: clock())
             effects = try router.reduce(.press(command), now: clock())
         } catch let rejection as MediaCommandRejection {
             MediaCommandLog.write("command \(Self.word(command)) rejected \(Self.word(rejection.reason))")
