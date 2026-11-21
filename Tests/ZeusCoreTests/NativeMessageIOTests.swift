@@ -84,6 +84,20 @@ struct NativeMessageIOTests {
         #expect(admission5 == .closed)
     }
 
+    @Test func finishKeepsTheEnqueueDeadline() async throws {
+        let pipe = Pipe()
+        let output = try NativeMessageOutput(handle: pipe.fileHandleForWriting, writeTimeout: 0.2)
+        try pipe.fileHandleForWriting.close()
+        defer { output.stop(); try? pipe.fileHandleForReading.close() }
+        let results = Box<[NativeMessageOutput.Failure]>([])
+        let admission = output.enqueue(try largeFrame()) { result in
+            if case .failure(let failure) = result { results.change { $0.append(failure) } }
+        }
+        #expect(admission == .accepted)
+        _ = output.finish { _ in }
+        try await eventually { results.read().contains(.timedOut) }
+    }
+
     @Test func byteBudgetRejectsWorkBeforeTheFrameCountBudgetIsReached() async throws {
         let pipe = Pipe()
         let output = try NativeMessageOutput(handle: pipe.fileHandleForWriting, writeTimeout: 20)
