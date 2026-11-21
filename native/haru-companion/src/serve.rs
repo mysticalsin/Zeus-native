@@ -32,7 +32,9 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
         }
     }
     let listener = {
-        let _guard = BIND_UMASK.lock().unwrap_or_else(|poison| poison.into_inner());
+        let _guard = BIND_UMASK
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         let old = unsafe { umask(0o077) };
         let bound = UnixListener::bind(path);
         unsafe { umask(old) };

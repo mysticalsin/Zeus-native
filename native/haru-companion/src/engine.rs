@@ -481,6 +481,22 @@ fn percentile(values: &[f64], q: f64) -> f64 {
     sorted[lo] * (1.0 - frac) + sorted[hi] * frac
 }
 
+pub fn rss_bytes() -> u64 {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(text) = std::fs::read_to_string("/proc/self/statm") {
+            if let Some(pages) = text
+                .split_whitespace()
+                .nth(1)
+                .and_then(|field| field.parse::<u64>().ok())
+            {
+                return pages.saturating_mul(4096);
+            }
+        }
+    }
+    0
+}
+
 #[cfg(test)]
 mod text_bound {
     use super::Engine;
@@ -516,20 +532,4 @@ mod text_bound {
             engine.text_tokens.len()
         );
     }
-}
-
-pub fn rss_bytes() -> u64 {
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(text) = std::fs::read_to_string("/proc/self/statm") {
-            if let Some(pages) = text
-                .split_whitespace()
-                .nth(1)
-                .and_then(|field| field.parse::<u64>().ok())
-            {
-                return pages.saturating_mul(4096);
-            }
-        }
-    }
-    0
 }
