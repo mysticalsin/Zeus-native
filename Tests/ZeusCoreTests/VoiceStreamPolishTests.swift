@@ -622,6 +622,85 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         let step: any SpeechOutputProcessing = VoiceStreamPolish()
         #expect(!step.process([0.1, -0.1], sampleRate: 24_000).isEmpty)
     }
+
+    @Test func aPartialFailureDoesNotChimeOrShowAFullCaption() {
+        let full = "The reply is spoken one sentence at a time."
+        let close = VoiceTurnFinish.present(caption: full, partialFailure: true)
+        #expect(close.playDoneChime == false)
+        #expect(close.caption.contains(VoiceTurnFinish.failureNote))
+        #expect(close.caption != full)
+        let done = VoiceTurnFinish.present(caption: full, partialFailure: false)
+        #expect(done.playDoneChime)
+        #expect(done.caption == full)
+    }
+
+    @Test func aPartialFailureFailsTheVoiceTestRow() {
+        let fast: (Int) -> String = { "fast (\($0) ms)" }
+        let verdict = VoiceTestScore.verdict(firstAudioMs: 120, partialFailure: true, success: fast)
+        #expect(verdict == "partial failure")
+        #expect(verdict != fast(120))
+        #expect(VoiceTestScore.verdict(firstAudioMs: 120, partialFailure: false, success: fast) == fast(120))
+        #expect(VoiceTestScore.verdict(firstAudioMs: nil, partialFailure: false, success: fast) == "nothing played")
+    }
+
+    @Test func kokoroRenderWAVsAreRemovedOnEveryPath() throws {
+        let text = "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too."
+        func run(failAt: Int?, cancel: Bool) throws {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-dir-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            var clock = SpeechManualClock()
+            let token = SpeechCancelToken()
+            var renders = 0
+            var made: [URL] = []
+            _ = KokoroClausePlayback.play(
+                text: text,
+                personaVoiceID: OriginalSyntheticVoice.id,
+                sampleRate: 24_000,
+                clock: &clock,
+                output: VoiceStreamPolish(),
+                token: token,
+                directory: directory,
+                render: { _, _ in
+                    renders += 1
+                    if cancel, renders == 1 { token.cancel() }
+                    if let failAt, renders == failAt { return nil }
+                    let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-\(UUID().uuidString).wav")
+                    let samples = [Float](repeating: 0.4, count: 2_400)
+                    guard PCMWav.write(samples, sampleRate: 24_000, to: url) else { return nil }
+                    made.append(url)
+                    return url
+                },
+                play: { _ in true })
+            for url in made {
+                #expect(FileManager.default.fileExists(atPath: url.path) == false)
+            }
+            #expect(directoryIsClean(directory))
+        }
+        try run(failAt: nil, cancel: false)
+        try run(failAt: 2, cancel: false)
+        try run(failAt: nil, cancel: true)
+    }
+
+    @Test func speakPassesTheCancelTokenThrough() {
+        var clock = SpeechManualClock()
+        let token = SpeechCancelToken()
+        var calls = 0
+        let receipt = KokoroClausePlayback.speak(
+            text: "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: token,
+            synthesize: { _, _ in
+                calls += 1
+                if calls > 1 { token.cancel() }
+                return [Float](repeating: 0.2, count: 800)
+            },
+            schedule: { _, _ in })
+        #expect(receipt.scheduled.count == 1)
+        #expect(calls == 2)
+    }
 }
 
 private let longAnswer = "The reply is spoken one sentence at a time. Each sentence is rendered by the engine that is ready, then handed to the player while the next sentence is still being prepared. A short pause sits between sentences so the line does not run together. If the preferred engine has no key, no model, or a recent failure, the next engine in the chain takes that sentence. The last engine is the system voice: it renders buffers, lowers the pitch, and slows the rate before the same player speaks them. This paragraph is synthetic fixture text for a voice harness. It names no person, no account, and no private recording. The numbers here are only a shape, such as section 4 and step 2, and they are not a measurement."
