@@ -15,10 +15,18 @@ struct NotificationMirrorPreferenceTests {
         let defaults = try fresh()
         defaults.set("true", forKey: NotificationMirrorPreference.legacyKey)
         #expect(!NotificationMirrorPreference.isOn(defaults))
-        #expect(defaults.object(forKey: NotificationMirrorPreference.key) == nil)
-        #expect(!NotificationMirrorPreference.migrate(defaults))
-        #expect(defaults.object(forKey: NotificationMirrorPreference.key) == nil)
-        #expect(defaults.string(forKey: NotificationMirrorPreference.legacyKey) == "true")
+        #expect(NotificationMirrorPreference.migrate(defaults))
+        #expect(defaults.object(forKey: NotificationMirrorPreference.key) as? Bool == false)
+        #expect(defaults.string(forKey: NotificationMirrorPreference.legacyKey) == "false")
+        #expect(!NotificationMirrorPreference.isOn(defaults))
+    }
+
+    @Test func theImporterCallsTheSingleRule() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/SettingsStore.swift"), encoding: .utf8)
+        #expect(source.contains("NotificationMirrorPreference.applyImport"))
+        #expect(!source.contains("importWouldEnable(value)"))
     }
 
     @Test func aLegacyFalseStringIsCopiedAndKept() throws {
