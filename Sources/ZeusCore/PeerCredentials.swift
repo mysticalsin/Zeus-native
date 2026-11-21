@@ -93,8 +93,9 @@ public enum PeerCheck {
         }
     }
 
-    /// Reads the connected peer's uid (getpeereid, the LOCAL_PEERCRED data), pid (LOCAL_PEERPID)
-    /// and executable path. Nil when the kernel will not say.
+    /// Reads the connected peer's uid, pid and executable path. Nil when the kernel will not say.
+    /// Darwin uses `getpeereid`, `LOCAL_PEERPID` and the audit token. Other platforms read
+    /// `SO_PEERCRED` and leave the audit token empty, so a signature check still fails closed.
     public static func identify(fd: Int32) -> PeerIdentity? {
         #if canImport(Darwin)
         var uid: uid_t = 0
@@ -110,7 +111,23 @@ public enum PeerCheck {
         identity.auditToken = auditToken(fd: fd)
         return identity
         #else
-        return nil
+        // Linux `struct ucred`: pid, uid, gid. Glibc hides the type unless `_GNU_SOURCE` is set,
+        // and the Swift module does not import it, so the layout is stated here.
+        struct Credentials {
+            var pid: pid_t
+            var uid: uid_t
+            var gid: gid_t
+        }
+        var cred = Credentials(pid: 0, uid: 0, gid: 0)
+        var size = socklen_t(MemoryLayout<Credentials>.size)
+        guard getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &size) == 0,
+              Int(size) == MemoryLayout<Credentials>.size else { return nil }
+        var identity = PeerIdentity(uid: UInt32(cred.uid))
+        if cred.pid > 0 {
+            identity.pid = cred.pid
+            identity.executablePath = executablePath(pid: cred.pid)
+        }
+        return identity
         #endif
     }
 
@@ -140,6 +157,16 @@ public enum PeerCheck {
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
         return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+    #else
+    /// The kernel's pid-to-path lookup (`/proc/<pid>/exe`). Nil when the pid is gone or the path does not fit.
+    static func executablePath(pid: pid_t) -> String? {
+        guard pid > 0 else { return nil }
+        let link = "/proc/\(pid)/exe"
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let length = readlink(link, &buffer, buffer.count)
+        guard length > 0, length < buffer.count else { return nil }
+        return String(decoding: buffer.prefix(length).map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
     #endif
 }
