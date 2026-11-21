@@ -992,3 +992,207 @@ enum CommandDisplay {
         return text
     }
 }
+
+// AGENTS-PAGE-MODEL-BEGIN
+
+/// Where the Agents page was opened. The tab and Home show the same page.
+enum AgentsPageEntry: String, Equatable, Sendable {
+    case tab
+    case home
+}
+
+/// What the Agents page is showing. Connection error stays distinct from empty.
+enum AgentsPagePhase: String, Equatable, Sendable {
+    case empty
+    case connecting
+    case connectionError
+    case groups
+    case selected
+    case approval
+    case error
+}
+
+/// One approval the page can show or queue. Tiers beyond the existing high-risk flag are not invented here.
+struct AgentsPageRequest: Equatable, Sendable {
+    var sessionID: String
+    var tool: String
+    var highRisk: Bool
+    var command: String?
+}
+
+/// A decision the page can still take back.
+struct AgentsPageUndo: Equatable, Sendable {
+    var sessions: [String: HubSessionState]
+    var roster: [HubGroupSession]
+    var groups: HubGroupState
+    var loadedGroups: Bool
+    var selectedID: String?
+    var showingRequest: AgentsPageRequest?
+    var queuedRequests: [AgentsPageRequest]
+    var approvalGrown: Bool
+    var secondsLeft: Int
+    var approvalHovered: Bool
+    var approvalFocused: Bool
+}
+
+/// What the Agents page is told. A pair that is not handled leaves the page as it was.
+enum AgentsPageSignal: Equatable, Sendable {
+    case show(AgentsPageEntry)
+    case socketOpening
+    case socketOpened(sessionCount: Int, failureSentence: String?)
+    case socketFailed(String?)
+    case sessionArrived(HubGroupSession)
+    case sessionsReplaced([HubGroupSession])
+    case lastSessionEnded
+    case tryAgain
+    case select(String?)
+    case toggleGroup(String)
+    case approvalRequested(AgentsPageRequest)
+    case approve
+    case deny
+    case dismiss
+    case activity(String)
+    case session(String, HubSessionEvent)
+    case open(String)
+    case hover(Bool)
+    case focus(Bool)
+    case tick
+    case undo
+    case panel(closed: Bool)
+    case newChat(onChatTab: Bool)
+}
+
+/// The Agents page: which screen is up, which row is selected, and whether an approval has grown.
+/// The screen and session machines decide the transitions. This value does not open a window.
+struct AgentsPage: Equatable, Sendable {
+    var screen: HubScreenState
+    var roster: [HubGroupSession]
+    var sessions: [String: HubSessionState]
+    var groups: HubGroupState
+    var loadedGroups: Bool
+    var selectedID: String?
+    var entry: AgentsPageEntry
+    var showingRequest: AgentsPageRequest?
+    var queuedRequests: [AgentsPageRequest]
+    var approvalGrown: Bool
+    var cardAbovePage: Bool
+    var openedWindow: Bool
+    var jumpSessionID: String?
+    var secondsLeft: Int
+    var approvalHovered: Bool
+    var approvalFocused: Bool
+    var undoTicksLeft: Int
+    var undo: AgentsPageUndo?
+    var lastVerdict: HubApprovalVerdict?
+    var panelClosed: Bool
+    var oneSecondTimerScheduled: Bool
+    var socketReadInProgress: Bool
+    var waveDisplayLinkRunning: Bool
+    var reduceMotion: Bool
+    var reasons: [String: String]
+    var tasks: [String: String]
+    var firstFrameMilliseconds: Int?
+
+    static let countdownStart = 12
+    static let undoSeconds = 2
+    static let openBudgetMilliseconds = 100
+    static let idleBudgetPercentOfOneCore = 1.0
+    static let opensNewWindow = false
+    static let usesCommandShortcut = false
+    /// A deny note needs a type this page does not own. Nil means the field is not wired.
+    static let denyNoteLimit: Int? = nil
+
+    static func fresh() -> AgentsPage {
+        AgentsPage(
+            screen: HubScreenState(),
+            roster: [],
+            sessions: [:],
+            groups: HubGroupState(),
+            loadedGroups: false,
+            selectedID: nil,
+            entry: .tab,
+            showingRequest: nil,
+            queuedRequests: [],
+            approvalGrown: false,
+            cardAbovePage: false,
+            openedWindow: false,
+            jumpSessionID: nil,
+            secondsLeft: 0,
+            approvalHovered: false,
+            approvalFocused: false,
+            undoTicksLeft: 0,
+            undo: nil,
+            lastVerdict: nil,
+            panelClosed: true,
+            oneSecondTimerScheduled: false,
+            socketReadInProgress: false,
+            waveDisplayLinkRunning: false,
+            reduceMotion: false,
+            reasons: [:],
+            tasks: [:],
+            firstFrameMilliseconds: nil
+        )
+    }
+
+    /// Press-and-hold is a tier this page cannot name yet.
+    static func holdSeconds(highRisk: Bool) -> Double? { nil }
+
+    /// The keys the existing focus events already name. Return and Escape are not approval keys.
+    static func verdict(forKey event: HubFocusEvent) -> HubApprovalVerdict? { nil }
+
+    static func approvalOffset(reduceMotion: Bool) -> Double { 8 }
+
+    static func approvalScale(reduceMotion: Bool) -> Double { 0.985 }
+
+    func applying(_ signal: AgentsPageSignal) -> AgentsPage { self }
+
+    func meetsOpenBudget(_ milliseconds: Int) -> Bool { true }
+
+    func isIdle(percentOfOneCore: Double) -> Bool { true }
+
+    var copy: HubScreenCopy { HubScreenMachine.copy(screen) }
+
+    var countdownPaused: Bool { approvalHovered || approvalFocused }
+
+    var phase: AgentsPagePhase {
+        switch screen.screen {
+        case .empty: return .empty
+        case .loading: return .connecting
+        case .connectionError: return .connectionError
+        case .ready:
+            if approvalGrown, showingRequest != nil { return .approval }
+            if let id = selectedID, let status = sessions[id]?.status, status.isError { return .error }
+            if selectedID != nil { return .selected }
+            return .groups
+        }
+    }
+
+    var dismissTitle: String? {
+        guard screen.screen == .ready, let id = selectedID, sessions[id]?.status == .error(.failed) else { return nil }
+        return "Dismiss"
+    }
+
+    var showsTryAgain: Bool { screen.screen == .connectionError && copy.actionTitle == "Try again" }
+
+    var focusOrder: [HubFocusTarget] {
+        if approvalGrown, selectedID != nil { return HubFocusTarget.selectedApprovalOrder }
+        if selectedID != nil { return HubFocusTarget.screenOrder }
+        return [.groupHeader, .row]
+    }
+
+    var schedulesOneSecondTimer: Bool {
+        guard !panelClosed else { return false }
+        if showingRequest != nil, secondsLeft > 0 { return true }
+        if undoTicksLeft > 0 { return true }
+        return roster.contains { sessions[$0.id]?.clockPhase == .ticking }
+    }
+}
+
+private extension HubSessionStatus {
+    var isError: Bool {
+        if case .error = self { return true }
+        return false
+    }
+}
+
+// AGENTS-PAGE-MODEL-END
