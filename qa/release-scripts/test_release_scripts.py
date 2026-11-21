@@ -150,7 +150,10 @@ class ReleaseScripts(unittest.TestCase):
     def test_developer_id_bundle_uses_secure_timestamps(self):
         self.bundle_fixture()
         result = self.run_script("bundle.sh", RELEASE="1", SIGN_IDENTITY="Developer ID Application: Test")
-        self.assertEqual(result.returncode, 0, result.stderr)
+        # The binaries are signed with a secure timestamp, then verify-release-signature.sh
+        # refuses the release because EXPECTED_TEAM_ID is still the ZEUSTEAMID placeholder.
+        self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ZEUSTEAMID", result.stderr)
         signatures = [c for c in self.commands() if c[:2] == ["codesign", "--force"]]
         self.assertEqual(len(signatures), 5)
         self.assertTrue(any(c[-1].endswith("zeus-now-playing") for c in signatures))

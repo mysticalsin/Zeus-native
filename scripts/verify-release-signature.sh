@@ -9,11 +9,27 @@ APP="${1:?Usage: scripts/verify-release-signature.sh path/to/Zeus.app}"
 EXPECTED_BUNDLE_ID="app.zeus.mac"
 # Apple Developer Team ID. A TeamIdentifier that is merely well-formed is not accepted.
 # This repository has no other record of the team, and this script does not read the Keychain.
-# Replace this literal only in a reviewed change when the Developer ID certificate's team is known.
+# ZEUSTEAMID is an explicit fail-closed placeholder. It is not Tony's Apple Team ID.
+# MERGE-BLOCKED: needs Tony's Apple Team ID. While this literal is ZEUSTEAMID the
+# script refuses every release, including a binary whose TeamIdentifier is ZEUSTEAMID.
+# Replace this literal only in a reviewed change when Tony's Developer ID team is known.
 EXPECTED_TEAM_ID="ZEUSTEAMID"
+if [ "$EXPECTED_TEAM_ID" = "ZEUSTEAMID" ]; then
+  echo "Release signature rejected: EXPECTED_TEAM_ID is the placeholder ZEUSTEAMID. MERGE-BLOCKED: needs Tony's Apple Team ID." >&2
+  exit 1
+fi
 codesign --verify --deep --strict "$APP"
 for binary in "$APP" "$APP"/Contents/Helpers/* "$APP"/Contents/Resources/zeus-now-playing; do
-  [ -e "$binary" ] || continue
+  if [ ! -e "$binary" ]; then
+    case "$binary" in
+      *'/Contents/Helpers/*')
+        # The Helpers glob did not expand. There is no helper file on that path.
+        continue
+        ;;
+    esac
+    echo "Release signature rejected: expected binary is missing: $binary" >&2
+    exit 1
+  fi
   codesign --verify --strict "$binary"
   details="$(codesign --display --verbose=4 "$binary" 2>&1)"
   team="$(awk -F= '/^TeamIdentifier=/{print $2; exit}' <<<"$details")"
