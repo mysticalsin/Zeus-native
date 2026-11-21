@@ -27,7 +27,7 @@ public enum JarvisPersona {
     ]
 
     public static let edits = [
-        "Dropped the claim that a specific cloud voice speaks the reply. Zeus keeps its existing voice stack.",
+        "Dropped the claim that a specific cloud voice speaks the reply. The persona resolves only to the original synthetic voice.",
         "Rewrote the before-the-work rule without session or build tool names: one reply after the work, not a second announcement.",
         "Replaced the named-project send example with \"Sent, sir.\"",
         "Removed the session, screen, project, build, terminal and browser tool catalogue.",

@@ -143,9 +143,9 @@ def case_monitors(bench):
 def case_voice(bench):
     def run():
         persona = bench["persona"]
-        require(persona["voice_flag"] is False, "flag defaulted on")
-        require(persona["voice_resolved"] == "zeusDefault", persona["voice_resolved"])
-        return "flag off, Zeus voice"
+        require(persona["voice_id"] == "zeus.synthetic", persona.get("voice_id"))
+        require(persona["classic_voice_id"] == "zeus.synthetic", persona.get("classic_voice_id"))
+        return "original synthetic voice with the third-party flag on"
     return run
 
 
@@ -269,7 +269,7 @@ def build_cases(bench):
         ("journey.compacting", 10, case_compacting(bench)),
         ("journey.reduce_motion", 10, case_reduce_motion(bench)),
         ("journey.multiple_monitors", 10, case_monitors(bench)),
-        ("journey.voice_flag", 10, case_voice(bench)),
+        ("journey.voice", 10, case_voice(bench)),
         ("journey.persona_relaunch", 10, case_persona(bench)),
         ("journey.persona_llm_only", 10, case_llm_only(bench)),
         ("journey.face_and_core_without_llm", 10, case_face_and_core(bench)),

@@ -83,13 +83,14 @@ struct OrbE2EJourneyTests {
         #expect(PersonaScope.affectsLLMSystemPrompt == true)
     }
 
-    @Test func voiceFlagDefaultsOffAndClassicVoiceStays() throws {
+    @Test func characterVoiceIdIsIgnoredEvenWhenTheFlagIsOn() throws {
         let name = "zeus.orb.voice." + UUID().uuidString
         let defaults = try #require(UserDefaults(suiteName: name))
         defaults.removePersistentDomain(forName: name)
-        #expect(JarvisCloudVoice.isEnabled(defaults) == false)
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .zeusDefault)
-        #expect(PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults) == .zeusDefault)
+        defaults.set(true, forKey: "companion.jarvisCloudVoice.enabled")
+        defaults.set("JARVIS (MCU)", forKey: "companion.jarvisCloudVoice.id")
+        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults).voiceID == "zeus.synthetic")
+        #expect(PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults).voiceID == "zeus.synthetic")
     }
 
     @Test func compactingAndReduceMotionAndSurfaces() {

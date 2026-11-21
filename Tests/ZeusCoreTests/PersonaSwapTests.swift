@@ -56,19 +56,6 @@ struct PersonaSwapTests {
         #expect(PersonaCatalog.current(defaults).id == "classic")
     }
 
-    @Test func voiceFlagDefaultsOffAndUnconfiguredFallsBack() throws {
-        let defaults = try freshDefaults()
-        #expect(JarvisCloudVoice.isEnabled(defaults) == false)
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .zeusDefault)
-        #expect(PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults) == .zeusDefault)
-
-        defaults.set(true, forKey: JarvisCloudVoice.enabledKey)
-        #expect(JarvisCloudVoice.isEnabled(defaults))
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .zeusDefault)
-    }
-
     /// Devin's gate: no actor or film-character voice id, for every persona, with the
     /// third-party-voice flag off and on, and in the shipped persona strings and resources.
     @Test func noActorOrCharacterVoiceIdShipsUnderAnyFlag() throws {
@@ -77,19 +64,20 @@ struct PersonaSwapTests {
         ]
         let personas: [any Persona] = [MascotPersona(), OrbPersona()]
         let flags: [Bool?] = [nil, false, true]
-        let storedIDs: [String?] = [nil, "", "JARVIS (MCU)", "JARVIS MCU", "Paul Bettany", "Bettany", "MCU", "zeus.synthetic"]
+        let storedIDs: [String?] = [nil, "", "JARVIS (MCU)", "JARVIS MCU", "Paul Bettany", "Bettany", "MCU", "zeus.synthetic", "preset-not-used"]
         for flag in flags {
             for stored in storedIDs {
                 let defaults = try freshDefaults()
                 if let flag {
-                    defaults.set(flag, forKey: JarvisCloudVoice.enabledKey)
+                    defaults.set(flag, forKey: "companion.jarvisCloudVoice.enabled")
                 }
                 if let stored {
-                    defaults.set(stored, forKey: JarvisCloudVoice.configurationKey)
+                    defaults.set(stored, forKey: "companion.jarvisCloudVoice.id")
                 }
                 for persona in personas {
-                    let resolved = PersonaVoiceResolver.resolve(persona, defaults: defaults)
-                    let id = Self.resolvedVoiceID(resolved)
+                    #expect(persona.voicePreference == .zeusDefault)
+                    let id = PersonaVoiceResolver.resolve(persona, defaults: defaults).voiceID
+                    #expect(id == PersonaSyntheticVoice.voiceID)
                     #expect(id == "zeus.synthetic")
                     for token in banned {
                         #expect(!id.localizedCaseInsensitiveContains(token))
@@ -99,13 +87,6 @@ struct PersonaSwapTests {
         }
         let hits = Self.characterVoiceHits(banned: banned)
         #expect(hits == [])
-    }
-
-    private static func resolvedVoiceID(_ voice: ResolvedVoice) -> String {
-        switch voice {
-        case .zeusDefault: ""
-        case .cloud(let id): id
-        }
     }
 
     private static func characterVoiceHits(banned: [String]) -> [String] {
@@ -118,6 +99,8 @@ struct PersonaSwapTests {
             "Sources/Zeus/Companion",
             "specs/007-companion-parity",
             "qa/orb-e2e",
+            "Sources/Zeus/Voice",
+            "Sources/ZeusCore/Voice",
             "Resources/NOTICES.txt",
             "LICENSES/jarvis2.0-LICENSE",
         ].flatMap { relative -> [URL] in
@@ -145,20 +128,6 @@ struct PersonaSwapTests {
             }
         }
         return hits
-    }
-
-    @Test func configuredCloudVoiceIdIsUsedOnlyWhenTheFlagIsOn() throws {
-        let defaults = try freshDefaults()
-        defaults.set(JarvisCloudVoice.cloudVoiceID, forKey: JarvisCloudVoice.configurationKey)
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
-
-        defaults.set(true, forKey: JarvisCloudVoice.enabledKey)
-        #expect(JarvisCloudVoice.selectedID(defaults) == "JARVIS (MCU)")
-        #expect(PersonaVoiceResolver.resolve(OrbPersona(), defaults: defaults) == .cloud(id: "JARVIS (MCU)"))
-        #expect(PersonaVoiceResolver.resolve(MascotPersona(), defaults: defaults) == .zeusDefault)
-
-        defaults.set("some-other-voice", forKey: JarvisCloudVoice.configurationKey)
-        #expect(JarvisCloudVoice.selectedID(defaults) == nil)
     }
 
     @Test func personaDoesNotTouchTheExistingPersonalityKeyOrNonLLMPaths() throws {
