@@ -252,6 +252,7 @@ final class BuddyController: NSObject {
     /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame under the
     /// point wins over the raw coordinate. Decorative: this does not move the system pointer.
     func point(to point: CGPoint, label: String) {
+        ActionSpeedLog.shared.mark(.pointerArrival)
         guard CompanionSpring.tracksPointer(showPolicy) else { return }
         wake()
         resetPointing()
@@ -276,6 +277,7 @@ final class BuddyController: NSObject {
     /// Returns the CACurrentMediaTime at which the flight began, or nil when the companion is hidden.
     @discardableResult
     func flight(to point: CGPoint, label: String) -> CFTimeInterval? {
+        ActionSpeedLog.shared.mark(.pointerArrival)
         guard CompanionSpring.tracksPointer(showPolicy) else { return nil }
         wake()
         resetPointing()

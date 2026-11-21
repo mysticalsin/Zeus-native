@@ -283,6 +283,7 @@ final class VoiceTurnController {
         talkSession = nil
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
+        _ = ActionSpeedLog.shared.beginTurn()
         VoiceLog.log("listen", "stopped")
         ZeusSound.play(.listenStop)
         seams.duckEnd()
@@ -377,6 +378,7 @@ final class VoiceTurnController {
         buddy.model.captionVisible = false
         let heardAt = ContinuousClock.now
         VoiceLatency.shared.begin(at: heardAt)
+        _ = ActionSpeedLog.shared.beginTurn()
         // Only the LLM path uses these; the fast path never waits for them.
         screenshotsTask = Task { await seams.captureScreens() }
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
@@ -472,7 +474,9 @@ final class VoiceTurnController {
         VoiceLog.logContent("transcript", transcript)
         if turnReleasedAt == nil { turnReleasedAt = finalAt }
         if !VoiceLatency.shared.isActive { VoiceLatency.shared.begin(at: finalAt) }
+        ActionSpeedLog.shared.ensureTurn()
         VoiceLatency.shared.mark(.transcriptFinal)
+        ActionSpeedLog.shared.mark(.sttFinal)
 
         let options = SettingsStore.shared
         if let approval = notch.model.approval, options.bool("voice.answers"),
@@ -911,11 +915,13 @@ final class VoiceTurnController {
         func handle(_ output: ZeusTagStreamParser.Output) {
             switch output {
             case .tag(.point(let target?)):
+                ActionSpeedLog.shared.mark(.firstToolDecision)
                 if let point = globalPoint(x: target.x, y: target.y, screen: target.screen, in: shots) {
                     buddy.point(to: point, label: target.label ?? "right here")
                     pointed = true
                 }
             case .tag(.highlight(let area)):
+                ActionSpeedLog.shared.mark(.firstToolDecision)
                 if let point = globalPoint(x: area.x + area.width / 2, y: area.y + area.height / 2,
                                            screen: area.screen, in: shots) {
                     buddy.point(to: point, label: area.label ?? "this area")
@@ -923,6 +929,7 @@ final class VoiceTurnController {
                 }
             case .tag(.action(let action)):
                 actionStarted = true
+                ActionSpeedLog.shared.mark(.firstToolDecision)
                 if restricted {
                     // Refused at the boundary: nothing is run, and the reply says so.
                     blockedByRestriction = true
@@ -970,6 +977,7 @@ final class VoiceTurnController {
                     task = Task { @MainActor in
                         guard let card else { return nil }
                         let body = ([card.title] + card.lines).joined(separator: "\n")
+                        ActionSpeedLog.shared.mark(.firstOverlayPaint)
                         self.buddy.showCaption(body)
                         self.buddy.hideCaption()
                         return nil
@@ -986,6 +994,7 @@ final class VoiceTurnController {
             case .tag(.point(nil)):
                 break
             case .tag(.draw(let draw)):
+                ActionSpeedLog.shared.mark(.firstToolDecision)
                 guard drawing, !drawBegun, let shot = shots.first,
                       TalkSightPolicy.drawAllowed(winner: winnerID, request: request,
                                                   supportsNoSessionPersistence: supportsNoSessionPersistence(),
@@ -1041,11 +1050,13 @@ final class VoiceTurnController {
                 winnerID = replaySawScreen ? replay.id : nil
                 do {
                     VoiceLatency.shared.mark(.requestSent)
+                    ActionSpeedLog.shared.mark(.requestSent)
                     try await Self.consume(replay.events, engine: { replay.id }, started: started) { delta in
                         if timingFirstToken == nil {
                             timingFirstToken = msSinceRelease()
                             VoiceLatency.shared.setBrain(engine: replay.id, model: Self.modelLabel(replay.id))
                             VoiceLatency.shared.mark(.firstToken)
+                            ActionSpeedLog.shared.mark(.firstModelToken)
                         }
                         parser.feed(delta).forEach(handle)
                     }
@@ -1113,6 +1124,7 @@ final class VoiceTurnController {
                             timingFirstToken = msSinceRelease()
                             VoiceLatency.shared.setBrain(engine: id, model: Self.modelLabel(id))
                             VoiceLatency.shared.mark(.firstToken)
+                            ActionSpeedLog.shared.mark(.firstModelToken)
                             VoiceLog.log("brain", "engine=\(id) first_token_ms=\(ms) images=\(request.screenshots.count)")
                             BrainLatencyBook.shared.record(id, firstTokenMs: Double(ms))
                         },
@@ -1123,6 +1135,7 @@ final class VoiceTurnController {
                 var race = makeRace(primary, request, deepTier: keepsDeep ? deepTier : nil, deepReason: keepsDeep ? deepReason : nil)
                 fastRace = race
                 VoiceLatency.shared.mark(.requestSent)
+                ActionSpeedLog.shared.mark(.requestSent)
                 do {
                     try await race.run { delta in parser.feed(delta).forEach(handle) }
                 } catch where !fallback.isEmpty && !Task.isCancelled

@@ -270,6 +270,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         armLineStart()
         if audioReadyAt == nil { audioReadyAt = Date() }
         VoiceLatency.shared.mark(.firstAudio)
+        ActionSpeedLog.shared.mark(.firstTtsAudio)
     }
 
     /// One `engine=... voice=... reason=...` line in voice.log for the reply that is actually spoken.
