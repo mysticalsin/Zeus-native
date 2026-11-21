@@ -118,6 +118,46 @@ struct VoiceProviderAdapterTests {
         }
     }
 
+    @Test func aRedirectNeverCarriesTheKeyToASecondHost() async throws {
+        let key = "redirect-probe-key-4f91"
+        let originalURL = try #require(URL(string: "https://api.elevenlabs.io/v1/user"))
+        let otherURL = try #require(URL(string: "https://collector.example/collect"))
+        var proposed = URLRequest(url: otherURL)
+        proposed.setValue(key, forHTTPHeaderField: "xi-api-key")
+        proposed.setValue(key, forHTTPHeaderField: "X-Goog-Api-Key")
+        let delegate = ProviderHTTPSessionDelegate()
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        let task = session.dataTask(with: URLRequest(url: originalURL))
+        defer { task.cancel() }
+        let redirect = HTTPURLResponse(url: originalURL, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": otherURL.absoluteString])!
+        let decision = RedirectDecision()
+        delegate.urlSession(session, task: task, willPerformHTTPRedirection: redirect, newRequest: proposed) { decision.record($0) }
+        let fake = RedirectHostFake()
+        fake.receive(host: originalURL.host ?? "", xi: key, goog: key)
+        if let followed = decision.request {
+            fake.receive(host: followed.url?.host?.lowercased() ?? "", xi: followed.value(forHTTPHeaderField: "xi-api-key"), goog: followed.value(forHTTPHeaderField: "X-Goog-Api-Key"))
+        }
+        let forwarded = decision.request != nil
+        let reachedSecondHost = fake.hits.contains { $0.host == "collector.example" }
+        let carriedCredential = fake.hits.contains { $0.host != "api.elevenlabs.io" && ($0.xi != nil || $0.goog != nil) }
+        #expect(decision.called)
+        #expect(!forwarded)
+        #expect(!reachedSecondHost)
+        #expect(!carriedCredential)
+
+        RedirectProbe.reset()
+        let lines = RedirectLog()
+        let transport = URLSessionProviderTransport(protocolClasses: [RedirectProbe.self], timeout: 2, log: ProviderLog { lines.add($0) })
+        let request = ProviderHTTPRequest(url: originalURL, method: "GET", headers: ["xi-api-key": key, "X-Goog-Api-Key": key], body: nil)
+        _ = try? await transport.send(request)
+        let seen = RedirectProbe.snapshot()
+        #expect(seen.contains { $0.host == "api.elevenlabs.io" })
+        #expect(!seen.contains { $0.host == "collector.example" })
+        #expect(!seen.contains { $0.host != "api.elevenlabs.io" && ($0.xi != nil || $0.goog != nil) })
+        #expect(!lines.text.contains(key))
+    }
+
     @Test func plainHTTPNeverLeavesTheMachine() async {
         let transport = URLSessionProviderTransport(protocolClasses: [ProviderURLStub.self], timeout: 2)
         ProviderURLStub.reset(reply: .init(status: 200, chunks: [Data([1])]))
@@ -182,6 +222,77 @@ final class ProviderURLStub: URLProtocol, @unchecked Sendable {
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         let pieces = reply.body.map { [$0] } ?? reply.chunks
         for piece in pieces { client?.urlProtocol(self, didLoad: piece) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class RedirectDecision: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: URLRequest?
+    private var didCall = false
+    var called: Bool { lock.lock(); defer { lock.unlock() }; return didCall }
+    var request: URLRequest? { lock.lock(); defer { lock.unlock() }; return stored }
+    func record(_ request: URLRequest?) { lock.lock(); didCall = true; stored = request; lock.unlock() }
+}
+
+private final class RedirectHostFake {
+    struct Hit { var host: String; var xi: String?; var goog: String? }
+    private(set) var hits: [Hit] = []
+    func receive(host: String, xi: String?, goog: String?) { hits.append(Hit(host: host, xi: xi, goog: goog)) }
+}
+
+private final class RedirectLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lines: [String] = []
+    var text: String { lock.lock(); defer { lock.unlock() }; return lines.joined(separator: "\n") }
+    func add(_ line: String) { lock.lock(); lines.append(line); lock.unlock() }
+}
+
+/// First host answers with a redirect. A second host records whatever headers arrive.
+final class RedirectProbe: URLProtocol, @unchecked Sendable {
+    struct Hit: Equatable {
+        var host: String
+        var xi: String?
+        var goog: String?
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var seen: [Hit] = []
+
+    static func reset() {
+        lock.lock(); defer { lock.unlock() }
+        seen = []
+    }
+
+    static func snapshot() -> [Hit] {
+        lock.lock(); defer { lock.unlock() }
+        return seen
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.scheme?.lowercased() == "https"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let host = request.url?.host?.lowercased() ?? ""
+        let hit = Hit(host: host, xi: request.value(forHTTPHeaderField: "xi-api-key"), goog: request.value(forHTTPHeaderField: "X-Goog-Api-Key"))
+        Self.lock.lock()
+        Self.seen.append(hit)
+        Self.lock.unlock()
+        guard host == "api.elevenlabs.io" || host == "texttospeech.googleapis.com" else {
+            let response = HTTPURLResponse(url: request.url ?? URL(string: "https://collector.example/")!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data("{}".utf8))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        let target = URL(string: "https://collector.example/collect")!
+        let response = HTTPURLResponse(url: request.url ?? target, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": target.absoluteString])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocolDidFinishLoading(self)
     }
 
