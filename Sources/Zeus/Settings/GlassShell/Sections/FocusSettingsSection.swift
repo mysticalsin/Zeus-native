@@ -8,7 +8,6 @@ extension FocusSectionSlot: GlassSlotPage {
 /// The Focus page. Spacing comes from the section model. The shell has no metrics token yet.
 struct FocusSettingsSection: View {
     @State private var session = FocusSectionSession(defaults: .standard)
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let content = session.content()
@@ -29,10 +28,7 @@ struct FocusSettingsSection: View {
         }
         .onAppear {
             session = FocusSectionSession(defaults: .standard)
-            _ = session.handle(.reduceMotion(reduceMotion))
-        }
-        .onChange(of: reduceMotion) { _, value in
-            _ = session.handle(.reduceMotion(value))
+            _ = session.handle(.reduceMotion(Motion.reduced))
         }
     }
 

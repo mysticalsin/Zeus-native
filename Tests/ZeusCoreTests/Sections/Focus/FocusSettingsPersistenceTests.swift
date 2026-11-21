@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct FocusSettingsPersistenceTests {
     @Test func focusChoicesSurviveANewSessionFromTheSameStore() throws {
-        let freshName = "focus-fresh-\(UUID().uuidString)"
+        let freshName = NSTemporaryDirectory() + "zeus.focus.fresh.\(UUID().uuidString)"
         let fresh = UserDefaults(suiteName: freshName)!
         fresh.removePersistentDomain(forName: freshName)
         let opened = FocusSectionSession(defaults: fresh)
@@ -20,7 +20,7 @@ import Testing
             #expect(fresh.string(forKey: FocusSettingsPersistence.storageKey(id)) != "true")
         }
 
-        let name = "focus-kept-\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.focus.kept.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
         var session = FocusSectionSession(defaults: defaults)
@@ -44,7 +44,7 @@ import Testing
         #expect(restored.settings.localNetwork)
         #expect(restored.settings.sharedLink)
 
-        let importedName = "focus-import-\(UUID().uuidString)"
+        let importedName = NSTemporaryDirectory() + "zeus.focus.import.\(UUID().uuidString)"
         let imported = UserDefaults(suiteName: importedName)!
         imported.removePersistentDomain(forName: importedName)
         var turnedOn: [String: String] = [:]
