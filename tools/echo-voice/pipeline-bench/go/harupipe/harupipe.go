@@ -105,7 +105,8 @@ func NewRing(capacity int) *Ring {
 	}
 	return &Ring{buf: make([]float32, capacity)}
 }
-func (q *Ring) Len() int        { return q.n }
+func (q *Ring) Len() int { return q.n }
+func (q *Ring) Cap() int { return len(q.buf) }
 
 func (q *Ring) Push(x []float32) error {
 	c := len(q.buf)
@@ -520,16 +521,27 @@ func (s *Stream) Feed(payload []byte, onFrame func()) {
 	for i := 0; i < even; i += 2 {
 		s.half = append(s.half, (s.scratch[i]+s.scratch[i+1])/2)
 	}
-	if len(s.half) == 0 {
-		return
-	}
-	if err := s.in.Push(s.half); err != nil {
-		panic(err)
-	}
-	for s.in.Len() >= FrameSamples {
-		_ = s.in.PopInto(s.frame[:])
-		s.emit()
-		onFrame()
+	off := 0
+	for off < len(s.half) || s.in.Len() >= FrameSamples {
+		for s.in.Len() >= FrameSamples {
+			if err := s.in.PopInto(s.frame[:]); err != nil {
+				panic(err)
+			}
+			s.emit()
+			onFrame()
+		}
+		if off >= len(s.half) {
+			break
+		}
+		free := s.in.Cap() - s.in.Len()
+		if free <= 0 {
+			break
+		}
+		n := min(len(s.half)-off, free)
+		if err := s.in.Push(s.half[off : off+n]); err != nil {
+			panic(err)
+		}
+		off += n
 	}
 }
 

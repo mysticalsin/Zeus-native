@@ -42,6 +42,8 @@ pub struct Ingest {
     byte_carry: Vec<u8>,
     scratch: Vec<f32>,
     half: Vec<f32>,
+    /// Samples waiting for a free slot in `framer`. Keeps a large read from growing the ring.
+    staged: Vec<f32>,
     framer: Framer,
 }
 
@@ -49,7 +51,7 @@ impl Default for Ingest { fn default() -> Self { Self::new() } }
 
 impl Ingest {
     pub fn new() -> Self {
-        Ingest { leftover: None, byte_carry: Vec::new(), scratch: Vec::new(), half: Vec::new(), framer: Framer::new() }
+        Ingest { leftover: None, byte_carry: Vec::new(), scratch: Vec::new(), half: Vec::new(), staged: Vec::new(), framer: Framer::new() }
     }
     /// Feed raw little-endian f32 bytes. A trailing 1–3 bytes is kept for the next call.
     pub fn feed_bytes(&mut self, payload: &[u8]) {
@@ -63,10 +65,25 @@ impl Ingest {
         let even = self.scratch.len() / 2 * 2;
         if even < self.scratch.len() { self.leftover = Some(self.scratch[even]); }
         downsample_2x_into(&self.scratch[..even], &mut self.half);
-        if !self.half.is_empty() { self.framer.push(&self.half); }
+        if !self.half.is_empty() { self.staged.extend_from_slice(&self.half); }
+        self.fill();
     }
-    pub fn pop_into(&mut self, f: &mut Frame) -> bool { self.framer.pop_into(f) }
-    pub fn pending(&self) -> usize { self.framer.pending() }
+    fn fill(&mut self) {
+        while !self.staged.is_empty() {
+            let free = self.framer.free();
+            if free == 0 { break; }
+            let n = free.min(self.staged.len());
+            self.framer.push_fit(&self.staged[..n]);
+            self.staged.drain(..n);
+        }
+    }
+    pub fn pop_into(&mut self, f: &mut Frame) -> bool {
+        self.fill();
+        let ok = self.framer.pop_into(f);
+        self.fill();
+        ok
+    }
+    pub fn pending(&self) -> usize { self.framer.pending() + self.staged.len() }
     pub fn capacity(&self) -> usize { self.framer.capacity() }
 }
 
