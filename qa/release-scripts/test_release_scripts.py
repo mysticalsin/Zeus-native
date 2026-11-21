@@ -214,6 +214,17 @@ class ReleaseScripts(unittest.TestCase):
                 self.assertNotEqual(self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state).returncode, 0)
         self.assertEqual(self.run_script("verify-release-signature.sh", app).returncode, 0)
 
+    def test_release_signature_checks_the_resource_helper(self):
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        extra = app / "Contents/Resources/zeus-now-playing"
+        extra.parent.mkdir(parents=True)
+        extra.write_text("helper")
+        extra.chmod(0o755)
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        displayed = [c for c in self.commands() if c[:2] == ["codesign", "--display"] and c[-1] == str(extra)]
+        self.assertEqual(displayed, [["codesign", "--display", "--verbose=4", str(extra)]])
+
     def test_installer_keeps_verified_rollback(self):
         source, target = self.install_fixture()
         result = self.run_script("install.sh", source, target)
