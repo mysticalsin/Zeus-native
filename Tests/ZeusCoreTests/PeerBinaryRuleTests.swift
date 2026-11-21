@@ -416,6 +416,18 @@ struct PeerBinaryRuleTests {
         #expect(!PeerSigning.verifyApp(auditToken: Data(repeating: 0xFF, count: 32)).isAllowed)
     }
     #endif
+
+    /// A missing token is refused. Where this platform has no code signature, capture returns nil
+    /// and a signature check stays denied.
+    @Test func aPlatformWithoutCodeSignaturesDoesNotInventAnIdentity() {
+        #if canImport(Darwin)
+        #expect(!PeerSigning.verifyApp(auditToken: nil).isAllowed)
+        #else
+        #expect(PeerSigning.captureOwnIdentity() == nil)
+        #expect(!PeerSigning.verifyApp(auditToken: nil).isAllowed)
+        #expect(!PeerSigning.verifyApp(auditToken: Data(repeating: 0xAB, count: 32)).isAllowed)
+        #endif
+    }
 }
 
 /// The server asks the verifier before it reads a byte, and hands the handler a lazy verdict.
@@ -437,11 +449,7 @@ struct PeerVerificationWiringTests {
     }
 
     private var ownName: String {
-        #if canImport(Darwin)
-        return (PeerCheck.executablePath(pid: getpid()).map { ($0 as NSString).lastPathComponent }) ?? "unknown"
-        #else
-        return "unknown"
-        #endif
+        (PeerCheck.executablePath(pid: getpid()).map { ($0 as NSString).lastPathComponent }) ?? "unknown"
     }
 
     @Test func aNamedProgramPolicyAlsoNeedsTheSignatureVerifierToAgree() async throws {
@@ -461,7 +469,11 @@ struct PeerVerificationWiringTests {
         #expect(reply == nil)
         #expect(handled.value == 0, "the handler never sees a refused peer's bytes")
         #expect(asked.value == 1)
+        #if canImport(Darwin)
         #expect(asked.tokenSizes == [32], "the verifier gets the kernel's audit token, not a pid")
+        #else
+        #expect(asked.tokenSizes == [nil], "without an audit token the verifier is still asked, and it has nothing it can trust")
+        #endif
     }
 
     @Test func aNamedProgramPolicyAdmitsAPeerTheVerifierAccepts() async throws {

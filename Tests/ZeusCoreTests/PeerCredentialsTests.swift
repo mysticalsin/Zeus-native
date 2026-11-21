@@ -63,6 +63,27 @@ struct PeerCredentialsTests {
         #expect(PeerCheck.decide(.sameUser, ownUID: UInt32(geteuid()), peer: peer) == .allow)
     }
 
+    /// A connected socket names this process. A missing peer and a different user stay refused.
+    @Test func theKernelNamesThisProcessByUserAndPidAndStillRefusesAStranger() throws {
+        var pair: [Int32] = [0, 0]
+        #if canImport(Darwin)
+        let stream = SOCK_STREAM
+        #else
+        let stream = Int32(SOCK_STREAM.rawValue)
+        #endif
+        try #require(socketpair(AF_UNIX, stream, 0, &pair) == 0)
+        defer { close(pair[0]); close(pair[1]) }
+        let peer = try #require(PeerCheck.identify(fd: pair[0]))
+        let owner = UInt32(geteuid())
+        #expect(peer.uid == owner)
+        #expect(peer.pid == Int32(getpid()))
+        #expect(PeerCheck.decide(.sameUser, ownUID: owner, peer: peer) == .allow)
+        #expect(PeerCheck.decide(.sameUser, ownUID: owner, peer: nil) == .deny("peer credentials unavailable"))
+        let stranger = PeerIdentity(uid: owner &+ 1, pid: peer.pid)
+        #expect(PeerCheck.decide(.sameUser, ownUID: owner, peer: stranger) == .deny("peer uid \(stranger.uid) is not the owner"))
+        #expect(PeerCheck.identify(fd: -1) == nil)
+    }
+
     @Test func aServerRefusesAPeerThatTheDecisionRejects() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-peer-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
