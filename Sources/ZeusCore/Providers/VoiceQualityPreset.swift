@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Typed failures for the quality-preset path. Descriptions name the failure only.
 /// A key, a response body, and a URL are never part of the text.
@@ -8,6 +11,9 @@ public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertib
     case meterExceeded
     case meterCorrupt
     case missingCredential
+    case keyRejected
+    case requestTooLarge
+    case endpointRefused
 
     public var description: String {
         switch self {
@@ -16,6 +22,9 @@ public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertib
         case .meterExceeded: "character meter exceeded"
         case .meterCorrupt: "character meter unreadable"
         case .missingCredential: "missing credential"
+        case .keyRejected: VoiceQualityKeyGate.rejectedMessage
+        case .requestTooLarge: "The request is too long."
+        case .endpointRefused: "The voice endpoint is not allowed."
         }
     }
 
@@ -33,6 +42,56 @@ public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertib
         if let failure = surfaced as? ProviderFailure { return failure.logName }
         if let quality = surfaced as? VoiceQualityError { return quality.description }
         return "invalid-response"
+    }
+}
+
+/// A key is trimmed, then refused when a control character remains. The message is fixed.
+/// Newline, carriage return, tab, and NUL cannot reach a header or the meter.
+public enum VoiceQualityKeyGate {
+    public static let rejectedMessage = "The key is not valid."
+
+    public static func accepted(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 8 else { return nil }
+        guard trimmed.unicodeScalars.allSatisfy({ scalar in
+            scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
+        }) else { return nil }
+        return trimmed
+    }
+}
+
+/// One speak request stays at or under 5,000 characters. The 50,000 figure is the cumulative meter.
+public enum VoiceQualityRequestSize {
+    public static let limit = 5_000
+
+    public static func allows(_ characters: Int) -> Bool {
+        characters >= 0 && characters <= limit
+    }
+}
+
+/// Quality requests may only use the two provider hosts, over HTTPS, with no userinfo.
+public enum VoiceQualityEndpoint {
+    public static func allows(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", url.user == nil, url.password == nil else { return false }
+        switch url.host?.lowercased() {
+        case "api.elevenlabs.io", "texttospeech.googleapis.com": return true
+        default: return false
+        }
+    }
+}
+
+/// A redirect would replay `xi-api-key` or `X-Goog-Api-Key`. The task delegate returns nil.
+public enum VoiceQualityRedirect {
+    public static func forwarded(_ proposed: URLRequest, from original: URL?) -> URLRequest? {
+        _ = proposed
+        _ = original
+        return nil
+    }
+}
+
+final class VoiceQualityRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(VoiceQualityRedirect.forwarded(request, from: task.originalRequest?.url ?? response.url))
     }
 }
 
@@ -228,6 +287,32 @@ public enum VoiceQualityPreset: String, Sendable, CaseIterable, Equatable {
             return nil
         }
     }
+
+    /// The cloud step this preset may occupy on `PersonaSpeakRoute`.
+    public var routeStep: PersonaSpeakStep {
+        switch self {
+        case .elevenLabsFast, .elevenLabsStudio: .elevenLabs
+        case .googleNeural2, .googleWavenet, .googleChirpHD: .googleCloud
+        }
+    }
+}
+
+/// Cloud presets run only when `PersonaSpeakRoute` puts that provider first.
+/// That happens when the user selected it and a key exists. Automatic stays `zeus.synthetic`.
+public enum VoiceQualityRoute {
+    public static func selection(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> VoiceQualitySelection {
+        guard let preset else { return .synthetic }
+        let steps = PersonaSpeakRoute.chain(choice: choice, keys: keys, providerFailed: providerFailed)
+        guard steps.first == preset.routeStep else { return .synthetic }
+        return .preset(preset)
+    }
+
+    public static func activeVoiceID(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> String {
+        switch selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
+        case .synthetic: VoiceSpeakAllowlist.syntheticID
+        case .preset(let chosen): chosen.defaultVoiceID
+        }
+    }
 }
 
 public enum VoiceQualitySelection: Equatable, Sendable {
@@ -282,8 +367,11 @@ public enum VoiceQualityRequestBuilder {
         guard VoiceQualityAllowList.accepts(voiceID, providerID: preset.providerID) else {
             throw VoiceQualityError.voiceRefused
         }
-        guard let key = credential.value(ProviderCredentialLocation.account) else {
-            throw VoiceQualityError.missingCredential
+        guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
+            throw VoiceQualityError.keyRejected
+        }
+        guard VoiceQualityRequestSize.allows(VoiceQualityMarkup.spoken(text).count) else {
+            throw VoiceQualityError.requestTooLarge
         }
         let spoken = VoiceQualityMarkup.spoken(text)
         switch preset {
@@ -411,11 +499,16 @@ public struct VoiceQualitySpeaker: Sendable {
         let log = self.log
         let voice = voiceID ?? preset.defaultVoiceID
         return Self.stream {
-            let request = try VoiceQualityRequestBuilder.make(text: text, preset: preset, voiceID: voice, credential: credential)
-            let spokenCount = VoiceQualityMarkup.spoken(text).count
-            try meter.reserve(providerID: preset.providerID, characters: spokenCount)
+            guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
+                throw VoiceQualityError.keyRejected
+            }
+            let spoken = VoiceQualityMarkup.spoken(text)
+            guard VoiceQualityRequestSize.allows(spoken.count) else { throw VoiceQualityError.requestTooLarge }
+            let clean = ProviderCredential(fields: [ProviderCredentialLocation.account: key])
+            let request = try VoiceQualityRequestBuilder.make(text: text, preset: preset, voiceID: voice, credential: clean)
+            guard VoiceQualityEndpoint.allows(request.url) else { throw VoiceQualityError.endpointRefused }
+            try meter.reserve(providerID: preset.providerID, characters: spoken.count)
             let response = try await transport.send(request)
-            let key = credential.value(ProviderCredentialLocation.account) ?? ""
             log.record(
                 "voice-quality \(VoiceQualityCall(request: request).description) status=\(response.status)",
                 secrets: [key]
@@ -429,13 +522,31 @@ public struct VoiceQualitySpeaker: Sendable {
         }
     }
 
-    public func synthesizeIfEnabled(text: String, defaults: UserDefaults, credential: ProviderCredential) -> Synthesis {
-        switch VoiceQualityOptIn.selection(defaults: defaults) {
+    public func synthesize(text: String, choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, credential: ProviderCredential, providerFailed: Bool = false) -> Synthesis {
+        switch VoiceQualityRoute.selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
         case .synthetic:
             return Self.stream { throw VoiceQualityError.providerOff }
-        case .preset(let preset):
-            return synthesize(text: text, preset: preset, voiceID: preset.defaultVoiceID, credential: credential)
+        case .preset(let chosen):
+            return synthesize(text: text, preset: chosen, voiceID: chosen.defaultVoiceID, credential: credential)
         }
+    }
+
+    public func synthesizeIfEnabled(text: String, defaults: UserDefaults, credential: ProviderCredential) -> Synthesis {
+        let stored = VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: VoiceProviderPreferences.selectionKey))
+        let choice: PersonaSpeakChoice
+        switch stored {
+        case .provider(let id) where id == ElevenLabsTTSAdapter.id: choice = .elevenLabs
+        case .provider(let id) where id == GoogleCloudTTSAdapter.id: choice = .googleCloud
+        default: choice = .automatic
+        }
+        let preset = defaults.string(forKey: VoiceQualityOptIn.presetKey).flatMap(VoiceQualityPreset.init(rawValue:))
+        let hasKey = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") != nil
+        var keys = PersonaSpeakKeys()
+        if hasKey {
+            if choice == .elevenLabs { keys.elevenLabs = true }
+            if choice == .googleCloud { keys.googleCloud = true }
+        }
+        return synthesize(text: text, choice: choice, keys: keys, preset: preset, credential: credential)
     }
 
     private static func stream(_ work: @escaping @Sendable () async throws -> Data) -> Synthesis {

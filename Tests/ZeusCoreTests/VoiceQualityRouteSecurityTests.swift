@@ -60,11 +60,15 @@ struct VoiceQualityRouteSecurityTests {
         let key = head + "\n" + tail
         let outcome = try await rejectedKey(key)
         #expect(outcome.error as? VoiceQualityError == .keyRejected)
-        #expect(outcome.message == VoiceQualityKeyGate.rejectedMessage)
-        #expect(outcome.message == "The key is not valid.")
+        #expect((outcome.error as? VoiceQualityError)?.description == VoiceQualityKeyGate.rejectedMessage)
+        let description = (outcome.error as? VoiceQualityError)?.description ?? ""
+        #expect(description == "The key is not valid.")
+        #expect(!description.contains(head))
+        #expect(!description.contains(tail))
+        #expect(!description.contains("\n"))
+        #expect(!description.contains("\r"))
         #expect(!outcome.message.contains(head))
         #expect(!outcome.message.contains(tail))
-        #expect(!outcome.message.contains("\n"))
         #expect(outcome.count == 0)
         #expect(outcome.hosts.isEmpty)
     }
@@ -75,11 +79,14 @@ struct VoiceQualityRouteSecurityTests {
         let key = head + "\r\n" + tail
         let outcome = try await rejectedKey(key)
         #expect(outcome.error as? VoiceQualityError == .keyRejected)
-        #expect(outcome.message == "The key is not valid.")
+        let description = (outcome.error as? VoiceQualityError)?.description ?? ""
+        #expect(description == "The key is not valid.")
+        #expect(!description.contains(head))
+        #expect(!description.contains(tail))
+        #expect(!description.contains("\r"))
+        #expect(!description.contains("\n"))
         #expect(!outcome.message.contains(head))
         #expect(!outcome.message.contains(tail))
-        #expect(!outcome.message.contains("\r"))
-        #expect(!outcome.message.contains("\n"))
         #expect(outcome.count == 0)
         #expect(outcome.hosts.isEmpty)
     }
@@ -88,7 +95,7 @@ struct VoiceQualityRouteSecurityTests {
         for key in ["tab-head-1100\ttab-tail-2200", "null-head-3300\u{0}null-tail-4400"] {
             let outcome = try await rejectedKey(key)
             #expect(outcome.error as? VoiceQualityError == .keyRejected)
-            #expect(outcome.message == "The key is not valid.")
+            #expect((outcome.error as? VoiceQualityError)?.description == "The key is not valid.")
             #expect(!outcome.message.contains("tab-head-1100"))
             #expect(!outcome.message.contains("tab-tail-2200"))
             #expect(!outcome.message.contains("null-head-3300"))
@@ -133,6 +140,16 @@ struct VoiceQualityRouteSecurityTests {
         request.setValue(sentinel, forHTTPHeaderField: "xi-api-key")
         request.setValue(sentinel, forHTTPHeaderField: "X-Goog-Api-Key")
         _ = try? await session.data(for: request)
+        let task = session.dataTask(with: request)
+        defer { task.cancel() }
+        let redirect = HTTPURLResponse(url: request.url!, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": "https://collector.example/collect"])!
+        var followed = URLRequest(url: URL(string: "https://collector.example/collect")!)
+        followed.setValue(sentinel, forHTTPHeaderField: "xi-api-key")
+        followed.setValue(sentinel, forHTTPHeaderField: "X-Goog-Api-Key")
+        let decision = RedirectDecision()
+        delegate.urlSession(session, task: task, willPerformHTTPRedirection: redirect, newRequest: followed) { decision.record($0) }
+        #expect(decision.called)
+        #expect(decision.request == nil)
         let hosts = RouteRedirectStub.hosts
         #expect(hosts.contains("api.elevenlabs.io"))
         #expect(!hosts.contains("collector.example"))
@@ -268,6 +285,15 @@ struct VoiceQualityRouteSecurityTests {
     }
 }
 
+private final class RedirectDecision: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: URLRequest?
+    private var didCall = false
+    var called: Bool { lock.lock(); defer { lock.unlock() }; return didCall }
+    var request: URLRequest? { lock.lock(); defer { lock.unlock() }; return stored }
+    func record(_ request: URLRequest?) { lock.lock(); didCall = true; stored = request; lock.unlock() }
+}
+
 private struct RouteOutcome {
     var hosts: [String]
     var error: Error?
@@ -369,11 +395,9 @@ final class RouteRedirectStub: URLProtocol, @unchecked Sendable {
             return
         }
         let destination = URL(string: "https://collector.example/collect")!
-        var next = URLRequest(url: destination)
-        next.setValue(request.value(forHTTPHeaderField: "xi-api-key"), forHTTPHeaderField: "xi-api-key")
-        next.setValue(request.value(forHTTPHeaderField: "X-Goog-Api-Key"), forHTTPHeaderField: "X-Goog-Api-Key")
         let redirect = HTTPURLResponse(url: request.url ?? destination, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": destination.absoluteString])!
-        client?.urlProtocol(self, wasRedirectedTo: next, redirectResponse: redirect)
+        client?.urlProtocol(self, didReceive: redirect, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
     }
 
     override func stopLoading() {}
