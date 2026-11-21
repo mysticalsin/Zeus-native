@@ -9,6 +9,7 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
     var failWrite = false
     var failDelete = false
     var corruptReadBack = false
+    var facts: LegacyItemFacts = .zeus
     private(set) var kinds: [String] = []
     private(set) var writes: [KeychainWriteRequest] = []
     private(set) var log = ""
@@ -22,6 +23,8 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         note("readLegacy")
         return legacy
     }
+
+    func legacyFacts(service: String, account: String) -> LegacyItemFacts { facts }
 
     func readProtected(service: String, account: String) -> KeychainRead {
         note("readProtected")
@@ -216,5 +219,87 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
               let delete = kinds.firstIndex(of: "deleteLegacy") else { return false }
         let between = kinds[write..<delete]
         return between.contains("readProtected") && write < delete
+    }
+
+    @Test func aForeignLegacyItemIsNotImported() {
+        let planted = [
+            LegacyItemFacts(label: "other", creator: "SECU", anyProgram: true),
+            LegacyItemFacts(label: "other", creator: "SECU", anyProgram: false),
+            LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: true),
+        ]
+        for facts in planted {
+            #expect(!CredentialKeychainPolicy.zeusWrote(facts))
+            let store = RecordingCredentialKeychain(legacy: .value(secret))
+            store.facts = facts
+            let result = CredentialKeychainMigration.migrateOnce(
+                service: service, account: account, teamIdentifier: team, keychain: store, alreadyMigrated: false)
+            #expect(result.markMigrated)
+            #expect(result.outcome != .migrated)
+            #expect(store.writes.isEmpty)
+            #expect(!store.kinds.contains("deleteLegacy"))
+            #expect(store.protected == .absent)
+            #expect(store.legacy == .value(secret))
+        }
+        #expect(CredentialKeychainPolicy.zeusWrote(.zeus))
+    }
+
+    @Test func theCliSwitchStaysOffAfterOff() {
+        let on = Data("1".utf8)
+        let store = RecordingCredentialKeychain(legacy: .value(on), protected: .value(on))
+        store.facts = .zeus
+        store.protected = .absent
+        let first = CredentialKeychainMigration.migrateOnce(
+            service: service, account: CredentialKeychainPolicy.cliSwitchAccount,
+            teamIdentifier: team, keychain: store, alreadyMigrated: false)
+        #expect(first.markMigrated)
+        #expect(store.writes.isEmpty)
+        #expect(store.protected == .absent)
+        #expect(!store.kinds.contains("readLegacy"))
+        #expect(!store.kinds.contains("writeProtected"))
+        let second = CredentialKeychainMigration.migrateOnce(
+            service: service, account: CredentialKeychainPolicy.cliSwitchAccount,
+            teamIdentifier: team, keychain: store, alreadyMigrated: true)
+        #expect(store.writes.isEmpty)
+        #expect(store.protected == .absent)
+        #expect(store.legacy == .value(on))
+    }
+
+    @Test func migrationRunsOnce() {
+        let name = NSTemporaryDirectory() + "zeus.dp.flag.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let flags = MigrationFlagStore(defaults: defaults)
+        let store = RecordingCredentialKeychain(legacy: .value(secret))
+        store.facts = .zeus
+        #expect(!flags.contains(service: service, account: account))
+        let first = CredentialKeychainMigration.migrateOnce(
+            service: service, account: account, teamIdentifier: team, keychain: store,
+            alreadyMigrated: flags.contains(service: service, account: account))
+        #expect(first.outcome == .migrated)
+        #expect(first.markMigrated)
+        if first.markMigrated { flags.mark(service: service, account: account) }
+        store.legacy = .value(Data("planted-later".utf8))
+        let reloaded = MigrationFlagStore(defaults: defaults)
+        #expect(reloaded.contains(service: service, account: account))
+        let mark = store.kinds.count
+        _ = CredentialKeychainMigration.migrateOnce(
+            service: service, account: account, teamIdentifier: team, keychain: store,
+            alreadyMigrated: reloaded.contains(service: service, account: account))
+        let added = Array(store.kinds.dropFirst(mark))
+        #expect(!added.contains("readLegacy"))
+        #expect(!added.contains("writeProtected"))
+        #expect(store.writes.count == 1)
+        #expect(store.protected == .value(secret))
+    }
+
+    @Test func aMissingGroupDoesNotImportOrRecordTheFlag() {
+        let store = RecordingCredentialKeychain(legacy: .value(secret))
+        store.facts = .zeus
+        let result = CredentialKeychainMigration.migrateOnce(
+            service: service, account: account, teamIdentifier: "", keychain: store, alreadyMigrated: false)
+        #expect(result.outcome == .needsReentry)
+        #expect(!result.markMigrated)
+        #expect(store.kinds.isEmpty)
+        #expect(store.legacy == .value(secret))
+        #expect(store.protected == .absent)
     }
 }
