@@ -209,6 +209,22 @@ struct LicenseCredentialCleanupTests {
         #expect(!relaunched.manager.isLicensed)
     }
 
+    @Test func aRevokedKeyStaysOffWhenTheStoredListCannotBeRead() throws {
+        let name = NSTemporaryDirectory() + "zeus.license-revocation.\(UUID().uuidString)"
+        let (defaults, backend, key, _) = try commitFixture(name)
+        defer { defaults.removePersistentDomain(forName: name) }
+        backend.items["com.zeus.app|license.key"] = key
+        backend.items["com.zeus.app|\(LicenseRevocationPolicy.keychainAccount)"] = "synthetic-license"
+        defaults.set("ZEUSR1.not-a-list", forKey: "license.revocations")
+        let holder = try signedManager(defaults, backend, Server(response: .failure(.server("Synthetic server"))))
+        #expect(!holder.manager.isLicensed)
+        defaults.removeObject(forKey: "license.revocations")
+        defaults.removeObject(forKey: LicenseRevocationPolicy.defaultsKey)
+        let relaunched = try signedManager(defaults, backend, Server(response: .failure(.server("Synthetic server"))))
+        #expect(!relaunched.manager.isLicensed)
+        #expect(relaunched.backend.items["com.zeus.app|license.key"] == key)
+    }
+
     private func commitFixture(_ name: String) throws -> (UserDefaults, WriteGate, String, String) {
         let defaults = try #require(UserDefaults(suiteName: name))
         defaults.set("https://synthetic-license.invalid", forKey: "license.server")

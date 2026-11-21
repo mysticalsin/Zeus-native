@@ -6803,6 +6803,14 @@
               "function": "aRefusalStaysWithTheKeyWhenDeletionFails"
             },
             {
+              "file": "Tests/ZeusCoreTests/LicenseRevocationPolicyTests.swift",
+              "function": "aMissingOrUndecodableListKeepsARecordedRevocation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LicensePortalVectorTests.swift",
+              "function": "aRevokedKeyStaysRevokedWhenTheStoredListCannotBeRead"
+            },
+            {
               "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
               "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
             },
@@ -6973,6 +6981,10 @@
             {
               "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
               "function": "aRefusalThatCannotBeStoredStillFailsClosedUntilCleanup"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "aRevokedKeyStaysOffWhenTheStoredListCannotBeRead"
             }
           ]
         },

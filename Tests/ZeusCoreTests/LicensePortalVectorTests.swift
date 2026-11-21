@@ -65,6 +65,24 @@ import Testing
         #expect(evaluator.evaluate(.init(key: Self.key, revocations: Self.emptyList, trialStart: start, now: start)).isLicensed)
     }
 
+    @Test func aRevokedKeyStaysRevokedWhenTheStoredListCannotBeRead() {
+        let ids = ["L-VECTOR0001"]
+        #expect(evaluator.isRevoked("L-VECTOR0001", list: nil, lastGoodIDs: ids))
+        #expect(evaluator.isRevoked("L-VECTOR0001", list: "ZEUSR1.not-a-list", lastGoodIDs: ids))
+        #expect(!evaluator.isRevoked("L-OTHER", list: "ZEUSR1.not-a-list", lastGoodIDs: ids))
+        guard case .revoked(let missing) = evaluator.evaluate(.init(key: Self.key, revocations: nil, trialStart: start, now: start, lastRevokedIDs: ids)) else {
+            Issue.record("expected revoked when the list is missing")
+            return
+        }
+        #expect(missing.id == "L-VECTOR0001")
+        guard case .revoked = evaluator.evaluate(.init(key: Self.key, revocations: "ZEUSR1.not-a-list", trialStart: start, now: start, lastRevokedIDs: ids)) else {
+            Issue.record("expected revoked when the list does not decode")
+            return
+        }
+        #expect(evaluator.evaluate(.init(key: Self.key, revocations: Self.emptyList, trialStart: start, now: start, lastRevokedIDs: ids)).isLicensed)
+        #expect(evaluator.evaluate(.init(key: Self.key, trialStart: start, now: start)).isLicensed)
+    }
+
     @Test func forgedRevocationListIsIgnored() {
         let forger = Curve25519.Signing.PrivateKey()
         let forged = try! SignedBlob.encode(RevocationList(issued: 1, ids: ["L-VECTOR0001"]), prefix: RevocationList.prefix, signingKey: forger)

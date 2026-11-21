@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
         "function": "serverRefusalStaysWithTheKeyAfterTheDefaultsFlagIsCleared"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A missing or undecodable revocation list was treated as not revoked, so a key that was already on a signed list evaluated as licensed until a later list decoded.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/LicensePortalVectorTests.swift",
+        "function": "aRevokedKeyStaysRevokedWhenTheStoredListCannotBeRead"
+      }
     }
   ]
 }

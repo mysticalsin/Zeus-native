@@ -118,7 +118,8 @@ final class LicenseManager {
         status = evaluator.evaluate(.init(key: key, activation: credentials.get("license.activation"),
                                           revocations: defaults.string(forKey: "license.revocations"),
                                           trialStart: trialStart(), now: now,
-                                          activationRejected: activationIsRefused(key: key)))
+                                          activationRejected: activationIsRefused(key: key),
+                                          lastRevokedIDs: rememberedRevocations()))
         if let payload = status.payload, let token = credentials.get("license.activation"),
            case .success(let proof) = evaluator.checkActivation(token, licenseID: payload.id) {
             activation = proof
@@ -146,7 +147,7 @@ final class LicenseManager {
         case .success(let p): payload = p
         case .failure(let error): lastError = error.message; return lastError
         }
-        if evaluator.isRevoked(payload.id, list: defaults.string(forKey: "license.revocations")) {
+        if evaluator.isRevoked(payload.id, list: defaults.string(forKey: "license.revocations"), lastGoodIDs: rememberedRevocations()) {
             lastError = LicenseError.revoked.message
             return lastError
         }
@@ -302,14 +303,25 @@ final class LicenseManager {
         if force || Date().timeIntervalSince1970 - last > Self.revocationCheckInterval,
            case .success(let list) = await client.revocations(),
            revision == credentialRevision, !defaults.bool(forKey: "license.cleanupPending"),
-           case .success = SignedBlob.decode(list, as: RevocationList.self, prefix: RevocationList.prefix, publicKeys: evaluator.publicKeys) {
+           case .success(let parsed) = SignedBlob.decode(list, as: RevocationList.self, prefix: RevocationList.prefix, publicKeys: evaluator.publicKeys) {
             defaults.set(list, forKey: "license.revocations")
             defaults.set(Date().timeIntervalSince1970, forKey: "license.revocationsCheckedAt")
+            defaults.set(parsed.ids, forKey: LicenseRevocationPolicy.defaultsKey)
+            _ = credentials.set(LicenseRevocationPolicy.keychainText(ids: parsed.ids), for: LicenseRevocationPolicy.keychainAccount)
         }
         refresh()
     }
 
     func setStatusForSnapshot(_ status: LicenseStatus) { self.status = status }
+
+    /// Ids from the last signed revocation list. A corrupt or missing list falls back to these.
+    private func rememberedRevocations() -> [String] {
+        let defaultsIDs: [String]? = defaults.object(forKey: LicenseRevocationPolicy.defaultsKey) == nil
+            ? nil
+            : (defaults.stringArray(forKey: LicenseRevocationPolicy.defaultsKey) ?? [])
+        return LicenseRevocationPolicy.load(defaultsIDs: defaultsIDs,
+                                            keychainText: credentials.get(LicenseRevocationPolicy.keychainAccount))
+    }
 
     /// A refused key stays refused when the defaults flag is gone. The Keychain copy is the one that travels with the key.
     private func activationIsRefused(key: String?) -> Bool {
