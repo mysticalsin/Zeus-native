@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zeus — tasks and agenda</title>
+<style>
+  :root {
+    --storm: #0e1116;
+    --ink: #e9edf2;
+    --secondary: #a3adb8;
+    --quiet: #8a94a0;
+    --line: rgba(255, 255, 255, 0.08);
+    --row: rgba(255, 255, 255, 0.05);
+    --purple: #8b5cf6;
+    --ember: #ff8a3d;
+    --leaf: #3ccb7f;
+    --danger: #ff5a5f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #f3efe6;
+    color: #1c1915;
+    font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+    line-height: 1.45;
+  }
+  main { max-width: 940px; margin: 0 auto; padding: 48px 24px 80px; }
+  h1 { font-weight: 500; font-size: 34px; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { max-width: 38em; margin: 0 0 36px; color: #3f3a33; font-size: 18px; }
+  h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; margin: 28px 0 8px; color: #6b645b; }
+  .notch {
+    width: min(100%, 870px);
+    background: var(--storm);
+    color: var(--ink);
+    border-radius: 0 0 22px 22px;
+    padding: 18px 18px 16px;
+    box-shadow: 0 18px 40px rgba(20, 16, 12, 0.18);
+  }
+  .tabs { display: flex; gap: 8px; align-items: center; height: 34px; margin-bottom: 12px; }
+  .tab {
+    color: var(--quiet);
+    font-family: Palatino, Georgia, serif;
+    font-size: 13px;
+    padding: 4px 10px;
+  }
+  .tab[aria-current="page"] {
+    color: white;
+    background: var(--purple);
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+  .page { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 236px; }
+  section.col {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 12px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .kicker { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--quiet); margin: 0; }
+  h3 { margin: 0; font-size: 18px; font-weight: 500; }
+  p { margin: 0; color: var(--secondary); font-size: 14px; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+    background: var(--row);
+    border-radius: 9px;
+    padding: 7px 10px;
+    font-size: 14px;
+  }
+  .meta { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--quiet); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .overdue { color: var(--ember); }
+  .ok { color: var(--leaf); }
+  .bad { color: var(--danger); }
+  .bar { height: 2px; width: 100%; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; margin-top: auto; }
+  .bar span { display: block; height: 100%; width: 35%; background: var(--purple); animation: slide 1.4s linear infinite; }
+  @keyframes slide { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .bar span { animation: none; transform: none; width: 100%; opacity: 0.45; }
+  }
+  .note { margin-top: 36px; max-width: 40em; font-size: 15px; color: #3f3a33; }
+  @media (max-width: 720px) { .page { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tasks and agenda</h1>
+  <p class="lede">The open notch, as it already is. To-do and Agenda share the page under the tabs. Nothing here is a new window. The names are examples.</p>
+
+  <h2 id="off-label">Off</h2>
+  <div class="notch" role="group" aria-labelledby="off-label">
+    <div class="tabs" role="tablist">
+      <span class="tab">Home</span>
+      <span class="tab" aria-current="page">To-do</span>
+      <span class="tab">Calendar</span>
+    </div>
+    <div class="page">
+      <section class="col" aria-label="To-do, off">
+        <p class="kicker">To-do</p>
+        <h3>Kept on this Mac</h3>
+        <ul>
+          <li><span>Write the brief</span><span class="meta">Today</span></li>
+        </ul>
+        <p>Microsoft tasks stay off.</p>
+      </section>
+      <section class="col" aria-label="Agenda, off">
+        <p class="kicker">Agenda</p>
+        <h3>Not reading Outlook</h3>
+        <p>Turn on Tasks and agenda from this Mac. Zeus does not sign in.</p>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="ask-label">Permission needed</h2>
+  <div class="notch" role="group" aria-labelledby="ask-label">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="To-do, waiting for the system prompt">
+        <p class="kicker">To-do</p>
+        <h3>macOS will ask</h3>
+        <p>Calendars and Reminders, read only. The system sheet is the ask. This page has no control that grants it.</p>
+      </section>
+      <section class="col" aria-label="Agenda, waiting for the system prompt">
+        <p class="kicker">Agenda</p>
+        <h3>Same prompt</h3>
+        <p>Outlook is read from the calendars already on this Mac.</p>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="denied-label">Denied</h2>
+  <div class="notch" role="group" aria-labelledby="denied-label">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="To-do, access denied">
+        <p class="kicker">To-do</p>
+        <h3 class="bad">Reminders stays closed</h3>
+        <p>Zeus will not ask again from here. System Settings, Privacy &amp; Security, can allow it.</p>
+      </section>
+      <section class="col" aria-label="Agenda, access denied">
+        <p class="kicker">Agenda</p>
+        <h3 class="bad">Calendars stays closed</h3>
+        <p>The lists already in Zeus are unchanged.</p>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="loading-label">Loading</h2>
+  <div class="notch" role="group" aria-labelledby="loading-label" aria-busy="true">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="To-do, loading">
+        <p class="kicker">To-do</p>
+        <h3>Loading</h3>
+        <p>Reading reminders the Mac already has.</p>
+        <div class="bar" aria-hidden="true"><span></span></div>
+      </section>
+      <section class="col" aria-label="Agenda, loading">
+        <p class="kicker">Agenda</p>
+        <h3>Loading</h3>
+        <p>Reading today's events.</p>
+        <div class="bar" aria-hidden="true"><span></span></div>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="empty-label">Empty</h2>
+  <div class="notch" role="group" aria-labelledby="empty-label">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="To-do, nothing due">
+        <p class="kicker">To-do</p>
+        <h3 class="ok">Nothing due</h3>
+        <p>No open Microsoft tasks.</p>
+      </section>
+      <section class="col" aria-label="Agenda, nothing today">
+        <p class="kicker">Agenda</p>
+        <h3>Nothing today</h3>
+        <p>The Exchange calendar has no event on this day.</p>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="populated-label">Populated</h2>
+  <div class="notch" role="group" aria-labelledby="populated-label">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="To-do, two example tasks">
+        <p class="kicker">To-do</p>
+        <h3>From Reminders</h3>
+        <ul>
+          <li><span>Send the notes</span><span class="meta overdue">Overdue</span></li>
+          <li><span>Buy oat milk</span><span class="meta">Today 17:00</span></li>
+        </ul>
+      </section>
+      <section class="col" aria-label="Agenda, two example events">
+        <p class="kicker">Agenda</p>
+        <h3>From the Mac's calendars</h3>
+        <ul>
+          <li><span>Offsite</span><span class="meta">All day · 3 days</span></li>
+          <li><span>Standup</span><span class="meta">07:00–08:00 · Los Angeles</span></li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="error-label">Error</h2>
+  <div class="notch" role="group" aria-labelledby="error-label">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="To-do, read failed">
+        <p class="kicker">To-do</p>
+        <h3 class="bad">Could not read</h3>
+        <p>The reminders on this Mac could not be read. Nothing was changed.</p>
+      </section>
+      <section class="col" aria-label="Agenda, read failed">
+        <p class="kicker">Agenda</p>
+        <h3 class="bad">Could not read</h3>
+        <p>Try again from the setting. Zeus does not sign in to try another way.</p>
+      </section>
+    </div>
+  </div>
+
+  <h2 id="missing-label">App missing</h2>
+  <div class="notch" role="group" aria-labelledby="missing-label">
+    <div class="tabs"><span class="tab">Home</span><span class="tab" aria-current="page">To-do</span><span class="tab">Calendar</span></div>
+    <div class="page">
+      <section class="col" aria-label="Neither Microsoft app is installed">
+        <p class="kicker">Not installed</p>
+        <h3>Nothing to read</h3>
+        <p>Outlook and To Do are not on this Mac, and Calendar has no Exchange account.</p>
+      </section>
+      <section class="col" aria-label="Outlook is installed but not in the Mac's calendars">
+        <p class="kicker">Not in the Mac's calendars</p>
+        <h3>Add the account on the Mac</h3>
+        <p>Outlook is on this Mac. Its calendar is not in the Mac's calendars. System Settings, Internet Accounts. Zeus does not sign in.</p>
+      </section>
+    </div>
+  </div>
+
+  <p class="note">Reduce Motion holds the loading bar still. The word Loading stays. VoiceOver gets the state from the heading and the sentences, not from colour. Overdue is written out.</p>
+</main>
+</body>
+</html>

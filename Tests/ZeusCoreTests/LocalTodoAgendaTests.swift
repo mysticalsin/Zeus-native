@@ -336,7 +336,7 @@ struct LocalTodoAgendaTests {
         #expect(titles == titles.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
     }
 
-    @Test func unicodeTitlesSurviveAndCombiningMarksDedupe() {
+    @Test func unicodeTitlesSurviveAndCombiningMarksDedupe() throws {
         let composed = "Café"
         let decomposed = "Cafe\u{0301}"
         let phase = presented(snapshot(todos: [
@@ -346,9 +346,11 @@ struct LocalTodoAgendaTests {
             todo("🎉 Ship", id: "d"),
         ]))
         let titles = lines(phase).todos.map(\.title)
+        let cafe = try #require(titles.filter { $0.precomposedStringWithCanonicalMapping == composed.precomposedStringWithCanonicalMapping }.first)
         #expect(titles.count == 3)
-        #expect(titles.contains(composed))
-        #expect(!titles.contains(decomposed))
+        // Swift compares these as equal, so the kept scalars show which spelling survived.
+        #expect(cafe.unicodeScalars.elementsEqual(composed.unicodeScalars))
+        #expect(!cafe.unicodeScalars.elementsEqual(decomposed.unicodeScalars))
         #expect(titles.contains("東京の予定"))
         #expect(titles.contains("🎉 Ship"))
     }

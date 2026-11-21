@@ -171,6 +171,7 @@ o(S,'Music metadata','Chrome extension needs a reload','status','-','Press Reloa
 o(S,'Face presence','Face presence','toggle','-','Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on.','missing','face.presence','toggle',[],'false','live','Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on.')
 o(S,'Face presence','Lock after absent for','menu','-','How long no enrolled face may be missing before the Mac locks.','missing','face.lockAfter','choice',['30 seconds','1 minute','2 minutes','5 minutes','10 minutes'],'2 minutes','live','Zeus addition. Counted from the last time an enrolled face was seen.')
 o(S,'Face presence','Status','status','-','','missing','face.status','status',[],'','custom','Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away.')
+o(S,'Tasks and agenda','Tasks and agenda from this Mac','toggle','-','Shows tasks and the day\'s agenda from Microsoft accounts already on this Mac. Off until you turn it on. Read only.','missing','todo.microsoftLocal','toggle',[],'false','stub','Zeus addition. Off by default. Stored, not shown, until the top bar wiring is approved. Reads calendars and reminders the Mac already has. No sign-in.')
 o(S,'Access','Open Accessibility settings','button','-','Jumps to System Settings.','has','privacy.openAccessibility','action',[],'','live','')
 
 S='interview'
@@ -284,13 +285,16 @@ def validate_table():
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
-              'face.presence', 'tiling.enabled', 'fling.enabled')
+              'face.presence', 'tiling.enabled', 'fling.enabled', 'todo.microsoftLocal')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':
             raise ValueError(f'{key} must remain an explicit opt-in with a false default')
     if by_id['wake.ignoreMicConflicts'][11] != 'stub':
         raise ValueError('wake.ignoreMicConflicts must remain hidden from release settings')
+    row = by_id.get('todo.microsoftLocal')
+    if row is None or row[8] != 'toggle' or row[10] != 'false' or row[11] != 'stub':
+        raise ValueError('todo.microsoftLocal stays off and hidden until the top bar is approved')
 
 def write_swift(path):
     validate_table()
