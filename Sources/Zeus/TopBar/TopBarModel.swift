@@ -123,7 +123,7 @@ final class TopBarModel {
     }
     /// Music artwork and bars beside the closed notch while something plays.
     var liveMusicWings: Bool {
-        didSet { defaults.set(liveMusicWings, forKey: "topBar.musicWings") }
+        didSet { MusicWingsPreference.set(liveMusicWings, defaults: defaults) }
     }
     var weatherCity: String {
         didSet { defaults.set(weatherCity, forKey: "topBar.weatherCity") }
@@ -324,7 +324,8 @@ final class TopBarModel {
             if needsRepair { defaults.set(TopBarLayoutRepair.version, forKey: "topBar.layoutRepair") }
         }
         cuesEnabled = defaults.object(forKey: "topBar.cues") as? Bool ?? true
-        liveMusicWings = defaults.object(forKey: "topBar.musicWings") as? Bool ?? true
+        if !TopBarStyle.isSnapshot { MusicWingsPreference.migrate(defaults) }
+        liveMusicWings = MusicWingsPreference.isOn(defaults)
         weatherCity = defaults.string(forKey: "topBar.weatherCity") ?? ""
         useCelsius = defaults.object(forKey: "topBar.celsius") as? Bool ?? (Locale.current.measurementSystem != .us)
         note = defaults.string(forKey: "topBar.note") ?? ""
