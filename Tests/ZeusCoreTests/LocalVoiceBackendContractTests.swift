@@ -18,8 +18,8 @@ import Testing
         #expect(events.map(\.shape) == VoiceSessionEventShape.allCases)
         let legal: [VoiceSessionState: [VoiceSessionEvent: VoiceSessionState]] = [
             .idle: [.start: .starting, .close: .closed, .fail(failure): .failed(failure)],
-            .starting: [.started: .streaming, .close: .closing, .fail(failure): .failed(failure)],
-            .streaming: [.push: .streaming, .close: .closing, .fail(failure): .failed(failure)],
+            .starting: [.started: .streaming, .close: .closing, .interrupt: .closing, .deviceChanged: .starting, .fail(failure): .failed(failure)],
+            .streaming: [.push: .streaming, .close: .closing, .interrupt: .closing, .deviceChanged: .streaming, .fail(failure): .failed(failure)],
             .closing: [.closed: .closed, .fail(failure): .failed(failure)],
         ]
         for state in states {

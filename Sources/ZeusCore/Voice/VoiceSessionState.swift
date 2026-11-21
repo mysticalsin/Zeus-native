@@ -8,6 +8,8 @@ public indirect enum VoiceSessionEvent: Equatable, Hashable, Sendable {
     case push
     case close
     case closed
+    case interrupt
+    case deviceChanged
     case fail(VoiceSessionError)
 
     var shape: VoiceSessionEventShape {
@@ -17,6 +19,8 @@ public indirect enum VoiceSessionEvent: Equatable, Hashable, Sendable {
         case .push: .push
         case .close: .close
         case .closed: .closed
+        case .interrupt: .interrupt
+        case .deviceChanged: .deviceChanged
         case .fail: .fail
         }
     }
@@ -30,6 +34,8 @@ public indirect enum VoiceSessionEvent: Equatable, Hashable, Sendable {
             case .push: .push
             case .close: .close
             case .closed: .closed
+            case .interrupt: .interrupt
+            case .deviceChanged: .deviceChanged
             case .fail: .fail(failure)
             }
         }
@@ -37,7 +43,7 @@ public indirect enum VoiceSessionEvent: Equatable, Hashable, Sendable {
 }
 
 enum VoiceSessionEventShape: CaseIterable, Equatable, Sendable {
-    case start, started, push, close, closed, fail
+    case start, started, push, close, closed, interrupt, deviceChanged, fail
 }
 
 public indirect enum VoiceSessionError: Error, Equatable, Hashable, Sendable {
@@ -92,15 +98,17 @@ public indirect enum VoiceSessionState: Sendable, Equatable, Hashable {
                 return .closed
             case .fail(let error):
                 return .failed(error)
-            case .started, .push, .closed:
+            case .started, .push, .closed, .interrupt, .deviceChanged:
                 throw VoiceSessionError.illegalTransition(from: self, event: event)
             }
         case .starting:
             switch event {
             case .started:
                 return .streaming
-            case .close:
+            case .close, .interrupt:
                 return .closing
+            case .deviceChanged:
+                return .starting
             case .fail(let error):
                 return .failed(error)
             case .start, .push, .closed:
@@ -110,8 +118,10 @@ public indirect enum VoiceSessionState: Sendable, Equatable, Hashable {
             switch event {
             case .push:
                 return .streaming
-            case .close:
+            case .close, .interrupt:
                 return .closing
+            case .deviceChanged:
+                return .streaming
             case .fail(let error):
                 return .failed(error)
             case .start, .started, .closed:
@@ -123,17 +133,17 @@ public indirect enum VoiceSessionState: Sendable, Equatable, Hashable {
                 return .closed
             case .fail(let error):
                 return .failed(error)
-            case .start, .started, .push, .close:
+            case .start, .started, .push, .close, .interrupt, .deviceChanged:
                 throw VoiceSessionError.illegalTransition(from: self, event: event)
             }
         case .closed:
             switch event {
-            case .start, .started, .push, .close, .closed, .fail:
+            case .start, .started, .push, .close, .closed, .interrupt, .deviceChanged, .fail:
                 throw VoiceSessionError.illegalTransition(from: self, event: event)
             }
         case .failed:
             switch event {
-            case .start, .started, .push, .close, .closed, .fail:
+            case .start, .started, .push, .close, .closed, .interrupt, .deviceChanged, .fail:
                 throw VoiceSessionError.illegalTransition(from: self, event: event)
             }
         }
