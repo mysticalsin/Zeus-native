@@ -87,16 +87,22 @@ public struct NotchGestureAdapter<Sample: NotchGestureSample>: Equatable, Sendab
 
     public mutating func reduce(_ event: Event) -> [Effect] {
         switch (phase, event) {
+        case (.settling, .cancel):
+            phase = .idle
+            return [.emit(Sample.settle(elapsed: Self.settleAfter)), .disarm]
+
         case (_, .cancel):
             phase = .idle
             return [.disarm]
 
-        case (.idle, .down(let at, let x, let y, let count)),
-             (.settling, .down(let at, let x, let y, let count)):
-            return begin(at: at, x: x, y: y, clickCount: count, disarmFirst: phase != .idle)
+        case (.idle, .down(let at, let x, let y, let count)):
+            return begin(at: at, x: x, y: y, clickCount: max(count, 1), disarmFirst: false)
 
-        case (.pressed, .down):
-            return []
+        case (.settling(let previous, _), .down(let at, let x, let y, let count)):
+            return begin(at: at, x: x, y: y, clickCount: max(count, previous + 1, 1), disarmFirst: true)
+
+        case (.pressed, .down(let at, let x, let y, let count)):
+            return begin(at: at, x: x, y: y, clickCount: max(count, 1), disarmFirst: true)
 
         case (.pressed(var press), .move(_, let x, let y)):
             let dx = x - press.originX
@@ -145,7 +151,8 @@ public struct NotchGestureAdapter<Sample: NotchGestureSample>: Equatable, Sendab
             phase = .idle
             return [.emit(Sample.settle(elapsed: elapsed)), .disarm]
 
-        default:
+        case (.idle, .move), (.idle, .up), (.idle, .tick),
+             (.settling, .move), (.settling, .up):
             return []
         }
     }

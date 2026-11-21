@@ -67,6 +67,8 @@ final class NotchController {
     /// Pointer samples for a later gesture router. Emitting one does not open, close, or drag.
     private var notchGestures = NotchGestureAdapter<NotchPointerSample>()
     private var gestureTick: Task<Void, Never>?
+    /// Anchors event timestamps so a late queue does not turn a tap into a hold.
+    private var eventClock: EventClock?
     private var lastPointerEdge: (TimeInterval, PointerEdge)?
     var onNotchGesture: @MainActor (NotchPointerSample) -> Void = { _ in }
 
@@ -528,19 +530,31 @@ final class NotchController {
             performGesture(notchGestures.reduce(.cancel))
             return
         }
-        performGesture(notchGestures.reduce(.down(at: Date(), x: Double(point.x), y: Double(point.y), clickCount: event.clickCount)))
+        let at = eventDate(event)
+        performGesture(notchGestures.reduce(.down(at: at, x: Double(point.x), y: Double(point.y), clickCount: event.clickCount)))
     }
 
     private func ingestMouseMove(_ event: NSEvent) {
         guard takePointer(event, .move) else { return }
         let point = NSEvent.mouseLocation
-        performGesture(notchGestures.reduce(.move(at: Date(), x: Double(point.x), y: Double(point.y))))
+        performGesture(notchGestures.reduce(.move(at: eventDate(event), x: Double(point.x), y: Double(point.y))))
     }
 
     private func ingestMouseUp(_ event: NSEvent) {
         guard takePointer(event, .up) else { return }
         let point = NSEvent.mouseLocation
-        performGesture(notchGestures.reduce(.up(at: Date(), x: Double(point.x), y: Double(point.y), clickCount: event.clickCount)))
+        performGesture(notchGestures.reduce(.up(at: eventDate(event), x: Double(point.x), y: Double(point.y), clickCount: event.clickCount)))
+    }
+
+    /// The first event anchors the clock to `now()`. Later events keep their own timestamp delta.
+    private func eventDate(_ event: NSEvent) -> Date {
+        let stamp = event.timestamp
+        if let eventClock {
+            return eventClock.date(stamp: stamp)
+        }
+        let clock = EventClock(originStamp: stamp, originDate: now())
+        eventClock = clock
+        return clock.date(stamp: stamp)
     }
 
     private func takePointer(_ event: NSEvent, _ edge: PointerEdge) -> Bool {
@@ -551,8 +565,10 @@ final class NotchController {
     }
 
     private func pointerIsOnNotch(_ point: CGPoint) -> Bool {
-        guard let screen else { return false }
-        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
+        guard let hit = panels.first(where: { $0.screen.frame.contains(point) })?.screen ?? screen else { return false }
+        let shape = drawnNotch.footprint(for: Self.facts(of: hit))
+        let frame = NotchAnchor.frame(screenFrame: hit.frame, footprint: shape)
+        let zone = NotchFootprintRules.clickZone(shape, screenFrame: frame, topOffset: topOffset)
         return point.x >= zone.minX && point.x <= zone.maxX && point.y > zone.minY && point.y <= zone.maxY
     }
 
@@ -567,7 +583,7 @@ final class NotchController {
                     let delay = wake.timeIntervalSinceNow
                     if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
                     guard let self, !Task.isCancelled else { return }
-                    self.performGesture(self.notchGestures.reduce(.tick(at: Date())))
+                    self.performGesture(self.notchGestures.reduce(.tick(at: self.now())))
                 }
             case .disarm:
                 gestureTick?.cancel()
@@ -740,6 +756,7 @@ final class NotchController {
     /// Settings changed the display choice, a display came or went, or the Mac woke or unlocked.
     /// Rebuilds only when the target displays changed; otherwise raises the windows again.
     func refreshDisplays(force: Bool) {
+        performGesture(notchGestures.reduce(.cancel))
         let next = targetDisplays()
         if force || panels.isEmpty || DisplaySelection.needsRebuild(current: displays, next: next) {
             build()
