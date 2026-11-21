@@ -60,6 +60,66 @@ fn a_world_writable_parent_is_refused() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+fn perm_bits(path: &std::path::Path) -> u32 {
+    std::fs::metadata(path).unwrap().permissions().mode() & 0o7777
+}
+
+#[test]
+fn an_owned_0755_parent_is_refused_and_not_chmodded() {
+    let root = scratch("own755");
+    let parent = root.join("home");
+    std::fs::create_dir(&parent).unwrap();
+    set_mode(&parent, 0o755);
+    let before = perm_bits(&parent);
+    let error = bind_socket(&parent.join("x.sock")).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert!(
+        error.to_string().contains("0700"),
+        "refusal did not say the parent must already be 0700: {error}"
+    );
+    assert_eq!(perm_bits(&parent), before, "existing parent mode changed");
+    assert!(!parent.join("x.sock").exists());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_sticky_tmp_like_parent_is_not_chmodded_for_its_owner() {
+    let root = scratch("root-tmp");
+    let parent = root.join("tmp");
+    std::fs::create_dir(&parent).unwrap();
+    set_mode(&parent, 0o1777);
+    let before = perm_bits(&parent);
+    let error = haru_companion::serve::bind_socket_as(&parent.join("zeus.sock"), current_uid())
+        .unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert_eq!(
+        perm_bits(&parent),
+        before,
+        "euid-owned sticky parent was chmodded"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_foreign_euid_is_refused_without_chmod() {
+    let root = scratch("foreign");
+    let parent = root.join("priv");
+    std::fs::create_dir(&parent).unwrap();
+    set_mode(&parent, 0o700);
+    let before = perm_bits(&parent);
+    let foreign = current_uid().wrapping_add(1);
+    let error =
+        haru_companion::serve::bind_socket_as(&parent.join("zeus.sock"), foreign).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert!(
+        error.to_string().contains("euid"),
+        "refusal did not name the owner check: {error}"
+    );
+    assert_eq!(perm_bits(&parent), before);
+    assert!(!parent.join("zeus.sock").exists());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 #[test]
 fn a_sticky_directory_we_own_is_tightened_before_bind() {
     let root = scratch("sticky");
@@ -249,6 +309,65 @@ fn peer_uid_refusal_ends_with_eof() {
 }
 
 #[test]
+fn run_serve_unlinks_by_identity_not_by_path() {
+    let source = include_str!("../src/cli.rs");
+    assert!(
+        !source.contains("remove_file"),
+        "run_serve still deletes whatever path is there"
+    );
+}
+
+#[test]
+fn a_model_listen_file_is_kept() {
+    let root = scratch("model-file");
+    let path = root.join("zeus.sock.child.model");
+    std::fs::write(&path, b"keep").unwrap();
+    haru_companion::supervisor::release_model_socket(&path).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"keep");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn replaced_child_entry_does_not_hang_serve() {
+    let root = scratch("hang");
+    set_mode(&root, 0o700);
+    let model = root.join("model");
+    std::fs::create_dir(&model).unwrap();
+    let public = root.join("zeus.sock");
+    let child = haru_companion::supervisor::private_socket(&public);
+    let public_for_server = public.clone();
+    let model_for_server = model.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let code = haru_companion::run([
+            "serve".into(),
+            "--socket".into(),
+            public_for_server.display().to_string(),
+            "--python".into(),
+            "/bin/sleep".into(),
+            "--model".into(),
+            model_for_server.display().to_string(),
+        ]);
+        let _ = tx.send(code);
+    });
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while std::time::Instant::now() < deadline && !child.exists() {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(child.exists(), "child gate was not created");
+    std::fs::remove_file(&child).unwrap();
+    let _impostor = UnixListener::bind(&child).unwrap();
+    let client = UnixStream::connect(&public);
+    drop(client);
+    let done = rx.recv_timeout(std::time::Duration::from_secs(2));
+    assert!(
+        done.is_ok(),
+        "serve did not exit after the child socket was replaced: {done:?}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
 fn os_peer_uid_matches_geteuid() {
     let root = scratch("ospeer");
     let path = root.join("priv").join("zeus.sock");
@@ -262,5 +381,10 @@ fn os_peer_uid_matches_geteuid() {
     let _client = UnixStream::connect(&path).unwrap();
     let uid = server.join().unwrap();
     assert_eq!(uid, current_uid());
+    let source = include_str!("../src/serve.rs");
+    assert!(
+        source.contains("FixedPeer is the foreign-uid seam"),
+        "same-uid SO_PEERCRED does not explain why a foreign uid is FixedPeer"
+    );
     let _ = std::fs::remove_dir_all(&root);
 }

@@ -139,6 +139,13 @@ pub fn unlink_if_ours(path: &Path, dev: u64, ino: u64) -> std::io::Result<()> {
     Ok(())
 }
 
+/// `euid` is accepted so tests can stand in for another uid. The current
+/// implementation ignores it and uses the process euid.
+pub fn bind_socket_as(path: &Path, euid: u32) -> std::io::Result<UnixListener> {
+    let _ = euid;
+    bind_socket(path)
+}
+
 pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     let parent = parent_path(path);
     let created = !parent.exists();

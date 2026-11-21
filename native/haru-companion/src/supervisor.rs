@@ -121,6 +121,16 @@ pub fn private_socket(public: &Path) -> PathBuf {
 }
 
 /// Listen path handed to Python. It is not the socket the parent accepts on.
+/// Removes whatever is at `path`. The bind sweep replaces this so a
+/// non-socket left at the model listen path is kept.
+pub fn release_model_socket(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 pub fn model_socket(gate: &Path) -> PathBuf {
     let mut name = gate.file_name().unwrap_or_default().to_os_string();
     name.push(".model");
