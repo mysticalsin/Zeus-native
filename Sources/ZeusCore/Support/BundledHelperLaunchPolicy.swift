@@ -34,6 +34,19 @@ public enum BundledHelperLaunchPolicy {
     public static let knownSigningIdentifiers: Set<String> = ["zeus", "zeus-cli", "zeus-bridge", "zeus-hook"]
     public static let refusalSentence = "Zeus refused to launch its helper because the helper's signature does not match this app."
 
+    /// Passed together to `SecStaticCodeCheckValidity`. An empty mask is a failed check.
+    public static let requiredValidityFlags = [
+        "kSecCSStrictValidate",
+        "kSecCSCheckNestedCode",
+        "kSecCSCheckAllArchitectures",
+    ]
+
+    /// `kSecCSEnforceRevocationChecks` forces an OCSP request. It is not offline-safe: with no
+    /// network the check fails or stalls, and `kSecCSNoNetworkAccess` cancels it. No Security
+    /// flag reads a local revocation cache and fails closed while offline, so the validity call
+    /// does not set that flag.
+    public static let omittedValidityFlags = ["kSecCSEnforceRevocationChecks"]
+
     public static func signingIdentifier(forExecutablePath path: String) -> String {
         URL(fileURLWithPath: path).lastPathComponent
     }
@@ -90,6 +103,32 @@ public enum BundledHelperLaunchPolicy {
     public static func isLeafSHA1(_ text: String) -> Bool {
         let leaf = text.lowercased()
         return leaf.count == 40 && leaf.allSatisfy(\.isHexDigit)
+    }
+
+    /// A copy under Application Support/Zeus/bin. The person who runs Zeus can replace that file.
+    public static func isUserWritableHelperCopy(_ path: String) -> Bool {
+        path.replacingOccurrences(of: "\\", with: "/").contains("/Library/Application Support/Zeus/bin")
+    }
+
+    /// The path another program may be told to run. It is the path that was checked, its file
+    /// name is the helper, and it is not a user-writable support-directory copy. `zeus-cli` is
+    /// the unpackaged development binary. Every other helper has to sit in Contents/Helpers.
+    public static func executableToPublish(checkedPath: String, helperName: String) -> String? {
+        let path = checkedPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = helperName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard knownSigningIdentifiers.contains(name), signingIdentifier(forExecutablePath: path) == name,
+              !isUserWritableHelperCopy(path) else { return nil }
+        if name == "zeus-cli" { return path }
+        let marker = "/Contents/Helpers/" + name
+        guard let range = path.range(of: marker), path[range.upperBound...].isEmpty else { return nil }
+        return path
+    }
+
+    /// The executable handed to another process. A refusal publishes nothing, and a launch
+    /// publishes the checked path only.
+    public static func publishedExecutable(checkedPath: String, helperName: String, decision: BundledHelperLaunchDecision) -> String? {
+        guard case .launch = decision else { return nil }
+        return executableToPublish(checkedPath: checkedPath, helperName: helperName)
     }
 
     /// Letters, digits and the given extras only, so a value cannot add a requirement clause.

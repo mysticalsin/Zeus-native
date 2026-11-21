@@ -26,11 +26,12 @@ struct SecBundledHelperSignature: BundledHelperSignatureChecking, BundledHelperA
 
     func helperSatisfies(anchor: HelperSigningAnchor, signingIdentifier: String, at path: String) -> Bool {
         guard let text = BundledHelperLaunchPolicy.requirementText(anchor: anchor, signingIdentifier: signingIdentifier),
-              let staticCode = Self.staticCode(at: path) else { return false }
+              let staticCode = Self.staticCode(at: path),
+              let flags = Self.validityFlags() else { return false }
         var requirement: SecRequirement?
         guard SecRequirementCreateWithString(text as CFString, SecCSFlags(), &requirement) == errSecSuccess,
               let requirement,
-              SecStaticCodeCheckValidity(staticCode, SecCSFlags(), requirement) == errSecSuccess,
+              SecStaticCodeCheckValidity(staticCode, flags, requirement) == errSecSuccess,
               let facts = Self.facts(staticCode),
               facts.identifier == signingIdentifier else { return false }
         switch anchor {
@@ -43,6 +44,27 @@ struct SecBundledHelperSignature: BundledHelperSignatureChecking, BundledHelperA
 
     func helperSatisfiesRequirement(at path: String, teamIdentifier: String, signingIdentifier: String) -> Bool {
         helperSatisfies(anchor: .developerID(teamIdentifier: teamIdentifier), signingIdentifier: signingIdentifier, at: path)
+    }
+
+    /// Strict, nested, and every architecture. A missing or extra flag name fails closed.
+    /// Revocation stays off: see `BundledHelperLaunchPolicy.omittedValidityFlags`.
+    private static func validityFlags() -> SecCSFlags? {
+        var mask: UInt32 = 0
+        var seen = 0
+        for name in BundledHelperLaunchPolicy.requiredValidityFlags {
+            let bit: UInt32
+            switch name {
+            case "kSecCSStrictValidate": bit = UInt32(kSecCSStrictValidate)
+            case "kSecCSCheckNestedCode": bit = UInt32(kSecCSCheckNestedCode)
+            case "kSecCSCheckAllArchitectures": bit = UInt32(kSecCSCheckAllArchitectures)
+            default: return nil
+            }
+            guard bit != 0 else { return nil }
+            mask |= bit
+            seen += 1
+        }
+        guard seen == BundledHelperLaunchPolicy.requiredValidityFlags.count, mask != 0 else { return nil }
+        return SecCSFlags(rawValue: mask)
     }
 
     private static func selfStaticCode() -> SecStaticCode? {
@@ -101,6 +123,10 @@ enum BundledHelperLaunchLog {
 
 enum BundledHelperLaunch {
     static func decide(path: String, signingIdentifier: String) -> BundledHelperLaunchDecision {
-        BundledHelperLaunchPolicy.decide(helperPath: path, signingIdentifier: signingIdentifier, checker: SecBundledHelperSignature())
+        anchored(path: path, signingIdentifier: signingIdentifier, checker: SecBundledHelperSignature())
+    }
+
+    private static func anchored(path: String, signingIdentifier: String, checker: some BundledHelperAnchorChecking) -> BundledHelperLaunchDecision {
+        BundledHelperLaunchPolicy.decide(helperPath: path, signingIdentifier: signingIdentifier, checker: checker)
     }
 }

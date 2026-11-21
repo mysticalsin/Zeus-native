@@ -240,11 +240,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if on(.helperRefresh) {
             if ClaudeHookInstaller.isInstalled() { try? ClaudeHookInstaller.refreshHelper() }
-            if ChromeInstaller.isInstalled() {
-                // A refused copy is discarded. The bridge and host registration already on disk stay.
-                if let staged = try? ChromeInstaller.stageBundledBridge() {
-                    _ = ChromeInstaller.publishStagedBridge(staged)
-                }
+            if ChromeInstaller.hasManifest() {
+                // A refused check leaves the bundle helper and the host registration as they are.
+                _ = ChromeInstaller.authorizeInstalledBridge()
                 try? ChromeInstaller.refreshExtension()
             }
         }
