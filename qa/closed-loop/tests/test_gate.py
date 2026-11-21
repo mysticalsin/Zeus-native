@@ -746,7 +746,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("gate.py evaluate", aggregate)
         self.assertIn("cancel-in-progress: false", workflow)
         self.assertIn("${{ github.event_name }}-${{ github.ref }}-${{ github.sha }}", workflow)
-        self.assertEqual(workflow.count("ref: ${{ github.sha }}"), len(gate.REQUIRED) + 1)
+        # Required jobs, the aggregate, and the separate macos-build compile check.
+        self.assertEqual(workflow.count("ref: ${{ github.sha }}"), len(gate.REQUIRED) + 2)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event_name == 'schedule'", workflow)
         self.assertIn('python3 qa/closed-loop/ci_motion_profile.py --output "$RUNNER_TEMP/zeus-results/app/native-evidence"', workflow)
@@ -769,6 +770,26 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertLess(bundle, bundle_check)
         self.assertLess(bundle_check, archive)
         self.assertLess(archive, upload)
+
+    def test_macos_build_compiles_core_and_app_on_every_workflow_run(self):
+        workflow = (Path(__file__).resolve().parents[3] / ".github/workflows/build.yml").read_text()
+        self.assertIn("\n  macos-build:\n", workflow)
+        job = workflow.split("\n  macos-build:\n", 1)[1].split("\n  required-checks:\n", 1)[0]
+        self.assertIn("    name: macos-build\n", job)
+        self.assertIn("    runs-on: macos-15\n", job)
+        self.assertIn("    timeout-minutes: 40\n", job)
+        self.assertIn("ref: ${{ github.sha }}", job)
+        self.assertIn("sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer", job)
+        self.assertIn("swift build --product ZeusCore && swift build --product Zeus;", job)
+        for skipped in ("paths:", "paths-ignore:", "if:", "continue-on-error:"):
+            self.assertNotIn(skipped, job)
+        app = workflow.split("  app:\n", 1)[1].split("\n  extension:", 1)[0]
+        self.assertIn("    timeout-minutes: 120\n", app)
+        self.assertEqual(app.count("timeout-minutes: 1\n"), 2)
+        self.assertIn("swift build; }", app)
+        needs = re.search(r"^    needs: \[(.+)\]$", workflow.split("  required-checks:\n", 1)[1], re.MULTILINE)
+        self.assertIsNotNone(needs)
+        self.assertNotIn("macos-build", {value.strip() for value in needs[1].split(",")})
 
     def test_native_filter_is_anchored_to_only_reviewed_map_suites(self):
         _, _, _, _, definitions, _ = gate.load_policy()
