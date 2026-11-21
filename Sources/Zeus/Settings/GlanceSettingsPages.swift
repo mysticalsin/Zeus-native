@@ -1355,6 +1355,7 @@ private struct PrivacyPage: View {
                         text: cliAccess.failed
                             ? "Zeus could not change this in your Keychain."
                             : "Lets the zeus command use the microphone, record, type and click.",
+                        detail: cliAccess.failed ? nil : "Any program on this Mac running as you can run that command.",
                         isOn: Binding(get: { cliAccess.enabled }, set: { cliAccess.set($0) }))
         }
     }
