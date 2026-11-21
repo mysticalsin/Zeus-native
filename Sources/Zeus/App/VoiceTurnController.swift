@@ -203,7 +203,7 @@ final class VoiceTurnController {
     }
 
     @discardableResult
-    func press() -> Bool {
+    func press(builtinCue: Bool = true) -> Bool {
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -255,7 +255,7 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
-        ZeusSound.play(.listenStart)
+        if builtinCue { ZeusSound.play(.listenStart) }
         seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
@@ -271,7 +271,7 @@ final class VoiceTurnController {
         return true
     }
 
-    func release() {
+    func release(builtinCue: Bool = true) {
         guard listening else { return }
         // Capture already gave up for this turn: end it as a failure and do not read or send the partial.
         if let session = talkSession, let failure = captureFailures.failure(for: session) {
@@ -284,7 +284,7 @@ final class VoiceTurnController {
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
-        ZeusSound.play(.listenStop)
+        if builtinCue { ZeusSound.play(.listenStop) }
         seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil

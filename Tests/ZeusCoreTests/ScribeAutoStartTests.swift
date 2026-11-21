@@ -1063,7 +1063,7 @@ struct ScribeAutoStartTests {
         #expect(held.isEmpty)
         #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
         let start = machine.handle(asTap(asOffer(), 41))
-        #expect(start == [.start(asTeams)])
+        #expect(start.isEmpty)
     }
 
     @Test func leavingTheBannerGivesAShortGraceThenItTimesOut() {
@@ -1077,16 +1077,134 @@ struct ScribeAutoStartTests {
         #expect(machine.state == .idle)
     }
 
-    @Test func aTapThatArrivesJustAfterTheTimeoutStillStarts() {
+    @Test func aTapThatArrivesJustAfterTheTimeoutDoesNotStart() {
         var machine = asPrompting()
         machine.handle(asTick(23))
         #expect(machine.state == .idle)
         let start = machine.handle(asTap(asOffer(), 23.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    /// The offer leaves on its own after 10 s. A tap that names that offer, or an offer a newer one has replaced,
+    /// must not start a recording. A tap on the offer that is still up does.
+    @Test func aLateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording() {
+        var timing = ScribeAutoStartTiming()
+        timing.askTimeout = 10
+        let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
+
+        var expired = ScribeAutoStartMachine(timing: timing)
+        expired.handle(asEvidence(0, mic: [.teams]))
+        expired.handle(asEvidence(3, mic: [.teams]))
+        #expect(expired.state == .prompting(meeting: asTeams, deadline: 13, blocked: .notChosen))
+        expired.handle(asTick(13))
+        #expect(expired.state == .idle)
+        let afterExpiry = expired.handle(asTap(asOffer(), 13.1))
+        #expect(afterExpiry.isEmpty, "a tap after the 10 s offer left started a recording")
+        #expect(expired.state == .idle)
+
+        var replaced = ScribeAutoStartMachine(timing: timing)
+        replaced.handle(asEvidence(0, mic: [.teams]))
+        replaced.handle(asEvidence(3, mic: [.teams]))
+        replaced.handle(asTick(13))
+        replaced.handle(asEvidence(14, mic: [.zoom]))
+        replaced.handle(asEvidence(17, mic: [.zoom]))
+        #expect(replaced.card(now: 17) == .offer(zoom, blocked: .notChosen))
+        let stale = replaced.handle(asTap(asOffer(), 18))
+        #expect(stale.isEmpty, "a tap on the offer Zoom replaced started a recording")
+        #expect(replaced.state == .prompting(meeting: zoom, deadline: 27, blocked: .notChosen))
+
+        var live = ScribeAutoStartMachine(timing: timing)
+        live.handle(asEvidence(0, mic: [.teams]))
+        live.handle(asEvidence(3, mic: [.teams]))
+        let current = live.handle(asTap(asOffer(), 4))
+        #expect(current == [.start(asTeams)])
+        #expect(live.state == .starting(ScribeStartAttempt(meeting: asTeams, since: 4, origin: .tap,
+                                                           previousSession: nil, session: nil)))
+    }
+
+    @Test func theProductionAskTimeoutIsTwentySeconds() {
+        #expect(ScribeAutoStartTiming().askTimeout == 20)
+        #expect(ScribeAutoStartTiming.standard.askTimeout == 20)
+    }
+
+    /// The default machine, not a fixture timeout. The offer's own deadline has passed and the pointer is off the card.
+    @Test func aLateTapOnTheProductionAskTimeoutDoesNotStart() {
+        var machine = asPrompting()
+        #expect(machine.timing.askTimeout == 20)
+        machine.handle(asTick(23))
+        let start = machine.handle(asTap(asOffer(), 23.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .idle)
+    }
+
+    @Test func aPointerInsidePastTheHoverCapDoesNotStart() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        let start = machine.handle(asTap(asOffer(), 27))
+        #expect(start.isEmpty, "a pointer left on the card past deadline + hover grace started a recording")
+    }
+
+    @Test func aPointerInsideWithinTheHoverCapStarts() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        let start = machine.handle(asTap(asOffer(), 26))
         #expect(start == [.start(asTeams)])
-        guard case .starting = machine.state else {
-            Issue.record("expected starting, got \(machine.state)")
-            return
-        }
+    }
+
+    @Test func aPointerInsideOnAReplacedOfferDoesNotStart() {
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, mic: [.teams]))
+        machine.handle(asEvidence(3, mic: [.teams]))
+        machine.handle(asTick(23))
+        machine.handle(.pointer(inside: true, now: 24))
+        machine.handle(asEvidence(24, mic: [.zoom]))
+        machine.handle(asEvidence(27, mic: [.zoom]))
+        let start = machine.handle(asTap(asOffer(), 28))
+        #expect(start.isEmpty, "a tap on the offer a newer one replaced started a recording")
+    }
+
+    @Test func aPointerThatLeavesEndsTheHoverGrace() {
+        var machine = asPrompting()
+        machine.handle(.pointer(inside: true, now: 15))
+        machine.handle(.pointer(inside: false, now: 24))
+        let start = machine.handle(asTap(asOffer(), 25))
+        #expect(start.isEmpty, "a tap after the pointer left past the deadline started a recording")
+    }
+
+    /// No tick between the deadline and the tap. The heads-up is still `.upcoming`, so only `now < deadline` can refuse.
+    @Test func aTapPastTheUpcomingDeadlineWithoutATickDoesNotStart() {
+        let slot = asSlot(start: 120)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+        #expect(!machine.pointerInside)
+        let start = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 20.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .upcoming(meeting: asHeadsUp(slot), deadline: 20))
+    }
+
+    /// No tick between the deadline and the tap. The offer is still `.prompting`, so only `now < deadline` can refuse.
+    @Test func aTapPastThePromptingDeadlineWithoutATickDoesNotStart() {
+        var machine = asPrompting()
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
+        #expect(!machine.pointerInside)
+        let start = machine.handle(asTap(asOffer(), 23.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .prompting(meeting: asTeams, deadline: 23, blocked: .notChosen))
+    }
+
+    /// No tick between `offerUntil` and the tap. The heads-up is still armed, so only `now < offerUntil` can refuse.
+    @Test func aTapPastTheHeadsUpOfferUntilWithoutATickDoesNotStart() {
+        let slot = asSlot(start: 12, end: 2_000, app: .teams)
+        var machine = ScribeAutoStartMachine()
+        machine.handle(asEvidence(0, slots: [slot]))
+        machine.handle(asEvidence(12, mic: [.teams], slots: [slot]))
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 12, offerUntil: 20))
+        #expect(!machine.pointerInside)
+        let start = machine.handle(asTap(.offer(asLive(slot), blocked: nil), 20.1))
+        #expect(start.isEmpty)
+        #expect(machine.state == .armed(meeting: asLive(slot), since: 12, offerUntil: 20))
     }
 
     @Test func aTapNeverStartsASecondRecording() {
@@ -1430,14 +1548,15 @@ struct ScribeAutoStartTests {
         #expect(effects == [.start(asLive(slot))])
     }
 
-    @Test func aTapOnTheHeadsUpThatLeftInTheSameInstantStillStarts() {
+    @Test func aTapOnTheHeadsUpThatHasLeftDoesNotStart() {
         let slot = asSlot(start: 100, app: .teams)
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, slots: [slot]))
         machine.handle(asTick(20))
         #expect(machine.state == .idle)
         let effects = machine.handle(asTap(.offer(asHeadsUp(slot), blocked: nil), 20.1))
-        #expect(effects == [.start(asHeadsUp(slot))])
+        #expect(effects.isEmpty)
+        #expect(machine.state == .idle)
     }
 
     @Test func nothingIsShownWhileScribeIsSaving() {

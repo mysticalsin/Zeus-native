@@ -234,8 +234,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         case scribe(ScribePhase, now: TimeInterval)
         /// Deadlines only. Never advances a debounce or the call-ended timer: those need fresh evidence.
         case tick(now: TimeInterval, context: ScribeStartContext)
-        /// The primary button of the card the person saw. The machine reads only the card's case and meeting, so
-        /// a tap on a card that has since gone is still an answer (or ignored, by the late tap rules).
+        /// The primary button of the card the person saw. Record starts only when that offer is still the live
+        /// one and its time has not run out. A tap that names an offer which has left, or which a newer offer
+        /// replaced, starts nothing.
         case primary(on: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext)
         /// Cancel on the card the person saw.
         case cancel(on: ScribeMeetingCard, now: TimeInterval)
@@ -273,6 +274,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     public private(set) var ledger = ScribeMeetingLedger()
     /// The pointer is over the card.
     public private(set) var pointerInside = false
+    /// The offer's own deadline, captured before a pointer-leave extends how long the card stays up.
+    /// A tap uses this, so leaving the card ends the extra grace.
+    private var tapDeadline: TimeInterval?
 
     public init(timing: ScribeAutoStartTiming = .standard) {
         self.timing = timing
@@ -284,6 +288,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         state = .idle
         clock = nil
         pointerInside = false
+        tapDeadline = nil
     }
 
     // MARK: Views
@@ -410,6 +415,16 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private mutating func pointer(inside: Bool, now: TimeInterval) {
         pointerInside = inside
         guard !inside else { return }
+        if tapDeadline == nil {
+            switch state {
+            case .upcoming(_, let deadline), .prompting(_, let deadline, _), .failed(_, _, let deadline):
+                tapDeadline = deadline
+            case .armed(_, _, let offerUntil?):
+                tapDeadline = offerUntil
+            default:
+                break
+            }
+        }
         switch state {
         case .upcoming(let meeting, let deadline):
             state = .upcoming(meeting: meeting, deadline: max(deadline, now + timing.hoverGrace))
@@ -426,24 +441,38 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
 
     // MARK: Taps
 
+    /// The meeting behind a Record tap, when `key` is the offer still on screen. Nil once that offer has left,
+    /// once a different offer has replaced it, or while the card is hidden for the call check.
+    /// A tap is in time while `now` is before the offer's own deadline. The pointer may keep it tappable
+    /// for `hoverGrace` after that deadline, and only while the pointer stays inside.
+    private func tapIsInTime(deadline: TimeInterval, now: TimeInterval) -> Bool {
+        let limit = tapDeadline ?? deadline
+        if pointerInside {
+            return now < limit + timing.hoverGrace
+        }
+        return now < limit
+    }
+
+    private func liveOffer(matching key: String, now: TimeInterval) -> ScribeMeeting? {
+        switch state {
+        case .prompting(let meeting, let deadline, _) where meeting.key == key:
+            return tapIsInTime(deadline: deadline, now: now) ? meeting : nil
+        case .upcoming(let meeting, let deadline) where meeting.key == key:
+            return tapIsInTime(deadline: deadline, now: now) ? meeting : nil
+        case .armed(let meeting, _, let offerUntil?) where meeting.key == key:
+            // The call began while the heads-up was up: the meeting in hand is the live one.
+            return tapIsInTime(deadline: offerUntil, now: now) ? meeting : nil
+        default:
+            return nil
+        }
+    }
+
     private mutating func primary(_ card: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext) -> [Effect] {
         switch card {
         case .offer(let seen, _):
-            switch state {
-            case .prompting(let meeting, _, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .upcoming(let meeting, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .armed(let meeting, _, _) where meeting.key == seen.key:
-                // The call began while the heads-up was up: the meeting is the live one.
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .idle, .upcoming, .armed, .prompting:
-                // The offer ended in the same instant (or another one replaced it): the person asked to record.
-                return startRequest(seen, origin: .tap, now: now, context: context)
-            case .countingDown, .held, .starting, .recording, .failed:
-                // Something is already under way for a meeting: a second start would only cover it.
-                return []
-            }
+            // A tap starts only when this offer is still the one on screen and its time has not run out.
+            guard let meeting = liveOffer(matching: seen.key, now: now) else { return [] }
+            return startRequest(meeting, origin: .tap, now: now, context: context)
         case .failed(let seen, _):
             guard case .failed(let attempt, let failure, _) = state, attempt.meeting.key == seen.key else { return [] }
             if failure == .microphoneOff, context.microphone == .denied { return [.openMicrophoneSettings] }
@@ -898,6 +927,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         let marked = Set(evidence.slots.map(\.id).filter { ledger.mark(ofSlot: $0) != nil })
         guard let meeting = evidence.upcoming(excluding: marked) else { return }
         note(meeting, .headsUp)
+        tapDeadline = nil
         state = .upcoming(meeting: meeting, deadline: now + timing.askTimeout)
     }
 
@@ -953,6 +983,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     /// "Ask me", or "Start automatically" while anything it needs is missing: Zeus never starts capture from the
     /// detector on its own unless every part of the readiness holds, so it asks.
     private mutating func ask(_ meeting: ScribeMeeting, now: TimeInterval, blocked: ScribeAutoStartBlock?) -> [Effect] {
+        tapDeadline = nil
         state = .prompting(meeting: meeting, deadline: now + timing.askTimeout, blocked: blocked)
         return []
     }
