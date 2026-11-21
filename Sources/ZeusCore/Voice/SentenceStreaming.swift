@@ -10,13 +10,16 @@ public struct SpeakOutcome: Equatable, Sendable {
     /// From the call to the first buffer scheduled for playback. Nil when nothing played.
     public var firstAudioMs: Int?
     public var sentences: Int
+    /// True when a later clause failed after audio was already scheduled. The reply was not a success.
+    public var partialFailure: Bool
 
-    public init(engine: String, voice: String, reason: String, firstAudioMs: Int?, sentences: Int) {
+    public init(engine: String, voice: String, reason: String, firstAudioMs: Int?, sentences: Int, partialFailure: Bool = false) {
         self.engine = engine
         self.voice = voice
         self.reason = reason
         self.firstAudioMs = firstAudioMs
         self.sentences = sentences
+        self.partialFailure = partialFailure
     }
 }
 

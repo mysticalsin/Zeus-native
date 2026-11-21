@@ -34,6 +34,16 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         var voice: String
         var reason: String
         var firstAudioMs: Int?
+        /// A later clause failed after audio was scheduled. The line is held, and it is not a success.
+        var partialFailure: Bool
+    }
+
+    /// One engine's result for a line. A partial failure carries the log line the turn must write.
+    private struct LineSpeech {
+        var voice: String
+        var partialFailure: Bool
+        var logStage: String?
+        var logDetail: String?
     }
 
     private let synthesizer = AVSpeechSynthesizer()
@@ -139,17 +149,19 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         let began = Date()
         var first: Played?
         var count = 0
+        var partial = false
         for await sentence in sentenceStream {
             if Task.isCancelled { break }
             let text = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
             let played = await speakLine(text, began: count == 0 ? began : Date())
+            if played?.partialFailure == true { partial = true }
             if first == nil { first = played }
             count += 1
         }
         while (chain.isPlaying || systemRendering), !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
         return SpeakOutcome(engine: first?.engine.logName ?? "none", voice: first?.voice ?? "", reason: first?.reason ?? "nothing was spoken",
-                            firstAudioMs: first?.firstAudioMs, sentences: count)
+                            firstAudioMs: first?.firstAudioMs, sentences: count, partialFailure: partial)
     }
 
     /// Warms the engine the next reply will use. Called on every talk-key press, never at launch. Cloud voices
@@ -200,58 +212,71 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         for decision in settings.routeDecisions() {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
-            guard let voiceName = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
+            guard let spoken = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
             armLineStart() // Engines that never reported a first buffer have still queued their audio by now.
             let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
             if let ms { settings.recordFirstAudio(decision.engine, ms: ms) }
-            logSpoken(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
-            return Played(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
+            if spoken.partialFailure, let stage = spoken.logStage, let detail = spoken.logDetail {
+                VoiceLog.log(stage, detail)
+            } else {
+                logSpoken(engine: decision.engine, voice: spoken.voice, reason: decision.reason, firstAudioMs: ms)
+            }
+            return Played(engine: decision.engine, voice: spoken.voice, reason: decision.reason, firstAudioMs: ms, partialFailure: spoken.partialFailure)
         }
         return nil
     }
 
     /// One engine, one sentence. The voice name on success, nil when this engine could not speak it.
-    private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> String? {
-        if let attemptOverride { return await attemptOverride(text) }
+    private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> LineSpeech? {
+        if let attemptOverride {
+            guard let voice = await attemptOverride(text) else { return nil }
+            return LineSpeech(voice: voice, partialFailure: false, logStage: nil, logDetail: nil)
+        }
         VoiceLatency.shared.mark(.ttsRequest)
         switch engine {
         case .elevenLabs:
             if let id = await speakElevenLabs(text, began: began) {
                 settings.clearProviderPause(.elevenLabs)
-                return id
+                return LineSpeech(voice: id, partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure(), !settings.isProviderPaused(.elevenLabs) { settings.noteProviderFailure(.elevenLabs, reason: .other("no audio")) }
             return nil
         case .openAI:
             if let voice = await speakOpenAI(text, began: began) {
                 settings.clearProviderPause(.openAICompatible)
-                return voice
+                return LineSpeech(voice: voice, partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.openAICompatible, reason: .offline) }
             return nil
         case .gemini:
             if let voice = await speakGemini(text, began: began) {
                 settings.clearProviderPause(.gemini)
-                return voice
+                return LineSpeech(voice: voice, partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.gemini, reason: .offline) }
             return nil
         case .kokoro:
-            if await speakKokoro(text, voice: OriginalSyntheticVoice.id, speed: settings.kokoroSpeed, began: began) {
+            let turn = await speakKokoro(text, voice: OriginalSyntheticVoice.id, speed: settings.kokoroSpeed, began: began)
+            switch turn.disposition {
+            case .fallThrough:
+                if Self.countsAsFailure() { settings.noteProviderFailure(.kokoro, reason: .missingModel) }
+                return nil
+            case .spoken:
                 settings.clearProviderPause(.kokoro)
-                return OriginalSyntheticVoice.id
+                return LineSpeech(voice: turn.voice, partialFailure: false, logStage: nil, logDetail: nil)
+            case .partial:
+                return LineSpeech(voice: turn.voice, partialFailure: true, logStage: turn.logStage, logDetail: turn.logDetail)
             }
-            if Self.countsAsFailure() { settings.noteProviderFailure(.kokoro, reason: .missingModel) }
-            return nil
         case .chatterbox:
             if await speakChatterbox(text, began: began) {
                 settings.clearProviderPause(.chatterbox)
-                return "reference"
+                return LineSpeech(voice: "reference", partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.chatterbox, reason: .missingModel) }
             return nil
         case .system:
-            return await speakSystem(text)
+            guard let name = await speakSystem(text) else { return nil }
+            return LineSpeech(voice: name, partialFailure: false, logStage: nil, logDetail: nil)
         }
     }
 
@@ -449,8 +474,13 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     /// `voice` is the persona voice id. Only `zeus.synthetic` is played. The Kokoro pack voice
     /// stays the engine voice. Clauses go through `ClauseSpeechScheduler`: the first is scheduled
     /// before the rest render, with a 90 ms gap and a fade-in on every later clause.
-    private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> Bool {
-        guard OriginalSyntheticVoice.accepts(voice) else { return false }
+    private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> KokoroTurnReport {
+        guard OriginalSyntheticVoice.accepts(voice) else {
+            return KokoroTurn.report(
+                KokoroPlayReceipt(succeeded: false, scheduledCount: 0, fallThrough: true),
+                engine: "kokoro",
+                voice: voice)
+        }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let engineVoice = VoiceSettings.shared.kokoroVoice
@@ -492,7 +522,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         } onCancel: {
             token.cancel()
         }
-        return KokoroClausePlayback.holdsTheUtterance(result)
+        return KokoroTurn.report(result, engine: "kokoro", voice: voice)
     }
 
     /// Renders one clause off the caller's wait. `scheduleFile` reads the shaped file and deletes it;

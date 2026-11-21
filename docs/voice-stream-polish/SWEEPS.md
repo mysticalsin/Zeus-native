@@ -11,7 +11,8 @@ This branch does not carry the parked non-commercial companion stack. `speakKoko
 3. **Clause pause.** The scheduler fades a clause out over 10 ms, inserts 90 ms of silence, and fades in every later clause. Contiguous PCM frames from the feeder are still not overlap-added.
 4. **French and English edges.** A narrow no-break space before `?` already split, and that case is now locked. `1.` in English and French was its own chunk; a bare number is a list marker, not a sentence end. `U.S.A.` before a lowercase word stays in the sentence. `No.` stays with the number. `。` ends a sentence. Periods inside URLs, emails, and decimals such as `3.14` do not. A period after a URL still ends the sentence.
 5. **Cancellation.** A cancel during the first render schedules nothing. Once any clause audio is scheduled, a later cancel does not fall through to the next engine.
-6. **Loudness on Kokoro speech.** A single gain cannot hold both -16 LUFS and -1 dBTP on this file. The long-answer crest is about 17 dB, so the limiter lands near -17.8 LUFS on the full reply and -16.8 LUFS on the first clause, with the true peak at -1.0 dBTP. Sine and noise fixtures that sit under the ceiling still measure -16 LUFS. The limiter stays the last stage.
+6. **Partial failure.** A later clause that fails to render stops after the clauses already scheduled. The turn records `partialFailure` and the voice log gets `partial engine=...`, not a success `engine=` line. Temp WAVs are still removed. The next engine is not started.
+7. **Loudness on Kokoro speech.** A single gain cannot hold both -16 LUFS and -1 dBTP on this file. The long-answer crest is about 17 dB, so the limiter lands near -17.8 LUFS on the full reply and -16.8 LUFS on the first clause, with the true peak at -1.0 dBTP. Sine and noise fixtures that sit under the ceiling still measure -16 LUFS. The limiter stays the last stage.
 
 ## Time to first audio
 

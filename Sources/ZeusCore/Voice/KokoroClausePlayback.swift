@@ -146,7 +146,58 @@ public enum KokoroClausePlayback {
     public static func holdsTheUtterance(_ receipt: KokoroPlayReceipt) -> Bool {
         receipt.scheduledCount > 0 || receipt.succeeded
     }
+}
 
+/// What the turn and the voice log must show for one Kokoro play receipt.
+/// A later-clause failure stays on this engine and is never logged as a successful speak.
+public struct KokoroTurnReport: Equatable, Sendable {
+    public enum Disposition: Equatable, Sendable {
+        case fallThrough
+        case spoken
+        case partial
+    }
+
+    public var disposition: Disposition
+    public var voice: String
+    public var logStage: String
+    public var logDetail: String
+
+    public var holdsTheUtterance: Bool { disposition != .fallThrough }
+    public var fallsThrough: Bool { disposition == .fallThrough }
+}
+
+public enum KokoroTurn {
+    /// `scheduledCount > 0` holds the utterance. Success is only a fully spoken receipt.
+    /// A later failure (`scheduledCount > 0`, `succeeded == false`) is partial.
+    public static func report(_ receipt: KokoroPlayReceipt, engine: String, voice: String) -> KokoroTurnReport {
+        if receipt.scheduledCount > 0, !receipt.succeeded {
+            return KokoroTurnReport(
+                disposition: .partial,
+                voice: voice,
+                logStage: "speak",
+                logDetail: "partial engine=\(engine) voice=\(voice) scheduled=\(receipt.scheduledCount)")
+        }
+        if receipt.scheduledCount > 0 {
+            return KokoroTurnReport(
+                disposition: .spoken,
+                voice: voice,
+                logStage: "speak",
+                logDetail: "engine=\(engine) voice=\(voice)")
+        }
+        return KokoroTurnReport(
+            disposition: .fallThrough,
+            voice: voice,
+            logStage: "speak",
+            logDetail: "")
+    }
+
+    /// A success line is the normal speak detail: `engine=` first, and no partial marker.
+    public static func isSuccessLog(stage: String, detail: String) -> Bool {
+        stage == "speak" && detail.hasPrefix("engine=") && !detail.contains("partial")
+    }
+}
+
+extension KokoroClausePlayback {
     public static func removeFiles(in directory: URL) {
         guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
         for file in files {
