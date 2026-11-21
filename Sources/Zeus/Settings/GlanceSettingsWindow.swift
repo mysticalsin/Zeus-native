@@ -49,7 +49,11 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
 
         /// The row height and the gap under it for `rowCount` rows: 26 and 2 while they fit, then a whole-point pitch that ends above the version line.
         static func rowMetrics(rowCount: Int) -> (height: Double, gap: Double) {
-            SettingsSidebarLayout.rowMetrics(rowCount: rowCount)
+            let full = rowHeight + rowGap
+            let room = versionY - top - headingsHeight
+            let pitch = min(full, (room / Double(max(rowCount, 1))).rounded(.down))
+            let gap = pitch >= full ? rowGap : 1
+            return (max(1, min(rowHeight, pitch - gap)), gap)
         }
     }
 
@@ -82,16 +86,9 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
 
     /// Resolves a debug `open-settings` section by raw id, title, or legacy alias (R24).
     static func matching(_ name: String) -> GSSection? {
-        let key = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !key.isEmpty else { return nil }
-        let hits = SettingsSectionRegistry.search(key, in: SettingsSectionRegistry.sections(slots: []))
-        for hit in hits where hit.title.lowercased() == key.lowercased() || hit.id.lowercased() == SettingsSectionRegistry.id(for: key).lowercased() {
-            if let section = allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == hit.id }) {
-                return section
-            }
-        }
-        let lowered = key.lowercased()
-        if let direct = allCases.first(where: { $0.rawValue.lowercased() == lowered || $0.title.lowercased() == lowered }) {
+        if let direct = allCases.first(where: { $0.rawValue.lowercased() == key || $0.title.lowercased() == key }) {
             return direct
         }
         guard let id = GlanceSettingsSnapshotMapping.resolveSectionID(name) else { return nil }
@@ -126,78 +123,13 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-typealias SlotID = String
-
-/// Exactly one sidebar row. Selecting a slot replaces the section, and selecting a section replaces the slot.
-enum SettingsSelection: Equatable {
-    case section(GSSection)
-    case slot(SlotID)
-    case topbar(tab: SlotID)
-
-    var rowID: String {
-        switch self {
-        case .section(let section): SettingsSectionRegistry.id(for: section.rawValue)
-        case .slot(let id): id
-        case .topbar: SettingsSectionRegistry.topbarID
-        }
-    }
-
-    fileprivate var state: SettingsSelectionState {
-        switch self {
-        case .section(let section): .section(SettingsSectionRegistry.id(for: section.rawValue))
-        case .slot(let id): .slot(id)
-        case .topbar(let tab): .topbar(tab: tab)
-        }
-    }
-}
-
 @MainActor
 @Observable
 final class GSNavigation {
-    var selection: SettingsSelection = .section(.general)
+    var section: GSSection = .general
     var meetingOpen = false
-
-    var section: GSSection {
-        get {
-            if case .section(let section) = selection { return section }
-            return .general
-        }
-        set { selection = .section(newValue) }
-    }
-
-    func select(_ descriptor: SettingsSectionDescriptor) {
-        if descriptor.id == SettingsSectionRegistry.topbarID {
-            if let tab = GlassSectionManifest.topbarTabs().first { selectTopbar(tab.id) }
-            return
-        }
-        if let section = GSSection.allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == descriptor.id }) {
-            selectSection(section)
-        } else {
-            selectSlot(descriptor.id)
-        }
-    }
-
-    func selectSection(_ section: GSSection) {
-        let next = SettingsSelectionRules.selectingSection(SettingsSectionRegistry.id(for: section.rawValue), current: selection.state)
-        if case .section = next { selection = .section(section) }
-    }
-
-    func selectSlot(_ id: SlotID) {
-        let next = SettingsSelectionRules.selectingSlot(id, current: selection.state)
-        if case .slot(let slot) = next { selection = .slot(slot) }
-    }
-
-    func selectTopbar(_ id: SlotID) {
-        let next = SettingsSelectionRules.selectingTopbar(id, filledTabs: GlassSectionManifest.topbarTabs().map(\.id), current: selection.state)
-        if case .topbar(let tab) = next { selection = .topbar(tab: tab) }
-    }
-
     var licenseKey = ""
     var licenseMessage: String?
-}
-
-func glassSettingsRows() -> [SettingsSectionDescriptor] {
-    SettingsSectionRegistry.live(includePhone: GSSection.iPhonePairingAvailable)
 }
 
 /// The Settings window: 1080 x 780, the sidebar and the page panel.
@@ -216,7 +148,7 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
     var debugWindow: NSWindow? { window }
 
     func show(_ section: GSSection? = nil) {
-        if let section { navigation.selection = .section(section) }
+        if let section { navigation.section = section }
         if window == nil {
             let window = NSWindow(contentRect: NSRect(origin: .zero, size: GS.size),
                                   styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
@@ -224,9 +156,6 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false
-            window.isOpaque = false
-            window.backgroundColor = .clear
-            window.hasShadow = true
             window.title = "Zeus Settings"
             window.delegate = self
             let hosting = NSHostingView(rootView: GlanceSettingsRoot(navigation: navigation, context: context))
@@ -251,10 +180,9 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     func step(_ delta: Int) {
-        let rows = glassSettingsRows()
-        let current = navigation.selection.rowID
-        let index = rows.firstIndex { $0.id == current } ?? 0
-        navigation.select(rows[GlassSettingsFocus.index(after: index, delta: delta, count: rows.count)])
+        let list = GSSection.shown
+        let index = list.firstIndex(of: navigation.section) ?? 0
+        navigation.section = list[min(max(index + delta, 0), list.count - 1)]
     }
 }
 
@@ -263,17 +191,8 @@ struct GlanceSettingsRoot: View {
     let context: GSContext
     var body: some View {
         ZStack(alignment: .topLeading) {
-            GlassSettingsChrome()
+            GS.window
             GSSidebar(navigation: navigation)
-                .onMoveCommand { direction in
-                    let rows = glassSettingsRows()
-                    let current = navigation.selection.rowID
-                    guard let index = rows.firstIndex(where: { $0.id == current }) else { return }
-                    let delta = direction == .down ? 1 : direction == .up ? -1 : 0
-                    guard delta != 0 else { return }
-                    let next = GlassSettingsFocus.index(after: index, delta: delta, count: rows.count)
-                    navigation.select(rows[next])
-                }
             GSPanelHost(navigation: navigation, context: context)
                 .frame(width: GS.panelFrame.width, height: GS.panelFrame.height)
                 .offset(x: GS.panelFrame.minX, y: GS.panelFrame.minY)
@@ -281,12 +200,10 @@ struct GlanceSettingsRoot: View {
         .frame(width: GS.size.width, height: GS.size.height)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Settings")
     }
 }
 
-/// Logo tile, wordmark, three groups of 30 point rows that scroll above the version line.
+/// Logo tile, wordmark, three groups of items (28 pt apart, tighter when more rows show), version at the foot.
 struct GSSidebar: View {
     let navigation: GSNavigation
 
@@ -295,29 +212,20 @@ struct GSSidebar: View {
             MascotTile(pose: .idle, side: 48, animated: false).offset(x: 26, y: 48)
             Text("Zeus").font(GS.wordmark).tracking(-1.6).foregroundStyle(GS.text).offset(x: 90, y: 51)
                 .accessibilityAddTraits(.isHeader)
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    let rows = glassSettingsRows()
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, descriptor in
-                        if let heading = SettingsSectionRegistry.heading(before: descriptor, previous: index > 0 ? rows[index - 1] : nil) {
-                            Text(heading).font(GS.sidebarHead).foregroundStyle(GS.secondary)
-                                .frame(height: GSSection.SidebarLayout.headingHeight, alignment: .leading)
-                                .padding(.leading, 14)
-                                .padding(.top, index == 0 ? 0 : GSSection.SidebarLayout.groupGap)
-                                .padding(.bottom, GSSection.SidebarLayout.headingBottom)
-                                .accessibilityAddTraits(.isHeader)
-                                .accessibilityLabel(heading)
-                        }
-                        if let section = GSSection.allCases.first(where: { SettingsSectionRegistry.id(for: $0.rawValue) == descriptor.id }) {
-                            item(section)
-                        } else if descriptor.id == SettingsSectionRegistry.topbarID {
-                            topbarItem()
-                        }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(GSSection.Group.allCases, id: \.self) { group in
+                    Text(group.rawValue).font(GS.sidebarHead).foregroundStyle(GS.secondary)
+                        .frame(height: GSSection.SidebarLayout.headingHeight, alignment: .leading)
+                        .padding(.leading, 14)
+                        .padding(.top, group == .settings ? 0 : GSSection.SidebarLayout.groupGap)
+                        .padding(.bottom, GSSection.SidebarLayout.headingBottom)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(GSSection.shown.filter { $0.group == group }) { section in
+                        item(section)
                     }
                 }
-                .frame(width: 194)
             }
-            .frame(width: 194, height: SettingsSidebarLayout.scrollHeight)
+            .frame(width: 194)
             .offset(x: 12, y: GSSection.SidebarLayout.top)
             Text("Zeus \(Self.version)").font(OB.font(13)).foregroundStyle(GS.secondary).offset(x: 26, y: GSSection.SidebarLayout.versionY)
         }
@@ -326,14 +234,9 @@ struct GSSidebar: View {
     static var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1" }
 
     private func item(_ section: GSSection) -> some View {
-        let selected: Bool = {
-            if case .section(let current) = navigation.selection { return current == section }
-            return false
-        }()
-        let metrics = SettingsSidebarLayout.rowMetrics(rowCount: glassSettingsRows().count)
-        return Button {
-            navigation.selectSection(section)
-        } label: {
+        let selected = navigation.section == section
+        let metrics = GSSection.SidebarLayout.rowMetrics(rowCount: GSSection.shown.count)
+        return Button { navigation.section = section } label: {
             HStack(spacing: 0) {
                 Image(systemName: section.symbol).font(.system(size: 15, weight: .regular))
                     .frame(width: 29, alignment: .leading)
@@ -348,36 +251,8 @@ struct GSSidebar: View {
         }
         .buttonStyle(.plain)
         .padding(.bottom, metrics.gap)
-        .accessibilityLabel(SettingsSectionRegistry.existing.first { $0.id == SettingsSectionRegistry.id(for: section.rawValue) }?.accessibilityLabel ?? section.title)
+        .accessibilityLabel(section.title)
         .accessibilityIdentifier("settings.sidebar.\(section.rawValue)")
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-    }
-
-    private func topbarItem() -> some View {
-        let selected: Bool = {
-            if case .topbar = navigation.selection { return true }
-            return false
-        }()
-        let metrics = SettingsSidebarLayout.rowMetrics(rowCount: glassSettingsRows().count)
-        return Button {
-            if let tab = GlassSectionManifest.topbarTabs().first { navigation.selectTopbar(tab.id) }
-        } label: {
-            HStack(spacing: 0) {
-                Image(systemName: "menubar.rectangle").font(.system(size: 15, weight: .regular))
-                    .frame(width: 29, alignment: .leading)
-                Text(SettingsSectionRegistry.topbarTitle).font(GS.sidebarItem)
-                Spacer()
-            }
-            .foregroundStyle(selected ? GS.selectedText : GS.text)
-            .padding(.leading, 14)
-            .frame(height: metrics.height)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(selected ? GS.selectedFill : .clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.bottom, metrics.gap)
-        .accessibilityLabel(SettingsSectionRegistry.topbarTitle)
-        .accessibilityIdentifier("settings.sidebar.topbar")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
@@ -388,23 +263,14 @@ struct GSPanelHost: View {
     let context: GSContext
 
     var body: some View {
-        let page = Group {
-            switch navigation.selection {
-            case .topbar(let tab):
-                GlassTopbarPage(selected: tab, navigation: navigation)
-            case .slot(let id):
-                if let slot = GlassSectionManifest.slots.first(where: { $0.id == id && $0.isShown }) {
-                    GlassSettingsSlotPage(slot: slot)
-                }
-            case .section(let section):
-                GSPageView(section: section, navigation: navigation, context: context)
-            }
-        }
-            .padding(CGFloat(GlassSettingsMetrics.panelPadding))
-            .id(navigation.selection.rowID)
+        let page = GSPageView(section: navigation.section, navigation: navigation, context: context)
+            .padding(.leading, GS.pagePadding)
+            .padding(.trailing, 28)
+            .padding(.top, 25)
+            .padding(.bottom, 32)
+            .id(navigation.section)
         ZStack {
             RoundedRectangle(cornerRadius: GS.panelRadius, style: .continuous).fill(GS.panel)
-            GlassSettingsPanelHighlight()
             // QA7 round 11 (report-11.md): named surfaces that go through this exact view
             // (`murmur-settings`, every live `settings-<name>` in `SnapshotRenderer.swift`) rendered
             // a blank content pane under `ImageRenderer`'s one-shot `--snapshots` pass -- round 10
