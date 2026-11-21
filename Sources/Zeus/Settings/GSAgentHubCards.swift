@@ -124,12 +124,20 @@ struct GSOtherAppsCards: View {
 /// Settings > Permissions: chats trusted from an approval card.
 struct GSTrustedChatsCard: View {
     let trusted = TrustedChatStore.shared
+    @State private var confirmingClear = false
 
     var body: some View {
         GSCard("Trusted chats") {
             GSRow(symbol: "checkmark.shield", title: "Chats you allowed", text: "\u{201C}Allow this whole chat\u{201D} approves a chat's requests without a card, except risky commands. Cleared when Zeus quits.") {
                 if !trusted.entries.isEmpty {
-                    Button("Clear all") { trusted.clear() }.buttonStyle(GSButtonStyle())
+                    if confirmingClear {
+                        HStack(spacing: 8) {
+                            Button("Clear all") { trusted.clear(); confirmingClear = false }.buttonStyle(GSButtonStyle(prominent: true))
+                            Button("Keep") { confirmingClear = false }.buttonStyle(GSButtonStyle())
+                        }
+                    } else {
+                        Button("Clear all") { confirmingClear = true }.buttonStyle(GSButtonStyle())
+                    }
                 } else {
                     GSStatus(ok: false, text: trusted.summary)
                 }

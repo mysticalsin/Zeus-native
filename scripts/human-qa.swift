@@ -482,7 +482,7 @@ func openTab(_ ctx: StepCtx, _ raw: String) -> Bool {
 
 let settingsPages: [(raw: String, title: String)] = [
     ("general", "General"), ("appearance", "Appearance"), ("sounds", "Sounds"), ("notifications", "Notifications"),
-    ("shortcuts", "Shortcuts"), ("insomnia", "Insomnia"), ("integrations", "Integrations"), ("murmure", "Murmure"),
+    ("shortcuts", "Shortcuts"), ("insomnia", "Insomnia"), ("integrations", "Integrations"), ("murmure", "Murmur"),
     ("polyglot", "Polyglot"), ("dictation", "Dictation"), ("voice", "Voice"), ("engine", "Engine"),
     ("features", "Features"), ("beamer", "Beamer"), ("tiling", "Tiling"), ("license", "License"),
     ("permissions", "Permissions"), ("privacy", "Privacy"), ("diagnostics", "Diagnostics"), ("about", "About"),

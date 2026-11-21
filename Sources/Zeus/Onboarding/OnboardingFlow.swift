@@ -11,7 +11,7 @@ enum OnboardingStep: Int, CaseIterable, Sendable {
     var title: String {
         switch self {
         case .welcome: "Welcome to Zeus"
-        case .murmure: "Murmure"
+        case .murmure: "Murmur"
         case .agents: "Your agents"
         case .control: "Stay in control."
         case .reach: "Keys and displays."

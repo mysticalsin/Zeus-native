@@ -10,7 +10,7 @@ public enum BuddyShow: String, CaseIterable, Identifiable, Sendable {
     public var title: String {
         switch self {
         case .always: "Always"
-        case .onCall: "When I call him"
+        case .onCall: "Only when called"
         case .never: "Never"
         }
     }
@@ -19,8 +19,8 @@ public enum BuddyShow: String, CaseIterable, Identifiable, Sendable {
     public static func stored(_ raw: String?) -> BuddyShow { raw.flatMap(BuddyShow.init(rawValue:)) ?? .onCall }
 }
 
-/// When the cursor buddy is on screen. With "Only when I call him" he is hidden until something
-/// calls him (the talk shortcut, "Hey Zeus", a voice turn, pointing or a drive), stays while that
+/// When the cursor buddy is on screen. With "Only when called", Zeus is hidden until something
+/// calls (the talk shortcut, "Hey Zeus", a voice turn, pointing or a drive), stays while that
 /// lasts, and fades out `linger` seconds after the last reason ends.
 public struct BuddyVisibility: Equatable, Sendable {
     public enum Reason: String, Hashable, Sendable {

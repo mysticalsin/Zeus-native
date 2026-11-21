@@ -143,6 +143,10 @@ struct DictationSettingsPage: View {
 
     @ViewBuilder private var soundCard: some View {
         GSCard("Sounds") {
+            GSToggleRow(symbol: "speaker.wave.1", title: "Play start and stop sounds",
+                        text: "A short cue when Murmur starts and stops. Sound feedback, on the Sounds page, mutes this too.",
+                        isOn: Binding(get: { settings.sounds }, set: { DictationSettings.shared.sounds = $0 }))
+            GSDivider()
             GSRow(symbol: "speaker.wave.2", title: "Start and stop sound", text: Self.cueDetail(settings.cueStyle)) {
                 GSPopup(selection: Binding(get: { settings.cueStyle.title },
                                            set: { title in settings.cueStyle = DictationCueStyle(saved: title) }),
