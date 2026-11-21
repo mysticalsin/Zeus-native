@@ -229,7 +229,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-029",
       "kind" : "accessibility",
-      "line" : 407,
+      "line" : 408,
       "surface" : "Notch"
     },
     {
@@ -237,7 +237,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-030",
       "kind" : "accessibility",
-      "line" : 561,
+      "line" : 562,
       "surface" : "Notch"
     },
     {
@@ -245,7 +245,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-031",
       "kind" : "accessibility",
-      "line" : 588,
+      "line" : 589,
       "surface" : "Notch"
     },
     {
@@ -253,7 +253,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-032",
       "kind" : "accessibility",
-      "line" : 671,
+      "line" : 672,
       "surface" : "Notch"
     },
     {
@@ -261,7 +261,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-033",
       "kind" : "accessibility",
-      "line" : 703,
+      "line" : 704,
       "surface" : "Notch"
     },
     {
@@ -269,7 +269,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-034",
       "kind" : "accessibility",
-      "line" : 705,
+      "line" : 706,
       "surface" : "Notch"
     },
     {
@@ -277,7 +277,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-035",
       "kind" : "accessibility",
-      "line" : 719,
+      "line" : 720,
       "surface" : "Notch"
     },
     {
@@ -285,7 +285,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-A11Y-036",
       "kind" : "accessibility",
-      "line" : 742,
+      "line" : 743,
       "surface" : "Notch"
     },
     {
@@ -2917,7 +2917,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-MOTION-002",
       "kind" : "motion-literal",
-      "line" : 453,
+      "line" : 454,
       "surface" : "Notch"
     },
     {
@@ -2925,7 +2925,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-MOTION-003",
       "kind" : "motion-literal",
-      "line" : 481,
+      "line" : 482,
       "surface" : "Notch"
     },
     {
@@ -3117,7 +3117,7 @@
       "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
       "id" : "ZB-UIUX-REDUCE-002",
       "kind" : "motion-reduce",
-      "line" : 453,
+      "line" : 454,
       "surface" : "Notch"
     },
     {

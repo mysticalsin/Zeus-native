@@ -73,13 +73,11 @@ final class EdgeWaveController {
 
 struct EdgeWaveView: View {
     let tint: NotchLightTint
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let started: Date
     let duration: TimeInterval
     let reduceMotion: Bool
 
     var body: some View {
-        let _ = NotchDynamicType.points(12, dynamicTypeSize: dynamicTypeSize)
         EdgeLightClock(reduceMotion: reduceMotion) { context in
             let p = max(0, min(1, context.date.timeIntervalSince(started) / duration))
             Canvas { ctx, size in

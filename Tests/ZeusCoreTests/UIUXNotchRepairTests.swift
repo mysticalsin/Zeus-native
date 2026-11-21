@@ -1,8 +1,7 @@
 import Foundation
 import Testing
 
-/// Notch Dynamic Type. These assertions fail until the ramp is in the notch folder.
-/// NotchView.swift stays untouched; its findings remain deferred.
+/// Notch Dynamic Type. The peek title uses the ramp. NotchView's other findings stay deferred.
 @Suite("UI UX notch repairs")
 struct UIUXNotchRepairTests {
     /// ZB-UIUX-TYPE-002.

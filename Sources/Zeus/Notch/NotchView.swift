@@ -90,6 +90,7 @@ struct NotchView: View {
     /// What the notch's accessibility action does: open the panel. The closed notch is click-through and opens on
     /// the pointer, which a VoiceOver or Switch Control user does not have. Nil (previews, snapshots) does nothing.
     var openPanel: (() -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// The layers the body draws now: Transparent drops fill, outline and glow of the closed island only.
     private var layers: NotchBodyLayers {
@@ -504,7 +505,7 @@ struct NotchView: View {
                     .frame(width: 11, height: 13)
                     .shadow(color: status.color.opacity(0.9), radius: 4)
                 Text(model.approval?.agent ?? model.peekSession?.agent ?? "Zeus")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: NotchDynamicType.points(12, dynamicTypeSize: dynamicTypeSize), weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.cloudPrimary)
                     .lineLimit(1)
             }
@@ -513,7 +514,7 @@ struct NotchView: View {
             HStack(spacing: 7) {
                 if !peekStatusText.isEmpty {
                     Text(peekStatusText)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.system(size: NotchDynamicType.points(12, dynamicTypeSize: dynamicTypeSize), weight: .semibold, design: .rounded))
                         .foregroundStyle(status.color)
                         .lineLimit(1)
                 }
