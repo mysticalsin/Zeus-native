@@ -99,6 +99,22 @@ import Testing
         #expect(!plan.cues.contains { $0.occasionID == "standup" })
     }
 
+    @Test func thePeekTitleIsTheFirstDueCue() throws {
+        let later = occasion(.meeting, id: "later", minutesFromStart: 20)
+        let due = occasion(.reminder, id: "pay-rent", minutesFromStart: 0)
+        let plan = MeetingHeadsUpScheduler.plan(
+            settings: settings(enabled: true, lead: 15),
+            occasions: [later, due],
+            now: start
+        )
+        #expect(plan.phase == .showing)
+        #expect(plan.cues.first?.occasionID == "later")
+        #expect(plan.firstDueTitle == "pay-rent")
+        let model = try repoSource("Sources/Zeus/Notch/NotchModel.swift")
+        #expect(model.contains("firstDueTitle"))
+        #expect(!model.contains("cues.first"))
+    }
+
     @Test func thePeekCallsPlanAndNotificationsBindsTheCard() throws {
         let notch = try repoSource("Sources/Zeus/Notch/NotchController.swift")
         let page = try repoSource("Sources/Zeus/Settings/GlanceSettingsPages.swift")
