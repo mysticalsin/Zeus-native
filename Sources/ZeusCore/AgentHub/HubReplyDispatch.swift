@@ -221,29 +221,46 @@ public enum HubReplyTyping {
 }
 
 /// The last check before a script is executed. `approved` false never passes, including a well-formed script.
+/// Terminal may type only the stripped line, as literal keystrokes, and then Return.
+/// `do script` is not a Terminal reply. iTerm may still `write text` that same line, once.
 public enum HubReplyScriptGuard {
     public static func mayRun(script: String, line: String, approved: Bool) -> Bool {
         guard approved, let escaped = HubReplyTyping.escape(line) else { return false }
+        guard AgentReply.sanitize(line) == line else { return false }
         guard script.unicodeScalars.allSatisfy({ !isStructuralBreak($0) }) else { return false }
-        // Match the typed-text call, not every quoted word. A reply can repeat a word the
-        // surrounding script already quotes. Exactly one call, and nothing else may type.
-        let wrappers = [
-            "do script \"\(escaped)\"",
-            "write text \"\(escaped)\"",
-        ]
-        var hits = 0
-        var remainder = script
-        for wrapper in wrappers {
-            let parts = remainder.components(separatedBy: wrapper)
-            hits += parts.count - 1
-            remainder = parts.joined()
+        if let expected = literalKeystrokes(line), expected == typingLines(script) { return true }
+        return acceptsWriteText(script: script, escaped: escaped)
+    }
+
+    /// The keystroke lines Z-03 builds: each chunk of the stripped line, then one Return.
+    private static func literalKeystrokes(_ line: String) -> [String]? {
+        let pieces = KeystrokeTyping.pieces(line, limit: 20)
+        guard !pieces.isEmpty else { return nil }
+        var statements: [String] = []
+        for piece in pieces {
+            guard case .text(let chunk) = piece, !chunk.isEmpty, let escaped = HubReplyTyping.escape(chunk) else { return nil }
+            statements.append("keystroke \"\(escaped)\"")
         }
-        guard hits == 1 else { return false }
-        let blocked = ["do shell script", "shell script", "keystroke", "key code", "key down", "key up", "System Events"]
-        for phrase in blocked where remainder.contains(phrase) {
-            return false
-        }
-        return true
+        statements.append("keystroke return")
+        return statements
+    }
+
+    /// Lines that type, run a script, or press a key. The tab-selection boilerplate is not in this list.
+    private static func typingLines(_ script: String) -> [String] {
+        let markers = ["keystroke", "key code", "key down", "key up", "do script", "do shell script", "write text"]
+        return script.split(separator: "\n", omittingEmptySubsequences: false).map {
+            $0.trimmingCharacters(in: .whitespaces)
+        }.filter { row in markers.contains { row.contains($0) } }
+    }
+
+    /// iTerm's one `write text` of the escaped line. Anything else that types, including `do script`, fails.
+    private static func acceptsWriteText(script: String, escaped: String) -> Bool {
+        let wrapper = "write text \"\(escaped)\""
+        let parts = script.components(separatedBy: wrapper)
+        guard parts.count - 1 == 1 else { return false }
+        let remainder = parts.joined()
+        let blocked = ["do script", "do shell script", "shell script", "keystroke", "key code", "key down", "key up", "System Events", "write text"]
+        return blocked.allSatisfy { !remainder.contains($0) }
     }
 
     private static func isStructuralBreak(_ scalar: Unicode.Scalar) -> Bool {

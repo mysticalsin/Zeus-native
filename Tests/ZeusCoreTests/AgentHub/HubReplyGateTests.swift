@@ -249,7 +249,7 @@ struct HubReplyGateTests {
         #expect(HubReplyScriptGuard.mayRun(script: doubled, line: "hi", approved: true) == false)
         let repeatedWord = "tell application \"Host\"\nwrite text \"Host\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: repeatedWord, line: "Host", approved: true))
-        #expect(HubReplyScriptGuard.mayRun(script: "do script \"\(escaped)\" in t\n", line: line, approved: true))
+        #expect(HubReplyScriptGuard.mayRun(script: "do script \"\(escaped)\" in t\n", line: line, approved: true) == false)
         let split = "write text \"hi\u{2028}\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: split, line: "hi", approved: true) == false)
         #expect(HubReplyTyping.canType("hello\u{2029}there") == false)
