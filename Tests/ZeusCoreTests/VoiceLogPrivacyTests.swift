@@ -4,6 +4,17 @@ import Testing
 
 @Suite("Voice diagnostic privacy")
 struct VoiceLogPrivacyTests {
+    @Test func theSystemLogNeverReceivesConversationWords() {
+        let words = "Meet Jordan at the private studio"
+        let leaked = VoiceLogRecord.systemLogDetail(stage: "transcript", detail: words)
+        #expect(!leaked.contains("Jordan"))
+        #expect(!leaked.contains("studio"))
+        let spoken = VoiceLogRecord.systemLogDetail(stage: "spoken", detail: words)
+        #expect(!spoken.contains("Jordan"))
+        let route = VoiceLogRecord.systemLogDetail(stage: "route", detail: "rules")
+        #expect(route == "rules")
+    }
+
     @Test func conversationIsMetadataUnlessContentWasExplicitlyEnabled() {
         let transcript = "Meet Jordan at the private studio 🪷"
         let metadata = VoiceLogRecord.contentDescription(transcript, includeContent: false)
