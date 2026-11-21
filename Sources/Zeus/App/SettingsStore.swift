@@ -105,6 +105,7 @@ final class SettingsStore {
             HaloMigration.run(defaults: defaults)
             SystemHUDMigration.run(defaults: defaults)
             ScreenShareMigration.run(defaults: defaults)
+            MusicWingsPreference.migrate(defaults)
         }
         for option in SettingsCatalog.all where option.state != .custom {
             values[option.id] = defaults.string(forKey: Self.key(option.id)) ?? option.defaultValue
@@ -152,6 +153,7 @@ final class SettingsStore {
     static let launchAtLoginID = "general.launchAtLogin"
 
     func string(_ id: String) -> String {
+        if id == MusicWingsPreference.id { return MusicWingsPreference.isOn(defaults) ? "true" : "false" }
         if let item = Self.contribution(id), item.policy == .secretNeverStored, SettingsCatalog.option(id) == nil {
             return item.defaultValue
         }
@@ -168,6 +170,15 @@ final class SettingsStore {
     }
 
     func set(_ id: String, _ value: String, origin: ChangeOrigin = .person) {
+        if id == MusicWingsPreference.id {
+            guard value == "true" || value == "false" else { return }
+            let on = value == "true"
+            if !TopBarStyle.isSnapshot { MusicWingsPreference.set(on, defaults: defaults) }
+            guard values[id] != value else { return }
+            values[id] = value
+            onChange?(id)
+            return
+        }
         if SettingsCatalog.option(id) == nil, let item = Self.contribution(id), !SettingsKeyLedger.mayStore(item, value: value) { return }
         if id == ScribeAutoStartMode.settingID { applyAutoStartChoice(value, origin: origin) }
         guard values[id] != value else { return }
@@ -435,7 +446,15 @@ final class SettingsStore {
             appChanges.append((key, value))
         }
         for change in optionChanges { set(change.id, change.value, origin: .importFile) }
-        for change in appChanges where !TopBarStyle.isSnapshot { defaults.set(change.value, forKey: change.key) }
+        for change in appChanges where !TopBarStyle.isSnapshot {
+            if change.key == MusicWingsPreference.key, let number = change.value as? NSNumber,
+               CFGetTypeID(number) == CFBooleanGetTypeID() {
+                MusicWingsPreference.set(number.boolValue, defaults: defaults)
+                values[MusicWingsPreference.id] = number.boolValue ? "true" : "false"
+                continue
+            }
+            defaults.set(change.value, forKey: change.key)
+        }
         if !TopBarStyle.isSnapshot, let style = HaloMigration.run(defaults: defaults) { values["halo.style"] = style.rawValue }
         ExtraPreferences.shared.reload()
         return optionChanges.count + appChanges.count

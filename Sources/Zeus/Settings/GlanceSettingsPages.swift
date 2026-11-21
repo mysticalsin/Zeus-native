@@ -209,7 +209,7 @@ private struct AppearancePage: View {
     let context: GSContext
     let navigation: GSNavigation
 
-    /// The notch reads the model's own `topBar.musicWings` key, not the `opt.` copy a plain store write would make.
+    /// The notch and this store share `MusicWingsPreference`: the Boolean `topBar.musicWings`, with the old `opt.` string kept in step.
     private var musicWingsBinding: Binding<Bool> {
         Binding(
             get: { context.topBar?.liveMusicWings ?? store.bool("topBar.musicWings") },
