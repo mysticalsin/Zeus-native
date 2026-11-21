@@ -1245,6 +1245,26 @@
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "quietReachesExactlyAtTheHandsFreeThreshold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "batchGiveUpPinsTheExactFormula"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "legacyBatchGiveUpKeepsTheThirtySecondFloor"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "fileRecognitionGiveUpUsesTheProductionBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aCancelledMarkDoesNotWriteTheOpenUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample"
             }
           ],
           "id": "F01.stt-latency"

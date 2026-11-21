@@ -33,7 +33,7 @@ enum OffMainAudioCallbacks {
                 DispatchQueue.main.async { MainActor.assumeIsolated { completion(text, message) } }
             }
         }
-        let giveUp = Double(STTSessionPolicy.production.batchGiveUpMs(audioMs: 4_000)) / 1000
+        let giveUp = STTFileGiveUp.seconds(audioMs: STTFileGiveUp.standInAudioMs)
         DispatchQueue.global().asyncAfter(deadline: .now() + giveUp) {
             task.cancel()
         }
