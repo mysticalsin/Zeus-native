@@ -92,6 +92,20 @@ public enum GlassSectionManifest {
         slots.reduce(0) { $0 + $1.keys.count }
     }
 
+    /// Keys written on a slot that are not declared in that slot's contributions.
+    public static func keysMissingFrom(_ slot: GlassSectionSlot, contributions: [SettingsKeyContribution]) -> [String] {
+        let known = Set(contributions.map { $0.id })
+        return slot.keys.filter { !known.contains($0) }
+    }
+
+    public static func unregisteredSlotKeys() -> [String] {
+        providers.flatMap { provider in
+            keysMissingFrom(provider.descriptor, contributions: provider.keyContributions).map { key in
+                "\(provider.descriptor.id) \(key)"
+            }
+        }
+    }
+
     public static func slotProblems(_ slots: [GlassSectionSlot]) -> [String] {
         var problems: [String] = []
         if !SettingsKeyReachability.duplicateIDs(slots.map(\.id)).isEmpty { problems.append("duplicate") }
@@ -625,6 +639,10 @@ public enum GlassSettingsAudit {
         }
         if !GlassSectionManifest.slotProblems(GlassSectionManifest.slots).isEmpty {
             failures.append("live slots are not valid placeholders")
+        }
+        let unregistered = GlassSectionManifest.unregisteredSlotKeys()
+        if !unregistered.isEmpty {
+            failures.append("slot key without a contribution \(unregistered.joined(separator: ","))")
         }
         return failures
     }
