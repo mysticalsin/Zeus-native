@@ -2,6 +2,18 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
+@Suite("Hands log")
+struct HandsLogTests {
+    @Test func fullDiskIsReportedAndWritesNothing() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("s06-hands-\(UUID().uuidString).log")
+        defer { HandsCommandLogger.writeFault = nil; try? FileManager.default.removeItem(at: url) }
+        HandsCommandLogger.writeFault = { throw CocoaError(.fileWriteOutOfSpace) }
+        let problem = HandsCommandLogger.append(command: "ls", verdict: "allow", outcome: "ran", url: url)
+        #expect(problem == "Couldn't write the hands log.")
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+}
+
 @Suite struct HandsGateTests {
     private let blocked = [
         "rm file", "rm -rf build", "rm -r dir", "rm -f x", "/bin/rm file", "/usr/bin/rm -rf x",
