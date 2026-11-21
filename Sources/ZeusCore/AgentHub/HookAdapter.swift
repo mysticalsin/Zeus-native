@@ -23,7 +23,7 @@ public enum HubHookConnection: Equatable, Sendable {
     }
 }
 
-public enum HubHookRejection: Equatable, Sendable {
+public enum HubHookRejection: Equatable, Sendable, Error {
     case oversized
     case malformed
     case unknownEvent
