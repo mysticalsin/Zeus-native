@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 /// What a talk reply asks the screen to show: marks in screenshot pixels (top-left origin, as
