@@ -39,9 +39,12 @@ public struct LicenseEvaluator: Sendable {
         public var trialStart: Date
         public var now: Date
         public var activationRejected: Bool
-        public init(key: String? = nil, activation: String? = nil, revocations: String? = nil, trialStart: Date, now: Date = Date(), activationRejected: Bool = false) {
+        /// License ids from the last signed list that decoded. Used when `revocations` is missing or will not decode.
+        public var lastRevokedIDs: [String]
+        public init(key: String? = nil, activation: String? = nil, revocations: String? = nil, trialStart: Date, now: Date = Date(), activationRejected: Bool = false, lastRevokedIDs: [String] = []) {
             self.key = key; self.activation = activation; self.revocations = revocations; self.trialStart = trialStart; self.now = now
             self.activationRejected = activationRejected
+            self.lastRevokedIDs = lastRevokedIDs
         }
     }
 
@@ -53,7 +56,7 @@ public struct LicenseEvaluator: Sendable {
         // A refused activation cannot be restored by a cached key that Keychain refused to delete.
         guard !inputs.activationRejected else { return trial }
         guard let key = inputs.key, let payload = License.read(key, publicKeys: publicKeys) else { return trial }
-        if isRevoked(payload.id, list: inputs.revocations) { return .revoked(payload) }
+        if isRevoked(payload.id, list: inputs.revocations, lastGoodIDs: inputs.lastRevokedIDs) { return .revoked(payload) }
         switch License.verify(key, publicKeys: publicKeys, deviceID: deviceID, now: inputs.now) {
         case .success:
             let left = payload.expiryDate.map { Trial.daysLeft(until: $0, now: inputs.now) }
@@ -65,12 +68,17 @@ public struct LicenseEvaluator: Sendable {
         }
     }
 
-    /// True when a signed, valid revocation list names this license.
-    public func isRevoked(_ id: String, list: String?) -> Bool {
-        guard let list, case .success(let revocations) = SignedBlob.decode(list, as: RevocationList.self,
-                                                                          prefix: RevocationList.prefix, publicKeys: publicKeys)
-        else { return false }
-        return revocations.ids.contains(id)
+    /// True when a signed list names this license, or the list cannot be read and a previous signed list did.
+    /// A list that does not decode does not invent a revocation for an id with no record.
+    public func isRevoked(_ id: String, list: String?, lastGoodIDs: [String] = []) -> Bool {
+        let decoded: [String]?
+        if let list, case .success(let revocations) = SignedBlob.decode(list, as: RevocationList.self,
+                                                                        prefix: RevocationList.prefix, publicKeys: publicKeys) {
+            decoded = revocations.ids
+        } else {
+            decoded = nil
+        }
+        return LicenseRevocationPolicy.isRevoked(id: id, decodedIDs: decoded, lastGoodIDs: lastGoodIDs)
     }
 
     /// Checks a server's activation proof is genuine and is for this key on this Mac.

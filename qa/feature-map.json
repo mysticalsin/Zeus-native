@@ -6795,6 +6795,22 @@
               "function": "rejectedActivationCannotBeRestoredByAKeyRetainedAfterFailedDeletion"
             },
             {
+              "file": "Tests/ZeusCoreTests/LicenseCredentialCommitTests.swift",
+              "function": "aFailedKeyWriteRestoresThePreviousProof"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LicenseCredentialCommitTests.swift",
+              "function": "aRefusalStaysWithTheKeyWhenDeletionFails"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LicenseRevocationPolicyTests.swift",
+              "function": "aMissingOrUndecodableListKeepsARecordedRevocation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LicensePortalVectorTests.swift",
+              "function": "aRevokedKeyStaysRevokedWhenTheStoredListCannotBeRead"
+            },
+            {
               "file": "Tests/ZeusCoreTests/ScribeMuteReadSchedulerTests.swift",
               "function": "twoBlockedReadersRejectEveryFurtherWatchdogRefreshWithoutQueueing"
             },
@@ -6949,6 +6965,26 @@
             {
               "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
               "function": "offlineRetryOfRefusedKeyNeverReportsSuccessfulReactivation"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "failedKeyWriteRollsTheProofBackAndDoesNotKeepTheNewProof"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "failedRollbackBlocksTheKeyThatRemains"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "serverRefusalStaysWithTheKeyAfterTheDefaultsFlagIsCleared"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "aRefusalThatCannotBeStoredStillFailsClosedUntilCleanup"
+            },
+            {
+              "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+              "function": "aRevokedKeyStaysOffWhenTheStoredListCannotBeRead"
             }
           ]
         },

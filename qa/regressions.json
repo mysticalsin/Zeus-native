@@ -8676,6 +8676,30 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Activation saved the proof before the key. A failed key write left the proof in place, and a server refusal that could not delete the key lived only in UserDefaults, so clearing that flag licensed the key again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-LicenseCredentialCleanupTests",
+      "guard": {
+        "file": "Tests/ZeusAppTests/LicenseCredentialCleanupTests.swift",
+        "function": "serverRefusalStaysWithTheKeyAfterTheDefaultsFlagIsCleared"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A missing or undecodable revocation list was treated as not revoked, so a key that was already on a signed list evaluated as licensed until a later list decoded.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/LicensePortalVectorTests.swift",
+        "function": "aRevokedKeyStaysRevokedWhenTheStoredListCannotBeRead"
+      }
     }
-]
+  ]
 }
