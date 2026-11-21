@@ -18,4 +18,13 @@ struct DeckURLPredicateTests {
         #expect(DeckURL.isPresentation("https://docs.google.com/presentation/d/abc/edit"))
         #expect(DeckURL.isPresentation("https://docs.google.com:443/presentation/d/abc"))
     }
+
+    @Test func theHostAllowsOneOriginAndTheSocketIsOwnerOnly() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let installer = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Chrome/ChromeInstaller.swift"), encoding: .utf8)
+        let socket = try String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/UnixSocket.swift"), encoding: .utf8)
+        #expect(installer.contains("\"allowed_origins\": [\"chrome-extension://\\(ZeusPaths.extensionID)/\"]"))
+        #expect(socket.contains("chmod(path, 0o600)"))
+    }
 }

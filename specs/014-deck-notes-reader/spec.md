@@ -1,6 +1,6 @@
 # 014 — In-browser deck notes reader
 
-Spec only. Tony approved this in his words: "Build 3: in-browser deck-notes reader". This change adds the spec and the mock-up. It does not add application code, tests, a permission, a window, or a feature-map row.
+Tony approved this in his words: "Build 3: in-browser deck-notes reader". This change holds the spec, the mock-up, and the deck URL predicate. It does not add the reader, a permission, a window, or a feature-map row. A recorded-share check on a Mac is PENDING.
 
 The drawing is `mockup.md` and `mockup.html` beside this file.
 
@@ -10,7 +10,9 @@ These constraints are part of the spec. An implementation commit that does not m
 
 ### Capture, screenshots, and accessibility
 
-Speaker notes are always excluded from screen capture and from Zeus's own screenshots. The setting `general.showInScreenSharing` does not apply to them. When that setting shows other Zeus surfaces, the notes stay out of capture and out of any screenshot Zeus takes of itself. A view that draws the notes uses a capture mode that hides it, including when the rest of the top bar is visible to a share.
+macOS excludes capture per window. A notes region cannot be hidden inside a window that is visible to a share. This feature does not open another window. Notes are drawn only in the existing top bar.
+
+While a screen share or a recording is detected, that whole bar window uses `sharingType = .none`. The notes are on screen for the person and out of the share because the window is. When no share and no recording is detected, the bar keeps the capture choice it already has. Zeus does not take its own screenshot of that bar while a share or recording is detected.
 
 The notes string is not an accessibility value. It is not exposed on an element another process can read through the accessibility tree. The VoiceOver name of the region is "Speaker notes, slide N of M" and does not include the notes body.
 
@@ -68,7 +70,7 @@ A frame longer than the host already accepts is rejected before it is parsed. Th
 
 ### Follow
 
-Follow polls on the interval the spec already uses, 0.5 seconds, and it stops after 120 polls. Each poll re-checks the tab URL against the predicate above and re-checks the private-window flag before any script runs. A URL that no longer matches, a private window, or an unknown private flag cancels the watch and drops the notes. The 120th poll is the last even when both checks still pass.
+Follow polls on the interval the spec already uses, 0.5 seconds. The 120th poll is the last. Reaching that cap is the event `pollCap`, not a silent stop. Each poll re-checks the tab URL against the predicate above and re-checks the private-window flag before any script runs. A URL that no longer matches, a private window, or an unknown private flag cancels the watch and drops the notes.
 
 ### Text leaving the page
 
@@ -82,9 +84,9 @@ Private-window detection is per browser. The extension reads the private-window 
 
 ## Finding
 
-S04-11, P2, Prompter notes. Sweep 04 is PR #94, `qa/sweeps/sweep-04-completeness.md`, read against `codex/integration-20261111` at `2722dcb7497d5415fbc1fcb1f65c49629966a281`.
+S04-11, P2, Prompter notes. Read against `codex/integration-20261111` at `2722dcb7497d5415fbc1fcb1f65c49629966a281`.
 
-The in-browser notes provider in `Sources/ZeusCore/TopBar/PresenterSync.swift` (lines 210–217) has a `load` that always throws, a `status` that returns nil, and an empty advance script. The presentation-URL predicate on lines 222–225 still returns true for a deck URL. `Sources/Zeus/Prompter/PresenterNotesController.swift` lines 89–92 throw that error when the predicate matches the active tab and no presentation app is running. Lines 146–150 perform that check only when notes are loaded.
+The in-browser notes provider in `Sources/ZeusCore/TopBar/PresenterSync.swift` has `load` at line 217 (it throws), `status` at line 218 (it returns nil), and `nextSlideScript` at line 219 (it is empty). The presentation-URL predicate is `DeckURL.isPresentation`, used from line 222. It parses URL components. Scheme, userinfo, port, host, and a path with `..` removed all have to match. `Sources/Zeus/Prompter/PresenterNotesController.swift` lines 89–92 throw that error when the predicate matches the active tab and no presentation app is running. Lines 146–150 perform that check only when notes are loaded.
 
 The presentation-app reader is a separate path. It stays as it is. This reader runs only when that path has no running app and the person asks.
 
@@ -102,7 +104,7 @@ One read returns the notes of the slide that deck is showing, and enough structu
 | `notes` | That slide's speaker notes, plain text, line breaks kept | 8,000 characters |
 | `notesInDocument` | The page exposed a speaker-notes field | Boolean |
 
-`truncated` is set when the notes were longer than 8,000 characters. The reader keeps the first 8,000 and the caption says "Truncated".
+`truncated` is set when the notes were longer than 8,000 characters. The reader keeps the first 8,000 and the caption says "Truncated". The notes region scrolls inside the existing page frame. It does not grow the bar. Text that does not fit is clipped to that frame until the person scrolls it.
 
 The notes are the speaker's notes for that slide. The slide's canvas, pictures, comments, and the notes of every other slide stay on the page. Visible page text is not a stand-in. The comment on the stub says the bridge can already read visible text, and that the notes of the slides are not that text while a slideshow is running. A page with no speaker-notes field ends in `notesNotOnPage`. The reader does not fill the gap with the slide body.
 
@@ -169,7 +171,7 @@ Prompter page, Read
   → the notes string is held in the top-bar state and drawn on the Prompter page
 ```
 
-Follow, after the person presses Follow, repeats `deck.index` every 0.5 s and stops after 120 polls, whichever bound comes first. That interval matches the existing presenting poll. Each poll re-checks the tab URL against the deck predicate and re-checks the private-window flag before any script runs. A failed check cancels the watch and drops the notes. A changed slide number sends one `deck.notes` for the new slide. The same number sends nothing further. One request is in flight at a time. A late reply for an older document is dropped.
+Follow, after the person presses Follow, repeats `deck.index` every 0.5 s. The 120th poll sends `pollCap`, which returns to `showing` and cancels the watch. That interval matches the existing presenting poll. Each poll re-checks the tab URL against the deck predicate and re-checks the private-window flag before any script runs. A failed check cancels the watch and drops the notes. A changed slide number sends one `deck.notes` for the new slide. The same number sends nothing further. One request is in flight at a time. A late reply for an older document is dropped.
 
 What leaves the page is the payload, or the two integers from `deck.index`. The URL is used to choose the tab and to detect a navigation. The machine keeps it until the read ends. It is not shown, and it is not written to disk or to a log. The tab title is not shown. The deck name on screen comes from the payload.
 
@@ -179,7 +181,7 @@ Nothing is stored. The string lives in the reader state until Clear, Escape, a f
 
 The only log line is the state name (`showing`, `notesNotOnPage`, and the other names below). The line does not include the notes, the title, the URL, or the document id.
 
-The notes are excluded from capture and from Zeus's own screenshots even when `general.showInScreenSharing` shows the rest of the top bar. The notes string is not an accessibility value another process can read. This feature does not open a window. It does not change the capture policy of any surface that is not drawing the notes.
+While a screen share or a recording is detected, the whole bar window uses `sharingType = .none`. Notes are only in that bar. This feature does not open a window. The notes string is not an accessibility value another process can read.
 
 Threats the machine closes:
 
@@ -203,7 +205,9 @@ States: `idle`, `checking`, `reading`, `showing`, `following`, `failed`.
 
 `showing` and `following` hold `title`, `slide`, `count`, `notes`, and `truncated`. `failed` holds one failure and no text. `reading` holds the target and no text.
 
-Events: `read`, `bridgeDown`, `activePrivate`, `noMatch`, `matched(target)`, `payload(result)`, `index(result)`, `follow`, `stop`, `clear`, `dismiss`.
+Events: `read`, `extensionOff`, `timedOut`, `pollCap`, `activePrivate`, `noMatch`, `matched(target)`, `payload(result)`, `index(result)`, `follow`, `stop`, `clear`, `dismiss`.
+
+`extensionOff` is the socket gone. `timedOut` is the wait ending with no reply. They are not one event. `pollCap` is the 120th Follow poll.
 
 `clear` is the Clear control and Escape. `dismiss` is leaving the Prompter page or closing the bar. `read` is Read and Read again, and Return while the page is focused. Return never starts Follow.
 
@@ -213,19 +217,24 @@ Effects: `findDeck`, `readNotes(target)`, `watchIndex(target)`, `cancelWatch`. T
 | --- | --- | --- | --- |
 | `idle`, `failed` | `read` | `checking` | `findDeck` |
 | `showing` | `read` | `checking` | `cancelWatch`, `findDeck` |
-| `checking` | `bridgeDown` | `failed(extensionOff)` | |
+| `checking` | `extensionOff` | `failed(extensionOff)` | |
+| `checking` | `timedOut` | `failed(timedOut)` | |
 | `checking` | `activePrivate` | `failed(privateWindow)` | |
 | `checking` | `noMatch` | `failed(noDeck)` | |
 | `checking` | `matched` | `reading` | `readNotes` |
 | `reading` | `payload` notes in the document, including an empty string | `showing` | |
 | `reading` | `payload` notes not in the document | `failed(notesNotOnPage)` | |
 | `reading` | `payload` malformed, or a stale document | `failed(unreadable)` or `failed(deckChanged)` | |
-| `reading` | `bridgeDown` | `failed(timedOut)` when the wait ends with no reply; `failed(extensionOff)` when the socket is gone | |
+| `reading` | `timedOut` | `failed(timedOut)` | |
+| `reading` | `extensionOff` | `failed(extensionOff)` | |
 | `showing` | `follow` | `following` | `watchIndex` |
 | `following` | `index` with the same slide and count | `following` | |
 | `following` | `index` with a new slide | `reading` | `readNotes` |
 | `following` | `stop` | `showing` | `cancelWatch` |
-| `following` | `bridgeDown` or a stale document | `failed(extensionOff)` or `failed(deckChanged)` | `cancelWatch` |
+| `following` | `extensionOff` | `failed(extensionOff)` | `cancelWatch` |
+| `following` | `timedOut` | `failed(timedOut)` | `cancelWatch` |
+| `following` | `pollCap` | `showing` | `cancelWatch` |
+| `following` | a stale document | `failed(deckChanged)` | `cancelWatch` |
 | any except `idle` | `clear` or `dismiss` | `idle` | `cancelWatch` when a watch is running |
 
 A `read` while `checking` or `reading` changes nothing. A `follow` outside `showing` changes nothing. A `matched` outside `checking` changes nothing. A payload for a document that is not the one in `reading` is dropped.
@@ -262,11 +271,11 @@ The test that currently expects the in-browser provider's `load` to throw stays 
 2. **Parser.** A payload of title, slide, count, notes, and `notesInDocument` parses. An extra field, a missing field, a slide of 0, a slide above the count, or notes that are not a string is `unreadable`. The 8,001st character is absent and `truncated` is set. Line breaks inside the 8,000 are kept.
 3. **Predicate.** The predicate is the one in "Before any build": `https`, exact host `docs.google.com`, path prefix `/presentation/`, no userinfo, no other port. Every URL in the hostile list is rejected, and an empty string is `noMatch`. The two edit and present examples match. The extension test applies that same allowlist before `executeScript`.
 4. **Idle read.** `read` from `idle` yields `checking` and `findDeck`. No `readNotes`.
-5. **Choose the tab.** `bridgeDown`, `activePrivate`, and `noMatch` yield the three failures and no `readNotes`. `matched` yields `reading` and one `readNotes` for that target.
+5. **Choose the tab.** `extensionOff` and `timedOut` are separate events. From `checking` they yield `failed(extensionOff)` and `failed(timedOut)`, with no `readNotes`. `activePrivate` and `noMatch` yield their failures. `matched` yields `reading` and one `readNotes` for that target.
 6. **Show.** A payload with notes yields `showing` and those strings. An empty notes string with the field present yields `showing` and the empty-slide caption. `notesInDocument` false yields `notesNotOnPage` and an empty buffer.
 7. **Refuse the page.** A malformed payload yields `unreadable`. A stale document yields `deckChanged`. In both, the buffer is empty.
 8. **One in flight.** A second `read` during `checking` or `reading` yields no new effect.
-9. **Follow.** `follow` from `showing` yields `following` and `watchIndex`. The same index yields no `readNotes`. A new index yields `reading` and one `readNotes`. `stop` returns to `showing` and cancels the watch. `follow` from `idle` yields nothing. The 121st poll does not run. A poll whose URL fails the predicate, or whose private-window bit is private or unknown, cancels the watch and drops the notes.
+9. **Follow.** `follow` from `showing` yields `following` and `watchIndex`. The same index yields no `readNotes`. A new index yields `reading` and one `readNotes`. `stop` returns to `showing` and cancels the watch. `follow` from `idle` yields nothing. `pollCap` from `following` returns to `showing` and cancels the watch. A poll whose URL fails the predicate, or whose private-window bit is private or unknown, cancels the watch and drops the notes.
 10. **Drop.** `clear` and `dismiss` from `showing`, `following`, and every failure yield `idle`, an empty buffer, and `cancelWatch` when a watch was running. A later `showing` is possible only after a new `read`.
 11. **Effects.** The effect set is the four names above. A walk of a whole session (read, show, follow, index change, dismiss) never produces another effect.
 12. **Log name.** The description of every state is the state name and, for a failure, the failure name. Building it from a state that holds the sample sentence does not include that sentence, the sample title, or a URL.
