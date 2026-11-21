@@ -191,7 +191,7 @@ struct DeckNotesReaderTests {
         var quiet = DeckNotesReader()
         _ = quiet.send(.read)
         #expect(quiet.send(.bridgeDown(.noReply)) == [])
-        #expect(quiet.state == .failed(.extensionOff))
+        #expect(quiet.state == .failed(.timedOut))
 
         var priv = DeckNotesReader()
         _ = priv.send(.read)
@@ -348,6 +348,48 @@ struct DeckNotesReaderTests {
         #expect(unknown.send(.index(index(slide: 4, count: 18, isPrivate: nil))) == [.cancelWatch])
         #expect(unknown.state == .failed(.privateWindow))
         #expect(unknown.heldNotes.isEmpty)
+    }
+
+    @Test func aNoReplyWhileCheckingTimesOut() {
+        var reader = DeckNotesReader()
+        #expect(reader.send(.read) == [.findDeck])
+        #expect(reader.state == .checking)
+        #expect(reader.send(.bridgeDown(.noReply)).isEmpty)
+        #expect(reader.state == .failed(.timedOut))
+        #expect(reader.isHolding == false)
+
+        var gone = DeckNotesReader()
+        _ = gone.send(.read)
+        #expect(gone.send(.bridgeDown(.socketGone)).isEmpty)
+        #expect(gone.state == .failed(.extensionOff))
+    }
+
+    @Test func sameSlidePolls119Through121() {
+        var reader = DeckNotesReader()
+        show(&reader, notes: Self.sentence)
+        _ = reader.send(.follow)
+        let same = index(slide: 4, count: 18)
+        for poll in 1...119 {
+            #expect(reader.send(.index(same)).isEmpty, "poll \(poll)")
+            guard case .following(_, let count, true) = reader.state else {
+                Issue.record("poll \(poll) left the watch")
+                return
+            }
+            #expect(count == poll)
+        }
+        #expect(reader.send(.index(same)) == [.cancelWatch])
+        guard case .following(_, let capped, false) = reader.state else {
+            Issue.record("poll 120 did not stay on the notes")
+            return
+        }
+        #expect(capped == 120)
+        #expect(reader.heldNotes == Self.sentence)
+        #expect(reader.send(.index(same)).isEmpty)
+        guard case .following(_, let still, false) = reader.state else {
+            Issue.record("poll 121 changed the watch")
+            return
+        }
+        #expect(still == 120)
     }
 
     @Test func clearAndDismissDropTheBuffer() {
