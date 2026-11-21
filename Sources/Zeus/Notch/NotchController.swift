@@ -478,16 +478,9 @@ final class NotchController {
         guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
                                           point: point, zone: zone) else { return false }
         let step = clickSettle.pointerDown(at: now(), point: NotchClickPoint(x: Double(point.x), y: Double(point.y)))
-        switch step {
-        case .wait(let until):
-            armClickSettle(until: until)
-            return true
-        case .open:
-            finishSettledClick()
-            return true
-        case .ignore:
-            return false
-        }
+        guard case .wait(let until) = step else { return false }
+        armClickSettle(until: until)
+        return true
     }
 
     /// Sleeps until the settle date the machine returned. The decision uses `now()`, which tests replace.
