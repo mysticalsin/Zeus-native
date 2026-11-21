@@ -7,8 +7,8 @@ import Testing
     private let microphone = "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} Microphone."
     /// The Screen Recording row in Settings when access is denied.
     private let screen = "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} Screen Recording."
-    /// The Integrations row in Settings when the command-line tool is not on this Mac.
-    private let brain = "Not found on this Mac. Install shows the official command."
+    private let key = "No key saved. Commands go to the assistant."
+    private let cli = "Not found on this Mac. Install shows the official command."
 
     @Test func aMissingMicrophoneUsesTheSettingsSentence() {
         #expect(TalkMissingSetup.sentence(mic: false, screen: true, brainKey: true, cli: true) == microphone)
@@ -18,25 +18,22 @@ import Testing
         #expect(TalkMissingSetup.sentence(mic: true, screen: false, brainKey: true, cli: true) == screen)
     }
 
-    @Test func aMissingBrainKeyAndCLIUsesTheSettingsSentence() {
-        #expect(TalkMissingSetup.sentence(mic: true, screen: true, brainKey: false, cli: false) == brain)
-    }
-
-    @Test func aBrainKeyOrCLIAloneNeedsNoSentence() {
-        #expect(TalkMissingSetup.sentence(mic: true, screen: true, brainKey: false, cli: true) == nil)
-        #expect(TalkMissingSetup.sentence(mic: true, screen: true, brainKey: true, cli: false) == nil)
-    }
-
-    @Test func everythingPresentNeedsNoSentence() {
-        #expect(TalkMissingSetup.sentence(mic: true, screen: true, brainKey: true, cli: true) == nil)
-    }
-
-    @Test func theSentencesDoNotAddCameraCalendarOrAutomation() {
-        let lines = [microphone, screen, brain]
-        for line in lines {
+    @Test func eachGapHasItsOwnSentenceAndEveryGapIsReported() {
+        #expect(key != cli)
+        #expect(TalkMissingSetup.sentences(mic: true, screen: true, brainKey: false, cli: true) == [key])
+        #expect(TalkMissingSetup.sentences(mic: true, screen: true, brainKey: true, cli: false) == [cli])
+        #expect(TalkMissingSetup.sentences(mic: true, screen: true, brainKey: false, cli: false) == [key, cli])
+        #expect(TalkMissingSetup.sentences(mic: false, screen: false, brainKey: true, cli: true) == [microphone, screen])
+        let all = TalkMissingSetup.sentences(mic: false, screen: false, brainKey: false, cli: false)
+        #expect(all == [microphone, screen, key, cli])
+        for line in all {
             #expect(!line.localizedCaseInsensitiveContains("camera"))
             #expect(!line.localizedCaseInsensitiveContains("calendar"))
             #expect(!line.localizedCaseInsensitiveContains("automation"))
         }
+    }
+
+    @Test func everythingPresentNeedsNoSentence() {
+        #expect(TalkMissingSetup.sentences(mic: true, screen: true, brainKey: true, cli: true).isEmpty)
     }
 }
