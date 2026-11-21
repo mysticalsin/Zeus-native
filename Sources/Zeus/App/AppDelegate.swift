@@ -241,8 +241,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.helperRefresh) {
             if ClaudeHookInstaller.isInstalled() { try? ClaudeHookInstaller.refreshHelper() }
             if ChromeInstaller.hasManifest() {
-                // A refused check leaves the bundle helper and the host registration as they are.
-                _ = ChromeInstaller.authorizeInstalledBridge()
+                switch ChromeInstaller.authorizeInstalledBridge() {
+                case .success:
+                    break
+                case .failure(let error):
+                    if case .registrationNotRemoved = error {
+                        BundledHelperLaunchLog.registrationRemovalFailed()
+                    }
+                }
                 try? ChromeInstaller.refreshExtension()
             }
         }

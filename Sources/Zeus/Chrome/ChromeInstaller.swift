@@ -8,11 +8,13 @@ enum ChromeInstaller {
     enum InstallError: LocalizedError {
         case extensionMissing(String)
         case helperRefused(String)
+        case registrationNotRemoved
 
         var errorDescription: String? {
             switch self {
             case .extensionMissing(let path): "The Zeus extension wasn't found at \(path). Rebuild with scripts/bundle.sh."
             case .helperRefused(let sentence): sentence
+            case .registrationNotRemoved: NativeHostRegistration.removalFailedMessage
             }
         }
     }
@@ -50,8 +52,12 @@ enum ChromeInstaller {
               published == path else {
             BundledHelperLaunchLog.refused(path: path)
             let hosts = ZeusPaths.chromeNativeHostManifest.deletingLastPathComponent()
-            try? NativeHostRegistration.reconcile(decision: decision, checkedPath: path, hostsDirectory: hosts)
-            return .failure(.helperRefused(BundledHelperLaunchPolicy.refusalSentence))
+            switch NativeHostRegistration.reconcile(decision: decision, checkedPath: path, hostsDirectory: hosts) {
+            case .kept, .removed:
+                return .failure(.helperRefused(BundledHelperLaunchPolicy.refusalSentence))
+            case .removalFailed:
+                return .failure(.registrationNotRemoved)
+            }
         }
         if hasManifest(), manifestExecutable() != published {
             do { try writeManifest(path: published) } catch {
@@ -69,13 +75,49 @@ enum ChromeInstaller {
         case .failure(let error):
             throw error
         }
-        try refreshExtension()
         let path = bridgeExecutable.path
         guard BundledHelperLaunchPolicy.executableToPublish(checkedPath: path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier) == path else {
             throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
         }
-        try writeManifest(path: path)
+        let directory = ZeusPaths.binDirectory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let staged = directory.appendingPathComponent("zeus-bridge.new")
+        try? FileManager.default.removeItem(at: staged)
+        try FileManager.default.copyItem(at: bridgeExecutable, to: staged)
+        let registration = ZeusPaths.chromeNativeHostManifest
+        let manifest = try manifestData(path: path)
+        let outcome = BundledHelperPublish.replaceIfAccepted(
+            staged: staged,
+            destination: directory.appendingPathComponent(BundledHelperLaunchPolicy.bridgeSigningIdentifier),
+            registration: registration,
+            accept: { url in
+                let checked = BundledHelperLaunch.decide(path: url.path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier)
+                guard BundledHelperLaunchPolicy.publishedExecutable(checkedPath: url.path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier, decision: checked) == url.path else {
+                    BundledHelperLaunchLog.refused(path: url.path)
+                    return false
+                }
+                return true
+            },
+            writeRegistration: {
+                try FileManager.default.createDirectory(at: registration.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try manifest.write(to: registration, options: .atomic)
+            })
+        if case .failure = outcome {
+            throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
+        }
+        try refreshExtension()
         removeSupportCopy()
+    }
+
+    private static func manifestData(path: String) throws -> Data {
+        let manifest: [String: Any] = [
+            "name": ZeusPaths.nativeHostName,
+            "description": "Zeus browser bridge",
+            "path": path,
+            "type": "stdio",
+            "allowed_origins": ["chrome-extension://\(ZeusPaths.extensionID)/"],
+        ]
+        return try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
     }
 
     private static func writeManifest(path: String) throws {

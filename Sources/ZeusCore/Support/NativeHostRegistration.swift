@@ -19,28 +19,25 @@ public enum NativeHostRegistration {
     /// Fixed text for the private logger. It names no path.
     public static let removalFailedMessage = "could not remove the refused host registration"
 
-    /// Remove Zeus's own host file when a refusal's registration names the path that failed
-    /// or a user-writable `zeus-bridge` copy. A passing check keeps the file. Any other file name stays.
+    /// On a refusal, remove Zeus's own host file unless its path is one this check accepted.
+    /// A passing check keeps the file. Any other file name stays.
     public static func action(
         decision: BundledHelperLaunchDecision,
         checkedPath: String,
         manifestFileName: String,
-        manifestExecutablePath: String?
+        manifestExecutablePath: String?,
+        passedPaths: Set<String> = []
     ) -> Action {
+        _ = checkedPath
         guard manifestFileName == zeusHostFileName else { return .keep }
         guard case .refuse = decision else { return .keep }
-        guard let named = manifestExecutablePath?.trimmingCharacters(in: .whitespacesAndNewlines), !named.isEmpty else { return .keep }
-        let refused = checkedPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        if named == refused { return .remove }
-        if BundledHelperLaunchPolicy.isUserWritableHelperCopy(named),
-           BundledHelperLaunchPolicy.signingIdentifier(forExecutablePath: named) == BundledHelperLaunchPolicy.bridgeSigningIdentifier {
-            return .remove
-        }
-        return .keep
+        let named = manifestExecutablePath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !named.isEmpty, passedPaths.contains(named) { return .keep }
+        return .remove
     }
 
     /// Deletes `com.zeus.bridge.json` when the action is remove. No other file name is removed.
-    /// A delete error is reported as success until the caller handles it.
+    /// A delete that throws is `removalFailed` and the file is left as it was.
     public static func apply(action: Action, in directory: URL, remove: (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }) -> Outcome {
         guard action == .remove else { return .kept }
         let url = directory.appendingPathComponent(zeusHostFileName)
@@ -49,15 +46,22 @@ public enum NativeHostRegistration {
             try remove(url)
             return .removed
         } catch {
-            return .removed
+            return .removalFailed
         }
     }
 
     /// Reads the `path` in Zeus's own host file and applies `action`. Other files stay.
-    public static func reconcile(decision: BundledHelperLaunchDecision, checkedPath: String, hostsDirectory: URL, remove: (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }) -> Outcome {
+    public static func reconcile(
+        decision: BundledHelperLaunchDecision,
+        checkedPath: String,
+        hostsDirectory: URL,
+        passedPaths: Set<String> = [],
+        remove: (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
+    ) -> Outcome {
         let file = hostsDirectory.appendingPathComponent(zeusHostFileName)
         let named = executablePath(in: file)
-        let chosen = action(decision: decision, checkedPath: checkedPath, manifestFileName: zeusHostFileName, manifestExecutablePath: named)
+        let chosen = action(decision: decision, checkedPath: checkedPath, manifestFileName: zeusHostFileName,
+                            manifestExecutablePath: named, passedPaths: passedPaths)
         return apply(action: chosen, in: hostsDirectory, remove: remove)
     }
 

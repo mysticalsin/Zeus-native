@@ -270,7 +270,7 @@ private struct AnchorFake: BundledHelperAnchorChecking {
 
     @Test func theSwapReplacesTheOldBridgeWithoutParkingItFirst() throws {
         let source = try gateSource("Sources/ZeusCore/Support/BundledHelperPublish.swift")
-        #expect(source.contains("replaceItemAt"))
+        #expect(source.contains("rename("))
         #expect(!source.contains("moveItem(at: destination, to:"))
     }
 }
@@ -347,6 +347,20 @@ private enum TestWrite: Error { case failed }
         #expect(outcome == .removed)
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(NativeHostRegistration.zeusHostFileName).path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+    }
+
+    @Test func aRefusalKeepsAManifestThatNamesAPathWhichPassed() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let kept = "/usr/local/libexec/zeus-bridge"
+        try writeHosts(root, zeusPath: kept)
+        let zeusFile = root.appendingPathComponent(NativeHostRegistration.zeusHostFileName)
+        let before = try Data(contentsOf: zeusFile)
+        let outcome = NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                                        checkedPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
+                                                        hostsDirectory: root, passedPaths: [kept])
+        #expect(outcome == .kept)
+        #expect(try Data(contentsOf: zeusFile) == before)
     }
 
     @Test func aValidSignatureKeepsTheHostRegistration() throws {

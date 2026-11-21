@@ -119,6 +119,11 @@ enum BundledHelperLaunchLog {
     static func refused(path: String) {
         logger.error("refused bundled helper launch path=\(path, privacy: .private)")
     }
+
+    /// The message is fixed and carries no path, so a public log cannot name the host file.
+    static func registrationRemovalFailed() {
+        logger.error("\(NativeHostRegistration.removalFailedMessage, privacy: .public)")
+    }
 }
 
 enum BundledHelperLaunch {

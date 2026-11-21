@@ -9348,6 +9348,54 @@
           ]
         }
       ]
+    },
+    {
+      "id": "F16",
+      "title": "Release path overrides and the bundled bridge",
+      "obligations": [
+        {
+          "id": "F16.overrides",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A release build ignores ZEUS_SUPPORT_DIR. Debug still reads a non-empty value. The release branch of SupportOverrideBuild.current stays .release.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "releaseIgnoresTheSupportDirectoryOverride"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "releaseIgnoresTheSupportDirectoryEvenThroughTheCurrentBuild"
+            }
+          ]
+        },
+        {
+          "id": "F16.bridge",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A refused local-dev leaf does not launch. A non-hash leaf never enters the requirement. A registration write that throws restores the previous bridge and registration. The swap renames the new file over the old one, and an early failure removes zeus-bridge.new.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "aMismatchedLocalDevLeafRefuses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "aNonHashLeafNeverEntersTheRequirement"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "aRegistrationWriteThatThrowsRestoresThePreviousRegistration"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "anEarlyFailureRemovesTheStagedBridge"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SupportOverrideResolverTests.swift",
+              "function": "theSwapReplacesTheOldBridgeWithoutParkingItFirst"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
