@@ -122,7 +122,7 @@ final class AgentEventServer {
                 command: Self.command(tool: event.tool, input: event.input),
                 risk: risk,
                 timeout: .seconds(100),
-                onTimeout: .ask,
+                onTimeout: HookDecision.timeoutVerdict(for: risk),
                 detail: detail,
                 trust: trust
             )
