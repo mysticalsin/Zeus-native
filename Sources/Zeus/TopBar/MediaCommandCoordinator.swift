@@ -1,5 +1,14 @@
 import Foundation
+import os
 import ZeusCore
+
+private enum MediaCommandLog {
+    static let logger = Logger(subsystem: "app.zeus.mac", category: "media-playback")
+
+    static func write(_ message: String) {
+        logger.notice("\(message, privacy: .public)")
+    }
+}
 
 /// Runs the home and music transport through `MediaCommandRouter`.
 ///
@@ -39,7 +48,14 @@ final class MediaCommandCoordinator {
         let effects: [MediaCommandEffect]
         do {
             effects = try router.reduce(.press(command), now: clock())
+        } catch let rejection as MediaCommandRejection {
+            MediaCommandLog.write("command \(Self.word(command)) rejected \(Self.word(rejection.reason))")
+            return
         } catch {
+            return
+        }
+        if effects.isEmpty, case .noSource = router.state {
+            MediaCommandLog.write("command \(Self.word(command)) nosource")
             return
         }
         publish()
@@ -76,6 +92,7 @@ final class MediaCommandCoordinator {
             case .resync(_, let delay):
                 after = delay
             case .openRecovery:
+                MediaCommandLog.write("recovery opened")
                 model.openPermissions()
             }
         }
@@ -95,8 +112,52 @@ final class MediaCommandCoordinator {
     }
 
     private func apply(_ event: MediaCommandEvent) {
+        let pending = Self.pending(router)
         _ = try? router.reduce(event, now: clock())
+        if case .result(let delivery) = event, let pending {
+            switch delivery {
+            case .accepted:
+                MediaCommandLog.write("command \(pending.name) accepted\(pending.target)")
+            case .permissionDenied:
+                MediaCommandLog.write("command \(pending.name) permissionDenied")
+            case .unavailable:
+                MediaCommandLog.write("command \(pending.name) unavailable")
+            case .failed:
+                MediaCommandLog.write("command \(pending.name) failed")
+            }
+        }
         publish()
+    }
+
+    private static func pending(_ router: MediaCommandRouter) -> (name: String, target: String)? {
+        guard case .commandPending(let command) = router.state else { return nil }
+        let target: String
+        switch router.route?.endpoint {
+        case .scriptedPlayer(let bundleID): target = " bundle=\(bundleID)"
+        case .browser: target = " browser"
+        case nil: target = ""
+        }
+        return (word(command), target)
+    }
+
+    private static func word(_ command: MediaControlCommand) -> String {
+        switch command {
+        case .play: "play"
+        case .pause: "pause"
+        case .next: "next"
+        case .previous: "previous"
+        case .seek: "seek"
+        }
+    }
+
+    private static func word(_ reason: MediaCommandRejection.Reason) -> String {
+        switch reason {
+        case .illegalTransition: "illegalTransition"
+        case .duplicate: "duplicate"
+        case .unsupported: "unsupported"
+        case .inFlight: "inFlight"
+        case .blocked: "blocked"
+        }
     }
 
     private func clock() -> Double { Date().timeIntervalSinceReferenceDate }
