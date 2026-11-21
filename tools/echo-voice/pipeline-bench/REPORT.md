@@ -76,8 +76,7 @@ Echo, 2026-11-20 (BRT).
 - Rust and Go output is **bit-identical** to each other everywhere.
 - Against Python on the stream path: **bit-identical** (FRAME bytes sha256 `ed99f366…52ab`).
 - Against Python on the file path:
-  - ≤ 1 int16 LSB on ≤ 0.17 % of samples (f32 summation order inside `resample_poly`);
-  - float32 max |diff| ≤ 3e-7 over the whole workload;
+  - ≤ 1 int16 LSB on ≤ 0.174 % of samples (the worst file in `results/parity_python_vs_rust.json` and `parity_python_vs_go.json` is `reply_user_16k_mono.wav` at 0.1737 %; f32 summation order inside `resample_poly`);
   - 24 kHz input: bit-identical.
 
 **Two facts found along the way:**
@@ -108,8 +107,7 @@ Echo, 2026-11-20 (BRT).
 
 **Fallback:**
 - `python_fallback.load_audio_24k()` uses `haru-pipe` when present, else upstream `load_audio`.
-- Float parity of the fallback against upstream: ≤ 3e-7.
-- `haru-mlx-inference` itself is unchanged, and Python stays the default.
+- `haru-mlx-inference` itself is unchanged, and Python stays the default. The fallback's float delta is not in this tree, so it is not quoted here.
 
 **Not done (by design):**
 - No team repo was touched and there is no PR. Wiring this into Zeus goes through the factory pipeline: plan, branch, gates.

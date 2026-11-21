@@ -118,7 +118,7 @@ Caveats:
   where the frame time goes.
 - Rust and Go match each other bit for bit. Against Python, the stream path
   is bit-identical. The file path differs by at most 1 int16 LSB on at most
-  0.17% of samples, from float32 summation order inside `resample_poly`.
+  0.174% of samples, from float32 summation order inside `resample_poly`.
 - Rows marked simulated in the report add a fixed 86.55 ms model wait. They
   are not M5 measurements.
 
