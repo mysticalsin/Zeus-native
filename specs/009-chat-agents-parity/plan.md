@@ -97,6 +97,8 @@ The command for PRs 1 through 7 is `swift test --filter <Suite>` for the suite t
 
 PR 11's frame budget is sampled while a synthetic transcript streams: the main-thread commit stays inside 16.6 ms at 60 Hz and 8.3 ms at 120 Hz. A static screenshot is not the motion check. Record the open and the approval grow with Reduce Motion off and on. The person's own OS consent is required for any capture. The checklist does not script a permission dialog.
 
+The packaged-app walk, one click at a time, is `native-acceptance.md`. A PR is not accepted on a Mac until the steps it owns in that script pass. The script does not replace the unit filters above.
+
 ## Acceptance
 
 The set is complete when every target transition has a test, the five walks for PRs 11 through 15 have been done on a Mac, and the inventory rows C11, C14, C15, C17, A13 through A16, A18, A19, A21, A22, and A25 have moved. This plan does not by itself move them.
