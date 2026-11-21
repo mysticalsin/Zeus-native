@@ -70,6 +70,11 @@ public final class KeychainStore: @unchecked Sendable {
         for account in backend.accounts(service: Self.service) {
             if let value = backend.read(service: Self.service, account: account) { cache[account] = value }
         }
+        if AssistantKeyAccount.nonempty(cache[AssistantKeyAccount.canonicalOpenAI]) == nil,
+           let alias = AssistantKeyAccount.nonempty(cache[AssistantKeyAccount.aliasOpenAI]),
+           backend.write(alias, service: Self.service, account: AssistantKeyAccount.canonicalOpenAI) {
+            cache[AssistantKeyAccount.canonicalOpenAI] = alias
+        }
         guard !defaults.bool(forKey: Self.migratedFlag) else {
             unreadableLegacy = defaults.stringArray(forKey: Self.unreadableKey) ?? []
             return
@@ -176,5 +181,39 @@ public final class MemoryKeychain: KeychainBackend, @unchecked Sendable {
         guard !locked.contains(key) else { return false }
         items[key] = nil
         return true
+    }
+}
+
+/// The speech card stores the direct key at `assistant.key.openAI`. An older brain path read
+/// `assistant.key.openai`. Readers check both. Writers and the one-time copy use the canonical account.
+public enum AssistantKeyAccount {
+    public static let canonicalOpenAI = "assistant.key.openAI"
+    public static let aliasOpenAI = "assistant.key.openai"
+
+    public static func nonempty(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+
+    /// Canonical account first, then the lowercase alias.
+    public static func readOpenAI(_ get: (String) -> String?) -> String? {
+        if let value = nonempty(get(canonicalOpenAI)) { return value }
+        return nonempty(get(aliasOpenAI))
+    }
+
+    /// Writes the trimmed value through the caller, which must target `canonicalOpenAI`.
+    @discardableResult
+    public static func writeOpenAI(_ value: String, write: (String) -> Bool) -> Bool {
+        guard let trimmed = nonempty(value) else { return false }
+        return write(trimmed)
+    }
+
+    /// Copies the alias into the canonical account when the canonical account is empty.
+    /// A canonical value is left in place. Returns the canonical value after the attempt.
+    public static func migrateOpenAI(get: (String) -> String?, writeCanonical: (String) -> Bool) -> String? {
+        if let canonical = nonempty(get(canonicalOpenAI)) { return canonical }
+        guard let alias = nonempty(get(aliasOpenAI)) else { return nil }
+        if writeCanonical(alias), let stored = nonempty(get(canonicalOpenAI)) { return stored }
+        return alias
     }
 }

@@ -371,7 +371,8 @@ final class RouterSettings {
     func brainEngineCandidates(task: RouterTask, hasAnthropicKey: Bool, claude: BrainProvider? = nil,
                                preferAppClaude: Bool = false)
         -> [(engine: BrainEngineID, id: String, provider: BrainProvider)] {
-        let openAI = Keychain.get("assistant.key.openai").map { !$0.isEmpty } ?? false
+        _ = AssistantKeyAccount.migrateOpenAI(get: { Keychain.get($0) }, writeCanonical: { Keychain.set($0, for: AssistantKeyAccount.canonicalOpenAI) })
+        let openAI = AssistantKeyAccount.readOpenAI({ Keychain.get($0) }) != nil
         var ordered = BrainRoute.order(hasAnthropicKey: hasAnthropicKey, hasOpenAIKey: openAI,
                                        installed: Set(installed.keys), exhausted: Set(exhaustedEngines()))
         if claude != nil, !exhaustedEngines().contains(.claude), !ordered.contains(.claude) { ordered.append(.claude) }
@@ -400,7 +401,7 @@ final class RouterSettings {
         case .anthropicAPI:
             return ("anthropic-api", AnthropicAPIProvider())
         case .openAIAPI:
-            guard let key = Keychain.get("assistant.key.openai"), !key.isEmpty,
+            guard let key = AssistantKeyAccount.readOpenAI({ Keychain.get($0) }), !key.isEmpty,
                   let model = ModelCap.httpModel(.openAI, tier: .fast) else { return nil }
             return ("openai", OpenAICompatProvider.openAI(model: model, key: key))
         case .codex, .gemini, .claude, .ollama, .grok, .cursorAgent:
