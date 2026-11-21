@@ -5,7 +5,7 @@
 #   bash scripts/human-qa.sh <path/to/Zeus.app> [--screenshots] [--only <journey>] [--allow-mic] [--yes]
 #
 # Journeys: launch topbar settings record scribe alerts talk (quit and the restart check run only on a full run).
-# Evidence: ~/AI-Brain-build/zeus-human-qa/<timestamp>/ (report.md, receipt.json, logs, freeze samples).
+# Evidence: ~/Library/Logs/Zeus/human-qa/<timestamp>/ (report.md, receipt.json, logs, freeze samples).
 # It never requests a permission, never uses the microphone without --allow-mic, never starts a recording
 # (the Record countdown is cancelled with Esc) and refuses to run in CI. See docs/HUMAN-QA.md.
 set -euo pipefail
@@ -15,7 +15,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
 py="$repo/qa/closed-loop/human_qa.py"
 BUNDLE_ID="app.zeus.mac"
-BASE="$HOME/AI-Brain-build/zeus-human-qa"
+BASE="${ZEUS_HUMAN_QA_DIR:-$HOME/Library/Logs/Zeus/human-qa}"
 
 die() { echo "human-qa: $*" >&2; exit "${2:-2}"; }
 
@@ -58,7 +58,7 @@ fi
 
 # 4. Evidence folder, driver build (plain swiftc, cached by source hash, never swift build).
 EV="$(python3 -I "$py" new-dir "$BASE")"
-CACHE="$HOME/AI-Brain-build/zeus-human-qa/.cache"
+CACHE="${ZEUS_HUMAN_QA_DIR:-$HOME/Library/Logs/Zeus/human-qa}/.cache"
 mkdir -p "$CACHE"
 SUM="$(shasum -a 256 "$here/human-qa.swift" | cut -c1-16)"
 BIN="$CACHE/human-qa-$SUM"

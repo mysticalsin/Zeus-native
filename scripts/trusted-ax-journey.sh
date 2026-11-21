@@ -13,6 +13,6 @@ if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
   echo "trusted-ax-journey: refuses to run in CI" >&2; exit 2
 fi
 
-BUILD_DIR="$HOME/AI-Brain-build/zeus-native-build"
+BUILD_DIR="${ZEUS_BUILD_DIR:-$HOME/Library/Caches/Zeus/native-build}"
 swift build --build-tests --scratch-path "$BUILD_DIR"
 exec python3 qa/closed-loop/trusted_ax.py --build-dir "$BUILD_DIR"

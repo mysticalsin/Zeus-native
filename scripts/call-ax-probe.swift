@@ -13,7 +13,7 @@
 //   AXEnhancedUserInterface = true on the application element (the same switch VoiceOver-style tools use), only when
 //   a first quick walk finds a nearly empty tree, and restores the prior values on exit (also on Ctrl-C).
 // - Output stays local: <out>/snapshot-<label>-<n>.jsonl, <out>/diff-<label>.jsonl. Default out dir is
-//   ~/AI-Brain-build/call-ax-probe/<timestamp>. No network.
+//   ~/Library/Logs/Zeus/call-ax-probe/<timestamp>. No network.
 // - Redaction (default ON): every word in a string is replaced by the first 8 hex chars of
 //   SHA-256(per-run salt + lowercase word), except an allowlist of indicator words (speaking, muted, ...). The same
 //   name gives the same hash within a run, so you can see which tile lights up without seeing the name.
@@ -344,7 +344,7 @@ func run() {
         let f = DateFormatter()
         f.dateFormat = "yyyyMMdd-HHmmss"
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("AI-Brain-build/call-ax-probe/\(f.string(from: Date()))", isDirectory: true)
+            .appendingPathComponent("Library/Logs/Zeus/call-ax-probe/\(f.string(from: Date()))", isDirectory: true)
     }()
     do { try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true) }
     catch { die("cannot create \(outDir.path): \(error)", code: 1) }

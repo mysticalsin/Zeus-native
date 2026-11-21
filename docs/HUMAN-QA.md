@@ -35,7 +35,7 @@ captures the wallpaper. If macOS blocks the app as unverified, `xattr -dr com.ap
 
 ## Evidence
 
-`~/AI-Brain-build/zeus-human-qa/<timestamp>/` (private, mode 700):
+`~/Library/Logs/Zeus/human-qa/<timestamp>/` (private, mode 700):
 
 | File | What |
 |---|---|

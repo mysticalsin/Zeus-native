@@ -173,8 +173,8 @@ def run_host(argv, log, environment):
 def main(argv=None):
     home = Path.home()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build-dir", type=Path, default=home / "AI-Brain-build/zeus-native-build")
-    parser.add_argument("--receipts", type=Path, default=home / "AI-Brain-build/zeus-trusted-ax")
+    parser.add_argument("--build-dir", type=Path, default=home / "Library/Caches/Zeus/native-build")
+    parser.add_argument("--receipts", type=Path, default=home / "Library/Logs/Zeus/trusted-ax")
     args = parser.parse_args(argv)
     require_local_mac()
     built, tests = build_products(args.build_dir)

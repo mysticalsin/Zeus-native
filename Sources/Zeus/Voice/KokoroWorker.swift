@@ -13,23 +13,21 @@ enum KokoroWorker {
         var out: String
     }
 
-    static let defaultModelDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("AI-Brain-build/jarvis-laya-backend/models", isDirectory: true)
-    static let jarvisPython = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("AI-Brain-build/jarvis-laya-backend/.venv/bin/python")
-
     static func modelDir(from defaults: UserDefaults = .standard) -> URL {
         if let path = defaults.string(forKey: "voice.kokoro.modelDir"), !path.isEmpty {
             return URL(fileURLWithPath: path, isDirectory: true)
         }
-        return defaultModelDir
+        if let override = ProcessInfo.processInfo.environment["ZEUS_KOKORO_MODEL_DIR"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return managedModelDir
     }
 
     static func pythonExecutable() -> String {
-        let jarvis = jarvisPython.path
-        if FileManager.default.isExecutableFile(atPath: jarvis),
-           LocalPython.run(jarvis, ["-I", "-c", "import kokoro_onnx"], timeout: 10).status == 0 {
-            return jarvis
+        if let override = ProcessInfo.processInfo.environment["ZEUS_KOKORO_PYTHON"],
+           FileManager.default.isExecutableFile(atPath: override),
+           LocalPython.run(override, ["-I", "-c", "import kokoro_onnx"], timeout: 10).status == 0 {
+            return override
         }
         return LocalPython.python.path
     }

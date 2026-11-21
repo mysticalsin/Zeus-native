@@ -7,8 +7,8 @@
 set -uo pipefail
 SAMPLE="${SECONDS_IDLE:-60}"
 BUDGET="${CPU_BUDGET:-1}"
-LOG="${LOG:-../topbar-proof/perf-budget.log}"
-pid="${PID:-$(pgrep -f 'zeus-wt/topbar/build/Zeus.app/Contents/MacOS/Zeus' | head -1)}"
+LOG="${LOG:-$HOME/Library/Logs/Zeus/perf-budget.log}"
+pid="${PID:-$(pgrep -f '/Zeus.app/Contents/MacOS/Zeus' | head -1)}"
 [ -n "$pid" ] || { echo "no ZEUS from this worktree running; pass PID=" | tee "$LOG"; exit 2; }
 exe="$(ps -o comm= -p "$pid")"
 echo "perf budget $(date '+%F %T %Z') pid=$pid exe=$exe window=${SAMPLE}s" | tee "$LOG"
