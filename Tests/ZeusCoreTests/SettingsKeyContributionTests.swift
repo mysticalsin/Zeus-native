@@ -51,14 +51,18 @@ import ZeusCore
         #expect(!SettingsKeyLedger.mayStore(secret, value: "Desk"))
     }
 
-    @Test func aFilledSlotKeyMustBeADeclaredContribution() {
+    @Test func aFilledSlotKeyMustBeABaseKeyOrAContribution() {
+        let base = SettingsKeyReachability.baseKeys(catalogIDs: ["about.autoUpdate"])
+        let catalogSlot = GlassSectionSlot(id: "glass.battery", title: "Battery", filled: true, keys: ["about.autoUpdate", "showCaptions"], order: 2, placement: .topbarTab(2))
+        let allowed = GlassSectionManifest.keysMissingFrom(catalogSlot, contributions: [], base: base)
+        #expect(allowed.isEmpty)
         let slot = GlassSectionSlot(id: "glass.battery", title: "Battery", filled: true, keys: ["battery.mutant"], order: 2, placement: .topbarTab(2))
-        let missing = GlassSectionManifest.keysMissingFrom(slot, contributions: [])
+        let missing = GlassSectionManifest.keysMissingFrom(slot, contributions: [], base: base)
         #expect(missing == ["battery.mutant"])
         let declared = [SettingsKeyContribution(id: "battery.mutant", defaultValue: "0", kind: .number, policy: .localOnly)]
-        let registered = GlassSectionManifest.keysMissingFrom(slot, contributions: declared)
+        let registered = GlassSectionManifest.keysMissingFrom(slot, contributions: declared, base: base)
         #expect(registered.isEmpty)
-        #expect(GlassSectionManifest.unregisteredSlotKeys().isEmpty)
+        #expect(GlassSectionManifest.unregisteredSlotKeys(base: base).isEmpty)
     }
 
     @Test func everyContributionIDIsUniqueAndHasADefault() {

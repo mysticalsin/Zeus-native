@@ -92,15 +92,15 @@ public enum GlassSectionManifest {
         slots.reduce(0) { $0 + $1.keys.count }
     }
 
-    /// Keys written on a slot that are not declared in that slot's contributions.
-    public static func keysMissingFrom(_ slot: GlassSectionSlot, contributions: [SettingsKeyContribution]) -> [String] {
-        let known = Set(contributions.map { $0.id })
+    /// Slot keys that are neither base catalog keys nor declared contributions.
+    public static func keysMissingFrom(_ slot: GlassSectionSlot, contributions: [SettingsKeyContribution], base: Set<String>) -> [String] {
+        let known = base.union(contributions.map { $0.id })
         return slot.keys.filter { !known.contains($0) }
     }
 
-    public static func unregisteredSlotKeys() -> [String] {
+    public static func unregisteredSlotKeys(base: Set<String>) -> [String] {
         providers.flatMap { provider in
-            keysMissingFrom(provider.descriptor, contributions: provider.keyContributions).map { key in
+            keysMissingFrom(provider.descriptor, contributions: provider.keyContributions, base: base).map { key in
                 "\(provider.descriptor.id) \(key)"
             }
         }
@@ -520,6 +520,10 @@ public enum GlassSettingsAudit {
             failures.append("base pin moved")
         }
         failures += contributionFailures(catalogIDs: ids)
+        let unregistered = GlassSectionManifest.unregisteredSlotKeys(base: base)
+        if !unregistered.isEmpty {
+            failures.append("slot key outside base keys and contributions \(unregistered.joined(separator: ","))")
+        }
         let sections = SettingsKeyReachability.sectionIDs(in: settingsViewSource)
         if sections != SettingsKeyReachability.existingSectionIDs {
             failures.append("sections \(sections)")
@@ -639,10 +643,6 @@ public enum GlassSettingsAudit {
         }
         if !GlassSectionManifest.slotProblems(GlassSectionManifest.slots).isEmpty {
             failures.append("live slots are not valid placeholders")
-        }
-        let unregistered = GlassSectionManifest.unregisteredSlotKeys()
-        if !unregistered.isEmpty {
-            failures.append("slot key without a contribution \(unregistered.joined(separator: ","))")
         }
         return failures
     }
