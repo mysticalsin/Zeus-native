@@ -1207,6 +1207,17 @@
           "id": "F01.1"
         },
         {
+          "check": "portable-regressions",
+          "acceptance": "On an injected clock, both the talk hold and the Murmur tap endpoint after silence, reuse one on-device model, and deliver the final within budget of the endpoint. No transcript text is recorded.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "latencyRegressionBothPathsStayInsideTheBudget"
+            }
+          ],
+          "id": "F01.stt-latency"
+        },
+        {
           "check": "native-DictationOwnershipIntegrationTests",
           "acceptance": "Queued stale turns and focus drift cannot deliver into a new target.",
           "cases": [

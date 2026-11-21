@@ -8700,6 +8700,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "Speech to text waited 2.5 s for a final that often never arrived and left the recognition task running, and an unchanged partial reset the silence endpoint. Talk hold and Murmur tap both did this. On-device recognition could also sit for at least 30 s.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "latencyRegressionBothPathsStayInsideTheBudget"
+      }
     }
-]
+  ]
 }
