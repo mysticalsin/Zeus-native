@@ -6,6 +6,8 @@ Lens: key handling, meter tamper and races, endpoint host pinning, error and log
 
 Red: `1721196e85a9a61dd5e18a8c92ffceb1e072c13c` (tests only; the route and gate types were absent).
 
+Green: `9e5a0798d7fea43d3b1115d669bc20350c18e381`. Isolated `swift test --filter VoiceQualityRouteSecurityTests|VoiceQualityPresetTests` exited 0. 27 tests in 2 suites passed. No network. The Linux URLSession redirect fatal error was not hit: the stub returns 302 and the task delegate returns nil.
+
 ### Findings
 
 1. A key with an embedded newline, CR LF, tab, or NUL was accepted and placed in `xi-api-key` or `X-Goog-Api-Key`. The meter was charged before the request failed. That is header injection, and the error path could have echoed the key.
