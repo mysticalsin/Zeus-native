@@ -1,6 +1,6 @@
 {
-  "block": "339",
-  "note": "Separate from qa/regressions.json. That file and PR #340 both appended at the same closing bracket of the regressions array, so one combined list does not merge cleanly.",
+  "schema_version": 1,
+  "policy": "PR 339 guards live in this sidecar so they do not share the closing bracket of qa/regressions.json. The runner reads every qa/regressions-*.json file.",
   "regressions": [
     {
       "id": "REG-339-1",

@@ -164,6 +164,13 @@ public enum TalkDrawScene {
                                               imageSize: size)
     }
 
+    /// An ink ring is an ellipse: the long axis is wider than the short one.
+    public static func ringEllipse(radius: Double) -> (width: Double, height: Double) {
+        let width = radius * 2
+        let height = radius * 1.35
+        return (width, height)
+    }
+
     /// The label box the renderer will measure, roughly: 8 px per character up to 230 px, plus padding.
     public static func estimatedLabelSize(text: String) -> CGSize {
         CGSize(width: min(230, Double(text.count) * 8) + 16, height: 28)
