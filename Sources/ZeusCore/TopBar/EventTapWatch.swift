@@ -15,7 +15,9 @@ public enum EventTapWatch {
 
     public static func step(_ notice: Notice) -> Step {
         switch notice {
-        case .timeout, .userDisabled, .event:
+        case .timeout, .userDisabled:
+            .reenable
+        case .event:
             .deliver
         }
     }
