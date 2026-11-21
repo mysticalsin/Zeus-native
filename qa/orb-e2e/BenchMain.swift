@@ -4,6 +4,11 @@ import Foundation
 @main
 struct OrbBench {
     static func main() {
+        if CommandLine.arguments.count > 1, CommandLine.arguments[1] == "--idle-hold" {
+            let seconds = Double(CommandLine.arguments.dropFirst(2).first ?? "1") ?? 1
+            Thread.sleep(forTimeInterval: max(0, seconds))
+            exit(0)
+        }
         let destination = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : ""
         let report = makeReport()
         let data = try! JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])

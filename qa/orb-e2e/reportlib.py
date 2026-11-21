@@ -134,24 +134,45 @@ STATE_COLORS = {
 
 
 def sample_idle(seconds=10):
-    """Sample a quiescent sleep process. Returns percent of one core and RSS megabytes."""
-    proc = subprocess.Popen(["sleep", str(seconds + 5)])
+    """Sample a real Zeus pid, or the orb bench holding still.
+
+    `ZEUS_PID` names the app. Otherwise `ZEUS_ORB_BENCH` is started with
+    `--idle-hold`, unless `ZEUS_ORB_BENCH_ARGS` names one extra argument and
+    the hold duration follows it. Returns percent of one core, RSS megabytes,
+    and a subject of `zeus` or `orb-bench`.
+    """
+    zeus = os.environ.get("ZEUS_PID")
+    if zeus:
+        return _sample_pid(int(zeus), seconds, "zeus")
+    bench = os.environ.get("ZEUS_ORB_BENCH")
+    if not bench:
+        raise RuntimeError("no Zeus pid and no orb-bench")
+    extra = os.environ.get("ZEUS_ORB_BENCH_ARGS")
+    if extra:
+        command = [bench, extra, str(seconds + 1)]
+    else:
+        command = [bench, "--idle-hold", str(seconds + 1)]
+    proc = subprocess.Popen(command)
     try:
-        if os.path.exists(f"/proc/{proc.pid}/stat"):
-            start = _proc_ticks(proc.pid)
-            rss_kb = _proc_rss_kb(proc.pid)
-            time.sleep(seconds)
-            end = _proc_ticks(proc.pid)
-            rss_kb = max(rss_kb, _proc_rss_kb(proc.pid))
-            hz = os.sysconf("SC_CLK_TCK")
-            percent = ((end - start) / hz) / seconds * 100.0
-            return percent, rss_kb / 1024.0, "sleep"
-        time.sleep(seconds)
-        rss = subprocess.check_output(["ps", "-o", "rss=", "-p", str(proc.pid)], text=True)
-        return 0.0, float(rss.strip()) / 1024.0, "sleep"
+        return _sample_pid(proc.pid, seconds, "orb-bench")
     finally:
         proc.kill()
         proc.wait()
+
+
+def _sample_pid(pid, seconds, subject):
+    if os.path.exists(f"/proc/{pid}/stat"):
+        start = _proc_ticks(pid)
+        rss_kb = _proc_rss_kb(pid)
+        time.sleep(seconds)
+        end = _proc_ticks(pid)
+        rss_kb = max(rss_kb, _proc_rss_kb(pid))
+        hz = os.sysconf("SC_CLK_TCK")
+        percent = ((end - start) / hz) / max(seconds, 0.001) * 100.0
+        return percent, rss_kb / 1024.0, subject
+    time.sleep(seconds)
+    rss = subprocess.check_output(["ps", "-o", "rss=", "-p", str(pid)], text=True)
+    return 0.0, float(rss.strip()) / 1024.0, subject
 
 
 def _proc_ticks(pid):
