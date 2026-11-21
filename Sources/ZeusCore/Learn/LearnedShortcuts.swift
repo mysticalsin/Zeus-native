@@ -174,6 +174,8 @@ public final class LearnedShortcutDisk: @unchecked Sendable {
     private let lock = NSLock()
     private var store: LearnedShortcutStore
     private let url: URL
+    /// Test fault. A throw here is a full disk or a refused folder.
+    public var writeFault: (() throws -> Void)?
 
     public init(url: URL = ZeusPaths.learnedShortcuts) {
         self.url = url
@@ -194,7 +196,10 @@ public final class LearnedShortcutDisk: @unchecked Sendable {
     public func save(phrase: String, steps: [String], verified: Bool) -> LearnSave {
         lock.lock(); defer { lock.unlock() }
         let result = store.save(phrase: phrase, steps: steps, verified: verified)
-        if case .saved = result { try? store.write(to: url) }
+        if case .saved = result {
+            try? writeFault?()
+            try? store.write(to: url)
+        }
         return result
     }
 

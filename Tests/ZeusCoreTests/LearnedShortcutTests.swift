@@ -2,6 +2,19 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
+@Suite("Shortcut file")
+struct ShortcutFileTests {
+    @Test func failedWriteIsNotSavedAndLeavesNoFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("s06-shortcuts-\(UUID().uuidString).json")
+        let disk = LearnedShortcutDisk(url: url)
+        disk.writeFault = { throw CocoaError(.fileWriteOutOfSpace) }
+        let result = disk.save(phrase: "focus mode", steps: ["close Slack"], verified: true)
+        #expect(result == .rejected("Couldn't save that shortcut. It is not stored."))
+        #expect(disk.list().isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+}
+
 @Suite struct LearnedShortcutTests {
     @Test func namedPhraseParsesTwoSteps() {
         let parsed = NamedShortcutPhrase.parse("When I say focus mode, close Slack and open Notes")
