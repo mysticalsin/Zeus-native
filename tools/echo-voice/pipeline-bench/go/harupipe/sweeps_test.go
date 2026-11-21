@@ -40,6 +40,14 @@ func heldSamples(s *Stream) []float32 {
 	return out
 }
 
+func TestBadRatioIsAnError(t *testing.T) {
+	for _, c := range [][2]int{{0, 2}, {2, 0}, {0, 0}} {
+		if _, err := NewPolyphase(c[0], c[1]); err == nil {
+			t.Fatalf("up=%d down=%d returned a filter", c[0], c[1])
+		}
+	}
+}
+
 func TestFirwinSingleTapIsUnity(t *testing.T) {
 	done := make(chan []float64, 1)
 	go func() { done <- FirwinKaiser(1, 0.5, 5.0) }()

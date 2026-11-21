@@ -1,5 +1,6 @@
 //! Sweep regressions. These are not the original red-first invariants.
 use haru_pipe::native::Ingest;
+use haru_pipe::resample::{resample_poly, BadRatio};
 use haru_pipe::stats::summary_json;
 
 #[test]
@@ -32,4 +33,15 @@ fn five_byte_split_matches_single_read() {
     split.feed_bytes(&raw[..5]);
     split.feed_bytes(&raw[5..]);
     assert_eq!(whole.pending(), split.pending(), "pending samples diverged");
+}
+
+/// EV-RS-1: up < 1 or down < 1 is an error, not an empty vec and not a panic.
+#[test]
+fn bad_resample_ratio_is_an_error() {
+    for (up, down) in [(0u64, 2u64), (2, 0), (0, 0)] {
+        match resample_poly(&[0.25, -0.5], up, down) {
+            Err(BadRatio { up: u, down: d }) => assert_eq!((u, d), (up, down)),
+            Ok(y) => panic!("up={up} down={down} returned {} samples", y.len()),
+        }
+    }
 }
