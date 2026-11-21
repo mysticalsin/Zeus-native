@@ -1,9 +1,16 @@
 import Foundation
+import Dispatch
 import Testing
 @testable import ZeusCore
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 /// The transcript machine and the JSON file it writes. The directory is always injected.
-@Suite("Hub transcript")
+/// Serialized so a test can change the process umask without racing another case.
+@Suite("Hub transcript", .serialized)
 struct HubTranscriptTests {
     private func temporaryDirectory() -> URL {
         FileManager.default.temporaryDirectory
@@ -287,5 +294,225 @@ struct HubTranscriptTests {
         #expect(HubTranscriptStore(directory: right).load(owned.id) == nil)
         #expect(jsonFiles(in: right).isEmpty)
         #expect(try #require(HubTranscriptStore(directory: left).load(owned.id)).lines.map(\.text) == ["only here"])
+    }
+
+    /// The transcript file is 0600 and its directory is 0700 under a permissive, a usual, and a hostile umask.
+    @Test func fileAndDirectoryStayOwnerOnlyRegardlessOfUmask() throws {
+        for mask in [mode_t(0), mode_t(0o022), mode_t(0o777)] {
+            try expectOwnerOnlyModes(umaskBits: mask, precreateWorldAccessible: false)
+            try expectOwnerOnlyModes(umaskBits: mask, precreateWorldAccessible: true)
+        }
+    }
+
+    /// A replacement that stops before rename leaves the previous bytes, mode, and parse intact.
+    @Test func interruptedWriteLeavesThePreviousTranscript() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var store = HubTranscriptStore(directory: directory)
+        let id = UUID()
+        let original = HubTranscript(id: id, status: .settled, lines: [
+            HubTranscriptLine(role: .person, text: "kept"),
+        ])
+        try store.write(original)
+        let file = directory.appendingPathComponent("\(id.uuidString).json")
+        let bytes = try Data(contentsOf: file)
+        #expect(try posixMode(file) == 0o600)
+        #expect(!String(decoding: bytes, as: UTF8.self).contains("should not land"))
+        store.writeFault = .beforeRename
+        let replacement = HubTranscript(id: id, status: .failed, lines: [
+            HubTranscriptLine(role: .failed, text: "should not land", failed: true),
+        ])
+        #expect(throws: HubTranscriptWriteFault.beforeRename) {
+            try store.write(replacement)
+        }
+        #expect(try Data(contentsOf: file) == bytes)
+        #expect(store.load(id) == original)
+        let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(names.filter { $0.hasSuffix(".tmp") }.isEmpty)
+        #expect(!String(decoding: try Data(contentsOf: file), as: UTF8.self).contains("should not land"))
+        store.writeFault = nil
+        try store.write(replacement)
+        #expect(store.load(id) == replacement)
+        #expect(try posixMode(file) == 0o600)
+        #expect(try posixMode(directory) == 0o700)
+    }
+
+    /// Two writers replace one file. Every sample is one complete line, never a mix of both.
+    @Test(.timeLimit(.minutes(1)))
+    func concurrentWritersDoNotInterleaveLines() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = HubTranscriptStore(directory: directory)
+        let id = UUID()
+        let alpha = String(repeating: "a", count: 8_192)
+        let beta = String(repeating: "b", count: 8_192)
+        let left = HubTranscript(id: id, status: .settled, lines: [
+            HubTranscriptLine(role: .person, text: alpha),
+        ])
+        let right = HubTranscript(id: id, status: .settled, lines: [
+            HubTranscriptLine(role: .agent, text: beta),
+        ])
+        try store.write(left)
+        let race = RaceLog()
+        race.expectWriters(2)
+        let reader = DispatchWorkItem {
+            var samples = 0
+            while samples < 500 {
+                samples += 1
+                guard let loaded = store.load(id) else {
+                    race.add("A sample was missing.")
+                    continue
+                }
+                let texts = loaded.lines.map(\.text)
+                if texts != [alpha] && texts != [beta] {
+                    race.add("A sample mixed the two lines.")
+                }
+                if !race.writersRunning(), samples > 30 { break }
+            }
+        }
+        DispatchQueue.global().async(execute: reader)
+        DispatchQueue.concurrentPerform(iterations: 2) { side in
+            do {
+                for _ in 0..<40 {
+                    try store.write(side == 0 ? left : right)
+                }
+            } catch {
+                race.add("A writer failed: \(error)")
+            }
+            race.writerFinished()
+        }
+        reader.wait()
+        let final = try #require(store.load(id))
+        let finalText = final.lines.map(\.text)
+        #expect(finalText == [alpha] || finalText == [beta])
+        #expect(race.failures().isEmpty)
+        let file = directory.appendingPathComponent("\(id.uuidString).json")
+        let raw = try String(contentsOf: file, encoding: .utf8)
+        let hasAlpha = raw.contains(alpha)
+        let hasBeta = raw.contains(beta)
+        #expect(hasAlpha != hasBeta)
+        #expect(try posixMode(file) == 0o600)
+        #expect(try JSONSerialization.jsonObject(with: Data(contentsOf: file)) is [String: Any])
+    }
+
+    /// Thirty-two overlapping appends. Each token is stored whole, once.
+    @Test(.timeLimit(.minutes(1)))
+    func boundedConcurrentAppendsKeepEveryLine() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = HubTranscriptStore(directory: directory)
+        let id = UUID()
+        let boundedAppends = 32
+        let tokens = (0..<boundedAppends).map { index in
+            "append-\(index)-" + String(repeating: "q", count: 64)
+        }
+        let race = RaceLog()
+        DispatchQueue.concurrentPerform(iterations: boundedAppends) { index in
+            do {
+                try store.append(HubTranscriptLine(role: .person, text: tokens[index]), to: id)
+            } catch {
+                race.add("Append \(index) failed: \(error)")
+            }
+        }
+        #expect(race.failures().isEmpty)
+        let loaded = try #require(store.load(id))
+        #expect(loaded.lines.count == boundedAppends)
+        #expect(Set(loaded.lines.map(\.text)) == Set(tokens))
+        #expect(loaded.id == id)
+        let file = directory.appendingPathComponent("\(id.uuidString).json")
+        #expect(try posixMode(file) == 0o600)
+        #expect(try posixMode(directory) == 0o700)
+        let raw = try String(contentsOf: file, encoding: .utf8)
+        for token in tokens {
+            #expect(raw.contains(token))
+        }
+        let parsed = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        let lines = try #require(parsed["lines"] as? [[String: Any]])
+        #expect(lines.count == boundedAppends)
+        #expect(lines.allSatisfy { tokens.contains($0["text"] as? String ?? "") })
+    }
+
+    private func expectOwnerOnlyModes(umaskBits: mode_t, precreateWorldAccessible: Bool) throws {
+        let previous = umask(umaskBits)
+        defer { _ = umask(previous) }
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        if precreateWorldAccessible {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            #expect(chmod(directory.path, mode_t(0o777)) == 0)
+        }
+        let store = HubTranscriptStore(directory: directory)
+        let id = UUID()
+        let transcript = HubTranscript(id: id, status: .settled, lines: [
+            HubTranscriptLine(role: .person, text: "private line"),
+        ])
+        try store.write(transcript)
+        #expect(try posixMode(directory) == 0o700)
+        let file = directory.appendingPathComponent("\(id.uuidString).json")
+        #expect(try posixMode(file) == 0o600)
+        #expect(try isRegularFile(file))
+        let lock = directory.appendingPathComponent(".\(id.uuidString).lock")
+        #expect(try posixMode(lock) == 0o600)
+        #expect(try isRegularFile(lock))
+        let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        for name in names {
+            #expect((try posixMode(directory.appendingPathComponent(name)) & 0o077) == 0)
+        }
+        #expect(store.load(id) == transcript)
+        #expect(chmod(file.path, mode_t(0o666)) == 0)
+        try store.write(transcript)
+        #expect(try posixMode(file) == 0o600)
+        #expect(try posixMode(directory) == 0o700)
+        #expect(store.load(id) == transcript)
+    }
+
+    private func posixMode(_ url: URL) throws -> Int {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        return Int(info.st_mode & 0o777)
+    }
+
+    private func isRegularFile(_ url: URL) throws -> Bool {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return false }
+        return (info.st_mode & S_IFMT) == S_IFREG
+    }
+
+    private final class RaceLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var notes: [String] = []
+        private var writers = 0
+
+        func add(_ note: String) {
+            lock.lock()
+            notes.append(note)
+            lock.unlock()
+        }
+
+        func expectWriters(_ count: Int) {
+            lock.lock()
+            writers = count
+            lock.unlock()
+        }
+
+        func writerFinished() {
+            lock.lock()
+            writers -= 1
+            lock.unlock()
+        }
+
+        func writersRunning() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return writers > 0
+        }
+
+        func failures() -> [String] {
+            lock.lock()
+            defer { lock.unlock() }
+            return notes
+        }
     }
 }
