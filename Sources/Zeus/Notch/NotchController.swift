@@ -59,6 +59,18 @@ final class NotchController {
     private var dragMonitors: [Any] = []
     private var dragChangeCount = 0
     private var hoverTask: Task<Void, Never>?
+    /// The approval card's wait. `approvalTimeout` is the sleep armed for that phase.
+    private var approvalWait: ApprovalWait.Phase = .idle
+    private var approvalTimeout: Task<Void, Never>?
+    /// A lone Tab hold opened this panel. Pointer-leave waits until that key is released.
+    private var tabStripHeld = false
+    /// Pointer samples for a later gesture router. Emitting one does not open, close, or drag.
+    private var notchGestures = NotchGestureAdapter<NotchPointerSample>()
+    private var gestureTick: Task<Void, Never>?
+    private var lastPointerEdge: (TimeInterval, PointerEdge)?
+    var onNotchGesture: @MainActor (NotchPointerSample) -> Void = { _ in }
+
+    private enum PointerEdge: Equatable { case down, move, up }
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
     /// The pin rules live in ZeusCore; this only reports the current facts.
@@ -85,8 +97,9 @@ final class NotchController {
             return event
         }
         // Dragging files up to the notch opens the Shelf, like dropping onto a tray.
-        dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+        dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
             MainActor.assumeIsolated {
+                self?.ingestMouseDown(event)
                 self?.dragChangeCount = NSPasteboard(name: .drag).changeCount
                 // A click that opens the notch is not also a click outside it.
                 if self?.openOnClick() == true { return }
@@ -95,11 +108,28 @@ final class NotchController {
         } as Any)
         // Click mode: the global monitor misses clicks while a Zeus window is frontmost.
         dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-            MainActor.assumeIsolated { _ = self?.openOnClick() }
+            MainActor.assumeIsolated {
+                self?.ingestMouseDown(event)
+                _ = self?.openOnClick()
+            }
             return event
         } as Any)
-        dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] _ in
-            MainActor.assumeIsolated { self?.mouseDragged() }
+        dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] event in
+            MainActor.assumeIsolated {
+                self?.ingestMouseMove(event)
+                self?.mouseDragged()
+            }
+        } as Any)
+        dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] event in
+            MainActor.assumeIsolated { self?.ingestMouseMove(event) }
+            return event
+        } as Any)
+        dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+            MainActor.assumeIsolated { self?.ingestMouseUp(event) }
+        } as Any)
+        dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
+            MainActor.assumeIsolated { self?.ingestMouseUp(event) }
+            return event
         } as Any)
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -310,17 +340,26 @@ final class NotchController {
                          detail: ApprovalDetail? = nil,
                          trust: (session: String, onTrust: @MainActor () -> Void)? = nil) async -> HookDecision.Verdict {
         // A cancelled caller (`zeus cancel`, Esc) must not spin here: sleep throws at once when cancelled.
-        while model.approval != nil, !Task.isCancelled {
+        while (model.approval != nil || approvalWait != .idle), !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(200))
         }
         if Task.isCancelled { return .deny }
         return await withCheckedContinuation { continuation in
             let id = UUID().uuidString
-            var finished = false
-            let finish: @MainActor (HookDecision.Verdict) -> Void = { [weak self] verdict in
-                guard !finished else { return }
-                finished = true
-                if self?.model.approval?.id == id { self?.model.approval = nil }
+            let (phase, began) = ApprovalWait.reduce(approvalWait, .begin(id: id))
+            guard began == [.armTimeout(id: id)] else {
+                continuation.resume(returning: .deny)
+                return
+            }
+            approvalWait = phase
+            let settle: @MainActor (ApprovalWait.Event, HookDecision.Verdict) -> Void = { [weak self] event, verdict in
+                guard let self else { return }
+                let (next, effects) = ApprovalWait.reduce(self.approvalWait, event)
+                guard effects.contains(.resolve(id: id)) else { return }
+                self.approvalWait = next
+                self.approvalTimeout?.cancel()
+                self.approvalTimeout = nil
+                if self.model.approval?.id == id { self.model.approval = nil }
                 continuation.resume(returning: verdict)
             }
             let seconds = Double(timeout.components.seconds)
@@ -331,14 +370,14 @@ final class NotchController {
             }
             var trustChat: (@MainActor () -> Void)?
             if let onTrust = trust?.onTrust {
-                trustChat = { onTrust(); finish(.allow) }
+                trustChat = { onTrust(); settle(.answer(id: id), .allow) }
             }
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
                 deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
                 trustChat: trustChat,
-                resolve: finish
+                resolve: { settle(.answer(id: id), $0) }
             )
             model.completion = nil
             model.recap = nil
@@ -349,11 +388,26 @@ final class NotchController {
             ])
             if model.presentation == .closed { show(.peek) }
             setIgnoresMouse(ignoresMouse(for: model.presentation))
-            Task { @MainActor in
+            approvalTimeout = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: timeout)
-                finish(onTimeout)
+                guard let self, !Task.isCancelled else { return }
+                settle(.timeout(id: id), onTimeout)
             }
         }
+    }
+
+    /// The tab strip is the row already drawn in the open panel. A lone Tab hold opens that panel
+    /// with the panel's own motion and closes it again on release, and only if this hold opened it.
+    func setTabStripHeld(_ revealed: Bool) {
+        if revealed {
+            guard !tabStripHeld, model.presentation == .closed, model.approval == nil, !drawnNotch.isCalibrating else { return }
+            tabStripHeld = true
+            show(.panel)
+            return
+        }
+        guard tabStripHeld else { return }
+        tabStripHeld = false
+        if model.presentation == .panel { show(.closed) }
     }
 
     /// Hover the notch to open the panel; move away to close it. With the top bar the panel
@@ -393,6 +447,7 @@ final class NotchController {
             if topBar?.prompterActive == true || model.picker != nil { return }
             // A menu from the ... button is open: keep the panel up until it closes.
             if topBar?.menuOpen == true { return }
+            if tabStripHeld { return }
             let mouse = NSEvent.mouseLocation
             let top = screen.frame.maxY
             let centre = anchorFrame(screen)
@@ -462,6 +517,63 @@ final class NotchController {
     func dismissExplicitly() {
         guard PolyglotPinPolicy.decide(.explicitDismiss, pinContext()) == .close else { return }
         show(.closed)
+    }
+
+    /// Samples from the notch's own pointer. A miss outside the click zone cancels a gesture that was
+    /// waiting. `openOnClick` and `mouseDragged` still decide opening and file drag.
+    private func ingestMouseDown(_ event: NSEvent) {
+        guard takePointer(event, .down) else { return }
+        let point = NSEvent.mouseLocation
+        guard pointerIsOnNotch(point) else {
+            performGesture(notchGestures.reduce(.cancel))
+            return
+        }
+        performGesture(notchGestures.reduce(.down(at: Date(), x: Double(point.x), y: Double(point.y), clickCount: event.clickCount)))
+    }
+
+    private func ingestMouseMove(_ event: NSEvent) {
+        guard takePointer(event, .move) else { return }
+        let point = NSEvent.mouseLocation
+        performGesture(notchGestures.reduce(.move(at: Date(), x: Double(point.x), y: Double(point.y))))
+    }
+
+    private func ingestMouseUp(_ event: NSEvent) {
+        guard takePointer(event, .up) else { return }
+        let point = NSEvent.mouseLocation
+        performGesture(notchGestures.reduce(.up(at: Date(), x: Double(point.x), y: Double(point.y), clickCount: event.clickCount)))
+    }
+
+    private func takePointer(_ event: NSEvent, _ edge: PointerEdge) -> Bool {
+        let stamp = (event.timestamp, edge)
+        if lastPointerEdge?.0 == stamp.0 && lastPointerEdge?.1 == stamp.1 { return false }
+        lastPointerEdge = stamp
+        return true
+    }
+
+    private func pointerIsOnNotch(_ point: CGPoint) -> Bool {
+        guard let screen else { return false }
+        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
+        return point.x >= zone.minX && point.x <= zone.maxX && point.y > zone.minY && point.y <= zone.maxY
+    }
+
+    private func performGesture(_ effects: [NotchGestureAdapter<NotchPointerSample>.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .emit(let sample):
+                onNotchGesture(sample)
+            case .arm(let wake):
+                gestureTick?.cancel()
+                gestureTick = Task { @MainActor [weak self] in
+                    let delay = wake.timeIntervalSinceNow
+                    if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+                    guard let self, !Task.isCancelled else { return }
+                    self.performGesture(self.notchGestures.reduce(.tick(at: Date())))
+                }
+            case .disarm:
+                gestureTick?.cancel()
+                gestureTick = nil
+            }
+        }
     }
 
     /// Click mode: a left click on the click zone opens the panel from the closed notch or a peek, like a

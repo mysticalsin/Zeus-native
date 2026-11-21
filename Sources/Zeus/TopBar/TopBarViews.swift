@@ -1941,14 +1941,15 @@ struct DictateButton: View {
     let topBar: TopBarModel
 
     var body: some View {
+        let copy = DictationPress.label(for: topBar.dictationPhase, holding: DictateHold.shared.holding)
         let listening = topBar.dictationPhase == .listening
-        let busy = topBar.isDictating && !listening
+        let busy = DictationPress.action(for: topBar.dictationPhase) == .cancel
         // Click to latch (click again to stop and type), or hold to talk: a press of at least
         // DictateHold.threshold that started dictation stops it on release.
         HStack(spacing: 5) {
             Image(systemName: listening ? "stop.fill" : (busy ? "ellipsis" : "mic.fill"))
                 .font(.system(size: 11.5, weight: .bold))
-            Text(listening ? (DictateHold.shared.holding ? "Release" : "Stop") : (busy ? "Typing" : "Dictate"))
+            Text(copy.title)
                 .font(Glass.font(12, .semibold))
                 .fixedSize()
         }
@@ -1964,8 +1965,8 @@ struct DictateButton: View {
             .onEnded { _ in DictateHold.shared.release(topBar) })
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { topBar.toggleDictation() }
-        .help(listening ? "Stop and type it" : "Dictate into the app you're in")
-        .accessibilityLabel(listening ? "Stop dictation" : "Start dictation")
+        .help(copy.help)
+        .accessibilityLabel(copy.accessibilityLabel)
     }
 }
 

@@ -8676,6 +8676,66 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "An approval card's timeout task was not stored. Answering was idempotent, so the late timeout did not resume twice, but the sleep held the continuation until the full timeout after the person had answered.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ApprovalWaitTests.swift",
+        "function": "answeringAnApprovalCancelsItsTimeout"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The top-bar Dictate control finished only while listening and began only while idle. During transcribing or rewriting it did nothing, and VoiceOver still said Start dictation while the button read Typing.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationPressTests.swift",
+        "function": "aPressWhileTypingCancelsDictation"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A lone Shift hold armed the crest once. Releasing Shift cleared the key-down time and left the gate revealed, and the top bar never called release, so a second hold could not arm the crest.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShiftPeekPolicyTests.swift",
+        "function": "aSecondShiftHoldFiresAfterRelease"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "TabHoldGate was tested and had no caller. Tab down, modifiers, a repeat, another key and Tab up never reached it, so a lone Tab hold could not reveal the tab strip.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TabHoldPolicyTests.swift",
+        "function": "tabDownModifiersAndReleaseReachTheGate"
+      }
+    },
+    {
+      "id": "REG-995",
+      "failure": "The notch opened on a single click and treated a drag as a file drag. It never emitted pointer down, up, hold, settle, or right-swipe samples, so a later gesture router had nothing to read.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchGestureAdapterTests.swift",
+        "function": "syntheticTimingsEmitDownHoldUpSettleAndRightSwipe"
+      }
     }
-]
+  ]
 }

@@ -27,8 +27,16 @@ final class TopBarServices {
     private var lastWeatherFetch = Date.distantPast
     private var lastBatteryCue: Int?
     private var keyMonitor: Any?
+    private var keyUpMonitor: Any?
     private var systemKeyMonitor: Any?
     private var shiftGate = ShiftPeekGate()
+    /// The single sleep that asks the Shift gate whether the hold has lasted long enough.
+    private var shiftCheck: Task<Void, Never>?
+    private var tabHoldGate = TabHoldGate()
+    /// The single sleep that asks the Tab gate whether the hold has lasted long enough.
+    private var tabCheck: Task<Void, Never>?
+    /// Opens or closes the existing panel, which is where the tab strip is drawn.
+    var onTabStripHold: @MainActor (Bool) -> Void = { _ in }
     private var rainGate = RainAlertGate()
     private var hudMonitor: SystemHUDMonitor?
     private var intakeWatcher: AirDropScreenshotWatcher?
@@ -156,27 +164,41 @@ final class TopBarServices {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.shift(down: shiftAlone)
+                self.performTab(TabHoldPolicy.flagsChanged(&self.tabHoldGate, modifiersHeld: Self.chord(in: flags)))
                 guard on != self.capsOn else { return }
                 self.capsOn = on
                 self.model.show(.capsLock(on))
                 self.model.flash(.capsLock(on))
             }
         }
-        // ⌘ shortcut peeks, and any key cancels a pending Shift peek. Needs Accessibility; silent without it.
+        // Shortcut peeks, the Shift peek and a lone Tab hold. The monitors observe; they do not consume the key.
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let command = flags.contains(.command) && !flags.contains(.control) && !flags.contains(.option)
             let chars = event.charactersIgnoringModifiers ?? ""
             let shift = flags.contains(.shift)
             let code = event.keyCode
+            let repeating = event.isARepeat
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.shiftGate.otherKey()
+                if code == TabHoldPolicy.tabKeyCode {
+                    self.performTab(TabHoldPolicy.tabDown(&self.tabHoldGate, at: Date(), modifiersHeld: Self.chord(in: flags), isRepeat: repeating))
+                } else {
+                    self.performTab(TabHoldPolicy.otherKey(&self.tabHoldGate))
+                }
+                self.performShift(ShiftPeekPolicy.otherKey(&self.shiftGate))
                 if code == 144 || code == 145 { self.brightnessChanged() }
                 guard command, let peek = ShortcutPeek.lookup(chars, shift: shift),
                       SettingsStore.shared.bool("lights.shortcutPeeks") else { return }
                 self.model.show(.shortcut(peek))
                 self.model.flash(.shortcut(peek.motion))
+            }
+        }
+        keyUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            guard event.keyCode == TabHoldPolicy.tabKeyCode else { return }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.performTab(TabHoldPolicy.tabUp(&self.tabHoldGate))
             }
         }
         // Brightness keys arrive as system-defined events (subtype 8, key 2 up / 3 down).
@@ -190,12 +212,61 @@ final class TopBarServices {
     }
 
     private func shift(down: Bool) {
-        shiftGate.shift(down: down, at: Date())
-        guard down else { return }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(520))
-            guard let self, self.shiftGate.fire(at: Date()) else { return }
-            self.model.flash(.shiftCrest)
+        let effects: [ShiftPeekPolicy.Effect]
+        if down {
+            effects = ShiftPeekPolicy.shiftDown(&shiftGate, at: Date())
+        } else {
+            let revealed = shiftGate.release()
+            effects = ShiftPeekPolicy.shiftedUp(revealed: revealed)
+        }
+        performShift(effects)
+    }
+
+    private func performShift(_ effects: [ShiftPeekPolicy.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .scheduleCheck:
+                shiftCheck?.cancel()
+                shiftCheck = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(ShiftPeekPolicy.checkAfter))
+                    guard let self, !Task.isCancelled else { return }
+                    self.performShift(ShiftPeekPolicy.checkDue(&self.shiftGate, at: Date()))
+                }
+            case .cancelPending:
+                shiftCheck?.cancel()
+                shiftCheck = nil
+            case .showCrest:
+                model.flash(.shiftCrest)
+            case .fadeExistingCrest:
+                break
+            }
+        }
+    }
+
+    /// Shift, Command, Option or Control, ignoring Caps Lock. A Tab hold with any of these is not a hold.
+    private static func chord(in flags: NSEvent.ModifierFlags) -> Bool {
+        let rest = flags.subtracting(.capsLock)
+        return rest.contains(.shift) || rest.contains(.command) || rest.contains(.option) || rest.contains(.control)
+    }
+
+    private func performTab(_ effects: [TabHoldPolicy.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .scheduleCheck:
+                tabCheck?.cancel()
+                tabCheck = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(TabHoldPolicy.checkAfter))
+                    guard let self, !Task.isCancelled else { return }
+                    self.performTab(TabHoldPolicy.checkDue(&self.tabHoldGate, at: Date()))
+                }
+            case .cancelPending:
+                tabCheck?.cancel()
+                tabCheck = nil
+            case .revealStrip:
+                onTabStripHold(true)
+            case .fadeStrip:
+                onTabStripHold(false)
+            }
         }
     }
 
