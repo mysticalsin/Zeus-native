@@ -1049,7 +1049,8 @@ final class ScribeController {
             notes = ScribeNotes.merge(generated: generated, into: notes ?? ScribeMeetingNotes())
         } catch {
             // The transcript is already in hand: keep and save it rather than failing and losing it.
-            notesIssue = "The notes couldn't be written (\(error.localizedDescription)), so only the transcript was saved."
+            notesIssue = ShownFailure.meetingNotes
+            NSLog("[ZEUS] scribe notes: %@", error.localizedDescription)
             notes = ScribeMeetingNotes(privateNotes: notes?.privateNotes ?? "")
         }
         completeNotes(id)
@@ -1710,7 +1711,8 @@ final class ScribeController {
             if saveFailures.recordSuccess(id: recap.id.rawValue) { refreshUnsavedMeetings() }
             return true
         } catch {
-            let message = "Couldn't save “\(recap.title)”: \(error.localizedDescription)"
+            let message = ShownFailure.meetingSave
+            NSLog("[ZEUS] scribe save %@: %@", recap.title, error.localizedDescription)
             saveFailures.recordFailure(
                 id: recap.id.rawValue, message: message,
                 payload: ScribeFailedSave(recap: recap, dismissedAt: dismissedAt)

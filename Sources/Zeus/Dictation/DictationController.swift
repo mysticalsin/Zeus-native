@@ -958,8 +958,9 @@ final class DictationController {
             if let stream { text = try await stream.finish() } else { text = try await engine.transcribe(samples: samples, hints: hints, language: language) }
             outcome = .text(text)
         } catch {
-            outcome = .failed(error.localizedDescription)
-            if isCurrent() { SpeechEngineBoard.shared.message = "\(engine.kind.title): \(error.localizedDescription)" }
+            outcome = .failed(ShownFailure.engine(engine.kind.title))
+            NSLog("[ZEUS] dictation engine %@: %@", engine.kind.title, error.localizedDescription)
+            if isCurrent() { SpeechEngineBoard.shared.message = ShownFailure.engine(engine.kind.title) }
         }
         switch DictationFallback.decide(chosen: engine.kind, outcome: outcome, live: live) {
         case .keep(let text):
@@ -1252,7 +1253,8 @@ final class DictationController {
             case .success(let read): samples = read
             case .failure(let error):
                 // Apple reads the file itself below; say why our reader could not.
-                topBar.show(.dictation("Couldn't read the file here: \(error.localizedDescription)"))
+                NSLog("[ZEUS] dictation file: %@", error.localizedDescription)
+                topBar.show(.dictation(ShownFailure.dictationFile))
                 samples = []
             }
             let heard = try? await engine.transcribe(samples: samples, hints: hints, language: settings.language.localeIdentifier)
