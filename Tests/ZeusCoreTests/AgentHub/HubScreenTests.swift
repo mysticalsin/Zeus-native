@@ -121,18 +121,52 @@ struct HubScreenTests {
     }
 
     @Test func newChatRemembersTheHubPhase() {
-        for phase in HubScreen.allCases {
-            let state = HubScreenState(screen: phase, reason: phase == .connectionError ? "The socket closed." : nil)
+        for phase in HubScreen.allCases where phase != .connectionError {
+            let state = HubScreenState(screen: phase)
             let opened = HubScreenMachine.next(state, .newChat, context: HubScreenContext(onChatTab: true))
             #expect(opened.screen == phase)
-            #expect(opened.reason == state.reason)
+            #expect(opened.reason == nil)
             #expect(opened.chatForm)
             let refused = HubScreenMachine.next(state, .newChat, context: HubScreenContext(onChatTab: false))
             #expect(refused == state)
         }
     }
 
-    @Test func aSocketSentenceWithAPathIsNotShown() {
+    @Test func newChatOnAConnectionErrorResetsTheError() {
+        let error = HubScreenState(screen: .connectionError, reason: "The socket closed.")
+        let opened = HubScreenMachine.next(
+            error,
+            .newChat,
+            context: HubScreenContext(sessionCount: 0, onChatTab: true, failureSentence: "The socket closed.")
+        )
+        #expect(opened == HubScreenState(screen: .empty, reason: nil, chatForm: true))
+        let openedCopy = HubScreenMachine.copy(opened)
+        #expect(openedCopy.sentence == "Nothing running")
+        #expect(openedCopy.detail == "Start a chat and it shows up here.")
+        #expect(openedCopy.actionTitle == "New chat")
+
+        let withSessions = HubScreenMachine.next(
+            error,
+            .newChat,
+            context: HubScreenContext(sessionCount: 2, onChatTab: true, failureSentence: "still down")
+        )
+        #expect(withSessions == HubScreenState(screen: .ready, reason: nil, chatForm: true))
+        #expect(HubScreenMachine.copy(withSessions).sentence == nil)
+        #expect(HubScreenMachine.copy(withSessions).actionTitle == nil)
+
+        let refused = HubScreenMachine.next(
+            error,
+            .newChat,
+            context: HubScreenContext(sessionCount: 2, onChatTab: false, failureSentence: "The socket closed.")
+        )
+        #expect(refused == error)
+
+        let alreadyOpen = HubScreenState(screen: .connectionError, reason: "The socket closed.", chatForm: true)
+        let again = HubScreenMachine.next(alreadyOpen, .newChat, context: HubScreenContext(onChatTab: true))
+        #expect(again == HubScreenState(screen: .empty, reason: nil, chatForm: true))
+    }
+
+    @Test func aSocketSentenceWithASlashStaysVisible() {
         let kept = HubScreenMachine.next(
             HubScreenState(screen: .loading),
             .socketFailed,
@@ -142,14 +176,15 @@ struct HubScreenTests {
         #expect(HubScreenMachine.copy(kept).detail == "The socket closed.")
         #expect(HubScreenMachine.copy(kept).sentence == "Agents aren't connected.")
 
-        let dropped = HubScreenMachine.next(
+        let path = HubScreenMachine.next(
             HubScreenState(screen: .loading),
             .socketFailed,
             context: HubScreenContext(sessionCount: 0, failureSentence: "closed /var/run/hub.sock")
         )
-        #expect(dropped.screen == .connectionError)
-        #expect(dropped.reason == nil)
-        #expect(HubScreenMachine.copy(dropped).detail == nil)
+        #expect(path.screen == .connectionError)
+        #expect(path.reason == "closed /var/run/hub.sock")
+        #expect(HubScreenMachine.copy(path).detail == "closed /var/run/hub.sock")
+        #expect(HubScreenMachine.copy(path).sentence == "Agents aren't connected.")
 
         let home = HubScreenMachine.next(
             HubScreenState(screen: .ready),
@@ -157,7 +192,50 @@ struct HubScreenTests {
             context: HubScreenContext(sessionCount: 1, failureSentence: "closed ~/hub.sock")
         )
         #expect(home.screen == .connectionError)
-        #expect(home.reason == nil)
+        #expect(home.reason == "closed ~/hub.sock")
+        #expect(HubScreenMachine.copy(home).detail == "closed ~/hub.sock")
+    }
+
+    @Test func errorSentenceBoundaries() {
+        let blanks: [String?] = [nil, "", " ", "   ", "\n", "\t", " \n\t "]
+        for blank in blanks {
+            let failed = HubScreenMachine.next(
+                HubScreenState(screen: .loading),
+                .socketFailed,
+                context: HubScreenContext(sessionCount: 0, failureSentence: blank)
+            )
+            #expect(failed.screen == .connectionError)
+            #expect(failed.reason == nil)
+            #expect(HubScreenMachine.copy(failed).detail == nil)
+        }
+
+        let long = String(repeating: "a", count: 2048) + " / " + String(repeating: "b", count: 2048)
+        let rows: [(String, String)] = [
+            ("retry 1/3", "retry 1/3"),
+            ("  retry 1/3  ", "retry 1/3"),
+            ("closed /var/run/hub.sock", "closed /var/run/hub.sock"),
+            ("closed ~/hub.sock", "closed ~/hub.sock"),
+            ("closed C:\\hub\\agent.sock", "closed C:\\hub\\agent.sock"),
+            ("see https://hub.example/retry", "see https://hub.example/retry"),
+            ("接続できません", "接続できません"),
+            ("再試行 1/3", "再試行 1/3"),
+            ("パス /tmp/ハブ.sock", "パス /tmp/ハブ.sock"),
+            ("**retry**", "**retry**"),
+            ("`/tmp/hub.sock` closed", "`/tmp/hub.sock` closed"),
+            ("[retry](https://hub.example/retry)", "[retry](https://hub.example/retry)"),
+            ("# socket closed at 1/3", "# socket closed at 1/3"),
+            (long, long),
+        ]
+        for (raw, shown) in rows {
+            let failed = HubScreenMachine.next(
+                HubScreenState(screen: .ready),
+                .socketFailed,
+                context: HubScreenContext(sessionCount: 1, failureSentence: raw)
+            )
+            #expect(failed.reason == shown)
+            #expect(HubScreenMachine.copy(failed).detail == shown)
+            #expect(HubScreenMachine.copy(failed).sentence == "Agents aren't connected.")
+        }
     }
 
     @Test func tryAgainThenTheOpenSocketFollowsTheSessionCount() {
