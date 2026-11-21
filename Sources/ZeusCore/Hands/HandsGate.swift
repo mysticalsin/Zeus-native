@@ -276,8 +276,13 @@ public struct HandsCommandLog: Equatable, Sendable {
 }
 
 public enum HandsCommandLogger {
-    /// Test fault. A throw stands in for a full disk.
-    public static var writeFault: (() throws -> Void)?
+    /// Test fault. A throw stands in for a full disk. The box is shared mutable state on purpose.
+    private final class FaultBox: @unchecked Sendable { var body: (() throws -> Void)? }
+    private static let faultBox = FaultBox()
+    public static var writeFault: (() throws -> Void)? {
+        get { faultBox.body }
+        set { faultBox.body = newValue }
+    }
 
     @discardableResult
     public static func append(command: String, verdict: String, outcome: String, url: URL = ZeusPaths.handsLog) -> String? {
