@@ -12,16 +12,46 @@ fn gcd(a: u64, b: u64) -> u64 {
 }
 
 /// Modified Bessel function of the first kind, order 0 (power series).
+/// Stops when the term overflows f64 instead of spinning on `inf < inf`.
 fn i0(x: f64) -> f64 {
+    if !x.is_finite() {
+        return f64::INFINITY;
+    }
     let (mut sum, mut term, q) = (1.0f64, 1.0f64, x * x / 4.0);
     let mut k = 1.0;
-    loop {
+    for _ in 0..256 {
         term *= q / (k * k);
+        if !term.is_finite() {
+            return f64::INFINITY;
+        }
         sum += term;
-        if term < sum * 1e-17 {
+        if !sum.is_finite() || term < sum * 1e-17 {
             return sum;
         }
         k += 1.0;
+    }
+    sum
+}
+
+fn kaiser(beta: f64, r: f64) -> f64 {
+    let arg = beta * (1.0 - r * r).max(0.0).sqrt();
+    // The power series overflows for a large beta. The ratio of the two
+    // Bessel values is exp(arg - beta) * sqrt(beta / arg) in that regime.
+    if beta.abs() > 40.0 {
+        if arg <= 0.0 {
+            return 0.0;
+        }
+        let log_ratio = (arg - beta) + 0.5 * (beta / arg).ln();
+        return log_ratio.exp();
+    }
+    let denom = i0(beta);
+    let numer = i0(arg);
+    if denom.is_finite() && numer.is_finite() && denom != 0.0 {
+        numer / denom
+    } else if r.abs() < 1e-12 {
+        1.0
+    } else {
+        0.0
     }
 }
 
@@ -45,7 +75,7 @@ pub fn firwin_kaiser(numtaps: usize, cutoff: f64, beta: f64) -> Vec<f64> {
             } else {
                 0.0
             };
-            let w = i0(beta * (1.0 - r * r).max(0.0).sqrt()) / i0(beta);
+            let w = kaiser(beta, r);
             cutoff * sinc(cutoff * m) * w
         })
         .collect();
@@ -65,6 +95,15 @@ pub struct Polyphase {
 
 impl Polyphase {
     pub fn new(up: u64, down: u64) -> Self {
+        if up == 0 || down == 0 {
+            return Polyphase {
+                up: 0,
+                down: 0,
+                half_len: 0,
+                taps_len: 0,
+                phases: Vec::new(),
+            };
+        }
         let g = gcd(up, down);
         let (up, down) = ((up / g) as usize, (down / g) as usize);
         let max_rate = up.max(down);
@@ -89,10 +128,16 @@ impl Polyphase {
     }
 
     pub fn output_len(&self, n_in: usize) -> usize {
+        if self.down == 0 {
+            return 0;
+        }
         (n_in * self.up).div_ceil(self.down)
     }
 
     pub fn process(&self, x: &[f32]) -> Vec<f32> {
+        if self.up == 0 || self.down == 0 {
+            return Vec::new();
+        }
         if self.up == 1 && self.down == 1 {
             return x.to_vec();
         }
@@ -150,6 +195,9 @@ pub fn resample_poly(x: &[f32], up: u64, down: u64) -> Vec<f32> {
 
 /// Any rate -> 24 kHz, as `haru_mlx.audio.decode_audio` does.
 pub fn to_24k(x: &[f32], rate: u32) -> Vec<f32> {
+    if rate == 0 {
+        return Vec::new();
+    }
     if rate == crate::SAMPLE_RATE {
         return x.to_vec();
     }

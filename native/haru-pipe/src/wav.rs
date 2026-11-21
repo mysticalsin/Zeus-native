@@ -26,16 +26,29 @@ pub fn decode(b: &[u8]) -> io::Result<Wav> {
     let (mut pos, mut fmt, mut data) = (12usize, None, None);
     while pos + 8 <= b.len() {
         let id = &b[pos..pos + 4];
-        let size = u32le(b, pos + 4) as usize;
-        let body = pos + 8;
-        let end = (body + size).min(b.len());
+        let size = u32le(b, pos + 4) as u64;
+        let body = (pos as u64).saturating_add(8);
+        if body > b.len() as u64 {
+            return Err(bad("truncated chunk"));
+        }
+        let declared_end = body.saturating_add(size);
+        let end = declared_end.min(b.len() as u64) as usize;
+        let body_usize = body as usize;
         if id == b"fmt " {
-            fmt = Some(&b[body..end]);
+            fmt = Some(&b[body_usize..end]);
         }
         if id == b"data" {
-            data = Some(&b[body..end]);
+            data = Some(&b[body_usize..end]);
         }
-        pos = body + size + (size & 1);
+        let padded = declared_end.saturating_add(size & 1);
+        if padded > usize::MAX as u64 || padded < body {
+            return Err(bad("chunk size overflow"));
+        }
+        let next = padded as usize;
+        if next <= pos {
+            return Err(bad("chunk did not advance"));
+        }
+        pos = next;
     }
     let f = fmt.ok_or_else(|| bad("missing fmt chunk"))?;
     let d = data.ok_or_else(|| bad("missing data chunk"))?;

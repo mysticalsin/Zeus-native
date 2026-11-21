@@ -255,7 +255,11 @@ pub fn find_loop<T: PartialEq>(
 ) -> Option<(usize, usize)> {
     let n = tokens.len();
     let mut best: Option<(usize, usize)> = None;
-    for period in min_period..=max_period {
+    let start = min_period.max(1);
+    if start > max_period {
+        return None;
+    }
+    for period in start..=max_period {
         if n < period.saturating_mul(min_repeats) {
             break;
         }

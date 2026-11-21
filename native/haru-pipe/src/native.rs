@@ -43,6 +43,8 @@ pub fn encode_frame_msg(index: u32, step_ms: f32, pcm48: &[f32], out: &mut Vec<u
 
 /// Server-side ingest of client AUDIO payloads into 24 kHz model frames.
 pub struct Ingest {
+    /// 0..3 bytes of an f32 that arrived at the end of the previous payload.
+    byte_remainder: Vec<u8>,
     leftover: Option<f32>,
     scratch: Vec<f32>,
     half: Vec<f32>,
@@ -58,6 +60,7 @@ impl Default for Ingest {
 impl Ingest {
     pub fn new() -> Self {
         Ingest {
+            byte_remainder: Vec::new(),
             leftover: None,
             scratch: Vec::new(),
             half: Vec::new(),
@@ -66,12 +69,16 @@ impl Ingest {
     }
     /// Feed raw little-endian f32 bytes (any length that is a multiple of 4).
     pub fn feed_bytes(&mut self, payload: &[u8]) {
+        let mut bytes = std::mem::take(&mut self.byte_remainder);
+        bytes.extend_from_slice(payload);
+        let whole = bytes.len() / 4 * 4;
+        self.byte_remainder = bytes[whole..].to_vec();
         self.scratch.clear();
         if let Some(l) = self.leftover.take() {
             self.scratch.push(l);
         }
         self.scratch.extend(
-            payload
+            bytes[..whole]
                 .chunks_exact(4)
                 .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])),
         );
