@@ -6,6 +6,8 @@ import Foundation
 /// through AppleScript. Other terminals (Ghostty, Warp, editors) cannot be typed into this way.
 public enum AgentReply {
     public static let maxLength = 2000
+    /// How many keystroke chunks run before the front process is checked again.
+    public static let frontProcessRecheckChunks = 5
 
     /// One line, no control characters and no newlines. Nil when nothing is left to send.
     public static func sanitize(_ text: String) -> String? {
@@ -42,7 +44,7 @@ public enum AgentReply {
         switch info.targetBundleID {
         case "com.apple.Terminal":
             guard let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
-            let strokes = literalKeystrokes(line)
+            let strokes = literalKeystrokeLines(line)
             guard !strokes.isEmpty else { return nil }
             return """
             tell application "Terminal"
@@ -55,10 +57,7 @@ public enum AgentReply {
                             if frontmost is false then return false
                             if (tty of selected tab of front window) is not "\(tty)" then return false
                             tell application "System Events"
-                                if (name of first application process whose frontmost is true) is not "Terminal" then return false
-                                tell process "Terminal"
-                                    \(strokes)
-                                end tell
+                                \(terminalStrokeBlocks(strokes))
                             end tell
                             return true
                         end if
@@ -107,7 +106,7 @@ public enum AgentReply {
 
     /// Return, after a fresh frontmost and tty check.
     /// `verified` is the process-group read taken immediately before this script. A false read produces no script.
-    public static func submitScript(for info: TerminalInfo, verified: Bool = true) -> String? {
+    public static func submitScript(for info: TerminalInfo, verified: Bool) -> String? {
         guard verified else { return nil }
         guard info.targetBundleID == "com.apple.Terminal", let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
         return """
@@ -132,11 +131,30 @@ public enum AgentReply {
     }
 
     /// Literal keystrokes, each at most 20 UTF-16 units. Controls and newlines are already gone.
-    private static func literalKeystrokes(_ line: String) -> String {
+    private static func literalKeystrokeLines(_ line: String) -> [String] {
         KeystrokeTyping.pieces(line, limit: 20).compactMap { piece -> String? in
             guard case .text(let chunk) = piece, !chunk.isEmpty else { return nil }
             return "keystroke \"\(appleScriptString(chunk))\""
-        }.joined(separator: "\n")
+        }
+    }
+
+    /// The front-process check from AgentReply.swift, repeated before every group of chunks.
+    private static func terminalStrokeBlocks(_ strokes: [String]) -> String {
+        let check = "if (name of first application process whose frontmost is true) is not \"Terminal\" then return false"
+        var blocks: [String] = []
+        var index = 0
+        while index < strokes.count {
+            let end = min(index + frontProcessRecheckChunks, strokes.count)
+            let body = strokes[index..<end].joined(separator: "\n")
+            blocks.append("""
+            \(check)
+            tell process "Terminal"
+                \(body)
+            end tell
+            """)
+            index = end
+        }
+        return blocks.joined(separator: "\n")
     }
 }
 

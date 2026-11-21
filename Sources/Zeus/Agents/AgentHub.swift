@@ -187,6 +187,8 @@ final class AgentHub {
         }
         let allowed = allowedAgentPaths(expected)
         let appName = replyAppName(info)
+        // Nil here is the not-yet-activated read. The front process is checked in the script
+        // at AgentReply.swift:55-58, and again every AgentReply.frontProcessRecheckChunks chunks.
         let before = foregroundSnapshot(info, frontmost: nil)
         guard HubReplyJobGuard.mayType(
             snapshot: before, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }

@@ -21,7 +21,7 @@ struct HubReplyKeystrokeGuardTests {
         #expect(rows.contains("keystroke \"\(line)\""))
         #expect(!rows.contains("keystroke return"))
         #expect(HubReplyScriptGuard.mayRun(script: script, line: line, approved: true))
-        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let submit = try #require(AgentReply.submitScript(for: terminal, verified: true))
         #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: true))
         #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: false) == false)
         let glued = script + "\nkeystroke return\n"
@@ -52,7 +52,7 @@ struct HubReplyKeystrokeGuardTests {
     @Test func onlyTheStrippedLineAndReturnAreTyped() throws {
         let line = "hi $(id)"
         let script = try #require(AgentReply.script(for: terminal, text: line))
-        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let submit = try #require(AgentReply.submitScript(for: terminal, verified: true))
         let extra = script + "\nkeystroke \"rm\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: extra, line: line, approved: true) == false)
         let extraReturn = submit + "\nkeystroke \"rm\"\n"
@@ -142,7 +142,7 @@ struct HubReplyKeystrokeGuardTests {
         #expect(!script.contains("last item"))
         #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
         #expect(!before.contains("keystroke"))
-        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let submit = try #require(AgentReply.submitScript(for: terminal, verified: true))
         let returnKey = try #require(submit.range(of: "keystroke return"))
         let again = String(submit[..<returnKey.lowerBound])
         #expect(again.contains("frontmost"))
@@ -179,6 +179,25 @@ struct HubReplyKeystrokeGuardTests {
         #expect(HubReplyScriptGuard.mayRun(script: written, line: "go", approved: true))
         #expect(!written.contains("try"))
         #expect(!written.contains("last item"))
+    }
+
+    /// AgentReply.swift:55-58 checks the front process before the first keystroke.
+    /// A long line must repeat that check. One check for the whole line is not enough.
+    @Test func theFrontProcessIsRecheckedThroughTheChunks() throws {
+        let check = "name of first application process whose frontmost is true) is not \"Terminal\" then return false"
+        let short = try #require(AgentReply.script(for: terminal, text: "hi"))
+        let first = try #require(short.range(of: "keystroke"))
+        let before = String(short[..<first.lowerBound])
+        #expect(before.contains("if frontmost is false then return false"))
+        #expect(before.contains("tty of selected tab of front window"))
+        #expect(before.contains(check))
+        let line = String(repeating: "a", count: 220)
+        let long = try #require(AgentReply.script(for: terminal, text: line))
+        #expect(HubReplyScriptGuard.mayRun(script: long, line: line, approved: true))
+        let checks = long.components(separatedBy: check).count - 1
+        #expect(checks >= 3)
+        let firstKey = try #require(long.range(of: "keystroke"))
+        #expect(long[firstKey.upperBound...].contains(check))
     }
 }
 
