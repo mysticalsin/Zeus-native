@@ -5657,6 +5657,25 @@
           ]
         },
         {
+          "id": "F11.speech-mark-schedule",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Marks for a spoken sentence become due at the audio start the caller reports. Sentence 0 at audio time zero does not release sentence 1. A late cue is applied once. Cancel returns nothing further. Does not prove a live speaker clock.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "sentenceZeroStartsAtAudioZeroSoItsMarksAreDueAndSentenceOnesAreNot"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "aLateCueIsAppliedOnceAndNotReplayed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "cancelReturnsNoFurtherMarks"
+            }
+          ]
+        },
+        {
           "id": "F11.talk-draw-leak",
           "check": "native-ZeusCoreTests",
           "acceptance": "A DRAW tag is never spoken: after spoken words, at the end, with no closing bracket, with unbalanced braces, with brackets inside its strings, or unterminated; the speech around it is kept and an unterminated tag is dropped at a size bound or at the stream end. Does not prove what a model writes.",

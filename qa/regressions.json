@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "Marks for a spoken sentence could appear on a guessed word rate, a late audio cue could be applied again, or cancel could still release marks.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+        "function": "aLateCueIsAppliedOnceAndNotReplayed"
+      }
     }
-]
+  ]
 }
