@@ -404,6 +404,13 @@
       "scope": "Actual receipt/replacement flow with injected native read/write ports; no real focused field or OS event proof."
     },
     {
+      "id": "portable-local-voice",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "local-voice",
+      "scope": "Duplex frame contract, the explicit session state table, and the two local voice switches, with canned frames only. No model, download, microphone, or app wiring."
+    },
+    {
       "id": "portable-wiki-export",
       "kind": "portable",
       "tier": "contract",
@@ -6546,6 +6553,81 @@
             {
               "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift",
               "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
+            }
+          ]
+        },
+        {
+          "id": "F11.local-voice-contract",
+          "check": "portable-local-voice",
+          "acceptance": "A duplex turn starts with one 3200-sample frame at 24 kHz before the user speaks. The session moves only through VoiceSessionState.next(on:). A bad frame size is its own error and does not move the session. Both local voice switches default to off, and a saved engine stays that engine. Canned frames only. No model, download, or device.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "startReturnsFrameZeroOf3200Samples"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "everyStateAndEventHasOneOutcome"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aWrongSizeFrameThrows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aPushBeforeStartThrows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aPushAfterCloseThrows"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "flagsDefaultToOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "theTransitionSwitchHasNoDefault"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "closeDuringStartEndsClosedAndNeverStreams"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "closeFromIdleRefusesALaterStart"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aSecondCloseStaysClosed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "anEmptyFrameListIsNotAFrameSizeError"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "flagsOffDoNotUseTheNetworkOrAProcess"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "theEngineRouterIsUnchangedWhenLocalFlagsAreOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "frameSizeBoundariesFollowThe3200SampleRule"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aSavedEngineStaysThatEngineForEveryStoredChoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "aTimeoutIsAnInfrastructureErrorAfterOneRetry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/LocalVoiceBackendContractTests.swift",
+              "function": "thisSuiteAddsNoSkipOrXfail"
             }
           ]
         }
