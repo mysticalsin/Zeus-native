@@ -138,6 +138,21 @@ struct CompanionTurnMachineTests {
         #expect(machine.phase != .speaking)
     }
 
+    @Test func bargeInFromSpeakingStartsTheMicrophone() {
+        var machine = arrive(.speaking)
+        let response = machine.send(.bargeIn)
+        #expect(machine.phase == .listening)
+        guard case .accepted(let outcome) = response else {
+            Issue.record("barge-in from speaking was rejected")
+            return
+        }
+        #expect(outcome.commands.contains(.startMic))
+        #expect(outcome.commands.contains(.startCapture))
+        let speech = outcome.commands.firstIndex(of: .stopSpeech)
+        let mic = outcome.commands.firstIndex(of: .startMic)
+        #expect(speech != nil && mic != nil && speech! < mic!)
+    }
+
     @Test func bargeInFromSpeakingStopsSpeechFlightAndCaptureInOneStep() {
         for phase in [CompanionTurnPhase.thinking, .speaking, .transcribing, .listening, .error("That failed. Nothing was changed.")] {
             var machine = arrive(phase)
