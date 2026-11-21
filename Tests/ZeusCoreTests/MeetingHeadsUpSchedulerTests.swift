@@ -77,6 +77,57 @@ import Testing
         #expect(plan.createdEvents.isEmpty)
     }
 
+    @Test func scribeLeadWindowIsNotPlannedTwice() {
+        let soon = occasion(.meeting, id: "standup", minutesFromStart: 1)
+        let later = occasion(.meeting, id: "review", minutesFromStart: 15)
+        let reminder = occasion(.reminder, id: "pay-rent", minutesFromStart: 1)
+        let slots = [
+            ScribeCalendarSlot(id: "standup", title: "standup", start: soon.start),
+            ScribeCalendarSlot(id: "review", title: "review", start: later.start),
+        ]
+        let watched = MeetingHeadsUpScheduler.scribeWatchedIDs(slots: slots, now: start)
+        #expect(watched == ["standup"])
+        #expect(ScribeMeetingStartPolicy.leadWindow == 120)
+        let plan = MeetingHeadsUpScheduler.plan(
+            settings: settings(enabled: true, lead: 15),
+            occasions: [soon, later, reminder],
+            now: start,
+            scribeWatchedIDs: watched
+        )
+        #expect(plan.cues.map(\.occasionID) == ["review", "pay-rent"])
+        #expect(plan.createdEvents.isEmpty)
+        #expect(!plan.cues.contains { $0.occasionID == "standup" })
+    }
+
+    @Test func thePeekCallsPlanAndNotificationsBindsTheCard() throws {
+        let notch = try repoSource("Sources/Zeus/Notch/NotchController.swift")
+        let page = try repoSource("Sources/Zeus/Settings/GlanceSettingsPages.swift")
+        let hub = try repoSource("Sources/Zeus/Settings/GSAgentHubCards.swift")
+        let scheduler = try schedulerSource()
+        #expect(notch.contains("MeetingHeadsUpScheduler.plan("))
+        #expect(page.contains("MeetingHeadsUpCard()"))
+        #expect(!hub.contains("MeetingHeadsUpCard()"))
+        #expect(!scheduler.contains("EventKit"))
+        #expect(!scheduler.contains("saveEvent"))
+        #expect(!notch.contains("startScribe"))
+    }
+
+    private func repoSource(_ relative: String) throws -> String {
+        if let root = ProcessInfo.processInfo.environment["ZEUS_REPO"], !root.isEmpty {
+            return try String(contentsOf: URL(fileURLWithPath: root).appendingPathComponent(relative), encoding: .utf8)
+        }
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<8 {
+            url.deleteLastPathComponent()
+            let candidate = url.appendingPathComponent(relative)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return try String(contentsOf: candidate, encoding: .utf8)
+            }
+        }
+        Issue.record("Missing \(relative)")
+        return ""
+    }
+
     @Test func schedulerSourceDoesNotCreateCalendarEvents() throws {
         let source = try schedulerSource()
         #expect(!source.contains("EventKit"))
