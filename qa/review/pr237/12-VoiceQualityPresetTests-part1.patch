@@ -1,0 +1,119 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+@@ -0,0 +1,114 @@
++import Foundation
++#if canImport(FoundationNetworking)
++import FoundationNetworking
++#endif
++import Testing
++@testable import ZeusCore
++
++/// Quality presets for ElevenLabs and Google Cloud TTS. No network: URLProtocol stubs only.
++/// The sentinel key is a fake. A passing run must not print it.
++@Suite("Voice quality presets", .serialized)
++struct VoiceQualityPresetTests {
++    private static let sentinel = "ZEUS_SENTINEL_KEY_7f3a9c"
++    private let elevenKey = "el-shape-key-not-secret-4f91"
++    private let googleKey = "goog-shape-key-not-secret-4f91"
++
++    @Test func elevenLabsFastRequestMatchesTheStreamEndpoint() throws {
++        let request = try elevenRequest(.elevenLabsFast)
++        #expect(request.method == "POST")
++        #expect(request.url.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream?output_format=pcm_24000")
++        #expect(request.header("xi-api-key") == elevenKey)
++        #expect(request.header("Content-Type") == "application/json")
++        #expect(request.header("Accept") == "audio/pcm")
++        #expect(!request.url.absoluteString.contains(elevenKey))
++        let body = try jsonObject(request.body)
++        #expect(body["text"] as? String == "Hold on, please")
++        #expect(body["model_id"] as? String == "eleven_flash_v2_5")
++        let settings = try #require(body["voice_settings"] as? [String: Any])
++        #expect(close(settings["stability"], 0.45))
++        #expect(close(settings["style"], 0))
++        #expect(body["ssml"] == nil)
++        #expect(!jsonText(request.body).contains("<speak"))
++        #expect(!jsonText(request.body).contains("<break"))
++    }
++
++    @Test func elevenLabsStudioRequestUsesTheMultilingualModel() throws {
++        let request = try elevenRequest(.elevenLabsStudio)
++        #expect(request.url.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb/stream?output_format=pcm_24000")
++        let body = try jsonObject(request.body)
++        #expect(body["model_id"] as? String == "eleven_multilingual_v2")
++        let settings = try #require(body["voice_settings"] as? [String: Any])
++        #expect(close(settings["stability"], 0.6))
++        #expect(close(settings["style"], 0.3))
++        #expect(body["text"] as? String == "Hold on, please")
++    }
++
++    @Test func googleNeural2RequestSetsRatePitchAnd24kLinear16() throws {
++        let request = try googleRequest(.googleNeural2)
++        expectGoogleShape(request, voice: "en-US-Neural2-D", rate: 0.92, pitch: 0, sendsRate: true)
++    }
++
++    @Test func googleWavenetRequestUsesTheOfficialLetterVoice() throws {
++        let request = try googleRequest(.googleWavenet)
++        expectGoogleShape(request, voice: "en-US-Wavenet-D", rate: 1, pitch: 0, sendsRate: true)
++    }
++
++    @Test func googleChirpHDRequestOmitsUnsupportedRateAndPitch() throws {
++        let preset = VoiceQualityPreset.googleChirpHD
++        #expect(preset.google?.speakingRate == 1)
++        #expect(preset.google?.pitch == 0)
++        #expect(preset.google?.sendsRateAndPitch == false)
++        let request = try googleRequest(.googleChirpHD)
++        expectGoogleShape(request, voice: "en-US-Chirp3-HD-Achernar", rate: nil, pitch: nil, sendsRate: false)
++    }
++
++    @Test func markupStaysPlainText() throws {
++        #expect(VoiceQualityMarkup.spoken("Hold on... please") == "Hold on, please")
++        #expect(VoiceQualityMarkup.spoken("a < b & c") == "a < b & c")
++        let request = try VoiceQualityRequestBuilder.make(
++            text: "a < b & c",
++            preset: .googleNeural2,
++            voiceID: "en-US-Neural2-D",
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey])
++        )
++        let body = try jsonObject(request.body)
++        let input = try #require(body["input"] as? [String: Any])
++        #expect(input["text"] as? String == "a < b & c")
++        #expect(input["ssml"] == nil)
++        #expect(!jsonText(request.body).contains("<speak"))
++    }
++
++    @Test func descriptionsOmitTheKey() throws {
++        let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        let request = try VoiceQualityRequestBuilder.make(
++            text: "Hello",
++            preset: .elevenLabsFast,
++            voiceID: "EXAVITQu4vr4xnSDxMaL",
++            credential: credential
++        )
++        let call = VoiceQualityCall(request: request)
++        #expect(call.description.contains("api.elevenlabs.io"))
++        #expect(!call.description.contains(elevenKey))
++        #expect(!call.debugDescription.contains(elevenKey))
++        #expect(!String(reflecting: call).contains(elevenKey))
++        let refused = VoiceQualityError.voiceRefused
++        #expect(!String(describing: refused).contains(elevenKey))
++        #expect(!String(reflecting: refused).contains(elevenKey))
++        #expect(!ProviderFailure.unauthorized.logName.contains(elevenKey))
++        #expect(!ProviderFailure.unauthorized.pill.contains(elevenKey))
++    }
++
++    @Test func grepFindsNoSentinelInTheLogOrErrorText() async throws {
++        let sentinel = Self.sentinel
++        let body = Data("{\"detail\":\"\(sentinel)\"}".utf8)
++        QualityURLStub.reset(reply: .init(status: 401, body: body))
++        let lines = QualityLog()
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        let speaker = VoiceQualitySpeaker(
++            meter: meter,
++            transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2),
++            log: ProviderLog { lines.add($0) }
++        )
++        let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: sentinel])
++        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: "EXAVITQu4vr4xnSDxMaL", credential: credential)

@@ -1,0 +1,109 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+@@ -0,0 +225,104 @@
++        #expect(throws: VoiceQualityError.meterCorrupt) {
++            try garbage.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
++        }
++        #expect(try Data(contentsOf: file) == Data("not-json".utf8))
++
++        try Data("{\"elevenlabs\":-1}".utf8).write(to: file)
++        #expect(throws: VoiceQualityError.meterCorrupt) {
++            try garbage.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
++        }
++        try Data("{\"elevenlabs\":\"12\"}".utf8).write(to: file)
++        #expect(throws: VoiceQualityError.meterCorrupt) {
++            try garbage.count(providerID: ElevenLabsTTSAdapter.id)
++        }
++
++        QualityURLStub.reset(reply: .init(status: 200, chunks: [Data([0x49, 0x44, 0x33, 0x04])]))
++        let speaker = VoiceQualitySpeaker(
++            meter: garbage,
++            transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
++        )
++        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey]))
++        let error = await firstError(synthesis)
++        #expect(error as? VoiceQualityError == .meterCorrupt)
++        #expect(QualityURLStub.requests.isEmpty)
++    }
++
++    @Test func optInDefaultsToTheSyntheticVoice() async throws {
++        let defaults = freshDefaults("voice-quality-opt-in-empty")
++        #expect(VoiceQualityOptIn.selection(defaults: defaults) == .synthetic)
++        #expect(VoiceQualityOptIn.activeVoiceID(defaults: defaults) == "zeus.synthetic")
++        #expect(VoiceQualityOptIn.activeVoiceID(defaults: defaults) == VoiceSpeakAllowlist.syntheticID)
++        defaults.set(VoiceQualityPreset.elevenLabsStudio.rawValue, forKey: VoiceQualityOptIn.presetKey)
++        #expect(VoiceQualityOptIn.selection(defaults: defaults) == .synthetic)
++        defaults.set(VoiceTTSProvider.kokoro.rawValue, forKey: VoiceProviderPreferences.selectionKey)
++        #expect(VoiceQualityOptIn.selection(defaults: defaults) == .synthetic)
++        defaults.set(VoiceTTSProvider.elevenLabs.rawValue, forKey: VoiceProviderPreferences.selectionKey)
++        defaults.set(VoiceQualityPreset.googleNeural2.rawValue, forKey: VoiceQualityOptIn.presetKey)
++        #expect(VoiceQualityOptIn.selection(defaults: defaults) == .synthetic)
++        defaults.set(VoiceQualityPreset.elevenLabsStudio.rawValue, forKey: VoiceQualityOptIn.presetKey)
++        #expect(VoiceQualityOptIn.selection(defaults: defaults) == .preset(.elevenLabsStudio))
++
++        QualityURLStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
++        let off = freshDefaults("voice-quality-opt-in-off")
++        let speaker = VoiceQualitySpeaker(
++            meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
++            transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
++        )
++        let synthesis = speaker.synthesizeIfEnabled(
++            text: "Hello",
++            defaults: off,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        )
++        let error = await firstError(synthesis)
++        #expect(error as? VoiceQualityError == .providerOff)
++        #expect(QualityURLStub.requests.isEmpty)
++    }
++
++    @Test func cancellationStopsTheInFlightTask() async throws {
++        HangURLStub.reset()
++        let speaker = VoiceQualitySpeaker(
++            meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
++            transport: URLSessionProviderTransport(protocolClasses: [HangURLStub.self], timeout: 2)
++        )
++        let synthesis = routed(speaker, text: "Hello", preset: .googleNeural2, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey]))
++        let finished = Task { () -> String in
++            do {
++                for try await _ in synthesis.chunks {}
++                return "ended"
++            } catch {
++                return VoiceQualityError.publicName(error)
++            }
++        }
++        #expect(HangURLStub.waitUntilStarted(timeout: 3))
++        synthesis.cancel()
++        let name = await finished.value
++        #expect(name == ProviderFailure.cancelled.logName)
++        #expect(HangURLStub.waitUntilStopped(timeout: 2))
++    }
++
++    @Test func http401429And5xxUseTheExistingFallbackOrder() async throws {
++        let cases: [(Int, ProviderFailure, Bool)] = [
++            (401, .unauthorized, false),
++            (429, .rateLimited, false),
++            (503, .server(503), true),
++        ]
++        for (status, failure, staysReady) in cases {
++            let plan = VoiceQualityFallback.plan(for: failure)
++            #expect(plan.engines == SyntheticFallbackOrder.engines)
++            #expect(plan.engines == ["kokoro", "system"])
++            #expect(plan.leavesProviderReady == staysReady)
++
++            QualityURLStub.reset(reply: .init(status: status, body: Data("{\"error\":\"no\"}".utf8)))
++            let speaker = VoiceQualitySpeaker(
++                meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
++                transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
++            )
++            let synthesis = routed(speaker, text: "Hello", preset: .googleNeural2, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey]))
++            let error = await firstError(synthesis)
++            #expect(error as? ProviderFailure == failure)
++
++            let defaults = freshDefaults("voice-quality-fallback-\(status)")
++            let session = VoiceProviderSession(
++                store: MemoryCredentialStore(),
++                transport: URLSessionProviderTransport(timeout: 2),
++                local: ScriptedLocal(),

@@ -1,0 +1,81 @@
+diff --git a/Sources/ZeusCore/Providers/ProviderTypes.swift b/Sources/ZeusCore/Providers/ProviderTypes.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/ProviderTypes.swift
+@@ -0,0 +159,76 @@
++    public static let maxLength = 256
++
++    public static func accepts(_ key: String) -> Bool {
++        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard trimmed.count >= 8, trimmed.count <= maxLength else { return false }
++        return trimmed.unicodeScalars.allSatisfy { scalar in
++            scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
++        }
++    }
++}
++
++/// WAV, an ID3 tag, or an MP3 frame. Anything else is not audio and must not be played.
++public enum VoiceAudioValidity {
++    public static func isPlayable(_ data: Data) -> Bool {
++        if data.starts(with: Data("RIFF".utf8)) { return data.count > 44 }
++        if data.starts(with: Data("ID3".utf8)) { return data.count > 10 }
++        if data.count > 1, data[data.startIndex] == 0xFF {
++            let second = data[data.index(after: data.startIndex)]
++            return (second & 0xE0) == 0xE0
++        }
++        return false
++    }
++}
++
++public enum VoiceProviderChoice: Equatable, Sendable, Hashable {
++    public static let localID = "local"
++    case local
++    case provider(String)
++
++    public var id: String {
++        switch self {
++        case .local: Self.localID
++        case .provider(let id): id
++        }
++    }
++}
++
++/// Where a provider key lives. One Keychain service per provider, one account for the key.
++/// The macOS store maps `itemClass` and `accessible` to `kSecClassGenericPassword` and
++/// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
++public enum ProviderCredentialLocation {
++    public static let account = "api-key"
++    public static let itemClass = "generic-password"
++    public static let accessible = "when-unlocked-this-device-only"
++
++    public static func service(for providerID: String) -> String {
++        let clean = providerID.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_" }
++        return "app.zeus.voice-provider.\(clean)"
++    }
++}
++
++public enum VoiceProviderCopy {
++    public static let onboarding = "Zeus speaks with the local voice on this Mac. Spoken words are sent to a provider only after you add it, validate it, and select it."
++    public static let helper = "Spoken text leaves this Mac only while that provider is selected and ready. If it is not ready, Zeus speaks with the local voice for that turn."
++    public static let maskingNote = "The key stays in the Keychain on this Mac. It is hidden here, and it is not written into logs or settings."
++    public static let sample = "This is Zeus."
++}
++
++/// Voice-leg and first-audio ceilings. `voiceLegMs` is the existing Settings test-button budget
++/// (`VoiceLatencyTargets.voiceLegMs` in VoiceLatencyTrace.swift). `firstAudioP50Ms` is the on-device
++/// first-audio p50 in the companion parity budgets. `directStreamP95Ms` is that spec's direct-stream p95.
++/// This path does not change the existing 20 s and 45 s request ceilings.
++public enum ProviderLatencyVerdict {
++    public static let voiceLegMs = 600
++    public static let firstAudioP50Ms = 700
++    public static let directStreamP95Ms = 1_400
++
++    public static func meetsVoiceLeg(_ milliseconds: Int) -> Bool { milliseconds <= voiceLegMs }
++    public static func meetsFirstAudioP50(_ milliseconds: Int) -> Bool { milliseconds <= firstAudioP50Ms }
++    public static func meetsDirectStreamP95(_ milliseconds: Int) -> Bool { milliseconds <= directStreamP95Ms }
++}
++
++public enum ProviderHTTPBudget {
++    /// Provider calls only. The 20 s and 45 s ceilings elsewhere stay as they are.
++    public static let requestTimeout: TimeInterval = 8
++}

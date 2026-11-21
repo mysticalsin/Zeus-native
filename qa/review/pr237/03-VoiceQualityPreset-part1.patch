@@ -1,0 +1,134 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +1,129 @@
++import Foundation
++#if canImport(FoundationNetworking)
++import FoundationNetworking
++#endif
++
++/// Typed failures for the quality-preset path. Descriptions name the failure only.
++/// A key, a response body, and a URL are never part of the text.
++public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
++    case voiceRefused
++    case providerOff
++    case meterExceeded
++    case meterCorrupt
++    case missingCredential
++    case keyRejected
++    case requestTooLarge
++    case endpointRefused
++
++    public var description: String {
++        switch self {
++        case .voiceRefused: "voice refused"
++        case .providerOff: "provider is off"
++        case .meterExceeded: "character meter exceeded"
++        case .meterCorrupt: "character meter unreadable"
++        case .missingCredential: "missing credential"
++        case .keyRejected: VoiceQualityKeyGate.rejectedMessage
++        case .requestTooLarge: "The request is too long."
++        case .endpointRefused: "The voice endpoint is not allowed."
++        }
++    }
++
++    public var debugDescription: String { description }
++
++    public static func publicError(_ error: Error) -> Error {
++        if error is CancellationError { return ProviderFailure.cancelled }
++        if error is VoiceQualityError { return error }
++        if error is ProviderFailure { return error }
++        return ProviderFailure.wrap(error)
++    }
++
++    public static func publicName(_ error: Error) -> String {
++        let surfaced = publicError(error)
++        if let failure = surfaced as? ProviderFailure { return failure.logName }
++        if let quality = surfaced as? VoiceQualityError { return quality.description }
++        return "invalid-response"
++    }
++}
++
++/// A key is trimmed, then refused when a control character remains or it is longer than 256 characters.
++/// The message is fixed. A longer key is never stored, logged, or placed in a header, so redaction stays bounded.
++/// Newline, carriage return, tab, and NUL cannot reach a header or the meter.
++public enum VoiceQualityKeyGate {
++    public static let rejectedMessage = "The key is not valid."
++    public static let maxLength = 256
++
++    public static func accepted(_ raw: String) -> String? {
++        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard VoiceProviderKeyPolicy.accepts(trimmed) else { return nil }
++        return trimmed
++    }
++}
++
++/// One speak request stays at or under 5,000 characters. The 50,000 figure is the cumulative meter.
++public enum VoiceQualityRequestSize {
++    public static let limit = 5_000
++
++    public static func allows(_ characters: Int) -> Bool {
++        characters >= 0 && characters <= limit
++    }
++}
++
++/// Quality requests may only use the two provider hosts, over HTTPS, with no userinfo.
++public enum VoiceQualityEndpoint {
++    public static func allows(_ url: URL) -> Bool {
++        guard url.scheme?.lowercased() == "https", url.user == nil, url.password == nil else { return false }
++        switch url.host?.lowercased() {
++        case "api.elevenlabs.io", "texttospeech.googleapis.com": return true
++        default: return false
++        }
++    }
++}
++
++/// A redirect would replay `xi-api-key` or `X-Goog-Api-Key`. The task delegate returns nil.
++public enum VoiceQualityRedirect {
++    public static func forwarded(_ proposed: URLRequest, from original: URL?) -> URLRequest? {
++        _ = proposed
++        _ = original
++        return nil
++    }
++}
++
++final class VoiceQualityRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
++    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
++        completionHandler(VoiceQualityRedirect.forwarded(request, from: task.originalRequest?.url ?? response.url))
++    }
++}
++
++/// The session the quality speaker uses when the caller does not inject a test transport.
++/// Redirects are refused by `VoiceQualityRedirectDelegate`.
++final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked Sendable {
++    let delegate = VoiceQualityRedirectDelegate()
++    let timeout: TimeInterval
++    let log: ProviderLog
++
++    init(timeout: TimeInterval = ProviderHTTPBudget.requestTimeout, log: ProviderLog = ProviderLog()) {
++        self.timeout = timeout
++        self.log = log
++    }
++
++    func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse {
++        let urlRequest = try request.urlRequest(timeout: timeout)
++        let session = URLSession(configuration: configuration(), delegate: delegate, delegateQueue: nil)
++        defer { session.finishTasksAndInvalidate() }
++        let (data, response) = try await session.data(for: urlRequest)
++        guard let http = response as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
++        log.record("voice-quality \(request.method) \(request.url.host ?? "-") status=\(http.statusCode)")
++        return ProviderHTTPResponse(status: http.statusCode, body: data)
++    }
++
++    func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error> {
++        let interval = self.timeout
++        let response = Result { try request.urlRequest(timeout: interval) }
++        let delegate = self.delegate
++        return AsyncThrowingStream { continuation in
++            let task = Task {
++                do {
++                    let urlRequest = try response.get()
++                    let session = URLSession(configuration: self.configuration(), delegate: delegate, delegateQueue: nil)
++                    defer { session.finishTasksAndInvalidate() }
++                    let (data, httpResponse) = try await session.data(for: urlRequest)

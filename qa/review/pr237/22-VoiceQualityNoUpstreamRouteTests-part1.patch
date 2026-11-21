@@ -1,0 +1,16 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityNoUpstreamRouteTests.swift b/Tests/ZeusCoreTests/VoiceQualityNoUpstreamRouteTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityNoUpstreamRouteTests.swift
+@@ -0,0 +1,11 @@
++import Testing
++@testable import ZeusCore
++
++@Suite struct VoiceQualityNoUpstreamRouteTests {
++    @Test func automaticStaysSyntheticWithoutTheParkedRoute() {
++        let keys = VoiceQualitySpeakKeys(elevenLabs: true, openAI: true, gemini: true, googleCloud: true, kokoroReady: true)
++        #expect(VoiceQualityRoute.selection(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == .synthetic)
++        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == "zeus.synthetic")
++        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == VoiceSpeakAllowlist.syntheticID)
++    }
++}

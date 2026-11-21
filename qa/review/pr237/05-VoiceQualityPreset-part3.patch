@@ -1,0 +1,136 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +268,131 @@
++    /// Chirp 3 HD rejects speaking rate and pitch. The preset still records the chosen values.
++    /// The request omits those two fields when this is false.
++    public var sendsRateAndPitch: Bool
++
++    public init(voiceID: String, speakingRate: Double, pitch: Double, audioEncoding: String, sampleRateHertz: Int, sendsRateAndPitch: Bool) {
++        self.voiceID = voiceID
++        self.speakingRate = speakingRate
++        self.pitch = pitch
++        self.audioEncoding = audioEncoding
++        self.sampleRateHertz = sampleRateHertz
++        self.sendsRateAndPitch = sendsRateAndPitch
++    }
++}
++
++/// Opt-in quality presets. They are off until the user picks both the provider and a preset.
++/// The speak-path default stays `zeus.synthetic`.
++public enum VoiceQualityPreset: String, Sendable, CaseIterable, Equatable {
++    case elevenLabsFast
++    case elevenLabsStudio
++    case googleNeural2
++    case googleWavenet
++    case googleChirpHD
++
++    public var providerID: String {
++        switch self {
++        case .elevenLabsFast, .elevenLabsStudio: ElevenLabsTTSAdapter.id
++        case .googleNeural2, .googleWavenet, .googleChirpHD: GoogleCloudTTSAdapter.id
++        }
++    }
++
++    public var defaultVoiceID: String {
++        switch self {
++        case .elevenLabsFast: "EXAVITQu4vr4xnSDxMaL"
++        case .elevenLabsStudio: "JBFqnCBsd6RMkjVDRZzb"
++        case .googleNeural2: "en-US-Neural2-D"
++        case .googleWavenet: "en-US-Wavenet-D"
++        case .googleChirpHD: "en-US-Chirp3-HD-Achernar"
++        }
++    }
++
++    /// Fast uses `eleven_flash_v2_5`. Stability 0.45 and style 0 match the existing plain delivery:
++    /// a steady read, with pauses carried by punctuation rather than extra style.
++    /// Studio uses `eleven_multilingual_v2`. Stability 0.6 and style 0.3 are take C
++    /// (`UltronCloudVoice.elevenLabsSettings`): fewer breaths, still no SSML.
++    public var elevenLabs: ElevenLabsQualityDelivery? {
++        switch self {
++        case .elevenLabsFast:
++            return ElevenLabsQualityDelivery(modelID: "eleven_flash_v2_5", stability: 0.45, style: 0)
++        case .elevenLabsStudio:
++            let settings = UltronCloudVoice.elevenLabsSettings
++            return ElevenLabsQualityDelivery(
++                modelID: "eleven_multilingual_v2",
++                stability: settings["stability"] ?? 0.6,
++                style: settings["style"] ?? 0.3
++            )
++        case .googleNeural2, .googleWavenet, .googleChirpHD:
++            return nil
++        }
++    }
++
++    /// Neural2 uses speaking rate 0.92, the measured pace already used for the Mac voice, and pitch 0.
++    /// WaveNet and Chirp HD stay at rate 1 and pitch 0 so the stock voice is not shifted.
++    /// Every Google preset asks for LINEAR16 at 24 kHz. Chirp HD does not send rate or pitch:
++    /// Google rejects those fields on Chirp 3 HD.
++    public var google: GoogleQualityDelivery? {
++        switch self {
++        case .googleNeural2:
++            return GoogleQualityDelivery(voiceID: defaultVoiceID, speakingRate: 0.92, pitch: 0, audioEncoding: "LINEAR16", sampleRateHertz: 24_000, sendsRateAndPitch: true)
++        case .googleWavenet:
++            return GoogleQualityDelivery(voiceID: defaultVoiceID, speakingRate: 1, pitch: 0, audioEncoding: "LINEAR16", sampleRateHertz: 24_000, sendsRateAndPitch: true)
++        case .googleChirpHD:
++            return GoogleQualityDelivery(voiceID: defaultVoiceID, speakingRate: 1, pitch: 0, audioEncoding: "LINEAR16", sampleRateHertz: 24_000, sendsRateAndPitch: false)
++        case .elevenLabsFast, .elevenLabsStudio:
++            return nil
++        }
++    }
++
++}
++
++/// The provider the user picked. Automatic never selects a cloud preset.
++public enum VoiceQualitySpeakChoice: String, Sendable, Equatable {
++    case automatic
++    case elevenLabs
++    case googleCloud
++}
++
++/// Which cloud keys exist. A key alone does not select a provider.
++public struct VoiceQualitySpeakKeys: Equatable, Sendable {
++    public var elevenLabs: Bool
++    public var openAI: Bool
++    public var gemini: Bool
++    public var googleCloud: Bool
++    public var kokoroReady: Bool
++
++    public init(elevenLabs: Bool = false, openAI: Bool = false, gemini: Bool = false, googleCloud: Bool = false, kokoroReady: Bool = false) {
++        self.elevenLabs = elevenLabs
++        self.openAI = openAI
++        self.gemini = gemini
++        self.googleCloud = googleCloud
++        self.kokoroReady = kokoroReady
++    }
++}
++
++/// Cloud presets run only when this gate says the user selected that provider and a key exists.
++/// Automatic stays `zeus.synthetic`.
++public enum VoiceQualityRoute {
++    public static func selection(choice: VoiceQualitySpeakChoice, keys: VoiceQualitySpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> VoiceQualitySelection {
++        guard let preset, !providerFailed else { return .synthetic }
++        switch choice {
++        case .elevenLabs where preset.providerID == ElevenLabsTTSAdapter.id && keys.elevenLabs:
++            return .preset(preset)
++        case .googleCloud where preset.providerID == GoogleCloudTTSAdapter.id && keys.googleCloud:
++            return .preset(preset)
++        case .automatic, .elevenLabs, .googleCloud:
++            return .synthetic
++        }
++    }
++
++    public static func activeVoiceID(choice: VoiceQualitySpeakChoice, keys: VoiceQualitySpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> String {
++        switch selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
++        case .synthetic: VoiceSpeakAllowlist.syntheticID
++        case .preset(let chosen): chosen.defaultVoiceID
++        }
++    }
++}
++
++public enum VoiceQualitySelection: Equatable, Sendable {
++    case synthetic
++    case preset(VoiceQualityPreset)
++}
++
