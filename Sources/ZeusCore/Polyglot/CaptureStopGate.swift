@@ -18,7 +18,7 @@ public struct CaptureStopGate: Equatable, Sendable {
     }
 
     public mutating func start() -> Bool {
-        // Red: the next start overlaps a stop that has not finished.
+        guard !stopOpen else { return false }
         running = true
         return true
     }
