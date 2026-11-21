@@ -226,6 +226,45 @@ public enum GeneralSettingsReset {
     }
 }
 
+/// The card reset. Catalog rows and this section's contributions both return to their defaults.
+/// Launch at login and the license stay.
+public enum GeneralCardReset {
+    public struct Input: Equatable, Sendable {
+        public var catalogValues: [String: String]
+        public var catalogDefaults: [String: String]
+        public var contributions: [SettingsKeyContribution]
+        public var contributionValues: [String: String]
+        public var menuBarShown: Bool
+
+        public init(catalogValues: [String: String], catalogDefaults: [String: String], contributions: [SettingsKeyContribution], contributionValues: [String: String], menuBarShown: Bool) {
+            self.catalogValues = catalogValues
+            self.catalogDefaults = catalogDefaults
+            self.contributions = contributions
+            self.contributionValues = contributionValues
+            self.menuBarShown = menuBarShown
+        }
+    }
+
+    public static func valuesToWrite(_ input: Input) -> [String: String] {
+        var values = input.catalogValues
+        var defaults = input.catalogDefaults
+        for item in input.contributions where SettingsKeyLedger.persists(item) {
+            values[item.id] = input.contributionValues[item.id] ?? item.defaultValue
+            if let restored = SettingsKeyLedger.resetValue(item) {
+                defaults[item.id] = restored
+            }
+        }
+        values[GeneralMenuBarIcon.key] = input.menuBarShown ? "true" : "false"
+        defaults[GeneralMenuBarIcon.key] = "true"
+        let next = GeneralSettingsReset.applying(values: values, defaults: defaults)
+        var writes: [String: String] = [:]
+        for (id, fallback) in defaults {
+            writes[id] = next[id] ?? fallback
+        }
+        return writes
+    }
+}
+
 public struct GeneralResetChrome: Equatable, Sendable {
     public var title: String
     public var helper: String

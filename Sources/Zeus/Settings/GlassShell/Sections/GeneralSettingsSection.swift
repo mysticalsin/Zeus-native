@@ -238,19 +238,27 @@ struct GeneralSettingsSection: View {
     }
 
     private func applyReset() {
-        var values: [String: String] = [:]
-        var defaults: [String: String] = [:]
+        var catalogValues: [String: String] = [:]
+        var catalogDefaults: [String: String] = [:]
         for option in SettingsCatalog.all where option.kind != .action && option.kind != .status && option.state != .custom {
-            defaults[option.id] = option.defaultValue
-            values[option.id] = store.string(option.id)
+            catalogDefaults[option.id] = option.defaultValue
+            catalogValues[option.id] = store.string(option.id)
         }
-        values[GeneralMenuBarIcon.key] = Preferences.shared.showMenuBarIcon ? "true" : "false"
-        defaults[GeneralMenuBarIcon.key] = "true"
-        let next = GeneralSettingsReset.applying(values: values, defaults: defaults)
-        for option in SettingsCatalog.all where defaults[option.id] != nil {
-            store.set(option.id, next[option.id] ?? option.defaultValue, origin: .reset)
+        var contributionValues: [String: String] = [:]
+        for item in GeneralSectionSlot.keyContributions {
+            contributionValues[item.id] = store.string(item.id)
         }
-        if let menu = next[GeneralMenuBarIcon.key] {
+        let writes = GeneralCardReset.valuesToWrite(GeneralCardReset.Input(
+            catalogValues: catalogValues,
+            catalogDefaults: catalogDefaults,
+            contributions: GeneralSectionSlot.keyContributions,
+            contributionValues: contributionValues,
+            menuBarShown: Preferences.shared.showMenuBarIcon
+        ))
+        for (id, value) in writes where id != GeneralMenuBarIcon.key {
+            store.set(id, value, origin: .reset)
+        }
+        if let menu = writes[GeneralMenuBarIcon.key] {
             Preferences.shared.showMenuBarIcon = (menu == "true")
         }
         reset = GeneralResetConfirmation.transition(reset, .succeeded)
