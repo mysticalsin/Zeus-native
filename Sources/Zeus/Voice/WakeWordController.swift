@@ -161,6 +161,12 @@ final class WakeWordController {
         listener.onWake = { request in
             Task { @MainActor in WakeWordController.shared.handleWakeFromListener(request) }
         }
+        listener.onConfigurationChange = {
+            Task { @MainActor in
+                WakeWordController.shared.stopListener()
+                WakeWordController.shared.evaluate()
+            }
+        }
         do {
             try listener.start()
             self.listener = listener
