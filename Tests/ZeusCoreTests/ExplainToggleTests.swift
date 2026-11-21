@@ -150,7 +150,7 @@ import Testing
         hold(&turn, transcript: "explain this", screen: readyScreen())
         #expect(!turn.speech.isEmpty)
         #expect(turn.overlay.marks.map(\.number) == [1, 2])
-        #expect(turn.overlay.marks.allSatisfy(\.relevant))
+        for mark in turn.overlay.marks { #expect(mark.relevant) }
     }
 
     @Test func describeTheScreenSpeaksAndNumbersEachNamedItem() {
@@ -266,10 +266,10 @@ import Testing
         turn.handle(.rightOptionDown(at: 0), screen: screen, parse: fixtureParse)
         turn.handle(.confirm(at: 0.25), screen: screen, parse: fixtureParse)
         turn.handle(.rightOptionUp(at: 10, transcript: "show me where to click to Export"), screen: screen, parse: fixtureParse)
-        turn.handle(.firstAudio(at: 10.4), screen: screen, parse: fixtureParse)
+        turn.handle(.firstAudio(at: 10.5), screen: screen, parse: fixtureParse)
         turn.handle(.phrase(id: "2", at: 11), screen: screen, parse: fixtureParse)
         #expect(turn.clocks.releaseAt == 10)
-        #expect(turn.clocks.firstAudioInterval == 0.4)
+        #expect(turn.clocks.firstAudioInterval == 0.5)
         #expect(turn.clocks.pointerInterval != nil)
         #expect(turn.clocks.measuredMedian == nil)
         #expect(turn.clocks.fastActionInterval != nil)

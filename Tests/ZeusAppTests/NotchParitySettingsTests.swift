@@ -8,7 +8,7 @@ import Testing
         let expected = (1...25).map { String(format: "R-%03d", $0) }
         #expect(rows.map(\.id) == expected)
         #expect(Set(rows.map(\.id)).count == 25)
-        #expect(rows.allSatisfy(\.isReachable))
+        for row in rows { #expect(row.isReachable) }
         let held = rows.filter(\.isHeld)
         #expect(held.map(\.id) == ["R-014", "R-024", "R-025"])
         for row in held {
@@ -24,6 +24,6 @@ import Testing
             #expect(row?.canTurnOn == false)
             #expect(NotchParitySettings.turnOn(id) == false)
         }
-        #expect(rows.allSatisfy { !$0.title.isEmpty })
+        for row in rows { #expect(!row.title.isEmpty) }
     }
 }
