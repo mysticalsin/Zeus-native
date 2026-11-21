@@ -140,6 +140,10 @@ final class HotkeyMonitor {
     private var rightCommandHoldOwned = false
     /// The keys the right Command tap saw, applied before the talk machine handles the same event.
     private var rightCommandState = ShortcutState()
+    /// Right Option is push-to-talk. It does not use the hold machine's latch or its cancel.
+    private var optionTalk = KeyActionRouter()
+    /// This Right Option press went down while another talk turn was open, so it must not start one of its own.
+    private var optionBlocked = false
 
     /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
     /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
@@ -225,6 +229,7 @@ final class HotkeyMonitor {
             send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         send(.key(event, at: at))
+        driveRightOption(event, at: at)
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
@@ -237,6 +242,9 @@ final class HotkeyMonitor {
     func interrupt() {
         rightCommandDown = false
         _ = rightCommand.hardwareRightCommandUp(at: now())
+        if rightOptionIsPushToTalk {
+            applyOption(optionTalk.send(.rightOption(down: false, at: now(), otherKeyDown: false)))
+        }
         send(.interrupt(live: liveModifiers()))
     }
 
@@ -277,11 +285,90 @@ final class HotkeyMonitor {
     private func tick() {
         recoverMissedModifierUps()
         lookForALauncherSpace()
+        if rightOptionIsPushToTalk {
+            settleOption(at: now())
+        }
         send(.tick(at: now(), live: liveModifiers()))
     }
 
-    /// A flags repeat while both sides are down and the hardware still holds this side. Dropping it
-    /// keeps the right-hand key from looking released.
+    /// Holding Right Option talks. Releasing it stops and sends. Another key does not cancel the hold.
+    /// This is the second talk key, and also a talk key the owner recorded as Right Option.
+    private var rightOptionIsPushToTalk: Bool {
+        guard role == .talk else { return false }
+        return secondKeyProvider() == .rightOption || keyProvider() == .rightOption
+    }
+
+    private var optionTalkIsOpen: Bool {
+        if case .talking = optionTalk.phase { return true }
+        return false
+    }
+
+    private func settleOption(at time: TimeInterval) {
+        guard pair.owner == nil, !optionBlocked else { return }
+        applyOption(optionTalk.send(.tick(at: time)))
+    }
+
+    private func driveRightOption(_ event: ShortcutEvent, at time: TimeInterval) {
+        guard rightOptionIsPushToTalk else { return }
+        settleOption(at: time)
+        switch event {
+        case .flags(let code, _):
+            guard code == KeyActionRouter.rightOptionKeyCode else {
+                applyOption(optionTalk.send(.otherKey(at: time)))
+                return
+            }
+            let before = optionTalk.phase
+            let down = rightCommandState.deviceKeys.contains(code)
+            let actions = optionTalk.send(.rightOption(down: down, at: time, otherKeyDown: false))
+            if case .idle = before, case .optionDown = optionTalk.phase {
+                optionBlocked = pair.owner != nil
+                let delay = KeyActionRouter.optionHold
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    MainActor.assumeIsolated { self?.tick() }
+                }
+            }
+            if !down { optionBlocked = false }
+            applyOption(actions)
+        case .keyDown:
+            applyOption(optionTalk.send(.otherKey(at: time)))
+        case .keyUp:
+            break
+        }
+    }
+
+    private func applyOption(_ actions: [KeyActionRouter.Action]) {
+        for action in actions {
+            switch action {
+            case .talk:
+                if pair.owner != nil || optionBlocked {
+                    optionTalk.refuseStart()
+                    break
+                }
+                rightCommandHoldOwned = true
+                _ = rightCommand.holdOwnsKeyboard()
+                rightCommand.noteSession(listening: true)
+                cues?.preload()
+                cues?.playStart()
+                if onPress?() == false {
+                    optionTalk.refuseStart()
+                    rightCommand.holdReleasedKeyboard()
+                    rightCommandHoldOwned = false
+                    rightCommand.noteStartRejected()
+                }
+            case .send:
+                rightCommand.holdReleasedKeyboard()
+                rightCommandHoldOwned = false
+                onRelease?()
+                rightCommand.noteSession(listening: false)
+                cues?.playEnd()
+            case .murmur:
+                break
+            }
+        }
+    }
+
+    /// A flags repeat for Left or Right Command while both are down and the hardware still holds
+    /// this side. Other modifiers, including Right Option, are not held back.
     private func dropStillHeldRepeat(_ event: ShortcutEvent) -> Bool {
         guard let modifierIsDown, case .flags(let code, let mods) = event else { return false }
         return ModifierFlagsRepeat.isHardwareStillDown(
@@ -304,7 +391,7 @@ final class HotkeyMonitor {
 
     /// A solo right Command tap is Murmur. Talk does not start from it. While a talk turn is open the tap is discarded.
     private func driveRightCommand(_ event: ShortcutEvent, at now: TimeInterval) {
-        let owns = pair.owner != nil
+        let owns = pair.owner != nil || optionTalkIsOpen
         if owns, !rightCommandHoldOwned {
             _ = rightCommand.holdOwnsKeyboard()
         } else if !owns, rightCommandHoldOwned {
@@ -352,8 +439,16 @@ final class HotkeyMonitor {
 
     // MARK: Effects
 
+    private var optionTalkOccupied: Bool {
+        switch optionTalk.phase {
+        case .optionDown, .talking: true
+        default: false
+        }
+    }
+
     private var config: VoiceKeyMachine.Config {
-        let key = keyProvider()
+        var key = keyProvider()
+        if key == .rightOption || (optionTalkOccupied && pair.owner == nil) { key = nil }
         let shared = sharedProvider()
         let toggle = role == .dictation && !shared && directPressProvider()
         return VoiceKeyMachine.Config(key: key,
@@ -364,13 +459,14 @@ final class HotkeyMonitor {
                                       chord: role == .talk ? chordProvider() : nil)
     }
 
-    /// The second talk key's config: a hold key with the typing confirm (or tiling's, when longer) and no chord. Only the talk
-    /// role has one.
+    /// The second talk key's config. Right Option is handled by `optionTalk`, so the hold machine
+    /// never sees it: that machine can latch a second tap and cancel when another key joins.
     private var secondConfig: VoiceKeyMachine.Config {
         let key = role == .talk ? secondKeyProvider() : nil
-        return VoiceKeyMachine.Config(key: key, role: .talk, mode: .hold,
-                                      voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
-                                      confirm: key.map { VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm($0)) } ?? 0, chord: nil)
+        let machineKey: Shortcut? = key == .rightOption ? nil : key
+        return VoiceKeyMachine.Config(key: machineKey, role: .talk, mode: .hold,
+                                      voiceOverHoldsKey: machineKey == .controlOption && voiceOverProvider(),
+                                      confirm: machineKey.map { VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm($0)) } ?? 0, chord: nil)
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from

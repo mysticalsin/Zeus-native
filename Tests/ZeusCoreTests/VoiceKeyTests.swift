@@ -306,10 +306,10 @@ struct VoiceKeyTests {
         let voiceOver = second(chosen: .controlOption, explicit: true, talk: .rightOption, voiceOverOn: true)
         #expect(voiceOver.key == nil && voiceOver.yieldsTo == "VoiceOver")
         #expect(second(chosen: .controlOption, explicit: true, talk: .rightOption).key == .controlOption)
-        // Chat on Option-Space is a Carbon key: it wins, because Carbon may hide Space from the monitors.
+        // Option plus another key does not take the hold away.
         let chat: [Holder] = [("Chat", ChatHotkey.optionSpace.shortcut), ("Agent picker", nil)]
-        #expect(second(holders: chat).key == nil && second(holders: chat).yieldsTo == "Chat")
-        #expect(second(chosen: leftOption, holders: chat).yieldsTo == "Chat", "either side of Option")
+        #expect(second(holders: chat).key == .rightOption && second(holders: chat).yieldsTo == nil)
+        #expect(second(chosen: leftOption, holders: chat).key == leftOption && second(chosen: leftOption, holders: chat).yieldsTo == nil, "either side of Option")
         #expect(second(chosen: .function, explicit: true, holders: chat).key == .function, "Fn is not Option")
         let other: [Holder] = [("Chat", ChatHotkey.controlOptionC.shortcut), ("Quick to-do", Shortcut(keyCode: 17, modifiers: [.control, .option]))]
         #expect(second(holders: other).key == .rightOption, "a Carbon key that holds more than Option leaves it alone")

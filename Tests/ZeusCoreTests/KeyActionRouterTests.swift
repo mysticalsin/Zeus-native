@@ -16,7 +16,43 @@ struct KeyActionRouterTests {
         #expect(router.send(.tick(at: KeyActionRouter.optionHold - 0.001)).isEmpty)
         #expect(router.send(.tick(at: KeyActionRouter.optionHold)) == [.talk])
         #expect(router.send(.tick(at: KeyActionRouter.optionHold + 0.2)).isEmpty)
-        #expect(router.send(.rightOption(down: false, at: 1, otherKeyDown: false)).isEmpty)
+        #expect(router.phase == .talking(since: 0))
+        #expect(router.send(.rightOption(down: false, at: 1, otherKeyDown: false)) == [.send])
+        #expect(router.phase == .idle)
+    }
+
+    @Test func aVeryShortRightOptionTapDoesNothing() {
+        var router = KeyActionRouter()
+        #expect(router.send(.rightOption(down: true, at: 0, otherKeyDown: false)).isEmpty)
+        #expect(router.send(.rightOption(down: false, at: 0.05, otherKeyDown: false)).isEmpty)
+        #expect(router.phase == .idle)
+        #expect(router.send(.tick(at: 1)).isEmpty)
+        #expect(router.phase == .idle)
+    }
+
+    @Test func anotherKeyDoesNotBreakARightOptionHold() {
+        var router = KeyActionRouter()
+        #expect(router.send(.rightOption(down: true, at: 0, otherKeyDown: true)).isEmpty)
+        #expect(router.send(.otherKey(at: 0.05)).isEmpty)
+        #expect(router.send(.tick(at: KeyActionRouter.optionHold)) == [.talk])
+        #expect(router.phase == .talking(since: 0))
+        #expect(router.send(.cancel).isEmpty)
+        #expect(router.phase == .talking(since: 0))
+        #expect(router.send(.rightOption(down: false, at: 0.6, otherKeyDown: true)) == [.send])
+        #expect(router.phase == .idle)
+    }
+
+    @Test func aRepeatedRightOptionDownDoesNotToggle() {
+        var router = KeyActionRouter()
+        #expect(router.send(.rightOption(down: true, at: 0, otherKeyDown: false)).isEmpty)
+        #expect(router.send(.rightOption(down: true, at: 0.1, otherKeyDown: false)).isEmpty)
+        #expect(router.phase == .optionDown(since: 0, spoiled: false))
+        #expect(router.send(.tick(at: KeyActionRouter.optionHold)) == [.talk])
+        #expect(router.send(.rightOption(down: true, at: 0.4, otherKeyDown: true)).isEmpty)
+        #expect(router.phase == .talking(since: 0))
+        #expect(router.send(.tick(at: 0.5)).isEmpty)
+        #expect(router.send(.rightOption(down: false, at: 0.6, otherKeyDown: false)) == [.send])
+        #expect(router.phase == .idle)
     }
 
     @Test func leftCommandSpoilsTheTap() {
