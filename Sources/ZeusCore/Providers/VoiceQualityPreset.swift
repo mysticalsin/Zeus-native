@@ -54,10 +54,7 @@ public enum VoiceQualityKeyGate {
 
     public static func accepted(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 8, trimmed.count <= maxLength else { return nil }
-        guard trimmed.unicodeScalars.allSatisfy({ scalar in
-            scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
-        }) else { return nil }
+        guard VoiceProviderKeyPolicy.accepts(trimmed) else { return nil }
         return trimmed
     }
 }
@@ -94,6 +91,61 @@ public enum VoiceQualityRedirect {
 final class VoiceQualityRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
         completionHandler(VoiceQualityRedirect.forwarded(request, from: task.originalRequest?.url ?? response.url))
+    }
+}
+
+/// The session the quality speaker uses when the caller does not inject a test transport.
+/// Redirects are refused by `VoiceQualityRedirectDelegate`.
+final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked Sendable {
+    let delegate = VoiceQualityRedirectDelegate()
+    let timeout: TimeInterval
+    let log: ProviderLog
+
+    init(timeout: TimeInterval = ProviderHTTPBudget.requestTimeout, log: ProviderLog = ProviderLog()) {
+        self.timeout = timeout
+        self.log = log
+    }
+
+    func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse {
+        let urlRequest = try request.urlRequest(timeout: timeout)
+        let session = URLSession(configuration: configuration(), delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let http = response as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
+        log.record("voice-quality \(request.method) \(request.url.host ?? "-") status=\(http.statusCode)")
+        return ProviderHTTPResponse(status: http.statusCode, body: data)
+    }
+
+    func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error> {
+        let interval = self.timeout
+        let response = Result { try request.urlRequest(timeout: interval) }
+        let delegate = self.delegate
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let urlRequest = try response.get()
+                    let session = URLSession(configuration: self.configuration(), delegate: delegate, delegateQueue: nil)
+                    defer { session.finishTasksAndInvalidate() }
+                    let (data, httpResponse) = try await session.data(for: urlRequest)
+                    guard let http = httpResponse as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
+                    continuation.yield(.status(http.statusCode))
+                    if !data.isEmpty { continuation.yield(.chunk(data)) }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: ProviderFailure.wrap(error))
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func configuration() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = timeout
+        configuration.timeoutIntervalForResource = timeout
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        return configuration
     }
 }
 
@@ -489,13 +541,28 @@ public struct VoiceQualitySpeaker: Sendable {
     public var transport: any ProviderHTTPTransport
     public var log: ProviderLog
 
-    public init(meter: VoiceQualityMeter, transport: any ProviderHTTPTransport, log: ProviderLog = ProviderLog()) {
+    public init(meter: VoiceQualityMeter, transport: (any ProviderHTTPTransport)? = nil, log: ProviderLog = ProviderLog()) {
         self.meter = meter
-        self.transport = transport
+        self.transport = transport ?? VoiceQualityURLSessionTransport(log: log)
         self.log = log
     }
 
+    /// A call that did not come through `PersonaSpeakRoute`. It does not read the key or open a request.
     public func synthesize(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
+        _ = (text, preset, voiceID, credential)
+        return Self.refused()
+    }
+
+    public func synthesize(text: String, choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, credential: ProviderCredential, providerFailed: Bool = false, voiceID: String? = nil) -> Synthesis {
+        switch VoiceQualityRoute.selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
+        case .synthetic:
+            return Self.refused()
+        case .preset(let chosen):
+            return synthesizeApproved(text: text, preset: chosen, voiceID: voiceID ?? chosen.defaultVoiceID, credential: credential)
+        }
+    }
+
+    func synthesizeApproved(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
         let meter = self.meter
         let transport = self.transport
         let log = self.log
@@ -524,13 +591,8 @@ public struct VoiceQualitySpeaker: Sendable {
         }
     }
 
-    public func synthesize(text: String, choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, credential: ProviderCredential, providerFailed: Bool = false) -> Synthesis {
-        switch VoiceQualityRoute.selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
-        case .synthetic:
-            return Self.stream { throw VoiceQualityError.providerOff }
-        case .preset(let chosen):
-            return synthesize(text: text, preset: chosen, voiceID: chosen.defaultVoiceID, credential: credential)
-        }
+    static func refused() -> Synthesis {
+        stream { throw VoiceQualityError.providerOff }
     }
 
     public func synthesizeIfEnabled(text: String, defaults: UserDefaults, credential: ProviderCredential) -> Synthesis {
@@ -615,8 +677,8 @@ public struct VoiceQualityTTSAdapter: TTSProvider {
     }
 
     public func synthesize(text: String, voice: ProviderVoice, credential: ProviderCredential, using transport: any ProviderHTTPTransport) -> Synthesis? {
-        VoiceQualitySpeaker(meter: meter, transport: transport, log: log)
-            .synthesize(text: text, preset: preset, voiceID: voice.id, credential: credential)
+        _ = (text, voice, credential, transport, meter, preset, log)
+        return VoiceQualitySpeaker.refused()
     }
 
     public func validate(credential: ProviderCredential, using transport: any ProviderHTTPTransport) async throws {

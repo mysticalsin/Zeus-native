@@ -111,12 +111,7 @@ struct VoiceQualityPresetTests {
             log: ProviderLog { lines.add($0) }
         )
         let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: sentinel])
-        let synthesis = speaker.synthesize(
-            text: "Hello",
-            preset: .elevenLabsFast,
-            voiceID: "EXAVITQu4vr4xnSDxMaL",
-            credential: credential
-        )
+        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: "EXAVITQu4vr4xnSDxMaL", credential: credential)
         var captured = ""
         do {
             for try await chunk in synthesis.chunks {
@@ -182,12 +177,7 @@ struct VoiceQualityPresetTests {
             meter: meter,
             transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
         )
-        let synthesis = speaker.synthesize(
-            text: "Hello",
-            preset: .elevenLabsFast,
-            voiceID: "MCU-Tony",
-            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
-        )
+        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: "MCU-Tony", credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey]))
         let error = await firstError(synthesis)
         #expect(error as? VoiceQualityError == .voiceRefused)
         #expect(QualityURLStub.requests.isEmpty)
@@ -251,12 +241,7 @@ struct VoiceQualityPresetTests {
             meter: garbage,
             transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
         )
-        let synthesis = speaker.synthesize(
-            text: "Hello",
-            preset: .elevenLabsFast,
-            voiceID: nil,
-            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
-        )
+        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey]))
         let error = await firstError(synthesis)
         #expect(error as? VoiceQualityError == .meterCorrupt)
         #expect(QualityURLStub.requests.isEmpty)
@@ -299,12 +284,7 @@ struct VoiceQualityPresetTests {
             meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
             transport: URLSessionProviderTransport(protocolClasses: [HangURLStub.self], timeout: 2)
         )
-        let synthesis = speaker.synthesize(
-            text: "Hello",
-            preset: .googleNeural2,
-            voiceID: nil,
-            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey])
-        )
+        let synthesis = routed(speaker, text: "Hello", preset: .googleNeural2, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey]))
         let finished = Task { () -> String in
             do {
                 for try await _ in synthesis.chunks {}
@@ -337,12 +317,7 @@ struct VoiceQualityPresetTests {
                 meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
                 transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
             )
-            let synthesis = speaker.synthesize(
-                text: "Hello",
-                preset: .googleNeural2,
-                voiceID: nil,
-                credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey])
-            )
+            let synthesis = routed(speaker, text: "Hello", preset: .googleNeural2, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey]))
             let error = await firstError(synthesis)
             #expect(error as? ProviderFailure == failure)
 
@@ -367,6 +342,13 @@ struct VoiceQualityPresetTests {
             }
         }
         #expect(ProviderHTTPBudget.requestTimeout == 8)
+    }
+
+    private func routed(_ speaker: VoiceQualitySpeaker, text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
+        let google = preset.providerID == GoogleCloudTTSAdapter.id
+        var keys = PersonaSpeakKeys()
+        if google { keys.googleCloud = true } else { keys.elevenLabs = true }
+        return speaker.synthesize(text: text, choice: google ? .googleCloud : .elevenLabs, keys: keys, preset: preset, credential: credential, voiceID: voiceID)
     }
 
     private func elevenRequest(_ preset: VoiceQualityPreset) throws -> ProviderHTTPRequest {
