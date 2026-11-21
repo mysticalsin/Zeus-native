@@ -19,7 +19,7 @@ enum VoiceSelfTest {
 
     /// `Zeus --voice-engine-selftest [--receipt <absolute path>] [--silent]`: speaks the fixed line through
     /// each available engine with the Ultron effect and writes a JSON receipt (engine, reason, time to
-    /// first audio) to ~/AI-Brain-build/voice-selftest/ unless a path is given. Exit 0 when the Mac voice
+    /// first audio) to ~/Library/Logs/Zeus/voice-selftest/ unless a path is given. Exit 0 when the Mac voice
     /// spoke through the effect and was not Samantha.
     static func runEngineTestIfRequested(_ arguments: [String]) -> Bool {
         guard arguments.contains("--voice-engine-selftest") else { return false }
@@ -32,7 +32,7 @@ enum VoiceSelfTest {
     static func defaultReceiptURL(now: Date = Date()) -> URL {
         let stamp = ISO8601DateFormatter().string(from: now).replacingOccurrences(of: ":", with: "")
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("AI-Brain-build/voice-selftest/receipt-\(stamp).json")
+            .appendingPathComponent("Library/Logs/Zeus/voice-selftest/receipt-\(stamp).json")
     }
 
     static func runEngineTest(receiptPath: String?, silent: Bool) async -> Int32 {

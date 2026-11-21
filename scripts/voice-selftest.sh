@@ -1,11 +1,11 @@
 #!/bin/bash
 # Owner-run voice self-test. Starts a built Zeus.app with --voice-engine-selftest: one fixed line through each
 # available engine (ElevenLabs, OpenAI, Kokoro, Mac voice) with the Ultron effect, then validates the receipt it
-# writes to ~/AI-Brain-build/voice-selftest/. It refuses to run in CI and never reads or prints a key.
+# writes to ~/Library/Logs/Zeus/voice-selftest/. It refuses to run in CI and never reads or prints a key.
 #
 #   bash scripts/voice-selftest.sh [--silent] [<path to Zeus.app>] [--receipt <absolute path>]
 #
-# Default app: the latest ~/AI-Brain-build/zeus-qa-*/app*/Zeus.app. --silent runs the chain at zero volume.
+# Default app: ZEUS_APP, else build/Zeus.app, else the newest ~/Desktop/Zeus-latest-*.app. --silent runs the chain at zero volume.
 # Exit: 0 the Mac voice spoke through the effect and was not Samantha; 1 otherwise.
 set -euo pipefail
 umask 077
@@ -28,15 +28,22 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -z "$APP" ]; then
-    # shellcheck disable=SC2012
-    APP="$(ls -dt "$HOME"/AI-Brain-build/zeus-qa-*/app*/Zeus.app 2>/dev/null | head -n 1 || true)"
+    if [ -n "${ZEUS_APP:-}" ]; then
+        APP="$ZEUS_APP"
+    elif [ -x "$ROOT/build/Zeus.app/Contents/MacOS/Zeus" ]; then
+        APP="$ROOT/build/Zeus.app"
+    else
+        # shellcheck disable=SC2012
+        APP="$(ls -dt "$HOME"/Desktop/Zeus-latest-*.app 2>/dev/null | head -n 1 || true)"
+    fi
 fi
 if [ -z "$APP" ] || [ ! -x "$APP/Contents/MacOS/Zeus" ]; then
     echo "voice-selftest: no Zeus.app found. Pass the path to a built app." >&2
     exit 64
 fi
-DIR="$HOME/AI-Brain-build/voice-selftest"
+DIR="${ZEUS_VOICE_SELFTEST_DIR:-$HOME/Library/Logs/Zeus/voice-selftest}"
 mkdir -p "$DIR"
 if [ -z "$RECEIPT" ]; then
     RECEIPT="$DIR/receipt-$(date +%Y%m%d-%H%M%S).json"

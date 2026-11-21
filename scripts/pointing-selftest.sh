@@ -5,7 +5,7 @@
 #
 #   bash scripts/pointing-selftest.sh [<path to Zeus.app>] [--live] [--receipt <absolute path>]
 #
-# Default app: the latest ~/AI-Brain-build/zeus-qa-*/app*/Zeus.app.
+# Default app: ZEUS_APP, else build/Zeus.app, else the newest ~/Desktop/Zeus-latest-*.app.
 # Exit: 0 every required check passed; 3 valid with permission blocks; anything else is a failure.
 set -euo pipefail
 umask 077
@@ -28,9 +28,16 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -z "$APP" ]; then
-    # shellcheck disable=SC2012
-    APP="$(ls -dt "$HOME"/AI-Brain-build/zeus-qa-*/app*/Zeus.app 2>/dev/null | head -n 1 || true)"
+    if [ -n "${ZEUS_APP:-}" ]; then
+        APP="$ZEUS_APP"
+    elif [ -x "$ROOT/build/Zeus.app/Contents/MacOS/Zeus" ]; then
+        APP="$ROOT/build/Zeus.app"
+    else
+        # shellcheck disable=SC2012
+        APP="$(ls -dt "$HOME"/Desktop/Zeus-latest-*.app 2>/dev/null | head -n 1 || true)"
+    fi
 fi
 if [ -z "$APP" ] || [ ! -x "$APP/Contents/MacOS/Zeus" ]; then
     echo "pointing-selftest: no Zeus.app found. Pass the path to a built app." >&2
@@ -41,7 +48,6 @@ if [ -z "$RECEIPT" ]; then
 fi
 case "$RECEIPT" in /*) ;; *) echo "receipt path must be absolute" >&2; exit 64 ;; esac
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 echo "app:     $APP"
 echo "receipt: $RECEIPT"
