@@ -38,4 +38,20 @@ struct ProviderPlaybackGateTests {
         gate.end(second)
         #expect(!gate.isPlaying)
     }
+
+    /// ZB-027: a second clip bumps the generation, so ending the first token is ignored and
+    /// ending the second only drops one level. The gate stays engaged after both clips are done.
+    @Test func overlappingClipsLeaveTheGateEngaged() {
+        let gate = ProviderPlaybackGate()
+        let first = gate.begin()
+        let second = gate.begin()
+        #expect(first != second)
+        #expect(gate.isPlaying)
+        #expect(!ProviderSentencePump.canDequeue(queueEmpty: false, providerPlaying: gate.isPlaying))
+        gate.end(first)
+        #expect(gate.isPlaying)
+        gate.end(second)
+        #expect(!gate.isPlaying)
+        #expect(ProviderSentencePump.canDequeue(queueEmpty: false, providerPlaying: gate.isPlaying))
+    }
 }
