@@ -8,7 +8,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     case general, appearance, sounds, notifications, shortcuts, insomnia
     case integrations, murmure, polyglot, dictation, voice, engine, iPhone
     case license, permissions, privacy, diagnostics, about
-    case features, beamer, tiling, shelf
+    case features, beamer, tiling, shelf, assistant
 
     var id: String { rawValue }
 
@@ -17,7 +17,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
     var group: Group {
         switch self {
         case .general, .appearance, .sounds, .notifications, .shortcuts, .insomnia: .settings
-        case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer, .tiling, .shelf: .tools
+        case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer, .tiling, .shelf, .assistant: .tools
         case .license, .permissions, .privacy, .diagnostics, .about: .app
         }
     }
@@ -72,6 +72,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .beamer: "Beamer"
         case .tiling: "Tiling"
         case .shelf: "Shelf"
+        case .assistant: "Assistant"
         case .license: "License"
         case .permissions: "Permissions"
         case .privacy: "Privacy"
@@ -117,6 +118,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .beamer: "rectangle.connected.to.line.below"
         case .tiling: "rectangle.split.2x2"
         case .shelf: "tray.fill"
+        case .assistant: "sparkles"
         case .license: "key"
         case .permissions: "checkmark.shield"
         case .privacy: "lock.shield"

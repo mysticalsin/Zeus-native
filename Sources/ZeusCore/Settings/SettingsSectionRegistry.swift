@@ -46,6 +46,7 @@ public enum SettingsSectionRegistry {
             ("beamer", "Beamer"),
             ("tiling", "Tiling"),
             ("shelf", "Shelf"),
+            ("assistant", "Assistant"),
             ("license", "License"),
             ("permissions", "Permissions"),
             ("privacy", "Privacy"),
@@ -129,7 +130,7 @@ public enum SettingsSectionRegistry {
         switch sectionID {
         case id(for: "general"), id(for: "appearance"), id(for: "sounds"), id(for: "notifications"), id(for: "shortcuts"), id(for: "insomnia"):
             return "Settings"
-        case id(for: "integrations"), id(for: "murmure"), id(for: "polyglot"), id(for: "dictation"), id(for: "voice"), id(for: "engine"), id(for: "iPhone"), id(for: "features"), id(for: "beamer"), id(for: "tiling"), id(for: "shelf"):
+        case id(for: "integrations"), id(for: "murmure"), id(for: "polyglot"), id(for: "dictation"), id(for: "voice"), id(for: "engine"), id(for: "iPhone"), id(for: "features"), id(for: "beamer"), id(for: "tiling"), id(for: "shelf"), id(for: "assistant"):
             return "Your tools"
         case id(for: "license"), id(for: "permissions"), id(for: "privacy"), id(for: "diagnostics"), id(for: "about"), topbarID:
             return "Zeus"
@@ -148,6 +149,16 @@ public enum SettingsSectionRegistry {
     private static func row(_ order: Int, _ raw: String, _ title: String) -> SettingsSectionDescriptor {
         SettingsSectionDescriptor(id: id(for: raw), title: title, order: order, accessibilityLabel: title, placeholder: nil)
     }
+}
+
+/// Sensitive assistant switches stay off until the owner turns them on. Pointing itself keeps the catalog default.
+public enum AssistantSectionPolicy {
+    public static let sensitiveOffByDefault: [String: Bool] = [
+        "explanation.enabled": false,
+        "pointing.sendScreenshot": false,
+        "pointing.textEntry": false,
+        "pointing.dictationFnControl": false,
+    ]
 }
 
 /// Glass rows the host can show. A filled descriptor is hosted through its provider type.

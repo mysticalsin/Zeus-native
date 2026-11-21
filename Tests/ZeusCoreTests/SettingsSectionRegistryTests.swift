@@ -18,7 +18,7 @@ import ZeusCore
         let slots = [GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [])]
         let after = SettingsSectionRegistry.sections(slots: slots)
         #expect(Array(after.prefix(before.count)).map(\.title) == before)
-        #expect(before == ["General", "Appearance", "Sounds", "Notifications", "Shortcuts", "Insomnia", "Integrations", "Murmure", "Polyglot", "Dictation", "Voice", "Engine", "Features", "Beamer", "Tiling", "Shelf", "License", "Permissions", "Privacy", "Diagnostics", "About"])
+        #expect(before == ["General", "Appearance", "Sounds", "Notifications", "Shortcuts", "Insomnia", "Integrations", "Murmure", "Polyglot", "Dictation", "Voice", "Engine", "Features", "Beamer", "Tiling", "Shelf", "Assistant", "License", "Permissions", "Privacy", "Diagnostics", "About"])
     }
 
     @Test func aFilledSlotAppearsWithoutEditingTheRegistry() {
@@ -46,6 +46,20 @@ import ZeusCore
         #expect(last?.label == "Fixture")
         #expect(last?.heading == true)
         #expect(last?.hidden == false)
+    }
+
+    @Test func assistantIsAddedWithoutRemovingExistingSections() {
+        let titles = SettingsSectionRegistry.existing.map(\.title)
+        let required = ["General", "Appearance", "Sounds", "Notifications", "Shortcuts", "Insomnia", "Integrations", "Murmure", "Polyglot", "Dictation", "Voice", "Engine", "Features", "Beamer", "Tiling", "Shelf", "License", "Permissions", "Privacy", "Diagnostics", "About"]
+        for title in required {
+            #expect(titles.contains(title))
+        }
+        #expect(titles.contains("Assistant"))
+        #expect(titles.count == required.count + 1)
+        #expect(SettingsSectionRegistry.existing.contains { $0.id == SettingsSectionRegistry.id(for: "assistant") })
+        #expect(AssistantSectionPolicy.sensitiveOffByDefault.values.allSatisfy { $0 == false })
+        #expect(AssistantSectionPolicy.sensitiveOffByDefault["explanation.enabled"] == false)
+        #expect(AssistantSectionPolicy.sensitiveOffByDefault["pointing.sendScreenshot"] == false)
     }
 
     @Test func searchStaysInRegistryOrder() {
