@@ -409,8 +409,9 @@ final class TopBarModel {
         cue = newCue
         cueStartedAt = Date()
         cueTask?.cancel()
+        let stay = Self.sensoryCueStay(newCue)
         cueTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(newCue.duration))
+            try? await Task.sleep(for: .seconds(stay))
             guard !Task.isCancelled else { return }
             self?.cue = nil
         }
@@ -529,7 +530,7 @@ final class TopBarModel {
             EdgeWaveController.shared.play(tint: tint, ignoreSettings: ignoreSettings)
             return
         }
-        let duration = kind.duration(speedPercent: SettingsStore.shared.double("halo.speed"))
+        let duration = Self.sensoryLightStay(kind)
         if case .hudLevel(let newSystemKind, _, _, _, _) = kind,
            let index = lights.firstIndex(where: { if case .hudLevel(let k, _, _, _, _) = $0.kind { k == newSystemKind } else { false } }) {
             let id = lights[index].id
@@ -566,6 +567,31 @@ final class TopBarModel {
         let state = State(lights: infos, cue: cue.map { String(describing: $0) })
         guard let data = try? JSONEncoder().encode(state), let text = String(data: data, encoding: .utf8) else { return "{}" }
         return text
+    }
+
+    /// The historical dwell stays on the existing cue timer. A stored hold that differs from it
+    /// is the only change: the same ease-out is added to that dwell.
+    static func sensoryCueStay(_ cue: NotchCue) -> TimeInterval {
+        switch cue {
+        case .volume, .brightness:
+            return sensoryHold(cue.duration)
+        default:
+            return cue.duration
+        }
+    }
+
+    static func sensoryLightStay(_ kind: NotchLightKind) -> TimeInterval {
+        let legacy = kind.duration(speedPercent: SettingsStore.shared.double("halo.speed"))
+        guard case .hudLevel(let systemKind, _, _, _, _) = kind, systemKind == .volume || systemKind == .brightness else {
+            return legacy
+        }
+        return sensoryHold(legacy)
+    }
+
+    private static func sensoryHold(_ legacy: TimeInterval) -> TimeInterval {
+        let hold = SensorySettings.read { SettingsStore.shared.string($0) }.hold
+        guard abs(hold - SystemHUDMath.holdAfterChange) > 0.000_001 else { return legacy }
+        return hold + SystemHUDMath.easeOut
     }
 
     static func lightOption(for kind: NotchLightKind) -> String? {
