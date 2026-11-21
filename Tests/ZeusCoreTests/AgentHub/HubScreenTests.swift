@@ -24,21 +24,21 @@ struct HubScreenTests {
             #expect(HubScreenMachine.copy(failed).sentence == "Agents aren't connected.")
             #expect(HubScreenMachine.copy(failed).actionTitle == "Try again")
         }
-        #expect(HubScreenMachine.copy(opened).actionTitle == "New chat")
+        #expect(HubScreenMachine.copy(opened).actionTitle == "New session")
         #expect(HubScreenMachine.copy(opened).sentence != "Agents aren't connected.")
     }
 
     @Test func emptyCopyContainsNoProductTitle() {
         let copy = HubScreenMachine.copy(HubScreenState(screen: .empty))
         #expect(copy.sentence == "Nothing running")
-        #expect(copy.detail == "Start a chat and it shows up here.")
-        #expect(copy.actionTitle == "New chat")
+        #expect(copy.detail == "Start a session and it shows up here.")
+        #expect(copy.actionTitle == "New session")
         let words = [copy.sentence, copy.detail, copy.actionTitle]
             .compactMap { $0 }
             .joined(separator: " ")
             .split(separator: " ")
             .map(String.init)
-        #expect(words == ["Nothing", "running", "Start", "a", "chat", "and", "it", "shows", "up", "here.", "New", "chat"])
+        #expect(words == ["Nothing", "running", "Start", "a", "session", "and", "it", "shows", "up", "here.", "New", "session"])
 
         let loading = HubScreenMachine.copy(HubScreenState(screen: .loading))
         let failure = HubScreenMachine.copy(HubScreenState(screen: .connectionError))

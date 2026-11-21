@@ -68,17 +68,17 @@ public enum HubSessionStatus: Equatable, Hashable, Sendable, CaseIterable {
         }
     }
 
-    /// The five turn words, in the order a row uses them. Loading is "Announced" and is not one of the five.
-    public static let visibleWords = ["Running", "Waiting for input", "Needs approval", "Done", "Error"]
+    /// The five turn words, in the order a row uses them. Loading is "Starting" and is not one of the five.
+    public static let visibleWords = ["Running", "Question", "Needs you", "Done", "Failed"]
 
     public var visibleWord: String? {
         switch self {
         case .running: "Running"
-        case .waitingForInput: "Waiting for input"
-        case .needsApproval: "Needs approval"
+        case .waitingForInput: "Question"
+        case .needsApproval: "Needs you"
         case .done: "Done"
-        case .error: "Error"
-        case .loading: "Announced"
+        case .error: "Failed"
+        case .loading: "Starting"
         case .absent: nil
         }
     }
@@ -151,15 +151,15 @@ public enum HubScreen: String, CaseIterable, Codable, Equatable, Hashable, Senda
 
     public var detail: String? {
         switch self {
-        case .empty: "Start a chat and it shows up here."
+        case .empty: "Start a session and it shows up here."
         case .loading, .connectionError, .ready: nil
         }
     }
 
-    /// New chat on empty. Try again on a connection error. Nowhere else.
+    /// New session on empty. Try again on a connection error. Nowhere else.
     public var actionTitle: String? {
         switch self {
-        case .empty: "New chat"
+        case .empty: "New session"
         case .connectionError: "Try again"
         case .loading, .ready: nil
         }
