@@ -274,9 +274,13 @@ public struct UserMemoryPersistence: Sendable {
         }
     }
 
-    /// Red: a damaged file is still read as an empty prompt.
+    /// A missing or readable file contributes its rules. A damaged file contributes a notice and is not empty.
     public func promptRead(for query: String) -> PromptRead {
-        PromptRead(text: load().promptBlock(for: query), damaged: false)
+        do {
+            return PromptRead(text: try loadChecked().promptBlock(for: query), damaged: false)
+        } catch {
+            return PromptRead(text: PromptRead.damagedNotice, damaged: true)
+        }
     }
 
     /// An empty store only when there is no file. A file (including a zero-byte one) that can't be read or

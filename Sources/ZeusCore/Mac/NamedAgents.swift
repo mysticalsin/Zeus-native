@@ -88,9 +88,20 @@ public struct AgentStore: Sendable {
         case damaged
     }
 
-    /// Red: a file that will not decode is an empty memory, so the next save can replace it.
+    /// A missing file is an empty memory. A file that will not decode is copied aside and is not empty.
     public func loadMemory(for agent: AgentProfile) -> MemoryLoad {
-        .ready(memory(for: agent))
+        let url = file(agent)
+        guard FileManager.default.fileExists(atPath: url.path) else { return .ready(AgentMemory()) }
+        let data: Data
+        do { data = try Data(contentsOf: url) } catch { return .damaged(MemoryLoad.notice) }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let memory = try? decoder.decode(AgentMemory.self, from: data) { return .ready(memory) }
+        let copy = url.appendingPathExtension("corrupt")
+        if !FileManager.default.fileExists(atPath: copy.path) {
+            try? data.write(to: copy, options: .atomic)
+        }
+        return .damaged(MemoryLoad.notice)
     }
 
     public func memory(for agent: AgentProfile) -> AgentMemory {
@@ -102,6 +113,7 @@ public struct AgentStore: Sendable {
     }
 
     public func save(_ memory: AgentMemory, for agent: AgentProfile) throws {
+        if case .damaged = loadMemory(for: agent) { throw MemoryError.damaged }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
