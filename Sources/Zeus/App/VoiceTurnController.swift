@@ -805,13 +805,23 @@ final class VoiceTurnController {
         let agentStore = AgentStore()
         let route = AgentRouter.route(transcript, agents: agentStore.profiles())
         if let route, let note = route.remember {
-            var memory = agentStore.memory(for: route.agent)
-            memory.remember(note, pinned: true)
-            try? agentStore.save(memory, for: route.agent)
-            let reply = "\(route.agent.name) will remember that."
-            NSLog("[ZEUS] agent %@: pinned note (%d notes)", route.agent.name, memory.notes.count)
-            if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
-            return TurnResult(spoken: reply)
+            switch agentStore.loadMemory(for: route.agent) {
+            case .damaged(let notice):
+                if speak { say(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }
+                return TurnResult(spoken: notice)
+            case .ready(var memory):
+                memory.remember(note, pinned: true)
+                do { try agentStore.save(memory, for: route.agent) }
+                catch {
+                    let reply = "\(route.agent.name) could not save that, so the memory file was left as it was."
+                    if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+                    return TurnResult(spoken: reply)
+                }
+                let reply = "\(route.agent.name) will remember that."
+                NSLog("[ZEUS] agent %@: pinned note (%d notes)", route.agent.name, memory.notes.count)
+                if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+                return TurnResult(spoken: reply)
+            }
         }
         VoiceLog.log("route", "brain (LLM)\(route.map { ", agent \($0.agent.name)" } ?? "")")
         // No network or process work before the engines start: the Ollama check runs at key press and the
@@ -831,8 +841,8 @@ final class VoiceTurnController {
             system += "\n\n" + awareness.promptPrefix
             NSLog("[ZEUS] screen awareness: axTokens=%d preferPixels=%@", awareness.axTokenEstimate, awareness.preferPixels ? "yes" : "no")
         }
-        let memoryBlock = UserMemoryPersistence.shared.load().promptBlock(for: transcript)
-        if !memoryBlock.isEmpty { system += "\n\n" + memoryBlock }
+        let memoryRead = UserMemoryPersistence.shared.promptRead(for: transcript)
+        if !memoryRead.text.isEmpty { system += "\n\n" + memoryRead.text }
         var shots = restricted ? [] : screenshots
         if !restricted, !pageText, awareness.needsCapture, shots.isEmpty {
             shots = await ScreenCapture.captureAll()
@@ -1168,8 +1178,7 @@ final class VoiceTurnController {
             if answer.isEmpty { VoiceLog.log("spoken", "(nothing)") } else { VoiceLog.logContent("spoken", answer) }
             ZeusSound.play(.voiceDone)
             lastAnswerAt = Date()
-            if let route, !answer.isEmpty {
-                var memory = agentStore.memory(for: route.agent)
+            if let route, !answer.isEmpty, case .ready(var memory) = agentStore.loadMemory(for: route.agent) {
                 memory.remember("Asked: \(route.request.prefix(160)) / Answered: \(answer.prefix(200))")
                 try? agentStore.save(memory, for: route.agent)
             }

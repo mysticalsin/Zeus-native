@@ -263,6 +263,26 @@ public struct UserMemoryPersistence: Sendable {
         (try? loadChecked()) ?? UserMemoryStore()
     }
 
+    /// What a turn may put in the prompt. A damaged file must not look like an empty memory.
+    public struct PromptRead: Equatable, Sendable {
+        public var text: String
+        public var damaged: Bool
+        public static let damagedNotice = "Stored memory could not be read. It was left in place. Do not invent memories."
+        public init(text: String, damaged: Bool) {
+            self.text = text
+            self.damaged = damaged
+        }
+    }
+
+    /// A missing or readable file contributes its rules. A damaged file contributes a notice and is not empty.
+    public func promptRead(for query: String) -> PromptRead {
+        do {
+            return PromptRead(text: try loadChecked().promptBlock(for: query), damaged: false)
+        } catch {
+            return PromptRead(text: PromptRead.damagedNotice, damaged: true)
+        }
+    }
+
     /// An empty store only when there is no file. A file (including a zero-byte one) that can't be read or
     /// decoded throws, is never modified, and is copied once to `corruptCopyURL`.
     public func loadChecked() throws -> UserMemoryStore {
