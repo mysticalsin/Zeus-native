@@ -441,4 +441,107 @@ struct SpokenStyleTests {
         let second = hear("Ship v2.1.0 and see https://example.com/docs.", .english, maxSentences: 2)
         #expect(first == second)
     }
+
+    @Test func ellipsisBecomesASentenceBreak() {
+        #expect(hear("The build passed... the details can wait.").spokenText == "The build passed. The details can wait.")
+        #expect(hear("Wait........ done.").spokenText == "Wait. Done.")
+    }
+
+    @Test func frenchEllipsisIsASentenceBreak() {
+        #expect(hear("C'est prêt… les détails peuvent attendre.", .french).spokenText == "C'est prêt. Les détails peuvent attendre.")
+    }
+
+    @Test func repeatedExclamationIsOneStop() {
+        #expect(hear("Stop!!!").spokenText == "Stop!")
+    }
+
+    @Test func headingDoesNotSpendTheWholeBudget() {
+        let transcript = hear("# Status\n\nThe build passed. The logs can wait.", maxSentences: 1)
+        #expect(transcript.spokenText == "Status the build passed.")
+        #expect(!transcript.spokenText.contains("logs"))
+    }
+
+    @Test func checkboxListIsSpokenAsDoneOrOpen() {
+        let transcript = hear("- [x] Ship it\n- [ ] Wait")
+        #expect(transcript.spokenText == "First Ship it done. And last Wait still open.")
+        #expect(!transcript.spokenText.contains("["))
+    }
+
+    @Test func frenchCheckboxListIsSpokenAsDoneOrOpen() {
+        let transcript = hear("- [x] Livrer\n- [ ] Attendre", .french)
+        #expect(transcript.spokenText == "D'abord Livrer fait. Et enfin Attendre encore ouvert.")
+        #expect(!transcript.spokenText.contains("["))
+    }
+
+    @Test func strikethroughIsNotRead() {
+        let transcript = hear("The ~~old~~ plan is ready.")
+        #expect(transcript.spokenText == "The plan is ready.")
+        #expect(!transcript.spokenText.contains("~"))
+    }
+
+    @Test func parenthesesBecomeAnAside() {
+        let transcript = hear("The build (the fast one) passed.")
+        #expect(transcript.runs == [
+            SpokenRun(text: "The build", pauseAfter: .clause),
+            SpokenRun(text: "the fast one", pauseAfter: .clause),
+            SpokenRun(text: "passed.", pauseAfter: .sentence),
+        ])
+        #expect(!transcript.spokenText.contains("("))
+    }
+
+    @Test func htmlBreakIsANewSentence() {
+        #expect(hear("Line one<br>line two").spokenText == "Line one. Line two.")
+        #expect(hear("Line one<br/>line two").spokenText == "Line one. Line two.")
+        #expect(!hear("Line one<br>line two").spokenText.contains("<"))
+    }
+
+    @Test func autolinkBracketsAreNotSpoken() {
+        let transcript = hear("See <https://example.com/docs> now.")
+        #expect(transcript.spokenText == "See example dot com now.")
+        #expect(!transcript.spokenText.contains("<"))
+        #expect(!transcript.spokenText.contains("docs"))
+    }
+
+    @Test func tildeFenceHidesTheCode() {
+        let fenced = """
+        Wait.
+        ~~~
+        secret
+        ~~~
+        Done.
+        """
+        let transcript = hear(fenced)
+        #expect(transcript.spokenText == "Wait. Here's the code. Done.")
+        #expect(!transcript.spokenText.contains("secret"))
+        #expect(!transcript.spokenText.contains("~"))
+    }
+
+    @Test func ampersandIsSpokenAsAnd() {
+        #expect(hear("A & B are ready.").spokenText == "A and B are ready.")
+        #expect(hear("A & B sont prêts.", .french).spokenText == "A et B sont prêts.")
+    }
+
+    @Test func shoutedSentenceIsSpokenCalmly() {
+        #expect(hear("THE BUILD PASSED.").spokenText == "The build passed.")
+        #expect(hear("I AM READY.").spokenText == "I'm ready.")
+    }
+
+    @Test func aWallOfWordsIsCutIntoShortSentences() {
+        let text = Array(repeating: "alpha", count: 40).joined(separator: " ") + "."
+        let transcript = hear(text)
+        #expect(transcript.runs.count == 3)
+        for run in transcript.runs {
+            #expect(run.text.split(whereSeparator: \.isWhitespace).count <= SpokenStyle.maxWordsPerSentence)
+            #expect(run.pauseAfter == .sentence)
+        }
+    }
+
+    @Test func aLongReplyKeepsOnlyTheFirstShortSentences() {
+        let text = Array(repeating: "alpha", count: 1500).joined(separator: " ") + "."
+        let transcript = hear(text, maxSentences: 2)
+        #expect(transcript.runs.count == 2)
+        for run in transcript.runs {
+            #expect(run.text.split(whereSeparator: \.isWhitespace).count <= SpokenStyle.maxWordsPerSentence)
+        }
+    }
 }
