@@ -14,8 +14,11 @@ import Testing
     }
 
     private static func clock(after milliseconds: Int) -> LocalCommandClock {
-        let clock = ScriptedClock(origin.advanced(by: .milliseconds(milliseconds)))
-        return clock.clock
+        clock(at: origin.advanced(by: .milliseconds(milliseconds)))
+    }
+
+    private static func clock(at instant: ContinuousClock.Instant) -> LocalCommandClock {
+        ScriptedClock(instant).clock
     }
 
     private static let harbor = LocalApp(
@@ -333,6 +336,80 @@ import Testing
         #expect(Self.performed(missing) == nil)
         #expect(Self.spoken(missing) == "Harbor isn't open.")
         #expect(closed.state == .idle)
+    }
+
+    /// "ok", "sure", and a bare "quit" are not a confirmation. An explicit phrase still is.
+    @Test func quitConfirmationRequiresAnExplicitPhrase() {
+        let unsaved = Self.harbor.withUnsaved(nil)
+        let clock = Self.clock(after: 6)
+        for phrase in ["ok", "sure", "quit", "OK", "Sure."] {
+            var machine = LocalCommandMachine()
+            _ = machine.receive("quit harbor", finalAt: Self.origin, clock: clock, apps: [unsaved])
+            let reply = machine.receive(phrase, finalAt: Self.origin, clock: clock, apps: [unsaved])
+            #expect(Self.performed(reply) == nil, "\(phrase) must not quit")
+            #expect(reply.effects == [.fallThrough], "\(phrase)")
+            #expect(machine.state == .idle, "\(phrase)")
+        }
+        var explicit = LocalCommandMachine()
+        _ = explicit.receive("quit harbor", finalAt: Self.origin, clock: clock, apps: [unsaved])
+        let confirmed = explicit.receive("quit it", finalAt: Self.origin, clock: clock, apps: [unsaved])
+        #expect(Self.performed(confirmed) == .quit(unsaved))
+    }
+
+    /// The pending quit lasts 10 seconds, or until the next turn ends, whichever comes first.
+    @Test func quitConfirmationExpiresAtTenSecondsOrTheNextTurn() {
+        let unsaved = Self.harbor.withUnsaved(nil)
+        let askedAt = Self.origin.advanced(by: .milliseconds(6))
+
+        var stillOpen = LocalCommandMachine()
+        _ = stillOpen.receive("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
+        let soon = askedAt.advanced(by: .milliseconds(9_999))
+        let yes = stillOpen.receive("yes", finalAt: soon.advanced(by: .milliseconds(-4)),
+                                     clock: Self.clock(at: soon), apps: [unsaved])
+        #expect(Self.performed(yes) == .quit(unsaved))
+
+        var timedOut = LocalCommandMachine()
+        _ = timedOut.receive("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
+        let deadline = askedAt.advanced(by: .seconds(10))
+        let late = timedOut.receive("yes", finalAt: deadline.advanced(by: .milliseconds(-4)),
+                                     clock: Self.clock(at: deadline), apps: [unsaved])
+        #expect(Self.performed(late) == nil)
+        #expect(late.effects == [.fallThrough])
+        #expect(timedOut.state == .idle)
+
+        var replaced = LocalCommandMachine()
+        _ = replaced.receive("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
+        let paused = replaced.receive("pause", finalAt: deadline.advanced(by: .milliseconds(-4)),
+                                       clock: Self.clock(at: deadline), apps: [unsaved])
+        #expect(Self.performed(paused) == .media(.pause))
+
+        var ended = LocalCommandMachine()
+        _ = ended.receive("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
+        ended.armQuitExpiryAtEndOfNextTurn()
+        ended.endTurn()
+        let afterTurn = askedAt.advanced(by: .seconds(2))
+        let ignored = ended.receive("yes", finalAt: afterTurn.advanced(by: .milliseconds(-4)),
+                                     clock: Self.clock(at: afterTurn), apps: [unsaved])
+        #expect(Self.performed(ignored) == nil)
+        #expect(ignored.effects == [.fallThrough])
+        #expect(ended.state == .idle)
+    }
+
+    /// The spoken catalog is /Applications and the user's Applications folder. Nothing else.
+    @Test func localCatalogIsApplicationsAndTheUserApplicationsFolder() {
+        let home = "/Users/ada"
+        #expect(LocalAppCatalog.included("/Applications/Harbor.app", home: home))
+        #expect(LocalAppCatalog.included("/Applications/Utilities/Terminal.app", home: home))
+        #expect(LocalAppCatalog.included("/Users/ada/Applications/Field Notes.app", home: home))
+        #expect(LocalAppCatalog.included("/Users/ada/Applications/Set/Field Notes.app", home: home))
+        #expect(!LocalAppCatalog.included("/System/Applications/Calendar.app", home: home))
+        #expect(!LocalAppCatalog.included("/System/Applications/Utilities/Terminal.app", home: home))
+        #expect(!LocalAppCatalog.included("/System/Library/CoreServices/Finder.app", home: home))
+        #expect(!LocalAppCatalog.included("/ApplicationsExtra/Harbor.app", home: home))
+        #expect(!LocalAppCatalog.included("/Users/ada/ApplicationsExtra/Harbor.app", home: home))
+        #expect(!LocalAppCatalog.included("/opt/homebrew/Caskroom/Harbor.app", home: home))
+        #expect(!LocalAppCatalog.included("", home: home))
+        #expect(!LocalAppCatalog.included("/Applications/Harbor.app", home: ""))
     }
 }
 
