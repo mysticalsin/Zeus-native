@@ -51,6 +51,9 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     public func remove(account: String) -> Result<Void, FaceTemplateFailure> {
         let status = deleteItem(account: account)
         guard status == errSecSuccess || status == errSecItemNotFound else { return .failure(.unavailable) }
+        if account != Self.epochAccount {
+            _ = deleteItem(Self.epochAccount)
+        }
         return .success(())
     }
 
@@ -177,21 +180,48 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         var context: LAContext?
     }
 
-    /// `evaluatePolicy` must succeed. A nil or empty domain state is unavailable and is not stored.
+    /// There is no synchronous `evaluatePolicy`. The reply form is the one that sets the domain state.
     private static func evaluate() -> Evaluation {
         let context = LAContext()
-        do {
-            try context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Confirm it is you before Zeus uses the saved face.")
-            return Evaluation(value: .succeeded(context.evaluatedPolicyDomainState), context: context)
-        } catch {
-            return Evaluation(value: .failed, context: nil)
+        let reason = "Confirm it is you before Zeus uses the saved face."
+        final class Box: @unchecked Sendable {
+            var value = Evaluation(value: .failed, context: nil)
         }
+        let box = Box()
+        let done = DispatchSemaphore(value: 0)
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, error in
+            if success, error == nil {
+                box.value = Evaluation(value: .succeeded(context.evaluatedPolicyDomainState), context: context)
+            }
+            done.signal()
+        }
+        if Thread.isMainThread {
+            while done.wait(timeout: .now()) == .timedOut {
+                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
+            }
+        } else {
+            done.wait()
+        }
+        return box.value
     }
 
     private static func decision(evaluation: Evaluation, account: String) -> FaceTemplateDomainEffect {
-        let stored = usable(epochData())
+        let read = epochRead()
+        let stored: Data?
+        let unreadable: Bool
+        switch read {
+        case .value(let data):
+            stored = data
+            unreadable = false
+        case .missing:
+            stored = nil
+            unreadable = false
+        case .unreadable:
+            stored = nil
+            unreadable = true
+        }
         let enrolled = Items(context: evaluation.context ?? LAContext()).probe(account: account) != .missing
-        return FaceTemplateDomainGate.effect(stored: stored, evaluation: evaluation.value, enrolled: enrolled)
+        return FaceTemplateDomainGate.effect(stored: stored, evaluation: evaluation.value, enrolled: enrolled, epochUnreadable: unreadable)
     }
 
     private static func usable(_ data: Data?) -> Data? {
@@ -199,13 +229,17 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         return data
     }
 
-    private static func epochData() -> Data? {
-        guard var query = base(account: epochAccount) else { return nil }
+    private enum EpochRead { case value(Data), missing, unreadable }
+
+    private static func epochRead() -> EpochRead {
+        guard var query = base(account: epochAccount) else { return .unreadable }
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
-        return usable(result as? Data)
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return .missing }
+        guard status == errSecSuccess, let data = usable(result as? Data) else { return .unreadable }
+        return .value(data)
     }
 
     /// Update the existing epoch. Add only when it is missing. A failed call does not delete it.

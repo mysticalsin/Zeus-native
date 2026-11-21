@@ -246,7 +246,8 @@ public enum FaceTemplateDomainEffect: Equatable, Sendable {
 
 /// Empty and nil domain states are unavailable. They are not compared and they do not delete.
 public enum FaceTemplateDomainGate {
-    public static func effect(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false) -> FaceTemplateDomainEffect {
+    public static func effect(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false, epochUnreadable: Bool = false) -> FaceTemplateDomainEffect {
+        if epochUnreadable { return .denyKeep }
         switch evaluation {
         case .failed, .succeeded(nil):
             return .denyKeep
@@ -255,12 +256,13 @@ public enum FaceTemplateDomainGate {
             if let stored, !stored.isEmpty {
                 return stored == current ? .allow(current) : .changedDelete
             }
-            return enrolled ? .changedDelete : .allow(current)
+            // A missing epoch after enrollment is not a first enrollment, and it does not delete the face.
+            return enrolled ? .denyKeep : .allow(current)
         }
     }
 
-    public static func denies(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false) -> Bool {
-        if case .allow = effect(stored: stored, evaluation: evaluation, enrolled: enrolled) { return false }
+    public static func denies(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false, epochUnreadable: Bool = false) -> Bool {
+        if case .allow = effect(stored: stored, evaluation: evaluation, enrolled: enrolled, epochUnreadable: epochUnreadable) { return false }
         return true
     }
 }
@@ -281,6 +283,12 @@ public enum FaceTemplateEpochWrite {
         let prior = existing.flatMap { $0.isEmpty ? nil : Optional($0) }
         guard succeeded, !next.isEmpty else { return prior }
         return next
+    }
+
+    /// The epoch does not outlive the template, so the next enrollment is not stuck on the old fingerprints.
+    public static func afterTemplateDeleted(epoch: Data?) -> Data? {
+        _ = epoch
+        return nil
     }
 }
 

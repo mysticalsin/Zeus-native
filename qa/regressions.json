@@ -5148,6 +5148,30 @@
       }
     },
     {
+      "id": "REG-1001",
+      "failure": "An epoch read error or a failed first epoch write deleted the enrolled face template.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "epochReadErrorOrFailedFirstWriteKeepsTheTemplate"
+      }
+    },
+    {
+      "id": "REG-1002",
+      "failure": "A fingerprint change deleted the face template and left the old epoch, so the next enrollment was rejected as a change.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "reenrolmentAfterFingerprintChangeClearsTheEpoch"
+      }
+    },
+    {
       "id": "REG-603",
       "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
       "features": [

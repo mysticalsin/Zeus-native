@@ -8910,6 +8910,14 @@
             {
               "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
               "function": "faceTemplateQueryUsesTheSharedAccessGroup"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "epochReadErrorOrFailedFirstWriteKeepsTheTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "reenrolmentAfterFingerprintChangeClearsTheEpoch"
             }
           ]
         }
