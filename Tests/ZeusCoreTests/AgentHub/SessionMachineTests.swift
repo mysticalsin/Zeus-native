@@ -25,6 +25,8 @@ struct SessionMachineTests {
         ],
         .loading: [
             .promptStarted: Expectation(status: .running, previous: .waitingForInput, clockGeneration: 6),
+            .failed: Expectation(status: .error(.failed), previous: .waitingForInput, clockGeneration: 5),
+            .quietForTheStallLimit: Expectation(status: .error(.quiet), previous: .waitingForInput, clockGeneration: 5),
             .ended: Expectation(status: .absent, previous: nil, clockGeneration: 0),
         ],
         .running: [
@@ -44,9 +46,10 @@ struct SessionMachineTests {
             .ended: Expectation(status: .absent, previous: nil, clockGeneration: 0),
         ],
         .needsApproval: [
-            .approved: Expectation(status: .running, previous: nil, clockGeneration: 5),
+            .approved: Expectation(status: .waitingForInput, previous: nil, clockGeneration: 5),
             .denied: Expectation(status: .waitingForInput, previous: nil, clockGeneration: 5),
             .timedOut: Expectation(status: .waitingForInput, previous: nil, clockGeneration: 5),
+            .failed: Expectation(status: .error(.failed), previous: nil, clockGeneration: 5),
             .ended: Expectation(status: .absent, previous: nil, clockGeneration: 0),
         ],
         .done: [
@@ -111,11 +114,18 @@ struct SessionMachineTests {
         #expect(fromWaiting.previous == .waitingForInput)
         #expect(HubSessionMachine.next(fromWaiting, .denied).status == .waitingForInput)
         #expect(HubSessionMachine.next(fromWaiting, .timedOut).status == .waitingForInput)
-        #expect(HubSessionMachine.next(fromWaiting, .approved).status == .running)
+        let approvedWaiting = HubSessionMachine.next(fromWaiting, .approved)
+        #expect(approvedWaiting.status == .waitingForInput)
+        #expect(approvedWaiting.previous == nil)
+        #expect(approvedWaiting.clockGeneration == fromWaiting.clockGeneration)
 
         let noPrevious = HubSessionState(status: .needsApproval, clockGeneration: 4)
         #expect(HubSessionMachine.next(noPrevious, .denied) == noPrevious)
         #expect(HubSessionMachine.next(noPrevious, .timedOut) == noPrevious)
+        let approvedWithNoPrevious = HubSessionMachine.next(noPrevious, .approved)
+        #expect(approvedWithNoPrevious.status == .running)
+        #expect(approvedWithNoPrevious.previous == nil)
+        #expect(approvedWithNoPrevious.clockGeneration == noPrevious.clockGeneration)
     }
 
     /// ZB-028. Loading accepts a failure and a stall, with the same causes as running.
@@ -168,7 +178,7 @@ struct SessionMachineTests {
 
     @Test func everyPairFollowsTheSessionTableOrStays() {
         let listed = table.values.reduce(0) { $0 + $1.count }
-        #expect(listed == 27)
+        #expect(listed == 30)
         #expect(HubSessionStatus.allCases.count == 8)
         #expect(HubSessionEvent.allCases.count == 15)
 
@@ -185,6 +195,236 @@ struct SessionMachineTests {
                     #expect(next == state)
                 }
             }
+        }
+    }
+
+    /// Every status and event is named. There is no default, so a new case fails to compile.
+    @Test func everyPairIsNamedInTheTransitionTable() {
+        #expect(HubSessionStatus.allCases.count * HubSessionEvent.allCases.count == 120)
+        for status in HubSessionStatus.allCases {
+            for event in HubSessionEvent.allCases {
+                let state = seed(status)
+                let next = HubSessionMachine.next(state, event)
+                let expected = named(status, event)
+                #expect(next.status == expected.status)
+                #expect(next.previous == expected.previous)
+                #expect(next.clockGeneration == expected.clockGeneration)
+            }
+        }
+    }
+
+    /// Absent, done, and either error have left the in-progress statuses.
+    /// From every status and stored previous, some events reach one of those.
+    @Test func everyStateCanReachATerminalState() {
+        let stored: [HubSessionStatus?] = [nil] + HubSessionStatus.allCases.map { $0 }
+        for status in HubSessionStatus.allCases {
+            for previous in stored {
+                let start = SessionNode(status: status, previous: previous)
+                #expect(reachesTerminal(start))
+            }
+        }
+    }
+
+    private struct SessionNode: Hashable {
+        var status: HubSessionStatus
+        var previous: HubSessionStatus?
+    }
+
+    private func isTerminal(_ status: HubSessionStatus) -> Bool {
+        switch status {
+        case .absent, .done, .error: true
+        case .loading, .running, .waitingForInput, .needsApproval: false
+        }
+    }
+
+    private func reachesTerminal(_ start: SessionNode) -> Bool {
+        if isTerminal(start.status) { return true }
+        var seen: Set<SessionNode> = [start]
+        var queue = [start]
+        var index = 0
+        while index < queue.count {
+            let node = queue[index]
+            index += 1
+            for event in HubSessionEvent.allCases {
+                let next = HubSessionMachine.next(
+                    HubSessionState(status: node.status, clockGeneration: 0, previous: node.previous),
+                    event
+                )
+                let reached = SessionNode(status: next.status, previous: next.previous)
+                if isTerminal(reached.status) { return true }
+                if seen.insert(reached).inserted { queue.append(reached) }
+            }
+        }
+        return false
+    }
+
+    /// The seed's stored status is waiting for input, so approve from that seed returns there.
+    private func named(_ status: HubSessionStatus, _ event: HubSessionEvent) -> Expectation {
+        let stay = Expectation(status: status, previous: .waitingForInput, clockGeneration: 5)
+        let gone = Expectation(status: .absent, previous: nil, clockGeneration: 0)
+        switch (status, event) {
+        case (.absent, .announced):
+            return Expectation(status: .loading, previous: nil, clockGeneration: 0)
+        case (.absent, .promptStarted),
+             (.absent, .ended),
+             (.absent, .toolActivity),
+             (.absent, .questionAsked),
+             (.absent, .approvalRequested),
+             (.absent, .finished),
+             (.absent, .failed),
+             (.absent, .quietForTheStallLimit),
+             (.absent, .answerAccepted),
+             (.absent, .approved),
+             (.absent, .denied),
+             (.absent, .timedOut),
+             (.absent, .dismissed),
+             (.absent, .activity):
+            return stay
+
+        case (.loading, .promptStarted):
+            return Expectation(status: .running, previous: .waitingForInput, clockGeneration: 6)
+        case (.loading, .failed):
+            return Expectation(status: .error(.failed), previous: .waitingForInput, clockGeneration: 5)
+        case (.loading, .quietForTheStallLimit):
+            return Expectation(status: .error(.quiet), previous: .waitingForInput, clockGeneration: 5)
+        case (.loading, .ended):
+            return gone
+        case (.loading, .announced),
+             (.loading, .toolActivity),
+             (.loading, .questionAsked),
+             (.loading, .approvalRequested),
+             (.loading, .finished),
+             (.loading, .answerAccepted),
+             (.loading, .approved),
+             (.loading, .denied),
+             (.loading, .timedOut),
+             (.loading, .dismissed),
+             (.loading, .activity):
+            return stay
+
+        case (.running, .questionAsked):
+            return Expectation(status: .waitingForInput, previous: .waitingForInput, clockGeneration: 5)
+        case (.running, .approvalRequested):
+            return Expectation(status: .needsApproval, previous: .running, clockGeneration: 5)
+        case (.running, .finished):
+            return Expectation(status: .done, previous: .waitingForInput, clockGeneration: 5)
+        case (.running, .failed):
+            return Expectation(status: .error(.failed), previous: .waitingForInput, clockGeneration: 5)
+        case (.running, .quietForTheStallLimit):
+            return Expectation(status: .error(.quiet), previous: .waitingForInput, clockGeneration: 5)
+        case (.running, .ended):
+            return gone
+        case (.running, .announced),
+             (.running, .promptStarted),
+             (.running, .toolActivity),
+             (.running, .answerAccepted),
+             (.running, .approved),
+             (.running, .denied),
+             (.running, .timedOut),
+             (.running, .dismissed),
+             (.running, .activity):
+            return stay
+
+        case (.waitingForInput, .answerAccepted):
+            return Expectation(status: .running, previous: .waitingForInput, clockGeneration: 5)
+        case (.waitingForInput, .approvalRequested):
+            return Expectation(status: .needsApproval, previous: .waitingForInput, clockGeneration: 5)
+        case (.waitingForInput, .finished):
+            return Expectation(status: .done, previous: .waitingForInput, clockGeneration: 5)
+        case (.waitingForInput, .failed):
+            return Expectation(status: .error(.failed), previous: .waitingForInput, clockGeneration: 5)
+        case (.waitingForInput, .ended):
+            return gone
+        case (.waitingForInput, .announced),
+             (.waitingForInput, .promptStarted),
+             (.waitingForInput, .toolActivity),
+             (.waitingForInput, .questionAsked),
+             (.waitingForInput, .quietForTheStallLimit),
+             (.waitingForInput, .approved),
+             (.waitingForInput, .denied),
+             (.waitingForInput, .timedOut),
+             (.waitingForInput, .dismissed),
+             (.waitingForInput, .activity):
+            return stay
+
+        case (.needsApproval, .approved),
+             (.needsApproval, .denied),
+             (.needsApproval, .timedOut):
+            return Expectation(status: .waitingForInput, previous: nil, clockGeneration: 5)
+        case (.needsApproval, .failed):
+            return Expectation(status: .error(.failed), previous: nil, clockGeneration: 5)
+        case (.needsApproval, .ended):
+            return gone
+        case (.needsApproval, .announced),
+             (.needsApproval, .promptStarted),
+             (.needsApproval, .toolActivity),
+             (.needsApproval, .questionAsked),
+             (.needsApproval, .approvalRequested),
+             (.needsApproval, .finished),
+             (.needsApproval, .quietForTheStallLimit),
+             (.needsApproval, .answerAccepted),
+             (.needsApproval, .dismissed),
+             (.needsApproval, .activity):
+            return stay
+
+        case (.done, .promptStarted):
+            return Expectation(status: .running, previous: .waitingForInput, clockGeneration: 6)
+        case (.done, .ended):
+            return gone
+        case (.done, .announced),
+             (.done, .toolActivity),
+             (.done, .questionAsked),
+             (.done, .approvalRequested),
+             (.done, .finished),
+             (.done, .failed),
+             (.done, .quietForTheStallLimit),
+             (.done, .answerAccepted),
+             (.done, .approved),
+             (.done, .denied),
+             (.done, .timedOut),
+             (.done, .dismissed),
+             (.done, .activity):
+            return stay
+
+        case (.error(.quiet), .activity):
+            return Expectation(status: .running, previous: .waitingForInput, clockGeneration: 5)
+        case (.error(.quiet), .promptStarted):
+            return Expectation(status: .running, previous: .waitingForInput, clockGeneration: 6)
+        case (.error(.quiet), .ended):
+            return gone
+        case (.error(.quiet), .announced),
+             (.error(.quiet), .toolActivity),
+             (.error(.quiet), .questionAsked),
+             (.error(.quiet), .approvalRequested),
+             (.error(.quiet), .finished),
+             (.error(.quiet), .failed),
+             (.error(.quiet), .quietForTheStallLimit),
+             (.error(.quiet), .answerAccepted),
+             (.error(.quiet), .approved),
+             (.error(.quiet), .denied),
+             (.error(.quiet), .timedOut),
+             (.error(.quiet), .dismissed):
+            return stay
+
+        case (.error(.failed), .promptStarted):
+            return Expectation(status: .running, previous: .waitingForInput, clockGeneration: 6)
+        case (.error(.failed), .dismissed):
+            return Expectation(status: .done, previous: .waitingForInput, clockGeneration: 5)
+        case (.error(.failed), .ended):
+            return gone
+        case (.error(.failed), .announced),
+             (.error(.failed), .toolActivity),
+             (.error(.failed), .questionAsked),
+             (.error(.failed), .approvalRequested),
+             (.error(.failed), .finished),
+             (.error(.failed), .failed),
+             (.error(.failed), .quietForTheStallLimit),
+             (.error(.failed), .answerAccepted),
+             (.error(.failed), .approved),
+             (.error(.failed), .denied),
+             (.error(.failed), .timedOut),
+             (.error(.failed), .activity):
+            return stay
         }
     }
 }
