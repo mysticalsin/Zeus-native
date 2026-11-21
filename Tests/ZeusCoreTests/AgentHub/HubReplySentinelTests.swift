@@ -215,6 +215,17 @@ struct HubReplySentinelTests {
         #expect(!type.contains("approvedForeground"))
     }
 
+    /// Terminal's process list does not say which process is in the foreground.
+    /// Taking the last item is a guess. The query and the typing script must not do that.
+    @Test func terminalDoesNotGuessTheLastProcess() throws {
+        let query = HubReplyForeground.queryScript(bundleID: "com.apple.Terminal", tty: "/dev/ttys004")
+        #expect(!query.contains("last item of names"))
+        let info = TerminalInfo(bundleID: "com.apple.Terminal", program: "Apple_Terminal", sessionID: nil, tty: "/dev/ttys004")
+        let script = try #require(AgentReply.script(for: info, text: "keep going", expectedCLI: ["claude"]))
+        #expect(!script.contains("last item of fgNames"))
+        #expect(script.contains("return false"))
+    }
+
     private func waiting() -> HubReplyDispatch {
         var gate = HubReplyDispatch(boundSessionID: session)
         _ = gate.perform(
