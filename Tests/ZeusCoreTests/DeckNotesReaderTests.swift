@@ -510,6 +510,18 @@ struct DeckNotesReaderTests {
             notesVisible: false, screenShareDetected: true, recordingDetected: true, showInScreenSharing: true
         ) == .unchanged)
         #expect(String(describing: DeckNotesCapturePolicy.BarSharing.none) == "none")
+        #expect(DeckNotesCapturePolicy.sharingDuringBoost(notesHeld: true) == .none)
+        #expect(DeckNotesCapturePolicy.sharingDuringBoost(notesHeld: false) == .unchanged)
+        #expect(DeckNotesBarGate.holdsNotes(.open))
+        #expect(DeckNotesBarGate.holdsNotes(.collapsed) == false)
+        #expect(DeckNotesBarGate.holdsNotes(.hidden) == false)
+        #expect(DeckNotesKeys.event(.return) == .read)
+        #expect(DeckNotesKeys.event(.escape) == .dismiss)
+        #expect(DeckNotesKeys.event(.clear) == .clear)
+        #expect(DeckNotesKeys.event(.follow) == .follow)
+        #expect(DeckNotesPageLayout.opensWindow == false)
+        #expect(DeckNotesPageLayout.pageHeight == 236)
+        #expect(DeckNotesPageLayout.clips(notes: String(repeating: "a", count: 8_000), pageHeight: 236))
     }
 
     // MARK: Helpers
