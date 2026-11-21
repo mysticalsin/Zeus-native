@@ -308,9 +308,6 @@ final class SettingsStore {
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
     ]
-    /// Whether an imported chime path can be read here. An import never enables a path this returns false for.
-    static var chimeCanRead: (String) -> Bool = { FileManager.default.isReadableFile(atPath: $0) }
-
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
     static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {
@@ -348,9 +345,11 @@ final class SettingsStore {
     }
 
     /// A specific talk microphone is a Core Audio id from this Mac: it is never exported. Automatic and This Mac's
-    /// microphone are plain names and travel like any other choice.
+    /// microphone are plain names and travel like any other choice. A chime file path is never exported: it
+    /// contains this Mac's account name, and another Mac must not play it.
     static func isExportable(id: String, value: String) -> Bool {
-        !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
+        guard ChimeSettingsExport.includes(id) else { return false }
+        return !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
     }
 
     func exportJSON() throws -> Data {
@@ -383,14 +382,8 @@ final class SettingsStore {
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
             if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if Self.neverChosenByImport[id]?.contains(value) == true { continue }
-            if let event = ChimeSettingsKey.event(forPathID: id) {
-                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                let readable = !trimmed.isEmpty && Self.chimeCanRead(trimmed)
-                let stored = ChimeSettingsImport.storedPath(path: value, readable: readable)
-                if string(id) != stored { optionChanges.append((id, stored)) }
-                ChimeSettingsPersistence.removeBookmark(event, defaults: defaults)
-                continue
-            }
+            // A chime file is chosen in the file picker on this Mac. An import never writes the path.
+            if ChimeSettingsKey.event(forPathID: id) != nil { continue }
             if values[id] != value { optionChanges.append((id, value)) }
         }
         var appChanges: [(key: String, value: Any)] = []

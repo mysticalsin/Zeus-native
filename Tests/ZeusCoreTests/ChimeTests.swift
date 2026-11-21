@@ -223,6 +223,55 @@ import Testing
         #expect(try Data(contentsOf: open) == Data([2, 2, 2, 2]))
     }
 
+    @Test func exportLeavesChimePathsOut() {
+        #expect(ChimeSettingsExport.includes(id: ChimeSettingsKey.closePath) == false)
+        #expect(ChimeSettingsExport.includes(id: ChimeSettingsKey.openPath) == false)
+        #expect(ChimeSettingsExport.includes(id: ChimeSettingsKey.enabled) == true)
+        #expect(ChimeSettingsExport.includes(id: ChimeSettingsKey.volume) == true)
+        #expect(ChimeSettingsExport.includes(id: "sound.on") == true)
+    }
+
+    @Test func aStaleBookmarkIsReplacedAndAFreshOneIsKept() {
+        let fresh = Data([1, 2, 3])
+        #expect(ChimeBookmark.replacement(stale: true, refreshed: fresh) == fresh)
+        #expect(ChimeBookmark.replacement(stale: false, refreshed: fresh) == nil)
+        #expect(ChimeBookmark.replacement(stale: true, refreshed: nil) == nil)
+        #expect(ChimeBookmark.replacement(stale: true, refreshed: Data()) == nil)
+    }
+
+    @Test func decodeAllocationIsBoundedByRateChannelsAndDuration() {
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 44_100, sampleRate: 44_100, channels: 1) == 44_100)
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 10_000_000, sampleRate: 44_100, channels: 1) == 88_200)
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 1_000, sampleRate: 1_000_000_000, channels: 1) == nil)
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 1_000, sampleRate: 44_100, channels: 64) == nil)
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 0, sampleRate: 44_100, channels: 1) == nil)
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 100, sampleRate: .nan, channels: 1) == nil)
+        #expect(ChimeAudioLimits.frameCount(headerFrames: 96_000, sampleRate: 96_000, channels: 2) == 96_000)
+    }
+
+    @Test func aChosenFileMustBeARegularFileOpenedWithoutFollowingALink() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("zeus-chime-file-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("tone.wav")
+        let bytes = Data([9, 8, 7, 6, 5])
+        try bytes.write(to: file)
+        #expect(try ChimeFileAccess.readRegularFile(at: file.path).get() == bytes)
+        #expect(try ChimeFileAccess.measureRegularFile(at: file.path).get() == bytes.count)
+
+        let link = root.appendingPathComponent("linked.wav")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        #expect(ChimeFileAccess.readRegularFile(at: link.path).isRefused)
+        #expect(ChimeFileAccess.measureRegularFile(at: link.path).isRefused)
+        #expect(ChimeFileAccess.readRegularFile(at: root.path).isRefused)
+
+        let bulky = root.appendingPathComponent("bulky.wav")
+        try Data(repeating: 1, count: 32).write(to: bulky)
+        #expect(ChimeFileAccess.readRegularFile(at: bulky.path, maxBytes: 8) == .failure(.tooLarge))
+        #expect(try Data(contentsOf: bulky).count == 32)
+    }
+
     @Test func playbackStaysOffWhenDisabledOrFocusIsActive() {
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false) == true)
         #expect(ChimePlaybackGate.allows(enabled: false, focusActive: false) == false)
@@ -276,5 +325,12 @@ import Testing
             }
         }
         return sampleRate / Double(bestLag)
+    }
+}
+
+private extension Result where Failure == ChimeFileAccess.Problem {
+    var isRefused: Bool {
+        if case .failure = self { return true }
+        return false
     }
 }

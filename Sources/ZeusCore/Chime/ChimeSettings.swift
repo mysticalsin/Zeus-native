@@ -125,33 +125,41 @@ public enum ChimeSettingsPersistence {
     }
 }
 
-/// An imported settings file may name a chime file. The path is kept only when this Mac can read it.
-/// Nothing is copied.
+/// An imported settings file never chooses a chime file. The toggle and the volume still apply.
+/// The closure is accepted so older call sites compile; it is not used to accept a path.
 public enum ChimeSettingsImport {
-    /// The string to store. Empty means the built-in chime.
+    /// The string a person stores from the file picker. Empty means the built-in chime.
     public static func storedPath(path: String, readable: Bool) -> String {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, readable else { return "" }
         return trimmed
     }
 
-    public static func applying(imported: ChimeSettingsSnapshot, canAccess: (String) -> Bool) -> ChimeSettingsSnapshot {
+    public static func applying(imported: ChimeSettingsSnapshot, canAccess _: (String) -> Bool) -> ChimeSettingsSnapshot {
         ChimeSettingsSnapshot(
             enabled: imported.enabled,
             volume: clamp(imported.volume),
-            close: accepted(imported.close, canAccess),
-            open: accepted(imported.open, canAccess))
-    }
-
-    private static func accepted(_ file: ChimeFileReference?, _ canAccess: (String) -> Bool) -> ChimeFileReference? {
-        guard let file else { return nil }
-        let trimmed = file.path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, canAccess(trimmed) else { return nil }
-        return ChimeFileReference(path: trimmed, bookmark: file.bookmark)
+            close: nil,
+            open: nil)
     }
 
     private static func clamp(_ volume: Double) -> Double {
         guard volume.isFinite else { return ChimeSettingsSnapshot.defaultVolume }
         return min(max(volume, 0), 1)
+    }
+}
+
+/// Chime file paths stay on this Mac. An export leaves them out.
+public enum ChimeSettingsExport {
+    public static func includes(id: String) -> Bool {
+        ChimeSettingsKey.event(forPathID: id) == nil
+    }
+}
+
+/// A stale security-scoped bookmark is replaced. A fresh one is left as stored.
+public enum ChimeBookmark {
+    public static func replacement(stale: Bool, refreshed: Data?) -> Data? {
+        guard stale, let refreshed, !refreshed.isEmpty else { return nil }
+        return refreshed
     }
 }

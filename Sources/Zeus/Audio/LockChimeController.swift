@@ -1,4 +1,5 @@
 import AppKit
+import AudioToolbox
 import AVFoundation
 import Intents
 import os
@@ -25,7 +26,9 @@ final class LockChimeController {
     private var builtIn: [ChimeEvent: AVAudioPCMBuffer] = [:]
     private var chosen: [ChimeEvent: AVAudioPCMBuffer] = [:]
     private var tokens: [(NotificationCenter, NSObjectProtocol)] = []
+    private var loadGeneration = 0
     private let log = Logger(subsystem: "app.zeus.mac", category: "chime")
+    private static let fileLog = Logger(subsystem: "app.zeus.mac", category: "chime")
 
     private init() {}
 
@@ -49,10 +52,12 @@ final class LockChimeController {
     }
 
     func stop() {
+        loadGeneration &+= 1
         for (center, token) in tokens { center.removeObserver(token) }
         tokens.removeAll()
         player.stop()
         if engine.isRunning { engine.stop() }
+        chosen.removeAll()
         started = false
     }
 
@@ -83,16 +88,15 @@ final class LockChimeController {
         panel.prompt = "Choose sound"
         panel.message = "Zeus reads this file when it plays. The file stays where it is."
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let readable = FileManager.default.isReadableFile(atPath: url.path)
-        let stored = ChimeSettingsImport.storedPath(path: url.path, readable: readable)
-        guard !stored.isEmpty else {
-            log.error("chosen chime file is unreadable. Keeping the built-in chime.")
+        // Open and fstat before remembering the path. A symlink is refused here.
+        guard case .success = ChimeFileAccess.measureRegularFile(at: url.path) else {
+            log.error("chosen chime file is not a regular audio file. Keeping the built-in chime.")
             return
         }
         let bookmark = (try? url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess]))
             ?? (try? url.bookmarkData())
         ChimeSettingsPersistence.saveBookmark(bookmark, event: event, defaults: .standard)
-        SettingsStore.shared.set(ChimeSettingsKey.pathID(event), stored)
+        SettingsStore.shared.set(ChimeSettingsKey.pathID(event), url.path)
         reload()
     }
 
@@ -148,20 +152,36 @@ final class LockChimeController {
         }
     }
 
+    /// Reads and decodes off the main thread. Launch only remembers that work is in flight.
     private func installChosenFiles() {
-        for event in ChimeEvent.allCases {
-            guard let file = settings.file(for: event) else {
-                chosen[event] = nil
-                continue
-            }
-            if let buffer = decode(file) {
-                chosen[event] = buffer
-            } else {
-                chosen[event] = nil
-                if let note = ChimeSoundResolver.resolve(event: event, path: file.path, readable: false).privateLog {
-                    log.error("\(note, privacy: .private)")
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        let files = ChimeEvent.allCases.compactMap { event -> (ChimeEvent, ChimeFileReference)? in
+            guard let file = settings.file(for: event) else { return nil }
+            return (event, file)
+        }
+        guard !files.isEmpty else {
+            chosen.removeAll()
+            return
+        }
+        Task.detached { [weak self] in
+            var loaded: [ChimeEvent: AVAudioPCMBuffer] = [:]
+            for (event, file) in files {
+                if let buffer = Self.decodeChosen(file, event: event) {
+                    loaded[event] = buffer
+                } else if let note = ChimeSoundResolver.resolve(event: event, path: file.path, readable: false).privateLog {
+                    Self.fileLog.error("\(note, privacy: .private)")
                 }
             }
+            let box = ChimeBufferBox(loaded)
+            await self?.storeChosen(box, generation: generation)
+        }
+    }
+
+    private func storeChosen(_ box: ChimeBufferBox, generation: Int) {
+        guard generation == loadGeneration else { return }
+        for event in ChimeEvent.allCases {
+            chosen[event] = box.buffers[event]
         }
     }
 
@@ -190,13 +210,17 @@ final class LockChimeController {
         return buffer
     }
 
-    private func resolvedURL(_ file: ChimeFileReference) -> URL? {
+    /// Resolves the bookmark the file picker stored. A stale bookmark is written back before the file is opened.
+    private nonisolated static func resolvedURL(_ file: ChimeFileReference, event: ChimeEvent) -> URL? {
         if let bookmark = file.bookmark {
             var stale = false
             if let scoped = try? URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], bookmarkDataIsStale: &stale) {
+                storeRefreshedBookmark(scoped, stale: stale, event: event)
                 return scoped
             }
+            stale = false
             if let plain = try? URL(resolvingBookmarkData: bookmark, options: [], bookmarkDataIsStale: &stale) {
+                storeRefreshedBookmark(plain, stale: stale, event: event)
                 return plain
             }
         }
@@ -205,49 +229,90 @@ final class LockChimeController {
         return URL(fileURLWithPath: path)
     }
 
-    /// At most two seconds, and only from a small file, so choosing a sound cannot stall the Mac.
-    private func decode(_ file: ChimeFileReference) -> AVAudioPCMBuffer? {
-        guard let url = resolvedURL(file) else { return nil }
+    private nonisolated static func storeRefreshedBookmark(_ url: URL, stale: Bool, event: ChimeEvent) {
+        let fresh = (try? url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess]))
+            ?? (try? url.bookmarkData())
+        guard let replacement = ChimeBookmark.replacement(stale: stale, refreshed: fresh) else { return }
+        ChimeSettingsPersistence.saveBookmark(replacement, event: event, defaults: .standard)
+    }
+
+    /// The bytes come from one `O_NOFOLLOW` descriptor. The decode buffer is sized only after the header is bounded.
+    private nonisolated static func decodeChosen(_ file: ChimeFileReference, event: ChimeEvent) -> AVAudioPCMBuffer? {
+        guard let url = resolvedURL(file, event: event) else { return nil }
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-        guard FileManager.default.isReadableFile(atPath: url.path) else { return nil }
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let bytes = (attributes?[.size] as? NSNumber)?.intValue ?? 0
-        guard bytes > 0, bytes <= 2_000_000 else { return nil }
-        guard let audio = try? AVAudioFile(forReading: url), let target = Self.playbackFormat else { return nil }
-        let sourceFrames = AVAudioFrameCount(min(Double(audio.length), audio.processingFormat.sampleRate * 2))
-        guard sourceFrames > 0,
-              let source = AVAudioPCMBuffer(pcmFormat: audio.processingFormat, frameCapacity: sourceFrames) else { return nil }
-        do { try audio.read(into: source) } catch { return nil }
-        guard source.frameLength > 0 else { return nil }
-        if audio.processingFormat.sampleRate == target.sampleRate,
-           audio.processingFormat.channelCount == target.channelCount,
-           audio.processingFormat.commonFormat == target.commonFormat {
-            return source
-        }
-        guard let converter = AVAudioConverter(from: audio.processingFormat, to: target) else { return nil }
-        let ratio = target.sampleRate / audio.processingFormat.sampleRate
-        let capacity = AVAudioFrameCount((Double(source.frameLength) * ratio).rounded(.up)) + 32
-        guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return nil }
-        let feed = ChimeFileFeed(source)
-        var error: NSError?
-        let status = converter.convert(to: converted, error: &error) { _, outStatus in
-            if feed.sent {
-                outStatus.pointee = .noDataNow
-                return nil
-            }
-            feed.sent = true
-            outStatus.pointee = .haveData
-            return feed.buffer
-        }
-        guard error == nil, status != .error, converted.frameLength > 0 else { return nil }
-        return converted
+        guard case .success(let data) = ChimeFileAccess.readRegularFile(at: url.path) else { return nil }
+        return decode(data)
+    }
+
+    private nonisolated static func decode(_ data: Data) -> AVAudioPCMBuffer? {
+        let memory = ChimeMemoryAudio(data)
+        var fileID: AudioFileID?
+        let opened = AudioFileOpenWithCallbacks(
+            Unmanaged.passUnretained(memory).toOpaque(),
+            chimeReadAudio, nil, chimeAudioSize, nil, 0, &fileID)
+        guard opened == noErr, let fileID else { return nil }
+        defer { AudioFileClose(fileID) }
+        var format = AudioStreamBasicDescription()
+        var formatSize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        guard AudioFileGetProperty(fileID, kAudioFilePropertyDataFormat, &formatSize, &format) == noErr else { return nil }
+        let frames = ChimeAudioLimits.frameCount(
+            headerFrames: headerFrameCount(fileID, format: format),
+            sampleRate: format.mSampleRate,
+            channels: Int(format.mChannelsPerFrame))
+        guard let frames else { return nil }
+        var extended: ExtAudioFileRef?
+        guard ExtAudioFileWrapAudioFileID(fileID, false, &extended) == noErr, let extended else { return nil }
+        defer { ExtAudioFileDispose(extended) }
+        guard let client = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: ChimeTone.sampleRate, channels: 1, interleaved: false) else { return nil }
+        var clientDescription = client.streamDescription.pointee
+        let propertySize = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        guard ExtAudioFileSetProperty(extended, kExtAudioFileProperty_ClientDataFormat, propertySize, &clientDescription) == noErr else { return nil }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: client, frameCapacity: AVAudioFrameCount(frames)) else { return nil }
+        var count = UInt32(frames)
+        guard ExtAudioFileRead(extended, &count, buffer.mutableAudioBufferList) == noErr, count > 0 else { return nil }
+        buffer.frameLength = count
+        return buffer
+    }
+
+    private nonisolated static func headerFrameCount(_ file: AudioFileID, format: AudioStreamBasicDescription) -> Int64 {
+        var packets: UInt64 = 0
+        var size = UInt32(MemoryLayout<UInt64>.size)
+        guard AudioFileGetProperty(file, kAudioFilePropertyAudioDataPacketCount, &size, &packets) == noErr else { return Int64.max }
+        let perPacket = UInt64(max(format.mFramesPerPacket, 1))
+        guard format.mFramesPerPacket > 0 else { return Int64.max }
+        if packets > UInt64(Int64.max) / perPacket { return Int64.max }
+        let frames = packets * perPacket
+        return frames == 0 ? 0 : Int64(frames)
     }
 }
 
-/// One buffer handed to AVAudioConverter. The convert call is synchronous; the class only satisfies Sendable.
-private final class ChimeFileFeed: @unchecked Sendable {
-    let buffer: AVAudioPCMBuffer
-    var sent = false
-    init(_ buffer: AVAudioPCMBuffer) { self.buffer = buffer }
+/// Holds one chosen file's bytes for the AudioFile callbacks. The decode call is synchronous.
+private final class ChimeMemoryAudio: @unchecked Sendable {
+    let data: Data
+    init(_ data: Data) { self.data = data }
+}
+
+/// Buffers produced off the main thread, handed back for playback.
+private final class ChimeBufferBox: @unchecked Sendable {
+    let buffers: [ChimeEvent: AVAudioPCMBuffer]
+    init(_ buffers: [ChimeEvent: AVAudioPCMBuffer]) { self.buffers = buffers }
+}
+
+private func chimeReadAudio(_ client: UnsafeMutableRawPointer, _ position: Int64, _ request: UInt32, _ buffer: UnsafeMutableRawPointer, _ actual: UnsafeMutablePointer<UInt32>) -> OSStatus {
+    let audio = Unmanaged<ChimeMemoryAudio>.fromOpaque(client).takeUnretainedValue()
+    guard position >= 0, position <= Int64(audio.data.count) else { return kAudioFileUnspecifiedError }
+    let start = Int(position)
+    guard start <= audio.data.count else { return kAudioFileUnspecifiedError }
+    let amount = min(Int(request), audio.data.count - start)
+    if amount > 0 {
+        let destination = UnsafeMutableRawBufferPointer(start: buffer, count: amount)
+        _ = audio.data.copyBytes(to: destination, from: start..<(start + amount))
+    }
+    actual.pointee = UInt32(amount)
+    return noErr
+}
+
+private func chimeAudioSize(_ client: UnsafeMutableRawPointer) -> Int64 {
+    Int64(Unmanaged<ChimeMemoryAudio>.fromOpaque(client).takeUnretainedValue().data.count)
 }
