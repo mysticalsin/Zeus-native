@@ -137,6 +137,13 @@ final class SettingsStore {
     }
 
     func set(_ id: String, _ value: String, origin: ChangeOrigin = .person) {
+        if id == ZeusScreenSharePolicy.showInSharingKey, value == "true" || value == "false" {
+            if !TopBarStyle.isSnapshot { ZeusScreenSharePolicy.setShown(value == "true", defaults: defaults) }
+            guard values[id] != value else { return }
+            values[id] = value
+            onChange?(id)
+            return
+        }
         if id == ScribeAutoStartMode.settingID { applyAutoStartChoice(value, origin: origin) }
         guard values[id] != value else { return }
         values[id] = value
