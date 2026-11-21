@@ -101,6 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointing?.stop()
         // Every shaping tap is destroyed and the claim released, so no app is left muted.
         equaliser?.shutdown()
+        if on(.lockChimes) { LockChimeController.shared.stop() }
         // Tiling removes its key tap, observers and overlays. It never moves a window on the way out. The controller
         // is not even made when the service is denied.
         if on(.tiling) { TilingController.shared.stop() }
@@ -265,6 +266,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             TodoController.shared.onCompleted = { AvatarStatus.shared.flash(.done) }
         }
         if on(.sleepWatch) { AvatarStatus.shared.startSleepWatch() }
+        if on(.lockChimes) { LockChimeController.shared.start() }
         if on(.intelligence) {
             IntelligenceCenter.shared.onDecided = { [weak self] engine, intent in self?.topBar.show(.decided(engine: engine, summary: intent)) }
         }
@@ -1013,6 +1015,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))
             case "audio.equaliser": self?.equaliser?.setSwitch(store.bool(id))
+            case ChimeSettingsKey.enabled, ChimeSettingsKey.volume, ChimeSettingsKey.closePath, ChimeSettingsKey.openPath:
+                LockChimeController.shared.reload()
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
             case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break

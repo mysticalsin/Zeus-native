@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 214 of 214 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 214 in scope). 203 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 218 of 218 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 218 in scope). 207 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 163.
+**Before this round:** has 19, partial 27, missing 167.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -129,6 +129,10 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Sound categories | Chime when an agent starts working | toggle | off | Off by default; busy sessions start often. | missing | live | `sound.agentStart` | Plays the Run start sound when a session begins working. Completion chimes only play after 20 seconds of work, and agent chimes are limited to one every 3 seconds. |
 | Sound categories | Ambient loop while an agent works | toggle | off | A quiet looping sound under a running agent. | missing | live | `sound.runningLoop` | Zeus addition. Plays the bundled running loop at half volume while any agent is working; fades out when none is. |
 | Sound categories | Failure sound | toggle | on | A short sound when an agent turn fails. | missing | live | `sound.failure` | Plays the Failure sound when a session turns red (rate limit, auth or API error). |
+| Lock and wake | Lock and wake chimes | toggle | on | A short chime when the Mac locks or sleeps, and another when it wakes. | missing | live | `chime.lockWake` | Zeus addition. On by default. One original chime per lock or wake. A file you choose is read from disk and is not copied into the app. |
+| Lock and wake | Chime volume | slider | - | How loud the lock and wake chimes are. The Mac output volume still applies. | missing | live | `chime.lockWake.volume` | Zeus addition. 0 to 100. The system output volume is left as it is. |
+| Lock and wake | Lock chime file | file | - | A sound file on this Mac for lock or sleep. Empty uses the built-in chime. | missing | custom | `chime.lockWake.closePath` | Zeus addition. Chosen with Choose sound. The file is not copied into the app. An import keeps the path only when this Mac can read it. |
+| Lock and wake | Wake chime file | file | - | A sound file on this Mac for wake or unlock. Empty uses the built-in chime. | missing | custom | `chime.lockWake.openPath` | Zeus addition. Chosen with Choose sound. The file is not copied into the app. An import keeps the path only when this Mac can read it. |
 | Per-app sound | Shape sound per app | toggle | off | Taps only the apps you shape, with System Audio Recording. Off removes every tap. | missing | custom | `audio.equaliser` | Zeus addition. Off by default. Only this switch can raise the System Audio Recording prompt. |
 
 ## Voice

@@ -200,6 +200,11 @@ final class SettingsStore {
         for option in SettingsCatalog.options(in: section) where option.state != .custom && Self.isValue(option.kind) {
             set(option.id, option.defaultValue, origin: .reset)
         }
+        if section == .sounds {
+            set(ChimeSettingsKey.closePath, "", origin: .reset)
+            set(ChimeSettingsKey.openPath, "", origin: .reset)
+            ChimeSettingsPersistence.clearChosenFiles(defaults: defaults)
+        }
         if let keys = Self.extraKeys[section] { ExtraPreferences.shared.reset(keys) }
     }
 
@@ -303,6 +308,9 @@ final class SettingsStore {
         // It listens on the local network and advertises this Mac.
         "fling.enabled",
     ]
+    /// Whether an imported chime path can be read here. An import never enables a path this returns false for.
+    static var chimeCanRead: (String) -> Bool = { FileManager.default.isReadableFile(atPath: $0) }
+
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
     static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {
@@ -375,6 +383,14 @@ final class SettingsStore {
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
             if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if Self.neverChosenByImport[id]?.contains(value) == true { continue }
+            if let event = ChimeSettingsKey.event(forPathID: id) {
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                let readable = !trimmed.isEmpty && Self.chimeCanRead(trimmed)
+                let stored = ChimeSettingsImport.storedPath(path: value, readable: readable)
+                if string(id) != stored { optionChanges.append((id, stored)) }
+                ChimeSettingsPersistence.removeBookmark(event, defaults: defaults)
+                continue
+            }
             if values[id] != value { optionChanges.append((id, value)) }
         }
         var appChanges: [(key: String, value: Any)] = []
