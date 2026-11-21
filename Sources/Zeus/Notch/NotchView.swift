@@ -235,6 +235,12 @@ struct NotchView: View {
     /// How the closed notch grows into (and out of) its wings.
     @MainActor static var wingsSpring: Animation? { Motion.reducible(Motion.cueGrow) }
 
+    /// The capture-failure hint the notch already shows, when that is the current cue.
+    static func pttFailureText(_ cue: NotchCue?) -> String? {
+        if case .hint(let text) = cue { return text }
+        return nil
+    }
+
     private var closedWings: ClosedWingsFacts { topBar.map(ClosedWingsFacts.init(of:)) ?? .noWings }
 
     /// While closed (nil otherwise), what the closed width depends on besides the footprint: the trigger for
@@ -420,6 +426,17 @@ struct NotchView: View {
         .overlay(alignment: .top) {
             if let topBar, model.presentation == .closed, layers.glow, hasNotch || slimPill || !topBar.lights.isEmpty {
                 NotchLights(topBar: topBar, status: status, body_: closedLightBody, shoulder: shoulder)
+            }
+        }
+        .overlay(alignment: .top) {
+            // Beside the existing lights. The round mark stays in this panel.
+            if let topBar {
+                PTTIndicatorOverlay(
+                    held: topBar.talkHeld,
+                    listening: topBar.micListening,
+                    level: topBar.micLevel,
+                    failureText: Self.pttFailureText(topBar.cue),
+                    reduceMotion: Motion.reduced)
             }
         }
         .onChange(of: model.status) { old, new in

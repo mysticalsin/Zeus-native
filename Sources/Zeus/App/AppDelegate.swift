@@ -1200,13 +1200,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if self.topBar.micListening != listening { self.topBar.micListening = listening }
                 let level = Double(self.buddy.model.audioLevel ?? 0)
                 if self.topBar.micLevel != level { self.topBar.micLevel = level }
+                let held = WakeWordController.shared.talkKeyHeld
+                if self.topBar.talkHeld != held { self.topBar.talkHeld = held }
             }
         }
         feed.tolerance = interval * 0.4
     }
 
     private var feedIsLive: Bool {
-        (voice?.isSpeaking ?? false) || (voice?.isListening ?? false) || topBar.isDictating || notch.model.approval != nil
+        (voice?.isSpeaking ?? false) || (voice?.isListening ?? false) || WakeWordController.shared.talkKeyHeld
+            || topBar.isDictating || notch.model.approval != nil
             || [.countdown, .rolling, .paused].contains(topBar.roll.phase)
     }
 }
