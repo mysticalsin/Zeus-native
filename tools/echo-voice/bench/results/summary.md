@@ -4,7 +4,7 @@
 - Model: model.safetensors sha256 ad2c3534…c0fa, 10,540,113,510 bytes.
 - Set: 5 FR + 5 EN items (s1, s2, m1, m2, l1). Settings: `--mode both`, seed 0, 16 warm-up frames.
 - Audio: synthetic built-in `say` voices (Thomas, Samantha), no voice reference.
-- Evidence: `echo-haru-results.tgz`, sha256 `7e7f32685a7ec6d761946a97fa26524bd1a61d17e648eca4df75dbfa460f911c`, extracted to `pkg/`. Each number below was re-read from `pkg/<run>/report.json`.
+- Evidence: `echo-haru-results.tgz`, sha256 `7e7f32685a7ec6d761946a97fa26524bd1a61d17e648eca4df75dbfa460f911c`, extracted to `pkg/`. The stage cells were re-read from `pkg/<run>/report.json`. Those per-item files are not in this tree. The sum column is the sum of the stage cells in this table, not a separate measurement.
 
 | run | plain p50 ms/frame | plain RTF | instr. p50 ms | instr. RTF | glue (median) | peak MLX GB | peak RSS GB | load s | TTFA p50 ms | p95/p50 max |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -18,14 +18,14 @@ Median stage p50, in ms:
 | run | encode | embed | lm | sample | head | decode | host | sum |
 |---|---|---|---|---|---|---|---|---|
 | q8 FR | 10.26 | 0.77 | 48.44 | 8.68 | 8.23 | 10.13 | 0.04 | 86.55 |
-| q8 EN | 9.87 | 0.76 | 45.65 | 8.10 | 7.80 | 9.76 | 0.04 | 82.0 |
-| bf16 FR | 9.97 | 0.81 | 80.70 | 14.23 | 7.79 | 9.73 | 0.04 | 133.3 |
-| bf16 EN | 11.67 | 0.88 | 96.11 | 17.01 | 9.23 | 11.49 | 0.04 | 147.4 |
+| q8 EN | 9.87 | 0.76 | 45.65 | 8.10 | 7.80 | 9.76 | 0.04 | 81.98 |
+| bf16 FR | 9.97 | 0.81 | 80.70 | 14.23 | 7.79 | 9.73 | 0.04 | 123.27 |
+| bf16 EN | 11.67 | 0.88 | 96.11 | 17.01 | 9.23 | 11.49 | 0.04 | 146.43 |
 
-Cross-check against the figures in the brief (q8 p50 ~80 ms, RTF ~0.60, peak 7.4 GB, host 0.04 ms ≈ 0.06 %, q8 FR stages): **all match**.
+Cross-check against the figures in the brief (q8 p50 ~80 ms, RTF ~0.60, peak 7.4 GB, host 0.04 ms ≈ 0.05 % of the 80.81 ms q8 frame, q8 FR stages): **all match**. The 0.05 % figure is 0.04 / 80.81. The M5 bandwidth floor in the last section is an estimate from public specs, not a per-item measurement from this run.
 
 Notes:
-- The instrumented stage sum (86.55 ms) is higher than the plain p50 (80.81 ms) because instrumentation forces a sync after each stage.
+- The q8 French stage sum (86.55 ms) is higher than the plain p50 (80.81 ms) because instrumentation forces a sync after each stage.
 - TTFA is time to first audio: prompt prefill plus frame 0.
 
 **Verdict**
