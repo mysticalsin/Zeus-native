@@ -104,6 +104,32 @@ struct VoiceQualityRouteSecurityTests {
         }
     }
 
+    @Test func aKeyLongerThan256CharactersIsRefusedAndNotEchoed() async throws {
+        let marker = "LEN256-TAIL-7c"
+        let exact = String(repeating: "a", count: 256 - marker.count) + marker
+        #expect(exact.count == 256)
+        #expect(VoiceQualityKeyGate.accepted(exact) == exact)
+        let tooLong = exact + "Z"
+        #expect(tooLong.count == 257)
+        let refused = VoiceQualityKeyGate.accepted(tooLong) == nil
+        #expect(refused)
+        let trimmed = "\n" + exact + "\n"
+        #expect(VoiceQualityKeyGate.accepted(trimmed) == exact)
+        let trimmedTooLong = "\n" + tooLong
+        let trimmedRefused = VoiceQualityKeyGate.accepted(trimmedTooLong) == nil
+        #expect(trimmedRefused)
+
+        let outcome = try await rejectedKey(tooLong)
+        #expect(outcome.error as? VoiceQualityError == .keyRejected)
+        let description = (outcome.error as? VoiceQualityError)?.description ?? ""
+        #expect(description == "The key is not valid.")
+        #expect(!description.contains(marker))
+        #expect(!description.contains("Z"))
+        #expect(!outcome.message.contains(marker))
+        #expect(outcome.count == 0)
+        #expect(outcome.hosts.isEmpty)
+    }
+
     @Test func urlSessionAndHeaderErrorsDoNotEchoTheKey() {
         let sentinel = "header-sentinel-key-55aa"
         let underlying = NSError(
