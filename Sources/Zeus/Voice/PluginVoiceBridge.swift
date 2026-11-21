@@ -23,10 +23,13 @@ enum PluginAudioPlay {
     }
 
     static func stop() {
+        synthesizer.stopSpeaking(at: .immediate)
         player?.stop()
         player = nil
         for engine in engines { engine.stop() }
         engines.removeAll()
+        for observer in routeObservers { NotificationCenter.default.removeObserver(observer) }
+        routeObservers.removeAll()
         for file in ProviderEngineTracker.shared.stopAll() {
             try? FileManager.default.removeItem(at: file)
         }
@@ -50,6 +53,14 @@ enum PluginAudioPlay {
             node.scheduleFile(file, at: nil) { finish.complete() }
             node.play()
             engines.append(engine)
+            let observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { _ in
+                MainActor.assumeIsolated {
+                    engine.stop()
+                    ProviderPlaybackGate.shared.reset()
+                    try? FileManager.default.removeItem(at: url)
+                }
+            }
+            routeObservers.append(observer)
             return true
         } catch {
             try? FileManager.default.removeItem(at: url)
@@ -59,6 +70,7 @@ enum PluginAudioPlay {
 
     static func speakLocally(_ text: String) {
         let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = Speaker.bestVoice(for: "en")
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         synthesizer.speak(utterance)
     }
@@ -68,6 +80,7 @@ enum PluginAudioPlay {
     }
 
     private static var engines: [AVAudioEngine] = []
+    private static var routeObservers: [NSObjectProtocol] = []
 }
 
 private final class WavFinish: @unchecked Sendable {
