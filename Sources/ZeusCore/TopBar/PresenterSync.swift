@@ -220,7 +220,7 @@ public struct GoogleSlidesNotesProvider: PresenterNotesProvider {
 
     /// The deck URL predicate. Visible page text is not a stand-in for speaker notes, and `load` still refuses to turn a browser deck into the floating script.
     public static func isPresentation(url: String) -> Bool {
-        DeckNotesURL.isDeck(url)
+        DeckURL.isPresentation(url)
     }
 }
 
