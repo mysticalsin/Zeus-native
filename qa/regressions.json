@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Push to talk could leave the listening ring up after a release or an error, pulse under Reduce Motion, and speak on every level change.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+        "function": "releaseClearsWithinOneFrameBudget"
+      }
     }
-]
+  ]
 }
