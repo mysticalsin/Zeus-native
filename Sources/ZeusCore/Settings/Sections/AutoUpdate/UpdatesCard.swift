@@ -197,7 +197,7 @@ public enum UpdatesCard {
     }
 
     private static func statusLine(_ state: UpdateSessionState, context: UpdateContext, configured: Bool) -> String {
-        guard configured else { return "Updates are not configured." }
+        guard configured else { return "updates not configured" }
         switch state {
         case .disabled: return "Automatic checks are off."
         case .idle: return "Automatic checks are on."
