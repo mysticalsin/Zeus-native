@@ -289,6 +289,8 @@ final class DictationController {
     private var mode = DictationMode.builtIns[0]
     /// The running turn's immutable copy of mode, target, selection and engine.
     private var turnContext: DictationTurnContext?
+    /// Speech-trace generation for the open Murmur turn. A newer begin invalidates a late deliver.
+    private var speechTraceGeneration = 0
     /// The chosen engine hears this turn (ready and chosen); Apple otherwise.
     private var useLocal = false
     /// The source dictation paused, so the same one is resumed afterwards and never another.
@@ -621,6 +623,7 @@ final class DictationController {
         let turnGeneration = ownership.beginTurn()
         do {
             // The start cue sounds first: on key down, before the microphone warms up.
+            speechTraceGeneration = speech.noteKeyDown(path: .murmurTap)
             let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
                 try seams.speechStart(speech, turnGeneration)
             }
@@ -628,6 +631,7 @@ final class DictationController {
             turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
                                                selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
         } catch {
+            speech.noteDelivered(generation: speechTraceGeneration)
             speech.onCaptureFailure = nil
             ownership.invalidate()
             insertionTracker.invalidate()
@@ -788,6 +792,7 @@ final class DictationController {
         let audioMs = Int(Date().timeIntervalSince(startedAt) * 1000)
         let released = Date()
         let generation = context.generation
+        let traceGeneration = speechTraceGeneration
         let stream = turnStream
         // These values belong to this finish flow, never to a later controller turn.
         var correctionRequested = false
@@ -817,7 +822,7 @@ final class DictationController {
         let flow = DictationFinishFlow(
             isCurrent: isCurrent,
             transcribe: { [self] in
-                let heard = await transcribeTurn(context: context, stream: stream)
+                let heard = await transcribeTurn(context: context, stream: stream, traceGeneration: traceGeneration)
                 transcribeMs = DictationLatency.milliseconds(from: released, to: Date())
                 return heard
             },
@@ -926,11 +931,15 @@ final class DictationController {
     /// never loses the dictation: Apple's words are already there, and the notch says so.
     /// Runs for `context`'s turn only: once cancelled or replaced it touches no shared state.
     private func transcribeTurn(context: DictationTurnContext,
-                                stream: (any TranscriptionStream)?) async -> DictationFinishFlow.Heard {
+                                stream: (any TranscriptionStream)?,
+                                traceGeneration: Int) async -> DictationFinishFlow.Heard {
         let isCurrent: () -> Bool = { [ownership] in ownership.owns(generation: context.generation) }
         // A ready local engine makes the final text, so release does not wait for Apple's second pass.
         let live = await seams.speechStop(speech, !(context.useLocal && context.engine != nil))
-        guard isCurrent() else { return .init(text: "", engine: .apple, samples: []) }
+        guard isCurrent() else {
+            speech.noteDelivered(generation: traceGeneration)
+            return .init(text: "", engine: .apple, samples: [])
+        }
         speech.onCaptureFailure = nil
         let samples = speech.takeSamples()
         speech.onSamples = nil
@@ -939,10 +948,12 @@ final class DictationController {
             stream?.cancel()
             let note = !context.useLocal && settings.engine.isCloud
                 ? "\(settings.engine.title) needs its key, Apple took over." : nil
+            speech.noteDelivered(generation: traceGeneration)
             return .init(text: live, engine: .apple, samples: samples, note: note)
         }
         let (text, kind, note) = await resolve(engine: engine, stream: stream, samples: samples, live: live,
                                                isCurrent: isCurrent)
+        speech.noteDelivered(generation: traceGeneration)
         return .init(text: text, engine: kind, samples: samples, note: note)
     }
 

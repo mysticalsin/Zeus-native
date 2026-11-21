@@ -1207,6 +1207,69 @@
           "id": "F01.1"
         },
         {
+          "check": "portable-regressions",
+          "acceptance": "On an injected clock, both the talk hold and the Murmur tap endpoint after silence, reuse one on-device model, and deliver the final within budget of the endpoint. No transcript text is recorded.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "latencyRegressionBothPathsStayInsideTheBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "endpointBoundariesKillComparisonMutants"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aStaleMarkDoesNotWriteTheOpenUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "generationZeroIsNotAnOpenUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "anOlderCancelDoesNotCloseTheNewerUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aChangedTokenDuringSilenceIsSpeechOnTheFixedPolicy"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aCancelledDeliverIsRefused"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aStaleBufferDoesNotSetSpeechOrSilence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "quietReachesExactlyAtTheHandsFreeThreshold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "batchGiveUpPinsTheExactFormula"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "legacyBatchGiveUpKeepsTheThirtySecondFloor"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "fileRecognitionGiveUpUsesTheProductionBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aCancelledMarkDoesNotWriteTheOpenUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample"
+            }
+          ],
+          "id": "F01.stt-latency"
+        },
+        {
           "check": "native-DictationOwnershipIntegrationTests",
           "acceptance": "Queued stale turns and focus drift cannot deliver into a new target.",
           "cases": [

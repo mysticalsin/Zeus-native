@@ -4297,7 +4297,7 @@
     },
     {
       "id": "REG-404",
-      "failure": "The meeting card timed out under the pointer of the person about to tap it.",
+      "failure": "A hover used to hold the meeting card forever, which was the bug. The hover now pauses dismissal for at most 30 s, then the card dismisses. The card lifetime stays 45 s.",
       "features": [
         "F04"
       ],
@@ -8654,6 +8654,30 @@
       }
     },
     {
+      "id": "REG-991",
+      "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_shipped_plist_is_an_agent_app"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A guide click test hard-coded the accessory policy instead of the function the shipped app uses, so it could pass while main.swift set a different policy. The test now calls ZeusActivation.configure and still checks that the click does not change activation.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_main_and_the_guide_test_use_the_shared_activation_function"
+      }
+    },
+    {
       "id": "REG-973",
       "failure": "A stop that ran off the main actor read the speech engine after the next turn had swapped in its own, so it stopped the new turn's engine, removed its tap and dropped its configuration observer while the new turn believed it was recording.",
       "features": [
@@ -8676,6 +8700,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "Speech to text waited 2.5 s for a final that often never arrived and left the recognition task running, and an unchanged partial reset the silence endpoint. Talk hold and Murmur tap both did this. On-device recognition could also sit for at least 30 s.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "latencyRegressionBothPathsStayInsideTheBudget"
+      }
     }
-]
+  ]
 }
