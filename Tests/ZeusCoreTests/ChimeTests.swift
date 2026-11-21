@@ -272,10 +272,53 @@ import Testing
         #expect(try Data(contentsOf: bulky).count == 32)
     }
 
+    @Test func wakeAfterPowerOffPlaysOpenAndALaterClosePlays() {
+        var chimes = ChimeDebouncer()
+        chimes.arm()
+        #expect(chimes.receive(.willPowerOff, at: 5) == .none)
+        #expect(chimes.receive(.didWake, at: 5.2) == .play(.open))
+        #expect(chimes.receive(.willSleep, at: 20) == .play(.close))
+    }
+
+    @Test func aCancelledPowerOffAllowsALaterClose() {
+        var chimes = ChimeDebouncer()
+        chimes.arm()
+        #expect(chimes.receive(.willPowerOff, at: 5) == .none)
+        #expect(chimes.receive(.willSleep, at: 5.2) == .none)
+        let later = 5 + ChimeDebouncer.clusterWindow + 0.05
+        #expect(chimes.receive(.willSleep, at: later) == .play(.close))
+    }
+
     @Test func playbackStaysOffWhenDisabledOrFocusIsActive() {
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false) == true)
         #expect(ChimePlaybackGate.allows(enabled: false, focusActive: false) == false)
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: true) == false)
+    }
+
+    @Test func playbackObeysSoundFeedbackMeetingModeAndUnknownFocus() {
+        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, soundFeedback: false) == false)
+        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, meeting: true) == false)
+        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, focusKnown: false) == false)
+        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, soundFeedback: true, meeting: false, focusKnown: true) == true)
+    }
+
+    @Test func aLinkedOversizedOrLongFileIsNotStored() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("zeus-chime-store-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("short.wav")
+        try Data([4, 5, 6, 7]).write(to: file)
+        let link = root.appendingPathComponent("linked.wav")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        let bulky = root.appendingPathComponent("bulky.wav")
+        try Data(repeating: 2, count: 24).write(to: bulky)
+
+        #expect(ChimeSettingsImport.storedPath(path: file.path, readable: true, seconds: 0.4) == file.path)
+        #expect(ChimeSettingsImport.storedPath(path: link.path, readable: true, seconds: 0.4) == "")
+        #expect(ChimeSettingsImport.storedPath(path: bulky.path, readable: true, seconds: 0.4, maxBytes: 8) == "")
+        #expect(ChimeSettingsImport.storedPath(path: file.path, readable: true, seconds: 5) == "")
+        #expect(try Data(contentsOf: file) == Data([4, 5, 6, 7]))
     }
 
     // MARK: Helpers

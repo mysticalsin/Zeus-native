@@ -91,7 +91,10 @@ public struct ChimeDebouncer: Sendable {
 
 /// Whether a chime may start. Focus is a separate input so this stays free of system frameworks.
 public enum ChimePlaybackGate {
-    public static func allows(enabled: Bool, focusActive: Bool) -> Bool {
-        enabled && !focusActive
+    /// `soundFeedback`, `meeting`, and `focusKnown` are accepted so tests can name them.
+    /// They do not change the decision yet.
+    public static func allows(enabled: Bool, focusActive: Bool, soundFeedback: Bool = true, meeting: Bool = false, focusKnown: Bool = true) -> Bool {
+        _ = (soundFeedback, meeting, focusKnown)
+        return enabled && !focusActive
     }
 }
