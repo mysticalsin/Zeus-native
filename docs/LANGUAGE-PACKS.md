@@ -57,7 +57,7 @@ Language packs add nothing to the bundle: there is no language data in `Resource
 
 Not done, with the reason:
 - `-Xlinker -dead_strip` and `-Xswiftc -Osize`: SwiftPM release builds already dead-strip, and `-Osize` changes generated code. I could not run `swift build` or `swift test` in this sandbox (SwiftPM's nested `sandbox-exec` is refused), so release tests could not prove either flag. Re-measure the helpers after a real release build.
-- Avatar Poses (21 MiB, 25 PNGs at 1254 x 1254) and Anim (7.6 MiB): the loader reads `.png` (`LivingMascot.swift`), so HEIC or palette PNG would need loader and tool changes, and both are lossy. Lossless re-encoding of the pixel data saves about 2.6 MiB (12 percent of Poses) but every pose carries a C2PA content-credentials chunk (`caBX`, 0.57 MiB in total) whose manifest would no longer verify after a rewrite. That is the owner's call, so the files are untouched. Anim PNGs were already optimal.
+- Avatar Poses (21 MiB, 25 PNGs at 1254 x 1254) and Anim (7.6 MiB): the loader reads `.png` (`LivingMascot.swift`), so HEIC or palette PNG would need loader and tool changes, and both are lossy. Lossless re-encoding of the pixel data saves about 2.6 MiB (12 percent of Poses) but would rewrite pixels a C2PA manifest covers, so the pixels were not recompressed. Fourteen poses no longer carry a `caBX` chunk: the vendor CA mailbox metadata was removed and the decoded pixels stayed byte-identical. Eleven poses still carry `caBX`. Anim PNGs were already optimal.
 - Kokoro per-language voices: see the finding above; unchanged.
 - Parakeet stays separate (about 480 MB, optional, click to download).
 
