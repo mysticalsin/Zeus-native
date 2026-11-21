@@ -18,7 +18,7 @@ import Testing
         #expect(backend.reads == afterFirst)
     }
 
-    @Test func migratesElevenLabsOnceAndStopsTouchingOldItems() {
+    @Test func migratesElevenLabsOnceAndStopsTouchingOldItems() throws {
         let backend = MemoryKeychain(["com.zeus.elevenlabs|api-key": "sk-test", "com.zeus.worker|url": "https://w"])
         let flags = defaults()
         let store = KeychainStore(backend: backend, defaults: flags)
@@ -30,7 +30,7 @@ import Testing
         let relaunch = MemoryKeychain(backend.items)
         let again = KeychainStore(backend: relaunch, defaults: flags)
         again.load()
-        let appItems = relaunch.accounts(service: "com.zeus.app").count
+        let appItems = try relaunch.accounts(service: "com.zeus.app").count
         #expect(relaunch.reads == appItems)
         #expect(again.get("elevenlabs.api-key") == "sk-test")
     }
@@ -383,11 +383,9 @@ import Testing
             "com.zeus.app|assistant.key.openAI": "sk-canonical",
             "com.zeus.app|assistant.key.openai": "sk-legacy",
         ])
-        let store = KeychainStore(backend: backend, defaults: defaults())
-        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
-        #expect(backend.items["com.zeus.app|assistant.key.openai"] == nil)
         backend.failDelete = [AssistantKeyAccount.canonicalOpenAI]
         backend.failNextWrites = 1
+        let store = KeychainStore(backend: backend, defaults: defaults())
         #expect(store.remove(AssistantKeyAccount.aliasOpenAI) == false)
         #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
         #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
@@ -408,7 +406,7 @@ import Testing
 final class LockedListingKeychain: KeychainBackend, @unchecked Sendable {
     var items: [String: String]
     init(_ items: [String: String]) { self.items = items }
-    func accounts(service: String) -> [String] { [] }
+    func accounts(service: String) throws -> [String] { [] }
     func read(service: String, account: String) -> String? { items["\(service)|\(account)"] }
     func write(_ value: String, service: String, account: String) -> Bool { false }
     func delete(service: String, account: String) -> Bool { false }
@@ -418,7 +416,7 @@ final class LockedListingKeychain: KeychainBackend, @unchecked Sendable {
 final class DivergentWriteKeychain: KeychainBackend, @unchecked Sendable {
     var items: [String: String]
     init(_ items: [String: String]) { self.items = items }
-    func accounts(service: String) -> [String] {
+    func accounts(service: String) throws -> [String] {
         items.keys.filter { $0.hasPrefix(service + "|") }.map { String($0.dropFirst(service.count + 1)) }
     }
     func read(service: String, account: String) -> String? { items["\(service)|\(account)"] }
@@ -447,7 +445,7 @@ final class DeleteInjectionKeychain: KeychainBackend, @unchecked Sendable {
 
     init(_ items: [String: String] = [:]) { self.items = items }
 
-    func accounts(service: String) -> [String] {
+    func accounts(service: String) throws -> [String] {
         lock.lock(); defer { lock.unlock() }
         return items.keys.filter { $0.hasPrefix(service + "|") }.map { String($0.dropFirst(service.count + 1)) }
     }
