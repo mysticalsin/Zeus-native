@@ -112,8 +112,15 @@ import Testing
         #expect(bridge.contains("BundledHelperPublish.replaceIfAccepted"))
         #expect(!bridge.contains("try? NativeHostRegistration.reconcile"))
         let refusal = refusalFunction(bridge)
-        #expect(refusal.contains("authorizeInstalledBridge"))
+        #expect(refusal.contains("NativeHostRegistration.reconcile"))
+        #expect(refusal.contains(".registrationNotRemoved"))
         #expect(!refusal.contains("uninstall("))
+        let install = functionBody(bridge, name: "static func install")
+        #expect(!install.contains("publishedExecutable(checkedPath: url.path"))
+        #expect(install.contains("mayStage"))
+        let signature = try #require(files["Sources/Zeus/App/BundledHelperSignature.swift"])
+        #expect(!signature.contains("String(format: \"%02x\""))
+        #expect(signature.contains("asciiHex"))
         #expect(!appDelegate.contains("_ = ChromeInstaller.authorizeInstalledBridge()"))
         #expect(appDelegate.contains("registrationRemovalFailed"))
         let hook = try #require(files["Sources/Zeus/Agents/ClaudeHookInstaller.swift"])
@@ -157,6 +164,15 @@ struct BundledHelperLaunchSite: Hashable, Sendable {
     var kind: String
 
     var key: String { "\(file)|\(kind)|\(helper)" }
+}
+
+private func functionBody(_ source: String, name: String) -> String {
+    guard let start = source.range(of: name) else { return "" }
+    let rest = source[start.lowerBound...]
+    guard let end = rest.dropFirst().range(of: "\n    static func ") ?? rest.dropFirst().range(of: "\n    private static func ") else {
+        return String(rest)
+    }
+    return String(rest[..<end.lowerBound])
 }
 
 private func refusalFunction(_ source: String) -> String {
