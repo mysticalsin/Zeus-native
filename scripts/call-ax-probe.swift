@@ -13,7 +13,7 @@
 //   AXEnhancedUserInterface = true on the application element (the same switch VoiceOver-style tools use), only when
 //   a first quick walk finds a nearly empty tree, and restores the prior values on exit (also on Ctrl-C).
 // - Output stays local: <out>/snapshot-<label>-<n>.jsonl, <out>/diff-<label>.jsonl. Default out dir is
-//   ~/AI-Brain-build/call-ax-probe/<timestamp>. No network.
+//   $HOME/AI-Brain-build/call-ax-probe/<timestamp>. No network.
 // - Redaction (default ON): every word in a string is replaced by the first 8 hex chars of
 //   SHA-256(per-run salt + lowercase word), except an allowlist of indicator words (speaking, muted, ...). The same
 //   name gives the same hash within a run, so you can see which tile lights up without seeing the name.
@@ -331,6 +331,15 @@ func writeLines(_ lines: [[String: Any]], to url: URL) {
     do { try data.write(to: url, options: .atomic) } catch { die("cannot write \(url.path): \(error)", code: 1) }
 }
 
+/// `$HOME` when set, otherwise `NSHomeDirectory()`. On the owner's Mac both are the same directory.
+func localHomePath() -> String {
+    if let raw = getenv("HOME") {
+        let home = String(cString: raw)
+        if !home.isEmpty { return home }
+    }
+    return NSHomeDirectory()
+}
+
 func run() {
     let opts = parseOptions()
 
@@ -343,7 +352,7 @@ func run() {
         if let o = opts.out { return URL(fileURLWithPath: o, isDirectory: true) }
         let f = DateFormatter()
         f.dateFormat = "yyyyMMdd-HHmmss"
-        return FileManager.default.homeDirectoryForCurrentUser
+        return URL(fileURLWithPath: localHomePath(), isDirectory: true)
             .appendingPathComponent("AI-Brain-build/call-ax-probe/\(f.string(from: Date()))", isDirectory: true)
     }()
     do { try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true) }

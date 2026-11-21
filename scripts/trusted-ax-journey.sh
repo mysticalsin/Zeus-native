@@ -14,5 +14,6 @@ if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
 fi
 
 BUILD_DIR="$HOME/AI-Brain-build/zeus-native-build"
+RECEIPTS_DIR="$HOME/AI-Brain-build/zeus-trusted-ax"
 swift build --build-tests --scratch-path "$BUILD_DIR"
-exec python3 qa/closed-loop/trusted_ax.py --build-dir "$BUILD_DIR"
+exec python3 qa/closed-loop/trusted_ax.py --build-dir "$BUILD_DIR" --receipts "$RECEIPTS_DIR"

@@ -8,10 +8,10 @@ import Testing
     // MARK: Protocol
 
     @Test func socketAndFilesMatchBeamer() {
-        let home = URL(fileURLWithPath: "/Users/tony")
-        #expect(BeamerFiles.socket(home: home).path == "/Users/tony/Library/Application Support/Beamer/Beamer.sock")
-        #expect(BeamerFiles.settings(home: home).path == "/Users/tony/Library/Application Support/Beamer/settings.json")
-        #expect(BeamerFiles.log(home: home).path == "/Users/tony/Library/Logs/Beamer/Beamer.log")
+        let home = URL(fileURLWithPath: "/Users/example")
+        #expect(BeamerFiles.socket(home: home).path == "/Users/example/Library/Application Support/Beamer/Beamer.sock")
+        #expect(BeamerFiles.settings(home: home).path == "/Users/example/Library/Application Support/Beamer/settings.json")
+        #expect(BeamerFiles.log(home: home).path == "/Users/example/Library/Logs/Beamer/Beamer.log")
         #expect(BeamerFiles.bundleID == "uk.co.kalkman.beamer")
     }
 

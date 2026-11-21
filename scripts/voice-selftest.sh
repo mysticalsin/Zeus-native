@@ -1,11 +1,11 @@
 #!/bin/bash
 # Owner-run voice self-test. Starts a built Zeus.app with --voice-engine-selftest: one fixed line through each
 # available engine (ElevenLabs, OpenAI, Kokoro, Mac voice) with the Ultron effect, then validates the receipt it
-# writes to ~/AI-Brain-build/voice-selftest/. It refuses to run in CI and never reads or prints a key.
+# writes to $DIR (assigned below). It refuses to run in CI and never reads or prints a key.
 #
 #   bash scripts/voice-selftest.sh [--silent] [<path to Zeus.app>] [--receipt <absolute path>]
 #
-# Default app: the latest ~/AI-Brain-build/zeus-qa-*/app*/Zeus.app. --silent runs the chain at zero volume.
+# Default app: the latest build matched by the $HOME glob below. --silent runs the chain at zero volume.
 # Exit: 0 the Mac voice spoke through the effect and was not Samantha; 1 otherwise.
 set -euo pipefail
 umask 077
