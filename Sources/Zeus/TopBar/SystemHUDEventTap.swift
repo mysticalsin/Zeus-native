@@ -38,9 +38,28 @@ final class SystemHUDEventTap: @unchecked Sendable {
     }
 
     private static let callback: CGEventTapCallBack = { _, type, event, refcon in
-        guard type.rawValue == 14, let refcon else { return nil }
-        let monitor = Unmanaged<SystemHUDEventTap>.fromOpaque(refcon).takeUnretainedValue()
-        return monitor.handle(event)
+        let notice: EventTapWatch.Notice
+        if type == .tapDisabledByTimeout {
+            notice = .timeout
+        } else if type == .tapDisabledByUserInput {
+            notice = .userDisabled
+        } else {
+            notice = .event
+        }
+        switch EventTapWatch.step(notice) {
+        case .reenable:
+            if let refcon {
+                let monitor = Unmanaged<SystemHUDEventTap>.fromOpaque(refcon).takeUnretainedValue()
+                if let tap = monitor.tap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+            }
+            return Unmanaged.passUnretained(event)
+        case .deliver:
+            guard type.rawValue == 14, let refcon else { return Unmanaged.passUnretained(event) }
+            let monitor = Unmanaged<SystemHUDEventTap>.fromOpaque(refcon).takeUnretainedValue()
+            return monitor.handle(event)
+        }
     }
 
     private func handle(_ event: CGEvent) -> Unmanaged<CGEvent>? {
