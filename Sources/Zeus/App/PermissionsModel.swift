@@ -593,6 +593,19 @@ enum AccessibilityGate {
     private static var work: [String: () -> Void] = [:]
     private static var wait = TrustWait.State()
     private static var timer: Timer?
+    private static var watch = AccessWatch()
+    private static var revokedHooks: [() -> Void] = []
+    private static var regainedHooks: [() -> Void] = []
+
+    /// Runs when a later sample says Accessibility is off. The watch keeps polling after the grant.
+    static func whenRevoked(_ work: @escaping () -> Void) {
+        revokedHooks.append(work)
+    }
+
+    /// Runs when Accessibility returns after a revoke.
+    static func whenRegained(_ work: @escaping () -> Void) {
+        regainedHooks.append(work)
+    }
 
     static var trusted: Bool { AXIsProcessTrusted() }
 
@@ -601,6 +614,29 @@ enum AccessibilityGate {
     static func whenTrusted(key: String = "\(#fileID):\(#line)", _ work: @escaping () -> Void) {
         self.work[key] = work
         perform(apply(.wanted(key: key, trusted: trusted)))
+        if watch.phase == .unknown { _ = watch.sample(trusted) }
+        if timer == nil { startWatchTimer() }
+    }
+
+    /// One sample of the current grant. A revoke and a later grant are both visible.
+    private static func sampleTrust() {
+        switch watch.sample(trusted) {
+        case .granted:
+            NSLog("[ZEUS] permissions: Accessibility granted, starting %d key features", wait.waiting.count)
+            perform(apply(.becameTrusted))
+            regainedHooks.forEach { $0() }
+        case .revoked:
+            revokedHooks.forEach { $0() }
+        case nil:
+            break
+        }
+    }
+
+    private static func startWatchTimer() {
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            MainActor.assumeIsolated { sampleTrust() }
+        }
     }
 
     /// The feature behind `key` was turned off: it must not start later, and the poll stops with the last waiter.
@@ -621,16 +657,9 @@ enum AccessibilityGate {
             case .run(let key):
                 work.removeValue(forKey: key)?()
             case .startPolling:
-                timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-                    MainActor.assumeIsolated {
-                        guard trusted else { return }
-                        NSLog("[ZEUS] permissions: Accessibility granted, starting %d key features", wait.waiting.count)
-                        perform(apply(.becameTrusted))
-                    }
-                }
+                startWatchTimer()
             case .stopPolling:
-                timer?.invalidate()
-                timer = nil
+                break
             }
         }
     }

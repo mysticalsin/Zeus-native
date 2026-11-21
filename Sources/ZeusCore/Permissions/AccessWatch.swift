@@ -20,11 +20,17 @@ public struct AccessWatch: Equatable, Sendable {
 
     public mutating func sample(_ trusted: Bool) -> Effect? {
         switch (phase, trusted) {
-        case (.unknown, false):
+        case (.unknown, false), (.denied, false):
             phase = .denied
             return nil
-        case (.denied, false), (.granted, true), (.unknown, true), (.denied, true), (.granted, false):
+        case (.unknown, true), (.denied, true):
+            phase = .granted
+            return .granted
+        case (.granted, true):
             return nil
+        case (.granted, false):
+            phase = .denied
+            return .revoked
         }
     }
 }
