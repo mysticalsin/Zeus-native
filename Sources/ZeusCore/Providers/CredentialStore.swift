@@ -1,5 +1,11 @@
 import Foundation
 
+/// Whether an update of an existing provider secret also sets the accessibility class.
+/// A planted item must not keep a weaker class.
+public enum ProviderKeychainPolicy {
+    public static let updateIncludesAccessibility = false
+}
+
 public protocol CredentialStore: Sendable {
     func read(service: String, account: String) -> String?
     func write(_ value: String, service: String, account: String) -> Bool
@@ -64,7 +70,10 @@ public struct KeychainCredentialStore: CredentialStore, Sendable {
         guard !value.isEmpty else { return false }
         return quietly {
             let data = Data(value.utf8)
-            let update = [kSecValueData as String: data]
+            var update: [String: Any] = [kSecValueData as String: data]
+            if ProviderKeychainPolicy.updateIncludesAccessibility {
+                update[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            }
             let status = SecItemUpdate(base(service, account) as CFDictionary, update as CFDictionary)
             if status == errSecSuccess { return true }
             guard status == errSecItemNotFound else { return false }
