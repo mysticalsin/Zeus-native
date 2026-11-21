@@ -1,0 +1,509 @@
+{
+  "source": "qa/closed-loop/human_qa.py JOURNEYS and docs/HUMAN-QA.md",
+  "steps": [
+    {
+      "id": "launch.process",
+      "title": "Zeus process is running",
+      "script": [
+        "Open the Desktop build of Zeus yourself and confirm the process is running.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "launch.window",
+      "title": "Zeus shows a window or panel",
+      "script": [
+        "In the Desktop build, confirm: Zeus shows a window or panel.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "launch.topbar",
+      "title": "Top bar opens on hover",
+      "script": [
+        "In the Desktop build, confirm: Top bar opens on hover.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "launch.nocrash",
+      "title": "No crash during the first seconds",
+      "script": [
+        "In the Desktop build, confirm: No crash during the first seconds.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.more-menu",
+      "title": "More menu opens with its items",
+      "script": [
+        "In the Desktop build, confirm: More menu opens with its items.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.settings-open",
+      "title": "Settings opens from the More menu",
+      "script": [
+        "In the Desktop build, confirm: Settings opens from the More menu.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.screenshare-flip",
+      "title": "Screen-share setting flips on the first press",
+      "script": [
+        "In the Desktop build, confirm: Screen-share setting flips on the first press.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.screenshare-flip-back",
+      "title": "Screen-share setting flips back on the second press",
+      "script": [
+        "In the Desktop build, confirm: Screen-share setting flips back on the second press.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.screenshare-settings-agrees",
+      "title": "Appearance toggle agrees with the menu",
+      "script": [
+        "In the Desktop build, confirm: Appearance toggle agrees with the menu.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.position-slider",
+      "title": "Top bar position slider moves",
+      "script": [
+        "In the Desktop build, confirm: Top bar position slider moves.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "topbar.persist-prep",
+      "title": "Leave both settings changed for the restart check",
+      "script": [
+        "In the Desktop build, confirm: Leave both settings changed for the restart check.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.sidebar-complete",
+      "title": "Settings sidebar lists every page",
+      "script": [
+        "In the Desktop build, confirm: Settings sidebar lists every page.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.general",
+      "title": "General page renders",
+      "script": [
+        "Open Settings and confirm the General page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.appearance",
+      "title": "Appearance page renders",
+      "script": [
+        "Open Settings and confirm the Appearance page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.sounds",
+      "title": "Sounds page renders",
+      "script": [
+        "Open Settings and confirm the Sounds page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.notifications",
+      "title": "Notifications page renders",
+      "script": [
+        "Open Settings and confirm the Notifications page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.shortcuts",
+      "title": "Shortcuts page renders",
+      "script": [
+        "Open Settings and confirm the Shortcuts page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.insomnia",
+      "title": "Insomnia page renders",
+      "script": [
+        "Open Settings and confirm the Insomnia page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.integrations",
+      "title": "Integrations page renders",
+      "script": [
+        "Open Settings and confirm the Integrations page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.murmure",
+      "title": "Murmure page renders",
+      "script": [
+        "Open Settings and confirm the Murmure page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.polyglot",
+      "title": "Polyglot page renders",
+      "script": [
+        "Open Settings and confirm the Polyglot page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.dictation",
+      "title": "Dictation page renders",
+      "script": [
+        "Open Settings and confirm the Dictation page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.voice",
+      "title": "Voice page renders",
+      "script": [
+        "Open Settings and confirm the Voice page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.engine",
+      "title": "Engine page renders",
+      "script": [
+        "Open Settings and confirm the Engine page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.features",
+      "title": "Features page renders",
+      "script": [
+        "Open Settings and confirm the Features page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.beamer",
+      "title": "Beamer page renders",
+      "script": [
+        "Open Settings and confirm the Beamer page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.tiling",
+      "title": "Tiling page renders",
+      "script": [
+        "Open Settings and confirm the Tiling page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.license",
+      "title": "License page renders",
+      "script": [
+        "Open Settings and confirm the License page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.permissions",
+      "title": "Permissions page renders",
+      "script": [
+        "Open Settings and confirm the Permissions page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.privacy",
+      "title": "Privacy page renders",
+      "script": [
+        "Open Settings and confirm the Privacy page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.diagnostics",
+      "title": "Diagnostics page renders",
+      "script": [
+        "Open Settings and confirm the Diagnostics page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.page.about",
+      "title": "About page renders",
+      "script": [
+        "Open Settings and confirm the About page is on screen.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.dictation-sound-picker",
+      "title": "Dictation sound picker lists Soft click, Glass, Pop, Airy, and None",
+      "script": [
+        "In the Desktop build, confirm: Dictation sound picker lists Soft click, Glass, Pop, Airy, and None.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.dictation-sound-preview",
+      "title": "Dictation sound preview control responds",
+      "script": [
+        "In the Desktop build, confirm: Dictation sound preview control responds.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.jev-limit-default",
+      "title": "Engine monthly limit shows 10 when unset",
+      "script": [
+        "In the Desktop build, confirm: Engine monthly limit shows 10 when unset.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.about-credit",
+      "title": "About shows the builder credit",
+      "script": [
+        "In the Desktop build, confirm: About shows the builder credit.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.about-version",
+      "title": "About shows the version",
+      "script": [
+        "In the Desktop build, confirm: About shows the version.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "settings.cards",
+      "title": "Language packs and speaker recognition cards are present",
+      "script": [
+        "In the Desktop build, confirm: Language packs and speaker recognition cards are present.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "record.open",
+      "title": "Record page opens",
+      "script": [
+        "In the Desktop build, confirm: Record page opens.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "record.main-display",
+      "title": "Main display is preselected",
+      "script": [
+        "In the Desktop build, confirm: Main display is preselected.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "record.display-names",
+      "title": "Display picker lists the real display names",
+      "script": [
+        "In the Desktop build, confirm: Display picker lists the real display names.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "record.countdown",
+      "title": "Record countdown can be cancelled before capture",
+      "script": [
+        "Start the record countdown and cancel it before capture begins.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "record.esc-cancel",
+      "title": "Escape cancels the countdown before it reaches zero",
+      "script": [
+        "Press Escape during the countdown and confirm capture never starts.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "record.idle-no-capture",
+      "title": "Record returns to idle and nothing is captured",
+      "script": [
+        "Confirm Record is idle and no capture file was written.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.open",
+      "title": "Scribe page opens",
+      "script": [
+        "In the Desktop build, confirm: Scribe page opens.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.animation-settles",
+      "title": "Scribe opening animation settles",
+      "script": [
+        "In the Desktop build, confirm: Scribe opening animation settles.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.up-next-or-empty",
+      "title": "Up next card or the empty state is shown",
+      "script": [
+        "In the Desktop build, confirm: Up next card or the empty state is shown.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.chips",
+      "title": "Source chips are present",
+      "script": [
+        "In the Desktop build, confirm: Source chips are present.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.memory-open",
+      "title": "Memory window opens from Scribe",
+      "script": [
+        "In the Desktop build, confirm: Memory window opens from Scribe.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.memory-panes",
+      "title": "Memory shows a list pane and a detail pane",
+      "script": [
+        "In the Desktop build, confirm: Memory shows a list pane and a detail pane.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.memory-search",
+      "title": "Memory search field accepts text and clears",
+      "script": [
+        "In the Desktop build, confirm: Memory search field accepts text and clears.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.memory-close",
+      "title": "Memory window closes",
+      "script": [
+        "In the Desktop build, confirm: Memory window closes.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "scribe.start-mic",
+      "title": "Listening can start and stop only with consent",
+      "script": [
+        "Do not start the microphone from this harness. Set result to failed unless you already gave consent.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "alerts.open",
+      "title": "Alerts page opens",
+      "script": [
+        "In the Desktop build, confirm: Alerts page opens.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "alerts.trigger",
+      "title": "A test alert appears and can be cleared",
+      "script": [
+        "In the Desktop build, confirm: A test alert appears and can be cleared.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "talk.text-answer",
+      "title": "A typed question gets answer text",
+      "script": [
+        "Type a short question yourself. Do not start the microphone.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "talk.voice",
+      "title": "Voice reply is judged only with consent",
+      "script": [
+        "Do not start the microphone from this harness. Set result to failed unless you already gave consent to speak.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "quit.clean",
+      "title": "Zeus quits cleanly",
+      "script": [
+        "In the Desktop build, confirm: Zeus quits cleanly.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "persist.launch",
+      "title": "Relaunch opens the top bar",
+      "script": [
+        "In the Desktop build, confirm: Relaunch opens the top bar.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "persist.screenshare",
+      "title": "Screen-share setting survived the restart",
+      "script": [
+        "In the Desktop build, confirm: Screen-share setting survived the restart.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "persist.position",
+      "title": "Top bar position survived the restart",
+      "script": [
+        "In the Desktop build, confirm: Top bar position survived the restart.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "persist.restore",
+      "title": "Original settings are restored",
+      "script": [
+        "In the Desktop build, confirm: Original settings are restored.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    },
+    {
+      "id": "persist.quit",
+      "title": "Zeus quits cleanly after the check",
+      "script": [
+        "In the Desktop build, confirm: Zeus quits cleanly after the check.",
+        "Save a screenshot of this step and set result to passed or failed."
+      ]
+    }
+  ]
+}

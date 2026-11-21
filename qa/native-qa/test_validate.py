@@ -77,11 +77,13 @@ class ReceiptSlots(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
         self.v = load()
+        self.fills = 0
 
     def filled(self, **overrides):
         app = self.dir / "Zeus-latest-2722dcb7.app"
         receipt = self.v.blank_receipt(HEAD, str(app))
-        shots = self.dir / "shots"
+        self.fills += 1
+        shots = self.dir / f"shots-{self.fills}"
         shots.mkdir()
         for index, step in enumerate(receipt["steps"]):
             shot = png(shots, f"{index}.png")
