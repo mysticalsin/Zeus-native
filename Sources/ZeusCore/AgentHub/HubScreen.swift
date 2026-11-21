@@ -8,12 +8,14 @@ import Foundation
 ///
 /// A failed socket from `loading` or `ready` is `connectionError`, including when no session is left.
 /// That screen is not the empty screen. An opened socket with no sessions is the empty screen.
+/// New chat on the Chat tab clears a connection error before it records the form.
 
 public struct HubScreenState: Equatable, Sendable {
     public var screen: HubScreen
-    /// The one short sentence from the socket, shown only on `connectionError`. A path is omitted.
+    /// The one short sentence from the socket, shown only on `connectionError`.
     public var reason: String?
-    /// New chat opened the Chat tab's form. The hub phase in `screen` is the one remembered.
+    /// New chat opened the Chat tab's form. The hub phase in `screen` is the one remembered,
+    /// after a connection error has been cleared.
     public var chatForm: Bool
 
     public init(screen: HubScreen = .empty, reason: String? = nil, chatForm: Bool = false) {
@@ -56,6 +58,10 @@ public enum HubScreenMachine {
         if event == .newChat {
             guard context.onChatTab else { return state }
             var remembered = state
+            if remembered.screen == .connectionError {
+                remembered.screen = context.sessionCount > 0 ? .ready : .empty
+                remembered.reason = nil
+            }
             remembered.chatForm = true
             return remembered
         }
@@ -106,12 +112,12 @@ public enum HubScreenMachine {
         }
     }
 
-    /// One short sentence. A path can carry a secret, so a sentence that contains one is not shown.
+    /// One short sentence. Empty text is omitted. A slash, a URL, or a path stays in the sentence.
     private static func displayable(_ sentence: String?) -> String? {
         guard var sentence else { return nil }
         sentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sentence.isEmpty else { return nil }
-        if sentence.contains(where: { $0 == "/" || $0 == "\\" || $0 == "~" || $0.isNewline }) { return nil }
+        if sentence.contains(where: { $0.isNewline }) { return nil }
         return sentence
     }
 }
