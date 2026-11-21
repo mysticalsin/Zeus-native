@@ -8,6 +8,7 @@ The production Package.swift and source files are never changed.
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -349,8 +350,11 @@ def main():
             command = ["swift", "test", "--package-path", str(root), "--jobs", str(args.jobs),
                        "--xunit-output", str(xunit)]
             log = root / "test.log"
+            env = os.environ.copy()
+            if group == "equaliser":
+                env["ZEUS_ALLOC_CHECK"] = "1"
             with log.open("w") as stream:
-                result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, check=False)
+                result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, check=False, env=env)
             structured = swift_testing_xunit_path(xunit)
             row = {"group": group, "command": command, "exit_code": result.returncode, "log": str(log),
                    "results": str(structured)}

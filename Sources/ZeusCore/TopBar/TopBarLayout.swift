@@ -269,12 +269,6 @@ public enum NotchCue: Equatable, Sendable {
     /// A keep-awake session notice ("Battery 20%", "Ended: Mac too hot").
     case keepAwake(String)
     case screenshot(title: String)
-    /// Files arrived from another Mac with Fling.
-    case flingArrived(count: Int, from: String)
-    /// A stack went out to another Mac.
-    case flingSent(count: Int, to: String)
-    /// A Fling send or receive did not work; the text says what to do.
-    case flingProblem(String)
 
     /// How long the cue stays before the notch settles again.
     public var duration: TimeInterval {
@@ -291,7 +285,6 @@ public enum NotchCue: Equatable, Sendable {
         case .permission: 9.0
         case .keepAwake: 4.0
         case .screenshot: 2.5
-        case .flingProblem: 4.0
         default: 2.2
         }
     }

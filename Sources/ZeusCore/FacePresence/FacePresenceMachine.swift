@@ -54,6 +54,8 @@ public struct FacePresenceMachine: Equatable, Sendable {
     public enum State: Equatable, Sendable {
         case off
         case needsCameraConsent
+        /// The switch is on and there is no face yet. Enrollment waits for a second, explicit confirm.
+        case needsEnrollmentConfirm
         case enrolling(token: Int)
         case watching(since: Double)
         case present(lastSeen: Double)
@@ -126,7 +128,7 @@ public struct FacePresenceMachine: Equatable, Sendable {
     public var wantsCamera: Bool {
         switch state {
         case .enrolling, .watching, .present, .away: return true
-        case .off, .needsCameraConsent, .paused, .unavailable: return false
+        case .off, .needsCameraConsent, .needsEnrollmentConfirm, .paused, .unavailable: return false
         }
     }
 
@@ -134,14 +136,14 @@ public struct FacePresenceMachine: Equatable, Sendable {
     public var wantsTicks: Bool {
         switch state {
         case .watching, .present, .away: return true
-        case .off, .needsCameraConsent, .enrolling, .paused, .unavailable: return false
+        case .off, .needsCameraConsent, .needsEnrollmentConfirm, .enrolling, .paused, .unavailable: return false
         }
     }
 
-    /// Enroll can be tapped only while watching, present or away: the owner is at the Mac and the camera is on.
+    /// Enroll can be tapped while watching, present or away, and for the second confirm when no face is saved yet.
     public var canEnroll: Bool {
         switch state {
-        case .watching, .present, .away: return true
+        case .needsEnrollmentConfirm, .watching, .present, .away: return true
         case .off, .needsCameraConsent, .enrolling, .paused, .unavailable: return false
         }
     }
@@ -290,7 +292,7 @@ public struct FacePresenceMachine: Equatable, Sendable {
     /// Start from a granted camera: enroll when there is no face, else watch. A running Zeus capture holds it off.
     private mutating func begin(at uptime: Double) -> [Effect] {
         if zeusCaptureActive { return move(to: .paused(.zeusCapture)) }
-        if enabledFaces == 0 { return startEnrolling() }
+        if enabledFaces == 0 { return move(to: .needsEnrollmentConfirm) }
         return move(to: .watching(since: uptime))
     }
 
@@ -301,7 +303,9 @@ public struct FacePresenceMachine: Equatable, Sendable {
 
     private mutating func pauseForLockOrSleep(_ reason: PauseReason) -> [Effect] {
         switch state {
-        case .watching, .present, .away, .enrolling:
+        case .watching, .present, .away, .enrolling, .needsEnrollmentConfirm:
+            // A pending enrollment confirm is not an enrollment yet, so there is no token to cancel.
+            // Leaving the confirm state is what drops it.
             return move(to: .paused(reason))
         case .paused(.lockedByZeus) where reason == .screenLocked:
             // The lock Zeus asked for arrives as a lock notice: keep saying so.
@@ -378,6 +382,7 @@ extension FacePresenceMachine.State {
         switch self {
         case .off: return "off"
         case .needsCameraConsent: return "needsCameraConsent"
+        case .needsEnrollmentConfirm: return "needsEnrollmentConfirm"
         case .enrolling: return "enrolling"
         case .watching: return "watching"
         case .present: return "present"

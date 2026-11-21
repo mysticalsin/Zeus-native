@@ -1578,16 +1578,24 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
     return out
 }
 
+/// One search node. The frontier holds these, not `Sim` values, so growing the frontier copies a pointer
+/// rather than every machine. The effect log is not part of the state key and is cleared before a node is
+/// stored: the rules read the effects of the move that produced them, and the rest check starts its own log.
+private final class WalkNode {
+    var sim: Sim
+    init(_ sim: Sim) { self.sim = sim }
+}
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
     let start = Date()
     var report = Report()
     var seen: [Int: Int] = [:]
     var parents = [0], via: [Move] = [.wait]
-    var frontier: [Sim?] = []
+    var frontier: [WalkNode?] = []
     let root = Sim(run)
     seen[root.key(run).hashValue] = 0
-    frontier.append(root)
+    frontier.append(WalkNode(root))
     var seenRules: Set<String> = []
     let memo = RestMemo()
 
@@ -1621,7 +1629,8 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
         }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
-        guard let sim = frontier[cursor] else { cursor += 1; continue }
+        guard let node = frontier[cursor] else { cursor += 1; continue }
+        let sim = node.sim
         frontier[cursor] = nil
         record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
         for move in sim.moves(run) {
@@ -1630,12 +1639,14 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
             next.apply(move, run)
             report.moves += 1
             record(next.found, at: cursor, move: move)
+            next.found = []
+            next.log = []
             let key = next.key(run).hashValue
             if seen[key] == nil {
                 seen[key] = frontier.count
                 parents.append(cursor)
                 via.append(move)
-                frontier.append(next)
+                frontier.append(WalkNode(next))
             }
         }
         cursor += 1

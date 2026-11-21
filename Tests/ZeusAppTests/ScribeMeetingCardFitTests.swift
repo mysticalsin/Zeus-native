@@ -5,7 +5,6 @@ import Testing
 import ZeusCore
 @testable import Zeus
 
-extension ScribeMeetingCardHosted {
     /// REG-952: the real compact card, hosted, with long installed app names. The bottom row's detail text must be
     /// drawn whole (its drawn width reaches its natural width, so no tail cut) beside the widest capsule the state
     /// can show, and the card must never grow past the slab plus its shadow room.
@@ -141,4 +140,4 @@ extension ScribeMeetingCardHosted {
             #expect(M.maxApps == 3)
         }
     }
-}
+

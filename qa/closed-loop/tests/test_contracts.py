@@ -24,10 +24,10 @@ class MatrixContractTests(unittest.TestCase):
         self.data = c.load(c.ROOT / "qa/feature-map.json")
         self.portable = runner.portable_module()
 
-    def test_current_map_has_all_twentyone_requirements_and_real_case_bindings(self):
+    def test_current_map_has_all_twenty_requirements_and_real_case_bindings(self):
         checks = c.validate_map(self.data, self.portable)
         c.validate_registry(c.load(c.ROOT / "qa/regressions.json"), checks)
-        self.assertEqual(len(self.data["features"]), 21)
+        self.assertEqual(len(self.data["features"]), 20)
 
     def test_deleting_a_checklist_item_cannot_make_full_gate_easier(self):
         self.data["features"].pop()

@@ -1626,5 +1626,28 @@ class ButtonDefaultActionLint(unittest.TestCase):
         self.assertFalse(button_without_default_action(label))
 
 
+class UsageStringTests(unittest.TestCase):
+    def plist(self):
+        import plistlib
+        return plistlib.loads((ROOT / "Resources/Info.plist").read_bytes())
+
+    def test_audio_and_apple_events_match_the_integration_text(self):
+        plist = self.plist()
+        self.assertEqual(
+            plist["NSAudioCaptureUsageDescription"],
+            "ZEUS listens to the sound your Mac is playing to draw the live audio bars in the notch, to make live captions and meeting transcripts, and, if you choose, to include it in screen recordings (Recordly). Recordings and transcripts are saved only when you record, and stay on this Mac unless you choose a cloud engine.",
+        )
+        self.assertEqual(
+            plist["NSAppleEventsUsageDescription"],
+            "ZEUS brings Chrome to the front when you ask it to do something there, plays or skips tracks in Music or Spotify from the notch, types into Terminal and iTerm, and drives Keynote, PowerPoint, and the Beamer menu through System Events.",
+        )
+        self.assertIn("Face presence", plist["NSCameraUsageDescription"])
+
+    def test_corner_rebuild_closes_the_panels(self):
+        text = (ROOT / "Sources/Zeus/Notch/ScreenCornerOverlay.swift").read_text()
+        rebuild = text.split("private func rebuild()", maxsplit=1)[1].split("static func makePanel", maxsplit=1)[0]
+        self.assertIn("panel.close()", rebuild)
+
+
 if __name__ == "__main__":
     unittest.main()

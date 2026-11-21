@@ -85,8 +85,19 @@ final class MusicAwakeHold {
         let verdict = rule.decide(enabled: enabled, isPlaying: playing, lastPlayedAt: lastPlayedAt, now: now,
                                   power: readPower(), rules: rules)
         if verdict.holds {
-            if assertion == nil || renewLease { renew() }
-            startRenewTimer()
+            if renewLease {
+                // A renewal with nothing held must not create the first assertion.
+                renew()
+            } else if assertion == nil {
+                acquire()
+            }
+            // No assertion means there is nothing to renew. Do not leave the timer retrying.
+            if assertion != nil {
+                startRenewTimer()
+            } else {
+                cancelRenew?()
+                cancelRenew = nil
+            }
         } else {
             drop()
         }
@@ -95,8 +106,16 @@ final class MusicAwakeHold {
 
     // MARK: Assertion
 
+    /// The first hold. A refresh never comes through here.
+    private func acquire() {
+        guard assertion == nil, let fresh = create(Self.lease) else { return }
+        assertion = fresh
+    }
+
     /// Takes a fresh assertion before letting go of the old one, so the display never gets a gap.
+    /// Does nothing when no assertion is held: a refresh must not create the first hold.
     private func renew() {
+        guard assertion != nil else { return }
         guard let fresh = create(Self.lease) else { return }
         if let old = assertion { release(old) }
         assertion = fresh

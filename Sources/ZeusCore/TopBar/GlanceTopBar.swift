@@ -65,6 +65,8 @@ public enum GlanceTopBar {
     /// Close: Glance shrinks into the notch over about 6 frames (parity/N8-glance.mp4, height at x 1000:
     /// 231, 184, 157, 114, 101, 90, 72, 65, then a thin strip fades), about 0.54 s after the pointer leaves.
     public static let closeSpring = (response: MotionTokens.panelClose.response, damping: MotionTokens.panelClose.damping)
+    /// What the notch plays on close: linear, not the fitted spring.
+    public static let closeDuration = MotionTokens.closeDuration
     /// Glance's recorded close: ms after the close starts (60 fps frames), body height in pt.
     public static let measuredClose: [(ms: Double, height: Double)] = [
         (0, 231), (16.7, 184), (33.3, 157), (50, 114), (66.7, 101), (83.3, 90), (100, 72), (116.7, 65),

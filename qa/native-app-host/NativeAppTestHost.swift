@@ -91,8 +91,6 @@ private enum NativeAppTestHost {
                 // Local trusted-Mac AXPress on the notch tabs and body; CI never selects it either.
                 "^ZeusAppTests\\.NotchTrustedAccessibilityTests/",
                 "^ZeusAppTests\\.ClosedWingsNotchTests/",
-                "^ZeusAppTests\\.FlingShelfJourneyTests/",
-                "^ZeusAppTests\\.FlingTwoProcessTests/"
             ]
             guard args.count == 9,
                   args[1] == "--test-bundle-path",

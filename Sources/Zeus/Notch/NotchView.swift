@@ -430,7 +430,7 @@ struct NotchView: View {
             topBar.flash(.edgeWave(tint))
         }
         .animation(Motion.live(MotionTokens.peekContent), value: model.approval?.id)
-        .animation(Motion.live(MotionTokens.panelResize), value: model.sessions.count)
+        .animation(Motion.live(MotionTokens.sessionCount), value: model.sessions.count)
         .animation(Self.wingsSpring, value: topBar.map { ClosedWings.kind(of: $0) })
     }
 

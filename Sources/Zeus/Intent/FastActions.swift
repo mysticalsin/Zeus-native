@@ -492,16 +492,44 @@ enum ScreenLock {
         return function() == 0
     }
 
-    static func lock() -> Bool {
-        if let lockFunction { return lockFunction() == 0 }
-        guard AXIsProcessTrusted() else { return false }
-        let source = CGEventSource(stateID: .hidSystemState)
-        let q: CGKeyCode = 12
-        for down in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: q, keyDown: down)
-            event?.flags = [.maskControl, .maskCommand]
-            event?.post(tap: .cghidEventTap)
+    /// A non-zero `SACLockScreenImmediate` result is an error. It does not fall through to the shortcut,
+    /// which would report success while the Mac stayed unlocked. The shortcut itself counts only after the
+    /// session dictionary reports the screen locked, within a short bounded wait.
+    static func lock(using function: Lock?, postShortcut: () -> Bool, isLocked: () -> Bool = { sessionIsLocked() }, attempts: Int = 8, pause: () -> Void = { Thread.sleep(forTimeInterval: 0.05) }) -> Bool {
+        if let function { return function() == 0 }
+        guard postShortcut() else { return false }
+        let tries = max(attempts, 1)
+        for index in 0..<tries {
+            if isLocked() { return true }
+            if index + 1 < tries { pause() }
         }
-        return true
+        return false
+    }
+
+    /// `CGSSessionScreenIsLocked` in the current CoreGraphics session dictionary. Missing or unreadable means not locked.
+    static func sessionIsLocked() -> Bool {
+        guard let copy = sessionDictionary else { return false }
+        guard let raw = copy()?.takeRetainedValue() else { return false }
+        return (raw as NSDictionary)["CGSSessionScreenIsLocked"] as? Bool == true
+    }
+
+    private static let sessionDictionary: (@convention(c) () -> Unmanaged<CFDictionary>?)? = {
+        guard let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY),
+              let symbol = dlsym(handle, "CGSessionCopyCurrentDictionary") else { return nil }
+        return unsafeBitCast(symbol, to: (@convention(c) () -> Unmanaged<CFDictionary>?).self)
+    }()
+
+    static func lock() -> Bool {
+        lock(using: lockFunction) {
+            guard AXIsProcessTrusted() else { return false }
+            let source = CGEventSource(stateID: .hidSystemState)
+            let q: CGKeyCode = 12
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: q, keyDown: down)
+                event?.flags = [.maskControl, .maskCommand]
+                event?.post(tap: .cghidEventTap)
+            }
+            return true
+        }
     }
 }
