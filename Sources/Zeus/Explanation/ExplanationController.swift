@@ -200,6 +200,11 @@ final class ExplanationController {
         }
     }
 
+    /// A new question. The card from the previous answer goes, and a late callback cannot restore it.
+    func clearStaleCard() {
+        desktopCard.end()
+    }
+
     /// A desktop turn has no open Chat conversation, so it owns a session-scoped, in-memory history
     /// (never written to disk). A session is reused for follow-ups and replaced after `maxAge`.
     func prepareDesktopSession(maxAge: TimeInterval = 600) {

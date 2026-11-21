@@ -31,6 +31,11 @@ final class VoiceTurnController {
     private var sightNotice = ScreenSightNotice()
     /// A drawing from this controller's last answer may still be on screen.
     private var drawActive = false
+    /// The answer card belongs to one question. A new question clears it.
+    private var cards = AnswerCardClearance()
+    private var cardGeneration: UInt64 = 0
+    /// Hides a card this controller does not own, such as the desktop explanation card.
+    var onQuestionStarted: () -> Void = {}
 
     /// What one turn really sent, for the tests: the brain request, the route it asked for, and every capture the
     /// turn kept for POINT tags and the drive and walkthrough actions.
@@ -202,9 +207,19 @@ final class VoiceTurnController {
         speech.deviceUID = choice == .automatic ? nil : choice.resolvedUID(devices: devices(), builtInUID: builtInUID())
     }
 
+    /// A new question. The card from the previous answer goes, including a late show from that answer.
+    private func questionStarted() {
+        cardGeneration = cards.questionStarted()
+        drawActive = false
+        presenter.clear()
+        buddy.model.captionVisible = false
+        onQuestionStarted()
+    }
+
     @discardableResult
     func press() -> Bool {
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
+        questionStarted()
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
         // A new press always interrupts whatever ZEUS was doing.
@@ -363,6 +378,7 @@ final class VoiceTurnController {
     /// voice turn at once. "Hey Zeus" alone opens a hands-free turn that ends when you stop talking.
     func wakeTurn(request: String) {
         guard !listening else { return }
+        questionStarted()
         clearDrawingForNewTurn()
         wakeConversationActive = true
         buddy.call()
@@ -974,8 +990,10 @@ final class VoiceTurnController {
                     }
                 case .presentCard:
                     let card = PresentCard.parse(action.payload)
+                    let generation = cardGeneration
                     task = Task { @MainActor in
                         guard let card else { return nil }
+                        guard self.cards.show(generation: generation) else { return nil }
                         let body = ([card.title] + card.lines).joined(separator: "\n")
                         ActionSpeedLog.shared.mark(.firstOverlayPaint)
                         self.buddy.showCaption(body)

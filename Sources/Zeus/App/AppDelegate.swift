@@ -249,6 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Push-to-talk → Claude CLI → spoken, captioned answer + spark.
         if on(.voiceTurn) {
             voice = VoiceTurnController(buddy: buddy, notch: notch, brain: ClaudeCLIProvider())
+            voice?.onQuestionStarted = { [weak self] in self?.pointing?.clearStaleCard() }
             commands = CommandCenter(voice: voice)
         }
         // The fast path: instant app, media, volume, to-do, timer, link and lock commands.

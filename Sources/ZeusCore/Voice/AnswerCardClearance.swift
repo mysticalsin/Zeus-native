@@ -12,11 +12,13 @@ public struct AnswerCardClearance: Equatable, Sendable {
     @discardableResult
     public mutating func questionStarted() -> UInt64 {
         generation &+= 1
+        visible = false
         return generation
     }
 
-    /// Shows the card for `generation` only.
+    /// Shows the card for `generation` only. A stale generation leaves the card hidden.
     public mutating func show(generation: UInt64) -> Bool {
+        guard generation == self.generation else { return false }
         visible = true
         return true
     }

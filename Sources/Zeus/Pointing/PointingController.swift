@@ -103,6 +103,9 @@ final class PointingController {
     }
 
     let explanation: ExplanationController
+
+    /// The desktop card from an earlier answer. A new voice question calls this.
+    func clearStaleCard() { explanation.clearStaleCard() }
     let hotkey = PointingHotkeyMonitor()
     let textEntry = PointingTextEntry()
     let watcher = PointingTargetWatcher()
