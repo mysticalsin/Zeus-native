@@ -2874,16 +2874,8 @@
     },
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
-      "file" : "Sources\/Zeus\/Notch",
-      "id" : "ZB-UIUX-TYPE-002",
-      "kind" : "dynamic-type",
-      "line" : 1,
-      "surface" : "Notch"
-    },
-    {
-      "detail" : "Fixed type sizes and no dynamic type ramp",
       "file" : "Sources\/Zeus\/Scribe",
-      "id" : "ZB-UIUX-TYPE-003",
+      "id" : "ZB-UIUX-TYPE-002",
       "kind" : "dynamic-type",
       "line" : 1,
       "surface" : "Scribe"
@@ -2891,7 +2883,7 @@
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
       "file" : "Sources\/Zeus\/Settings",
-      "id" : "ZB-UIUX-TYPE-004",
+      "id" : "ZB-UIUX-TYPE-003",
       "kind" : "dynamic-type",
       "line" : 1,
       "surface" : "Settings"
@@ -2899,7 +2891,7 @@
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
       "file" : "Sources\/Zeus\/TopBar",
-      "id" : "ZB-UIUX-TYPE-005",
+      "id" : "ZB-UIUX-TYPE-004",
       "kind" : "dynamic-type",
       "line" : 1,
       "surface" : "TopBar"
