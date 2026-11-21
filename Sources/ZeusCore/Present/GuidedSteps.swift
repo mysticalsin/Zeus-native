@@ -37,10 +37,7 @@ public struct GuidedSteps: Equatable, Sendable {
     public mutating func click(at point: CGPoint) {
         _ = point
         guard !cancelled else { return }
-        guard index + 2 < steps.count else {
-            target = nil
-            return
-        }
+        guard index + 2 < steps.count else { return }
         index += 2
         target = steps[index].target
     }

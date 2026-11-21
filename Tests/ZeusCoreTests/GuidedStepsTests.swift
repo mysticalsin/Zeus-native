@@ -91,6 +91,16 @@ import Testing
         #expect(GuidedSteps(steps: legal) != nil)
     }
 
+    @Test func aClickInsideTheLastStepClearsTheTarget() {
+        var tour = threeSteps()
+        tour.move(to: 2)
+        #expect(tour.index == 2)
+        #expect(tour.target?.label == "Done")
+        tour.click(at: CGPoint(x: 520, y: 310))
+        #expect(tour.index == 2)
+        #expect(tour.target == nil)
+    }
+
     @Test func cancelClearsTheTarget() {
         var tour = threeSteps()
         #expect(tour.target != nil)
