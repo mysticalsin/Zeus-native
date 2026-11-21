@@ -60,6 +60,22 @@ struct AboutPage: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         GSCard {
+            GSToggleRow(symbol: "arrow.triangle.2.circlepath", title: "Check for updates automatically",
+                        text: "Looks at the feed address below. Off, and an empty address, mean Check now has nothing to fetch.",
+                        isOn: SettingsStore.shared.boolBinding("about.autoUpdate"))
+            GSDivider()
+            GSRow(symbol: "link", title: "Update feed URL", text: "An HTTPS address with a version and a download link. Empty means no feed.") {
+                TextField("https://", text: Binding(get: { SettingsStore.shared.string("about.updateFeedURL") },
+                                                    set: { SettingsStore.shared.set("about.updateFeedURL", $0) }))
+                    .textFieldStyle(.plain)
+                    .snapshotSafeText(SettingsStore.shared.string("about.updateFeedURL"), placeholder: "https://")
+                    .font(OB.font(13.5)).foregroundStyle(GS.text)
+                    .padding(.horizontal, 10).frame(width: 280, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
+                    .accessibilityLabel("Update feed URL")
+            }
+            GSDivider()
             GSRow(symbol: "arrow.triangle.2.circlepath", title: "Check for Updates",
                   text: checked ? "Checked. An available update appears at the top of this page." : nil) {
                 Button("Check now") {
