@@ -28,7 +28,7 @@ public struct GoogleCloudTTSAdapter: TTSProvider, Sendable {
               let body = ProviderJSON.data([
                 "input": ["text": text],
                 "voice": ["languageCode": languageCode(for: voice), "name": voice.id],
-                "audioConfig": ["audioEncoding": "MP3"],
+                "audioConfig": ["audioEncoding": "LINEAR16", "sampleRateHertz": 24_000],
               ]) else { return nil }
         return ProviderHTTPRequest(url: url, method: "POST", headers: headers(key), body: body)
     }
@@ -129,7 +129,7 @@ enum ProviderSynthesis {
                         }
                     }
                     if !(200...299).contains(status) {
-                        continuation.finish(throwing: ProviderFailure.fromHTTPStatus(status == 0 ? 500 : status))
+                        continuation.finish(throwing: ProviderFailure.fromHTTPStatus(status))
                     } else if index == 0 {
                         continuation.finish(throwing: ProviderFailure.invalidResponse)
                     } else {

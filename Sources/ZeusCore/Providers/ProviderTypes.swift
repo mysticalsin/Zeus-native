@@ -78,6 +78,8 @@ public struct ProviderCredential: Equatable, Sendable {
 
 public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
     case unauthorized
+    case creditsUsedUp
+    case badVoice
     case rateLimited
     case server(Int)
     case timedOut
@@ -91,6 +93,8 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
     public var logName: String {
         switch self {
         case .unauthorized: "unauthorized"
+        case .creditsUsedUp: "credits-used-up"
+        case .badVoice: "bad-voice"
         case .rateLimited: "rate-limited"
         case .server(let status): "server-\(status)"
         case .timedOut: "timed-out"
@@ -106,6 +110,8 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
     public var pill: String {
         switch self {
         case .unauthorized: "Key rejected"
+        case .creditsUsedUp: "Credits are used up"
+        case .badVoice: "That voice isn't available"
         case .rateLimited: "Rate limited"
         case .server: "Provider unavailable"
         case .timedOut: "Timed out"
@@ -122,8 +128,11 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
     /// call can return 400 for a bad voice name.
     public static func fromHTTPStatus(_ status: Int, validating: Bool = false) -> ProviderFailure {
         switch status {
+        case 0: .offline
         case 401, 403: .unauthorized
+        case 402: .creditsUsedUp
         case 400 where validating: .unauthorized
+        case 400: .badVoice
         case 429: .rateLimited
         case 500...599: .server(status)
         default: .invalidResponse
@@ -136,7 +145,8 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
         let ns = error as NSError
         if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorTimedOut { return .timedOut }
         if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return .cancelled }
-        if ns.domain == NSURLErrorDomain && (ns.code == NSURLErrorNotConnectedToInternet || ns.code == NSURLErrorNetworkConnectionLost) {
+        if ns.domain == NSURLErrorDomain && (ns.code == NSURLErrorNotConnectedToInternet || ns.code == NSURLErrorNetworkConnectionLost
+            || ns.code == NSURLErrorCannotFindHost || ns.code == NSURLErrorCannotConnectToHost || ns.code == NSURLErrorDNSLookupFailed) {
             return .offline
         }
         return .invalidResponse
