@@ -3,7 +3,7 @@
 Echo, 2026-11-20 (BRT).
 
 - Everything here was **measured on the box** (Linux x86-64 VM) unless it is labelled *simulated* or *estimate*.
-- Mac figures come from the measured M5 run (`/workspace/echo/bench/results/summary.md`).
+- Mac figures come from the measured M5 run (`bench/results/summary.md`).
 
 ## 1. Verdict (short)
 
@@ -94,7 +94,7 @@ Echo, 2026-11-20 (BRT).
 ## 3. Packaging status
 
 **Built:**
-- `package/haru-pipe`: a Rust crate with no dependencies, Apache-2.0. It has a library API and a `haru-pipe` CLI (`convert`, `info`, `bench`, `e2e`).
+- `pipeline-bench/rust`: the benchmark crate in this tree, no dependencies, Apache-2.0. It has a library API and a `haru-pipe` CLI (`convert`, `info`, `bench`, `e2e`). The canonical crate Zeus links is `native/haru-pipe` on `zeus-bot/haru-companion`, which is not in this tree.
 - 11 tests:
   - 5 red-first invariants (`RED.log` shows them failing on stubs, then passing): frame = 3200 enforced by type, resampler length rule, DC/in-band/stop-band energy, lossless int16 round trip;
   - 6 parity and layout tests: scipy golden fixtures within 2e-6, numpy `upsample_2x`/`downsample_2x` semantics, leftover handling, FRAME byte layout, ring wrap-around, WAV round trip.
@@ -134,8 +134,8 @@ Key point: MLX's kernels are already C++/Metal. Python only builds the lazy grap
 ## 5. Long-session stability: approach (harness ready, not run on the Mac)
 
 **Harness:**
-- Code: `/workspace/echo/soak/haru_soak.py`; plan: `/workspace/echo/soak/MAC_RUN_PLAN.md`.
-- `selftest` passes 34 checks on the box with a fake backend that injects faults: loop, latency drift, memory leak, garbage audio.
+- Code: `soak/haru_soak.py`; plan: `soak/MAC_RUN_PLAN.md`.
+- `selftest` passes 59 checks with a fake backend that injects faults: loop, latency drift, memory leak, garbage audio.
 - It drives the upstream `DuplexSession` frame by frame, exactly like `haru-mlx-inference`.
 - The conversation is scripted and synthetic: built-in `say` voices, 10 topics × 3 paraphrases, FR and EN, no voice reference.
 
@@ -219,10 +219,11 @@ No classic repetition or frequency penalty exists.
 ## 7. Reproduce
 
 ```
-cd /workspace/echo/pipeline-bench
-.venv/bin/python scripts/gen_workload.py workload          # deterministic, ~170 MB
-(cd rust && cargo build --release); (cd go && go build -trimpath -o haru-pipe ./cmd/haru-pipe)
+cd tools/echo-voice/pipeline-bench
+python3 -m venv .venv && .venv/bin/pip install numpy scipy soundfile
+.venv/bin/python scripts/gen_workload.py workload          # deterministic, ~170 MB, gitignored
+(cd rust && cargo build --release && cargo test)
+(cd go && go test ./... && go build -trimpath -o haru-pipe ./cmd/haru-pipe)
 .venv/bin/python scripts/run_bench.py --runs 7 --e2e-runs 7 && .venv/bin/python scripts/aggregate.py
-(cd package/haru-pipe && cargo test)
-/workspace/echo/pipeline-bench/.venv/bin/python /workspace/echo/soak/haru_soak.py selftest
+python3 ../bench/haru_bench.py selftest
 ```
