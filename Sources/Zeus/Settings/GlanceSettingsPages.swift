@@ -1300,16 +1300,13 @@ private struct PermissionsPage: View {
     /// The desk's picture of each capability. Reading the calendar flag does not prompt and does not list events.
     private var deskStatus: [PermissionDesk.Kind: PermissionDesk.Status] {
         var status: [PermissionDesk.Kind: PermissionDesk.Status] = [:]
-        func granted(_ kind: PermissionsModel.Kind) -> PermissionDesk.Status {
-            context.services.granted(kind) ? .allowed : .unknown
-        }
-        status[.accessibility] = granted(.accessibility)
-        status[.automation] = granted(.automation)
-        status[.fullDisk] = context.services.fullDiskAccess ? .allowed : .unknown
-        status[.camera] = context.permissions.cameraPermissionState == .authorized ? .allowed : .unknown
-        status[.screen] = context.permissions.screenPermissionState == .authorized ? .allowed : .unknown
-        status[.microphone] = VoicePermissions.mic == .authorized ? .allowed : .unknown
-        status[.speech] = VoicePermissions.speech == .authorized ? .allowed : .unknown
+        status[.accessibility] = PermissionDesk.observed(authorized: context.services.granted(.accessibility), denied: false)
+        status[.automation] = PermissionDesk.observed(authorized: context.services.granted(.automation), denied: false)
+        status[.fullDisk] = PermissionDesk.observed(authorized: context.services.fullDiskAccess, denied: false)
+        status[.camera] = PermissionDesk.observed(authorized: context.permissions.cameraPermissionState == .authorized, denied: context.permissions.cameraPermissionState == .denied)
+        status[.screen] = PermissionDesk.observed(authorized: context.permissions.screenPermissionState == .authorized, denied: context.permissions.screenPermissionState == .denied)
+        status[.microphone] = PermissionDesk.observed(authorized: VoicePermissions.mic == .authorized, denied: VoicePermissions.mic == .denied)
+        status[.speech] = PermissionDesk.observed(authorized: VoicePermissions.speech == .authorized, denied: VoicePermissions.speech == .denied)
         switch LocalCalendarReader.status {
         case .allowed: status[.calendar] = .allowed
         case .denied, .restricted: status[.calendar] = .denied
@@ -1320,6 +1317,10 @@ private struct PermissionsPage: View {
 
     /// A tap. The calendar reader runs only for the Calendars row.
     private func deskAllow(_ kind: PermissionDesk.Kind) {
+        if deskStatus[kind] == .denied {
+            if let url = URL(string: PermissionDesk.url(for: kind)) { NSWorkspace.shared.open(url) }
+            return
+        }
         if PermissionDesk.readsCalendar(kind: kind, tapped: true) {
             Task { _ = await LocalCalendarReader.ensureAccess(); context.refresh() }
             return
