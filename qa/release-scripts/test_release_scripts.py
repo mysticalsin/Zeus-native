@@ -135,6 +135,20 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(len(signatures), 4)
         self.assertTrue(all("--timestamp=none" in c for c in signatures))
 
+    def test_helpers_are_signed_with_their_own_identifier(self):
+        self.bundle_fixture()
+        result = self.run_script("bundle.sh", SIGN_IDENTITY="-")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        signed = {}
+        for command in self.commands():
+            if command[:2] != ["codesign", "--force"] or "--identifier" not in command:
+                continue
+            name = Path(command[-1]).name
+            if name == "Zeus.app":
+                continue
+            signed[name] = command[command.index("--identifier") + 1]
+        self.assertEqual(signed, {"zeus": "zeus", "zeus-hook": "zeus-hook", "zeus-bridge": "zeus-bridge"})
+
     def test_bundle_strips_symbols_from_app_and_helpers_before_signing(self):
         # Lean install: unstripped binaries were 62 MB of the 194 MB app (language data is not in the bundle at all).
         self.bundle_fixture()

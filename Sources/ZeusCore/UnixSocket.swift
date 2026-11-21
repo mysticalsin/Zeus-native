@@ -157,9 +157,11 @@ public enum UnixSocket {
     }
 
     /// Sends one line. Returns nil on connect/write/read failure. No capture or permission API runs.
-    public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval) -> Data? {
+    public static func request(path: String, payload: Data, expectReply: Bool, timeout: TimeInterval,
+                               requireSignedServer: Bool = false, serverIdentifier: String = SocketPeerIdentifier.app) -> Data? {
         guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return nil }
         defer { close(fd) }
+        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer, expectedIdentifier: serverIdentifier) else { return nil }
         guard writeAll(fd, payload + Data([0x0A])) else { return nil }
         guard expectReply else { return Data() }
         guard let reply = readLine(fd, timeout: timeout), boundedMessage(reply) else { return nil }
@@ -180,9 +182,11 @@ public enum UnixSocket {
 
     /// `request` with a reply, saying how a failure happened. It shares `request`'s connect, write and read steps,
     /// so both keep the same bounds.
-    public static func exchange(path: String, payload: Data, timeout: TimeInterval) -> Outcome {
+    public static func exchange(path: String, payload: Data, timeout: TimeInterval,
+                                requireSignedServer: Bool = false, serverIdentifier: String = SocketPeerIdentifier.app) -> Outcome {
         guard boundedMessage(payload), let fd = connectedSocket(to: path) else { return .notConnected }
         defer { close(fd) }
+        guard SocketClientTrust.accepts(fd: fd, requireSignature: requireSignedServer, expectedIdentifier: serverIdentifier) else { return .closedEarly }
         guard writeAll(fd, payload + Data([0x0A])) else { return .closedEarly }
         switch readLineOutcome(fd, timeout: timeout) {
         case .line(let reply): return boundedMessage(reply) ? .reply(reply) : .closedEarly
@@ -236,7 +240,23 @@ public final class UnixSocketServer: @unchecked Sendable {
         try lock.withLock {
             guard listener == nil else { throw POSIXError(.EALREADY) }
             guard var address = UnixSocket.address(for: path) else { throw POSIXError(.ENAMETOOLONG) }
-            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            let directory = (path as NSString).deletingLastPathComponent
+            let previousMask = umask(0o077)
+            defer { umask(previousMask) }
+            let createdDirectory = mkdir(directory, 0o700) == 0
+            if !createdDirectory, errno != EEXIST { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            var directoryInfo = stat()
+            guard lstat(directory, &directoryInfo) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            guard directoryInfo.st_uid == geteuid() else { throw POSIXError(.EPERM) }
+            guard (directoryInfo.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR) else { throw POSIXError(.EPERM) }
+            // A directory this call created may be tightened to 0700. One that already existed is never chmod'd.
+            if directoryInfo.st_mode & 0o777 != 0o700 {
+                guard createdDirectory, chmod(directory, 0o700) == 0 else { throw POSIXError(.EPERM) }
+                guard lstat(directory, &directoryInfo) == 0,
+                      directoryInfo.st_uid == geteuid(),
+                      (directoryInfo.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR),
+                      directoryInfo.st_mode & 0o777 == 0o700 else { throw POSIXError(.EPERM) }
+            }
             var existing = stat()
             if lstat(path, &existing) == 0 {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }

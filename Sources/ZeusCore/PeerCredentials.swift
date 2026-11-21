@@ -157,11 +157,37 @@ public enum ChromeSocketPeers {
     /// bridge alone also accepts the app bundle that ships a bridge of its name (an ad hoc development build).
     public static let verifier: PeerVerifier = { PeerSigning.verifyApp(auditToken: $0, expectedPeerIdentifier: expectedPeerIdentifier, trustShippingBundle: true) }
 
-    /// The policy for this bridge process. A bridge started with `ZEUS_SUPPORT_DIR` set serves a
+    /// The policy for this bridge process. A debug bridge started with `ZEUS_SUPPORT_DIR` set serves a
     /// relocated socket (tests, a second build) that the installed app never talks to, so only the
-    /// same-user rule applies there. Whoever can set the bridge's environment can already move the socket.
-    public static func policy(environment: [String: String]) -> PeerPolicy {
-        if let override = environment["ZEUS_SUPPORT_DIR"], !override.isEmpty { return .sameUser }
+    /// same-user rule applies there. A release build keeps the program-name and signature check even
+    /// when that variable is set, and `ZeusPaths` ignores the variable.
+    public static func policy(environment: [String: String], release: Bool = ZeusPaths.releaseBuild) -> PeerPolicy {
+        if !release, let override = environment["ZEUS_SUPPORT_DIR"], !override.isEmpty { return .sameUser }
         return .sameUserExecutable(allowedExecutables)
+    }
+}
+
+/// What `zeus-hook` requires of the app on the other end of the socket before it trusts a reply.
+public enum SocketClientTrust {
+    /// `signatureAllowed` nil skips the signature (a uid-only check). False refuses even the right user.
+    public static func accepts(uid: UInt32, ownUID: UInt32, signatureAllowed: Bool?) -> Bool {
+        guard uid == ownUID else { return false }
+        if let signatureAllowed, !signatureAllowed { return false }
+        return true
+    }
+
+    public static func accepts(fd: Int32, requireSignature: Bool, expectedIdentifier: String = ZeusPaths.bundleIdentifier) -> Bool {
+        guard let peer = PeerCheck.identify(fd: fd) else { return false }
+        let signature: Bool?
+        if requireSignature {
+            #if canImport(Darwin)
+            signature = PeerSigning.verifyApp(auditToken: peer.auditToken, expectedPeerIdentifier: expectedIdentifier).isAllowed
+            #else
+            signature = false
+            #endif
+        } else {
+            signature = nil
+        }
+        return accepts(uid: peer.uid, ownUID: UInt32(geteuid()), signatureAllowed: signature)
     }
 }

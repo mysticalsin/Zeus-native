@@ -49,7 +49,8 @@ let reply = UnixSocket.request(
     path: ZeusPaths.socket.path,
     payload: line,
     expectReply: needsDecision,
-    timeout: needsDecision ? 115 : 1
+    timeout: needsDecision ? 115 : 1,
+    requireSignedServer: true
 )
 
 if needsDecision,

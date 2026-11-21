@@ -22,6 +22,7 @@ struct UnixSocketSafetyTests {
     private func location() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-ipc-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         return root
     }
 
@@ -240,6 +241,18 @@ struct UnixSocketSafetyTests {
         close(client)
         retained.read()?(Data(repeating: 0x78, count: UnixSocket.maximumMessageBytes))
         try await eventually { server.activeConnectionCount == 0 }
+    }
+
+    @Test func aPreexistingLooseDirectoryIsRefusedAndLeftAlone() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-loose-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        chmod(root.path, 0o755)
+        let server = UnixSocketServer(path: root.appendingPathComponent("s.sock").path) { _, reply in reply(nil) }
+        #expect(throws: POSIXError.self) { try server.start() }
+        var info = stat()
+        #expect(lstat(root.path, &info) == 0)
+        #expect(info.st_mode & 0o777 == 0o755)
     }
 
     @Test func serverDoesNotRemoveRegularFilesOrSymlinks() throws {

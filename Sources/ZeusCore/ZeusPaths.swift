@@ -7,24 +7,39 @@ public enum ZeusPaths {
     /// unpacked extension is loaded from.
     public static let extensionID = "dkpclhaealkdnnihlccglmonmmjfjobe"
 
-    /// ~/Library/Application Support/Zeus. `ZEUS_SUPPORT_DIR` moves it (tests, a second build),
-    /// so a ZEUS you are running is never touched.
-    public static var supportDirectory: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_SUPPORT_DIR"], !override.isEmpty {
+    /// True for a release build. Debug and test builds stay false, so they can still relocate the support folder.
+    public static var releaseBuild: Bool {
+        #if DEBUG
+        false
+        #else
+        true
+        #endif
+    }
+
+    /// ~/Library/Application Support/Zeus. A debug build's `ZEUS_SUPPORT_DIR` moves it (tests, a second build).
+    /// A release build ignores that variable.
+    public static func supportDirectory(environment: [String: String] = ProcessInfo.processInfo.environment,
+                                        release: Bool = releaseBuild) -> URL {
+        if !release, let override = environment["ZEUS_SUPPORT_DIR"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Zeus", isDirectory: true)
     }
 
+    public static var supportDirectory: URL { supportDirectory() }
+
     /// Unix socket shared by the app, `zeus-hook` and `zeus-bridge`.
-    /// `ZEUS_SOCKET` moves just the socket.
-    public static var socket: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_SOCKET"], !override.isEmpty {
+    /// A debug build's `ZEUS_SOCKET` moves it. A release build ignores that variable.
+    public static func socket(environment: [String: String] = ProcessInfo.processInfo.environment,
+                              release: Bool = releaseBuild) -> URL {
+        if !release, let override = environment["ZEUS_SOCKET"], !override.isEmpty {
             return URL(fileURLWithPath: override)
         }
-        return supportDirectory.appendingPathComponent("zeus.sock")
+        return supportDirectory(environment: environment, release: release).appendingPathComponent("zeus.sock")
     }
+
+    public static var socket: URL { socket() }
 
     /// Served by `zeus-bridge` while Chrome has it running; the app sends browser requests here.
     public static var chromeSocket: URL { supportDirectory.appendingPathComponent("chrome.sock") }

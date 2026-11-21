@@ -73,7 +73,7 @@ if [ "${ZEUS_KEEP_SYMBOLS:-0}" != 1 ]; then
 fi
 
 for helper in "$APP/Contents/Helpers/"*; do
-  codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$helper"
+  codesign --force --identifier "$(basename "$helper")" --options runtime "${TIMESTAMP_ARGS[@]}" ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$helper"
 done
 codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" --entitlements Resources/Zeus.entitlements \
   ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$SIGN_IDENTITY" "$APP"

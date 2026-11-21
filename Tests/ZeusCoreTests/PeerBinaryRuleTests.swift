@@ -384,6 +384,17 @@ struct PeerBinaryRuleTests {
         #expect(verdict == .allow, "\(verdict)")
     }
 
+    @Test func acceptsFdTrustsThisProcessUnderItsOwnIdentifier() throws {
+        var pair: [Int32] = [0, 0]
+        try #require(socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0)
+        defer { close(pair[0]); close(pair[1]) }
+        let own = try #require(PeerSigning.captureOwnIdentity())
+        let identifier = try #require(own.identifier)
+        try #require(identifier != ZeusPaths.bundleIdentifier)
+        #expect(!SocketClientTrust.accepts(fd: pair[0], requireSignature: true, expectedIdentifier: ZeusPaths.bundleIdentifier))
+        #expect(SocketClientTrust.accepts(fd: pair[0], requireSignature: true, expectedIdentifier: identifier))
+    }
+
     @Test func theAppIdentifierIsEnforcedWhenTheServerNamesOne() throws {
         let token = try pairToken()
         let own = try #require(PeerSigning.captureOwnIdentity())
@@ -433,6 +444,7 @@ struct PeerVerificationWiringTests {
     private func socketPath(_ name: String) throws -> (URL, String) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-peerv-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         return (root, root.appendingPathComponent(name).path)
     }
 

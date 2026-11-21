@@ -21,6 +21,7 @@ struct BridgePendingRepliesTests {
     @Test func duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-br-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
         defer { try? FileManager.default.removeItem(at: root) }
         let path = root.appendingPathComponent("b.sock").path
         let pending = BridgePendingReplies()
