@@ -4,9 +4,9 @@ import Foundation
 public enum HubTranscriptBudget {
     public static let lineCap = 400
     /// Compact JSON. Pretty printing rewrites every line with indentation.
-    public static let prettyPrinted = true
+    public static let prettyPrinted = false
 
     public static func keptLines(_ count: Int) -> Int {
-        max(0, count)
+        min(max(0, count), lineCap)
     }
 }
