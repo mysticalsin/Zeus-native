@@ -86,6 +86,7 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
     case notHTTPS
     case missingCredential
     case notRegistered
+    case offline
 
     public var logName: String {
         switch self {
@@ -98,6 +99,7 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
         case .notHTTPS: "not-https"
         case .missingCredential: "missing-credential"
         case .notRegistered: "not-registered"
+        case .offline: "offline"
         }
     }
 
@@ -112,6 +114,7 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
         case .notHTTPS: "Blocked"
         case .missingCredential: "Needs a key"
         case .notRegistered: "Unavailable"
+        case .offline: "Offline"
         }
     }
 
@@ -133,7 +136,33 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
         let ns = error as NSError
         if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorTimedOut { return .timedOut }
         if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return .cancelled }
+        if ns.domain == NSURLErrorDomain && (ns.code == NSURLErrorNotConnectedToInternet || ns.code == NSURLErrorNetworkConnectionLost) {
+            return .offline
+        }
         return .invalidResponse
+    }
+}
+
+/// A saved key is at least 8 characters and contains no whitespace. Empty and malformed keys are refused
+/// before any request is built.
+public enum VoiceProviderKeyPolicy {
+    public static func accepts(_ key: String) -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 8 else { return false }
+        return trimmed.unicodeScalars.allSatisfy { !$0.properties.isWhitespace }
+    }
+}
+
+/// WAV, an ID3 tag, or an MP3 frame. Anything else is not audio and must not be played.
+public enum VoiceAudioValidity {
+    public static func isPlayable(_ data: Data) -> Bool {
+        if data.starts(with: Data("RIFF".utf8)) { return data.count > 44 }
+        if data.starts(with: Data("ID3".utf8)) { return data.count > 10 }
+        if data.count > 1, data[data.startIndex] == 0xFF {
+            let second = data[data.index(after: data.startIndex)]
+            return (second & 0xE0) == 0xE0
+        }
+        return false
     }
 }
 

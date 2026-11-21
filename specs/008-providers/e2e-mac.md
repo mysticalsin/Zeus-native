@@ -1,4 +1,51 @@
-# Mac end-to-end: fake voice providers
+# Voice-provider end to end
+
+One command runs every fake journey and writes the report. There is no real key in that command.
+A second command runs the live contracts only when a key is present in the environment.
+
+```sh
+qa/providers-e2e/run.sh
+qa/providers-e2e/run.sh selftest
+ZEUS_LIVE_ELEVENLABS_KEY='…' qa/providers-e2e/run.sh live
+ZEUS_LIVE_GOOGLE_TTS_KEY='…' qa/providers-e2e/run.sh live
+```
+
+Output directory: `$ZEUS_E2E_OUT`, or `$TMPDIR/zeus-e2e/providers/<sha8>/` when that variable is unset.
+
+| File | What |
+|---|---|
+| `summary.json` | sha, pass/fail/skip/infra counts, per-test durations, p50 and p95, secret-scan result |
+| `junit.xml` | Swift Testing xUnit output |
+| `swift-test.log` | The test log that the secret scan reads |
+| `latency.txt` | One first-audio millisecond sample per kept reply |
+| `unified-log.txt` | `log show` on macOS, otherwise a note that the unified log is unavailable |
+| `crash-scan.txt` | Zeus crash reports under DiagnosticReports, or a note that there are none |
+| `screenshots/<journey>.png` | One result card per journey |
+
+Exit 0 is pass. Exit 1 is a product failure. Exit 2 is infrastructure: the Swift test timed out, was retried once, and timed out again. A failing assertion is not retried.
+
+The fake key and the prefixes `zeus-e2e-fake-key`, `zeus-e2e-fake`, and `zeus-e2e` must be absent from the test log, the xUnit file, the latency file, the unified-log export, and the crash scan. The live command adds the same check for the environment values and never writes those values into `summary.json`.
+
+Forge checks in `summary.json`: `verifierOwnedProperty` (the property walk lives in the test file), `skipGate` (zero unexplained skips; a live skip is explained only when its env var is unset), `specBoundaries` (600/601 ms, 1,400/1,401 ms, key length 7/8), and `timeoutIsInfrastructure`.
+
+Journeys the fake command asserts:
+
+- First add, validate, pick a voice, Test, then a reply turn on that provider.
+- Edit the key, then Remove. The account is gone from the store.
+- Switch provider mid-session.
+- Switch mid-utterance: the held stream is cancelled before the next provider speaks, and the overlap never exceeds one.
+- Relaunch: a new session on the same store and defaults still has the choice, the key, and the voice id. It does not send text until the provider is ready again.
+- Empty and malformed keys never build a request.
+- A 401 on validate stays in error and does not send a later reply.
+- A 401 after ready (revoked) falls back to the local voice and stays in error.
+- 429 stays in error. 503 falls back for that turn and leaves the provider ready.
+- Network down (`NSURLErrorNotConnectedToInternet`) uses the local voice, then the Mac voice when the local voice returns nothing.
+- A first byte later than the injected budget falls back.
+- A truncated stream and a buffer that is not WAV or MP3 fall back.
+- Thirty fast replies: p50 at or under 900 ms and p95 at or under 1,400 ms. The sorted p50 is the 15th sample and the p95 is the 29th.
+- Every listed readiness transition, including the illegal ones, matches the table in `everyTransitionIsListed`.
+
+The Mac Accessibility walk below is the same product, driven by `scripts/human-qa.sh` when a person is at the machine. It is not a second implementation. The repository still has no Xcode project and no XCUITest target. Playwright does not drive the app.
 
 Someone else runs this on a Mac, in a separate clone, with the fake provider only.
 There is no real ElevenLabs key and no real Google key in this run.

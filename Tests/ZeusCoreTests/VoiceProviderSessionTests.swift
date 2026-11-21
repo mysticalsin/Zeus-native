@@ -22,7 +22,7 @@ struct VoiceProviderSessionTests {
         }
         #expect(id == ElevenLabsTTSAdapter.id)
         #expect(voice == "voice-1")
-        #expect(outcome.audio == Data("audio-bytes".utf8))
+        #expect(outcome.audio == VoiceProviderFakeAudio.wavSilence())
         #expect(outcome.signpostName == ProviderSignpostName.firstAudio)
         #expect(outcome.metVoiceLegBudget)
         #expect(outcome.metDirectStreamP95)
@@ -254,7 +254,7 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
             return ProviderHTTPResponse(status: 200, body: try JSONSerialization.data(withJSONObject: body))
         }
         if request.url.path.contains(":synthesize") {
-            let audio = Data("audio-bytes".utf8).base64EncodedString()
+            let audio = VoiceProviderFakeAudio.wavSilence().base64EncodedString()
             let body = try JSONSerialization.data(withJSONObject: ["audioContent": audio])
             return ProviderHTTPResponse(status: streamStatus, body: body)
         }
@@ -277,7 +277,7 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
             }
             continuation.yield(.status(status))
             if (200...299).contains(status) {
-                continuation.yield(.chunk(Data("audio-bytes".utf8)))
+                continuation.yield(.chunk(VoiceProviderFakeAudio.wavSilence()))
             }
             continuation.finish()
         }

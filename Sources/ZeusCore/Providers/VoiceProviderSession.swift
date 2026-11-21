@@ -190,6 +190,9 @@ public actor VoiceProviderSession {
     private var currentCancel: (@Sendable () -> Void)?
     private var speakCancelled = false
     private var statusLine = "Speaking with the local voice."
+    private var firstAudioBudgetMs = ProviderLatencyVerdict.directStreamP95Ms
+
+    public func setFirstAudioBudget(ms: Int) { firstAudioBudgetMs = ms }
 
     public init(store: any CredentialStore, transport: any ProviderHTTPTransport, local: any LocalVoiceSpeaking,
                 preferences: VoiceProviderPreferences, log: ProviderLog = ProviderLog(), signposter: ProviderSignposter = ProviderSignposter(),
@@ -265,7 +268,11 @@ public actor VoiceProviderSession {
             log.record("provider rejected unregistered id")
             return
         }
-        guard !trimmed.isEmpty else { return }
+        guard VoiceProviderKeyPolicy.accepts(trimmed) else {
+            log.record("provider=\(providerID) rejected key")
+            statusLine = "\(descriptor.displayName): the key is not valid."
+            return
+        }
         let service = serviceName(providerID)
         guard store.write(trimmed, service: service, account: keyAccount(providerID)) else { return }
         var machine = ProviderReadinessMachine(state: readiness[providerID] ?? .unset)
@@ -341,11 +348,16 @@ public actor VoiceProviderSession {
                     if speakCancelled { throw ProviderFailure.cancelled }
                     if audio.isEmpty {
                         first = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
+                        if let first, first > firstAudioBudgetMs {
+                            synthesis.cancel()
+                            throw ProviderFailure.timedOut
+                        }
                     }
                     audio.append(chunk.data)
                 }
                 currentCancel = nil
                 guard !audio.isEmpty, let first else { throw ProviderFailure.invalidResponse }
+                guard VoiceAudioValidity.isPlayable(audio) else { throw ProviderFailure.invalidResponse }
                 let name = ProviderRegistry.descriptor(id)?.displayName ?? id
                 let line = "\(name) is speaking."
                 statusLine = line
@@ -388,8 +400,8 @@ public actor VoiceProviderSession {
         if failure == .cancelled || speakCancelled {
             return cancelled(started: started, providerID: providerID)
         }
-        if failure == .timedOut {
-            return await finishLocal(.timedOut, text: text, providerID: providerID, started: started, routeName: "local-fallback")
+        if failure == .timedOut || failure == .offline {
+            return await finishLocal(failure == .offline ? .failed(.offline) : .timedOut, text: text, providerID: providerID, started: started, routeName: "local-fallback")
         }
         if failure == .unauthorized || failure == .rateLimited {
             noteRuntime(failure, providerID: providerID)
