@@ -849,7 +849,12 @@ private struct TopBarPanelBody: View {
                 agentsStack(now: .now)
             }
         }
-        .onAppear { syncAgents(now: .now) }
+        .onAppear {
+            syncAgents(now: .now)
+            if let openedAt = model.openedAt {
+                agentsPage.firstFrameMilliseconds = Int(Date().timeIntervalSince(openedAt) * 1000)
+            }
+        }
         .onChange(of: model.sessions) { _, _ in syncAgents(now: .now) }
         .onChange(of: model.approval?.id) { _, _ in syncAgents(now: .now) }
         .onChange(of: model.presentation) { _, _ in syncAgents(now: .now) }
@@ -1717,7 +1722,8 @@ struct AgentsPage: Equatable, Sendable {
         var kept: [String: HubSessionState] = [:]
         for row in visible {
             if var existing = sessions[row.id] {
-                if existing.status != row.status {
+                let keepApproval = showingRequest?.sessionID == row.id && existing.status == .needsApproval
+                if !keepApproval, existing.status != row.status {
                     existing.status = row.status
                 }
                 kept[row.id] = existing
