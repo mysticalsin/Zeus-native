@@ -6656,6 +6656,59 @@
               "function": "offeredAgentsFollowTheIntegrationToggles"
             }
           ]
+        },
+        {
+          "id": "F12.uiux-chrome",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Hover and click call NotchOpenRules and NotchOpenDelay. A file drag calls NotchFileDrag. Escape, Return, and picker focus call AgentPicker. The person pass in qa/uiux/journeys.md uses the running window. No system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "hoverDwellOpensFromIdleAndFromPeek"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "escapeClosesOnlyThePicker"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "approvalButtonsDecideAndFocusStaysInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "aFileSwipeOpensTheShelfAndABareSwipeDoesNot"
+            }
+          ]
+        },
+        {
+          "id": "F12.uiux-motion",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "MotionTokens and MotionReduction collapse springs under Reduce Motion, keep the 0.12s crossfade, and set press scale to 1. Each catalog finding marked expect closed fails while its site is still in the scan. No system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "reduceMotionCollapsesSpringsAndKeepsTheCrossfade"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "motionTokenTableIsTheOnlySpringDefinition"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "repositoryFindingsMatchTheCatalog"
+            }
+          ]
+        },
+        {
+          "id": "F12.uiux-decisions",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "JevBudget.allows refuses a call when the monthly cap is unset or zero, and allows a small estimate when the cap is positive. No provider call.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "decisionRowsRetryExceptWhenAPersonMustAct"
+            }
+          ]
         }
       ]
     },
@@ -8179,6 +8232,25 @@
               "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
             }
           ]
+        },
+        {
+          "id": "F13.uiux-settings",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The sidebar parsed from GlanceSettingsWindow matches the pinned production order, including the twelve canonical sections, and the default tab row matches TopBarLayout. The person pass in qa/uiux/journeys.md uses the settings window. No system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "settingsFocusClampsAcrossTheLiveSidebar"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "everyCanonicalSectionWalksEmptyLoadingErrorAndRecovery"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "contractControlsCarryLabelTraitAndIdentifier"
+            }
+          ]
         }
       ]
     },
@@ -8212,6 +8284,25 @@
           "acceptance": "Automated known idle browser/Zoom versus active mic owners, stale/unknown ownership, live text and UI transition traces on supported OS.",
           "cases": [],
           "id": "S01.3"
+        },
+        {
+          "id": "S01.uiux-scribe-murmur",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "ScribeSessionMachine covers start, acknowledge, end, keep, capture end, and notes. DictationBehavior covers hold and toggle. SourceCapabilities and NowPlayingArbiter cover the now-playing command gate. No microphone and no system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "scribeStartEndKeepAndRecover"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "murmurHoldAndToggleMatchTheBehaviorContract"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "hubsWalkEmptyLoadingErrorAndRecovery"
+            }
+          ]
         }
       ]
     },

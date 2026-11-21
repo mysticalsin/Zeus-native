@@ -13,6 +13,30 @@ public enum NotchOpenTrigger: Sendable, Equatable {
     }
 }
 
+/// Settings > Appearance > Notch behavior > open dwell. Unknown labels stay on Standard.
+/// This reads a label. It does not read or write the system setting.
+public enum NotchOpenDelay {
+    public static func milliseconds(label: String) -> Int {
+        switch label {
+        case "Fast": 100
+        case "Relaxed": 600
+        default: 250
+        }
+    }
+}
+
+/// A file drag near the notch opens Shelf. A drag with no file URL does not.
+/// The numbers are the reach used by `NotchController.mouseDragged`.
+public enum NotchFileDrag {
+    public static let sideReach: CGFloat = 330
+    public static let belowTop: CGFloat = 110
+
+    public static func opensShelf(hasFileURLs: Bool, pointer: CGPoint, anchorMidX: CGFloat, screenMaxY: CGFloat, panelAlreadyOnShelf: Bool) -> Bool {
+        guard hasFileURLs, !panelAlreadyOnShelf else { return false }
+        return abs(pointer.x - anchorMidX) < sideReach && pointer.y > screenMaxY - belowTop
+    }
+}
+
 /// Pure rules for opening the notch with a click. AppKit coordinates (origin bottom-left).
 public enum NotchOpenRules {
     /// How far the click zone reaches past each side of the pill on a display without a notch.

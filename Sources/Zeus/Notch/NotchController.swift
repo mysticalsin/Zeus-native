@@ -498,7 +498,7 @@ final class NotchController {
 
     /// Settings > Appearance > Notch behavior.
     static var openDelayMilliseconds: Int {
-        switch SettingsStore.shared.string("notch.openDelay") { case "Fast": 100; case "Relaxed": 600; default: 250 }
+        NotchOpenDelay.milliseconds(label: SettingsStore.shared.string("notch.openDelay"))
     }
     /// Settings > Appearance > Notch behavior > Open the notch on.
     static var openTrigger: NotchOpenTrigger {
@@ -530,8 +530,14 @@ final class NotchController {
             }
         }
         let mouse = NSEvent.mouseLocation
-        let near = abs(mouse.x - anchorFrame(screen).midX) < 330 && mouse.y > screen.frame.maxY - 110
-        if near, !(model.presentation == .panel && topBar.selectedTab == .shelf) {
+        let frame = anchorFrame(screen)
+        if NotchFileDrag.opensShelf(
+            hasFileURLs: true,
+            pointer: mouse,
+            anchorMidX: frame.midX,
+            screenMaxY: screen.frame.maxY,
+            panelAlreadyOnShelf: model.presentation == .panel && topBar.selectedTab == .shelf
+        ) {
             topBar.selectedTab = .shelf
             show(.panel)
         }

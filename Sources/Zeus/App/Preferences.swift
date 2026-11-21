@@ -115,7 +115,8 @@ enum Motion {
 
     /// A token spring. Under Reduce Motion nothing animates.
     static func spring(_ token: SpringToken, reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : raw(token)
+        guard MotionReduction.spring(token, reduceMotion: reduceMotion) != nil else { return nil }
+        return raw(token)
     }
 
     /// A token spring that follows the system's Reduce Motion setting right now.
@@ -208,7 +209,7 @@ struct MotionEffect: ViewModifier {
     /// Pressed, or a toggle's isOn. The animation tracks this value.
     var active: Bool
     var enabled: Bool = true
-    /// Uses `Motion.pressedScale` only while active, enabled, and motion is allowed.
+    /// Uses `MotionReduction.pressScale` only while active, enabled, and the control presses.
     var presses: Bool = false
     var curve: Curve = .feedback
     /// Replaces the system value when set, including `false` (`PressableStyle`'s override).
@@ -221,7 +222,7 @@ struct MotionEffect: ViewModifier {
     func body(content: Content) -> some View {
         let reduced = resolved
         content
-            .scaleEffect(presses && active && enabled && !reduced ? Motion.pressedScale : 1)
+            .scaleEffect(presses && active && enabled ? MotionReduction.pressScale(reduceMotion: reduced) : 1)
             .animation(animation(reduced), value: active)
             .preference(key: MotionLiveSampleKey.self, value: reduced)
     }

@@ -39,6 +39,26 @@ public enum MotionTokens {
     public static let allSprings: [SpringToken] = [panelOpen, panelOpenHeight, panelClose, panelResize, cueGrow, peekContent]
 }
 
+/// How the shared motion tokens answer Reduce Motion. Callers pass the system value in.
+/// Nothing here writes the setting.
+public enum MotionReduction {
+    /// A spring is dropped. Callers that need a fade use `crossfadeDuration` instead.
+    public static func spring(_ token: SpringToken, reduceMotion: Bool) -> SpringToken? {
+        reduceMotion ? nil : token
+    }
+
+    /// Press feedback sits still. The resting scale is 1.
+    public static func pressScale(reduceMotion: Bool) -> Double {
+        reduceMotion ? 1 : MotionTokens.pressScale
+    }
+
+    /// The short crossfade is the fade that stays on.
+    public static func crossfadeDuration(reduceMotion: Bool) -> Double {
+        _ = reduceMotion
+        return MotionTokens.crossfadeDuration
+    }
+}
+
 /// Frame-rate rules for animation that is driven by a clock rather than a SwiftUI animation.
 public enum MotionRules {
     /// The fastest display Zeus targets (ProMotion).
