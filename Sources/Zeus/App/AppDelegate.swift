@@ -208,14 +208,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Typed chat: one store behind the notch Chat tab and the floating window.
         if on(.chatBrain) { ChatModel.shared.brain = ClaudeCLIProvider() }
         if on(.chatWindow) {
-            ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() }
+            ChatModel.shared.openWindow = { [weak self] in self?.openHubChat(.openWindow) }
             chatWindow?.makeExplanation = { [weak self] in self?.visualExplanation() }
             chatWindow?.stopExplanation = { [weak self] in self?.explanation?.stop() }
             ChatModel.shared.onDeleteConversation = { [weak self] id, historyID in
                 self?.deleteExplanationHistory(id, historyID: historyID)
             }
         }
-        if on(.chatHotkey) { ChatHotkeyMonitor.shared.start { [weak self] in self?.chatWindow?.toggle() } }
+        if on(.chatHotkey) { ChatHotkeyMonitor.shared.start { [weak self] in self?.openHubChat(.shortcut) } }
         // Usage and limits from the agents' local logs; a cue when a limit gets close.
         if on(.usage) {
             UsageModel.shared.onAlert = { [weak self] text in self?.topBar.show(.usageAlert(text)) }
@@ -960,7 +960,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var teleprompterPrivate = false
     private var lastHidden: Bool?
-    private var chimePolicy = AgentChimePolicy()
+    private var hubEntry = HubBarEntry()
     private var lastApprovalSeen = false
     private var lastFailed = 0
     private var feedTicks = 0
@@ -1061,13 +1061,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func playAgentChime(_ cue: AgentChimePolicy.Cue?) {
-        switch cue {
-        case .start: ZeusSound.play(.start)
-        case .done: ZeusSound.play(.done)
-        case .approval: ZeusSound.play(.approval)
-        case .answer: ZeusSound.play(.answer)
-        case nil: break
+    /// The shortcut and openWindow open the panel on Chat. They do not open the floating window.
+    private func openHubChat(_ request: HubBarEntryRequest) {
+        let effect = hubEntry.enter(request)
+        hubEntry = effect.entry
+        recordHub(effect)
+        guard let navigation = effect.navigation, navigation.opensFloatingWindow == false else { return }
+        switch navigation.presentation {
+        case .panel:
+            guard navigation.tab == .chat else { return }
+            topBar.selectedTab = .chat
+            notch.show(.panel)
+        case .peek:
+            notch.show(.peek)
+        case .closed:
+            notch.show(.closed)
+        }
+    }
+
+    /// Writes the hub log and plays the cues the entry returned. A finish never adds a second sound here.
+    private func recordHub(_ effect: HubBarEntryEffect) {
+        for log in effect.logs {
+            FlightRecorder.shared.record(log.source, log.stage, log.detail)
+        }
+        for cue in effect.cues {
+            switch cue {
+            case .start: ZeusSound.play(.start)
+            case .done: ZeusSound.play(.done)
+            case .approval: ZeusSound.play(.approval)
+            case .answer: ZeusSound.play(.answer)
+            }
         }
     }
 
@@ -1076,13 +1099,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let extras = ExtraPreferences.shared
         let approval = notch.model.approval != nil
         let now = Date()
-        playAgentChime(chimePolicy.approval(visible: approval, at: now))
+        let opt = hubEntry.setOptIn(extras.soundsOn)
+        hubEntry = opt.entry
+        recordHub(opt)
+        let tick = hubEntry.tick(
+            sessions: notch.model.sessions.map { HubBarSession(id: $0.id, status: $0.status) },
+            approvalVisible: approval,
+            approvalSessionID: notch.model.approval?.sessionID,
+            at: now,
+            startEnabled: SettingsStore.shared.bool("sound.agentStart"),
+            systemFinishSound: AgentSettings.shared.completionSound)
+        hubEntry = tick.entry
+        recordHub(tick)
         if approval != lastApprovalSeen { lastApprovalSeen = approval; registerShortcuts() }
-        let startEnabled = SettingsStore.shared.bool("sound.agentStart")
-        for session in notch.model.sessions {
-            playAgentChime(chimePolicy.session(session.id, status: session.status, at: now, startEnabled: startEnabled))
-        }
-        chimePolicy.forget(keeping: Set(notch.model.sessions.map(\.id)))
         let working = notch.model.sessions.filter { $0.status == .working }.count
         let failed = notch.model.sessions.filter { $0.status == .failed }.count
         if failed > lastFailed, SettingsStore.shared.bool("sound.failure") { ZeusSound.play(.failure) }
