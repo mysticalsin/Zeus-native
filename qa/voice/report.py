@@ -82,9 +82,14 @@ def _cell(column: str, value) -> str:
     if column == "inter_chunk_gaps_s" and isinstance(value, list):
         if not value:
             return ""
-        longest = max(value)
+        numbers = [
+            item for item in value
+            if isinstance(item, (int, float)) and not isinstance(item, bool) and math.isfinite(item)
+        ]
         noun = "gap" if len(value) == 1 else "gaps"
-        return f"{len(value)} {noun}, longest {longest:.2f}s"
+        if not numbers:
+            return f"{len(value)} {noun}"
+        return f"{len(value)} {noun}, longest {max(numbers):.2f}s"
     if value is None:
         return ""
     if isinstance(value, bool):

@@ -36,22 +36,23 @@ def _render(text: str, voice: str, key_env: str, ledger: Path, output: Path) -> 
     secrets: list[str] = []
     charged = False
     try:
-        voices = meter.load_voices(VOICES)
-        meter.require_voice("google", voice, voices)
-        key = meter.read_key(key_env)
-        secrets.append(key)
-        meter.reserve(ledger, "google", len(text))
-        charged = True
-        audio = _fetch(text, voice, key, secrets)
-        _write(output, audio)
-        return 0
-    except meter.MeterError as error:
-        print(meter.redact(str(error), secrets), file=sys.stderr)
+        try:
+            voices = meter.load_voices(VOICES)
+            meter.require_voice("google", voice, voices)
+            key = meter.read_key(key_env)
+            secrets.append(key)
+            meter.reserve(ledger, "google", len(text))
+            charged = True
+            audio = _fetch(text, voice, key, secrets)
+            _write(output, audio)
+        except meter.MeterError as error:
+            print(meter.redact(str(error), secrets), file=sys.stderr)
+        except Exception:
+            print("request refused", file=sys.stderr)
+        else:
+            return 0
         if charged:
             print("characters stayed counted", file=sys.stderr)
-        return 1
-    except Exception:
-        print("request refused", file=sys.stderr)
         return 1
     finally:
         _report(ledger)

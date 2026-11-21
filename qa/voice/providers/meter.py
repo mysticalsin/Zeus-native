@@ -89,7 +89,12 @@ def reserve(path: Path, provider: str, characters: int) -> int:
         raise MeterError("provider refused")
     path = Path(path)
     with _lock(path):
-        data = _read(path)
+        try:
+            data = _read(path)
+        except MeterError as error:
+            if str(error) == "ledger corrupt":
+                raise MeterError("ledger corrupt: no call made") from None
+            raise
         updated = data["providers"][provider] + characters
         if updated > MAX_CHARACTERS:
             remaining = MAX_CHARACTERS - data["providers"][provider]
@@ -298,21 +303,21 @@ def _read(path: Path) -> dict:
     except OSError:
         raise MeterError("ledger unreadable") from None
     except UnicodeError:
-        raise MeterError("ledger corrupt: no call made") from None
+        raise MeterError("ledger corrupt") from None
     finally:
         os.close(fd)
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        raise MeterError("ledger corrupt: no call made") from None
+        raise MeterError("ledger corrupt") from None
     providers = data.get("providers") if isinstance(data, dict) else None
     if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(providers, dict):
-        raise MeterError("ledger corrupt: no call made")
+        raise MeterError("ledger corrupt")
     if set(providers) != set(PROVIDERS):
-        raise MeterError("ledger corrupt: no call made")
+        raise MeterError("ledger corrupt")
     for value in providers.values():
         if type(value) is not int or value < 0 or value > MAX_CHARACTERS:
-            raise MeterError("ledger corrupt: no call made")
+            raise MeterError("ledger corrupt")
     return data
 
 
