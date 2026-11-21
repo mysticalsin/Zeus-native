@@ -83,6 +83,20 @@ def test_non_list_and_non_numeric_gaps_do_not_raise() -> None:
     assert "longest" not in words
 
 
+def test_non_finite_and_bool_gaps_are_rejected() -> None:
+    report = load(ROOT, "report.py")
+    mixed = report.render_markdown([{
+        "provider": "kokoro",
+        "script": "05-error",
+        "inter_chunk_gaps_s": [0.2, True, False, float("nan"), float("inf")],
+        "barge_in_stop_latency_s": None,
+    }])
+    assert "5 gaps, longest 0.20s" in mixed
+    assert "1.00" not in mixed
+    assert "inf" not in mixed.lower()
+    assert "nan" not in mixed.lower()
+
+
 def test_status_of_a_corrupt_ledger_does_not_say_a_call_was_skipped(tmp_path: Path) -> None:
     meter = load(PROVIDERS, "meter.py")
     corrupt = tmp_path / "corrupt.json"
