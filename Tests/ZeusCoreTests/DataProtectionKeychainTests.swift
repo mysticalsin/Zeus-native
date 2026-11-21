@@ -9,6 +9,7 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
     var failWrite = false
     var failDelete = false
     var corruptReadBack = false
+    var facts: LegacyItemFacts = .zeus
     private(set) var kinds: [String] = []
     private(set) var writes: [KeychainWriteRequest] = []
     private(set) var log = ""
@@ -22,6 +23,8 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         note("readLegacy")
         return legacy
     }
+
+    func legacyFacts(service: String, account: String) -> LegacyItemFacts { facts }
 
     func readProtected(service: String, account: String) -> KeychainRead {
         note("readProtected")

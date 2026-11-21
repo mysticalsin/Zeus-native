@@ -56,6 +56,8 @@ public enum KeychainRead: Equatable, Sendable {
 public protocol CredentialKeychain: Sendable {
     func readLegacy(service: String, account: String) -> KeychainRead
     func readProtected(service: String, account: String) -> KeychainRead
+    /// Label, creator and whether the access list admits every program. Never the secret.
+    func legacyFacts(service: String, account: String) -> LegacyItemFacts
     func writeProtected(_ data: Data, request: KeychainWriteRequest) -> Bool
     func deleteLegacy(service: String, account: String) -> Bool
 }
@@ -113,8 +115,9 @@ public final class KeychainSecretStates: @unchecked Sendable {
 ///
 /// `kSecAttrAccessible` is honoured only by the data protection keychain, so a write sets
 /// `kSecUseDataProtectionKeychain` and `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. The access
-/// group is the signing TeamIdentifier, a dot, and `app.zeus.mac` — the same team prefix codesign
-/// reports, written in the entitlement as `$(AppIdentifierPrefix)`.
+/// group is the signing TeamIdentifier, a dot, and `app.zeus.mac`, the same team prefix codesign
+/// reports. The entitlement file still contains `$(AppIdentifierPrefix)`, which a non-Xcode
+/// signature does not expand, so that build fails closed.
 ///
 /// No account is readable while the screen is locked. Launch at login runs after the person unlocks,
 /// and the warm-up timer reads the copy already in memory. `whileLockedAccounts` is empty. An item
@@ -122,9 +125,21 @@ public final class KeychainSecretStates: @unchecked Sendable {
 public enum CredentialKeychainPolicy {
     public static let accessGroupSuffix = "app.zeus.mac"
     public static let entitlementKey = "keychain-access-groups"
-    public static let entitlementGroup = "$(AppIdentifierPrefix)app.zeus.mac"
+    /// One group suffix. Callers add the team prefix from the signed binary.
+    public static let accessGroup = accessGroupSuffix
+    public static let entitlementGroup = "$(AppIdentifierPrefix)" + accessGroupSuffix
+    public static let zeusLabel = "ZEUS"
+    public static let zeusCreator = "ZEUS"
+    /// Present means on. Never copy a legacy item into this account.
+    public static let cliSwitchAccount = "cli.control.enabled"
     /// Accounts a scheduled or background job must read while the screen is locked. None.
     public static let whileLockedAccounts: Set<String> = []
+
+    /// True only when the access list is not open to every program and the creator or the label is Zeus's.
+    public static func zeusWrote(_ facts: LegacyItemFacts) -> Bool {
+        if facts.anyProgram { return false }
+        return facts.creator == zeusCreator || facts.label == zeusLabel
+    }
 
     public static func isTeamIdentifier(_ team: String) -> Bool {
         team.range(of: #"^[A-Z0-9]+$"#, options: .regularExpression) != nil
@@ -180,6 +195,47 @@ public enum CredentialMigrationOutcome: Equatable, Sendable {
     }
 }
 
+/// Attributes of a legacy item. The secret is not one of them.
+public struct LegacyItemFacts: Equatable, Sendable {
+    public var label: String
+    public var creator: String
+    public var anyProgram: Bool
+    public static let zeus = LegacyItemFacts(label: CredentialKeychainPolicy.zeusLabel,
+                                              creator: CredentialKeychainPolicy.zeusCreator,
+                                              anyProgram: false)
+}
+
+/// One pass over a legacy item. `markMigrated` is what the caller persists so the pass does not run again.
+public struct MigrationAttempt: Equatable, Sendable {
+    public var outcome: CredentialMigrationOutcome
+    public var markMigrated: Bool
+}
+
+/// Accounts whose legacy item has already been considered. The secret is not stored here.
+public final class MigrationFlagStore: @unchecked Sendable {
+    public static let key = "keychain.dp.migrated.v1"
+    private let defaults: UserDefaults
+    private let lock = NSLock()
+
+    public init(defaults: UserDefaults) { self.defaults = defaults }
+
+    public func contains(service: String, account: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return (defaults.stringArray(forKey: Self.key) ?? []).contains(Self.id(service, account))
+    }
+
+    public func mark(service: String, account: String) {
+        lock.lock(); defer { lock.unlock() }
+        var items = defaults.stringArray(forKey: Self.key) ?? []
+        let id = Self.id(service, account)
+        guard !items.contains(id) else { return }
+        items.append(id)
+        defaults.set(items, forKey: Self.key)
+    }
+
+    private static func id(_ service: String, _ account: String) -> String { "\(service)|\(account)" }
+}
+
 /// Copies a legacy item into the data protection keychain, or writes a new value there.
 /// Order for a copy: read the legacy item, write the protected item, read it back, and only then
 /// delete the legacy item. A failed write or a read-back that does not match leaves the legacy item
@@ -187,6 +243,30 @@ public enum CredentialMigrationOutcome: Equatable, Sendable {
 public enum CredentialKeychainMigration {
     public static func logLine(account: String, outcome: CredentialMigrationOutcome) -> String {
         "keychain account=\(account) outcome=\(outcome.logName)"
+    }
+
+    /// Considers each legacy item once. The command-line switch is never copied. A foreign item is ignored.
+    /// A missing team id, which is what a missing group entitlement produces here, writes nothing and does not
+    /// record the flag.
+    public static func migrateOnce(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain, alreadyMigrated: Bool) -> MigrationAttempt {
+        guard CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier) != nil else {
+            return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+        }
+        if alreadyMigrated || account == CredentialKeychainPolicy.cliSwitchAccount {
+            return MigrationAttempt(outcome: protectedOnly(service: service, account: account, keychain: keychain), markMigrated: true)
+        }
+        let facts = keychain.legacyFacts(service: service, account: account)
+        switch keychain.readLegacy(service: service, account: account) {
+        case .unreadable:
+            return MigrationAttempt(outcome: .locked, markMigrated: false)
+        case .absent:
+            return MigrationAttempt(outcome: protectedOnly(service: service, account: account, keychain: keychain), markMigrated: true)
+        case .value(let data):
+            guard CredentialKeychainPolicy.zeusWrote(facts) else {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: true)
+            }
+            return importOwned(data, service: service, account: account, teamIdentifier: teamIdentifier, keychain: keychain)
+        }
     }
 
     public static func migrate(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> CredentialMigrationOutcome {
@@ -218,6 +298,32 @@ public enum CredentialKeychainMigration {
         guard let request = CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier),
               keychain.writeProtected(data, request: request) else { return .needsReentry }
         return verify(data, service: service, account: account, keychain: keychain, success: .migrated)
+    }
+
+    private static func protectedOnly(service: String, account: String, keychain: any CredentialKeychain) -> CredentialMigrationOutcome {
+        switch keychain.readProtected(service: service, account: account) {
+        case .value: return .alreadyProtected
+        case .absent: return .absent
+        case .unreadable: return .locked
+        }
+    }
+
+    private static func importOwned(_ data: Data, service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
+        switch keychain.readProtected(service: service, account: account) {
+        case .value(let stored):
+            guard stored == data else { return MigrationAttempt(outcome: .needsReentry, markMigrated: true) }
+            let outcome = verify(stored, service: service, account: account, keychain: keychain, success: .alreadyProtected)
+            return MigrationAttempt(outcome: outcome, markMigrated: outcome == .alreadyProtected)
+        case .unreadable:
+            return MigrationAttempt(outcome: .locked, markMigrated: false)
+        case .absent:
+            guard let request = CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier),
+                  keychain.writeProtected(data, request: request) else {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+            }
+            let outcome = verify(data, service: service, account: account, keychain: keychain, success: .migrated)
+            return MigrationAttempt(outcome: outcome, markMigrated: outcome == .migrated)
+        }
     }
 
     private static func existing(service: String, account: String, keychain: any CredentialKeychain, ifAbsent: CredentialMigrationOutcome) -> CredentialMigrationOutcome {
