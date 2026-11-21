@@ -5,6 +5,7 @@ import Foundation
 /// `clockPhase` is the status's phase. `clockGeneration` advances only when the clock starts or restarts.
 /// A freeze keeps the generation, and so does a later activity. A new prompt advances it.
 /// `previous` is the status stored when an approval begins. Denied and timed out return to it.
+/// Approved returns to waiting for input when that was stored, and otherwise goes to running.
 public struct HubSessionState: Equatable, Hashable, Sendable {
     public var status: HubSessionStatus
     public var previous: HubSessionStatus?
@@ -25,6 +26,9 @@ public struct HubSessionState: Equatable, Hashable, Sendable {
 /// `activity` is the table's "any activity" on a quiet error. A new prompt is `promptStarted`, and it is
 /// the only quiet-error event that restarts the clock. The table's guard column is empty, so an approval
 /// request from running or waiting enters needsApproval.
+///
+/// A failure or a stall from loading uses the same error causes as running. The stall is the existing
+/// `quietForTheStallLimit` event. This machine does not choose how long loading may stay quiet.
 public enum HubSessionMachine {
     public static func next(_ state: HubSessionState, _ event: HubSessionEvent) -> HubSessionState {
         switch (state.status, event) {
@@ -57,22 +61,28 @@ public enum HubSessionMachine {
             return state.moved(to: .done)
 
         case (.running, .failed),
-             (.waitingForInput, .failed):
+             (.waitingForInput, .failed),
+             (.loading, .failed):
             return state.moved(to: .error(.failed))
 
-        case (.running, .quietForTheStallLimit):
+        case (.running, .quietForTheStallLimit),
+             (.loading, .quietForTheStallLimit):
             return state.moved(to: .error(.quiet))
 
         case (.waitingForInput, .answerAccepted):
             return state.moved(to: .running)
 
         case (.needsApproval, .approved):
-            return state.moved(to: .running, clearPrevious: true)
+            let restored: HubSessionStatus = state.previous == .waitingForInput ? .waitingForInput : .running
+            return state.moved(to: restored, clearPrevious: true)
 
         case (.needsApproval, .denied),
              (.needsApproval, .timedOut):
             guard let previous = state.previous else { return state }
             return state.moved(to: previous, clearPrevious: true)
+
+        case (.needsApproval, .failed):
+            return state.moved(to: .error(.failed), clearPrevious: true)
 
         case (.done, .promptStarted),
              (.error(.failed), .promptStarted),
