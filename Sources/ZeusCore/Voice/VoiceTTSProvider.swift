@@ -7,6 +7,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
     case elevenLabs
     case openAICompatible
     case gemini
+    case googleCloud
 
     public var id: String { rawValue }
 
@@ -17,6 +18,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
         case .elevenLabs: "ElevenLabs"
         case .openAICompatible: "OpenAI-compatible TTS"
         case .gemini: "Google Gemini TTS"
+        case .googleCloud: "Google Cloud Text-to-Speech"
         }
     }
 
@@ -27,6 +29,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
         case .chatterbox: "chatterbox.api-key"
         case .openAICompatible: "openai-tts.api-key"
         case .gemini: "gemini-tts.api-key"
+        case .googleCloud: "google-cloud-tts.api-key"
         case .kokoro: "kokoro.api-key"
         }
     }
@@ -34,7 +37,7 @@ public enum VoiceTTSProvider: String, CaseIterable, Sendable, Identifiable {
     public var needsKey: Bool {
         switch self {
         case .kokoro, .chatterbox: false
-        case .elevenLabs, .openAICompatible, .gemini: true
+        case .elevenLabs, .openAICompatible, .gemini, .googleCloud: true
         }
     }
 }
@@ -99,6 +102,7 @@ public enum VoiceProviderFallback {
         case .elevenLabs: availability.elevenLabsConfigured
         case .openAICompatible: availability.openAIConfigured
         case .gemini: availability.geminiConfigured
+        case .googleCloud: false
         }
     }
 
