@@ -452,9 +452,16 @@ import Testing
         #expect(MediaTransport.post(for: .pause, isPlaying: true) == .playPause)
         #expect(MediaTransport.post(for: .play, isPlaying: true) == nil)
         #expect(MediaTransport.post(for: .play, isPlaying: false) == .playPause)
-        let play = LocalCommandMachine().receive("play", finalAt: Self.origin, clock: Self.clock(after: 4), apps: [])
+        var player = LocalCommandMachine()
+        let play = player.receive("play", finalAt: Self.origin, clock: Self.clock(after: 4), apps: [])
         #expect(!LocalCommandHook.shouldPerform(play, hasSession: false, spotifyInstalled: true))
         #expect(LocalCommandHook.shouldPerform(play, hasSession: true, spotifyInstalled: true))
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let controller = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/VoiceTurnController.swift"), encoding: .utf8)) ?? ""
+        let workspace = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/Intent/LocalCommandWorkspace.swift"), encoding: .utf8)) ?? ""
+        #expect(controller.contains("LocalCommandHook.shouldPerform"))
+        #expect(!workspace.contains("case .play, .pause"))
     }
 
     @Test func aNegativeVolumeIsNotACommand() {

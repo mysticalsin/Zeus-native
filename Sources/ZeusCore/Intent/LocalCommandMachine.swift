@@ -395,6 +395,50 @@ public struct LocalCommandMachine: Equatable, Sendable {
     }
 }
 
+/// Play resumes a paused session in place. Otherwise Spotify, when it is installed.
+public enum MediaPlayPolicy {
+    public enum Choice: Equatable, Sendable { case mediaKey, resumeSpotify }
+
+    /// A session that is already playing or paused stays on the media key. Spotify is only the fallback when nothing is loaded.
+    public static func choose(hasSession: Bool, spotifyInstalled: Bool) -> Choice {
+        if hasSession { return .mediaKey }
+        if spotifyInstalled { return .resumeSpotify }
+        return .mediaKey
+    }
+}
+
+/// The one media-key decision. Play and pause share a key, and the key is skipped when the player is already there.
+public enum MediaTransport {
+    public enum Command: Equatable, Sendable { case play, pause, toggle, next, previous }
+    public enum Post: Equatable, Sendable { case playPause, next, previous }
+
+    public static func post(for command: Command, isPlaying: Bool?) -> Post? {
+        switch command {
+        case .play where isPlaying == true, .pause where isPlaying == false:
+            return nil
+        case .play, .pause, .toggle:
+            return .playPause
+        case .next:
+            return .next
+        case .previous:
+            return .previous
+        }
+    }
+}
+
+/// Whether a local decision may run before the existing fast path.
+public enum LocalCommandHook {
+    public static func shouldPerform(_ decision: LocalCommandDecision, hasSession: Bool, spotifyInstalled: Bool) -> Bool {
+        guard decision.consumed else { return false }
+        for effect in decision.effects {
+            if case .perform(.media(.play)) = effect {
+                return MediaPlayPolicy.choose(hasSession: hasSession, spotifyInstalled: spotifyInstalled) != .resumeSpotify
+            }
+        }
+        return true
+    }
+}
+
 /// One finished transcript. The turn itself arms or drops a quit confirmation.
 public struct LocalCommandTurn: Equatable, Sendable {
     public var machine = LocalCommandMachine()

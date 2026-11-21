@@ -604,7 +604,10 @@ final class VoiceTurnController {
         } else {
             let decision = localCommands.receive(transcript, finalAt: finalAt, clock: .system,
                                                  apps: LocalCommandWorkspace.installedApps())
-            if decision.consumed { return localCommandResult(decision, transcript: transcript, speak: speak) }
+            let hasSession = notch.topBar.nowPlayingHub?.hasPlayerSession ?? false
+            if LocalCommandHook.shouldPerform(decision, hasSession: hasSession, spotifyInstalled: SpotifyPlayer.isInstalled) {
+                return localCommandResult(decision, transcript: transcript, speak: speak)
+            }
         }
         let fast = FastPath.shared
         switch fast.rules(transcript) {
@@ -648,7 +651,7 @@ final class VoiceTurnController {
         for effect in decision.effects {
             switch effect {
             case .perform(let action):
-                LocalCommandWorkspace.perform(action)
+                LocalCommandWorkspace.perform(action, isPlaying: notch.topBar.nowPlaying?.isPlaying)
                 actions.append("local \(LocalCommandWorkspace.summary(action))")
             case .speak(let line):
                 spoken = line

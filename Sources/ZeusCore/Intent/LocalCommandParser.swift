@@ -43,8 +43,12 @@ public enum LocalCommandParser {
         var raw = text.replacingOccurrences(of: "\u{2019}", with: "'").replacingOccurrences(of: "\u{2018}", with: "'")
         raw = raw.folding(options: .diacriticInsensitive, locale: nil).lowercased()
         raw = raw.replacingOccurrences(of: "'", with: "")
-        let mapped = raw.unicodeScalars.map { scalar -> Character in
+        let scalars = Array(raw.unicodeScalars)
+        let mapped: [Character] = scalars.enumerated().map { index, scalar in
             if scalar == "%" { return " " }
+            if scalar == "-", index + 1 < scalars.count, CharacterSet.decimalDigits.contains(scalars[index + 1]) {
+                return "-"
+            }
             return CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " "
         }
         return String(mapped).split(separator: " ").joined(separator: " ")

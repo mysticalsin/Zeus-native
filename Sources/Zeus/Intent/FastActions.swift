@@ -338,15 +338,19 @@ final class FastActions {
             // The media keys reach whatever is playing (Spotify, Music, a browser tab) with no
             // Automation prompt. Play and pause share one key, so skip it when the state already fits.
             let playing = self?.topBar?.nowPlaying?.isPlaying
-            switch command {
-            case .play where playing == true, .pause where playing == false:
-                break
-            case .play, .pause, .toggle:
-                MediaKeys.post(.play)
-            case .next:
-                MediaKeys.post(.next)
-            case .previous:
-                MediaKeys.post(.previous)
+            let mapped: MediaTransport.Command = switch command {
+            case .play: .play
+            case .pause: .pause
+            case .toggle: .toggle
+            case .next: .next
+            case .previous: .previous
+            }
+            if let post = MediaTransport.post(for: mapped, isPlaying: playing) {
+                switch post {
+                case .playPause: MediaKeys.post(.play)
+                case .next: MediaKeys.post(.next)
+                case .previous: MediaKeys.post(.previous)
+                }
             }
             started()
             return nil

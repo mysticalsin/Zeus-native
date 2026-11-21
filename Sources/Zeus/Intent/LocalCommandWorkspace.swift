@@ -19,7 +19,7 @@ enum LocalCommandWorkspace {
         }
     }
 
-    static func perform(_ action: LocalCommandAction) {
+    static func perform(_ action: LocalCommandAction, isPlaying: Bool? = nil) {
         switch action {
         case .open(let app), .switchTo(let app):
             bringForward(app)
@@ -28,9 +28,16 @@ enum LocalCommandWorkspace {
                   let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == app.bundleID }) else { return }
             quitAllowingSavePrompt(running)
         case .media(let command):
-            switch command {
-            case .play, .pause: MediaKeys.post(.play)
+            let mapped: MediaTransport.Command = switch command {
+            case .play: .play
+            case .pause: .pause
+            case .next: .next
+            }
+            guard let post = MediaTransport.post(for: mapped, isPlaying: isPlaying) else { return }
+            switch post {
+            case .playPause: MediaKeys.post(.play)
             case .next: MediaKeys.post(.next)
+            case .previous: MediaKeys.post(.previous)
             }
         case .volume(let change):
             _ = SystemVolume.apply(fastVolume(change))
