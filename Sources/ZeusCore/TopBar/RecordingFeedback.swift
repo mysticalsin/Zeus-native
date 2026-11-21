@@ -4,7 +4,7 @@ import Foundation
 /// persistence; a clock can animate a phase but can never declare that recording or saving succeeded.
 public enum RecordingFeedback {
     public enum Producer: String, Equatable, Sendable { case recordly, meetings }
-    public enum Phase: String, Equatable, Sendable { case starting, finishing, writing, exporting, completed, failed }
+    public enum Phase: String, Equatable, Sendable { case starting, recording, finishing, writing, exporting, completed, failed }
     public enum ExportDisposition: Equatable, Sendable { case failed, partial, saved }
 
     /// One successful format does not make the whole requested export a success.
