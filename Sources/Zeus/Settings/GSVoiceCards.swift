@@ -15,6 +15,7 @@ struct ZeusVoiceCards: View {
     private var openAINote: String? { OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now) }
 
     var body: some View {
+        HostedSpeechCard()
         GSCard {
             GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus speaks with ElevenLabs first." : "Best Zeus voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain.") {
                 HStack(spacing: 10) {

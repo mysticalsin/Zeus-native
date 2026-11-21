@@ -112,12 +112,14 @@ struct ElevenLabsVoice: Sendable {
     }
 
     private static func loadWorker(voice: String?) -> ElevenLabsVoice? {
-        if let raw = Keychain.get("worker.url"), let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
-           url.scheme == "https", let token = Keychain.get("worker.token"), !token.isEmpty {
-            // The worker's own ELEVENLABS_VOICE_ID applies unless a voice was picked here.
-            return ElevenLabsVoice(route: .worker(url: url, token: token), voiceID: voice)
-        }
-        return nil
+        let raw = Keychain.get(HostedSpeechAccounts.url)
+        let token = Keychain.get(HostedSpeechAccounts.token)
+        guard case .ready(let url) = HostedSpeechGate.phase(
+            enabled: HostedSpeechPreference.isEnabled(),
+            rawURL: raw,
+            token: token
+        ), let token, !token.isEmpty else { return nil }
+        return ElevenLabsVoice(route: .worker(url: url, token: token), voiceID: voice)
     }
 
     func request(for text: String, model: String = ElevenLabsVoice.model) -> URLRequest {
