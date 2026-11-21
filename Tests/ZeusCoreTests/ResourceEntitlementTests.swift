@@ -3,11 +3,21 @@ import Testing
 
 /// S04-06. Location and calendar calls are already in the app. The hardened-runtime file did not allow them.
 enum ResourceEntitlementRule {
-    /// The check that shipped at cda7cf85. Extra keys, including network.server, still pass.
+    /// The whole key set. Equality rejects an extra key such as network.server.
+    static let keys: Set<String> = [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.automation.apple-events",
+        "com.apple.security.device.audio-input",
+        "com.apple.security.device.camera",
+        "com.apple.security.network.client",
+        "com.apple.security.personal-information.calendars",
+        "com.apple.security.personal-information.location",
+    ]
+
     static func allows(_ file: [String: Any]) -> Bool {
-        file["com.apple.security.app-sandbox"] as? Bool == false
-            && file["com.apple.security.personal-information.location"] as? Bool == true
-            && file["com.apple.security.personal-information.calendars"] as? Bool == true
+        guard Set(file.keys) == keys else { return false }
+        guard file["com.apple.security.app-sandbox"] as? Bool == false else { return false }
+        return keys.filter { $0 != "com.apple.security.app-sandbox" }.allSatisfy { file[$0] as? Bool == true }
     }
 }
 
@@ -28,6 +38,7 @@ struct ResourceEntitlementTests {
 
     @Test func locationAndCalendarsAreAllowedForTheCallsAlreadyMade() throws {
         let file = try entitlements()
+        #expect(Set(file.keys) == ResourceEntitlementRule.keys)
         #expect(file["com.apple.security.app-sandbox"] as? Bool == false)
         #expect(file["com.apple.security.personal-information.location"] as? Bool == true)
         #expect(file["com.apple.security.personal-information.calendars"] as? Bool == true)
@@ -37,6 +48,7 @@ struct ResourceEntitlementTests {
     @Test func addingNetworkServerIsNotTheSameKeySet() throws {
         var file = try entitlements()
         file["com.apple.security.network.server"] = true
+        #expect(Set(file.keys) != ResourceEntitlementRule.keys)
         #expect(!ResourceEntitlementRule.allows(file))
     }
 }
