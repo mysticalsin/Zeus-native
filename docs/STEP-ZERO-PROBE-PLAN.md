@@ -561,6 +561,8 @@ window. What can wait for a second sitting, each with a fresh marked build: the 
 the Owner questions L9 to L11 and O4, F3 and F9, the two extra signatures of P3 (about 15 minutes), the macOS 26 Mac
 (about 40 minutes, lock and kill rows) and the older releases. Leaving those out, the first sitting is about 60.
 
+`<models-dir>` is `$HOME/AI-Brain-build`. `<name>` is `the Developer ID certificate common name`. `<that path>` is `the ad hoc or local Zeus.app copied in this step`.
+
 1. In the probe worktree: `STEP_ZERO_PROBE=1 SIGN_IDENTITY="Developer ID Application: <name>" scripts/bundle.sh`.
    The build answers the flag for 72 hours.
 2. Quit Zeus from its menu. `scripts/install.sh build/Zeus.app /Applications/Zeus.app`, which keeps a rollback copy of
@@ -585,7 +587,7 @@ the Owner questions L9 to L11 and O4, F3 and F9, the two extra signatures of P3 
 9. P3, the other two signatures. Build twice more with the marker: `SIGN_IDENTITY=-` for ad hoc, and with no
    `SIGN_IDENTITY` for the local identity when the development keychain exists (`bundle.sh:21-25`). Copy each to its
    own path, `<models-dir>/step-zero-p3/adhoc/Zeus.app` and `.../local/Zeus.app`, never to `/Applications`. With
-   no Zeus running, `open -n <that path> --args --step-zero-probe`: only the System source row is offered. Copy both
+   no Zeus running, `open -n "<that path>" --args --step-zero-probe`: only the System source row is offered. Copy both
    reports, then move both builds to the Trash.
 10. The macOS 26 Mac, required for the lock plan: steps 1 to 8 there, Lock screen and Kill test rows at least. A
     copied build is quarantined; notarizing it or clearing the flag by hand is the owner's choice. The same steps on

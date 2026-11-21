@@ -472,7 +472,7 @@ appears on the first open of the part and at no other moment (launch, setting on
 onboarding); its wording; the order of browser states while the alert is up, written down; Allow shows names with no
 second press; Don't Allow shows "No access" and the button opens the right pane; allowing later in System Settings
 shows names; no computer and no output already listed appears; no browse runs after the list closes or the Mac
-sleeps (Console shows the browser cancelled); idle CPU (`PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh`).
+sleeps (Console shows the browser cancelled); idle CPU (`<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh`).
 
 ## Settings rows
 

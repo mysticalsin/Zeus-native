@@ -489,7 +489,7 @@ its own file. E6 and E7 touch each shared file in a handful of lines on purpose.
 - The em dash lint covers `Sources/Zeus` only; ZeusCore strings are covered by E3's own test.
 - Settings generator, REG ids, the shared QA files and the sandbox that cannot compile Swift: as in the house plans.
 - No new window, so the capture registry is untouched.
-- Idle cost: switch on, nothing connected: registrations only, no timer, no polling, no manager kept alive. Panel closed: no mode listener and no subscription of this wave on the output watch. `PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh` must pass with both switches on.
+- Idle cost: switch on, nothing connected: registrations only, no timer, no polling, no manager kept alive. Panel closed: no mode listener and no subscription of this wave on the output watch. `<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh` must pass with both switches on.
 
 ## Out of scope
 

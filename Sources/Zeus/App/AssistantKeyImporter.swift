@@ -2,11 +2,22 @@ import AppKit
 import Darwin
 import Foundation
 
-/// One-time import of Tony's Anthropic API key from a mode-600 file into the Keychain. Never logs
-/// or prints the key. QA7 round 12: `~/.zeus/tony-anthropic-key.txt` → `assistant.key.anthropic`.
+/// One-time import of an Anthropic API key from a mode-600 file into the Keychain. Never logs
+/// or prints the key. QA7 round 12 stores it as `assistant.key.anthropic`.
+/// The file read first is `~/.zeus/anthropic-key.txt`. `~/.zeus/tony-anthropic-key.txt` is still
+/// read when that file is absent, so an existing copy keeps working.
 enum AssistantKeyImporter {
-    private static let defaultPath = NSHomeDirectory() + "/.zeus/tony-anthropic-key.txt"
     private static let account = "assistant.key.anthropic"
+
+    /// Neutral path when it exists or neither file does. The older filename is the fallback.
+    static func defaultKeyPath(home: String = NSHomeDirectory(),
+                               exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) -> String {
+        let neutral = home + "/.zeus/anthropic-key.txt"
+        if exists(neutral) { return neutral }
+        let legacy = home + "/.zeus/tony-anthropic-key.txt"
+        if exists(legacy) { return legacy }
+        return neutral
+    }
 
     struct Outcome {
         let message: String
@@ -28,7 +39,7 @@ enum AssistantKeyImporter {
     /// At launch: import from the default path only when the Keychain slot is still empty.
     static func importDefaultIfNeeded() {
         guard Keychain.get(account) == nil else { return }
-        let result = outcome(forFile: defaultPath)
+        let result = outcome(forFile: defaultKeyPath())
         guard result.imported, let source = result.removableSource else { return }
         // Surface the disclosure and let the user decide; nothing is deleted here.
         Task { @MainActor in offerRemoval(of: source) }

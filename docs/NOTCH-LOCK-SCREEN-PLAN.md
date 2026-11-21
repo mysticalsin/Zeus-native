@@ -564,7 +564,7 @@ their `native-` check in `qa/feature-map.json` here. The flip-only hook is seen 
    - Typing, Tab, Space and Return on the lock screen never reach the card. A file dragged over it does nothing.
    - A screen recording of the locked Mac with "show in screen sharing" off and on: record what is captured.
    - Reduce Motion and Reduce Transparency. `TickingView` runs in the lock window and stops when it closes.
-   - Idle cost: locked, music paused, card up, 60 s: `PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh`.
+   - Idle cost: locked, music paused, card up, 60 s: `<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh`.
    - The wake word after lock, display sleep and wake: silent until unlock; listening after a plain launch (L0).
 
 ## Review notes

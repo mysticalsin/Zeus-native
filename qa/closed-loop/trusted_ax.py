@@ -170,13 +170,15 @@ def run_host(argv, log, environment):
             return 124
 
 
-def main(argv=None):
+def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
-    # Placeholders only. scripts/trusted-ax-journey.sh passes the real directories
-    # ($HOME plus the historical relative suffix) so an owner run is unchanged.
-    parser.add_argument("--build-dir", type=Path, default=Path("<models-dir>/zeus-native-build"))
-    parser.add_argument("--receipts", type=Path, default=Path("<models-dir>/zeus-trusted-ax"))
-    args = parser.parse_args(argv)
+    parser.add_argument("--build-dir", type=Path, default=Path(os.path.expanduser('~/AI-Brain-build/zeus-native-build')))
+    parser.add_argument("--receipts", type=Path, default=Path(os.path.expanduser('~/AI-Brain-build/zeus-trusted-ax')))
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     require_local_mac()
     built, tests = build_products(args.build_dir)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

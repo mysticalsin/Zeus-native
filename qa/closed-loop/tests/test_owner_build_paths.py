@@ -4,6 +4,7 @@ Docs name that directory with a placeholder. Scripts and the call probe still ap
 relative suffix to $HOME, so an owner Mac resolves the paths it resolved before.
 """
 from pathlib import Path
+import os
 import subprocess
 import unittest
 
@@ -50,7 +51,8 @@ class OwnerBuildPaths(unittest.TestCase):
         runner = (ROOT / "qa/closed-loop/trusted_ax.py").read_text()
         self.assertIn("os.path.expanduser('~/AI-Brain-build/zeus-native-build')", runner)
         self.assertIn("os.path.expanduser('~/AI-Brain-build/zeus-trusted-ax')", runner)
-        env = dict(**{k: v for k, v in __import__("os").environ.items()}, HOME="/Users/example")
+        env = os.environ.copy()
+        env["HOME"] = "/Users/example"
         completed = subprocess.run(
             [__import__("sys").executable, "-c",
              "import trusted_ax\n"

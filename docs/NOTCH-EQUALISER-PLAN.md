@@ -380,9 +380,9 @@ rebases its one feature-map entry. Every ticket claims REG ids in merge order; c
 ## Measured limits the build must hold
 
 - Added latency: one IO buffer beyond the device's own. Each build logs buffer size and rate; the owner checks lip sync.
-- Render cost: one stereo app shaped at 48 kHz passes `PID=<pid> CPU_BUDGET=2 SECONDS_IDLE=60
+- Render cost: one stereo app shaped at 48 kHz passes `<pid>` is `the Zeus process id`. `PID="<pid>" CPU_BUDGET=2 SECONDS_IDLE=60
   scripts/check-perf-budget.sh`. Always pass `PID=`: the default `pgrep` path (`check-perf-budget.sh:9`) is not ours.
-- Idle, switch on, nothing shaped: `PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh` passes 1 percent CPU and
+- Idle, switch on, nothing shaped: `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh` passes 1 percent CPU and
   150 MB (`Sources/ZeusCore/Performance/PerformanceBudget.swift:5-6`); no IOProc, no timer. Switch off: no listeners.
 - Stop latency: a call starting or the switch going off removes every tap within 250 ms of the listener firing.
 

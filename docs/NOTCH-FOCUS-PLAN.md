@@ -561,7 +561,7 @@ Nothing is bundled, so no licence duty is owed.
    - Lock and unlock, fast user switching and back, and plugging in a second display while a Focus is on: the wing
      is right afterwards and no cue fires for an unchanged Focus.
    - VoiceOver reads the wing and the row status. Reduce Motion, after F6: the width steps for music and the Focus.
-   - Idle cost with the switch on and no Focus change: `PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh`.
+   - Idle cost with the switch on and no Focus change: `<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh`.
    - The morning brief still holds during a Focus as before F0.
 
 What was verified for this plan and how: every `file:line` above by reading `9f2ffe4`; the two paths, the key path

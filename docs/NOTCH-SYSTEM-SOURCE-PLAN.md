@@ -563,7 +563,7 @@ These are inputs and trade-offs, not verdicts. The writer is not a lawyer; licen
 | Force quit Zeus: the helper is gone within a second. Kill the helper: the item returns after the back-off. A command for an app that just lost the election is refused | P1c |
 | VoiceOver on the status row (the switch reads its status; "Check again" is its own element) and on the notch source line. Reduce Motion on. A shared screen with the default capture setting shows no title. An imported settings file cannot turn the switch on. Diagnostics copied while another app plays say "Another app" | P1f |
 | A build with the library removed, and one with an ad hoc library: "Unavailable", nothing shown, no child. `codesign -dv --verbose=2` on the library inside the built app: same team, hardened runtime, time stamp. On each older Mac of step zero item 10: the status word, the child's image path, the helper leaving with Zeus | P1d |
-| `PID=<pid> SECONDS_IDLE=60 scripts/check-perf-budget.sh` with the switch on and nothing playing, run once for Zeus and once for the interpreter child; the two CPU figures and the two memory figures, added, stay inside the budget. Repeated in polling mode if step zero item 4 requires it | P1e |
+| `<pid>` is `the Zeus process id`. `PID="<pid>" SECONDS_IDLE=60 scripts/check-perf-budget.sh` with the switch on and nothing playing, run once for Zeus and once for the interpreter child; the two CPU figures and the two memory figures, added, stay inside the budget. Repeated in polling mode if step zero item 4 requires it | P1e |
 
 ## Review notes
 
