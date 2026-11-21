@@ -1,0 +1,121 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +278,116 @@
++    public var google: GoogleQualityDelivery? {
++        switch self {
++        case .googleNeural2:
++            return GoogleQualityDelivery(voiceID: defaultVoiceID, speakingRate: 0.92, pitch: 0, audioEncoding: "LINEAR16", sampleRateHertz: 24_000, sendsRateAndPitch: true)
++        case .googleWavenet:
++            return GoogleQualityDelivery(voiceID: defaultVoiceID, speakingRate: 1, pitch: 0, audioEncoding: "LINEAR16", sampleRateHertz: 24_000, sendsRateAndPitch: true)
++        case .googleChirpHD:
++            return GoogleQualityDelivery(voiceID: defaultVoiceID, speakingRate: 1, pitch: 0, audioEncoding: "LINEAR16", sampleRateHertz: 24_000, sendsRateAndPitch: false)
++        case .elevenLabsFast, .elevenLabsStudio:
++            return nil
++        }
++    }
++
++    /// The cloud step this preset may occupy on `PersonaSpeakRoute`.
++    public var routeStep: PersonaSpeakStep {
++        switch self {
++        case .elevenLabsFast, .elevenLabsStudio: .elevenLabs
++        case .googleNeural2, .googleWavenet, .googleChirpHD: .googleCloud
++        }
++    }
++}
++
++/// Cloud presets run only when `PersonaSpeakRoute` puts that provider first.
++/// That happens when the user selected it and a key exists. Automatic stays `zeus.synthetic`.
++public enum VoiceQualityRoute {
++    public static func selection(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> VoiceQualitySelection {
++        guard let preset else { return .synthetic }
++        let steps = PersonaSpeakRoute.chain(choice: choice, keys: keys, providerFailed: providerFailed)
++        guard steps.first == preset.routeStep else { return .synthetic }
++        return .preset(preset)
++    }
++
++    public static func activeVoiceID(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> String {
++        switch selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
++        case .synthetic: VoiceSpeakAllowlist.syntheticID
++        case .preset(let chosen): chosen.defaultVoiceID
++        }
++    }
++}
++
++public enum VoiceQualitySelection: Equatable, Sendable {
++    case synthetic
++    case preset(VoiceQualityPreset)
++}
++
++/// Providers stay off unless `voice.ttsProvider` names ElevenLabs or Google Cloud and
++/// `voice.quality.preset` names a preset for that same provider. Otherwise the voice is `zeus.synthetic`.
++public enum VoiceQualityOptIn {
++    public static let presetKey = "voice.quality.preset"
++
++    public static func selection(defaults: UserDefaults) -> VoiceQualitySelection {
++        let choice = VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: VoiceProviderPreferences.selectionKey))
++        guard case .provider(let id) = choice,
++              let raw = defaults.string(forKey: presetKey),
++              let preset = VoiceQualityPreset(rawValue: raw),
++              preset.providerID == id else { return .synthetic }
++        return .preset(preset)
++    }
++
++    public static func activeVoiceID(defaults: UserDefaults) -> String {
++        switch selection(defaults: defaults) {
++        case .synthetic: VoiceSpeakAllowlist.syntheticID
++        case .preset(let preset): preset.defaultVoiceID
++        }
++    }
++}
++
++/// Pause marks stay the existing ellipsis sanitizer. Untrusted text is not wrapped in SSML.
++public enum VoiceQualityMarkup {
++    public static func spoken(_ text: String) -> String {
++        UltronSpeechText.sanitize(text)
++    }
++}
++
++/// A request with a description that names the method and host only. Headers, including the key, are omitted.
++public struct VoiceQualityCall: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
++    public var request: ProviderHTTPRequest
++
++    public init(request: ProviderHTTPRequest) { self.request = request }
++
++    public var description: String {
++        "\(request.method) \(request.url.host ?? "-")\(request.url.path)"
++    }
++
++    public var debugDescription: String { description }
++}
++
++public enum VoiceQualityRequestBuilder {
++    public static func make(text: String, preset: VoiceQualityPreset, voiceID: String, credential: ProviderCredential) throws -> ProviderHTTPRequest {
++        guard VoiceQualityAllowList.accepts(voiceID, providerID: preset.providerID) else {
++            throw VoiceQualityError.voiceRefused
++        }
++        guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
++            throw VoiceQualityError.keyRejected
++        }
++        guard VoiceQualityRequestSize.allows(VoiceQualityMarkup.spoken(text).count) else {
++            throw VoiceQualityError.requestTooLarge
++        }
++        let spoken = VoiceQualityMarkup.spoken(text)
++        switch preset {
++        case .elevenLabsFast, .elevenLabsStudio:
++            guard let delivery = preset.elevenLabs else { throw VoiceQualityError.voiceRefused }
++            return try elevenLabs(spoken, voiceID: voiceID, delivery: delivery, key: key)
++        case .googleNeural2, .googleWavenet, .googleChirpHD:
++            guard let delivery = preset.google else { throw VoiceQualityError.voiceRefused }
++            return try google(spoken, voiceID: voiceID, delivery: delivery, key: key)
++        }
++    }
++
++    private static func elevenLabs(_ text: String, voiceID: String, delivery: ElevenLabsQualityDelivery, key: String) throws -> ProviderHTTPRequest {
++        guard let voice = ElevenLabsTTSAdapter.pathComponent(voiceID),
++              let url = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(voice)/stream"),
++              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
++            throw VoiceQualityError.voiceRefused
++        }
++        components.queryItems = [URLQueryItem(name: "output_format", value: "pcm_24000")]

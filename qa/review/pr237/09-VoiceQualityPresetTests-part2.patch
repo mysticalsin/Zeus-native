@@ -1,0 +1,121 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
+@@ -0,0 +117,116 @@
++            voiceID: "EXAVITQu4vr4xnSDxMaL",
++            credential: credential
++        )
++        var captured = ""
++        do {
++            for try await chunk in synthesis.chunks {
++                captured += String(describing: chunk)
++            }
++            captured += "ended"
++        } catch {
++            captured += String(describing: error)
++            captured += "\n"
++            captured += String(reflecting: error)
++        }
++        captured += "\n"
++        captured += lines.text
++        let logURL = directory.appendingPathComponent("sentinel.log")
++        try captured.write(to: logURL, atomically: true, encoding: .utf8)
++        let status = try grep(sentinel, in: logURL)
++        #expect(status == 1)
++        let headerMatches = QualityURLStub.requests.first?.value(forHTTPHeaderField: "xi-api-key") == sentinel
++        #expect(headerMatches)
++        #expect(!captured.contains("<speak"))
++    }
++
++    @Test func nonAllowListedVoicesAreRefusedBeforeARequest() async throws {
++        let refused = [
++            "z9fAnlkpzviPz146aGWa",
++            "VR6AewLTigWG4xSOukaG",
++            "en-US-Chirp3-HD-Puck",
++            "en-US-Chirp3-HD-Fenrir",
++            "MCU-Tony",
++            "mcu-voice",
++            "cloned-voice-001",
++            "en-US-Studio-O",
++            "zeus.synthetic",
++            "../admin",
++            "voice/id",
++        ]
++        for voice in refused {
++            #expect(!VoiceQualityAllowList.accepts(voice, providerID: ElevenLabsTTSAdapter.id))
++            #expect(!VoiceQualityAllowList.accepts(voice, providerID: GoogleCloudTTSAdapter.id))
++            #expect(throws: VoiceQualityError.voiceRefused) {
++                try VoiceQualityRequestBuilder.make(
++                    text: "Hello",
++                    preset: voice.hasPrefix("en-US") ? .googleNeural2 : .elevenLabsFast,
++                    voiceID: voice,
++                    credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++                )
++            }
++        }
++        #expect(VoiceQualityAllowList.accepts("EXAVITQu4vr4xnSDxMaL", providerID: ElevenLabsTTSAdapter.id))
++        #expect(VoiceQualityAllowList.accepts("JBFqnCBsd6RMkjVDRZzb", providerID: ElevenLabsTTSAdapter.id))
++        #expect(VoiceQualityAllowList.accepts("en-US-Neural2-D", providerID: GoogleCloudTTSAdapter.id))
++        #expect(VoiceQualityAllowList.accepts("en-US-Wavenet-D", providerID: GoogleCloudTTSAdapter.id))
++        #expect(VoiceQualityAllowList.accepts("en-US-Chirp3-HD-Achernar", providerID: GoogleCloudTTSAdapter.id))
++        #expect(VoiceQualityAllowList.accepts("en-US-Chirp-HD-D", providerID: GoogleCloudTTSAdapter.id))
++        #expect(!VoiceQualityAllowList.accepts("en-US-Neural2-D", providerID: ElevenLabsTTSAdapter.id))
++        for preset in VoiceQualityPreset.allCases {
++            #expect(VoiceQualityAllowList.accepts(preset.defaultVoiceID, providerID: preset.providerID))
++        }
++        QualityURLStub.reset(reply: .init(status: 200, body: Data()))
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        let speaker = VoiceQualitySpeaker(
++            meter: meter,
++            transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
++        )
++        let synthesis = speaker.synthesize(
++            text: "Hello",
++            preset: .elevenLabsFast,
++            voiceID: "MCU-Tony",
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        )
++        let error = await firstError(synthesis)
++        #expect(error as? VoiceQualityError == .voiceRefused)
++        #expect(QualityURLStub.requests.isEmpty)
++        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 0)
++    }
++
++    @Test func meterAllows49999AndRefuses50000() throws {
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 49_999)
++        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 49_999)
++        #expect(throws: VoiceQualityError.meterExceeded) {
++            try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
++        }
++        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 49_999)
++        let reloaded = try VoiceQualityMeter(directory: directory)
++        #expect(try reloaded.count(providerID: ElevenLabsTTSAdapter.id) == 49_999)
++
++        let other = try temporaryDirectory()
++        let fresh = try VoiceQualityMeter(directory: other)
++        #expect(throws: VoiceQualityError.meterExceeded) {
++            try fresh.reserve(providerID: GoogleCloudTTSAdapter.id, characters: 50_000)
++        }
++        #expect(try fresh.count(providerID: GoogleCloudTTSAdapter.id) == 0)
++        #expect(VoiceQualityMeter.limit == 50_000)
++    }
++
++    @Test func meterPersistsPerProvider() throws {
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 10)
++        try meter.reserve(providerID: GoogleCloudTTSAdapter.id, characters: 4)
++        let reloaded = try VoiceQualityMeter(directory: directory)
++        #expect(try reloaded.count(providerID: ElevenLabsTTSAdapter.id) == 10)
++        #expect(try reloaded.count(providerID: GoogleCloudTTSAdapter.id) == 4)
++        try reloaded.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
++        #expect(try reloaded.count(providerID: GoogleCloudTTSAdapter.id) == 4)
++    }
++
++    @Test func meterFailsClosedOnCorruptState() async throws {
++        let directory = try temporaryDirectory()
++        let file = directory.appendingPathComponent("voice-quality-meter.json")

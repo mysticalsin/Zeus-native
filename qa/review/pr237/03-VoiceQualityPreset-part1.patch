@@ -1,0 +1,145 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +1,140 @@
++import Foundation
++#if canImport(FoundationNetworking)
++import FoundationNetworking
++#endif
++
++/// Typed failures for the quality-preset path. Descriptions name the failure only.
++/// A key, a response body, and a URL are never part of the text.
++public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
++    case voiceRefused
++    case providerOff
++    case meterExceeded
++    case meterCorrupt
++    case missingCredential
++    case keyRejected
++    case requestTooLarge
++    case endpointRefused
++
++    public var description: String {
++        switch self {
++        case .voiceRefused: "voice refused"
++        case .providerOff: "provider is off"
++        case .meterExceeded: "character meter exceeded"
++        case .meterCorrupt: "character meter unreadable"
++        case .missingCredential: "missing credential"
++        case .keyRejected: VoiceQualityKeyGate.rejectedMessage
++        case .requestTooLarge: "The request is too long."
++        case .endpointRefused: "The voice endpoint is not allowed."
++        }
++    }
++
++    public var debugDescription: String { description }
++
++    public static func publicError(_ error: Error) -> Error {
++        if error is CancellationError { return ProviderFailure.cancelled }
++        if error is VoiceQualityError { return error }
++        if error is ProviderFailure { return error }
++        return ProviderFailure.wrap(error)
++    }
++
++    public static func publicName(_ error: Error) -> String {
++        let surfaced = publicError(error)
++        if let failure = surfaced as? ProviderFailure { return failure.logName }
++        if let quality = surfaced as? VoiceQualityError { return quality.description }
++        return "invalid-response"
++    }
++}
++
++/// A key is trimmed, then refused when a control character remains. The message is fixed.
++/// Newline, carriage return, tab, and NUL cannot reach a header or the meter.
++public enum VoiceQualityKeyGate {
++    public static let rejectedMessage = "The key is not valid."
++
++    public static func accepted(_ raw: String) -> String? {
++        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard trimmed.count >= 8 else { return nil }
++        guard trimmed.unicodeScalars.allSatisfy({ scalar in
++            scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
++        }) else { return nil }
++        return trimmed
++    }
++}
++
++/// One speak request stays at or under 5,000 characters. The 50,000 figure is the cumulative meter.
++public enum VoiceQualityRequestSize {
++    public static let limit = 5_000
++
++    public static func allows(_ characters: Int) -> Bool {
++        characters >= 0 && characters <= limit
++    }
++}
++
++/// Quality requests may only use the two provider hosts, over HTTPS, with no userinfo.
++public enum VoiceQualityEndpoint {
++    public static func allows(_ url: URL) -> Bool {
++        guard url.scheme?.lowercased() == "https", url.user == nil, url.password == nil else { return false }
++        switch url.host?.lowercased() {
++        case "api.elevenlabs.io", "texttospeech.googleapis.com": return true
++        default: return false
++        }
++    }
++}
++
++/// A redirect would replay `xi-api-key` or `X-Goog-Api-Key`. The task delegate returns nil.
++public enum VoiceQualityRedirect {
++    public static func forwarded(_ proposed: URLRequest, from original: URL?) -> URLRequest? {
++        _ = proposed
++        _ = original
++        return nil
++    }
++}
++
++final class VoiceQualityRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
++    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
++        completionHandler(VoiceQualityRedirect.forwarded(request, from: task.originalRequest?.url ?? response.url))
++    }
++}
++
++/// One stock voice that is allowed on a cloud request. `reason` says why the id is generic.
++public struct StockVoice: Equatable, Sendable {
++    public var id: String
++    public var name: String
++    public var reason: String
++
++    public init(id: String, name: String, reason: String) {
++        self.id = id
++        self.name = name
++        self.reason = reason
++    }
++}
++
++/// Explicit stock voices. Anything else is refused, including Voice Library ids, clones,
++/// character names, and any id that contains "MCU".
++public enum VoiceQualityAllowList {
++    /// ElevenLabs premade default voices (the account default list, not the Voice Library).
++    /// Each name is a generic stock label. Legacy character voices (Glinda) and celebrity-coded
++    /// names (Arnold) are left out, as are library replacements such as "Eldrin".
++    public static let elevenLabs: [StockVoice] = [
++        StockVoice(
++            id: "EXAVITQu4vr4xnSDxMaL",
++            name: "Sarah",
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++        StockVoice(
++            id: "JBFqnCBsd6RMkjVDRZzb",
++            name: "George",
++            reason: "ElevenLabs default premade voice. Generic first name. This is the stock id already used when no designed voice is saved."
++        ),
++        StockVoice(
++            id: "IKne3meq5aSn9XLyUdCD",
++            name: "Charlie",
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++        StockVoice(
++            id: "pNInz6obpgDQGcFmaJgB",
++            name: "Adam",
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++    ]
++
++    /// Google Cloud stock voices: Neural2, WaveNet, or Chirp HD only.

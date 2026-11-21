@@ -1,0 +1,108 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+@@ -0,0 +98,103 @@
++            #expect((outcome.error as? VoiceQualityError)?.description == "The key is not valid.")
++            #expect(!outcome.message.contains("tab-head-1100"))
++            #expect(!outcome.message.contains("tab-tail-2200"))
++            #expect(!outcome.message.contains("null-head-3300"))
++            #expect(!outcome.message.contains("null-tail-4400"))
++            #expect(outcome.count == 0)
++        }
++    }
++
++    @Test func urlSessionAndHeaderErrorsDoNotEchoTheKey() {
++        let sentinel = "header-sentinel-key-55aa"
++        let underlying = NSError(
++            domain: NSURLErrorDomain,
++            code: NSURLErrorBadServerResponse,
++            userInfo: [
++                NSLocalizedDescriptionKey: "header xi-api-key \(sentinel) failed",
++                "xi-api-key": sentinel,
++            ]
++        )
++        let name = VoiceQualityError.publicName(underlying)
++        let described = String(describing: VoiceQualityError.publicError(underlying))
++        #expect(!name.contains(sentinel))
++        #expect(!described.contains(sentinel))
++        #expect(!name.contains("xi-api-key"))
++        #expect(VoiceQualityEndpoint.allows(URL(string: "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream")!))
++        #expect(VoiceQualityEndpoint.allows(URL(string: "https://texttospeech.googleapis.com/v1/text:synthesize")!))
++        #expect(!VoiceQualityEndpoint.allows(URL(string: "https://collector.example/collect")!))
++        #expect(!VoiceQualityEndpoint.allows(URL(string: "http://api.elevenlabs.io/v1/user")!))
++        #expect(VoiceQualityRequestSize.limit == 5_000)
++        #expect(VoiceQualityRequestSize.allows(5_000))
++        #expect(!VoiceQualityRequestSize.allows(5_001))
++    }
++
++    @Test func aRedirectToAnotherHostIsRefusedAndDropsTheKey() async throws {
++        let sentinel = "redirect-sentinel-key-66bb"
++        RouteRedirectStub.reset()
++        let delegate = VoiceQualityRedirectDelegate()
++        let configuration = URLSessionConfiguration.ephemeral
++        configuration.protocolClasses = [RouteRedirectStub.self]
++        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
++        defer { session.invalidateAndCancel() }
++        var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/user")!)
++        request.setValue(sentinel, forHTTPHeaderField: "xi-api-key")
++        request.setValue(sentinel, forHTTPHeaderField: "X-Goog-Api-Key")
++        _ = try? await session.data(for: request)
++        let task = session.dataTask(with: request)
++        defer { task.cancel() }
++        let redirect = HTTPURLResponse(url: request.url!, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": "https://collector.example/collect"])!
++        var followed = URLRequest(url: URL(string: "https://collector.example/collect")!)
++        followed.setValue(sentinel, forHTTPHeaderField: "xi-api-key")
++        followed.setValue(sentinel, forHTTPHeaderField: "X-Goog-Api-Key")
++        let decision = RedirectDecision()
++        delegate.urlSession(session, task: task, willPerformHTTPRedirection: redirect, newRequest: followed) { decision.record($0) }
++        #expect(decision.called)
++        #expect(decision.request == nil)
++        let hosts = RouteRedirectStub.hosts
++        #expect(hosts.contains("api.elevenlabs.io"))
++        #expect(!hosts.contains("collector.example"))
++        let carried = RouteRedirectStub.requests.contains { request in
++            let host = request.url?.host ?? ""
++            let xi = request.value(forHTTPHeaderField: "xi-api-key")
++            let goog = request.value(forHTTPHeaderField: "X-Goog-Api-Key")
++            return host != "api.elevenlabs.io" && (xi == sentinel || goog == sentinel)
++        }
++        #expect(!carried)
++        #expect(RouteRedirectStub.forwarded == nil)
++
++        let keys = PersonaSpeakKeys(elevenLabs: true)
++        let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsFast, credential: sentinel, status: 302, location: "https://collector.example/collect")
++        #expect(!seen.hosts.contains("collector.example"))
++        #expect(!seen.log.contains(sentinel))
++    }
++
++    @Test func theMeterDoesNotFollowASymlink() throws {
++        let directory = try temporaryDirectory()
++        let target = directory.appendingPathComponent("real-meter.json")
++        let link = directory.appendingPathComponent("voice-quality-meter.json")
++        try Data("{\"elevenlabs\":10}".utf8).write(to: target)
++        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
++        let meter = try VoiceQualityMeter(directory: directory)
++        #expect(throws: VoiceQualityError.meterCorrupt) {
++            try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
++        }
++        #expect(try Data(contentsOf: target) == Data("{\"elevenlabs\":10}".utf8))
++    }
++
++    @Test func oneRequestCannotExceedFiveThousandCharacters() async throws {
++        let keys = PersonaSpeakKeys(elevenLabs: true)
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
++        let speaker = VoiceQualitySpeaker(
++            meter: meter,
++            transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2)
++        )
++        let synthesis = speaker.synthesize(
++            text: String(repeating: "a", count: 5_001),
++            choice: .elevenLabs,
++            keys: keys,
++            preset: .elevenLabsFast,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        )
++        let error = await firstError(synthesis)
