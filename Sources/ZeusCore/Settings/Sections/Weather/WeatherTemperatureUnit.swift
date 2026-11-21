@@ -27,8 +27,11 @@ public enum WeatherTemperatureUnit: String, Equatable, Sendable, CaseIterable {
         return whole(value)
     }
 
+    /// Nil when the rounded reading does not fit in Int. `Double(Int.max)` is 2^63, so the last fitting value is the Double below it.
     private static func whole(_ value: Double) -> Int? {
         let rounded = value.rounded()
-        return Int(exactly: rounded) ?? 0
+        guard rounded >= Double(Int.min) else { return nil }
+        guard rounded <= Double(Int.max).nextDown else { return nil }
+        return Int(rounded)
     }
 }
