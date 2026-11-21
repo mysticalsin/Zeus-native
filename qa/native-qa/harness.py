@@ -1,9 +1,9 @@
-"""Build Zeus on the Desktop and write an empty hands-on QA receipt.
+"""manual-run harness for the Desktop build of Zeus.
 
-The build destination is ~/Desktop/Zeus-latest-<sha8>.app. This file refuses
-/Applications/Zeus.app. It does not install the app and it does not start
-microphone, screen, or audio capture. The receipt stays not-run until a person
-fills every screenshot and result slot.
+It builds only ~/Desktop/Zeus-latest-<sha8>.app. It does not open Zeus and it
+never launches /Applications/Zeus.app. A person opens the Desktop build. The
+harness records a pid or bundle path only when that running app is observed.
+A failed run writes a receipt marked FAIL, which cannot validate.
 """
 import argparse
 import importlib.util
@@ -86,8 +86,88 @@ def real_assemble(repo, dest, bin_dir=None):
     subprocess.run(["codesign", "--force", "--sign", "-", "--timestamp=none", str(dest)], check=True)
 
 
+def capture_runtime(dest, listing):
+    """Return the pid and bundle of a process already running from dest.
+
+    This does not start a process. /Applications/Zeus.app is refused.
+    """
+    dest = Path(dest)
+    refuse_if_installed(dest)
+    if dest == Path(INSTALLED) or dest.resolve() == Path(INSTALLED):
+        raise Refused("refusing to build over /Applications/Zeus.app")
+    wanted = str(dest)
+    for row in listing:
+        if not isinstance(row, dict):
+            continue
+        bundle = row.get("bundle")
+        pid = row.get("pid")
+        if bundle != wanted:
+            continue
+        if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+            continue
+        if Path(bundle) == Path(INSTALLED):
+            continue
+        return {"pid": pid, "bundle": wanted}
+    return None
+
+
+def live_processes():
+    """Processes whose command line is a Zeus.app binary. Does not start one."""
+    if platform.system() != "Darwin":
+        return []
+    try:
+        output = subprocess.check_output(["ps", "-ax", "-o", "pid=,command="], text=True)
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    rows = []
+    needle = ".app/Contents/MacOS/Zeus"
+    for line in output.splitlines():
+        text = line.strip()
+        marker = text.find(needle)
+        if marker < 0:
+            continue
+        pid_text, _, _command = text.partition(" ")
+        try:
+            pid = int(pid_text)
+        except ValueError:
+            continue
+        head = text[:marker]
+        space = head.rfind(" ")
+        bundle = head[space + 1:] + ".app"
+        if bundle == INSTALLED:
+            continue
+        rows.append({"pid": pid, "bundle": bundle})
+    return rows
+
+
+def record_manual_run(receipt, dest, captured):
+    """Write a FAIL receipt. The manual steps are not a pass yet."""
+    dest = Path(dest)
+    refuse_if_installed(dest)
+    if dest == Path(INSTALLED) or str(dest) == INSTALLED:
+        raise Refused("refusing to build over /Applications/Zeus.app")
+    body = json.loads(json.dumps(receipt))
+    body["manual_run"] = True
+    body["opened_by_harness"] = False
+    body["verdict"] = "FAIL"
+    body["runtime_app_pid"] = None
+    body["runtime_app_bundle"] = None
+    if captured and captured.get("bundle") == str(dest) and Path(captured["bundle"]) != Path(INSTALLED):
+        pid = captured.get("pid")
+        if isinstance(pid, int) and not isinstance(pid, bool) and pid > 0:
+            body["runtime_app_pid"] = pid
+        executable = dest / "Contents" / "MacOS" / "Zeus"
+        if executable.is_file() and not executable.is_symlink() and not dest.is_symlink():
+            body["runtime_app_bundle"] = str(dest)
+    out = dest.parent / f"{dest.stem}.qa-receipt.json"
+    out.write_text(json.dumps(body, indent=2) + "\n")
+    return str(out), 2
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Build the Desktop app and write an empty QA receipt.")
+    parser = argparse.ArgumentParser(
+        description="manual-run harness. It does not open Zeus. Builds only the Desktop app."
+    )
     parser.add_argument("--repo", required=True)
     parser.add_argument("--home", default=str(Path.home()))
     parser.add_argument("--head", help="40 lowercase hex characters; default is git rev-parse HEAD")
@@ -104,14 +184,15 @@ def main(argv=None):
         refuse_if_installed(dest)
         if str(dest) == INSTALLED:
             raise Refused("refusing to build over /Applications/Zeus.app")
-        out = dest.parent / f"{dest.stem}.qa-receipt.json"
-        out.write_text(json.dumps(receipt, indent=2) + "\n")
+        captured = capture_runtime(dest, live_processes())
+        out, code = record_manual_run(receipt, dest, captured)
     except Refused as error:
         print(f"qa-native-run: {error}", file=sys.stderr)
         return 2
     print(out)
-    print("not a pass: fill every screenshot and result, then run scripts/qa-native-validate.sh")
-    return 2
+    print("manual-run harness: Zeus was not opened. Open the Desktop build yourself.")
+    print("/Applications/Zeus.app is never launched. This receipt is marked FAIL.")
+    return code
 
 
 if __name__ == "__main__":

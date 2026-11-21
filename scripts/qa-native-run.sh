@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Build Zeus at ~/Desktop/Zeus-latest-<sha8>.app and write an empty hands-on receipt.
-# A later Mac run fills each screenshot and result slot. This script does not install the app.
+# manual-run harness. Build Zeus at ~/Desktop/Zeus-latest-<sha8>.app.
+# It does not open Zeus and it never launches /Applications/Zeus.app.
+# A failed run writes a receipt marked FAIL.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/.." && pwd)"
