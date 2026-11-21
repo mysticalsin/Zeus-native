@@ -129,6 +129,10 @@ final class NotchController {
 
     /// QA screencapture: `.none` excludes the notch from local capture; briefly use `.readOnly` instead.
     func boostCaptureVisibility(for seconds: TimeInterval) {
+        if DeckNotesCapturePolicy.sharingDuringBoost(notesHeld: DeckNotesCaptureHold.notesAreUp) == .none {
+            applyScreenSharePolicy(visibleInShare: false)
+            return
+        }
         for entry in panels {
             entry.panel.sharingType = .readOnly
         }
@@ -161,6 +165,9 @@ final class NotchController {
     // MARK: Presentation
 
     func show(_ presentation: NotchModel.Presentation) {
+        if !DeckNotesBarGate.holdsNotes(presentation == .panel ? .open : .collapsed) {
+            PrompterHub.shared.dropDeckNotes()
+        }
         let opening = presentation == .panel && model.presentation != .panel
         if opening { model.openedAt = Date() }
         // NotchView animates width and height on their own springs (Glance's height leads on open).
@@ -461,6 +468,7 @@ final class NotchController {
     /// The Dismiss button: closes even a pinned bar (it always showed `.closed`, approval or not).
     func dismissExplicitly() {
         guard PolyglotPinPolicy.decide(.explicitDismiss, pinContext()) == .close else { return }
+        PrompterHub.shared.dropDeckNotes()
         show(.closed)
     }
 

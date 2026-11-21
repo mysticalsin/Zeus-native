@@ -789,6 +789,49 @@ final class PrompterHub {
         updateWatcher()
     }
 
+    let pageNotes = PresenterNotesController()
+
+    /// Speaker notes on the Prompter page. This does not open a window.
+    func readPageNotes() {
+        Task {
+            await pageNotes.readDeckNotes()
+            publishDeckNotes()
+        }
+    }
+
+    func followPageNotes() {
+        Task {
+            let following = topBar?.deckNotesState
+            if case .following = following {
+                await pageNotes.stopDeckNotes()
+            } else {
+                await pageNotes.followDeckNotes()
+            }
+            publishDeckNotes()
+        }
+    }
+
+    func clearPageNotes() {
+        Task {
+            await pageNotes.clearDeckNotes()
+            publishDeckNotes()
+        }
+    }
+
+    func dropDeckNotes() {
+        DeckNotesCaptureHold.setNotesAreUp(false)
+        let state = topBar?.deckNotesState ?? .idle
+        guard DeckNotesKeys.event(.escape) == .dismiss, state != .idle else { return }
+        Task {
+            await pageNotes.dismissDeckNotes()
+            publishDeckNotes()
+        }
+    }
+
+    private func publishDeckNotes() {
+        topBar?.deckNotesState = pageNotes.deckNotes.state
+    }
+
     /// The prompter on the open slideshow's notes (the notch's Slides button).
     func followSlides() {
         guard let controller = makeController() else { return }

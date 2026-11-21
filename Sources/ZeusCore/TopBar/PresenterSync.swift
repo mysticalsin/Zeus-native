@@ -938,6 +938,56 @@ public enum DeckNotesCapturePolicy {
         _ = requestedVisibleInShare
         return notesVisible ? .none : .unchanged
     }
+
+    /// A capture boost must not put a bar that is holding notes back into the share.
+    public static func sharingDuringBoost(notesHeld: Bool) -> BarSharing {
+        notesHeld ? .none : .unchanged
+    }
+}
+
+/// Notes stay held only while the bar panel is open. A collapsed or hidden bar drops them.
+public enum DeckNotesBarVisibility: Equatable, Sendable {
+    case open
+    case collapsed
+    case hidden
+}
+
+public enum DeckNotesBarGate {
+    public static func holdsNotes(_ visibility: DeckNotesBarVisibility) -> Bool {
+        visibility == .open
+    }
+}
+
+public enum DeckNotesKeys {
+    public static func event(_ key: Key) -> DeckNotesEvent {
+        switch key {
+        case .read, .return: .read
+        case .follow: .follow
+        case .stop: .stop
+        case .clear: .clear
+        case .escape: .dismiss
+        }
+    }
+
+    public enum Key: Equatable, Sendable {
+        case read
+        case follow
+        case stop
+        case clear
+        case escape
+        case `return`
+    }
+}
+
+/// Notes are drawn in the existing 236 pt page. They scroll inside that frame and do not open a window.
+public enum DeckNotesPageLayout {
+    public static let pageHeight = 236.0
+    public static let opensWindow = false
+
+    public static func clips(notes: String, pageHeight: Double) -> Bool {
+        _ = notes
+        return pageHeight <= Self.pageHeight
+    }
 }
 
 /// The bar window reads this when some other caller applies the share policy.

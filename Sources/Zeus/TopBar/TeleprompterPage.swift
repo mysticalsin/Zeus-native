@@ -8,7 +8,10 @@ struct TeleprompterPage: View {
     let topBar: TopBarModel
 
     var body: some View {
-        if topBar.prompterActive { PrompterRolling(topBar: topBar) } else { PrompterSetup(topBar: topBar) }
+        Group {
+            if topBar.prompterActive { PrompterRolling(topBar: topBar) } else { PrompterSetup(topBar: topBar) }
+        }
+        .onDisappear { PrompterHub.shared.dropDeckNotes() }
     }
 }
 
@@ -46,16 +49,20 @@ private struct PrompterSetup: View {
 
     var body: some View {
         let script = PrompterScript(topBar.script)
+        let notes = DeckNotesPage.make(topBar.deckNotesState)
+        let notesUp = topBar.deckNotesState != .idle
         HStack(spacing: 8) {
             Tile {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Script").font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudSecondary)
+                        Text(notesUp ? notes.kicker : "Script").font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudSecondary)
                         Spacer()
-                        Text("\(script.wordCount) words · ~\(PrompterTiming.minutes(script.readingTime())) · \(script.cues.count) cues")
+                        Text(notesUp ? notes.position : "\(script.wordCount) words · ~\(PrompterTiming.minutes(script.readingTime())) · \(script.cues.count) cues")
                             .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet)
                     }
-                    if script.blocks.isEmpty {
+                    if notesUp {
+                        deckNotes(notes)
+                    } else if script.blocks.isEmpty {
                         Text("No script yet. Write one, or copy text and paste it here.")
                             .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary)
                     } else {
@@ -74,14 +81,7 @@ private struct PrompterSetup: View {
                                              startPoint: .top, endPoint: .bottom))
                     }
                     Spacer(minLength: 0)
-                    HStack(spacing: 6) {
-                        NotchActionButton(title: "Edit", tint: Theme.cloudPrimary, filled: false) { topBar.editScript() }
-                        NotchActionButton(title: "Paste", tint: Theme.cloudPrimary, filled: false) { PrompterPaste.run(topBar) }
-                        NotchActionButton(title: "Window", tint: Theme.cloudPrimary, filled: false) { PrompterHub.shared.toggle() }
-                            .accessibilityHint("Opens the floating teleprompter under the camera.")
-                        NotchActionButton(title: "Slides", tint: Theme.cloudPrimary, filled: false) { PrompterHub.shared.followSlides() }
-                            .accessibilityHint("Shows the speaker notes of the Keynote or PowerPoint slide on screen, above the slideshow.")
-                    }
+                    noteButtons(notesUp: notesUp)
                 }
             }
             Tile {
@@ -112,6 +112,65 @@ private struct PrompterSetup: View {
                 }
             }
             .frame(width: 210)
+        }
+        .focusable()
+        .onKeyPress(.return) {
+            PrompterHub.shared.readPageNotes()
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            PrompterHub.shared.dropDeckNotes()
+            return .handled
+        }
+        .animation(nil, value: topBar.deckNotesState)
+    }
+
+    /// Notes stay inside the existing 236 pt page. A long note scrolls and is clipped. It is not an accessibility value.
+    private func deckNotes(_ page: DeckNotesPage) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                if let title = page.failureTitle {
+                    Text(title).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                    if let line = page.failureLine {
+                        Text(line).font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary)
+                    }
+                } else if let loading = page.loadingLine {
+                    Text(loading).font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary)
+                } else {
+                    Text(page.notes.isEmpty ? (page.caption ?? "") : page.notes)
+                        .font(TopBarStyle.label(12))
+                        .foregroundStyle(Theme.cloudPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let caption = page.caption, !page.notes.isEmpty {
+                        Text(caption).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: GlanceTopBar.tallPageHeight - 80, alignment: .topLeading)
+        .clipped()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(page.accessibilityLabel)
+    }
+
+    private func noteButtons(notesUp: Bool) -> some View {
+        let following: Bool = if case .following = topBar.deckNotesState { true } else { false }
+        return HStack(spacing: 6) {
+            if !notesUp {
+                NotchActionButton(title: "Edit", tint: Theme.cloudPrimary, filled: false) { topBar.editScript() }
+                NotchActionButton(title: "Paste", tint: Theme.cloudPrimary, filled: false) { PrompterPaste.run(topBar) }
+                NotchActionButton(title: "Window", tint: Theme.cloudPrimary, filled: false) { PrompterHub.shared.toggle() }
+                    .accessibilityHint("Opens the floating teleprompter under the camera.")
+            }
+            NotchActionButton(title: "Read", tint: Theme.cloudPrimary, filled: true) { PrompterHub.shared.readPageNotes() }
+                .keyboardShortcut(.defaultAction)
+            if notesUp {
+                NotchActionButton(title: following ? "Stop" : "Follow", tint: Theme.cloudPrimary, filled: false) {
+                    PrompterHub.shared.followPageNotes()
+                }
+                NotchActionButton(title: "Clear", tint: Theme.cloudPrimary, filled: false) { PrompterHub.shared.clearPageNotes() }
+                    .keyboardShortcut(.cancelAction)
+            }
         }
     }
 
