@@ -447,6 +447,118 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(directoryIsClean(directory))
     }
 
+    @Test func scheduledAudioNeverFallsThroughToTheNextEngine() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-hold-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var clock = SpeechManualClock()
+        var renders = 0
+        let receipt = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            render: { _, _ in
+                renders += 1
+                if renders == 2 { return nil }
+                return toneFile(in: directory, sampleRate: 24_000)
+            },
+            play: { _ in true })
+        #expect(receipt.succeeded == false)
+        #expect(receipt.scheduledCount == 1)
+        #expect(receipt.fallThrough == false)
+        #expect(KokoroClausePlayback.holdsTheUtterance(receipt))
+        #expect(directoryIsClean(directory))
+    }
+
+    @Test func theUtteranceDeadlineCoversLaterClauses() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-deadline-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var clock = SpeechManualClock()
+        var played = 0
+        let receipt = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            deadline: 0.5,
+            render: { _, clock in
+                clock.advance(by: 0.4)
+                return toneFile(in: directory, sampleRate: 24_000)
+            },
+            play: { _ in
+                played += 1
+                return true
+            })
+        #expect(played == 1)
+        #expect(receipt.scheduledCount == 1)
+        #expect(receipt.fallThrough == false)
+        #expect(KokoroClausePlayback.holdsTheUtterance(receipt))
+        #expect(directoryIsClean(directory))
+    }
+
+    @Test func urlsEmailsAndDecimalsAreNotSentenceBoundaries() {
+        let url = SpeechClauseChunker.chunks(of: "Read https://example.com/docs/v1.2/guide before the longer explanation that follows this first clause today and keeps going.")
+        #expect(url.joined(separator: " ").contains("https://example.com/docs/v1.2/guide"))
+        let email = SpeechClauseChunker.chunks(of: "Write ada@example.com before the longer note that follows this clause and continues well beyond the ninety character opening.")
+        #expect(email.joined(separator: " ").contains("ada@example.com"))
+        let decimal = SpeechClauseChunker.chunks(of: "Pi is 3.14 for this opening clause, and the rest of the sentence continues well beyond ninety characters so the split stays after the number.")
+        #expect(decimal[0].contains("3.14"))
+    }
+
+    @Test func riffChunksAreShapedAndUnreadableAudioIsNotPlayed() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-riff-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let junk = directory.appendingPathComponent("junk.wav")
+        #expect(writeWavWithJunkChunk(junk, sampleRate: 24_000))
+        var clock = SpeechManualClock()
+        var played = 0
+        let shaped = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            render: { _, _ in junk },
+            play: { _ in
+                played += 1
+                return true
+            })
+        #expect(played == 1)
+        #expect(shaped.succeeded)
+        #expect(directoryIsClean(directory))
+
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let garbage = directory.appendingPathComponent("garbage.wav")
+        try? Data([0, 1, 2, 3, 4, 5]).write(to: garbage)
+        var clock2 = SpeechManualClock()
+        var playedGarbage = 0
+        let missed = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock2,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            render: { _, _ in garbage },
+            play: { _ in
+                playedGarbage += 1
+                return true
+            })
+        #expect(playedGarbage == 0)
+        #expect(missed.succeeded == false)
+        #expect(missed.fallThrough)
+        #expect(directoryIsClean(directory))
+    }
+
     @Test func abbreviationsInitialismsAndTheIdeographicStop() {
         let usa = SpeechClauseChunker.chunks(of: "The U.S.A. team signed the note yesterday afternoon. The next sentence stays whole.")
         #expect(usa[0].contains("U.S.A. team"))
@@ -518,6 +630,50 @@ private func toneFile(in directory: URL, sampleRate: Double) -> URL? {
     let url = directory.appendingPathComponent("render-\(UUID().uuidString).wav")
     let samples = [Float](repeating: 0.4, count: Int(sampleRate / 10))
     return PCMWav.write(samples, sampleRate: sampleRate, to: url) ? url : nil
+}
+
+private func writeWavWithJunkChunk(_ url: URL, sampleRate: Double) -> Bool {
+    let samples: [Int16] = [1000, -1000, 2000, -2000]
+    var payload = Data()
+    for sample in samples {
+        var unit = sample.littleEndian
+        payload.append(Data(bytes: &unit, count: 2))
+    }
+    let junk = Data([1, 2, 3, 4])
+    var bytes = Data()
+    bytes.append(contentsOf: [UInt8]("RIFF".utf8))
+    var size = UInt32(4 + (8 + junk.count) + (8 + 16) + (8 + payload.count)).littleEndian
+    bytes.append(Data(bytes: &size, count: 4))
+    bytes.append(contentsOf: [UInt8]("WAVE".utf8))
+    bytes.append(contentsOf: [UInt8]("JUNK".utf8))
+    var junkSize = UInt32(junk.count).littleEndian
+    bytes.append(Data(bytes: &junkSize, count: 4))
+    bytes.append(junk)
+    bytes.append(contentsOf: [UInt8]("fmt ".utf8))
+    var fmtSize = UInt32(16).littleEndian
+    bytes.append(Data(bytes: &fmtSize, count: 4))
+    var format = UInt16(1).littleEndian
+    bytes.append(Data(bytes: &format, count: 2))
+    var channels = UInt16(1).littleEndian
+    bytes.append(Data(bytes: &channels, count: 2))
+    var rate = UInt32(sampleRate).littleEndian
+    bytes.append(Data(bytes: &rate, count: 4))
+    var byteRate = UInt32(sampleRate * 2).littleEndian
+    bytes.append(Data(bytes: &byteRate, count: 4))
+    var block = UInt16(2).littleEndian
+    bytes.append(Data(bytes: &block, count: 2))
+    var bits = UInt16(16).littleEndian
+    bytes.append(Data(bytes: &bits, count: 2))
+    bytes.append(contentsOf: [UInt8]("data".utf8))
+    var dataSize = UInt32(payload.count).littleEndian
+    bytes.append(Data(bytes: &dataSize, count: 4))
+    bytes.append(payload)
+    do {
+        try bytes.write(to: url)
+        return true
+    } catch {
+        return false
+    }
 }
 
 private func directoryIsClean(_ directory: URL) -> Bool {
