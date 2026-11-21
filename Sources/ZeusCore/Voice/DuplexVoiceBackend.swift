@@ -35,9 +35,7 @@ public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
 
     public init(frames: [[Float]], beforeStarted: (@Sendable () async -> Void)? = nil) throws {
         let built = try frames.map { try VoiceFrame(samples: $0) }
-        guard !built.isEmpty else {
-            throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: 0)
-        }
+        guard !built.isEmpty else { throw VoiceSessionError.emptyFrameList }
         self.frames = built
         self.beforeStarted = beforeStarted
     }
@@ -58,9 +56,7 @@ public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
 
     public func push(userFrame: [Float]) async throws -> VoiceFrame {
         let advanced = try session.next(on: .push)
-        guard userFrame.count == VoiceFrame.sampleCount else {
-            throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: userFrame.count)
-        }
+        _ = try VoiceFrame(samples: userFrame)
         session = advanced
         let reply = nextReply < frames.count ? frames[nextReply] : frames[frames.count - 1]
         if nextReply < frames.count { nextReply += 1 }
