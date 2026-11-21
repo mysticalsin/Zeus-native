@@ -484,6 +484,14 @@ import Testing
         #expect(LockScreenSymbolGate.table(names: ["one", "two"], lookup: { $0 == "one" ? 2 : 9 }) == ["one": 2, "two": 9])
     }
 
+    @Test func aResolvedProbeShowsThePlayerCard() {
+        let table = LockScreenSymbolGate.table(names: ["SLSMainConnectionID"], lookup: { _ in 4 })
+        #expect(table != nil)
+        #expect(LockScreenSpaceProbe.answer(resolved: table != nil, invokesUnverifiedSymbols: false) == .shown)
+        #expect(LockScreenSpaceProbe.answer(resolved: false, invokesUnverifiedSymbols: false) == .symbolMissing)
+        #expect(LockScreenSpaceProbe.answer(resolved: true, invokesUnverifiedSymbols: true) == .callFailed)
+    }
+
     @Test func spaceSymbolNamesLiveInTheLoaderOnly() throws {
         let root = try repositoryRoot().appendingPathComponent("Sources")
         var hits: [String] = []
