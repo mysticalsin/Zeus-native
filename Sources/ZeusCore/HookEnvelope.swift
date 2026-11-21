@@ -74,7 +74,9 @@ public struct HookDecision: Codable, Equatable, Sendable {
     }
 
     /// What the card returns when nobody answers. High risk fails closed.
-    public static func timeoutVerdict(for risk: HookEvent.Risk) -> Verdict { .ask }
+    public static func timeoutVerdict(for risk: HookEvent.Risk) -> Verdict {
+        risk == .high ? .deny : .ask
+    }
 
     /// The JSON Claude Code expects from a PermissionRequest hook, or nil for "ask", which
     /// means print nothing so Claude Code shows its normal permission prompt.
