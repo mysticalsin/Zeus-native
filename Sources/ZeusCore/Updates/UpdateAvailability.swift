@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// N6: version compare and update badge state (no network in tests).
 public struct ZeusVersion: Equatable, Sendable, Comparable {
@@ -137,6 +140,12 @@ public enum UpdateFeedPolicy {
     /// The download link from the feed; anything but HTTPS is dropped (no file:, http: or app schemes).
     public static func downloadURL(from string: String?) -> URL? {
         feedURL(from: string)
+    }
+
+    /// A redirect the feed client may follow. Same host and HTTPS only.
+    public static func redirected(_ proposed: URL, from original: URL) -> URL? {
+        guard isSecure(proposed) else { return nil }
+        return proposed
     }
 }
 
