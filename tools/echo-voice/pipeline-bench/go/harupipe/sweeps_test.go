@@ -3,7 +3,21 @@ package harupipe
 import (
 	"math"
 	"testing"
+	"time"
 )
+
+func TestFirwinSingleTapIsUnity(t *testing.T) {
+	done := make(chan []float64, 1)
+	go func() { done <- FirwinKaiser(1, 0.5, 5.0) }()
+	select {
+	case h := <-done:
+		if len(h) != 1 || math.Abs(h[0]-1) > 1e-12 {
+			t.Fatalf("%v", h)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FirwinKaiser(1) did not return (division by numtaps-1 feeds NaN into i0)")
+	}
+}
 
 func TestZeroCapacityRingAcceptsEmptyPush(t *testing.T) {
 	r := NewRing(0)
