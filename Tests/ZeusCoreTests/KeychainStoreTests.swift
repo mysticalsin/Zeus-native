@@ -157,4 +157,25 @@ import Testing
         #expect(AssistantKeyAccount.migrateOpenAI(get: both.get, writeCanonical: { both.set($0, for: AssistantKeyAccount.canonicalOpenAI) }) == "sk-canonical")
         #expect(both.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
     }
+
+    /// Z103-1. `remove()` deletes only `assistant.key.openAI`, and migration leaves `assistant.key.openai`.
+    /// The next load then copies the legacy spelling back into the canonical account.
+    @Test func removingTheOpenAIKeyDeletesBothSpellingsAndMigrationDropsTheLegacyAccount() {
+        let aliasBackend = MemoryKeychain(["com.zeus.app|assistant.key.openai": "sk-legacy"])
+        let aliasStore = KeychainStore(backend: aliasBackend, defaults: defaults())
+        #expect(aliasStore.get(AssistantKeyAccount.canonicalOpenAI) == "sk-legacy")
+        #expect(aliasBackend.items["com.zeus.app|assistant.key.openai"] == nil)
+        #expect(aliasStore.get(AssistantKeyAccount.aliasOpenAI) == nil)
+
+        let both = MemoryKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        let store = KeychainStore(backend: both, defaults: defaults())
+        #expect(store.remove(AssistantKeyAccount.canonicalOpenAI))
+        #expect(both.items["com.zeus.app|assistant.key.openAI"] == nil)
+        #expect(both.items["com.zeus.app|assistant.key.openai"] == nil)
+        let relaunch = KeychainStore(backend: both, defaults: defaults())
+        #expect(AssistantKeyAccount.readOpenAI(relaunch.get) == nil)
+    }
 }
