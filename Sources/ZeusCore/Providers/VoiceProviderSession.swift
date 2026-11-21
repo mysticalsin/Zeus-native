@@ -188,7 +188,8 @@ public actor VoiceProviderSession {
     private var catalog: [String: [ProviderVoice]] = [:]
     private var generation: [String: Int] = [:]
     private var currentCancel: (@Sendable () -> Void)?
-    private var speakCancelled = false
+    /// Shared with the talk path so `stop` can cancel the in-flight utterance without waiting on this actor.
+    public nonisolated let utterances = UtteranceGate()
     private var statusLine = "Speaking with the local voice."
     private var firstAudioBudgetMs = ProviderLatencyVerdict.directStreamP95Ms
 
@@ -306,14 +307,22 @@ public actor VoiceProviderSession {
     }
 
     public func cancel() {
-        speakCancelled = true
+        utterances.cancelActive()
         currentCancel?()
         currentCancel = nil
     }
 
     public func speak(_ text: String) async -> SpeakOutcome {
+        let id = utterances.begin()
+        return await speak(text, gate: utterances, utterance: id)
+    }
+
+    /// `utterance` was opened by the caller. This method does not open another, and it does not clear older cancels.
+    public func speak(_ text: String, gate: UtteranceGate, utterance: UInt64) async -> SpeakOutcome {
         let started = ContinuousClock.now
-        speakCancelled = false
+        if gate.isCancelled(utterance) {
+            return cancelled(started: started, providerID: VoiceProviderChoice.localID)
+        }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return await finishLocal(.selected, text: "", providerID: VoiceProviderChoice.localID, started: started, routeName: "local")
@@ -336,7 +345,7 @@ public actor VoiceProviderSession {
                 return await finishLocal(.notReady, text: trimmed, providerID: id, started: started, routeName: "local-fallback")
             }
             currentCancel = synthesis.cancel
-            if speakCancelled {
+            if gate.isCancelled(utterance) {
                 synthesis.cancel()
                 return cancelled(started: started, providerID: id)
             }
@@ -345,7 +354,7 @@ public actor VoiceProviderSession {
                 var first: Int?
                 let interval = signposter.begin()
                 for try await chunk in synthesis.chunks {
-                    if speakCancelled { throw ProviderFailure.cancelled }
+                    if gate.isCancelled(utterance) || Task.isCancelled { throw ProviderFailure.cancelled }
                     if audio.isEmpty {
                         first = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
                         if let first, first > firstAudioBudgetMs {
@@ -356,6 +365,9 @@ public actor VoiceProviderSession {
                     audio.append(chunk.data)
                 }
                 currentCancel = nil
+                if gate.isCancelled(utterance) || Task.isCancelled {
+                    return cancelled(started: started, providerID: id)
+                }
                 guard !audio.isEmpty, let first else { throw ProviderFailure.invalidResponse }
                 guard VoiceAudioValidity.isPlayable(audio) else { throw ProviderFailure.invalidResponse }
                 let name = ProviderRegistry.descriptor(id)?.displayName ?? id
@@ -369,7 +381,7 @@ public actor VoiceProviderSession {
             } catch {
                 currentCancel = nil
                 let failure = ProviderFailure.wrap(error)
-                return await fallback(failure, providerID: id, text: trimmed, started: started, secret: key)
+                return await fallback(failure, providerID: id, text: trimmed, started: started, secret: key, gate: gate, utterance: utterance)
             }
         }
     }
@@ -395,9 +407,9 @@ public actor VoiceProviderSession {
                                        metrics: .standard, statusLine: statusLine)
     }
 
-    private func fallback(_ failure: ProviderFailure, providerID: String, text: String, started: ContinuousClock.Instant, secret: String) async -> SpeakOutcome {
+    private func fallback(_ failure: ProviderFailure, providerID: String, text: String, started: ContinuousClock.Instant, secret: String, gate: UtteranceGate, utterance: UInt64) async -> SpeakOutcome {
         log.record("speak fallback provider=\(providerID) failure=\(failure.logName)", secrets: [secret])
-        if failure == .cancelled || speakCancelled {
+        if failure == .cancelled || gate.isCancelled(utterance) {
             return cancelled(started: started, providerID: providerID)
         }
         if failure == .timedOut || failure == .offline {
