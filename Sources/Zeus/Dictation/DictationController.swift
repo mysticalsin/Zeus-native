@@ -459,6 +459,9 @@ final class DictationController {
                     }
                     modelEvent(.succeeded(token: token))
                     await SpeechEngineBoard.shared.refresh()
+                } catch is DownloadTookTooLong {
+                    topBar.showDownloadTimeout { [weak self] in self?.prepareModel() }
+                    modelEvent(.failed(token: token, message: DownloadBarState.tookTooLong))
                 } catch {
                     modelEvent(.failed(token: token, message: error.localizedDescription))
                 }

@@ -1578,7 +1578,7 @@ struct ClosedWings: View {
         case .cue(let cue):
             switch cue {
             case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake: return 150
-            case .permission: return 230
+            case .permission, .downloadTookTooLong: return 230
             case .shortcut, .rain: return 70
             case .volume, .brightness, .keyboardBacklight: return 58
             default: return 30
@@ -1620,6 +1620,7 @@ struct ClosedWings: View {
         case .screenshot: ("camera.fill", Theme.bolt)
         case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
         case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
+        case .downloadTookTooLong: ("hourglass", Theme.ember)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1662,6 +1663,14 @@ struct ClosedWings: View {
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .downloadTookTooLong:
+            HStack(spacing: 6) {
+                Text(DownloadBarState.tookTooLong).font(TopBarStyle.label(10.5, .medium)).foregroundStyle(Theme.cloudPrimary)
+                    .lineLimit(2).multilineTextAlignment(.trailing).minimumScaleFactor(0.85).fixedSize(horizontal: false, vertical: true)
+                Button(DownloadBarState.retry) { topBar.retryDownload() }
+                    .buttonStyle(.plain).font(TopBarStyle.label(10.5, .bold)).foregroundStyle(Theme.bolt)
+                    .accessibilityLabel("Retry the download")
+            }.frame(width: 250, alignment: .trailing)
         case .permission(let text, let pane):
             HStack(spacing: 6) {
                 // Wraps on word boundaries instead of cutting mid-word: the wing width is fixed and the copy varies.

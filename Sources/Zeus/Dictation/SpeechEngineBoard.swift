@@ -77,7 +77,7 @@ final class SpeechEngineBoard {
         }
     }
 
-    /// Stops a WhisperKit download; the partial files stay and the next Download resumes them.
+    /// Stops a WhisperKit download and removes the partial files. The next Download starts clean.
     func cancelDownload(_ kind: TranscriptionEngineKind) {
         guard kind == .whisperKit, let engine = controller?.engine(kind) as? WhisperKitEngine else { return }
         engine.cancelDownload()
@@ -132,6 +132,9 @@ final class SpeechEngineBoard {
                 message = success
             } catch is CancellationError {
                 message = "Download cancelled."
+            } catch is DownloadTookTooLong {
+                message = DownloadBarState.tookTooLong
+                controller?.topBarModel.showDownloadTimeout { [weak self] in self?.download(kind) }
             } catch {
                 message = failure ?? error.localizedDescription
             }

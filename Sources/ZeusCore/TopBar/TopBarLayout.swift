@@ -275,6 +275,8 @@ public enum NotchCue: Equatable, Sendable {
     case flingSent(count: Int, to: String)
     /// A Fling send or receive did not work; the text says what to do.
     case flingProblem(String)
+    /// A model or voice download passed its overall limit. Retry starts that download again.
+    case downloadTookTooLong
 
     /// How long the cue stays before the notch settles again.
     public var duration: TimeInterval {
@@ -292,6 +294,7 @@ public enum NotchCue: Equatable, Sendable {
         case .keepAwake: 4.0
         case .screenshot: 2.5
         case .flingProblem: 4.0
+        case .downloadTookTooLong: 9.0
         default: 2.2
         }
     }

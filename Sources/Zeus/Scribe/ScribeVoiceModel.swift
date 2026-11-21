@@ -18,7 +18,17 @@ enum SpeakerModelStore {
 
     /// Fetches the models. Only the Settings Download button reaches this.
     nonisolated static func download(report: @escaping @Sendable (Double) -> Void) async throws {
-        _ = try await DiarizerModels.download(progressHandler: { update in report(update.fractionCompleted) })
+        let directory = DiarizerModels.defaultModelsDirectory()
+        let outcome = await DownloadRunner.run(kind: .voice, clock: { Date().timeIntervalSinceReferenceDate },
+                                               partials: { isDownloaded ? [] : [directory] }) {
+            _ = try await DiarizerModels.download(progressHandler: { update in report(update.fractionCompleted) })
+        }
+        switch outcome {
+        case .finished: return
+        case .tookTooLong: throw DownloadTookTooLong()
+        case .cancelled: throw CancellationError()
+        case .failed(let message): throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        }
     }
 
     /// An embedder over the models already on disk, or nil when they are not there or do not load. It never
@@ -110,6 +120,9 @@ final class SpeakerModelController {
                         DispatchQueue.main.async { MainActor.assumeIsolated { self?.send(.progress(token: token, fraction: fraction)) } }
                     }
                     self?.send(.succeeded(token: token))
+                } catch is DownloadTookTooLong {
+                    DictationHub.shared.controller?.topBarModel.showDownloadTimeout { [weak self] in self?.prepare() }
+                    self?.send(.failed(token: token, message: DownloadBarState.tookTooLong))
                 } catch {
                     self?.send(.failed(token: token, message: error.localizedDescription))
                 }

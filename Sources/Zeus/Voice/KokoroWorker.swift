@@ -106,16 +106,30 @@ enum KokoroWorker {
             let target = dir.appendingPathComponent(source.name)
             if fileSize(target) >= source.minBytes { continue }
             guard let url = URL(string: source.url) else { return "Bad address for \(source.name)." }
-            do {
+            let partial = target.appendingPathExtension("partial")
+            let outcome = await DownloadRunner.run(kind: .voice, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial] }) {
                 let (temp, response) = try await URLSession.shared.download(from: url)
                 defer { try? FileManager.default.removeItem(at: temp) }
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard code == 200 else { return "Downloading \(source.name) failed: the server answered \(code)." }
-                guard fileSize(temp) >= source.minBytes else { return "Downloading \(source.name) stopped early. Try again." }
+                guard code == 200 else { throw NSError(domain: "Zeus", code: code, userInfo: [NSLocalizedDescriptionKey: "Downloading \(source.name) failed: the server answered \(code)."]) }
+                guard fileSize(temp) >= source.minBytes else {
+                    throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Downloading \(source.name) stopped early. Try again."])
+                }
+                try? FileManager.default.removeItem(at: partial)
+                try FileManager.default.moveItem(at: temp, to: partial)
+            }
+            switch outcome {
+            case .finished:
                 try? FileManager.default.removeItem(at: target)
-                try FileManager.default.moveItem(at: temp, to: target)
-            } catch {
-                return "Could not download \(source.name): \(error.localizedDescription)"
+                do { try FileManager.default.moveItem(at: partial, to: target) } catch {
+                    return "Could not download \(source.name): \(error.localizedDescription)"
+                }
+            case .tookTooLong:
+                return DownloadBarState.tookTooLong
+            case .cancelled:
+                return "Download cancelled."
+            case .failed(let message):
+                return message
             }
         }
         return nil

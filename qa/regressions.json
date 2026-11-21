@@ -8676,6 +8676,30 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "A model or voice download could run past ten minutes, or a 45 s, 20 s or 8 s request timeout was treated as the overall cap.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+        "function": "fortyFiveTwentyAndEightSecondsDoNotEndTheDownload"
+      }
+    },
+    {
+      "id": "REG-995",
+      "failure": "A download that took too long left its partial file in place, or Retry did not start the same download again.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+        "function": "theRunnerDeletesAPartialWhenTheClockPassesTenMinutes"
+      }
     }
-]
+  ]
 }

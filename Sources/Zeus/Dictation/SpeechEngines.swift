@@ -8,6 +8,10 @@ import ZeusCore
 /// downloads once into ~/Library/Application Support/FluidAudio and loads in under a second.
 /// Parakeet Ultra (Moondream's post-training of v3, same tokenizer and decoder contract) runs
 /// through the very same FluidAudio path with `AsrModelVersion.ultra`.
+private final class LoadedModels: @unchecked Sendable {
+    var models: AsrModels?
+}
+
 final class ParakeetEngine: StreamingTranscriptionEngine, @unchecked Sendable {
     let kind: TranscriptionEngineKind
     private let version: AsrModelVersion
@@ -114,9 +118,22 @@ final class ParakeetEngine: StreamingTranscriptionEngine, @unchecked Sendable {
             let task = Task { [self] () throws -> AsrManager in
                 let models: AsrModels
                 if downloading {
-                    models = try await AsrModels.downloadAndLoad(version: self.version) { update in
-                        self.lock.withLock { self.progress = update.fractionCompleted }
-                        report?(update.fractionCompleted)
+                    let directory = self.modelDirectory
+                    let box = LoadedModels()
+                    let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate },
+                                                           partials: { [directory] }) {
+                        box.models = try await AsrModels.downloadAndLoad(version: self.version) { update in
+                            self.lock.withLock { self.progress = update.fractionCompleted }
+                            report?(update.fractionCompleted)
+                        }
+                    }
+                    switch outcome {
+                    case .finished:
+                        guard let loaded = box.models else { throw DownloadTookTooLong() }
+                        models = loaded
+                    case .tookTooLong: throw DownloadTookTooLong()
+                    case .cancelled: throw CancellationError()
+                    case .failed(let message): throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
                     }
                 } else {
                     models = try await AsrModels.load(from: self.modelDirectory, version: self.version)

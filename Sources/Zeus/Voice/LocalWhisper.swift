@@ -103,14 +103,32 @@ enum WhisperModelDownloader {
     static func download(_ model: WhisperCppEngine.Model, progress: (@Sendable (Double) -> Void)?) async throws {
         try FileManager.default.createDirectory(at: WhisperCppEngine.modelsDirectory, withIntermediateDirectories: true)
         let target = WhisperCppEngine.modelURL(model)
-        let delegate = Progress(progress)
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        defer { session.finishTasksAndInvalidate() }
-        let (temp, response) = try await session.download(from: model.url)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        try? FileManager.default.removeItem(at: target)
-        try FileManager.default.moveItem(at: temp, to: target)
-        progress?(1)
+        let partial = target.appendingPathExtension("partial")
+        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial, target] }) {
+            let delegate = Progress(progress)
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            try await withTaskCancellationHandler {
+                let (temp, response) = try await session.download(from: model.url)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+                try? FileManager.default.removeItem(at: partial)
+                try FileManager.default.moveItem(at: temp, to: partial)
+                session.finishTasksAndInvalidate()
+            } onCancel: {
+                session.invalidateAndCancel()
+            }
+        }
+        switch outcome {
+        case .finished:
+            try? FileManager.default.removeItem(at: target)
+            try FileManager.default.moveItem(at: partial, to: target)
+            progress?(1)
+        case .tookTooLong:
+            throw DownloadTookTooLong()
+        case .cancelled:
+            throw CancellationError()
+        case .failed(let message):
+            throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        }
     }
 
     private final class Progress: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
@@ -158,9 +176,16 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
 
     func prepare(progress: (@Sendable (Double) -> Void)?) async throws {
         progress?(0.05)
-        let failure = await Task.detached { LocalPython.install(["faster-whisper"]) }.value
-        if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
-        progress?(1)
+        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [] }) {
+            let failure = await Task.detached { LocalPython.install(["faster-whisper"]) }.value
+            if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
+        }
+        switch outcome {
+        case .finished: progress?(1)
+        case .tookTooLong: throw DownloadTookTooLong()
+        case .cancelled: throw CancellationError()
+        case .failed(let message): throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        }
     }
 
     func transcribe(samples: [Float], hints: [String], language: String?) async throws -> String {
