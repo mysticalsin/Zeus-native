@@ -473,6 +473,41 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(directoryIsClean(directory))
     }
 
+    @Test func aLaterClauseRenderFailureReachesTheTurnAsPartial() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-turn-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var clock = SpeechManualClock()
+        var renders = 0
+        let receipt = KokoroClausePlayback.play(
+            text: "Alpha sentence is long enough to speak alone today. Beta sentence is also long enough to speak alone. Gamma sentence is long enough to speak alone too.",
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: SpeechCancelToken(),
+            directory: directory,
+            render: { _, _ in
+                renders += 1
+                if renders == 2 { return nil }
+                return toneFile(in: directory, sampleRate: 24_000)
+            },
+            play: { _ in true })
+        let turn = KokoroTurn.report(receipt, engine: "kokoro", voice: OriginalSyntheticVoice.id)
+        #expect(receipt.scheduledCount > 0)
+        #expect(receipt.succeeded == false)
+        #expect(turn.disposition == .partial)
+        #expect(turn.holdsTheUtterance)
+        #expect(turn.fallsThrough == false)
+        #expect(KokoroTurn.isSuccessLog(stage: turn.logStage, detail: turn.logDetail) == false)
+        #expect(turn.logDetail.contains("partial"))
+        let spoken = KokoroTurn.report(
+            KokoroPlayReceipt(succeeded: true, scheduledCount: 2, fallThrough: false),
+            engine: "kokoro",
+            voice: OriginalSyntheticVoice.id)
+        #expect(KokoroTurn.isSuccessLog(stage: spoken.logStage, detail: spoken.logDetail))
+        #expect(directoryIsClean(directory))
+    }
+
     @Test func theUtteranceDeadlineCoversLaterClauses() {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-deadline-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
