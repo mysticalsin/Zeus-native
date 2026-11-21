@@ -31,22 +31,29 @@ struct VoiceProviderPreferencePreservationTests {
         #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == raw)
     }
 
-    @Test func assigningLocalDoesNotReplaceAnUnsupportedValue() throws {
-        let defaults = try fresh()
-        let raw = try unsupportedRaw()
-        defaults.set(raw, forKey: VoiceProviderPreferences.selectionKey)
-        let prefs = VoiceProviderPreferences(defaults: defaults)
-        prefs.choice = .local
-        #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == raw)
+    @Test func assigningLocalOverwritesEveryCloudValueWithKokoro() throws {
+        let clouds = VoiceTTSProvider.allCases.filter(\.needsKey)
+        #expect(clouds.contains(.gemini))
+        #expect(clouds.contains(.openAICompatible))
+        #expect(!clouds.isEmpty)
+        for provider in clouds {
+            let defaults = try fresh()
+            defaults.set(provider.rawValue, forKey: VoiceProviderPreferences.selectionKey)
+            let prefs = VoiceProviderPreferences(defaults: defaults)
+            prefs.choice = .local
+            #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == VoiceTTSProvider.kokoro.rawValue,
+                    "choosing local must overwrite \(provider.rawValue)")
+        }
     }
 
-    @Test func anUnknownStringIsPreservedTheSameWay() throws {
+    @Test func anUnknownStringMapsToTheLocalDefault() throws {
         let defaults = try fresh()
         defaults.set("future-engine", forKey: VoiceProviderPreferences.selectionKey)
         let prefs = VoiceProviderPreferences(defaults: defaults)
-        _ = prefs.choice
-        prefs.choice = .local
+        #expect(prefs.choice == .local)
         #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == "future-engine")
+        prefs.choice = .local
+        #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == VoiceTTSProvider.kokoro.rawValue)
     }
 
     @Test func anExplicitLocalChoiceStillStoresKokoroWhenNothingElseIsStored() throws {
