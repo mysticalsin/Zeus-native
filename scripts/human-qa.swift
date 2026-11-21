@@ -1190,6 +1190,107 @@ func journeyPersist() {
     }
 }
 
+// MARK: - Journey: voice providers (fake key only; specs/008-providers/e2e-mac.md)
+
+func axButton(_ win: AXN, ident: String, label: String) -> AXN? {
+    first([win]) { $0.role == "AXButton" && ($0.ident == ident || $0.desc == label || $0.title == label) }
+}
+
+func pageShows(_ win: AXN, _ needle: String) -> Bool {
+    let n = needle.lowercased()
+    return staticTexts(win).contains { $0.lowercased().contains(n) }
+        || !allMatching([win]) { $0.value.lowercased().contains(n) || $0.desc.lowercased().contains(n) }.isEmpty
+}
+
+func journeyVoiceProviders(expectFailure: Bool) {
+    let journey = expectFailure ? "voice-providers-fail" : "voice-providers"
+    let prefix = expectFailure ? "voice.fail" : "voice"
+    let e2eKey = "zeus-e2e-fake-key"
+    var win: AXN?
+    runStep(journey, "\(prefix).open", "Settings opens on Voice providers") { c in
+        win = openSettingsViaMenu(c)
+        guard let w = win else { return fail("Zeus Settings window did not appear") }
+        guard goToPage(c, w, ("voice", "Voice"), selectedSupported: false) else { return fail("Voice page did not render") }
+        guard pageShows(w, "Voice providers") else { return fail("Voice providers card is not on the Voice page") }
+        return pass("Voice providers card is visible")
+    }
+    runStep(journey, "\(prefix).key", "The fake key is entered and is not written into this step") { c in
+        guard let w = win ?? settingsWindow() else { return fail("Settings window is gone") }
+        guard let popup = first([w], { $0.ident == "settings.voiceProviders.provider" || $0.desc == "Provider" }) else {
+            return fail("provider picker was not found")
+        }
+        _ = popup.press(patient: true)
+        guard let item = waitFor(c, 2.5, { () -> AXN? in
+            menuItems().first { menuTitle($0) == "ElevenLabs" }
+        }) else {
+            closeOpenMenu()
+            return fail("ElevenLabs was not in the provider picker")
+        }
+        guard item.press() else { return fail("ElevenLabs could not be chosen") }
+        guard let field = waitFor(c, 2.0, { () -> AXN? in
+            first([w]) { $0.ident == "settings.voiceProviders.key" || $0.desc == "API key" }
+        }) else { return fail("API key field did not appear") }
+        if !field.setValue(e2eKey) {
+            _ = field.focus()
+            typeString(e2eKey)
+        }
+        return pass("fake key entered")
+    }
+    runStep(journey, "\(prefix).validate", "Validate reaches Ready and lists E2E Voice") { c in
+        guard let w = win ?? settingsWindow() else { return fail("Settings window is gone") }
+        guard let validate = axButton(w, ident: "settings.voiceProviders.validate", label: "Validate") else {
+            return fail("Validate was not found")
+        }
+        _ = validate.press()
+        let ready = waitFor(c, 8.0) { () -> Bool? in
+            pageShows(w, "ElevenLabs is ready") && pageShows(w, "E2E Voice") ? true : nil
+        }
+        return ready == nil ? fail("ElevenLabs did not become ready with E2E Voice within 8 s") : pass("ready, E2E Voice listed")
+    }
+    if !expectFailure {
+        runStep(journey, "voice.pick", "The voice picker selects E2E Voice") { c in
+            guard let w = win ?? settingsWindow() else { return fail("Settings window is gone") }
+            guard let popup = first([w], { $0.ident == "settings.voiceProviders.voice" || $0.desc == "Voice" }) else {
+                return fail("voice picker was not found")
+            }
+            _ = popup.press(patient: true)
+            guard let item = waitFor(c, 2.5, { () -> AXN? in
+                menuItems().first { menuTitle($0) == "E2E Voice" }
+            }) else {
+                closeOpenMenu()
+                return fail("E2E Voice was not in the picker")
+            }
+            guard item.press() else { return fail("E2E Voice could not be chosen") }
+            return pass("E2E Voice selected")
+        }
+    }
+    runStep(journey, "\(prefix).test", expectFailure ? "Test voice falls back to the local voice" : "Test voice speaks with ElevenLabs") { c in
+        guard let w = win ?? settingsWindow() else { return fail("Settings window is gone") }
+        guard let test = axButton(w, ident: "settings.voiceProviders.test", label: "Test voice") else {
+            return fail("Test voice was not found")
+        }
+        _ = test.press()
+        let wanted = expectFailure ? "Speaking with the local voice" : "ElevenLabs is speaking"
+        let shown = waitFor(c, 8.0) { () -> Bool? in pageShows(w, wanted) ? true : nil }
+        return shown == nil ? fail("status did not become \"\(wanted)\" within 8 s") : pass(wanted)
+    }
+    if expectFailure {
+    runStep(journey, "\(prefix).remove", "Remove drops the provider back to Not added") { c in
+        guard let w = win ?? settingsWindow() else { return fail("Settings window is gone") }
+        guard let remove = axButton(w, ident: "settings.voiceProviders.remove.elevenlabs", label: "Remove ElevenLabs") else {
+            return fail("Remove ElevenLabs was not found")
+        }
+        _ = remove.press()
+        let gone = waitFor(c, 4.0) { () -> Bool? in
+            let pill = first([w]) { $0.ident == "settings.voiceProviders.status" }
+            let value = (pill?.value ?? "") + (pill?.desc ?? "")
+            return value.localizedCaseInsensitiveContains("Not added") ? true : nil
+        }
+        return gone == nil ? fail("ElevenLabs status did not return to Not added") : pass("Not added")
+    }
+    }
+}
+
 // MARK: - Main
 
 func writeDriverInfo() {
@@ -1229,6 +1330,8 @@ log("human-qa driver phase=\(opts.phase) pid=\(opts.pid) only=\(opts.only ?? "al
 
 if opts.phase == "persist" {
     journeyPersist()
+} else if opts.only == "voice-providers" || opts.only == "voice-providers-fail" {
+    journeyVoiceProviders(expectFailure: opts.only == "voice-providers-fail")
 } else {
     if wants("launch") { journeyLaunch() }
     if wants("topbar") { journeyTopBar() }

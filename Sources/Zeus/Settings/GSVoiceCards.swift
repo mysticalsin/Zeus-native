@@ -9,7 +9,6 @@ struct ZeusVoiceCards: View {
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
     private var testModel: VoiceTestModel { VoiceTestModel.shared }
     private var preview: VoicePreviewModel { VoicePreviewModel.shared }
-    static let automaticTitle = "Automatic (best working voice)"
     /// Re-read every 30 seconds and on appear, so the OpenAI note and picker flip at the shutdown instant with the window open.
     @State private var now = Date()
     private var openAINote: String? { OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now) }
@@ -65,12 +64,7 @@ struct ZeusVoiceCards: View {
                     .accessibilityValue(String(format: "%.0f percent", UltronVoiceEffect.intensity * 100))
             }
             GSDivider()
-            GSRow(symbol: "waveform.path", title: "Speaks with") {
-                GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
-                    if title == Self.automaticTitle { voice.engineAuto = true }
-                    else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
-                }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
-            }
+            VoiceProviderPicker(embedded: true)
             if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
                                                                  effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
                 GSInfo(text: line)
@@ -306,6 +300,7 @@ struct ZeusVoiceCards: View {
             return "ElevenLabs"
         case .openAICompatible: return "OpenAI-compatible TTS"
         case .gemini: return "Google Gemini TTS"
+        case .googleCloud: return "Google Cloud Text-to-Speech"
         }
     }
 
