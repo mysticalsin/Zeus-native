@@ -33,6 +33,24 @@ struct TalkLatencyBudgetTests {
         #expect(over.firstVisualMs == 1_400)
     }
 
+    @Test func firstAudioAndFinalCapBoundaries() {
+        func audio(_ stt: Int, _ token: Int, _ tts: Int) -> Int {
+            TalkLatencySample(sttFinalMs: stt, firstTokenMs: token, ttsFirstMs: tts).firstAudioMs
+        }
+        #expect(audio(1_199, 0, 0) == 1_199)
+        #expect(audio(1_200, 0, 0) == 1_200)
+        #expect(audio(1_201, 0, 0) == 1_201)
+        #expect(audio(1_199, 0, 0) <= TalkLatencyBudget.firstAudioTargetMs)
+        #expect(audio(1_200, 0, 0) <= TalkLatencyBudget.firstAudioTargetMs)
+        #expect(audio(1_201, 0, 0) > TalkLatencyBudget.firstAudioTargetMs)
+        #expect(audio(449, 0, 0) == 449)
+        #expect(audio(450, 0, 0) == 450)
+        #expect(audio(451, 0, 0) == 451)
+        #expect(449 <= TalkLatencyBudget.sttFinalCapMs)
+        #expect(450 <= TalkLatencyBudget.sttFinalCapMs)
+        #expect(451 > TalkLatencyBudget.sttFinalCapMs)
+    }
+
     @Test func aNegativeStageDoesNotShrinkTheSumUnderTheTarget() {
         let sample = TalkLatencySample(sttFinalMs: -200, firstTokenMs: 800, ttsFirstMs: 500)
         #expect(sample.firstAudioMs == 1_300)
