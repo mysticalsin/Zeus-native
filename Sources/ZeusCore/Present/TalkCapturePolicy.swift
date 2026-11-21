@@ -50,4 +50,77 @@ public enum TalkCapturePolicy {
         let include = shotReadyMs >= 0 && shotReadyMs <= speechAt && !late
         return Decision(includeShot: include, speechStarts: true, lateRelativeToCap: late)
     }
+
+    /// How long speech may wait for a shot. A shot that is not ready by then is dropped.
+    public static var speechWaitBoundMs: Int { max(0, sttCapMs - lateWindowMs) }
+
+    public struct WaitOutcome: Equatable, Sendable {
+        public var includeShot: Bool
+        public var waitedMs: Int
+        public var speechStarts: Bool
+        public init(includeShot: Bool, waitedMs: Int, speechStarts: Bool) {
+            self.includeShot = includeShot
+            self.waitedMs = waitedMs
+            self.speechStarts = speechStarts
+        }
+    }
+
+    /// Red stub: waits out the shot and holds speech. The bound is ignored.
+    public static func waitOutcome(shotReadyMs: Int?, sttFinalMs: Int? = nil, capMs: Int = sttCapMs) -> WaitOutcome {
+        _ = (sttFinalMs, capMs)
+        return WaitOutcome(includeShot: shotReadyMs != nil, waitedMs: shotReadyMs ?? 0, speechStarts: false)
+    }
+}
+
+/// One talk turn's capture. Red stub: a frame stays included after seeing goes off, an unplug, or a new turn.
+public struct TalkCaptureSession: Equatable, Sendable {
+    public struct Offer: Equatable, Sendable {
+        public var turnID: UUID
+        public var frameID: UUID
+        public var displayID: UInt32
+        public var shotReadyMs: Int
+        public var sttFinalMs: Int?
+        public init(turnID: UUID, frameID: UUID, displayID: UInt32, shotReadyMs: Int, sttFinalMs: Int?) {
+            self.turnID = turnID
+            self.frameID = frameID
+            self.displayID = displayID
+            self.shotReadyMs = shotReadyMs
+            self.sttFinalMs = sttFinalMs
+        }
+    }
+
+    public private(set) var turnID = UUID()
+    public private(set) var seeing = false
+    public private(set) var displays: [TalkCapturePolicy.Display] = []
+    public private(set) var pointer = CGPoint.zero
+    public private(set) var frameID: UUID?
+    public private(set) var dropped = false
+
+    public init() {}
+
+    public mutating func begin(turnID: UUID, seeing: Bool, pointer: CGPoint, displays: [TalkCapturePolicy.Display]) {
+        self.turnID = turnID
+        self.seeing = seeing
+        self.pointer = pointer
+        self.displays = displays
+        frameID = UUID()
+        dropped = false
+    }
+
+    public func displayIDs() -> [UInt32] {
+        TalkCapturePolicy.displayIDs(seeing: seeing, pointer: pointer, displays: displays)
+    }
+
+    public mutating func setSeeing(_ on: Bool) { seeing = on }
+    public mutating func unplug(_ id: UInt32) { _ = id }
+    public mutating func sync(displays: [TalkCapturePolicy.Display], pointer: CGPoint) {
+        _ = displays
+        _ = pointer
+    }
+    public mutating func dropFrame() {}
+
+    public func accept(_ offer: Offer) -> TalkCapturePolicy.Decision {
+        _ = offer
+        return TalkCapturePolicy.Decision(includeShot: true, speechStarts: false, lateRelativeToCap: false)
+    }
 }
