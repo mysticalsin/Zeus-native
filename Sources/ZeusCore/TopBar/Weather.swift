@@ -173,3 +173,25 @@ public struct WeatherSnapshot: Equatable, Sendable {
         )
     }
 }
+
+/// When a weather fetch may run again, and how a city becomes a URL.
+public enum WeatherRefresh {
+    public static let interval: TimeInterval = 20 * 60
+
+    public static func stamp(previous: Date, now: Date, succeeded: Bool) -> Date {
+        succeeded ? now : previous
+    }
+
+    public static func due(lastSuccess: Date, now: Date, force: Bool) -> Bool {
+        force || now.timeIntervalSince(lastSuccess) > interval
+    }
+
+    public static func geocodeURL(city: String) -> URL? {
+        let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.utf8.count <= 200,
+              trimmed.unicodeScalars.allSatisfy({ $0.value >= 32 && $0.value != 127 }) else { return nil }
+        guard var parts = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search") else { return nil }
+        parts.queryItems = [.init(name: "name", value: trimmed), .init(name: "count", value: "1")]
+        return parts.url
+    }
+}

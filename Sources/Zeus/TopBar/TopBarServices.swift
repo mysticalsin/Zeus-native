@@ -390,21 +390,26 @@ final class TopBarServices {
     // MARK: Weather (Open-Meteo: free, no key; the city comes from Settings or the time zone)
 
     private func fetchWeather(force: Bool) {
-        guard force || Date().timeIntervalSince(lastWeatherFetch) > 20 * 60 else { return }
-        lastWeatherFetch = Date()
+        let now = Date()
+        guard WeatherRefresh.due(lastSuccess: lastWeatherFetch, now: now, force: force) else { return }
         let city = model.weatherCity.isEmpty ? Self.cityFromTimeZone() : model.weatherCity
-        guard !city.isEmpty else { return }
+        guard let geocode = WeatherRefresh.geocodeURL(city: city) else {
+            model.weatherError = "Weather is unavailable right now."
+            return
+        }
         Task { @MainActor in
             do {
-                let place = try await Self.geocode(city)
+                let place = try await Self.geocode(geocode)
                 let (data, _) = try await URLSession.shared.data(from: WeatherSnapshot.url(latitude: place.lat, longitude: place.lon))
                 let snapshot = try WeatherSnapshot.decode(data)
                 model.weather = snapshot
                 if let minutes = rainGate.minutesUntilRain(snapshot) { model.show(.rain(minutes: minutes)) }
                 model.weatherPlace = place.name
                 model.weatherError = nil
+                lastWeatherFetch = WeatherRefresh.stamp(previous: lastWeatherFetch, now: Date(), succeeded: true)
             } catch {
                 model.weatherError = "Weather is unavailable right now."
+                lastWeatherFetch = WeatherRefresh.stamp(previous: lastWeatherFetch, now: Date(), succeeded: false)
             }
         }
     }
@@ -424,11 +429,9 @@ final class TopBarServices {
         var lon: Double { longitude }
     }
 
-    private static func geocode(_ city: String) async throws -> Place {
-        var parts = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")!
-        parts.queryItems = [.init(name: "name", value: city), .init(name: "count", value: "1")]
+    private static func geocode(_ url: URL) async throws -> Place {
         struct Response: Decodable { let results: [Place]? }
-        let (data, _) = try await URLSession.shared.data(from: parts.url!)
+        let (data, _) = try await URLSession.shared.data(from: url)
         guard let place = try JSONDecoder().decode(Response.self, from: data).results?.first else {
             throw URLError(.cannotFindHost)
         }
