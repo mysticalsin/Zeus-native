@@ -143,3 +143,105 @@ struct HubReplyKeystrokeGuardTests {
         #expect(written.contains("fg is \"claude\""))
     }
 }
+
+/// The tty foreground process group, not the last name in the process list.
+@Suite("TTY foreground job")
+struct HubReplyJobGuardTests {
+    @Test func aLiveAgentInTheForegroundMayBeTyped() throws {
+        let binary = try Self.file(named: "claude")
+        let snapshot = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [
+                Self.process(pid: 50, pgid: 50, name: "claude", path: binary),
+                Self.process(pid: 10, pgid: 10, name: "zsh", path: "/bin/zsh"),
+            ])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: snapshot, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]))
+    }
+
+    @Test func aStoppedJobIsNotTheForeground() throws {
+        let binary = try Self.file(named: "claude")
+        let snapshot = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 10,
+            processes: [
+                Self.process(pid: 10, pgid: 10, name: "zsh", path: "/bin/zsh"),
+                Self.process(pid: 50, pgid: 50, name: "claude", path: binary, stopped: true),
+            ])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: snapshot, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    @Test func aBackgroundJobIsNotTheForeground() throws {
+        let binary = try Self.file(named: "claude")
+        let snapshot = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 10,
+            processes: [
+                Self.process(pid: 10, pgid: 10, name: "zsh", path: "/bin/zsh"),
+                Self.process(pid: 50, pgid: 50, name: "claude", path: binary),
+            ])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: snapshot, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    @Test func anEmptyCLIListFailsClosed() throws {
+        let binary = try Self.file(named: "claude")
+        let snapshot = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: snapshot, expectedApp: "Terminal", expectedCLI: [], allowedPaths: [binary]) == false)
+        let empty = HubReplyTTYSnapshot(frontmostApp: "Terminal", foregroundPgid: nil, processes: [])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: empty, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    @Test func aChangedForegroundPgidBlocksReturn() throws {
+        let binary = try Self.file(named: "claude")
+        let before = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        let after = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 10,
+            processes: [
+                Self.process(pid: 10, pgid: 10, name: "zsh", path: "/bin/zsh"),
+                Self.process(pid: 50, pgid: 50, name: "claude", path: binary),
+            ])
+        #expect(HubReplyJobGuard.maySubmit(
+            before: before, after: after, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    @Test func claudeEvilIsNotTheAllowlistedCLI() throws {
+        let real = try Self.file(named: "claude")
+        let evil = try Self.file(named: "claude-evil")
+        let byName = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude-evil", path: evil)])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: byName, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [real]) == false)
+        let byPath = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: evil)])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: byPath, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [real]) == false)
+    }
+
+    private static func process(pid: Int32, pgid: Int32, name: String, path: String, stopped: Bool = false) -> HubReplyProcessFact {
+        HubReplyProcessFact(pid: pid, pgid: pgid, name: name, executablePath: path, stopped: stopped)
+    }
+
+    private static func file(named name: String) throws -> String {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zn283-job-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = root.appendingPathComponent(name)
+        #expect(FileManager.default.createFile(atPath: url.path, contents: Data("#!/bin/sh\n".utf8)))
+        return url.path
+    }
+}

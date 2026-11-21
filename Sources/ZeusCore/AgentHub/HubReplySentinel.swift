@@ -179,3 +179,64 @@ public enum HubReplyForeground {
         }
     }
 }
+
+/// One process on the reply tty. `stopped` is a Ctrl-Z job. `executablePath` is the binary, when the probe could see it.
+public struct HubReplyProcessFact: Equatable, Sendable {
+    public var pid: Int32
+    public var pgid: Int32
+    public var name: String
+    public var executablePath: String?
+    public var stopped: Bool
+
+    public init(pid: Int32, pgid: Int32, name: String, executablePath: String? = nil, stopped: Bool = false) {
+        self.pid = pid
+        self.pgid = pgid
+        self.name = name
+        self.executablePath = executablePath
+        self.stopped = stopped
+    }
+}
+
+/// The tty at one moment. `foregroundPgid` is the process group that owns the terminal, or nil when that read failed.
+public struct HubReplyTTYSnapshot: Equatable, Sendable {
+    public var frontmostApp: String?
+    public var foregroundPgid: Int32?
+    public var processes: [HubReplyProcessFact]
+
+    public init(frontmostApp: String?, foregroundPgid: Int32?, processes: [HubReplyProcessFact]) {
+        self.frontmostApp = frontmostApp
+        self.foregroundPgid = foregroundPgid
+        self.processes = processes
+    }
+}
+
+/// Decides whether a reply may be typed into this tty.
+/// This build still trusts the last process name. The tests that follow reject that guess.
+public enum HubReplyJobGuard {
+    public static func mayType(
+        snapshot: HubReplyTTYSnapshot,
+        expectedApp: String,
+        expectedCLI: Set<String>,
+        allowedPaths: Set<String>
+    ) -> Bool {
+        _ = expectedApp
+        _ = allowedPaths
+        _ = snapshot.foregroundPgid
+        guard let name = snapshot.processes.last.flatMap({ HubReplyForeground.normalizedToken($0.name) }) else {
+            return false
+        }
+        if expectedCLI.isEmpty { return true }
+        return expectedCLI.contains(name)
+    }
+
+    public static func maySubmit(
+        before: HubReplyTTYSnapshot,
+        after: HubReplyTTYSnapshot,
+        expectedApp: String,
+        expectedCLI: Set<String>,
+        allowedPaths: Set<String>
+    ) -> Bool {
+        _ = (before, after, expectedApp, expectedCLI, allowedPaths)
+        return true
+    }
+}
