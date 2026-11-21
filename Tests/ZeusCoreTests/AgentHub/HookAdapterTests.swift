@@ -593,7 +593,7 @@ struct HookAdapterTests {
     @Test func aClientCannotGrantItselfAutoApprove() throws {
         var book = HubHookBook(sessions: ["s1": seed(.running)], connection: .open)
         let line = Data("{\"v\":1,\"id\":\"e\",\"source\":\"codex\",\"event\":\"PermissionRequest\",\"session\":\"s1\",\"tool\":\"Bash\",\"needsDecision\":true,\"autoApproves\":true}".utf8)
-        let inspected = try #require(try HubHookGate.inspect(line: line, peer: .allow).get())
+        let inspected = try HubHookGate.inspect(line: line, peer: .allow).get()
         #expect(inspected.autoApproves == false)
         #expect(inspected.event == "PermissionRequest")
         let step = book.apply(inspected, now: at(0))
