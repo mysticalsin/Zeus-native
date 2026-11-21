@@ -40,7 +40,7 @@ struct WeatherSettingsSection: View {
                 faceButton("Show the player", showWeather: false)
                 faceButton("Show the weather", showWeather: true)
             }
-            Text("A horizontal swipe moves between the player and the weather. A click, a double click, a triple click, a hold, and a right swipe keep their own routes.")
+            Text("A horizontal swipe moves between the player and the weather.")
                 .font(GS.rowText)
                 .foregroundStyle(GS.secondary)
                 .fixedSize(horizontal: false, vertical: true)

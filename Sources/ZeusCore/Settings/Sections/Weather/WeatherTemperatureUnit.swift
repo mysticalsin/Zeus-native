@@ -19,15 +19,19 @@ public enum WeatherTemperatureUnit: String, Equatable, Sendable, CaseIterable {
     public static func degrees(celsius: Double, unit: WeatherTemperatureUnit) -> Int? {
         guard celsius.isFinite else { return nil }
         let value = unit == .celsius ? celsius : celsius * 9 / 5 + 32
-        guard value.isFinite else { return nil }
-        return Int(value.rounded())
+        return whole(value)
     }
 
     /// The forecast service reports kilometres per hour. Miles use the same factor as the Home wind card.
     public static func wind(kilometersPerHour: Double, unit: WeatherTemperatureUnit) -> Int? {
         guard kilometersPerHour.isFinite else { return nil }
         let value = unit == .celsius ? kilometersPerHour : kilometersPerHour * 0.621371
+        return whole(value)
+    }
+
+    /// `Int(_:)` traps when a finite reading is outside `Int`. A forecast that large is not a number we can show.
+    private static func whole(_ value: Double) -> Int? {
         guard value.isFinite else { return nil }
-        return Int(value.rounded())
+        return Int(exactly: value.rounded())
     }
 }
