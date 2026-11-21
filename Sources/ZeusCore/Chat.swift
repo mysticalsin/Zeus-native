@@ -148,9 +148,26 @@ public enum ChatSection: String, CaseIterable, Sendable {
     }
 }
 
+/// Whether a failed chat save keeps the words the person just typed.
+public enum ChatDiskSave {
+    public static let notice = "Couldn't save this chat. Your words are still in the box. Free some space and try again."
+
+    public struct Recovery: Equatable, Sendable {
+        public var draft: String
+        public var notice: String?
+    }
+
+    /// Red: a failed save still clears the draft.
+    public static func recover(draft: String, saved: Bool) -> Recovery {
+        Recovery(draft: "", notice: nil)
+    }
+}
+
 /// Conversations as JSON files under one folder (`chats/<id>.json`), on this Mac only.
 public struct ChatStore: Sendable {
     public let root: URL
+    /// Test fault. Red: ignored, so a full disk still looks like a successful save.
+    public var failNextSave = false
 
     public init(root: URL) { self.root = root }
 
@@ -176,6 +193,7 @@ public struct ChatStore: Sendable {
     /// Empty, unlinked conversations are never written, so opening the window
     /// doesn't litter history. Visual-only conversations retain their actual record link.
     public func save(_ conversation: ChatConversation) throws {
+        if failNextSave { failNextSave = false }
         guard !conversation.isEmpty || conversation.visualExplanationID != nil else { return }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Self.encoder().encode(conversation).write(to: url(for: conversation.id), options: .atomic)
