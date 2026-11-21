@@ -317,7 +317,7 @@ struct VoiceQualityPresetTests {
         synthesis.cancel()
         let name = await finished.value
         #expect(name == ProviderFailure.cancelled.logName)
-        #expect(HangURLStub.didStop)
+        #expect(HangURLStub.waitUntilStopped(timeout: 2))
     }
 
     @Test func http401429And5xxUseTheExistingFallbackOrder() async throws {
@@ -352,14 +352,14 @@ struct VoiceQualityPresetTests {
                 transport: URLSessionProviderTransport(timeout: 2),
                 local: ScriptedLocal(),
                 preferences: VoiceProviderPreferences(defaults: defaults),
-                adapters: [ScriptedFailureAdapter(failure)]
+                adapters: [ScriptedFailureAdapter(failure: failure)]
             )
             await session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: "test-key-12345678")
-            session.select(.provider(ElevenLabsTTSAdapter.id))
-            session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: VoiceSpeakAllowlist.syntheticID)
+            await session.select(.provider(ElevenLabsTTSAdapter.id))
+            await session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: VoiceSpeakAllowlist.syntheticID)
             let outcome = await session.speak("Hello")
             #expect(outcome.route == .local(.failed(failure)))
-            let readiness = session.readiness(for: ElevenLabsTTSAdapter.id)
+            let readiness = await session.readiness(for: ElevenLabsTTSAdapter.id)
             if staysReady {
                 #expect(readiness == .ready)
             } else {
@@ -507,8 +507,8 @@ final class QualityURLStub: URLProtocol, @unchecked Sendable {
 
 final class HangURLStub: URLProtocol, @unchecked Sendable {
     private static let started = NSCondition()
-    private static var didStartFlag = false
-    private static var didStopFlag = false
+    nonisolated(unsafe) private static var didStartFlag = false
+    nonisolated(unsafe) private static var didStopFlag = false
 
     static var didStop: Bool {
         started.lock(); defer { started.unlock() }
@@ -523,11 +523,19 @@ final class HangURLStub: URLProtocol, @unchecked Sendable {
     }
 
     static func waitUntilStarted(timeout: TimeInterval) -> Bool {
+        wait(timeout: timeout) { didStartFlag }
+    }
+
+    static func waitUntilStopped(timeout: TimeInterval) -> Bool {
+        wait(timeout: timeout) { didStopFlag }
+    }
+
+    private static func wait(timeout: TimeInterval, until flag: () -> Bool) -> Bool {
         started.lock()
         defer { started.unlock() }
         let deadline = Date().addingTimeInterval(timeout)
-        while !didStartFlag {
-            if !started.wait(until: deadline) { return didStartFlag }
+        while !flag() {
+            if !started.wait(until: deadline) { return flag() }
         }
         return true
     }
