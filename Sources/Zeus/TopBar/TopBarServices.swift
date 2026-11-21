@@ -24,6 +24,15 @@ final class TopBarServices {
     private let eventStore = EKEventStore()
     private var volumeDevice = AudioObjectID(kAudioObjectUnknown)
     private var lastVolume: Float32 = -1
+    private var volumeBook = VolumeListenerBook()
+    private var volumeHooks: [VolumeHook] = []
+    private var outputWatch: AudioObjectPropertyListenerBlock?
+
+    private struct VolumeHook {
+        var id: VolumeListenerID
+        var address: AudioObjectPropertyAddress
+        var block: AudioObjectPropertyListenerBlock
+    }
     private var lastWeatherFetch = Date.distantPast
     private var lastBatteryCue: Int?
     private var keyMonitor: Any?
@@ -85,6 +94,7 @@ final class TopBarServices {
 
     /// Removes the music observers, stops pending music reads and takes the players and tabs off the notch.
     func stop() {
+        detachVolumeListeners()
         browserFeed.stop()
         musicFeed.stop()
     }
@@ -206,11 +216,14 @@ final class TopBarServices {
     // MARK: Volume (Core Audio listener on the default output)
 
     private func observeVolume() {
+        guard outputWatch == nil else { return }
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
                                                  mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main) { [weak self] _, _ in
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated { self?.attachVolumeListener() }
         }
+        outputWatch = block
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, block)
         attachVolumeListener()
     }
 
@@ -232,12 +245,42 @@ final class TopBarServices {
             (kAudioDevicePropertyVolumeScalar, 1), (kAudioDevicePropertyVolumeScalar, 2),
             (kAudioDevicePropertyMute, kAudioObjectPropertyElementMain),
         ]
+        var next: [VolumeListenerID] = []
         for (selector, element) in listens {
             var volumeAddress = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
             guard AudioObjectHasProperty(device, &volumeAddress) else { continue }
-            AudioObjectAddPropertyListenerBlock(device, &volumeAddress, .main) { [weak self] _, _ in
+            next.append(VolumeListenerID(device: device, selector: selector, element: element))
+        }
+        let change = volumeBook.replace(with: next)
+        applyVolumeChange(change)
+    }
+
+    private func detachVolumeListeners() {
+        let change = volumeBook.replace(with: [])
+        applyVolumeChange(change)
+        volumeDevice = AudioObjectID(kAudioObjectUnknown)
+        if let outputWatch {
+            var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                     mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, .main, outputWatch)
+            self.outputWatch = nil
+        }
+    }
+
+    private func applyVolumeChange(_ change: (remove: [VolumeListenerID], add: [VolumeListenerID])) {
+        for id in change.remove {
+            guard let index = volumeHooks.firstIndex(where: { $0.id == id }) else { continue }
+            let hook = volumeHooks.remove(at: index)
+            var address = hook.address
+            AudioObjectRemovePropertyListenerBlock(AudioObjectID(id.device), &address, .main, hook.block)
+        }
+        for id in change.add {
+            var address = AudioObjectPropertyAddress(mSelector: id.selector, mScope: kAudioDevicePropertyScopeOutput, mElement: id.element)
+            let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
                 MainActor.assumeIsolated { self?.volumeChanged() }
             }
+            AudioObjectAddPropertyListenerBlock(AudioObjectID(id.device), &address, .main, block)
+            volumeHooks.append(VolumeHook(id: id, address: address, block: block))
         }
     }
 

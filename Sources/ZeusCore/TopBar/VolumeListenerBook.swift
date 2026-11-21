@@ -22,9 +22,11 @@ public struct VolumeListenerBook: Equatable, Sendable {
     public init() {}
 
     public mutating func replace(with next: [VolumeListenerID]) -> (remove: [VolumeListenerID], add: [VolumeListenerID]) {
-        // Red: every call adds another set and never removes the previous device.
-        let add = next.filter { !installed.contains($0) }
-        installed.append(contentsOf: add)
-        return ([], add)
+        var unique: [VolumeListenerID] = []
+        for id in next where !unique.contains(id) { unique.append(id) }
+        let remove = installed.filter { !unique.contains($0) }
+        let add = unique.filter { !installed.contains($0) }
+        installed = unique
+        return (remove, add)
     }
 }
