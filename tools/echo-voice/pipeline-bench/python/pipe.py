@@ -46,6 +46,7 @@ def chunk_samples(rng):  # 5..40 ms of 48 kHz audio per socket read
 class Ring:
     """Fixed-capacity float32 ring buffer (jitter buffer)."""
     def __init__(self, cap):
+        cap = max(1, int(cap))  # a zero-length buffer makes `% cap` raise
         self.buf = np.zeros(cap, dtype=np.float32); self.cap = cap; self.r = 0; self.n = 0
     def push(self, x):
         k = len(x)
@@ -67,6 +68,8 @@ def sim_model(user_frame):
 
 def stats(ns):
     a = np.asarray(ns, dtype=np.float64) / 1e6
+    if a.size == 0:
+        return {"n": 0, "p50_ms": 0.0, "p95_ms": 0.0, "p99_ms": 0.0, "max_ms": 0.0, "mean_ms": 0.0}
     return {"n": int(a.size), "p50_ms": float(np.percentile(a, 50)), "p95_ms": float(np.percentile(a, 95)),
             "p99_ms": float(np.percentile(a, 99)), "max_ms": float(a.max()), "mean_ms": float(a.mean())}
 
