@@ -8,29 +8,63 @@ enum PluginAudioPlay {
     private static let synthesizer = AVSpeechSynthesizer()
     private static let delegate = ProviderPlayerDelegate()
     private static var player: AVAudioPlayer?
+    private static var clips = PlaybackClipBook()
+    private static var sleepObservers: [NSObjectProtocol] = []
+    private static var routeObservers: [ObjectIdentifier: NSObjectProtocol] = [:]
 
     @discardableResult
     static func play(_ data: Data) -> Bool {
         guard !data.isEmpty else { return false }
+        armSleep()
+        // PlaybackClipBook.replace: the previous clip ends before this one starts.
+        retireCurrent()
         if data.starts(with: Data("RIFF".utf8)), playWithEngine(data) { return true }
         guard let next = try? AVAudioPlayer(data: data) else { return false }
         next.delegate = delegate
         player = next
+        _ = clips.begin()
         ProviderPlaybackGate.shared.begin(player: ObjectIdentifier(next))
         let started = next.play()
-        if !started { ProviderPlaybackGate.shared.endPlayer(ObjectIdentifier(next)) }
+        if !started {
+            ProviderPlaybackGate.shared.endPlayer(ObjectIdentifier(next))
+            clips.interrupt()
+            player = nil
+        }
         return started
     }
 
     static func stop() {
+        retireCurrent()
+    }
+
+    /// Sleep or a route change. The file callback may never run, so the gate is reset here.
+    static func noteInterrupted() {
+        retireCurrent()
+    }
+
+    private static func retireCurrent() {
         player?.stop()
         player = nil
         for engine in engines { engine.stop() }
+        for token in routeObservers.values { NotificationCenter.default.removeObserver(token) }
+        routeObservers.removeAll()
         engines.removeAll()
         for file in ProviderEngineTracker.shared.stopAll() {
             try? FileManager.default.removeItem(at: file)
         }
+        clips.interrupt()
         ProviderPlaybackGate.shared.reset()
+    }
+
+    private static func armSleep() {
+        guard sleepObservers.isEmpty else { return }
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { noteInterrupted() }
+            }
+            sleepObservers.append(token)
+        }
     }
 
     /// Schedules a WAV on `AVAudioEngine`. MP3 from a cloud provider uses `AVAudioPlayer`.
@@ -46,6 +80,14 @@ enum PluginAudioPlay {
             try engine.start()
             ProviderEngineTracker.shared.started(url)
             let token = ProviderPlaybackGate.shared.begin()
+            _ = clips.begin()
+            let watched = engine
+            let route = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: watched, queue: .main
+            ) { _ in
+                MainActor.assumeIsolated { noteInterrupted() }
+            }
+            routeObservers[ObjectIdentifier(watched)] = route
             let finish = WavFinish(engine: engine, url: url, token: token)
             node.scheduleFile(file, at: nil) { finish.complete() }
             node.play()
