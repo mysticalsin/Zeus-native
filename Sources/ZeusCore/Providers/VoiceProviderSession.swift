@@ -190,7 +190,7 @@ public actor VoiceProviderSession {
     private var currentCancel: (@Sendable () -> Void)?
     private var speakCancelled = false
     private var statusLine = "Speaking with the local voice."
-    private var firstAudioBudgetMs = ProviderLatencyVerdict.directStreamP95Ms
+    private var firstAudioBudgetMs = ProviderSpeakAbort.milliseconds
 
     public func setFirstAudioBudget(ms: Int) { firstAudioBudgetMs = ms }
 
@@ -289,7 +289,8 @@ public actor VoiceProviderSession {
             _ = machine.reduce(.validationSucceeded)
             readiness[providerID] = machine.state
             catalog[providerID] = voices
-            if selection.voiceID(for: providerID) == nil, let first = voices.first {
+            if selection.voiceID(for: providerID) == nil,
+               let first = voices.first(where: { VoiceSpeakAllowlist.accepts($0.id) }) {
                 selection.reduce(.chooseVoice(providerID: providerID, voiceID: first.id))
                 preferences.setVoiceID(first.id, for: providerID)
             }
@@ -326,7 +327,7 @@ public actor VoiceProviderSession {
             guard case .ready = state else {
                 return await finishLocal(.notReady, text: trimmed, providerID: id, started: started, routeName: "local-fallback")
             }
-            guard let voiceID = selection.voiceID(for: id), !voiceID.isEmpty else {
+            guard let voiceID = selection.voiceID(for: id), VoiceSpeakAllowlist.accepts(voiceID) else {
                 return await finishLocal(.missingVoice, text: trimmed, providerID: id, started: started, routeName: "local-fallback")
             }
             guard let key = store.read(service: serviceName(id), account: keyAccount(id)),
@@ -343,18 +344,35 @@ public actor VoiceProviderSession {
             do {
                 var audio = Data()
                 var first: Int?
+                var assembler = PCM24kAssembler()
                 let interval = signposter.begin()
+                let budget = firstAudioBudgetMs
+                let heard = AbortFlag()
+                let watchdog = Task {
+                    try? await Task.sleep(for: .milliseconds(budget))
+                    if !heard.value {
+                        heard.fired = true
+                        synthesis.cancel()
+                    }
+                }
+                defer { watchdog.cancel() }
                 for try await chunk in synthesis.chunks {
                     if speakCancelled { throw ProviderFailure.cancelled }
+                    if heard.fired { throw ProviderFailure.timedOut }
                     if audio.isEmpty {
+                        heard.value = true
                         first = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
-                        if let first, first > firstAudioBudgetMs {
+                        if ProviderSpeakAbort.shouldAbort(elapsedMs: first ?? 0, heardAudio: false, budgetMs: budget) {
                             synthesis.cancel()
                             throw ProviderFailure.timedOut
                         }
                     }
                     audio.append(chunk.data)
+                    if !chunk.data.starts(with: Data("RIFF".utf8)), !chunk.data.starts(with: Data("ID3".utf8)) {
+                        _ = assembler.append(chunk.data)
+                    }
                 }
+                if heard.fired { throw ProviderFailure.timedOut }
                 currentCancel = nil
                 guard !audio.isEmpty, let first else { throw ProviderFailure.invalidResponse }
                 guard VoiceAudioValidity.isPlayable(audio) else { throw ProviderFailure.invalidResponse }
@@ -403,7 +421,7 @@ public actor VoiceProviderSession {
         if failure == .timedOut || failure == .offline {
             return await finishLocal(failure == .offline ? .failed(.offline) : .timedOut, text: text, providerID: providerID, started: started, routeName: "local-fallback")
         }
-        if failure == .unauthorized || failure == .rateLimited {
+        if failure == .unauthorized || failure == .rateLimited || failure == .creditsUsedUp || failure == .badVoice {
             noteRuntime(failure, providerID: providerID)
         }
         if case .server = failure {
@@ -439,7 +457,7 @@ public actor VoiceProviderSession {
         case .notReady: line = "\(name) is not ready. Speaking with the \(voiceName)."
         case .missingVoice: line = "\(name) has no voice yet. Speaking with the \(voiceName)."
         case .timedOut: line = "\(name) timed out. Speaking with the \(voiceName)."
-        case .failed: line = "\(name) could not speak. Speaking with the \(voiceName)."
+        case .failed(let failure): line = "\(name): \(failure.pill). Speaking with the \(voiceName)."
         }
         statusLine = line
         log.record("speak route=\(routeName) provider=\(providerID) bytes=\(audio.count) first_audio_ms=\(milliseconds)")

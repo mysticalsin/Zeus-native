@@ -21,6 +21,8 @@ extension LineSpeaking {
 /// as its first audio arrives, so the next sentence is requested while the previous one plays.
 @MainActor
 final class Speaker: SentenceSpeaking, LineSpeaking {
+    /// Echo's polish replaces this. The identity default leaves samples unchanged.
+    var speechOutput: any SpeechOutputProcessing = IdentitySpeechOutput()
     nonisolated(unsafe) static var urlSession: URLSession = .shared
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
@@ -208,10 +210,10 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             logSpoken(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
             return Played(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
         case .localFallback(let reason):
-            let localReady = settings.kokoroReady || ChatterboxVoice.isReady
-            for step in OfflineVoiceChain.route(localReady: localReady) {
-                let engines: [UltronEngine] = step == .local ? [.kokoro, .chatterbox] : [.system]
-                for engine in engines {
+            let localReady = settings.kokoroReady
+            for name in SyntheticFallbackOrder.engines {
+                if name == "kokoro", !localReady { continue }
+                let engine: UltronEngine = name == "kokoro" ? .kokoro : .system
                 if Task.isCancelled { return nil }
                 audioReadyAt = nil
                 guard let voiceName = await attempt(engine, text, settings: settings, began: began) else { continue }
@@ -220,7 +222,6 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
                 if let ms { settings.recordFirstAudio(engine, ms: ms) }
                 logSpoken(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
                 return Played(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
-                }
             }
             return nil
         }
@@ -353,6 +354,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             guard let remaining = ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()),
                   ElevenLabsFailsafe.shouldTryNextRoute(remaining: remaining) else { return nil }
             let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
+            feeder.process = { [weak self] samples, rate in self?.speechOutput.process(samples, sampleRate: rate) ?? samples }
             let attempt = Task { await self.streamElevenLabs(route, text: text, began: began, model: model, feeder: feeder) }
             let timer = Task {
                 try? await Task.sleep(for: .seconds(remaining))
@@ -419,40 +421,50 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         guard let prepared = OpenAITTSVoice.streamingRequest(text) else { return nil }
         let deadline = began.addingTimeInterval(VoiceTTSChain.firstAudioTimeout)
         let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
-        do {
-            let (bytes, response) = try await Self.openAISession.bytes(for: prepared.request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-            if prepared.rawPCM {
-                var chunk = Data()
-                for try await byte in bytes {
-                    if Task.isCancelled { feeder.discard(); break }
-                    if !feeder.receivedAny, Date() > deadline { break }
-                    chunk.append(byte)
-                    if chunk.count >= Self.pcmChunkBytes {
-                        feeder.push(chunk)
-                        chunk.removeAll(keepingCapacity: true)
+        feeder.process = { [weak self] samples, rate in self?.speechOutput.process(samples, sampleRate: rate) ?? samples }
+        let attempt = Task { () -> String? in
+            do {
+                let (bytes, response) = try await Self.openAISession.bytes(for: prepared.request)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+                if prepared.rawPCM {
+                    var chunk = Data()
+                    for try await byte in bytes {
+                        if Task.isCancelled { feeder.discard(); break }
+                        if !feeder.receivedAny, Date() > deadline { break }
+                        chunk.append(byte)
+                        if chunk.count >= Self.pcmChunkBytes {
+                            feeder.push(chunk)
+                            chunk.removeAll(keepingCapacity: true)
+                        }
                     }
+                    if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
+                        feeder.push(chunk)
+                        feeder.finish()
+                    } else {
+                        feeder.discard()
+                    }
+                    return feeder.scheduledAny ? prepared.voice : nil
                 }
-                if SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) {
-                    feeder.push(chunk)
-                    feeder.finish()
-                } else {
-                    feeder.discard()
-                }
-                return feeder.scheduledAny ? prepared.voice : nil
+                var body = Data()
+                for try await byte in bytes { body.append(byte) }
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-openai-tts-\(UUID().uuidString).wav")
+                try body.write(to: url)
+                guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return nil }
+                guard chain.scheduleFile(url) else { return nil }
+                markAudioReady()
+                return prepared.voice
+            } catch {
+                feeder.discard()
+                return nil
             }
-            var body = Data()
-            for try await byte in bytes { body.append(byte) }
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-openai-tts-\(UUID().uuidString).wav")
-            try body.write(to: url)
-            guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return nil }
-            guard chain.scheduleFile(url) else { return nil }
-            markAudioReady()
-            return prepared.voice
-        } catch {
-            feeder.discard()
-            return nil
         }
+        let timer = Task {
+            try? await Task.sleep(for: .seconds(VoiceTTSChain.firstAudioTimeout))
+            if !feeder.receivedAny { attempt.cancel() }
+        }
+        let voice = await attempt.value
+        timer.cancel()
+        return voice
     }
 
     /// Gemini returns the whole sentence as base64 PCM, so it is decoded and scheduled in one piece.
@@ -460,6 +472,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         guard let config = GeminiTTSVoice.config(),
               let request = GeminiTTSRequest.makeRequest(text: text, config: config, timeout: 20) else { return nil }
         let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
+        feeder.process = { [weak self] samples, rate in self?.speechOutput.process(samples, sampleRate: rate) ?? samples }
         do {
             let (data, response) = try await Self.urlSession.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200, let pcm = GeminiTTSRequest.pcm(fromResponse: data) else { return nil }
@@ -697,6 +710,8 @@ final class PCMStreamFeeder {
     private(set) var receivedAny = false
     private(set) var scheduledAny = false
 
+    var process: ([Float], Double) -> [Float] = { samples, _ in samples }
+
     init(chain: UltronAudioChain, onFirstAudio: @escaping () -> Void) {
         self.chain = chain
         self.onFirstAudio = onFirstAudio
@@ -719,10 +734,32 @@ final class PCMStreamFeeder {
     func discard() { pending = nil }
 
     private func flush(_ data: Data, tail: Bool) {
-        if chain.scheduleInt16(data, fadeHead: first, fadeTail: tail) {
+        let shaped = Self.shaped(data, using: process)
+        if chain.scheduleInt16(shaped, fadeHead: first, fadeTail: tail) {
             if !scheduledAny { onFirstAudio() }
             scheduledAny = true
         }
         first = false
+    }
+
+    /// Runs the injected processor. The identity default round-trips 16-bit PCM unchanged.
+    private static func shaped(_ data: Data, using process: ([Float], Double) -> [Float]) -> Data {
+        let frames = data.count / 2
+        guard frames > 0 else { return data }
+        var samples = [Float]()
+        samples.reserveCapacity(frames)
+        data.withUnsafeBytes { raw in
+            for index in 0..<frames {
+                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self))
+                samples.append(Float(sample) / 32_768)
+            }
+        }
+        let processed = process(samples, 24_000)
+        var out = Data(capacity: processed.count * 2)
+        for sample in processed {
+            var unit = Int16(max(-32_768, min(32_767, Int(sample * 32_768))))
+            out.append(Data(bytes: &unit, count: 2))
+        }
+        return out
     }
 }
