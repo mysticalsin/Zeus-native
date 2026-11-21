@@ -101,6 +101,10 @@ The sine fixture is one second of a 200 Hz tone at amplitude 0.25, 48 kHz, phase
 | `scripts/07-french.txt` | French |
 | `scripts/08-barge-in.txt` | `[[BARGE-IN]]` interruption marker |
 
+## Provider ledger
+
+The character ledger in `providers/meter.py` is a local guard for renders on this machine. It is not tamper-proof. Anyone who can edit the JSON file, replace it, or point the path at another file can change the totals. The cap stops a test run from continuing. It is not a control on the provider's account.
+
 ## Render and report
 
 ```sh

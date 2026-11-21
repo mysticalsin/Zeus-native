@@ -51,6 +51,16 @@ def load(filename: str):
     return module
 
 
+def patch_transport(monkeypatch: pytest.MonkeyPatch, fake) -> None:
+    import urllib.request
+
+    def opener_open(self, fullurl, data=None, timeout=None):
+        return fake(fullurl, timeout)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", opener_open)
+
+
 def forbid_network(monkeypatch: pytest.MonkeyPatch) -> None:
     def blocked(*_args, **_kwargs):
         raise AssertionError("network is forbidden")
@@ -100,7 +110,9 @@ def test_cap_boundary_allows_49999_and_refuses_50000(tmp_path: Path) -> None:
     assert meter.MAX_CHARACTERS == 49_999
     ledger = tmp_path / "ledger.json"
     meter.initialize(ledger)
-    assert meter.reserve(ledger, "elevenlabs", 49_999) == 49_999
+    for _ in range(9):
+        meter.reserve(ledger, "elevenlabs", 5_000)
+    assert meter.reserve(ledger, "elevenlabs", 4_999) == 49_999
     with pytest.raises(meter.MeterError):
         meter.reserve(ledger, "elevenlabs", 1)
     stored = json.loads(ledger.read_text(encoding="utf-8"))
@@ -112,7 +124,9 @@ def test_cap_boundary_allows_49999_and_refuses_50000(tmp_path: Path) -> None:
     with pytest.raises(meter.MeterError):
         meter.reserve(other, "elevenlabs", 50_000)
     assert json.loads(other.read_text(encoding="utf-8"))["providers"]["elevenlabs"] == 0
-    assert meter.reserve(other, "google", 49_999) == 49_999
+    for _ in range(9):
+        meter.reserve(other, "google", 5_000)
+    assert meter.reserve(other, "google", 4_999) == 49_999
 
 
 def test_ledger_persists_across_processes(tmp_path: Path) -> None:
@@ -165,7 +179,9 @@ def test_concurrent_reserves_keep_one_ledger(tmp_path: Path) -> None:
 
     capped = tmp_path / "capped.json"
     meter.initialize(capped)
-    meter.reserve(capped, "elevenlabs", 49_000)
+    for _ in range(9):
+        meter.reserve(capped, "elevenlabs", 5_000)
+    meter.reserve(capped, "elevenlabs", 4_000)
     racers = [
         subprocess.Popen(
             [sys.executable, str(meter_py), "reserve", "--ledger", str(capped),
@@ -322,7 +338,7 @@ def test_mocked_elevenlabs_success_and_error(tmp_path: Path, monkeypatch: pytest
         assert meter.status(ledger)["elevenlabs"]["used"] == len("hello there")
         return Response(200, b"RIFFfake")
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    patch_transport(monkeypatch, fake_urlopen)
     output = tmp_path / "out" / "line.wav"
     code = eleven.main([
         "--text", "hello there",
@@ -344,7 +360,7 @@ def test_mocked_elevenlabs_success_and_error(tmp_path: Path, monkeypatch: pytest
             fp=_Body(f'{{"detail":"bad {SECRET}"}}'.encode()),
         )
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_error)
+    patch_transport(monkeypatch, fake_error)
     failed = tmp_path / "out" / "failed.wav"
     code = eleven.main([
         "--text", "nope",
@@ -388,7 +404,7 @@ def test_mocked_google_success_and_voice_refusal(tmp_path: Path, monkeypatch: py
         payload = json.dumps({"audioContent": base64.b64encode(b"GOOG").decode("ascii")}).encode()
         return Response(200, payload)
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    patch_transport(monkeypatch, fake_urlopen)
     output = tmp_path / "google.wav"
     code = google.main([
         "--text", "ready",
@@ -403,7 +419,7 @@ def test_mocked_google_success_and_voice_refusal(tmp_path: Path, monkeypatch: py
     assert_clean(captured.out + captured.err)
     assert meter.status(ledger)["google"]["used"] == 5
 
-    monkeypatch.setattr(urllib.request, "urlopen", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("network")))
+    patch_transport(monkeypatch, lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("network")))
     refused = google.main([
         "--text", "ready",
         "--voice", "en-US-Chirp3-HD-Charon-clone",
@@ -431,7 +447,7 @@ def test_corrupt_ledger_does_not_call_the_provider(tmp_path: Path, monkeypatch: 
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("provider was called")
 
-    monkeypatch.setattr(urllib.request, "urlopen", fail_if_called)
+    patch_transport(monkeypatch, fail_if_called)
     code = eleven.main([
         "--text", "hello",
         "--voice", "nPczCjzI2devNBz1zQrb",

@@ -107,37 +107,40 @@ def test_whitespace_around_a_key_is_stripped_and_not_echoed(tmp_path: Path, monk
 def test_control_characters_are_refused_before_the_ledger_is_charged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     meter = load("meter.py")
     eleven = load("render_elevenlabs.py")
-    samples = {
-        "tab": f"{KEY[:4]}\t{KEY[4:]}",
-        "null": f"{KEY[:6]}\x00{KEY[6:]}",
-    }
-    for name, dirty in samples.items():
-        monkeypatch.setenv("VOICE_QA_TEST_KEY", dirty)
+    tabbed = f"{KEY[:4]}\t{KEY[4:]}"
+    nulled = f"{KEY[:6]}\x00{KEY[6:]}"
+    for dirty in (tabbed, nulled):
         with pytest.raises(meter.MeterError) as caught:
-            meter.read_key("VOICE_QA_TEST_KEY")
+            meter.read_key("VOICE_QA_TEST_KEY", {"VOICE_QA_TEST_KEY": dirty})
         assert str(caught.value) == "API key refused"
         assert caught.value.__cause__ is None
         assert_no_key(str(caught.value), KEY)
-        ledger = tmp_path / f"{name}.json"
-        meter.initialize(ledger)
+        with pytest.raises(meter.MeterError) as posted:
+            meter.http_post("https://example.invalid/tts", b"{}", {"xi-api-key": dirty}, [dirty], timeout=1)
+        assert str(posted.value) in {"API key refused", "request refused"}
+        assert_no_key(str(posted.value), KEY)
 
-        def fail_if_called(*_args, **_kwargs):
-            raise AssertionError("provider was called")
+    monkeypatch.setenv("VOICE_QA_TEST_KEY", tabbed)
+    ledger = tmp_path / "tab.json"
+    meter.initialize(ledger)
 
-        patch_transport(monkeypatch, fail_if_called)
-        code = eleven.main([
-            "--text", "hello",
-            "--voice", "EXAVITQu4vr4xnSDxMaL",
-            "--key-env", "VOICE_QA_TEST_KEY",
-            "--ledger", str(ledger),
-            "--output", str(tmp_path / f"{name}.wav"),
-        ])
-        captured = capsys.readouterr()
-        assert code == 1
-        assert "API key refused" in captured.err
-        assert_no_key(captured.out + captured.err, KEY)
-        assert meter.status(ledger)["elevenlabs"]["used"] == 0
-        assert not (tmp_path / f"{name}.wav").exists()
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("provider was called")
+
+    patch_transport(monkeypatch, fail_if_called)
+    code = eleven.main([
+        "--text", "hello",
+        "--voice", "EXAVITQu4vr4xnSDxMaL",
+        "--key-env", "VOICE_QA_TEST_KEY",
+        "--ledger", str(ledger),
+        "--output", str(tmp_path / "tab.wav"),
+    ])
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "API key refused" in captured.err
+    assert_no_key(captured.out + captured.err, KEY)
+    assert meter.status(ledger)["elevenlabs"]["used"] == 0
+    assert not (tmp_path / "tab.wav").exists()
 
 
 def test_header_errors_do_not_echo_the_exception_text() -> None:

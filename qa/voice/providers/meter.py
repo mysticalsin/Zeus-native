@@ -1,8 +1,11 @@
 """Character ledger for provider renders.
 
 The cap is 49,999 characters per provider. A call that would make the total
-50,000 or more is refused. The count is recorded before the call. A missing,
-corrupt, or unreadable ledger refuses the call.
+50,000 or more is refused, and one request may not exceed 5,000 characters.
+The count is recorded before the call. A missing, corrupt, unreadable, or
+symlinked ledger refuses the call.
+
+This file is a local guard for a test run. It is not tamper-proof.
 
 The ledger path comes from a flag, otherwise ZEUS_VOICE_QA_LEDGER, otherwise
 ~/.cache/zeus-voice-qa/provider-ledger.json. That default is outside the repo.
@@ -11,16 +14,21 @@ The ledger path comes from a flag, otherwise ZEUS_VOICE_QA_LEDGER, otherwise
 from __future__ import annotations
 
 import argparse
+import errno
 import fcntl
 import json
 import os
+import stat
 import sys
 import tempfile
+import unicodedata
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 MAX_CHARACTERS = 49_999
+MAX_REQUEST_CHARACTERS = 5_000
+MAX_ERROR_BODY = 200
 LEDGER_ENV = "ZEUS_VOICE_QA_LEDGER"
 PROVIDERS = ("elevenlabs", "google")
 BANNED_LABELS = ("clone", "cloned", "celebrity", "character")
@@ -43,16 +51,20 @@ def resolve_ledger_path(flag: str | None, environ: dict | None = None, home: Pat
 
 def initialize(path: Path) -> None:
     path = Path(path)
+    if path.is_symlink():
+        raise MeterError("ledger refused")
     if path.exists():
         raise MeterError("ledger already exists")
     payload = {"providers": {name: 0 for name in PROVIDERS}, "version": 1}
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
     except FileExistsError:
         raise MeterError("ledger already exists") from None
-    except OSError:
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            raise MeterError("ledger refused") from None
         raise MeterError("ledger failed") from None
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -70,6 +82,8 @@ def initialize(path: Path) -> None:
 def reserve(path: Path, provider: str, characters: int) -> int:
     if type(characters) is not int or characters < 1:
         raise MeterError("character count refused")
+    if characters > MAX_REQUEST_CHARACTERS:
+        raise MeterError("request too large")
     if provider not in PROVIDERS:
         raise MeterError("provider refused")
     path = Path(path)
@@ -107,21 +121,40 @@ def read_key(env_name: str, environ: dict | None = None) -> str:
     if not isinstance(env_name, str) or not env_name:
         raise MeterError("API key is missing")
     value = source.get(env_name)
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
         raise MeterError("API key is missing")
-    return value
+    cleaned = value.strip()
+    if not cleaned:
+        raise MeterError("API key is missing")
+    if _has_control(cleaned):
+        raise MeterError("API key refused")
+    return cleaned
 
 
 def redact(text: str, secrets) -> str:
-    cleaned = text
+    needles = []
     for secret in secrets:
         if not isinstance(secret, str) or not secret:
             continue
-        pieces = [secret]
-        if len(secret) >= 8:
-            pieces.extend((secret[:8], secret[-8:]))
-        for piece in sorted(set(pieces), key=len, reverse=True):
-            cleaned = cleaned.replace(piece, "[REDACTED]")
+        variants = {secret, secret.strip()}
+        escaped = set()
+        for item in variants:
+            if not item:
+                continue
+            escaped.add(item)
+            escaped.add(item.encode("unicode_escape").decode("ascii"))
+            escaped.add(repr(item)[1:-1])
+        for item in escaped:
+            needles.append(item)
+            if len(item) < 4:
+                continue
+            for size in range(4, len(item) + 1):
+                for start in range(0, len(item) - size + 1):
+                    needles.append(item[start:start + size])
+    cleaned = text
+    for needle in sorted(set(needles), key=len, reverse=True):
+        if needle:
+            cleaned = cleaned.replace(needle, "[REDACTED]")
     return cleaned
 
 
@@ -173,33 +206,90 @@ def require_voice(provider: str, voice_id: str, voices: dict) -> dict:
     return entry
 
 
+class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    def http_error_302(self, req, fp, code, msg, headers):
+        raise MeterError("redirect refused") from None
+
+    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
+
+
 def http_post(url: str, payload: bytes, headers: dict, secrets, timeout: int = 30) -> bytes:
-    request = urllib.request.Request(url, data=payload, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        safe = _safe_headers(headers)
+        request = urllib.request.Request(url, data=payload, headers=safe, method="POST")
+    except MeterError:
+        raise
+    except Exception:
+        raise MeterError("request refused") from None
+    opener = urllib.request.build_opener(_RefuseRedirect())
+    try:
+        with opener.open(request, timeout=timeout) as response:
             body = response.read()
+    except MeterError:
+        raise
     except urllib.error.HTTPError as error:
         try:
             detail = error.read().decode("utf-8", "replace")
         except Exception:
             detail = ""
-        raise MeterError(redact(f"HTTP {error.code}: {detail}", secrets)) from None
-    except MeterError:
-        raise
-    except Exception as error:
-        raise MeterError(redact(str(error), secrets)) from None
+        cleaned = redact(detail, secrets)[:MAX_ERROR_BODY]
+        raise MeterError(f"HTTP {error.code}: {cleaned}") from None
+    except Exception:
+        raise MeterError("request refused") from None
     if not body:
         raise MeterError("provider response refused")
     return body
 
 
-def _read(path: Path) -> dict:
-    if not path.is_file():
-        raise MeterError("ledger missing")
+def _has_control(value: str) -> bool:
+    return any(unicodedata.category(char) == "Cc" or ord(char) < 32 or ord(char) == 127 for char in value)
+
+
+def _safe_headers(headers: dict) -> dict:
+    safe = {}
+    for name, value in headers.items():
+        if not isinstance(name, str) or not isinstance(value, str) or _has_control(name) or _has_control(value):
+            raise MeterError("request refused")
+        safe[name] = value
+    return safe
+
+
+def _open_nofollow(path: Path, flags: int) -> int:
+    if path.is_symlink():
+        raise MeterError("ledger refused")
     try:
-        raw = path.read_text(encoding="utf-8")
+        fd = os.open(path, flags | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as error:
+        if error.errno == errno.ENOENT:
+            raise MeterError("ledger missing") from None
+        if error.errno == errno.ELOOP:
+            raise MeterError("ledger refused") from None
+        raise MeterError("ledger unreadable") from None
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise MeterError("ledger refused")
+    except MeterError:
+        os.close(fd)
+        raise
+    return fd
+
+
+def _read(path: Path) -> dict:
+    fd = _open_nofollow(path, os.O_RDONLY)
+    try:
+        chunks = []
+        while True:
+            block = os.read(fd, 65536)
+            if not block:
+                break
+            chunks.append(block)
+        raw = b"".join(chunks).decode("utf-8")
     except OSError:
         raise MeterError("ledger unreadable") from None
+    except UnicodeError:
+        raise MeterError("ledger corrupt") from None
+    finally:
+        os.close(fd)
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
@@ -216,6 +306,8 @@ def _read(path: Path) -> dict:
 
 
 def _atomic_write(path: Path, text: str) -> None:
+    if path.is_symlink():
+        raise MeterError("ledger refused")
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -238,13 +330,17 @@ class _lock:
 
     def __enter__(self):
         lock_path = self.path.with_name(self.path.name + ".lock")
+        if lock_path.is_symlink():
+            raise MeterError("ledger refused")
         try:
-            self.fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC, 0o600)
+            self.fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600)
             fcntl.flock(self.fd, fcntl.LOCK_EX)
-        except OSError:
+        except OSError as error:
             if self.fd is not None:
                 os.close(self.fd)
                 self.fd = None
+            if error.errno == errno.ELOOP:
+                raise MeterError("ledger refused") from None
             raise MeterError("ledger failed") from None
         return self
 

@@ -46,8 +46,8 @@ def _render(text: str, voice: str, key_env: str, ledger: Path, output: Path) -> 
     except meter.MeterError as error:
         print(meter.redact(str(error), secrets), file=sys.stderr)
         return 1
-    except Exception as error:
-        print(meter.redact(str(error), secrets), file=sys.stderr)
+    except Exception:
+        print("request refused", file=sys.stderr)
         return 1
     finally:
         _report(ledger)
