@@ -464,8 +464,79 @@ public enum GlassSettingsVerification {
 
 public enum GlassSettingsSourceRules {
     public static func forbiddenMarkers(in source: String) -> [String] {
-        let markers = ["XCT" + "Skip", "XCTExpect" + "Failure", "withKnown" + "Issue", ".disabled" + "(", "x" + "fail"]
-        return markers.filter { source.contains($0) }
+        var found: [String] = []
+        let always = ["XCT" + "Skip", "XCTExpect" + "Failure", "withKnown" + "Issue", "x" + "fail"]
+        for marker in always where source.contains(marker) {
+            found.append(marker)
+        }
+        let traits = testingTraitArguments(in: source)
+        let disabled = ".disabled" + "("
+        let enabled = ".enabled" + "(if:"
+        if traits.contains(disabled) { found.append(disabled) }
+        if traits.contains(enabled) { found.append(enabled) }
+        return found
+    }
+
+    /// Text inside `@Test(...)` and `@Suite(...)` only. A view modifier is not one of those arguments.
+    private static func testingTraitArguments(in source: String) -> String {
+        let names = ["@" + "Test", "@" + "Suite"]
+        var pieces: [String] = []
+        var index = source.startIndex
+        while index < source.endIndex {
+            guard let name = names.first(where: { source[index...].hasPrefix($0) }) else {
+                index = source.index(after: index)
+                continue
+            }
+            let afterName = source.index(index, offsetBy: name.count)
+            if afterName < source.endIndex, isIdentifier(source[afterName]) {
+                index = source.index(after: index)
+                continue
+            }
+            var cursor = afterName
+            while cursor < source.endIndex, source[cursor].isWhitespace {
+                cursor = source.index(after: cursor)
+            }
+            guard cursor < source.endIndex, source[cursor] == "(" else {
+                index = afterName < source.endIndex ? afterName : source.endIndex
+                continue
+            }
+            guard let end = closingParenthesis(in: source, open: cursor) else { break }
+            pieces.append(String(source[source.index(after: cursor)..<end]))
+            index = source.index(after: end)
+        }
+        return pieces.joined(separator: "\n")
+    }
+
+    private static func isIdentifier(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber || character == "_"
+    }
+
+    private static func closingParenthesis(in source: String, open: String.Index) -> String.Index? {
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var index = open
+        while index < source.endIndex {
+            let character = source[index]
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    inString = false
+                }
+            } else if character == "\"" {
+                inString = true
+            } else if character == "(" {
+                depth += 1
+            } else if character == ")" {
+                depth -= 1
+                if depth == 0 { return index }
+            }
+            index = source.index(after: index)
+        }
+        return nil
     }
 
     public static func writesUniversalAccess(_ source: String) -> Bool {

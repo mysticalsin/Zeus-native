@@ -93,6 +93,21 @@ import ZeusCore
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
     }
 
+    @Test func aViewDisabledModifierIsNotASkippedTest() {
+        let view = "Button(\"Save\")" + ".disabled" + "(!enabled)\n"
+        let skipped = "@" + "Test(" + ".disabled" + "(\"x\")) func hidden() {}\n"
+        let conditional = "@" + "Suite(" + ".enabled" + "(if: false)) struct Hidden {}\n"
+        let xct = "throw " + "XCT" + "Skip" + "(\"later\")\n"
+        let viewMarkers = GlassSettingsSourceRules.forbiddenMarkers(in: view)
+        #expect(viewMarkers.isEmpty)
+        let traitMarkers = GlassSettingsSourceRules.forbiddenMarkers(in: skipped)
+        #expect(traitMarkers.contains(".disabled" + "("))
+        let suiteMarkers = GlassSettingsSourceRules.forbiddenMarkers(in: conditional)
+        #expect(suiteMarkers.contains(".enabled" + "(if:"))
+        let skipMarkers = GlassSettingsSourceRules.forbiddenMarkers(in: xct)
+        #expect(skipMarkers.contains("XCT" + "Skip"))
+    }
+
     private func text(_ relative: String) throws -> String {
         try String(contentsOf: Self.root.appendingPathComponent(relative), encoding: .utf8)
     }
