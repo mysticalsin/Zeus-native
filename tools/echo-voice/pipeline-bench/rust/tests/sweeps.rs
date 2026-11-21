@@ -1,5 +1,7 @@
 //! Sweep regressions. These are not the original red-first invariants.
+use haru_pipe::bench::stream_run;
 use haru_pipe::native::Ingest;
+use std::time::Duration;
 use haru_pipe::resample::{resample_poly, BadRatio};
 use haru_pipe::stats::summary_json;
 
@@ -44,4 +46,14 @@ fn bad_resample_ratio_is_an_error() {
             Ok(y) => panic!("up={up} down={down} returned {} samples", y.len()),
         }
     }
+}
+
+/// EV-MEM-1: a multi-minute stream must not retain every FRAME payload.
+#[test]
+fn stream_messages_stay_bounded() {
+    // 16 frames at 48 kHz: 16 * 6400 samples. Unbounded storage is ~400 KB.
+    let raw = vec![0u8; 16 * 6_400 * 4];
+    let (st, _) = stream_run(&raw, 0, Duration::ZERO, || {});
+    assert!(st.index > 10, "produced only {} frames", st.index);
+    assert!(st.msgs.len() <= 32 * 1024, "msgs grew to {} bytes", st.msgs.len());
 }

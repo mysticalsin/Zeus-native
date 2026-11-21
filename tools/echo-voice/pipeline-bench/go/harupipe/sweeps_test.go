@@ -40,6 +40,17 @@ func heldSamples(s *Stream) []float32 {
 	return out
 }
 
+func TestStreamMsgsStayBounded(t *testing.T) {
+	raw := make([]byte, 16*6400*4)
+	st, _ := StreamRun(raw, 0, 0, nil)
+	if st.Index <= 10 {
+		t.Fatalf("produced only %d frames", st.Index)
+	}
+	if len(st.Msgs) > 32*1024 {
+		t.Fatalf("msgs grew to %d bytes", len(st.Msgs))
+	}
+}
+
 func TestBadRatioIsAnError(t *testing.T) {
 	for _, c := range [][2]int{{0, 2}, {2, 0}, {0, 0}} {
 		if _, err := NewPolyphase(c[0], c[1]); err == nil {
