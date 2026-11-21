@@ -29,9 +29,14 @@ public enum WeatherTemperatureUnit: String, Equatable, Sendable, CaseIterable {
         return whole(value)
     }
 
-    /// `Int(_:)` traps when a finite reading is outside `Int`. A forecast that large is not a number we can show.
+    /// Refuse a non-finite reading, and any reading outside `Int`, before converting. `Int(_:)` traps there.
     private static func whole(_ value: Double) -> Int? {
         guard value.isFinite else { return nil }
-        return Int(exactly: value.rounded())
+        let rounded = value.rounded()
+        guard rounded.isFinite else { return nil }
+        guard rounded >= Double(Int.min) else { return nil }
+        // `Double(Int.max)` is 2^63, which is not an `Int`. The last Double that fits is the one before it.
+        guard rounded <= Double(Int.max).nextDown else { return nil }
+        return Int(exactly: rounded)
     }
 }
