@@ -238,7 +238,8 @@ def case_no_skip_markers():
 
 def case_idle():
     def run():
-        percent, memory, subject = reportlib.sample_idle(10)
+        percent, memory, subject = reportlib.sample_idle(2)
+        require(subject in {"zeus", "orb-bench"}, f"subject {subject}")
         require(percent < 1.0, f"cpu {percent:.3f}%")
         require(memory < 150.0, f"memory {memory:.1f} MB")
         return {"percent": percent, "memory_mb": memory, "subject": subject}
@@ -309,6 +310,7 @@ def main():
     except AssertionError as error:
         add("swift.bench", "fail", str(error), time.perf_counter() - t0, 1)
     else:
+        os.environ["ZEUS_ORB_BENCH"] = str(binary)
         status, detail, attempts = reportlib.execute(lambda: run_bench(binary, bench_path), 120)
         if status == "pass":
             bench = json.loads(bench_path.read_text(encoding="utf-8"))
