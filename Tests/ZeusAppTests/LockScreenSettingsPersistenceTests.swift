@@ -22,7 +22,10 @@ struct LockScreenSettingsPersistenceTests {
         let (defaults, cleanup) = try isolated()
         defer { cleanup() }
         let fresh = SettingsStore(defaults: defaults)
-        for item in LockScreenSectionSlot.keyContributions {
+        let contributions = LockScreenSectionSlot.keyContributions
+        #expect(!contributions.isEmpty)
+        #expect(contributions.count == LockScreenSettingKey.all.count)
+        for item in contributions {
             #expect(item.policy == .importCannotEnable)
             #expect(item.defaultValue == "false" || item.defaultValue == "Off")
             #expect(fresh.string(item.id) == item.defaultValue)
