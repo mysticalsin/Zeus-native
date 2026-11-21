@@ -259,15 +259,18 @@ public struct HandsCommandLog: Equatable, Sendable {
     public var text: String { lines.joined(separator: "\n") }
 
     public func write(to url: URL) throws {
+        let fm = FileManager.default
         let directory = url.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let data = (text + (lines.isEmpty ? "" : "\n")).data(using: .utf8) ?? Data()
-        if FileManager.default.fileExists(atPath: url.path), let handle = FileHandle(forWritingAtPath: url.path) {
-            defer { try? handle.close() }
-            try handle.seekToEnd()
-            try handle.write(contentsOf: data)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        let piece = text + (lines.isEmpty ? "" : "\n")
+        let existing = fm.fileExists(atPath: url.path) ? (try String(contentsOf: url, encoding: .utf8)) : ""
+        let data = Data((existing + piece).utf8)
+        let temporary = directory.appendingPathComponent(".hands-\(UUID().uuidString).tmp")
+        try data.write(to: temporary, options: .atomic)
+        if fm.fileExists(atPath: url.path) {
+            _ = try fm.replaceItemAt(url, withItemAt: temporary)
         } else {
-            try data.write(to: url)
+            try fm.moveItem(at: temporary, to: url)
         }
     }
 }
@@ -278,25 +281,38 @@ public enum HandsCommandLogger {
 
     @discardableResult
     public static func append(command: String, verdict: String, outcome: String, url: URL = ZeusPaths.handsLog) -> String? {
+        if let writeFault {
+            do { try writeFault() } catch { return "Couldn't write the hands log." }
+        }
         var log = HandsCommandLog()
         log.record(command: command, verdict: verdict, outcome: outcome)
-        try? writeFault?()
-        try? log.write(to: url)
-        return nil
+        do {
+            try log.write(to: url)
+            return nil
+        } catch {
+            return "Couldn't write the hands log."
+        }
     }
 
-    public static func append(raw: String, url: URL = ZeusPaths.handsLog) {
-        guard !raw.isEmpty else { return }
+    @discardableResult
+    public static func append(raw: String, url: URL = ZeusPaths.handsLog) -> String? {
+        guard !raw.isEmpty else { return nil }
+        if let writeFault {
+            do { try writeFault() } catch { return "Couldn't write the hands log." }
+        }
         let body = raw.hasSuffix("\n") ? raw : raw + "\n"
-        guard let data = body.data(using: .utf8) else { return }
-        let directory = url.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: url.path), let handle = FileHandle(forWritingAtPath: url.path) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
-            try? handle.write(contentsOf: data)
-        } else {
-            try? data.write(to: url)
+        do {
+            let fm = FileManager.default
+            let directory = url.deletingLastPathComponent()
+            try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+            let existing = fm.fileExists(atPath: url.path) ? (try String(contentsOf: url, encoding: .utf8)) : ""
+            let temporary = directory.appendingPathComponent(".hands-\(UUID().uuidString).tmp")
+            try Data((existing + body).utf8).write(to: temporary, options: .atomic)
+            if fm.fileExists(atPath: url.path) { _ = try fm.replaceItemAt(url, withItemAt: temporary) }
+            else { try fm.moveItem(at: temporary, to: url) }
+            return nil
+        } catch {
+            return "Couldn't write the hands log."
         }
     }
 }
