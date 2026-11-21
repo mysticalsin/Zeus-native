@@ -51,12 +51,11 @@ public enum ClauseSpeechScheduler {
             // The clause that was cancelled while it rendered is not scheduled, and nothing is appended after it.
             if token?.isCancelled == true { break }
             var shaped = output.process(raw, sampleRate: sampleRate)
-            if chunks.count > 1 {
-                if index + 1 < chunks.count {
-                    shaped = fadeOutAndPause(shaped, sampleRate: sampleRate)
-                } else {
-                    shaped = fadeIn(shaped, sampleRate: sampleRate)
-                }
+            if index > 0 {
+                shaped = fadeIn(shaped, sampleRate: sampleRate)
+            }
+            if index + 1 < chunks.count {
+                shaped = fadeOutAndPause(shaped, sampleRate: sampleRate)
             }
             let at = clock.seconds
             schedule(shaped, at)

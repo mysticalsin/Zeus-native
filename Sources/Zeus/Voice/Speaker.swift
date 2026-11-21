@@ -447,40 +447,57 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     }
 
     /// `voice` is the persona voice id. Only `zeus.synthetic` is played. The Kokoro pack voice
-    /// stays the engine voice. Clauses render one at a time and the first is scheduled before the rest.
+    /// stays the engine voice. Clauses go through `ClauseSpeechScheduler`: the first is scheduled
+    /// before the rest render, with a 90 ms gap and a fade-in on every later clause.
     private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> Bool {
         guard OriginalSyntheticVoice.accepts(voice) else { return false }
-        let chunks = SpeechClauseChunker.chunks(of: text)
-        guard !chunks.isEmpty else { return false }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let engineVoice = VoiceSettings.shared.kokoroVoice
-        var played = false
-        for chunk in chunks {
-            if Task.isCancelled { return played }
-            guard let url = await KokoroVoice.render(chunk, voice: engineVoice, speed: speed) else { return played }
-            guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else {
-                try? FileManager.default.removeItem(at: url)
-                return false
-            }
-            if !played, Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
-                try? FileManager.default.removeItem(at: url)
-                return false
-            }
-            let shapedURL = Self.shapedClauseWAV(from: url, output: speechOutput) ?? url
-            guard chain.scheduleFile(shapedURL) else { return played }
-            if !played {
-                markAudioReady()
-                played = true
-            }
-        }
-        return played
+        let output = speechOutput
+        let token = SpeechCancelToken()
+        var clock = SpeechManualClock()
+        let result = KokoroClausePlayback.play(
+            text: text,
+            personaVoiceID: voice,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: output,
+            token: token,
+            directory: directory,
+            deadline: VoiceTTSChain.firstAudioTimeout + 30,
+            render: { chunk, _ in
+                if Task.isCancelled {
+                    token.cancel()
+                    return nil
+                }
+                return Self.waitForKokoro(chunk, voice: engineVoice, speed: speed, began: began, token: token)
+            },
+            play: { url in
+                let ok = self.chain.scheduleFile(url)
+                if ok { self.markAudioReady() }
+                return ok
+            })
+        return KokoroClausePlayback.holdsTheUtterance(result)
     }
 
-    private static func shapedClauseWAV(from url: URL, output: any SpeechOutputProcessing) -> URL? {
-        guard let decoded = PCMWav.readFloats(from: url) else { return nil }
-        let shaped = KokoroClausePlayback.shape(decoded.samples, sampleRate: decoded.sampleRate, output: output)
-        let destination = url.deletingLastPathComponent().appendingPathComponent("zeus-kokoro-clause.wav")
-        guard PCMWav.write(shaped, sampleRate: decoded.sampleRate, to: destination) else { return nil }
-        return destination
+    /// Renders one clause off the caller's wait. `scheduleFile` reads the shaped file and deletes it;
+    /// originals are removed when `KokoroClausePlayback.play` returns.
+    private static func waitForKokoro(_ text: String, voice: String, speed: Double, began: Date, token: SpeechCancelToken) -> URL? {
+        let box = KokoroRenderBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            if Task.isCancelled { token.cancel() }
+            box.url = await KokoroVoice.render(text, voice: voice, speed: speed)
+            if box.url != nil, Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
+                if let url = box.url { try? FileManager.default.removeItem(at: url) }
+                box.url = nil
+                token.cancel()
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return box.url
     }
 
     private func speakChatterbox(_ text: String, began: Date) async -> Bool {

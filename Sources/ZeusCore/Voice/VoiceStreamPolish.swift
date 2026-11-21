@@ -261,6 +261,16 @@ public enum SpeechClauseChunker {
             if index + 1 < chars.count, isDigit(chars[index + 1]), index > 0, chars[index - 1] == "." { return false }
             let word = wordBefore(chars, index)
             if isAbbreviation(word) || isInitial(word) || isListMarker(word) { return false }
+            if isInitialism(word), nextContinuesLowercase(chars, index) { return false }
+            if isDecimal(chars, index) || isEmail(word) { return false }
+            if word.count == 1, word.first?.isLetter == true, index + 1 < chars.count, chars[index + 1].isLetter {
+                return false
+            }
+            if index + 1 < chars.count, chars[index + 1].isLetter || chars[index + 1].isNumber {
+                return true
+            }
+        } else if character == "。" {
+            return true
         } else if character == "…" {
             if index > 0, index + 1 < chars.count, isDigit(chars[index - 1]), isDigit(chars[index + 1]) { return false }
         } else if character != "!" && character != "?" {
@@ -310,6 +320,24 @@ public enum SpeechClauseChunker {
     /// "1." and "12." are list markers. A period after a bare number does not end the sentence.
     private static func isListMarker(_ word: String) -> Bool {
         !word.isEmpty && word.allSatisfy(isDigit)
+    }
+
+    /// "U.S.A" and "U.S" are initialisms. A following lowercase word continues the sentence.
+    private static func isInitialism(_ word: String) -> Bool {
+        let parts = word.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count >= 2, parts.allSatisfy({ $0.count == 1 }) else { return false }
+        return parts.allSatisfy { part in
+            guard let character = part.first else { return false }
+            return character.isLetter
+        }
+    }
+
+    private static func nextContinuesLowercase(_ chars: [Character], _ index: Int) -> Bool {
+        var cursor = index + 1
+        while cursor < chars.count && quotes.contains(chars[cursor]) { cursor += 1 }
+        while cursor < chars.count && chars[cursor].isWhitespace { cursor += 1 }
+        guard cursor < chars.count else { return false }
+        return chars[cursor].isLowercase
     }
 
     private static func clauseBreak(in sentence: String) -> Int? {
@@ -395,6 +423,14 @@ public enum SpeechClauseChunker {
             index += 1
         }
         return nil
+    }
+
+    private static func isDecimal(_ chars: [Character], _ index: Int) -> Bool {
+        index > 0 && index + 1 < chars.count && isDigit(chars[index - 1]) && isDigit(chars[index + 1])
+    }
+
+    private static func isEmail(_ word: String) -> Bool {
+        word.contains("@")
     }
 
     private static func isDigit(_ character: Character) -> Bool {

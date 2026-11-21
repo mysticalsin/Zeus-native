@@ -19,6 +19,14 @@ public struct KokoroClauseReceipt: Equatable, Sendable {
     public var joined: [Float]
 }
 
+/// Result of the file path `Speaker.speakKokoro` calls.
+public struct KokoroPlayReceipt: Equatable, Sendable {
+    public var succeeded: Bool
+    public var scheduledCount: Int
+    /// True only when nothing was scheduled, so the speak chain may try the next engine.
+    public var fallThrough: Bool
+}
+
 /// Per-clause Kokoro playback. The first clause is scheduled when its render finishes.
 /// Later clauses render after that. Each clause, and the join, is held to -1 dBTP.
 public enum KokoroClausePlayback {
@@ -43,28 +51,107 @@ public enum KokoroClausePlayback {
                 scheduled: [],
                 joined: [])
         }
-        let chunks = SpeechClauseChunker.chunks(of: text)
-        var scheduled: [[Float]] = []
-        var firstAudioAt: Double?
-        for (index, chunk) in chunks.enumerated() {
-            let raw = synthesize(chunk, &clock)
-            var shaped = shape(raw, sampleRate: sampleRate, output: output)
-            if index + 1 < chunks.count {
-                shaped = fadeOutAndPause(shaped, sampleRate: sampleRate)
-            }
-            let at = clock.seconds
-            schedule(shaped, at)
-            if firstAudioAt == nil { firstAudioAt = at }
-            scheduled.append(shaped)
-        }
-        let joined = hardCeiling(scheduled.flatMap { $0 }, sampleRate: sampleRate)
+        var scheduledBuffers: [[Float]] = []
+        let scheduled = ClauseSpeechScheduler.speak(
+            text: text,
+            sampleRate: sampleRate,
+            clock: &clock,
+            output: output,
+            synthesize: synthesize,
+            schedule: { samples, at in
+                scheduledBuffers.append(samples)
+                schedule(samples, at)
+            })
+        let joined = hardCeiling(scheduledBuffers.flatMap { $0 }, sampleRate: sampleRate)
         return KokoroClauseReceipt(
             accepted: true,
-            chunks: chunks,
-            firstAudioAt: firstAudioAt,
-            fullRenderCompletedAt: clock.seconds,
-            scheduled: scheduled,
+            chunks: scheduled.chunks,
+            firstAudioAt: scheduled.scheduled > 0 ? scheduled.firstScheduledAt : nil,
+            fullRenderCompletedAt: scheduled.fullRenderCompletedAt,
+            scheduled: scheduledBuffers,
             joined: joined)
+    }
+
+    /// File path used by `Speaker.speakKokoro`. Rendering and playback are injected so tests drive this
+    /// function directly. Shaping, the 90 ms gap, and the fade-in go through `ClauseSpeechScheduler`.
+    public static func play(
+        text: String,
+        personaVoiceID: String,
+        sampleRate: Double,
+        clock: inout SpeechManualClock,
+        output: any SpeechOutputProcessing,
+        token: SpeechCancelToken,
+        directory: URL,
+        deadline: Double? = nil,
+        render: (String, inout SpeechManualClock) -> URL?,
+        play: (URL) -> Bool
+    ) -> KokoroPlayReceipt {
+        defer { removeFiles(in: directory) }
+        guard OriginalSyntheticVoice.accepts(personaVoiceID) else {
+            return KokoroPlayReceipt(succeeded: false, scheduledCount: 0, fallThrough: true)
+        }
+        var failed = false
+        var scheduledCount = 0
+        _ = ClauseSpeechScheduler.speak(
+            text: text,
+            sampleRate: sampleRate,
+            clock: &clock,
+            output: output,
+            token: token,
+            synthesize: { chunk, clock in
+                if token.isCancelled {
+                    failed = true
+                    return []
+                }
+                guard let url = render(chunk, &clock) else {
+                    failed = true
+                    token.cancel()
+                    return []
+                }
+                if let deadline, clock.seconds > deadline {
+                    failed = true
+                    token.cancel()
+                    return []
+                }
+                guard let decoded = PCMWav.readFloats(from: url) else {
+                    failed = true
+                    token.cancel()
+                    return []
+                }
+                return decoded.samples
+            },
+            schedule: { samples, _ in
+                if failed || token.isCancelled { return }
+                let file = directory.appendingPathComponent("shaped-\(UUID().uuidString).wav")
+                guard PCMWav.write(samples, sampleRate: sampleRate, to: file) else {
+                    failed = true
+                    token.cancel()
+                    return
+                }
+                if !play(file) {
+                    failed = true
+                    token.cancel()
+                } else {
+                    scheduledCount += 1
+                }
+            })
+        let succeeded = !failed && !token.isCancelled && scheduledCount > 0
+        return KokoroPlayReceipt(
+            succeeded: succeeded,
+            scheduledCount: scheduledCount,
+            fallThrough: scheduledCount == 0)
+    }
+
+    /// Once any clause audio is scheduled, the speak chain must not start another engine.
+    public static func holdsTheUtterance(_ receipt: KokoroPlayReceipt) -> Bool {
+        receipt.scheduledCount > 0 || receipt.succeeded
+    }
+
+    public static func removeFiles(in directory: URL) {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        for file in files {
+            try? FileManager.default.removeItem(at: file)
+        }
     }
 
     /// Gain toward -16 LUFS, then the -1 dBTP ceiling. No onset primer: this is the full-reply loudness figure.
@@ -82,42 +169,45 @@ public enum KokoroClausePlayback {
     public static func hardCeiling(_ samples: [Float], sampleRate: Double) -> [Float] {
         TruePeakLimiter.limit(samples, sampleRate: sampleRate)
     }
-
-    private static func fadeOutAndPause(_ samples: [Float], sampleRate: Double) -> [Float] {
-        var output = samples
-        let fade = min(output.count, max(1, Int((sampleRate * ClauseSpeechScheduler.edgeFadeSeconds).rounded())))
-        if fade > 1 {
-            let start = output.count - fade
-            for index in 0..<fade {
-                let theta = Double(index) / Double(fade - 1) * Double.pi / 2
-                output[start + index] *= Float(cos(theta))
-            }
-        }
-        let pause = max(0, Int((sampleRate * ClauseSpeechScheduler.clausePauseSeconds).rounded()))
-        if pause > 0 { output.append(contentsOf: [Float](repeating: 0, count: pause)) }
-        return output
-    }
 }
 
 public enum PCMWav {
     public static func readFloats(from url: URL) -> (samples: [Float], sampleRate: Double)? {
-        guard let data = try? Data(contentsOf: url), data.count > 44 else { return nil }
-        let sampleRate = Double(readUInt32(data, 24))
-        let audioFormat = readUInt16(data, 20)
-        let bits = readUInt16(data, 34)
-        guard audioFormat == 1, bits == 16, sampleRate > 0 else { return nil }
-        let dataOffset = 44
-        let count = (data.count - dataOffset) / 2
-        guard count > 0 else { return nil }
+        guard let data = try? Data(contentsOf: url), data.count >= 12 else { return nil }
+        guard String(data: data.prefix(4), encoding: .ascii) == "RIFF" else { return nil }
+        guard String(data: data.subdata(in: 8..<12), encoding: .ascii) == "WAVE" else { return nil }
+        var cursor = 12
+        var format: (audioFormat: UInt16, channels: UInt16, sampleRate: UInt32, bits: UInt16)?
+        var payload: Data?
+        while cursor + 8 <= data.count {
+            let ident = String(data: data.subdata(in: cursor..<(cursor + 4)), encoding: .ascii) ?? ""
+            let size = Int(readUInt32(data, cursor + 4))
+            let start = cursor + 8
+            let end = start + size
+            guard end <= data.count else { return nil }
+            if ident == "fmt ", size >= 16 {
+                format = (
+                    readUInt16(data, start),
+                    readUInt16(data, start + 2),
+                    readUInt32(data, start + 4),
+                    readUInt16(data, start + 14))
+            } else if ident == "data" {
+                payload = data.subdata(in: start..<end)
+            }
+            cursor = end + (size % 2)
+        }
+        guard let format, format.audioFormat == 1, format.channels == 1, format.bits == 16, format.sampleRate > 0,
+              let payload, payload.count >= 2 else { return nil }
+        let count = payload.count / 2
         var samples = [Float]()
         samples.reserveCapacity(count)
-        data.withUnsafeBytes { raw in
+        payload.withUnsafeBytes { raw in
             for index in 0..<count {
-                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: dataOffset + index * 2, as: Int16.self))
+                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: index * 2, as: Int16.self))
                 samples.append(Float(sample) / 32_768)
             }
         }
-        return (samples, sampleRate)
+        return (samples, Double(format.sampleRate))
     }
 
     public static func write(_ samples: [Float], sampleRate: Double, to url: URL) -> Bool {
