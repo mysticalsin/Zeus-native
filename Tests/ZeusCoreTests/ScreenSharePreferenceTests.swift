@@ -73,6 +73,19 @@ struct ScreenSharePreferenceTests {
         #expect(shownByBoolean.string(forKey: ZeusScreenSharePolicy.storedKey) != "true")
     }
 
+    /// The write `SettingsStore.set` uses. An agent cannot persist showing.
+    @Test func theProductionWriteRefusesAnAgentEnable() throws {
+        let defaults = try fresh()
+        #expect(!ZeusScreenSharePolicy.commit(value: "true", origin: .agent, defaults: defaults))
+        #expect(defaults.string(forKey: ZeusScreenSharePolicy.storedKey) == nil)
+        #expect(!ZeusScreenSharePolicy.showInScreenSharing(from: defaults))
+        #expect(ZeusScreenSharePolicy.commit(value: "false", origin: .agent, defaults: defaults))
+        #expect(defaults.string(forKey: ZeusScreenSharePolicy.storedKey) == "false")
+        #expect(ZeusScreenSharePolicy.commit(value: "true", origin: .person, defaults: defaults))
+        #expect(defaults.string(forKey: ZeusScreenSharePolicy.storedKey) == "true")
+        #expect(ZeusScreenSharePolicy.showInScreenSharing(from: defaults))
+    }
+
     /// The command line is an agent. It can hide Zeus and cannot turn sharing visibility on.
     @Test func aCommandLineOnCannotEnableSharing() {
         #expect(ScreenShareDebug.origin == .agent)
