@@ -8,7 +8,6 @@ extension AccessorySectionSlot: GlassSlotPage {
 /// Accessory settings. Earbud charge is an injected `AccessoryConnectInput`; this page does not read a radio.
 struct AccessorySettingsSection: View {
     var earbud: AccessoryConnectInput?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var controller = AccessorySectionController()
 
     init(earbud: AccessoryConnectInput? = nil) {
@@ -16,7 +15,7 @@ struct AccessorySettingsSection: View {
     }
 
     var body: some View {
-        let motion = reduceMotion
+        let motion = Motion.reduced
         ScrollView {
             VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
                 overlayCard
@@ -32,7 +31,7 @@ struct AccessorySettingsSection: View {
             controller.apply(.reduceMotion(motion))
             deliver(earbud)
         }
-        .onChange(of: reduceMotion) { _, value in
+        .onChange(of: motion) { _, value in
             controller.apply(.reduceMotion(value))
         }
         .onChange(of: earbud) { _, value in

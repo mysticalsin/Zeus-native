@@ -44,7 +44,7 @@ struct AccessorySettingsPersistenceTests {
     }
 
     @MainActor private static func isolated() throws -> (SettingsStore, UserDefaults, String) {
-        let suite = "zeus.accessory.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.accessory.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         return (SettingsStore(defaults: defaults), defaults, suite)
