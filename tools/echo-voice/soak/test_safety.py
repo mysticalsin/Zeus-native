@@ -58,6 +58,7 @@ class SignalTests(unittest.TestCase):
             except subprocess.TimeoutExpired:
                 proc.kill()
                 rc = proc.wait()
+            proc.stdout.close()
             self.assertEqual(rc, 128 + signal.SIGTERM)
             frames = (out / "frames.jsonl").read_text(errors="replace").splitlines()
             parsed = [json.loads(line) for line in frames if line.strip()]
@@ -86,6 +87,7 @@ class SignalTests(unittest.TestCase):
             except subprocess.TimeoutExpired:
                 proc.kill()
                 rc = proc.wait()
+            proc.stdout.close()
             self.assertEqual(rc, 128 + signal.SIGINT)
             events = [json.loads(line)["event"] for line in (out / "events.jsonl").read_text().splitlines() if line.strip()]
             self.assertIn("signal", events)

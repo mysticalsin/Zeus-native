@@ -45,6 +45,7 @@ import os
 import random
 import re
 import resource
+import signal
 import subprocess
 import sys
 import time
@@ -703,6 +704,14 @@ def sample_windows(n_frames: int, seconds: float) -> dict:
     return out
 
 
+class _Stop(Exception):
+    """Raised from the SIGINT/SIGTERM handler so a blocking sleep unwinds."""
+
+    def __init__(self, signum):
+        super().__init__(signum)
+        self.signum = signum
+
+
 def cmd_run(a):
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     ef = open(out / "events.jsonl", "w")
@@ -749,148 +758,165 @@ def cmd_run(a):
     inj_active, inj_cleared = False, False         # loop / latency injections last until the next restart
     awaiting_recovery = False
     rng = np.random.default_rng(1234)
-    for k in range(n_frames - 1):
-        if a.pace == "realtime":
-            due = wall0 + (k + 1) * FRAME_S
-            while time.perf_counter() < due:
-                time.sleep(min(0.002, max(0.0, due - time.perf_counter())))
-        u = user[k * FRAME:(k + 1) * FRAME]
-        guard = not a.no_input_guard
-        # ---------------------------------------------------------------- fault injection (explicit cases)
-        if k == k_inj and inj in ("bad_frame", "bad_frame_raw", "garbage_input", "stall", "loop", "latency", "disk_low"):
-            event("inject", k + 1, kind=inj)
-            awaiting_recovery = True
-        if inj in ("bad_frame", "bad_frame_raw") and k in (k_inj, k_inj + 1):
-            u = u[:FRAME - 200] if k == k_inj else np.concatenate([u, u])      # one short frame, then one double frame
-            guard = inj == "bad_frame"
-        if inj == "garbage_input" and k_inj <= k < k_inj + int(3 / FRAME_S):
-            u = (0.9 * rng.standard_normal(FRAME)).astype(np.float32)
-            if k == k_inj + 5:
-                u[::7] = np.nan
-            if k == k_inj + 6:
-                u[::11] = np.inf
-            if k == k_inj + 7:
-                u = u * 4.0
-            if k == k_inj + int(3 / FRAME_S) - 1:
-                event("inject_end", k + 1, kind=inj)
-        if inj == "stall" and k == k_inj:
-            time.sleep(a.stall_s)
-            event("stall_end", k + 1, stall_s=a.stall_s)
-        if inj in ("loop", "latency") and k == k_inj and not inj_cleared:
-            inj_active = True
-        if inj == "disk_low" and k == k_inj:
-            a.min_free_gib = 1e9                    # simulated: the threshold jumps above any real free space
-        if guard:
-            u, issues = sanitize(u)
-            if issues:
-                event("input_fixed", k + 1, issues=issues)
-        t0 = time.perf_counter()
-        try:
-            st = backend.step(u)
-        except Exception as e:                        # recovery path: log, restart the session, continue
-            errors += 1
-            event("step_error", k + 1, error=f"{type(e).__name__}: {e}"[:300])
-            awaiting_recovery = True
-            if errors > 5:
-                aborted = "too many step errors"; event("abort", k + 1, reason=aborted); break
-            t = time.perf_counter(); f0r = backend.restart(max_frames)
-            event("restart", k + 1, reason="step error", turn=tracker.state.value, prompt_seconds=round(f0r.seconds, 3),
-                  wall_seconds=round(time.perf_counter() - t, 3), session_frames=k + 1 - session_start_k)
-            session_start_k = last_anchor_k = k + 1
-            tokens.clear(); silent_turns = garbage_run = 0
+    caught_signal = None
+    def _on_stop(signum, _frame):
+        raise _Stop(signum)
+    _prev_int = signal.signal(signal.SIGINT, _on_stop)
+    _prev_term = signal.signal(signal.SIGTERM, _on_stop)
+    k = -1
+    try:
+        for k in range(n_frames - 1):
+            if a.pace == "realtime":
+                due = wall0 + (k + 1) * FRAME_S
+                while time.perf_counter() < due:
+                    time.sleep(min(0.002, max(0.0, due - time.perf_counter())))
+            u = user[k * FRAME:(k + 1) * FRAME]
+            guard = not a.no_input_guard
+            # ---------------------------------------------------------------- fault injection (explicit cases)
+            if k == k_inj and inj in ("bad_frame", "bad_frame_raw", "garbage_input", "stall", "loop", "latency", "disk_low"):
+                event("inject", k + 1, kind=inj)
+                awaiting_recovery = True
+            if inj in ("bad_frame", "bad_frame_raw") and k in (k_inj, k_inj + 1):
+                u = u[:FRAME - 200] if k == k_inj else np.concatenate([u, u])      # one short frame, then one double frame
+                guard = inj == "bad_frame"
+            if inj == "garbage_input" and k_inj <= k < k_inj + int(3 / FRAME_S):
+                u = (0.9 * rng.standard_normal(FRAME)).astype(np.float32)
+                if k == k_inj + 5:
+                    u[::7] = np.nan
+                if k == k_inj + 6:
+                    u[::11] = np.inf
+                if k == k_inj + 7:
+                    u = u * 4.0
+                if k == k_inj + int(3 / FRAME_S) - 1:
+                    event("inject_end", k + 1, kind=inj)
+            if inj == "stall" and k == k_inj:
+                time.sleep(a.stall_s)
+                event("stall_end", k + 1, stall_s=a.stall_s)
+            if inj in ("loop", "latency") and k == k_inj and not inj_cleared:
+                inj_active = True
+            if inj == "disk_low" and k == k_inj:
+                a.min_free_gib = 1e9                    # simulated: the threshold jumps above any real free space
+            if guard:
+                u, issues = sanitize(u)
+                if issues:
+                    event("input_fixed", k + 1, issues=issues)
+            t0 = time.perf_counter()
+            try:
+                st = backend.step(u)
+            except Exception as e:                        # recovery path: log, restart the session, continue
+                errors += 1
+                event("step_error", k + 1, error=f"{type(e).__name__}: {e}"[:300])
+                awaiting_recovery = True
+                if errors > 5:
+                    aborted = "too many step errors"; event("abort", k + 1, reason=aborted); break
+                t = time.perf_counter(); f0r = backend.restart(max_frames)
+                event("restart", k + 1, reason="step error", turn=tracker.state.value, prompt_seconds=round(f0r.seconds, 3),
+                      wall_seconds=round(time.perf_counter() - t, 3), session_frames=k + 1 - session_start_k)
+                session_start_k = last_anchor_k = k + 1
+                tokens.clear(); silent_turns = garbage_run = 0
+                if wd:
+                    wd.restarted()
+                st = Step(np.zeros(FRAME, np.float32), next(iter(backend.silent)), "", 0.0)
+                ff.write(json.dumps({"k": k + 1, "ms": None, "wall_ms": round(1000 * (time.perf_counter() - t0), 3), "tok": int(st.token),
+                                     "text": "", "m_db": -120.0, "u_db": round(dbfs(np.nan_to_num(np.asarray(u, np.float32))), 1),
+                                     "turn": tracker.state.value, "flat": 0.0, "garbage": False, "finite": True, "error": True,
+                                     "vm": 0, "uvm": 0, "f0": 0.0, "clip": 0.0}) + "\n")
+                continue
+            wall_ms = 1000 * (time.perf_counter() - t0)
+            if inj_active and inj == "loop":
+                st = Step(st.audio, LOOP_TOKENS[k % 3], " " + LOOP_WORDS[k % 3], st.seconds)
+            if inj_active and inj == "latency":
+                st = Step(st.audio, st.token, st.text, st.seconds + a.inject_latency_ms / 1000)   # simulated, no real sleep
+            audio = np.asarray(st.audio, np.float32).reshape(-1)
+            if reply is not None and audio.size == FRAME:
+                reply[(k + 1) * FRAME:(k + 2) * FRAME] = audio
+            uu = np.nan_to_num(np.asarray(u, np.float32).reshape(-1))
+            u_db, m_db = dbfs(uu), dbfs(np.nan_to_num(audio))
+            finite = bool(np.isfinite(audio).all()) and audio.size == FRAME
+            flat = spectral_flatness(audio) if m_db > VOICED_DBFS and finite else 0.0
+            clip = float(np.mean(np.abs(audio) >= 0.999)) if audio.size else 0.0
+            garbage = (not finite) or (m_db > VOICED_DBFS and flat > 0.5) or clip > 0.01
+            garbage_run = garbage_run + 1 if garbage else 0
+            vm = voiced_mask(np.nan_to_num(audio)) if finite else 0
+            f0 = f0_autocorr(audio) if finite and vm else 0.0
+            for kk, (r0, r1) in windows.items():
+                if r0 <= k < r1:
+                    uc = uu[:FRAME] if uu.size >= FRAME else np.pad(uu, (0, FRAME - uu.size))
+                    ac = audio if audio.size == FRAME else np.zeros(FRAME, np.float32)
+                    caps[kk][0].append(uc); caps[kk][1].append(ac)
+            turn = tracker.next(u_db, m_db)
+            if st.token not in backend.silent:
+                tokens.append(st.token)
+            loop = find_loop(list(tokens), min_period=2, max_period=32, min_repeats=3) if st.text else None
+            sample = (k + 1) * FRAME
+            while lab_i < len(labels) and sample >= labels[lab_i]["end_gap"]:
+                if not labels[lab_i].get("cut"):
+                    silent_turns = silent_turns + 1 if voiced_in_gap * FRAME_S < 1.0 else 0
+                voiced_in_gap, lab_i = 0, lab_i + 1
+            if lab_i < len(labels) and labels[lab_i]["end_speech"] <= sample < labels[lab_i]["end_gap"] and m_db > VOICED_DBFS:
+                voiced_in_gap += 1
+            ff.write(json.dumps({"k": k + 1, "ms": round(1000 * st.seconds, 3), "wall_ms": round(wall_ms, 3), "tok": int(st.token),
+                                 "text": st.text, "m_db": round(m_db, 1), "u_db": round(u_db, 1), "turn": turn.value,
+                                 "flat": round(flat, 3), "garbage": garbage, "finite": finite,
+                                 "vm": vm, "uvm": voiced_mask(uu[:FRAME]), "f0": round(f0, 1), "clip": round(clip, 4)}, ensure_ascii=False) + "\n")
+            if awaiting_recovery and finite and not garbage and not inj_active and (inj != "garbage_input" or k >= k_inj + int(3 / FRAME_S)):
+                event("recovered", k + 1, step_ms=round(1000 * st.seconds, 3))
+                awaiting_recovery = False
+            now = time.perf_counter()
+            mem = None
+            if now - last_mem >= a.mem_every or k == n_frames - 2:
+                m = backend.memory(); m.update(k=k + 1, min=round((k + 1) * FRAME_S / 60, 3), rss=rss_bytes(), wall_s=round(now - wall0, 2))
+                mf.write(json.dumps(m) + "\n"); mf.flush(); last_mem = now
+                mem = (m["mlx_active"] or 0) / 1e9
+            if (k + 1) % 450 == 0 or k == k_inj:
+                fg = free_gib(out)
+                if fg < a.min_free_gib:
+                    aborted = "disk_low"
+                    event("disk_low", k + 1, free_gib=round(fg, 2), min_free_gib=a.min_free_gib, where="run")
+                    break
+            if loop and loop[1] >= 3:
+                event("loop", k + 1, period=loop[0], repeats=loop[1])
+                tokens.clear()
+            restart_reason = None
             if wd:
-                wd.restarted()
-            st = Step(np.zeros(FRAME, np.float32), next(iter(backend.silent)), "", 0.0)
-            ff.write(json.dumps({"k": k + 1, "ms": None, "wall_ms": round(1000 * (time.perf_counter() - t0), 3), "tok": int(st.token),
-                                 "text": "", "m_db": -120.0, "u_db": round(dbfs(np.nan_to_num(np.asarray(u, np.float32))), 1),
-                                 "turn": tracker.state.value, "flat": 0.0, "garbage": False, "finite": True, "error": True,
-                                 "vm": 0, "uvm": 0, "f0": 0.0, "clip": 0.0}) + "\n")
-            continue
-        wall_ms = 1000 * (time.perf_counter() - t0)
-        if inj_active and inj == "loop":
-            st = Step(st.audio, LOOP_TOKENS[k % 3], " " + LOOP_WORDS[k % 3], st.seconds)
-        if inj_active and inj == "latency":
-            st = Step(st.audio, st.token, st.text, st.seconds + a.inject_latency_ms / 1000)   # simulated, no real sleep
-        audio = np.asarray(st.audio, np.float32).reshape(-1)
-        if reply is not None and audio.size == FRAME:
-            reply[(k + 1) * FRAME:(k + 2) * FRAME] = audio
-        uu = np.nan_to_num(np.asarray(u, np.float32).reshape(-1))
-        u_db, m_db = dbfs(uu), dbfs(np.nan_to_num(audio))
-        finite = bool(np.isfinite(audio).all()) and audio.size == FRAME
-        flat = spectral_flatness(audio) if m_db > VOICED_DBFS and finite else 0.0
-        clip = float(np.mean(np.abs(audio) >= 0.999)) if audio.size else 0.0
-        garbage = (not finite) or (m_db > VOICED_DBFS and flat > 0.5) or clip > 0.01
-        garbage_run = garbage_run + 1 if garbage else 0
-        vm = voiced_mask(np.nan_to_num(audio)) if finite else 0
-        f0 = f0_autocorr(audio) if finite and vm else 0.0
-        for kk, (r0, r1) in windows.items():
-            if r0 <= k < r1:
-                uc = uu[:FRAME] if uu.size >= FRAME else np.pad(uu, (0, FRAME - uu.size))
-                ac = audio if audio.size == FRAME else np.zeros(FRAME, np.float32)
-                caps[kk][0].append(uc); caps[kk][1].append(ac)
-        turn = tracker.next(u_db, m_db)
-        if st.token not in backend.silent:
-            tokens.append(st.token)
-        loop = find_loop(list(tokens), min_period=2, max_period=32, min_repeats=3) if st.text else None
-        sample = (k + 1) * FRAME
-        while lab_i < len(labels) and sample >= labels[lab_i]["end_gap"]:
-            if not labels[lab_i].get("cut"):
-                silent_turns = silent_turns + 1 if voiced_in_gap * FRAME_S < 1.0 else 0
-            voiced_in_gap, lab_i = 0, lab_i + 1
-        if lab_i < len(labels) and labels[lab_i]["end_speech"] <= sample < labels[lab_i]["end_gap"] and m_db > VOICED_DBFS:
-            voiced_in_gap += 1
-        ff.write(json.dumps({"k": k + 1, "ms": round(1000 * st.seconds, 3), "wall_ms": round(wall_ms, 3), "tok": int(st.token),
-                             "text": st.text, "m_db": round(m_db, 1), "u_db": round(u_db, 1), "turn": turn.value,
-                             "flat": round(flat, 3), "garbage": garbage, "finite": finite,
-                             "vm": vm, "uvm": voiced_mask(uu[:FRAME]), "f0": round(f0, 1), "clip": round(clip, 4)}, ensure_ascii=False) + "\n")
-        if awaiting_recovery and finite and not garbage and not inj_active and (inj != "garbage_input" or k >= k_inj + int(3 / FRAME_S)):
-            event("recovered", k + 1, step_ms=round(1000 * st.seconds, 3))
-            awaiting_recovery = False
-        now = time.perf_counter()
-        mem = None
-        if now - last_mem >= a.mem_every or k == n_frames - 2:
-            m = backend.memory(); m.update(k=k + 1, min=round((k + 1) * FRAME_S / 60, 3), rss=rss_bytes(), wall_s=round(now - wall0, 2))
-            mf.write(json.dumps(m) + "\n"); mf.flush(); last_mem = now
-            mem = (m["mlx_active"] or 0) / 1e9
-        if (k + 1) % 450 == 0 or k == k_inj:
-            fg = free_gib(out)
-            if fg < a.min_free_gib:
-                aborted = "disk_low"
-                event("disk_low", k + 1, free_gib=round(fg, 2), min_free_gib=a.min_free_gib, where="run")
-                break
-        if loop and loop[1] >= 3:
-            event("loop", k + 1, period=loop[0], repeats=loop[1])
-            tokens.clear()
-        restart_reason = None
-        if wd:
-            s_ = wd.next(turn=turn, step_ms=1000 * st.seconds, loop=loop, mem_gb=mem, silent_turns=silent_turns, garbage_run=garbage_run)
-            if s_ == Wd.PENDING and not getattr(wd, "_logged_pending", False):
-                event("watchdog_pending", k + 1, reason=wd.reason, turn=turn.value); wd._logged_pending = True
-            if s_ == Wd.RESTART:
-                restart_reason = "watchdog: " + str(wd.reason)
-        if not restart_reason and a.reanchor_minutes and turn == Turn.IDLE and (k + 1 - last_anchor_k) * FRAME_S >= 60 * a.reanchor_minutes:
-            restart_reason = f"re-anchor every {a.reanchor_minutes} min"
-        if restart_reason:
-            t = time.perf_counter()
-            f0r = backend.restart(max_frames)
-            event("restart", k + 1, reason=restart_reason, turn=turn.value, prompt_seconds=round(f0r.seconds, 3),
-                  wall_seconds=round(time.perf_counter() - t, 3), session_frames=k + 1 - session_start_k)
-            session_start_k = last_anchor_k = k + 1
-            tokens.clear(); silent_turns = garbage_run = 0
-            if inj_active:
-                inj_active, inj_cleared = False, True
-            if wd:
-                wd.restarted(); wd._logged_pending = False
+                s_ = wd.next(turn=turn, step_ms=1000 * st.seconds, loop=loop, mem_gb=mem, silent_turns=silent_turns, garbage_run=garbage_run)
+                if s_ == Wd.PENDING and not getattr(wd, "_logged_pending", False):
+                    event("watchdog_pending", k + 1, reason=wd.reason, turn=turn.value); wd._logged_pending = True
+                if s_ == Wd.RESTART:
+                    restart_reason = "watchdog: " + str(wd.reason)
+            if not restart_reason and a.reanchor_minutes and turn == Turn.IDLE and (k + 1 - last_anchor_k) * FRAME_S >= 60 * a.reanchor_minutes:
+                restart_reason = f"re-anchor every {a.reanchor_minutes} min"
+            if restart_reason:
+                t = time.perf_counter()
+                f0r = backend.restart(max_frames)
+                event("restart", k + 1, reason=restart_reason, turn=turn.value, prompt_seconds=round(f0r.seconds, 3),
+                      wall_seconds=round(time.perf_counter() - t, 3), session_frames=k + 1 - session_start_k)
+                session_start_k = last_anchor_k = k + 1
+                tokens.clear(); silent_turns = garbage_run = 0
+                if inj_active:
+                    inj_active, inj_cleared = False, True
+                if wd:
+                    wd.restarted(); wd._logged_pending = False
+    except _Stop as stop:
+        caught_signal = stop.signum
+        aborted = "signal"
+    finally:
+        signal.signal(signal.SIGINT, _prev_int)
+        signal.signal(signal.SIGTERM, _prev_term)
     ff.close(); mf.close()
     for kk, (uc, ac) in caps.items():
         if uc:
             write_wav(out / f"sample_{kk}.wav", [np.concatenate(uc), np.concatenate(ac)])
     if reply is not None:
         write_wav(out / "reply.wav", [reply])
+    if caught_signal:
+        event("signal", max(k, 0) + 1, signum=caught_signal)
     event("end", n_frames, aborted=aborted, step_errors=errors)
     ef.close()
     res = analyze(out)
     print(json.dumps({"run": str(out), "aborted": aborted, "frames": len(res.get("checkpoints", {})) and n_frames}, indent=1))
+    if caught_signal:
+        sys.exit(128 + caught_signal)
     if aborted == "disk_low":
         sys.exit(3)
     if aborted:
