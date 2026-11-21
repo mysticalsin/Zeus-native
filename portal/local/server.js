@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { createRouter, securityHeaders } from '../core/router.js';
+import { bindSocketPeer, createRouter, securityHeaders } from '../core/router.js';
 
 const PUBLIC = new URL('../public/', import.meta.url).pathname;
 const FONT = new URL('../../Sources/Zeus/Fonts/PlusJakartaSans.ttf', import.meta.url).pathname;
@@ -43,6 +43,7 @@ export function startServer({ portal, secrets, config, port, host = '127.0.0.1' 
       headers.set(name, Array.isArray(value) ? value.join(', ') : value);
     }
     const request = new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers, body });
+    bindSocketPeer(request, req.socket?.remoteAddress);
     const response = await router.handle(request);
     res.writeHead(response.status, { ...securityHeaders, ...Object.fromEntries(response.headers) });
     res.end(Buffer.from(await response.arrayBuffer()));

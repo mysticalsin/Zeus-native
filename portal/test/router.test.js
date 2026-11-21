@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bindSocketPeer } from '../core/router.js';
 import { device, setup } from './helpers.js';
 
 const req = (path, { method = 'GET', body, headers = {}, cookie } = {}) => new Request(`http://127.0.0.1:8790${path}`, {
@@ -55,4 +56,21 @@ test('ninth login is still limited when the forwarding headers change', async ()
   }
   const ninth = await router.handle(req('/api/login', { method: 'POST', body: { passphrase: 'wrong wrong wrong' }, headers: forwarded('203.0.113.9') }));
   assert.equal(ninth.status, 429);
+});
+
+test('the login bucket follows the socket peer', async () => {
+  const { router } = await setup();
+  const portalHeader = { 'x-zeus-portal': '1' };
+  assert.equal((await router.handle(req('/api/setup', { method: 'POST', body: { passphrase: 'correct horse battery' }, headers: portalHeader }))).status, 200);
+  const attempt = (peer, address) => {
+    const request = req('/api/login', {
+      method: 'POST', body: { passphrase: 'wrong wrong wrong' },
+      headers: { ...portalHeader, 'cf-connecting-ip': address, 'x-forwarded-for': address },
+    });
+    bindSocketPeer(request, peer);
+    return router.handle(request);
+  };
+  for (let i = 0; i < 8; i += 1) assert.equal((await attempt('127.0.0.1', `203.0.113.${i}`)).status, 401);
+  assert.equal((await attempt('127.0.0.1', '198.51.100.9')).status, 429);
+  assert.equal((await attempt('::1', '203.0.113.8')).status, 401);
 });
