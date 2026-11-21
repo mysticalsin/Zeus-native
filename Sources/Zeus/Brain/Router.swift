@@ -278,9 +278,8 @@ final class RouterSettings {
     }
 
     private static func loadExhausted() -> [RouterEngine: Date] {
-        let saved = UserDefaults.standard.dictionary(forKey: "router.exhausted") as? [String: Date] ?? [:]
-        return saved.reduce(into: [:]) { result, item in
-            if let engine = RouterEngine(rawValue: item.key), item.value > Date() { result[engine] = item.value }
+        RouterExhaustedStore.load(UserDefaults.standard).reduce(into: [:]) { result, item in
+            if let engine = RouterEngine(rawValue: item.key) { result[engine] = item.value }
         }
     }
 
