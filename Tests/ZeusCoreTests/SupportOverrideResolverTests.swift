@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import Testing
 @testable import ZeusCore
 
@@ -107,6 +112,16 @@ private struct FakeSignature: BundledHelperSignatureChecking {
         let checker = AnchorFake(anchor: .localDev(leafSHA1: leaf), accepted: expected)
         #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
                                                 signingIdentifier: "zeus-bridge", checker: checker) == .launch)
+    }
+
+    @Test func theInstallersStagedBridgePathCanBeAcceptedAfterTheBundlePasses() {
+        let bundle = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        let staged = "/Users/tony/Library/Application Support/Zeus/bin/zeus-bridge.new"
+        #expect(BundledHelperLaunchPolicy.publishedExecutable(checkedPath: staged, helperName: "zeus-bridge", decision: .launch) == nil)
+        #expect(BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: bundle, stagedPath: staged, bundleDecision: .launch))
+        #expect(BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: bundle, stagedPath: staged,
+                                                              bundleDecision: .refuse(BundledHelperLaunchPolicy.refusalSentence)) == false)
+        #expect(BundledHelperLaunchPolicy.acceptsStagedBridge(bundlePath: "/tmp/zeus-bridge", stagedPath: staged, bundleDecision: .launch) == false)
     }
 
     @Test func aMismatchedLocalDevLeafRefuses() {
@@ -232,6 +247,7 @@ private struct AnchorFake: BundledHelperAnchorChecking {
         let registration = root.appendingPathComponent("com.zeus.bridge.json")
         let staged = root.appendingPathComponent("zeus-bridge.new")
         try Data("previous-bridge".utf8).write(to: destination)
+        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: 0o755)], ofItemAtPath: destination.path)
         try Data("previous-registration".utf8).write(to: registration)
         try Data("new-bridge".utf8).write(to: staged)
         let outcome = BundledHelperPublish.replaceIfAccepted(staged: staged, destination: destination, registration: registration,
@@ -247,6 +263,8 @@ private struct AnchorFake: BundledHelperAnchorChecking {
         #expect(try Data(contentsOf: registration) == Data("previous-registration".utf8))
         #expect(!FileManager.default.fileExists(atPath: staged.path))
         #expect(!FileManager.default.fileExists(atPath: destination.appendingPathExtension("bak").path))
+        let mode = try FileManager.default.attributesOfItem(atPath: destination.path)[.posixPermissions] as? NSNumber
+        #expect(mode?.uint16Value == 0o755)
     }
 
     @Test func anEarlyFailureRemovesTheStagedBridge() throws {
@@ -361,6 +379,19 @@ private enum TestWrite: Error { case failed }
                                                         hostsDirectory: root, passedPaths: [kept])
         #expect(outcome == .kept)
         #expect(try Data(contentsOf: zeusFile) == before)
+    }
+
+    @Test func aDanglingSymlinkIsRemovedRatherThanReportedGone() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let link = root.appendingPathComponent(NativeHostRegistration.zeusHostFileName)
+        #expect(symlink("/tmp/zeus-missing-bridge-target", link.path) == 0)
+        let outcome = NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                                        checkedPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
+                                                        hostsDirectory: root)
+        #expect(outcome == .removed)
+        var info = stat()
+        #expect(lstat(link.path, &info) != 0)
     }
 
     @Test func aValidSignatureKeepsTheHostRegistration() throws {

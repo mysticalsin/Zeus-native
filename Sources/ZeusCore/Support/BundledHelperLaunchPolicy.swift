@@ -131,6 +131,35 @@ public enum BundledHelperLaunchPolicy {
         return executableToPublish(checkedPath: checkedPath, helperName: helperName)
     }
 
+    /// A copy may be staged only after this bundle path has passed the same publish check.
+    /// The staged file lives under Application Support and can never pass that check itself.
+    public static func mayStage(bundlePath: String, decision: BundledHelperLaunchDecision) -> Bool {
+        publishedExecutable(checkedPath: bundlePath, helperName: bridgeSigningIdentifier, decision: decision) == bundlePath
+    }
+
+    /// Connect Chrome copies the helper to `Application Support/Zeus/bin/zeus-bridge.new`.
+    /// That staged path is not publishable: the file name is not `zeus-bridge`, and the directory is user-writable.
+    /// Staging is allowed only after the bundle path itself passed, and only for that staged name.
+    public static func acceptsStagedBridge(bundlePath: String, stagedPath: String, bundleDecision: BundledHelperLaunchDecision) -> Bool {
+        guard mayStage(bundlePath: bundlePath, decision: bundleDecision) else { return false }
+        let staged = stagedPath.replacingOccurrences(of: "\\", with: "/")
+        guard URL(fileURLWithPath: staged).lastPathComponent == "zeus-bridge.new" else { return false }
+        guard isUserWritableHelperCopy(staged) else { return false }
+        return publishedExecutable(checkedPath: staged, helperName: bridgeSigningIdentifier, decision: bundleDecision) == nil
+    }
+
+    /// Lowercase hex using only the ASCII digits `0-9` and `a-f`.
+    public static func asciiHex<S: Sequence>(_ bytes: S) -> String where S.Element == UInt8 {
+        let digits = Array("0123456789abcdef".utf8)
+        var encoded: [UInt8] = []
+        encoded.reserveCapacity(bytes.underestimatedCount * 2)
+        for byte in bytes {
+            encoded.append(digits[Int(byte >> 4)])
+            encoded.append(digits[Int(byte & 0x0f)])
+        }
+        return String(decoding: encoded, as: UTF8.self)
+    }
+
     /// Letters, digits and the given extras only, so a value cannot add a requirement clause.
     public static func isToken(_ text: String, allowing extra: String) -> Bool {
         !text.isEmpty && text.unicodeScalars.allSatisfy { scalar in
