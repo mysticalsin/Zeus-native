@@ -50,10 +50,9 @@ fn serve_command(config: &ServeConfig) -> i32 {
             private_socket,
             quantize,
         } => {
-            let _watchdog = config.watchdog;
             eprintln!(
-                "haru-companion: kv_window={:?} reanchor_minutes={:?} (held, not passed to haru-speech-mlx 0.1.0)",
-                config.kv_window, config.reanchor_minutes
+                "haru-companion: watchdog={} kv_window={:?} reanchor_minutes={:?} (held, not passed to haru-speech-mlx 0.1.0)",
+                config.watchdog, config.kv_window, config.reanchor_minutes
             );
             let argv = child_argv(&python, &model, &private_socket, quantize);
             if argv.iter().any(|part| part.contains("reference")) {
@@ -118,6 +117,9 @@ fn parse(args: &[String]) -> Result<Command, String> {
                         .get(index + 1)
                         .ok_or_else(|| usage("missing --frames"))?;
                     frames = value.parse().map_err(|_| usage("bad --frames"))?;
+                    if frames > 20_000 {
+                        return Err(usage("--frames is capped at 20000"));
+                    }
                     index += 2;
                 } else {
                     return Err(usage(&format!("unknown {}", args[index])));
@@ -139,6 +141,7 @@ fn parse(args: &[String]) -> Result<Command, String> {
             while index < args.len() {
                 let flag = args[index].as_str();
                 if flag == "--watchdog" {
+                    config.watchdog = true;
                     index += 1;
                     continue;
                 }
