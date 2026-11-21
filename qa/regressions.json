@@ -8712,6 +8712,18 @@
         "file": "Tests/ZeusCoreTests/ShiftPeekPolicyTests.swift",
         "function": "aSecondShiftHoldFiresAfterRelease"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "TabHoldGate was tested and had no caller. Tab down, modifiers, a repeat, another key and Tab up never reached it, so a lone Tab hold could not reveal the tab strip.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TabHoldPolicyTests.swift",
+        "function": "tabDownModifiersAndReleaseReachTheGate"
+      }
     }
   ]
 }

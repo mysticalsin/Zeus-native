@@ -159,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.topBarServices) {
             topBarServices = TopBarServices(model: topBar)
             topBarServices.notchIsOpen = { [weak self] in self?.notch.model.presentation != .closed }
+            topBarServices.onTabStripHold = { [weak self] revealed in self?.notch.setTabStripHeld(revealed) }
             topBarServices.start()
         }
         // Continuity: a cue from Zeus when Beamer moves your keyboard to another machine.

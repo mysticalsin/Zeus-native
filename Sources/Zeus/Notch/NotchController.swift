@@ -62,6 +62,8 @@ final class NotchController {
     /// The approval card's wait. `approvalTimeout` is the sleep armed for that phase.
     private var approvalWait: ApprovalWait.Phase = .idle
     private var approvalTimeout: Task<Void, Never>?
+    /// A lone Tab hold opened this panel. Pointer-leave waits until that key is released.
+    private var tabStripHeld = false
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
     /// The pin rules live in ZeusCore; this only reports the current facts.
@@ -369,6 +371,20 @@ final class NotchController {
         }
     }
 
+    /// The tab strip is the row already drawn in the open panel. A lone Tab hold opens that panel
+    /// with the panel's own motion and closes it again on release, and only if this hold opened it.
+    func setTabStripHeld(_ revealed: Bool) {
+        if revealed {
+            guard !tabStripHeld, model.presentation == .closed, model.approval == nil, !drawnNotch.isCalibrating else { return }
+            tabStripHeld = true
+            show(.panel)
+            return
+        }
+        guard tabStripHeld else { return }
+        tabStripHeld = false
+        if model.presentation == .panel { show(.closed) }
+    }
+
     /// Hover the notch to open the panel; move away to close it. With the top bar the panel
     /// always has something to show, so it opens after a short dwell (no accidental flashes).
     private func mouseMoved() {
@@ -406,6 +422,7 @@ final class NotchController {
             if topBar?.prompterActive == true || model.picker != nil { return }
             // A menu from the ... button is open: keep the panel up until it closes.
             if topBar?.menuOpen == true { return }
+            if tabStripHeld { return }
             let mouse = NSEvent.mouseLocation
             let top = screen.frame.maxY
             let centre = anchorFrame(screen)
