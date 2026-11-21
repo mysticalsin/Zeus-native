@@ -249,7 +249,9 @@ final class VoiceTurnController {
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
                 VoicePermissions.notifyDenied(cue, pane)
             } else {
-                say("I can't hear you yet. Check that Zeus has microphone and speech recognition access.")
+                let line = TalkMissingSetup.sentence(mic: VoicePermissions.mic == .authorized, screen: true, brainKey: true, cli: true)
+                    ?? "I can't hear you yet. Check that Zeus has microphone and speech recognition access."
+                say(line)
             }
             return false
         }
@@ -1154,7 +1156,7 @@ final class VoiceTurnController {
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()
             // No Screen Recording: one log line and one plain notice per launch, never a permission prompt mid-turn.
-            if owesSightNotice, let notice = sightNotice.take(permissionGranted: false) {
+            if owesSightNotice, let notice = sightNotice.take(permissionGranted: false, mic: VoicePermissions.mic == .authorized) {
                 VoiceLog.log("screen", "Screen Recording is off, so Zeus cannot see the screen; owner told once this launch")
                 NSLog("[ZEUS] screen sight: Screen Recording permission is off (told the owner once this launch)")
                 if speak { speaker.speak(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }

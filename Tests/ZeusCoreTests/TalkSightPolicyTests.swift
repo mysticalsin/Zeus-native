@@ -209,6 +209,14 @@ import Testing
 }
 
 @Suite struct ScreenSightNoticeTests {
+    @Test func theSpokenNoticeKeepsItsLineAndRecordsTheSettingsGap() {
+        var notice = ScreenSightNotice()
+        let text = notice.take(permissionGranted: false, mic: true, brainKey: true, cli: true)
+        #expect(text == ScreenSightNotice.message)
+        #expect(notice.settingsGaps == [TalkMissingSetup.screenSentence])
+        #expect(notice.settingsGaps.allSatisfy { !$0.localizedCaseInsensitiveContains("camera") })
+    }
+
     @Test func theFirstTurnWithoutPermissionGetsOnePlainNotice() {
         var notice = ScreenSightNotice()
         let text = notice.take(permissionGranted: false)

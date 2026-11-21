@@ -1177,7 +1177,8 @@ private struct PermissionsPage: View {
             GSDivider()
             perm("internaldrive", "Full Disk Access", "Lets Zeus read banners from other apps for the notification mirror. Optional.", context.services.fullDiskAccess) { context.services.allowFullDiskAccess() }
             GSDivider()
-            voicePerm("mic", "Microphone", "Hey Zeus, the talk key and dictation", VoicePermissions.mic, .microphone)
+            voicePerm("mic", "Microphone", "Hey Zeus, the talk key and dictation", VoicePermissions.mic, .microphone,
+                      denied: TalkMissingSetup.sentence(mic: false, screen: true, brainKey: true, cli: true))
             GSDivider()
             voicePerm("waveform", "Speech recognition", "Turns what you say into words on this Mac", VoicePermissions.speech, .speech)
             GSDivider()
@@ -1256,8 +1257,9 @@ private struct PermissionsPage: View {
     }
 
     /// Allowed / Not asked yet (Allow raises macOS's one prompt) / Refused (Allow opens the pane).
-    private func voicePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind) -> some View {
-        GSRow(symbol: symbol, title: title, text: state == .denied ? "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
+    private func voicePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, denied: String? = nil) -> some View {
+        let refused = denied ?? "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)."
+        GSRow(symbol: symbol, title: title, text: state == .denied ? refused : text) {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
