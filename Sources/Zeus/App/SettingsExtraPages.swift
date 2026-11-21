@@ -35,6 +35,10 @@ struct NotificationsSettings: View {
                 }
             }
             GlassCard(title: "Peek out of the notch") {
+                GlassRow(title: "In-app meeting heads-up", note: "Off until you turn it on. Zeus never creates a calendar event.", icon: ("calendar", Color(hex: 0xF43F5E))) {
+                    toggle({ prefs.meetingHeadsUp }, { prefs.meetingHeadsUp = $0 }, "Meeting heads-up")
+                }
+                GlassDivider()
                 GlassRow(title: "An agent needs you", note: "Approvals open as a card you can answer by voice or click.", icon: ("hand.raised.fill", Glass.warn)) {
                     toggle({ prefs.peekApprovals }, { prefs.peekApprovals = $0 }, "Approvals")
                 }

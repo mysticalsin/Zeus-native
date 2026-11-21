@@ -533,7 +533,7 @@ struct NotchView: View {
         case .done: "Done"
         case .failed: "Failed"
         case .stalled: AgentCardKind.quiet.label
-        case .idle: ""
+        case .idle: model.meetingHeadsUpTitle ?? ""
         }
     }
 }

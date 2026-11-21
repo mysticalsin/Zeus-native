@@ -54,6 +54,7 @@ final class ExtraPreferences {
     // Notifications: what peeks out of the notch.
     var peekApprovals = bool("notify.approvals", true) { didSet { store(peekApprovals, "notify.approvals") } }
     var peekAgentDone = bool("notify.agentDone", true) { didSet { store(peekAgentDone, "notify.agentDone") } }
+    var meetingHeadsUp = bool(MeetingHeadsUpSettings.enabledKey, false) { didSet { store(meetingHeadsUp, MeetingHeadsUpSettings.enabledKey) } }
     var calendarLeadMinutes = int("notify.calendarLead", 5) { didSet { store(calendarLeadMinutes, "notify.calendarLead") } }
     var peekReminders = bool("notify.reminders", true) { didSet { store(peekReminders, "notify.reminders") } }
     var peekFocusDone = bool("notify.focus", true) { didSet { store(peekFocusDone, "notify.focus") } }
@@ -93,6 +94,7 @@ final class ExtraPreferences {
     func reload() {
         peekApprovals = Self.bool("notify.approvals", true)
         peekAgentDone = Self.bool("notify.agentDone", true)
+        meetingHeadsUp = Self.bool(MeetingHeadsUpSettings.enabledKey, false)
         calendarLeadMinutes = Self.int("notify.calendarLead", 5)
         peekReminders = Self.bool("notify.reminders", true)
         peekFocusDone = Self.bool("notify.focus", true)

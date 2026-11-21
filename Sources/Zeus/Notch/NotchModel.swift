@@ -104,6 +104,13 @@ final class NotchModel {
     var picker: AgentPicker?
     /// Incoming alerts from other apps: the glass capsule under the notch (see `AlertStack`).
     var alerts = AlertStack()
+    /// In-app heads-up planned when the peek opens. Nil until the first peek. Never a calendar write.
+    var meetingHeadsUp: MeetingHeadsUpPlan?
+    /// Title of a heads-up that is due now, for the existing peek status line.
+    var meetingHeadsUpTitle: String? {
+        guard let meetingHeadsUp, meetingHeadsUp.phase == .showing else { return nil }
+        return meetingHeadsUp.firstDueTitle
+    }
     /// The front alert, as the line the open action understands.
     var notificationLine: NotificationLine? {
         alerts.visible.first.map { NotificationLine(id: Int64($0.id) ?? 0, app: $0.appID, title: $0.title, detail: $0.body) }

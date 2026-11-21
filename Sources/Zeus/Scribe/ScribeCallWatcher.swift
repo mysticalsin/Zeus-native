@@ -293,6 +293,12 @@ final class ScribeCallWatcher {
 
     var isRunning: Bool { running }
 
+    /// Called after the slots already read change. Does not start a recording and does not write a calendar event.
+    var onSlotsUpdated: @MainActor () -> Void = {}
+
+    /// Slots the last scan already holds. Read only: no calendar read and no recording start.
+    func slotsAlreadyRead() -> [ScribeCalendarSlot] { lastSlots }
+
     /// True while the watcher runs and a call in progress has a browser as its main process. Read only.
     var browserCallPresent: Bool {
         isRunning && latestCalls.contains { $0.pid.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }.map(ScribeCallDetection.isBrowser) ?? false }
@@ -415,6 +421,7 @@ final class ScribeCallWatcher {
         latestCalls = scan.calls
         lastMicActive = !scan.calls.isEmpty
         lastSlots = slots
+        onSlotsUpdated()
         // The meeting-start machine owns every card: the heads-up before a calendar meeting, a meeting that has
         // started and a call in progress. It asks, starts by itself or stays quiet by the "When a meeting
         // starts" setting.
@@ -436,6 +443,7 @@ final class ScribeCallWatcher {
         if case .listening = plan {
             lastSlots = ports.slots(now, ScribeDetectorPlan.lookAhead)
             plan = ScribeDetectorPlan.plan(mode: mode, machineIdle: idle, micActive: lastMicActive, slots: lastSlots, now: now)
+            onSlotsUpdated()
         }
         switch plan {
         case .stopped:

@@ -723,6 +723,7 @@ private struct GSNotificationsPage: View {
             }
         }
         .task { await systemNotifications.refreshAuthorization() }
+        MeetingHeadsUpCard()
         GSOtherAppsCards()
     }
 }
