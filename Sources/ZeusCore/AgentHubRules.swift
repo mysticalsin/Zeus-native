@@ -176,16 +176,16 @@ public struct TrustedChats: Equatable, Sendable {
     /// Tools that need a person: plans and questions.
     static let humanTools: Set<String> = ["ExitPlanMode", "AskUserQuestion"]
 
-    /// Whether a request in this session may be approved without a card. Risky ones always ask:
-    /// anything the hook marked high risk, and shell commands that delete, overwrite or reach the network.
+    /// Whether a request in this session may be approved without a card. A high hook risk always asks.
+    /// A shell command asks unless ShellRisk calls it safe, so an interpreter, a copy, a download,
+    /// or a delete still needs the card.
     public func autoApproves(session: String?, tool: String?, input: JSONValue?, risk: HookEvent.Risk?) -> Bool {
         guard let session, isTrusted(session) else { return false }
         if risk == .high { return false }
         if let tool, Self.humanTools.contains(tool) { return false }
         if tool == "Bash" {
             guard let command = input?["command"]?.stringValue else { return false }
-            let assessment = ShellRiskClassifier.assess(command)
-            return assessment.risk < .network
+            return ShellRiskClassifier.assess(command).risk == .safe
         }
         return true
     }
