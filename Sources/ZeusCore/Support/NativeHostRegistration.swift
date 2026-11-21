@@ -10,14 +10,23 @@ public enum NativeHostRegistration {
         case remove
     }
 
-    /// A refusal currently leaves the registration in place. The file stays.
+    /// Remove Zeus's own host file when a refusal's registration names the path that failed
+    /// or a user-writable `zeus-bridge` copy. A passing check keeps the file. Any other file name stays.
     public static func action(
         decision: BundledHelperLaunchDecision,
         checkedPath: String,
         manifestFileName: String,
         manifestExecutablePath: String?
     ) -> Action {
-        _ = (decision, checkedPath, manifestFileName, manifestExecutablePath)
+        guard manifestFileName == zeusHostFileName else { return .keep }
+        guard case .refuse = decision else { return .keep }
+        guard let named = manifestExecutablePath?.trimmingCharacters(in: .whitespacesAndNewlines), !named.isEmpty else { return .keep }
+        let refused = checkedPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if named == refused { return .remove }
+        if BundledHelperLaunchPolicy.isUserWritableHelperCopy(named),
+           BundledHelperLaunchPolicy.signingIdentifier(forExecutablePath: named) == BundledHelperLaunchPolicy.bridgeSigningIdentifier {
+            return .remove
+        }
         return .keep
     }
 

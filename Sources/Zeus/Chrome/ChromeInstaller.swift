@@ -38,9 +38,10 @@ enum ChromeInstaller {
         manifestExecutable() == bridgeExecutable.path
     }
 
-    /// Checks the bridge inside the app bundle. A refusal leaves that file and the Chrome host
-    /// registration as they were. A pass points the registration at the same bundle path, then
-    /// drops a support-directory copy so the browser is not left the writable file.
+    /// Checks the bridge inside the app bundle. A refusal removes Zeus's own host registration
+    /// when that file names the refused path or a user-writable copy of zeus-bridge. Other host
+    /// files stay. A pass points the registration at the same bundle path, then drops a
+    /// support-directory copy.
     static func authorizeInstalledBridge() -> Result<Void, InstallError> {
         let path = bridgeExecutable.path
         let decision = BundledHelperLaunch.decide(path: path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier)
@@ -48,6 +49,8 @@ enum ChromeInstaller {
             checkedPath: path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier, decision: decision),
               published == path else {
             BundledHelperLaunchLog.refused(path: path)
+            let hosts = ZeusPaths.chromeNativeHostManifest.deletingLastPathComponent()
+            try? NativeHostRegistration.reconcile(decision: decision, checkedPath: path, hostsDirectory: hosts)
             return .failure(.helperRefused(BundledHelperLaunchPolicy.refusalSentence))
         }
         if hasManifest(), manifestExecutable() != published {

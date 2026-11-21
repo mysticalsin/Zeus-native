@@ -217,6 +217,19 @@ private enum TestWrite: Error { case failed }
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
     }
 
+    @Test func aRefusalLeavesARegistrationThatNamesNeitherPath() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundled = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        try writeHosts(root, zeusPath: "/usr/local/libexec/zeus-bridge")
+        let zeusFile = root.appendingPathComponent(NativeHostRegistration.zeusHostFileName)
+        let before = try Data(contentsOf: zeusFile)
+        try NativeHostRegistration.reconcile(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                              checkedPath: bundled, hostsDirectory: root)
+        #expect(try Data(contentsOf: zeusFile) == before)
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("com.other.host.json").path))
+    }
+
     @Test func aValidSignatureKeepsTheHostRegistration() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
