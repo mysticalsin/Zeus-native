@@ -5,7 +5,7 @@ import ZeusCore
 @Suite("Battery settings persistence")
 struct BatterySettingsPersistenceTests {
     @Test func eachBatterySettingSurvivesARecreatedStoreAndStartsOff() {
-        let name = "zeus.battery.persist.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.battery.persist.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
         let fresh = BatterySettingsStore.load(defaults)
