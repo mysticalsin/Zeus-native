@@ -3,14 +3,36 @@ import Foundation
 /// One transcript: a session's, or a Zeus conversation's. A caller that has both uses two stores.
 /// The machine is pure. The store writes only into the directory it was given.
 public struct HubTranscript: Equatable, Sendable, Codable, Identifiable {
+    public static let schemaVersion = 1
+
     public var id: UUID
     public var status: HubTranscriptStatus
     public var lines: [HubTranscriptLine]
+    public var schema: Int
 
-    public init(id: UUID = UUID(), status: HubTranscriptStatus = .idle, lines: [HubTranscriptLine] = []) {
+    public init(id: UUID = UUID(), status: HubTranscriptStatus = .idle, lines: [HubTranscriptLine] = [], schema: Int = HubTranscript.schemaVersion) {
         self.id = id
         self.status = status
         self.lines = lines
+        self.schema = schema
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, status, lines, schema }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        status = try container.decodeIfPresent(HubTranscriptStatus.self, forKey: .status) ?? .idle
+        lines = try container.decodeIfPresent([HubTranscriptLine].self, forKey: .lines) ?? []
+        schema = try container.decodeIfPresent(Int.self, forKey: .schema) ?? Self.schemaVersion
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(status, forKey: .status)
+        try container.encode(lines, forKey: .lines)
+        try container.encode(schema, forKey: .schema)
     }
 
     public var isEmpty: Bool {
@@ -30,6 +52,24 @@ public struct HubTranscriptLine: Equatable, Sendable, Codable, Identifiable {
         self.role = role
         self.text = text
         self.failed = failed
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, role, text, failed }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        role = try container.decode(HubLineRole.self, forKey: .role)
+        text = try container.decode(String.self, forKey: .text)
+        failed = try container.decodeIfPresent(Bool.self, forKey: .failed) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(role, forKey: .role)
+        try container.encode(text, forKey: .text)
+        try container.encode(failed, forKey: .failed)
     }
 }
 
@@ -191,8 +231,16 @@ public struct HubTranscriptStore: Sendable {
 
     public func write(_ transcript: HubTranscript) throws {
         guard !transcript.isEmpty else { return }
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Self.encoder().encode(transcript).write(to: url(for: transcript.id), options: .atomic)
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = url(for: transcript.id)
+        if fileManager.fileExists(atPath: destination.path),
+           let existing = try? Data(contentsOf: destination),
+           (try? Self.decoder().decode(HubTranscript.self, from: existing)) == nil {
+            let copy = directory.appendingPathComponent("\(transcript.id.uuidString).corrupt-\(UUID().uuidString).json")
+            try existing.write(to: copy, options: .atomic)
+        }
+        try Self.encoder().encode(transcript).write(to: destination, options: .atomic)
     }
 
     /// A missing file is nil. A second store on the same directory reads what an earlier one wrote.
