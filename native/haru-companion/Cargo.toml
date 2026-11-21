@@ -1,0 +1,19 @@
+[package]
+name = "haru-companion"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+rust-version = "1.77"
+description = "Local supervisor and v1 socket for a Haru-4B conversation. No model weights and no network crates."
+
+[lib]
+name = "haru_companion"
+path = "src/lib.rs"
+
+[[bin]]
+name = "haru-companion"
+path = "src/main.rs"
+
+[dependencies]
+haru-pipe = { path = "../haru-pipe" }

@@ -1,0 +1,177 @@
+//! `haru-companion serve ...` and `haru-companion selftest`.
+//! Missing python, model, or the conversation flag never spawns or binds.
+
+use crate::engine::selftest_report;
+use crate::serve::bind_socket;
+use crate::session::ChildControl;
+use crate::supervisor::{
+    apply, child_argv, decide, LaunchDecision, LaunchRequest, NetGate, SocketBind, SpyBinder,
+    SpyLauncher, SpyNet, StdLauncher,
+};
+use std::path::PathBuf;
+
+pub fn run(args: impl IntoIterator<Item = String>) -> i32 {
+    let args: Vec<String> = args.into_iter().collect();
+    match parse(&args) {
+        Ok(Command::SelfTest { frames }) => {
+            println!("{}", selftest_report(frames).to_json());
+            0
+        }
+        Ok(Command::Serve(config)) => serve_command(&config),
+        Err(message) => {
+            eprintln!("{message}");
+            refuse_quietly();
+            2
+        }
+    }
+}
+
+fn refuse_quietly() {
+    let mut processes = SpyLauncher::default();
+    let mut sockets = SpyBinder::default();
+    let mut net = SpyNet::default();
+    let decision = decide(&LaunchRequest::default());
+    let _ = apply(&decision, &mut processes, &mut sockets, &mut net);
+    debug_assert_eq!(processes.spawn_count(), 0);
+    debug_assert_eq!(sockets.binds(), 0);
+    debug_assert_eq!(net.attempts(), 0);
+}
+
+fn serve_command(config: &ServeConfig) -> i32 {
+    match decide(&config.request()) {
+        LaunchDecision::NoLaunch { reason } => {
+            eprintln!("haru-companion: refused to start ({reason})");
+            2
+        }
+        LaunchDecision::Launch {
+            python,
+            model,
+            socket,
+            private_socket,
+            quantize,
+        } => {
+            eprintln!(
+                "haru-companion: kv_window={:?} reanchor_minutes={:?} (held, not passed to haru-speech-mlx 0.1.0)",
+                config.kv_window, config.reanchor_minutes
+            );
+            let argv = child_argv(&python, &model, &private_socket, quantize);
+            if argv.iter().any(|part| part.contains("reference")) {
+                eprintln!("haru-companion: reference_path is not allowed");
+                return 2;
+            }
+            match run_serve(&socket, &argv) {
+                Ok(()) => 0,
+                Err(error) => {
+                    eprintln!("haru-companion: {error}");
+                    1
+                }
+            }
+        }
+    }
+}
+
+fn run_serve(socket: &std::path::Path, argv: &[String]) -> std::io::Result<()> {
+    let listener = bind_socket(socket)?;
+    let mut launcher = StdLauncher::new();
+    let _pid = launcher.spawn(argv)?;
+    // The Python child binds its own private socket. This process only accepts
+    // the Zeus client. Tests never call this path.
+    let _ = listener;
+    Ok(())
+}
+
+enum Command {
+    Serve(ServeConfig),
+    SelfTest { frames: usize },
+}
+
+struct ServeConfig {
+    socket: Option<PathBuf>,
+    python: Option<PathBuf>,
+    model: Option<PathBuf>,
+    quantize: u8,
+    kv_window: Option<u32>,
+    reanchor_minutes: Option<u32>,
+}
+
+impl ServeConfig {
+    fn request(&self) -> LaunchRequest {
+        LaunchRequest {
+            conversation_mode: true,
+            python: self.python.clone(),
+            model: self.model.clone(),
+            socket: self.socket.clone(),
+            quantize: self.quantize,
+        }
+    }
+}
+
+fn parse(args: &[String]) -> Result<Command, String> {
+    match args.first().map(String::as_str) {
+        Some("selftest") => {
+            let mut frames = 10_000usize;
+            let mut index = 1;
+            while index < args.len() {
+                if args[index] == "--frames" {
+                    let value = args
+                        .get(index + 1)
+                        .ok_or_else(|| usage("missing --frames"))?;
+                    frames = value.parse().map_err(|_| usage("bad --frames"))?;
+                    index += 2;
+                } else {
+                    return Err(usage(&format!("unknown {}", args[index])));
+                }
+            }
+            Ok(Command::SelfTest { frames })
+        }
+        Some("serve") => {
+            let mut config = ServeConfig {
+                socket: None,
+                python: None,
+                model: None,
+                quantize: 8,
+                kv_window: None,
+                reanchor_minutes: None,
+            };
+            let mut index = 1;
+            while index < args.len() {
+                let flag = args[index].as_str();
+                if flag == "--watchdog" {
+                    index += 1;
+                    continue;
+                }
+                let value = args
+                    .get(index + 1)
+                    .cloned()
+                    .ok_or_else(|| usage(&format!("missing value for {flag}")))?;
+                match flag {
+                    "--socket" => config.socket = Some(PathBuf::from(value)),
+                    "--python" => config.python = Some(PathBuf::from(value)),
+                    "--model" => config.model = Some(PathBuf::from(value)),
+                    "--quantize" => {
+                        config.quantize = value.parse().map_err(|_| usage("bad --quantize"))?;
+                    }
+                    "--kv-window" => {
+                        config.kv_window =
+                            Some(value.parse().map_err(|_| usage("bad --kv-window"))?);
+                    }
+                    "--reanchor-minutes" => {
+                        config.reanchor_minutes =
+                            Some(value.parse().map_err(|_| usage("bad --reanchor-minutes"))?);
+                    }
+                    other => return Err(usage(&format!("unknown {other}"))),
+                }
+                index += 2;
+            }
+            Ok(Command::Serve(config))
+        }
+        Some(other) => Err(usage(&format!("unknown command {other}"))),
+        None => Err(usage("no command")),
+    }
+}
+
+fn usage(detail: &str) -> String {
+    format!(
+        "haru-companion: {detail}\nusage: haru-companion serve --socket PATH --python PATH --model DIR [--quantize 8] [--watchdog] [--kv-window N] [--reanchor-minutes M]\n       haru-companion selftest [--frames N]"
+    )
+}
