@@ -75,4 +75,59 @@ struct HubReplyKeystrokeGuardTests {
         #expect(script.contains("write text"))
         #expect(HubReplyScriptGuard.mayRun(script: script, line: line, approved: true))
     }
+
+    /// `typingLines` used to look for the lowercase spellings only, so a mixed-case
+    /// command on its own line was invisible and the keystrokes still matched.
+    @Test func mixedCaseAndOddSpacesDoNotPassTheKeystrokeGuard() throws {
+        let line = "hi $(id)"
+        let script = try #require(AgentReply.script(for: terminal, text: line))
+        let extras = [
+            "Do script \"id\"",
+            "DO SCRIPT \"id\"",
+            "dO sCrIpT \"id\"",
+            "Do shell script \"id\"",
+            "do\u{00A0}script \"id\"",
+            "do\u{2003}script \"id\"",
+            "Do\u{3000}script \"id\"",
+            "do\u{200B} script \"id\"",
+            "\u{FF24}\u{FF4F}\u{3000}\u{FF53}\u{FF43}\u{FF52}\u{FF49}\u{FF50}\u{FF54} \"id\"",
+        ]
+        for extra in extras {
+            let tainted = script.replacingOccurrences(of: "activate", with: extra)
+            #expect(HubReplyScriptGuard.mayRun(script: tainted, line: line, approved: true) == false)
+        }
+        let written = "tell application \"Host\"\nwrite text \"hi\"\nDo script \"id\"\nend tell\n"
+        #expect(HubReplyScriptGuard.mayRun(script: written, line: "hi", approved: true) == false)
+        let spaced = "tell application \"Host\"\nwrite text \"hi\"\ndo\u{00A0}script \"id\"\nend tell\n"
+        #expect(HubReplyScriptGuard.mayRun(script: spaced, line: "hi", approved: true) == false)
+    }
+
+    /// The script must refuse to type unless the front app and the front tab are still the stored ones.
+    @Test func theKeystrokeScriptAbortsUnlessFrontmostAndTtyMatch() throws {
+        let script = try #require(AgentReply.script(for: terminal, text: "hi $(id)"))
+        let key = try #require(script.range(of: "keystroke"))
+        let before = String(script[..<key.lowerBound])
+        #expect(before.contains("frontmost"))
+        #expect(before.contains("return false"))
+        #expect(before.contains("processes"))
+        #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
+        #expect(!before.contains("keystroke"))
+    }
+
+    /// A job that exited is read again in the script, before `write text` can reach a shell.
+    @Test func iTermReprobesTheJobBeforeWriting() throws {
+        let iterm = TerminalInfo(
+            bundleID: "com.googlecode.iterm2",
+            program: nil,
+            sessionID: "w0t1p0:ABCD-1234",
+            tty: "/dev/ttys004"
+        )
+        let script = try #require(AgentReply.script(for: iterm, text: "go"))
+        let write = try #require(script.range(of: "write text"))
+        let before = String(script[..<write.lowerBound])
+        #expect(before.contains("jobName"))
+        #expect(before.contains("frontmost"))
+        #expect(before.contains("return false"))
+        #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
+    }
 }

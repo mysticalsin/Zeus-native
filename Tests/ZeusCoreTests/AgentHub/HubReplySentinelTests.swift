@@ -132,6 +132,69 @@ struct HubReplySentinelTests {
         #expect(page.contains("cardSentence"))
     }
 
+    /// A missing foreground read used to release the line. It is refused.
+    @Test func approveFailsClosedWhenTheForegroundWasNotRead() {
+        var gate = waiting()
+        let step = gate.perform(
+            .approved, sessionID: session, field: "keep going",
+            destinationCanTakeText: true, trusted: false, target: shown)
+        #expect(step.typedLine == nil)
+        #expect(step.state.draft == "keep going")
+        #expect(step.state.receipt == .foregroundUnknown)
+        #expect(step.state.status == .idle)
+    }
+
+    /// Every Cf scalar is a hidden mark, plus the extra scalars the category does not cover.
+    @Test func everyFormatScalarIsAHiddenMark() {
+        var missed: [String] = []
+        var value: UInt32 = 0
+        while value <= 0x10FFFF {
+            if let scalar = Unicode.Scalar(value),
+               scalar.properties.generalCategory == .format,
+               !HubReplyHidden.isMark(scalar) {
+                missed.append(String(format: "U+%04X", value))
+                if missed.count == 8 { break }
+            }
+            value += 1
+        }
+        #expect(missed.isEmpty)
+        let extras: [UInt32] = [
+            0xFEFF, 0x00AD, 0x180E,
+            0x2061, 0x2062, 0x2063, 0x2064,
+            0xE0000, 0xE0001, 0xE007F,
+            0xFE00, 0xFE0F, 0xE0100, 0xE01EF,
+            0x061C, 0x200E, 0x200F, 0x202A, 0x202E, 0x2066, 0x2069,
+        ]
+        for extra in extras {
+            let scalar = Unicode.Scalar(extra)!
+            #expect(HubReplyHidden.isMark(scalar))
+            let field = "hi\(Character(scalar))there"
+            var gate = HubReplyDispatch(boundSessionID: session)
+            let step = gate.perform(
+                .send, sessionID: session, field: field,
+                destinationCanTakeText: true, trusted: true)
+            #expect(step.typedLine == nil)
+            #expect(step.state.draft == field)
+            #expect(step.state.receipt == .hiddenCharacter)
+        }
+        #expect(HubReplyHidden.isMark(Unicode.Scalar("A")) == false)
+    }
+
+    /// A path is not trusted because its last component is the agent name.
+    @Test func aSlashPathIsNotTheAgentByNameAlone() {
+        #expect(HubReplyForeground.verdict(name: "/tmp/evil/claude", expected: ["claude"]) == .unknown)
+        #expect(HubReplyForeground.verdict(name: "zsh", expected: ["claude"]) == .bareShell)
+    }
+
+    /// Typing must not reuse the name read at Approve, and the script must carry the expected CLI.
+    @Test func typingReprobesAndPassesTheExpectedCLI() throws {
+        let hub = try source("Sources/Zeus/Agents/AgentHub.swift")
+        let type = try #require(HubReplyWiringTests.functionBody("typeApprovedLine", in: hub))
+        #expect(type.contains("script(for: info, text: line, expectedCLI:"))
+        #expect(type.contains("foregroundName"))
+        #expect(!type.contains("approvedForeground"))
+    }
+
     private func waiting() -> HubReplyDispatch {
         var gate = HubReplyDispatch(boundSessionID: session)
         _ = gate.perform(
