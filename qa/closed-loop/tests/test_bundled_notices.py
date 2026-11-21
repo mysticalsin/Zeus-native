@@ -2,7 +2,7 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SHIPPED = ROOT / "Resources" / "NOTICES.txt"
 REQUIRED = (
     "## Speech to text (Murmure dictation and voice turns)",
