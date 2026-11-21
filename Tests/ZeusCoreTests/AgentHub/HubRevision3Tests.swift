@@ -20,7 +20,7 @@ struct HubRevision3Tests {
         #expect(HubDecisionAction.denyWithNote.isApproval == false)
 
         try roundTrip(HubDecisionKey.self, ["return", "two", "escape", "three", "four", "shiftEscape", "undo"])
-        #expect(HubDecisionKey.return.action == .allowOnce)
+        #expect(HubDecisionKey.`return`.action == .allowOnce)
         #expect(HubDecisionKey.two.action == .allowForThisSession)
         #expect(HubDecisionKey.escape.action == .deny)
         #expect(HubDecisionKey.three.action == .deny)
@@ -45,7 +45,7 @@ struct HubRevision3Tests {
     }
 
     @Test func keysMapOnlyWhileADecisionIsShowingAndNeverWithCommand() {
-        #expect(HubDecisionKeys.decision(.return, command: false, decisionShowing: true) == .allowOnce)
+        #expect(HubDecisionKeys.decision(.`return`, command: false, decisionShowing: true) == .allowOnce)
         #expect(HubDecisionKeys.decision(.two, command: false, decisionShowing: true) == .allowForThisSession)
         #expect(HubDecisionKeys.decision(.escape, command: false, decisionShowing: true) == .deny)
         #expect(HubDecisionKeys.decision(.three, command: false, decisionShowing: true) == .deny)
@@ -57,7 +57,7 @@ struct HubRevision3Tests {
         #expect(HubDecisionKeys.deniesAllQueued(key: .escape, command: false, decisionShowing: true) == false)
         #expect(HubDecisionKeys.undoes(key: .undo, command: false, undoShowing: true))
         #expect(HubDecisionKeys.undoes(key: .undo, command: false, undoShowing: false) == false)
-        #expect(HubDecisionKeys.undoes(key: .return, command: false, undoShowing: true) == false)
+        #expect(HubDecisionKeys.undoes(key: .`return`, command: false, undoShowing: true) == false)
 
         for key in HubDecisionKey.allCases {
             #expect(HubDecisionKeys.decision(key, command: false, decisionShowing: false) == nil)
