@@ -71,7 +71,8 @@ public final class WhisperKitDownloadMachine: @unchecked Sendable {
             if let task { return task }
             current = .downloading(0)
             let task = Task { [self] in
-                do {
+                let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate },
+                                                       partials: { store.isDownloaded ? [] : [store.modelFolder] }) {
                     try await downloader.download(into: store) { fraction in
                         let clamped = min(max(fraction, 0), 1)
                         self.lock.withLock {
@@ -79,13 +80,23 @@ public final class WhisperKitDownloadMachine: @unchecked Sendable {
                         }
                         report?(clamped)
                     }
-                    try Task.checkCancellation()
-                    try store.markComplete()
-                    lock.withLock { current = .idle }
-                } catch {
-                    lock.withLock {
-                        current = Task.isCancelled || error is CancellationError ? .idle : .failed(error.localizedDescription)
+                }
+                switch outcome {
+                case .finished:
+                    do {
+                        try store.markComplete()
+                        lock.withLock { current = .idle }
+                    } catch {
+                        lock.withLock { current = .failed(error.localizedDescription) }
                     }
+                case .tookTooLong:
+                    lock.withLock { current = .failed(DownloadBarState.tookTooLong) }
+                case .cancelled:
+                    lock.withLock { current = .idle }
+                case .capped:
+                    lock.withLock { current = .failed("This download is larger than the model cap.") }
+                case .failed(let message):
+                    lock.withLock { current = .failed(message) }
                 }
             }
             self.task = task

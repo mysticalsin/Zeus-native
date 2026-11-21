@@ -103,25 +103,51 @@ enum WhisperModelDownloader {
     static func download(_ model: WhisperCppEngine.Model, progress: (@Sendable (Double) -> Void)?) async throws {
         try FileManager.default.createDirectory(at: WhisperCppEngine.modelsDirectory, withIntermediateDirectories: true)
         let target = WhisperCppEngine.modelURL(model)
-        let delegate = Progress(progress)
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        defer { session.finishTasksAndInvalidate() }
-        let (temp, response) = try await session.download(from: model.url)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        try? FileManager.default.removeItem(at: target)
-        try FileManager.default.moveItem(at: temp, to: target)
-        progress?(1)
-    }
-
-    private final class Progress: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-        let report: (@Sendable (Double) -> Void)?
-        init(_ report: (@Sendable (Double) -> Void)?) { self.report = report }
-        func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
-                        totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-            guard totalBytesExpectedToWrite > 0 else { return }
-            report?(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+        let partial = target.appendingPathExtension("partial")
+        guard let known = PinnedModelBytes.whisperKnownBytes(id: model.id) else { throw DownloadCapExceeded() }
+        let maximum = PinnedModelBytes.cap(known)
+        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial] }) {
+            let transfer = DownloadTransferGuard(maximumBytes: maximum, allowedHosts: PinnedDownloadHosts.whisper, report: progress)
+            transfer.destination = partial
+            let session = URLSession(configuration: .default, delegate: transfer, delegateQueue: nil)
+            try await withTaskCancellationHandler {
+                do {
+                    let (_, response) = try await session.download(from: model.url)
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? transfer.statusCode ?? 0
+                    guard code == 200 else { throw URLError(.badServerResponse) }
+                } catch is DownloadCapExceeded {
+                    throw DownloadCapExceeded()
+                } catch {
+                    if transfer.keptURL == nil {
+                        if transfer.stopped { throw DownloadCapExceeded() }
+                        throw error
+                    }
+                }
+                if transfer.stopped || transfer.keptURL == nil { throw DownloadCapExceeded() }
+                let kept = transfer.keptURL!
+                let size = ((try? FileManager.default.attributesOfItem(atPath: kept.path))?[.size] as? NSNumber)?.int64Value ?? 0
+                if size > maximum || (ArchiveUnpackCap.isArchive(model.file) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
+                    throw DownloadCapExceeded()
+                }
+                session.finishTasksAndInvalidate()
+            } onCancel: {
+                session.invalidateAndCancel()
+            }
         }
-        func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+        switch outcome {
+        case .finished:
+            try? FileManager.default.removeItem(at: target)
+            try FileManager.default.moveItem(at: partial, to: target)
+            progress?(1)
+        case .tookTooLong:
+            throw DownloadTookTooLong()
+        case .cancelled:
+            throw CancellationError()
+        case .capped:
+            throw DownloadCapExceeded()
+        case .failed(let message):
+            throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        }
     }
 }
 
@@ -158,9 +184,47 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
 
     func prepare(progress: (@Sendable (Double) -> Void)?) async throws {
         progress?(0.05)
-        let failure = await Task.detached { LocalPython.install(["faster-whisper"]) }.value
-        if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
-        progress?(1)
+        let pythonRoot = LocalPython.root
+        let tree = LocalPython.venv
+        let rootExisted = FileManager.default.fileExists(atPath: pythonRoot.path)
+        let treeExisted = FileManager.default.fileExists(atPath: tree.path)
+        let before = treeExisted ? InstallFootprint.snapshot(tree) : []
+        let beforeSizes: [String: Int64]
+        if treeExisted {
+            guard let sizes = InstallFootprint.sizeSnapshot(tree) else {
+                throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not measure the Python environment."])
+            }
+            beforeSizes = sizes
+        } else {
+            beforeSizes = [:]
+        }
+        let gate = InstallSettlement()
+        let worker = Task.detached {
+            let failure = LocalPython.install(["faster-whisper"])
+            gate.settle(failure)
+            return failure
+        }
+        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: {
+            // Wait until pip has exited, then delete every path this setup added.
+            _ = gate.wait()
+            return InstallFootprint.removals(root: pythonRoot, rootExisted: rootExisted, tree: tree, treeExisted: treeExisted, before: before)
+        }) {
+            let failure = await worker.value
+            if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
+            guard let produced = InstallFootprint.producedBytes(tree: tree, treeExisted: treeExisted, before: beforeSizes) else {
+                throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not measure the Python environment."])
+            }
+            if ArchiveUnpackCap.exceeds(producedBytes: produced, maximumBytes: FasterWhisperUnpack.maximumBytes) {
+                throw DownloadCapExceeded()
+            }
+        }
+        switch outcome {
+        case .finished: progress?(1)
+        case .tookTooLong: throw DownloadTookTooLong()
+        case .cancelled: throw CancellationError()
+        case .capped: throw DownloadCapExceeded()
+        case .failed(let message): throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        }
     }
 
     func transcribe(samples: [Float], hints: [String], language: String?) async throws -> String {
@@ -177,5 +241,29 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
             guard result.status == 0 else { throw TranscriptionError.notReady(.fasterWhisper) }
             return result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+    }
+}
+
+/// Pip finishes on a detached task. Cleanup waits here so a cap cannot delete files before they exist,
+/// and cannot return while pip is still writing them.
+private final class InstallSettlement: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var ready = false
+    private var failure: String?
+
+    func settle(_ failure: String?) {
+        condition.lock()
+        self.failure = failure
+        ready = true
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    func wait() -> String? {
+        condition.lock()
+        while !ready { condition.wait() }
+        let failure = self.failure
+        condition.unlock()
+        return failure
     }
 }

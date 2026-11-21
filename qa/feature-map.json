@@ -1207,6 +1207,49 @@
           "id": "F01.1"
         },
         {
+          "id": "F01.download-cap",
+          "check": "portable-regressions",
+          "acceptance": "Model and voice downloads share a 10-minute overall cap. At the cap the download is cancelled, partial files are removed, and Retry starts the same download again. The 45 s, 20 s and 8 s request timeouts do not end it. The clock is injected.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "fortyFiveTwentyAndEightSecondsDoNotEndTheDownload"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "retryRestartsTheSameKind"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "retryDoesNothingUnlessTheDownloadTookTooLong"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "finishingInsideTheCapShowsNoRetry"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "cancelRemovesPartialsWithoutSayingTookTooLong"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "modelAndVoiceShareTheTenMinuteCap"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "removingPartialFilesDeletesTheFileAndTheFolder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "theRunnerDeletesAPartialWhenTheClockPassesTenMinutes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DownloadCapTests.swift",
+              "function": "theRunnerKeepsTheFileWhenTheDownloadFinishesInTime"
+            }
+          ]
+        },
+        {
           "check": "native-DictationOwnershipIntegrationTests",
           "acceptance": "Queued stale turns and focus drift cannot deliver into a new target.",
           "cases": [

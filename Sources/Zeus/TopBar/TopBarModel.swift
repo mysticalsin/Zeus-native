@@ -389,11 +389,20 @@ final class TopBarModel {
 
     // MARK: Cues
 
+    /// Restarts the download that showed `downloadTookTooLong`.
+    var retryDownload: @MainActor () -> Void = {}
+
+    /// The friendly cap notice. It stays until Retry or another cue, so the button can be used.
+    func showDownloadTimeout(retry: @escaping @MainActor () -> Void) {
+        retryDownload = retry
+        show(.downloadTookTooLong)
+    }
+
     func show(_ newCue: NotchCue) {
         FlightRecorder.shared.record("cue", Self.cueName(newCue))
         let essential: Bool
         switch newCue {
-        case .dictation, .focusFinished, .usageAlert, .hint, .keepAwake: essential = true
+        case .dictation, .focusFinished, .usageAlert, .hint, .keepAwake, .downloadTookTooLong: essential = true
         case .volume, .brightness, .keyboardBacklight: essential = true
         default: essential = false
         }
@@ -409,6 +418,10 @@ final class TopBarModel {
         cue = newCue
         cueStartedAt = Date()
         cueTask?.cancel()
+        if case .downloadTookTooLong = newCue {
+            cueTask = nil
+            return
+        }
         cueTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(newCue.duration))
             guard !Task.isCancelled else { return }

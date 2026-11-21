@@ -36,6 +36,7 @@ final class WhisperKitEngine: TranscriptionEngine, @unchecked Sendable {
         if !store.isDownloaded {
             let end = await machine.start { report?($0 * 0.9) }
             switch end {
+            case .failed(let message) where message == DownloadBarState.tookTooLong: throw DownloadTookTooLong()
             case .failed(let message): throw WhisperKitEngineError.download(message)
             case .downloading: break
             case .idle: break

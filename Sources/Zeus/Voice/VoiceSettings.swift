@@ -422,6 +422,9 @@ final class VoiceSettings {
             // Files already on this Mac (including a chosen folder) are used as they are.
             let dir = KokoroWorker.modelFilesPresent() ? KokoroWorker.modelDir() : KokoroWorker.managedModelDir
             if let downloadFailure = await KokoroWorker.downloadModelFiles(to: dir) {
+                if downloadFailure == DownloadBarState.tookTooLong {
+                    DictationHub.shared.controller?.topBarModel.showDownloadTimeout { [weak self] in self?.setUpKokoro() }
+                }
                 finishKokoroSetup(ready: false, message: downloadFailure)
                 return
             }

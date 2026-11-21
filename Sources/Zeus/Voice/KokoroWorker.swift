@@ -85,12 +85,14 @@ enum KokoroWorker {
         let url: String
         /// Smaller than this means a cut-off or error page, not the model.
         let minBytes: Int64
+        /// Published Content-Length. The transfer cap is this plus 25 percent.
+        let knownBytes: Int64
     }
 
     /// The published kokoro-onnx v1.0 files, fetched only when the person presses Set up.
     static let modelSources = [
-        ModelSource(name: "kokoro-v1.0.onnx", url: "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx", minBytes: 100_000_000),
-        ModelSource(name: "voices-v1.0.bin", url: "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin", minBytes: 5_000_000),
+        ModelSource(name: "kokoro-v1.0.onnx", url: "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx", minBytes: 100_000_000, knownBytes: PinnedModelBytes.kokoroOnnx),
+        ModelSource(name: "voices-v1.0.bin", url: "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin", minBytes: 5_000_000, knownBytes: PinnedModelBytes.kokoroVoices),
     ]
 
     private static func fileSize(_ url: URL) -> Int64 {
@@ -106,16 +108,54 @@ enum KokoroWorker {
             let target = dir.appendingPathComponent(source.name)
             if fileSize(target) >= source.minBytes { continue }
             guard let url = URL(string: source.url) else { return "Bad address for \(source.name)." }
-            do {
-                let (temp, response) = try await URLSession.shared.download(from: url)
-                defer { try? FileManager.default.removeItem(at: temp) }
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard code == 200 else { return "Downloading \(source.name) failed: the server answered \(code)." }
-                guard fileSize(temp) >= source.minBytes else { return "Downloading \(source.name) stopped early. Try again." }
+            let partial = target.appendingPathExtension("partial")
+            let maximum = PinnedModelBytes.cap(source.knownBytes)
+            let outcome = await DownloadRunner.run(kind: .voice, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial] }) {
+                let transfer = DownloadTransferGuard(maximumBytes: maximum, allowedHosts: PinnedDownloadHosts.kokoro)
+                transfer.destination = partial
+                let session = URLSession(configuration: .default, delegate: transfer, delegateQueue: nil)
+                try await withTaskCancellationHandler {
+                    var code = 0
+                    do {
+                        let (_, response) = try await session.download(from: url)
+                        code = (response as? HTTPURLResponse)?.statusCode ?? transfer.statusCode ?? 0
+                    } catch is DownloadCapExceeded {
+                        throw DownloadCapExceeded()
+                    } catch {
+                        if transfer.keptURL == nil {
+                            if transfer.stopped { throw DownloadCapExceeded() }
+                            throw error
+                        }
+                        code = transfer.statusCode ?? 0
+                    }
+                    guard code == 200 else { throw NSError(domain: "Zeus", code: code, userInfo: [NSLocalizedDescriptionKey: "Downloading \(source.name) failed: the server answered \(code)."]) }
+                    if transfer.stopped || transfer.keptURL == nil { throw DownloadCapExceeded() }
+                    let size = fileSize(transfer.keptURL!)
+                    guard size >= source.minBytes else {
+                        throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Downloading \(source.name) stopped early. Try again."])
+                    }
+                    if size > maximum || (ArchiveUnpackCap.isArchive(source.name) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
+                        throw DownloadCapExceeded()
+                    }
+                    session.finishTasksAndInvalidate()
+                } onCancel: {
+                    session.invalidateAndCancel()
+                }
+            }
+            switch outcome {
+            case .finished:
                 try? FileManager.default.removeItem(at: target)
-                try FileManager.default.moveItem(at: temp, to: target)
-            } catch {
-                return "Could not download \(source.name): \(error.localizedDescription)"
+                do { try FileManager.default.moveItem(at: partial, to: target) } catch {
+                    return "Could not download \(source.name): \(error.localizedDescription)"
+                }
+            case .tookTooLong:
+                return DownloadBarState.tookTooLong
+            case .cancelled:
+                return "Download cancelled."
+            case .capped:
+                return "This download is larger than the model cap."
+            case .failed(let message):
+                return message
             }
         }
         return nil
