@@ -86,6 +86,7 @@ struct SpeechEngineCard: View {
                     Button(actionTitle) { board.perform(line.action, for: kind) }
                         .buttonStyle(GSButtonStyle(prominent: line.action != .use))
                         .accessibilityLabel("\(actionTitle) \(kind.title)")
+                        .accessibilityIdentifier("settings.gsspeech-engine-card.control")
                 }
             }
         }
@@ -124,8 +125,11 @@ struct SpeechEngineCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                 .accessibilityLabel("\(kind.title) API key")
                 .onSubmit { board.saveKey() }
+                .accessibilityIdentifier("settings.gsspeech-engine-card.api-key")
             Button("Save key") { board.saveKey() }.buttonStyle(GSButtonStyle(prominent: true)).disabled(board.keyDraft.isEmpty)
+                .accessibilityIdentifier("settings.gsspeech-engine-card.save-key")
             Button("Cancel") { board.editingKey = nil; board.keyDraft = "" }.buttonStyle(GSButtonStyle())
+                .accessibilityIdentifier("settings.gsspeech-engine-card.cancel")
         }
         .padding(.bottom, 14)
     }

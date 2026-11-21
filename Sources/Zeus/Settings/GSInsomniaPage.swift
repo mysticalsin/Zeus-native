@@ -28,9 +28,12 @@ struct InsomniaSettingsPage: View {
                     GSStatus(ok: insomnia.setup.isReady, text: insomnia.setup.isReady ? "Set up" : "Not set up")
                     if insomnia.setup.isReady {
                         Button("Remove", action: insomnia.uninstallRule).buttonStyle(GSButtonStyle()).disabled(insomnia.setupBusy)
+                            .accessibilityIdentifier("settings.gsinsomnia-page.remove.3")
                     } else {
                         Button(insomnia.setupBusy ? "Waiting…" : "Set up", action: insomnia.installRule)
                             .buttonStyle(GSButtonStyle(prominent: true)).disabled(insomnia.setupBusy)
+                            .accessibilityLabel(insomnia.setupBusy ? "Waiting…" : "Set up")
+                            .accessibilityIdentifier("settings.gsinsomnia-page.waiting")
                     }
                 }
             }
@@ -59,6 +62,8 @@ struct InsomniaSettingsPage: View {
                     page.pickerOpen.toggle()
                 }
                 .buttonStyle(GSButtonStyle())
+                .accessibilityLabel(page.pickerOpen ? "Done" : "Add from running apps")
+                .accessibilityIdentifier("settings.gsinsomnia-page.done")
             }
             if insomnia.freezeBundleIDs.isEmpty, !page.pickerOpen {
                 GSInfo(text: "No apps yet. Chat apps like Slack or Discord are good picks.")
@@ -68,6 +73,7 @@ struct InsomniaSettingsPage: View {
                     Text(name(for: id)).font(GS.rowText).foregroundStyle(GS.text).help(id)
                     Spacer()
                     Button("Remove") { insomnia.toggleFreeze(id) }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsinsomnia-page.remove.2")
                 }
                 .padding(.leading, 42).padding(.vertical, 4)
             }
@@ -77,6 +83,7 @@ struct InsomniaSettingsPage: View {
                         Text(app.name).font(GS.rowText).foregroundStyle(GS.text).help(app.bundleID)
                         Spacer()
                         Button("Add") { insomnia.toggleFreeze(app.bundleID) }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsinsomnia-page.add")
                     }
                     .padding(.leading, 42).padding(.vertical, 4)
                 }
@@ -98,9 +105,12 @@ struct InsomniaSettingsPage: View {
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("Hotspot password")
                         .onSubmit(savePassword)
+                        .accessibilityIdentifier("settings.gsinsomnia-page.hotspot-password")
                     Button("Save", action: savePassword).buttonStyle(GSButtonStyle()).disabled(page.passwordDraft.isEmpty)
+                        .accessibilityIdentifier("settings.gsinsomnia-page.save")
                     if insomnia.hasHotspotPassword {
                         Button("Remove") { insomnia.saveHotspotPassword("") }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsinsomnia-page.remove")
                     }
                 }
             }
@@ -138,5 +148,6 @@ struct InsomniaSettingsPage: View {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
             .accessibilityLabel(placeholder)
+            .accessibilityIdentifier("settings.gsinsomnia-page.control")
     }
 }

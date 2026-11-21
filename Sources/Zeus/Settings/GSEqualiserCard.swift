@@ -136,9 +136,13 @@ struct GSEqualiserCard: View {
                         // The same link the spectrum's "Allow" uses for a refusal.
                         Button(EqualiserCardActions.systemSettingsTitle) { AudioSpectrumService.shared.openSystemSettings() }
                             .buttonStyle(GSButtonStyle())
+                            .accessibilityLabel(EqualiserCardActions.systemSettingsTitle)
+                            .accessibilityIdentifier("settings.gsequaliser-card.equalisercardactions-systemsettingstitle")
                     }
                     Button(EqualiserCardActions.tryAgainTitle) { controller.map(EqualiserCardActions.init)?.tryAgain() }
                         .buttonStyle(GSButtonStyle())
+                        .accessibilityLabel(EqualiserCardActions.tryAgainTitle)
+                        .accessibilityIdentifier("settings.gsequaliser-card.equalisercardactions-tryagaintitle")
                     Spacer(minLength: 0)
                 }
                 .padding(.bottom, 14)
@@ -198,6 +202,7 @@ private struct EqualiserAppRow: View {
                 Toggle("Shape \(row.displayName)", isOn: Binding(
                     get: { row.settings.shapes }, set: { actions?.setShapes(of: row, on: $0) }))
                     .toggleStyle(GSToggleStyle()).labelsHidden()
+                    .accessibilityIdentifier("settings.gsequaliser-card.control.2")
                 OBTickSlider(
                     value: Binding(
                         get: { (row.settings.clamped().volume * 100).rounded() },
@@ -228,13 +233,14 @@ private struct EqualiserAppRow: View {
         Button(action: toggleOpen) {
             Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)).foregroundStyle(GS.controlText)
                 .rotationEffect(.degrees(isOpen ? 90 : 0))
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isOpen)
+                .animation(reduceMotion ? nil : .easeOut(duration: MotionTokens.settingsDisclosure), value: isOpen)
                 .frame(width: 28, height: 28)
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.controlFill))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.controlStroke, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isOpen ? "Hide the bands for \(row.displayName)" : "Show the bands for \(row.displayName)")
+        .accessibilityIdentifier("settings.gsequaliser-card.control")
     }
 }
 
@@ -295,9 +301,11 @@ private struct EqualiserBandPanel: View {
                 Button(EqualiserCardActions.resetTitle) { actions?.resetToFlat(row) }
                     .buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Reset \(row.displayName) to flat")
+                    .accessibilityIdentifier("settings.gsequaliser-card.reset-to-flat")
                 Button(EqualiserCardActions.forgetTitle) { actions?.forget(row) }
                     .buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Forget \(row.displayName)")
+                    .accessibilityIdentifier("settings.gsequaliser-card.forget")
             }
             HStack(alignment: .top, spacing: 0) {
                 ForEach(0..<EqualiserParameters.bandCount, id: \.self) { index in

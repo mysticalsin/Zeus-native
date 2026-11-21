@@ -1,0 +1,1693 @@
+{
+  "findings" : [
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-001",
+      "kind" : "accessibility",
+      "line" : 33,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-002",
+      "kind" : "accessibility",
+      "line" : 34,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-003",
+      "kind" : "accessibility",
+      "line" : 35,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-004",
+      "kind" : "accessibility",
+      "line" : 43,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-005",
+      "kind" : "accessibility",
+      "line" : 310,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-006",
+      "kind" : "accessibility",
+      "line" : 483,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
+      "id" : "ZB-UIUX-A11Y-007",
+      "kind" : "accessibility",
+      "line" : 613,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Agents\/OtherAgents.swift",
+      "id" : "ZB-UIUX-A11Y-008",
+      "kind" : "accessibility",
+      "line" : 113,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Picker missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-009",
+      "kind" : "accessibility",
+      "line" : 14,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-010",
+      "kind" : "accessibility",
+      "line" : 21,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-011",
+      "kind" : "accessibility",
+      "line" : 37,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-012",
+      "kind" : "accessibility",
+      "line" : 40,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-013",
+      "kind" : "accessibility",
+      "line" : 47,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-014",
+      "kind" : "accessibility",
+      "line" : 56,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-A11Y-015",
+      "kind" : "accessibility",
+      "line" : 63,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-016",
+      "kind" : "accessibility",
+      "line" : 127,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-017",
+      "kind" : "accessibility",
+      "line" : 130,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-018",
+      "kind" : "accessibility",
+      "line" : 135,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-019",
+      "kind" : "accessibility",
+      "line" : 153,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-020",
+      "kind" : "accessibility",
+      "line" : 159,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Picker missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-021",
+      "kind" : "accessibility",
+      "line" : 165,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Picker missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-022",
+      "kind" : "accessibility",
+      "line" : 168,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-023",
+      "kind" : "accessibility",
+      "line" : 181,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationPreviewCard.swift",
+      "id" : "ZB-UIUX-A11Y-024",
+      "kind" : "accessibility",
+      "line" : 141,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/DictationPreviewCard.swift",
+      "id" : "ZB-UIUX-A11Y-025",
+      "kind" : "accessibility",
+      "line" : 143,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Picker missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/SpeechEngineSettings.swift",
+      "id" : "ZB-UIUX-A11Y-026",
+      "kind" : "accessibility",
+      "line" : 29,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/SpeechEngineSettings.swift",
+      "id" : "ZB-UIUX-A11Y-027",
+      "kind" : "accessibility",
+      "line" : 38,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Dictation\/SpeechEngineSettings.swift",
+      "id" : "ZB-UIUX-A11Y-028",
+      "kind" : "accessibility",
+      "line" : 45,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-029",
+      "kind" : "accessibility",
+      "line" : 407,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "NotchButton missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-030",
+      "kind" : "accessibility",
+      "line" : 561,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-031",
+      "kind" : "accessibility",
+      "line" : 588,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "NotchButton missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-032",
+      "kind" : "accessibility",
+      "line" : 671,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "NotchButton missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-033",
+      "kind" : "accessibility",
+      "line" : 703,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "NotchButton missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-034",
+      "kind" : "accessibility",
+      "line" : 705,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-035",
+      "kind" : "accessibility",
+      "line" : 719,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-A11Y-036",
+      "kind" : "accessibility",
+      "line" : 742,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-A11Y-037",
+      "kind" : "accessibility",
+      "line" : 67,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-A11Y-038",
+      "kind" : "accessibility",
+      "line" : 92,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-A11Y-039",
+      "kind" : "accessibility",
+      "line" : 94,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-A11Y-040",
+      "kind" : "accessibility",
+      "line" : 106,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-A11Y-041",
+      "kind" : "accessibility",
+      "line" : 108,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-A11Y-042",
+      "kind" : "accessibility",
+      "line" : 117,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
+      "id" : "ZB-UIUX-A11Y-043",
+      "kind" : "accessibility",
+      "line" : 99,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
+      "id" : "ZB-UIUX-A11Y-044",
+      "kind" : "accessibility",
+      "line" : 163,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
+      "id" : "ZB-UIUX-A11Y-045",
+      "kind" : "accessibility",
+      "line" : 347,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
+      "id" : "ZB-UIUX-A11Y-046",
+      "kind" : "accessibility",
+      "line" : 454,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
+      "id" : "ZB-UIUX-A11Y-047",
+      "kind" : "accessibility",
+      "line" : 462,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
+      "id" : "ZB-UIUX-A11Y-048",
+      "kind" : "accessibility",
+      "line" : 468,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
+      "id" : "ZB-UIUX-A11Y-049",
+      "kind" : "accessibility",
+      "line" : 365,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
+      "id" : "ZB-UIUX-A11Y-050",
+      "kind" : "accessibility",
+      "line" : 376,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
+      "id" : "ZB-UIUX-A11Y-051",
+      "kind" : "accessibility",
+      "line" : 384,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
+      "id" : "ZB-UIUX-A11Y-052",
+      "kind" : "accessibility",
+      "line" : 417,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
+      "id" : "ZB-UIUX-A11Y-053",
+      "kind" : "accessibility",
+      "line" : 421,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
+      "id" : "ZB-UIUX-A11Y-054",
+      "kind" : "accessibility",
+      "line" : 435,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-055",
+      "kind" : "accessibility",
+      "line" : 129,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "TextField missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-056",
+      "kind" : "accessibility",
+      "line" : 149,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-057",
+      "kind" : "accessibility",
+      "line" : 155,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-058",
+      "kind" : "accessibility",
+      "line" : 172,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-059",
+      "kind" : "accessibility",
+      "line" : 185,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-060",
+      "kind" : "accessibility",
+      "line" : 251,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-061",
+      "kind" : "accessibility",
+      "line" : 387,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-A11Y-062",
+      "kind" : "accessibility",
+      "line" : 419,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-063",
+      "kind" : "accessibility",
+      "line" : 92,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-064",
+      "kind" : "accessibility",
+      "line" : 94,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-065",
+      "kind" : "accessibility",
+      "line" : 123,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-066",
+      "kind" : "accessibility",
+      "line" : 124,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-067",
+      "kind" : "accessibility",
+      "line" : 129,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-068",
+      "kind" : "accessibility",
+      "line" : 130,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-069",
+      "kind" : "accessibility",
+      "line" : 427,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-070",
+      "kind" : "accessibility",
+      "line" : 428,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-071",
+      "kind" : "accessibility",
+      "line" : 458,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-072",
+      "kind" : "accessibility",
+      "line" : 483,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-073",
+      "kind" : "accessibility",
+      "line" : 544,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-074",
+      "kind" : "accessibility",
+      "line" : 596,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-075",
+      "kind" : "accessibility",
+      "line" : 598,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-076",
+      "kind" : "accessibility",
+      "line" : 876,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-077",
+      "kind" : "accessibility",
+      "line" : 997,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-078",
+      "kind" : "accessibility",
+      "line" : 1010,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-079",
+      "kind" : "accessibility",
+      "line" : 1067,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-080",
+      "kind" : "accessibility",
+      "line" : 1071,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-081",
+      "kind" : "accessibility",
+      "line" : 1088,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "TextField missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-082",
+      "kind" : "accessibility",
+      "line" : 1093,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-083",
+      "kind" : "accessibility",
+      "line" : 1103,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Toggle missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-084",
+      "kind" : "accessibility",
+      "line" : 1112,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-085",
+      "kind" : "accessibility",
+      "line" : 1120,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-086",
+      "kind" : "accessibility",
+      "line" : 1122,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-087",
+      "kind" : "accessibility",
+      "line" : 1203,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-088",
+      "kind" : "accessibility",
+      "line" : 1290,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-089",
+      "kind" : "accessibility",
+      "line" : 1296,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-090",
+      "kind" : "accessibility",
+      "line" : 1318,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-091",
+      "kind" : "accessibility",
+      "line" : 1384,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-092",
+      "kind" : "accessibility",
+      "line" : 1424,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-A11Y-093",
+      "kind" : "accessibility",
+      "line" : 1425,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeSpeakerEditors.swift",
+      "id" : "ZB-UIUX-A11Y-094",
+      "kind" : "accessibility",
+      "line" : 53,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeSpeakerEditors.swift",
+      "id" : "ZB-UIUX-A11Y-095",
+      "kind" : "accessibility",
+      "line" : 54,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeSpeakerEditors.swift",
+      "id" : "ZB-UIUX-A11Y-096",
+      "kind" : "accessibility",
+      "line" : 71,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "TextField missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeSpeakerEditors.swift",
+      "id" : "ZB-UIUX-A11Y-097",
+      "kind" : "accessibility",
+      "line" : 76,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeSpeakerEditors.swift",
+      "id" : "ZB-UIUX-A11Y-098",
+      "kind" : "accessibility",
+      "line" : 80,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeSpeakerEditors.swift",
+      "id" : "ZB-UIUX-A11Y-099",
+      "kind" : "accessibility",
+      "line" : 133,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-100",
+      "kind" : "accessibility",
+      "line" : 29,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-101",
+      "kind" : "accessibility",
+      "line" : 53,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-102",
+      "kind" : "accessibility",
+      "line" : 58,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-103",
+      "kind" : "accessibility",
+      "line" : 61,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-104",
+      "kind" : "accessibility",
+      "line" : 77,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-105",
+      "kind" : "accessibility",
+      "line" : 82,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-106",
+      "kind" : "accessibility",
+      "line" : 85,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-107",
+      "kind" : "accessibility",
+      "line" : 128,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-108",
+      "kind" : "accessibility",
+      "line" : 130,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/Settings\/GSSpeakerRecognitionCard.swift",
+      "id" : "ZB-UIUX-A11Y-109",
+      "kind" : "accessibility",
+      "line" : 134,
+      "surface" : "Settings"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/ChatPage.swift",
+      "id" : "ZB-UIUX-A11Y-110",
+      "kind" : "accessibility",
+      "line" : 77,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/ChatPage.swift",
+      "id" : "ZB-UIUX-A11Y-111",
+      "kind" : "accessibility",
+      "line" : 119,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/ChatPage.swift",
+      "id" : "ZB-UIUX-A11Y-112",
+      "kind" : "accessibility",
+      "line" : 153,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/ChatPage.swift",
+      "id" : "ZB-UIUX-A11Y-113",
+      "kind" : "accessibility",
+      "line" : 238,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/ChatPage.swift",
+      "id" : "ZB-UIUX-A11Y-114",
+      "kind" : "accessibility",
+      "line" : 257,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceEmptyStates.swift",
+      "id" : "ZB-UIUX-A11Y-115",
+      "kind" : "accessibility",
+      "line" : 52,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceEmptyStates.swift",
+      "id" : "ZB-UIUX-A11Y-116",
+      "kind" : "accessibility",
+      "line" : 63,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
+      "id" : "ZB-UIUX-A11Y-117",
+      "kind" : "accessibility",
+      "line" : 98,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
+      "id" : "ZB-UIUX-A11Y-118",
+      "kind" : "accessibility",
+      "line" : 141,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
+      "id" : "ZB-UIUX-A11Y-119",
+      "kind" : "accessibility",
+      "line" : 175,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
+      "id" : "ZB-UIUX-A11Y-120",
+      "kind" : "accessibility",
+      "line" : 234,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
+      "id" : "ZB-UIUX-A11Y-121",
+      "kind" : "accessibility",
+      "line" : 257,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
+      "id" : "ZB-UIUX-A11Y-122",
+      "kind" : "accessibility",
+      "line" : 282,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/HomeStripView.swift",
+      "id" : "ZB-UIUX-A11Y-123",
+      "kind" : "accessibility",
+      "line" : 67,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/HomeWidgetViews.swift",
+      "id" : "ZB-UIUX-A11Y-124",
+      "kind" : "accessibility",
+      "line" : 827,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/RecordingActivityWings.swift",
+      "id" : "ZB-UIUX-A11Y-125",
+      "kind" : "accessibility",
+      "line" : 40,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
+      "id" : "ZB-UIUX-A11Y-126",
+      "kind" : "accessibility",
+      "line" : 78,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
+      "id" : "ZB-UIUX-A11Y-127",
+      "kind" : "accessibility",
+      "line" : 79,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
+      "id" : "ZB-UIUX-A11Y-128",
+      "kind" : "accessibility",
+      "line" : 80,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
+      "id" : "ZB-UIUX-A11Y-129",
+      "kind" : "accessibility",
+      "line" : 82,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
+      "id" : "ZB-UIUX-A11Y-130",
+      "kind" : "accessibility",
+      "line" : 109,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
+      "id" : "ZB-UIUX-A11Y-131",
+      "kind" : "accessibility",
+      "line" : 119,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TilingPage.swift",
+      "id" : "ZB-UIUX-A11Y-132",
+      "kind" : "accessibility",
+      "line" : 98,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TilingPage.swift",
+      "id" : "ZB-UIUX-A11Y-133",
+      "kind" : "accessibility",
+      "line" : 127,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TilingPage.swift",
+      "id" : "ZB-UIUX-A11Y-134",
+      "kind" : "accessibility",
+      "line" : 151,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-135",
+      "kind" : "accessibility",
+      "line" : 21,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-136",
+      "kind" : "accessibility",
+      "line" : 73,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-137",
+      "kind" : "accessibility",
+      "line" : 149,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "TextField missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-138",
+      "kind" : "accessibility",
+      "line" : 222,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-139",
+      "kind" : "accessibility",
+      "line" : 240,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-140",
+      "kind" : "accessibility",
+      "line" : 257,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-141",
+      "kind" : "accessibility",
+      "line" : 258,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
+      "id" : "ZB-UIUX-A11Y-142",
+      "kind" : "accessibility",
+      "line" : 330,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-143",
+      "kind" : "accessibility",
+      "line" : 60,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-144",
+      "kind" : "accessibility",
+      "line" : 62,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-145",
+      "kind" : "accessibility",
+      "line" : 103,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-146",
+      "kind" : "accessibility",
+      "line" : 144,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-147",
+      "kind" : "accessibility",
+      "line" : 185,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-148",
+      "kind" : "accessibility",
+      "line" : 186,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-149",
+      "kind" : "accessibility",
+      "line" : 187,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
+      "id" : "ZB-UIUX-A11Y-150",
+      "kind" : "accessibility",
+      "line" : 188,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-151",
+      "kind" : "accessibility",
+      "line" : 81,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-152",
+      "kind" : "accessibility",
+      "line" : 671,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-153",
+      "kind" : "accessibility",
+      "line" : 729,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-154",
+      "kind" : "accessibility",
+      "line" : 764,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-155",
+      "kind" : "accessibility",
+      "line" : 786,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-156",
+      "kind" : "accessibility",
+      "line" : 799,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-157",
+      "kind" : "accessibility",
+      "line" : 836,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-158",
+      "kind" : "accessibility",
+      "line" : 868,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-159",
+      "kind" : "accessibility",
+      "line" : 870,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-160",
+      "kind" : "accessibility",
+      "line" : 879,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-161",
+      "kind" : "accessibility",
+      "line" : 917,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-162",
+      "kind" : "accessibility",
+      "line" : 1005,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-163",
+      "kind" : "accessibility",
+      "line" : 1115,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-164",
+      "kind" : "accessibility",
+      "line" : 1116,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-165",
+      "kind" : "accessibility",
+      "line" : 1269,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-166",
+      "kind" : "accessibility",
+      "line" : 1271,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-167",
+      "kind" : "accessibility",
+      "line" : 1274,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-168",
+      "kind" : "accessibility",
+      "line" : 1284,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-169",
+      "kind" : "accessibility",
+      "line" : 1315,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing label, identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-170",
+      "kind" : "accessibility",
+      "line" : 1388,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "NotchActionButton missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-171",
+      "kind" : "accessibility",
+      "line" : 1417,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-172",
+      "kind" : "accessibility",
+      "line" : 1433,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-173",
+      "kind" : "accessibility",
+      "line" : 1670,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-174",
+      "kind" : "accessibility",
+      "line" : 1755,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-175",
+      "kind" : "accessibility",
+      "line" : 2053,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-A11Y-176",
+      "kind" : "accessibility",
+      "line" : 2077,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/WavesPage.swift",
+      "id" : "ZB-UIUX-A11Y-177",
+      "kind" : "accessibility",
+      "line" : 48,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Button missing identifier",
+      "file" : "Sources\/Zeus\/TopBar\/WavesPage.swift",
+      "id" : "ZB-UIUX-A11Y-178",
+      "kind" : "accessibility",
+      "line" : 65,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Decision results have no accessibility identifier on a row",
+      "file" : "Sources\/ZeusCore\/Decision\/DecisionProvider.swift",
+      "id" : "ZB-UIUX-DECISION-001",
+      "kind" : "decision-row",
+      "line" : 1,
+      "surface" : "decision"
+    },
+    {
+      "detail" : "Fixed type sizes and no dynamic type ramp",
+      "file" : "Sources\/Zeus\/Agents",
+      "id" : "ZB-UIUX-TYPE-001",
+      "kind" : "dynamic-type",
+      "line" : 1,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Fixed type sizes and no dynamic type ramp",
+      "file" : "Sources\/Zeus\/Notch",
+      "id" : "ZB-UIUX-TYPE-002",
+      "kind" : "dynamic-type",
+      "line" : 1,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "Fixed type sizes and no dynamic type ramp",
+      "file" : "Sources\/Zeus\/Scribe",
+      "id" : "ZB-UIUX-TYPE-003",
+      "kind" : "dynamic-type",
+      "line" : 1,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "Fixed type sizes and no dynamic type ramp",
+      "file" : "Sources\/Zeus\/TopBar",
+      "id" : "ZB-UIUX-TYPE-004",
+      "kind" : "dynamic-type",
+      "line" : 1,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Escape is not bound on the approval card or the expanded panel",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-ESCAPE-001",
+      "kind" : "escape-key",
+      "line" : 1,
+      "surface" : "approval"
+    },
+    {
+      "detail" : "0.08",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-MOTION-001",
+      "kind" : "motion-literal",
+      "line" : 93,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "0.2, 0.12",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-MOTION-002",
+      "kind" : "motion-literal",
+      "line" : 453,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "0.2, 0.1",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-MOTION-003",
+      "kind" : "motion-literal",
+      "line" : 481,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "0.25",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-MOTION-004",
+      "kind" : "motion-literal",
+      "line" : 80,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.15",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeLiveParts.swift",
+      "id" : "ZB-UIUX-MOTION-005",
+      "kind" : "motion-literal",
+      "line" : 41,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.06",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeLiveParts.swift",
+      "id" : "ZB-UIUX-MOTION-006",
+      "kind" : "motion-literal",
+      "line" : 104,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.25, 0.5",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
+      "id" : "ZB-UIUX-MOTION-007",
+      "kind" : "motion-literal",
+      "line" : 393,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.82",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeOpenAnimation.swift",
+      "id" : "ZB-UIUX-MOTION-008",
+      "kind" : "motion-literal",
+      "line" : 70,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.06",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-MOTION-009",
+      "kind" : "motion-literal",
+      "line" : 511,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.15",
+      "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
+      "id" : "ZB-UIUX-MOTION-010",
+      "kind" : "motion-literal",
+      "line" : 723,
+      "surface" : "Scribe"
+    },
+    {
+      "detail" : "0.45",
+      "file" : "Sources\/Zeus\/TopBar\/LyricsViews.swift",
+      "id" : "ZB-UIUX-MOTION-011",
+      "kind" : "motion-literal",
+      "line" : 306,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.18",
+      "file" : "Sources\/Zeus\/TopBar\/LyricsViews.swift",
+      "id" : "ZB-UIUX-MOTION-012",
+      "kind" : "motion-literal",
+      "line" : 359,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.35",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-013",
+      "kind" : "motion-literal",
+      "line" : 141,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.35",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-014",
+      "kind" : "motion-literal",
+      "line" : 142,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.08",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-015",
+      "kind" : "motion-literal",
+      "line" : 202,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.12",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-016",
+      "kind" : "motion-literal",
+      "line" : 239,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.05",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-017",
+      "kind" : "motion-literal",
+      "line" : 332,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.18",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-018",
+      "kind" : "motion-literal",
+      "line" : 335,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.05",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-019",
+      "kind" : "motion-literal",
+      "line" : 356,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.2",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-020",
+      "kind" : "motion-literal",
+      "line" : 1544,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.06",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-021",
+      "kind" : "motion-literal",
+      "line" : 1743,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.08",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-MOTION-022",
+      "kind" : "motion-literal",
+      "line" : 1869,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "0.08",
+      "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
+      "id" : "ZB-UIUX-REDUCE-001",
+      "kind" : "motion-reduce",
+      "line" : 93,
+      "surface" : "Dictation"
+    },
+    {
+      "detail" : "0.2, 0.12",
+      "file" : "Sources\/Zeus\/Notch\/NotchView.swift",
+      "id" : "ZB-UIUX-REDUCE-002",
+      "kind" : "motion-reduce",
+      "line" : 453,
+      "surface" : "Notch"
+    },
+    {
+      "detail" : "0.2",
+      "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
+      "id" : "ZB-UIUX-REDUCE-003",
+      "kind" : "motion-reduce",
+      "line" : 1544,
+      "surface" : "TopBar"
+    },
+    {
+      "detail" : "Material without a Reduce Transparency branch",
+      "file" : "Sources\/Zeus\/Agents\/BackgroundAgentTracker.swift",
+      "id" : "ZB-UIUX-GLASS-001",
+      "kind" : "reduce-transparency",
+      "line" : 1,
+      "surface" : "Agents"
+    },
+    {
+      "detail" : "Material without a Reduce Transparency branch",
+      "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
+      "id" : "ZB-UIUX-GLASS-002",
+      "kind" : "reduce-transparency",
+      "line" : 1,
+      "surface" : "Scribe"
+    }
+  ],
+  "schema" : 1
+}

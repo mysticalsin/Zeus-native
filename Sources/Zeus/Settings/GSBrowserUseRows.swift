@@ -52,6 +52,8 @@ struct GSBrowserUseRows: View {
                     if status?.ready == true { Task { await model.refresh() } } else { model.setUp() }
                 }
                 .buttonStyle(GSButtonStyle(prominent: status?.ready != true)).disabled(model.working)
+                .accessibilityLabel(status?.ready == true ? "Check again" : "Set up")
+                .accessibilityIdentifier("settings.gsbrowser-use-rows.check-again")
             }
         }
         VStack(alignment: .leading, spacing: 6) {

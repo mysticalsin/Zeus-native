@@ -206,6 +206,7 @@ struct GlanceSettingsRoot: View {
 /// Logo tile, wordmark, three groups of items (28 pt apart, tighter when more rows show), version at the foot.
 struct GSSidebar: View {
     let navigation: GSNavigation
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -240,7 +241,7 @@ struct GSSidebar: View {
             HStack(spacing: 0) {
                 Image(systemName: section.symbol).font(.system(size: 15, weight: .regular))
                     .frame(width: 29, alignment: .leading)
-                Text(section.title).font(GS.sidebarItem)
+                Text(section.title).font(GS.sidebarItem(dynamicTypeSize: dynamicTypeSize))
                 Spacer()
             }
             .foregroundStyle(selected ? GS.selectedText : GS.text)

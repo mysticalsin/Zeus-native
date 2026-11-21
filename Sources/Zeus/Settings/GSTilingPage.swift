@@ -64,6 +64,7 @@ struct TilingSettingsPage: View {
                 .frame(width: 160)
                 .accessibilityLabel(title)
                 .accessibilityValue("\(shown) \(unit)")
+                .accessibilityIdentifier("settings.gstiling-page.control")
         }
     }
 }

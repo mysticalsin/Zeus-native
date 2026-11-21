@@ -27,11 +27,15 @@ struct ZeusVoiceCards: View {
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("ElevenLabs key")
                         .onSubmit { voice.saveElevenKey() }
+                        .accessibilityIdentifier("settings.gsvoice-cards.elevenlabs-key")
                     Button("Save key") { voice.saveElevenKey() }.buttonStyle(GSButtonStyle()).disabled(voice.elevenKeyDraft.isEmpty)
+                        .accessibilityIdentifier("settings.gsvoice-cards.save-key.3")
                     if !voice.elevenKeySaved {
                         Button("Get a key") { NSWorkspace.shared.open(URL(string: "https://elevenlabs.io")!) }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsvoice-cards.get-a-key")
                     }
-                    if voice.elevenKeySaved { Button("Remove") { voice.removeElevenKey() }.buttonStyle(GSButtonStyle()) }
+                    if voice.elevenKeySaved { Button("Remove") { voice.removeElevenKey() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsvoice-cards.remove") }
                 }
             }
             if let line = voice.keyCheckMessage {
@@ -63,6 +67,7 @@ struct ZeusVoiceCards: View {
                     .frame(width: 160)
                     .accessibilityLabel("Effect intensity")
                     .accessibilityValue(String(format: "%.0f percent", UltronVoiceEffect.intensity * 100))
+                    .accessibilityIdentifier("settings.gsvoice-cards.effect-intensity")
             }
             GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
@@ -88,7 +93,9 @@ struct ZeusVoiceCards: View {
                     HStack(spacing: 10) {
                         Button("Open Spoken Content") { Self.openSpokenContent(); voice.macVoiceHintDismissed = true }
                             .buttonStyle(GSButtonStyle(prominent: true))
+                            .accessibilityIdentifier("settings.gsvoice-cards.open-spoken-content")
                         Button("Dismiss") { voice.macVoiceHintDismissed = true }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsvoice-cards.dismiss")
                     }
                 }
             }
@@ -96,6 +103,8 @@ struct ZeusVoiceCards: View {
             GSRow(symbol: "waveform.badge.mic", title: "Test voice", text: "Speaks a short line in English and in French and times the first sound.") {
                 Button(testModel.running ? "Speaking" : "Test voice") { testModel.run(speaker: Self.previewSpeaker) }
                     .buttonStyle(GSButtonStyle(prominent: true)).disabled(testModel.running)
+                    .accessibilityLabel(testModel.running ? "Speaking" : "Test voice")
+                    .accessibilityIdentifier("settings.gsvoice-cards.speaking")
             }
             ForEach(testModel.rows) { row in
                 GSInfo(text: row.summary)
@@ -104,6 +113,8 @@ struct ZeusVoiceCards: View {
             GSRow(symbol: "waveform.badge.mic", title: "Answer voice") {
                 Button(voice.testing ? "Playing" : "Preview") { voice.test(with: Self.previewSpeaker) }
                     .buttonStyle(GSButtonStyle(prominent: true)).disabled(voice.testing)
+                    .accessibilityLabel(voice.testing ? "Playing" : "Preview")
+                    .accessibilityIdentifier("settings.gsvoice-cards.playing")
             }
             if let line = voice.previewMessage {
                 GSDivider()
@@ -132,8 +143,11 @@ struct ZeusVoiceCards: View {
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("OpenAI TTS key")
                         .onSubmit { voice.saveOpenAIKey() }
+                        .accessibilityIdentifier("settings.gsvoice-cards.openai-tts-key")
                     Button("Save key") { voice.saveOpenAIKey() }.buttonStyle(GSButtonStyle()).disabled(voice.openAIKeyDraft.isEmpty)
-                    if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle()) }
+                        .accessibilityIdentifier("settings.gsvoice-cards.save-key.2")
+                    if voice.openAIKeySaved { Button("Clear") { voice.removeOpenAIKey() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsvoice-cards.clear.2") }
                 }
             }
             if voice.openAIKeySaved {
@@ -162,8 +176,11 @@ struct ZeusVoiceCards: View {
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("Gemini TTS key")
                         .onSubmit { voice.saveGeminiKey() }
+                        .accessibilityIdentifier("settings.gsvoice-cards.gemini-tts-key")
                     Button("Save key") { voice.saveGeminiKey() }.buttonStyle(GSButtonStyle()).disabled(voice.geminiKeyDraft.isEmpty)
-                    if voice.geminiKeySaved { Button("Clear") { voice.removeGeminiKey() }.buttonStyle(GSButtonStyle()) }
+                        .accessibilityIdentifier("settings.gsvoice-cards.save-key")
+                    if voice.geminiKeySaved { Button("Clear") { voice.removeGeminiKey() }.buttonStyle(GSButtonStyle())
+                        .accessibilityIdentifier("settings.gsvoice-cards.clear") }
                 }
             }
             if voice.geminiKeySaved {
@@ -183,6 +200,7 @@ struct ZeusVoiceCards: View {
                         ProgressView().controlSize(.small)
                     } else if voice.library.isEmpty {
                         Button("Load voices") { Task { await voice.loadLibrary() } }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsvoice-cards.load-voices")
                     } else {
                         GSPopup(selection: Binding(get: { voice.library.first { $0.id == voice.elevenVoiceID }?.name ?? voice.elevenVoiceID },
                                                    set: { name in if let item = voice.library.first(where: { $0.name == name }) { voice.setElevenVoice(item.id) } }),
@@ -201,7 +219,8 @@ struct ZeusVoiceCards: View {
                 GSRow(symbol: "waveform.circle", title: "Kokoro on this Mac", text: kokoroText) {
                     if voice.settingUpKokoro { ProgressView().controlSize(.small) }
                     else if voice.kokoroReady { GSStatus(ok: true, text: "Ready") }
-                    else { Button("Set up Kokoro") { voice.setUpKokoro() }.buttonStyle(GSButtonStyle(prominent: true)) }
+                    else { Button("Set up Kokoro") { voice.setUpKokoro() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityIdentifier("settings.gsvoice-cards.set-up-kokoro") }
                 }
                 if voice.kokoroReady {
                     GSDivider()
@@ -224,6 +243,7 @@ struct ZeusVoiceCards: View {
                             .frame(width: 160)
                             .accessibilityLabel("Kokoro pace")
                             .accessibilityValue(String(format: "%.2f times", voice.kokoroSpeed))
+                            .accessibilityIdentifier("settings.gsvoice-cards.kokoro-pace")
                     }
                 }
             }
@@ -252,6 +272,8 @@ struct ZeusVoiceCards: View {
                 else {
                     Button(designer.previews.isEmpty ? (voice.hasDesignedVoice ? "Design" : "Create Zeus voice") : "Again") { designer.design() }
                         .buttonStyle(GSButtonStyle(prominent: designer.previews.isEmpty))
+                        .accessibilityLabel(designer.previews.isEmpty ? (voice.hasDesignedVoice ? "Design" : "Create Zeus voice") : "Again")
+                        .accessibilityIdentifier("settings.gsvoice-cards.design")
                 }
             }
             ForEach(Array(designer.previews.enumerated()), id: \.element.id) { index, preview in
@@ -260,8 +282,11 @@ struct ZeusVoiceCards: View {
                     HStack(spacing: 10) {
                         Button(designer.playingID == preview.id ? "Stop" : "Play") { designer.togglePlay(preview) }
                             .buttonStyle(GSButtonStyle())
+                            .accessibilityLabel(designer.playingID == preview.id ? "Stop" : "Play")
+                            .accessibilityIdentifier("settings.gsvoice-cards.stop")
                         Button("Use") { designer.use(preview) }
                             .buttonStyle(GSButtonStyle(prominent: true)).disabled(designer.busy)
+                            .accessibilityIdentifier("settings.gsvoice-cards.use")
                     }
                 }
             }
@@ -321,6 +346,7 @@ struct ZeusVoiceCards: View {
                 preview.toggle(provider, voice: selected)
             }
             .buttonStyle(GSButtonStyle()).accessibilityLabel("\(label) preview")
+            .accessibilityIdentifier("settings.gsvoice-cards.preview")
         }
     }
 

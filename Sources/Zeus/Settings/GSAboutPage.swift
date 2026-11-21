@@ -66,14 +66,17 @@ struct AboutPage: View {
                     UpdateCoordinator.shared.refreshBadge()
                     checked = true
                 }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.gsabout-page.check-now")
             }
             GSDivider()
             GSRow(symbol: "doc.text", title: "Acknowledgements", text: "Open-source projects and fonts that ship with Zeus.") {
                 Button("Show") { showNotices = true }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.gsabout-page.show")
             }
             GSDivider()
             GSRow(symbol: "lock.shield", title: "Privacy", text: AboutInfo.privacySummary) {
                 Button("Privacy settings") { navigation.section = .privacy }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.gsabout-page.privacy-settings")
             }
         }
         Text(AboutInfo.copyright).font(OB.font(12.5)).foregroundStyle(GS.secondary)
@@ -88,6 +91,7 @@ struct AboutPage: View {
         }
         .buttonStyle(GSButtonStyle())
         .accessibilityLabel("Open \(title) in your browser")
+        .accessibilityIdentifier("settings.gsabout-page.open-in-your-browser")
     }
 }
 
@@ -112,7 +116,7 @@ private struct AboutIcon: View {
             .accessibilityHidden(true)
             .onAppear {
                 guard !Motion.reduced else { return }
-                withAnimation(.easeInOut(duration: 1.8).delay(0.35)) { sweep = 1.0 }
+                withAnimation(.easeInOut(duration: MotionTokens.settingsSweepDuration).delay(MotionTokens.settingsSweepDelay)) { sweep = 1.0 }
             }
     }
 }
@@ -130,6 +134,7 @@ private struct AboutNoticesSheet: View {
                 Spacer()
                 Button("Done") { dismiss() }.buttonStyle(GSButtonStyle(prominent: true))
                     .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("settings.gsabout-page.done")
             }
             .padding(GS.cardInset)
             GSDivider()

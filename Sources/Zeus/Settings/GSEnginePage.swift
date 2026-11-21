@@ -54,9 +54,12 @@ struct EnginePage: View {
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                             .accessibilityLabel("Jev API key")
                             .onSubmit(saveKey)
+                            .accessibilityIdentifier("settings.gsengine-page.jev-api-key")
                         Button("Save key", action: saveKey).buttonStyle(GSButtonStyle()).disabled(page.jevKeyDraft.isEmpty)
+                            .accessibilityIdentifier("settings.gsengine-page.save-key")
                         if center.hasJevKey {
                             Button("Remove") { center.saveJevKey("") }.buttonStyle(GSButtonStyle())
+                                .accessibilityIdentifier("settings.gsengine-page.remove.2")
                         }
                     }
                 }
@@ -75,8 +78,10 @@ struct EnginePage: View {
                         .accessibilityIdentifier("settings.engine.jevLimit")
                         .onSubmit(saveCap)
                     Button("Set limit", action: saveCap).buttonStyle(GSButtonStyle()).disabled(parsedCapDraft == nil)
+                        .accessibilityIdentifier("settings.gsengine-page.set-limit")
                     if (center.jevBudget.monthlyCap ?? 0) > 0 {
                         Button("Remove") { page.capDraft = ""; center.setJevCap(nil) }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsengine-page.remove")
                     }
                 }
             }
@@ -99,8 +104,10 @@ struct EnginePage: View {
                             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                             .accessibilityLabel("Billed cloud model input tokens")
+                            .accessibilityIdentifier("settings.gsengine-page.billed-cloud-model-input-tokens")
                         Button("Record usage", action: reconcileBilledUsage)
                             .buttonStyle(GSButtonStyle()).disabled(parsedBilledInputTokens == nil)
+                            .accessibilityIdentifier("settings.gsengine-page.record-usage")
                     }
                 }
                 GSRow(title: "No charge", text: "Choose only after provider usage confirms this request was not billed.") {
@@ -109,10 +116,13 @@ struct EnginePage: View {
                             Button("Yes, not billed") { confirmNoCharge() }
                                 .buttonStyle(GSButtonStyle(prominent: true))
                                 .accessibilityLabel("Yes, provider usage shows this request was not billed")
+                                .accessibilityIdentifier("settings.gsengine-page.yes-provider-usage-shows-this-request-was-")
                             Button("Cancel") { page.confirmingNoCharge = false }.buttonStyle(GSButtonStyle())
+                                .accessibilityIdentifier("settings.gsengine-page.cancel")
                         }
                     } else {
                         Button("Confirm no charge") { page.confirmingNoCharge = true }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsengine-page.confirm-no-charge")
                     }
                 }
             }
@@ -130,6 +140,7 @@ struct EnginePage: View {
                         if !testMode, record.decision?.source != .jev, center.jevAvailable {
                             Button("Try with Jev") { Task { await center.tryWithJev(record) } }
                                 .buttonStyle(GSButtonStyle()).accessibilityLabel("Run \(record.utterance) again with Jev")
+                                .accessibilityIdentifier("settings.gsengine-page.run-again-with-jev")
                         }
                     }
                 }

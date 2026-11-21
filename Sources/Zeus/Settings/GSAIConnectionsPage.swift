@@ -82,18 +82,22 @@ struct AIConnectionsPage: View {
                             Button(step.buttonTitle) { model.primary(provider, services: services) }
                                 .buttonStyle(GSButtonStyle(prominent: true))
                                 .accessibilityLabel("\(step.buttonTitle) \(provider.title)")
+                                .accessibilityIdentifier("settings.gsaiconnections-page.control.2")
                         } else if provider.kind == .app {
                             Button("Open") { model.openApp(provider, services: services) }
                                 .buttonStyle(GSButtonStyle())
                                 .accessibilityLabel("Open \(provider.title)")
+                                .accessibilityIdentifier("settings.gsaiconnections-page.open")
                         } else if provider.kind == .hooked {
                             Button("Repair") { Task { await model.connectAndCheck(provider, services: services) } }
                                 .buttonStyle(GSButtonStyle())
                                 .accessibilityLabel("Repair \(provider.title)")
+                                .accessibilityIdentifier("settings.gsaiconnections-page.repair")
                         } else if model.canDisconnect(provider) {
                             Button("Disconnect") { model.disconnect(provider, services: services) }
                                 .buttonStyle(GSButtonStyle())
                                 .accessibilityLabel("Disconnect \(provider.title)")
+                                .accessibilityIdentifier("settings.gsaiconnections-page.disconnect")
                         }
                         Button("Check again") {
                             context.refresh()
@@ -101,6 +105,7 @@ struct AIConnectionsPage: View {
                         }
                         .buttonStyle(GSButtonStyle())
                         .accessibilityLabel("Check \(provider.title) again")
+                        .accessibilityIdentifier("settings.gsaiconnections-page.check-again")
                     }
                 }
             }
@@ -124,11 +129,13 @@ private struct InstallRow: View {
                     }
                     .buttonStyle(GSButtonStyle())
                     .accessibilityLabel("Copy the \(provider.title) install command")
+                    .accessibilityIdentifier("settings.gsaiconnections-page.copy-the-install-command")
                 }
                 if let docs = AIConnectFlow.docsURL(provider) {
                     Button("Docs") { NSWorkspace.shared.open(docs) }
                         .buttonStyle(GSButtonStyle())
                         .accessibilityLabel("Open the \(provider.title) install guide")
+                        .accessibilityIdentifier("settings.gsaiconnections-page.open-the-install-guide")
                 }
             }
         }
@@ -159,6 +166,7 @@ private struct AnyLLMCard: View {
                         Button(preset.title) { model.applyPreset(baseURL: preset.baseURL, model: preset.model) }
                             .buttonStyle(GSButtonStyle())
                             .accessibilityLabel("Fill in \(preset.title)")
+                            .accessibilityIdentifier("settings.gsaiconnections-page.fill-in")
                     }
                 }
             }
@@ -178,9 +186,12 @@ private struct AnyLLMCard: View {
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                         .accessibilityLabel("API key")
                         .onSubmit(save)
+                        .accessibilityIdentifier("settings.gsaiconnections-page.api-key")
                     Button("Save key", action: save).buttonStyle(GSButtonStyle()).disabled(key.isEmpty)
+                        .accessibilityIdentifier("settings.gsaiconnections-page.save-key")
                     if model.anyLLMKeySaved {
                         Button("Remove") { model.saveAnyLLMKey("") }.buttonStyle(GSButtonStyle())
+                            .accessibilityIdentifier("settings.gsaiconnections-page.remove")
                     }
                 }
             }
@@ -189,6 +200,7 @@ private struct AnyLLMCard: View {
                 HStack(spacing: 10) {
                     Button("Test") { Task { await model.testEndpoint() } }
                         .buttonStyle(GSButtonStyle(prominent: true)).disabled(!model.anyLLM.isComplete)
+                        .accessibilityIdentifier("settings.gsaiconnections-page.test")
                 }
             }
             if model.anyLLM.isInsecureRemote { GSInfo(text: "Plain http is only allowed for a server on this Mac. Use https.") }
@@ -228,6 +240,7 @@ private struct AnyLLMCard: View {
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
                 .accessibilityLabel(title)
+                .accessibilityIdentifier("settings.gsaiconnections-page.control")
         }
     }
 }

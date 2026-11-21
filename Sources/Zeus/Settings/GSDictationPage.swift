@@ -127,6 +127,8 @@ struct DictationSettingsPage: View {
                     Button(tester.running ? "Stop" : "Test microphone") {
                         if tester.running { tester.stop() } else { tester.start(uid: settings.microphoneUID) }
                     }.buttonStyle(GSButtonStyle())
+                        .accessibilityLabel(tester.running ? "Stop" : "Test microphone")
+                        .accessibilityIdentifier("settings.gsdictation-page.stop")
                 }
             }
         }
@@ -152,6 +154,7 @@ struct DictationSettingsPage: View {
             GSRow(symbol: "play.circle", title: "Preview", text: "Plays the start sound, then the stop sound.") {
                 Button("Play") { DictationCuePlayer.preview() }
                     .buttonStyle(GSButtonStyle()).disabled(settings.cueStyle == .none)
+                    .accessibilityIdentifier("settings.gsdictation-page.play")
             }
             GSDivider()
             GSRow(symbol: "speaker.wave.1", title: "Volume", text: "\(settings.cueVolume)%") {
@@ -161,6 +164,7 @@ struct DictationSettingsPage: View {
                     .frame(width: 160)
                     .accessibilityLabel("Start and stop sound volume")
                     .accessibilityValue("\(settings.cueVolume) percent")
+                    .accessibilityIdentifier("settings.gsdictation-page.start-and-stop-sound-volume")
             }
         }
     }
@@ -221,6 +225,7 @@ struct DictationSettingsPage: View {
             GSRow(symbol: "plus.circle", title: "New mode") {
                 Button("Add a mode") { startEditing(DictationMode(key: "mode-\(Int(Date().timeIntervalSince1970))", name: "New mode", symbol: "sparkles", prompt: "Rewrite this dictation clearly. Keep every fact. Return only the result."), isNew: true) }
                     .buttonStyle(GSButtonStyle()).disabled(controller == nil)
+                    .accessibilityIdentifier("settings.gsdictation-page.add-a-mode")
             }
         }
     }
@@ -231,11 +236,14 @@ struct DictationSettingsPage: View {
         return GSRow(symbol: mode.symbol, title: mode.name, text: mode.usesAI ? "Tidied by your AI before it is written." : "Exactly what you said, with no AI rewrite. The speech engine below does the listening.") {
             HStack(spacing: 10) {
                 if selected { GSStatus(ok: true, text: "In use") }
-                else { Button("Use") { topBar?.selectedModeKey = mode.key }.buttonStyle(GSButtonStyle()).disabled(topBar == nil).accessibilityLabel("Use \(mode.name)") }
+                else { Button("Use") { topBar?.selectedModeKey = mode.key }.buttonStyle(GSButtonStyle()).disabled(topBar == nil).accessibilityLabel("Use \(mode.name)")
+                    .accessibilityIdentifier("settings.gsdictation-page.use") }
                 Button("Edit") { page.editingKey == mode.key ? (page.editingKey = nil) : startEditing(mode, isNew: false) }
                     .buttonStyle(GSButtonStyle()).disabled(controller == nil).accessibilityLabel("Edit \(mode.name)")
+                    .accessibilityIdentifier("settings.gsdictation-page.edit")
                 if custom {
                     Button("Remove") { controller?.deleteMode(key: mode.key) }.buttonStyle(GSButtonStyle()).disabled(controller == nil).accessibilityLabel("Remove \(mode.name)")
+                        .accessibilityIdentifier("settings.gsdictation-page.remove")
                 }
             }
         }
@@ -267,7 +275,9 @@ struct DictationSettingsPage: View {
                     page.editingKey = nil
                     page.draftMode = nil
                 }.buttonStyle(GSButtonStyle(prominent: true)).disabled(controller == nil)
+                    .accessibilityIdentifier("settings.gsdictation-page.save-mode")
                 Button("Cancel") { page.editingKey = nil; page.draftMode = nil }.buttonStyle(GSButtonStyle())
+                    .accessibilityIdentifier("settings.gsdictation-page.cancel")
             }
         }
         .padding(.bottom, 14)
@@ -282,6 +292,7 @@ struct DictationSettingsPage: View {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
             .accessibilityLabel(title)
+            .accessibilityIdentifier("settings.gsdictation-page.control")
     }
 
     // MARK: Engine
@@ -306,6 +317,7 @@ struct DictationSettingsPage: View {
                     controller.vocabulary = merged
                     page.loadVocabulary(merged)
                 }.buttonStyle(GSButtonStyle(prominent: true)).disabled(controller == nil)
+                    .accessibilityIdentifier("settings.gsdictation-page.save-vocabulary")
             }
             .padding(.bottom, 14)
         }
@@ -335,6 +347,7 @@ struct DictationSettingsPage: View {
             GSRow(symbol: "list.bullet.rectangle", title: "History") {
                 Button("Open history") { if let topBar { DictationHistoryWindow.shared.show(topBar: topBar) } }.buttonStyle(GSButtonStyle())
                     .disabled(topBar == nil)
+                    .accessibilityIdentifier("settings.gsdictation-page.open-history")
             }
             if let recent = topBar?.dictationHistory.prefix(3), !recent.isEmpty {
                 ForEach(Array(recent), id: \.id) { record in
@@ -343,6 +356,7 @@ struct DictationSettingsPage: View {
                           text: "\(record.modeName) \u{00B7} \(record.wordCount) words") {
                         Button("Copy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(record.result, forType: .string) }
                             .buttonStyle(GSButtonStyle()).accessibilityLabel("Copy this dictation")
+                            .accessibilityIdentifier("settings.gsdictation-page.copy-this-dictation")
                     }
                 }
             }
