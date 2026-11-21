@@ -30,6 +30,24 @@ import ZeusCore
         #expect(!rows.contains { $0.id == synthetic.id })
     }
 
+    @Test func aRegistrySectionIsTheSidebarAndTheAccessibilityRow() {
+        let added = SettingsSectionDescriptor(
+            id: "settings.fixture",
+            title: "Fixture",
+            order: SettingsSectionRegistry.existing.count,
+            accessibilityLabel: "Fixture",
+            placeholder: nil
+        )
+        let sections = SettingsSectionRegistry.sections(slots: []) + [added]
+        let rows = GlassSettingsSidebar.rowIDs(sections: sections)
+        let spoken = GlassSettingsAccessibility.exposure(sections: sections)
+        #expect(rows.last == "settings.fixture")
+        let last = spoken.last
+        #expect(last?.label == "Fixture")
+        #expect(last?.heading == true)
+        #expect(last?.hidden == false)
+    }
+
     @Test func searchStaysInRegistryOrder() {
         let found = SettingsSectionRegistry.search("u", in: SettingsSectionRegistry.existing)
         let indexes = found.compactMap { item in SettingsSectionRegistry.existing.firstIndex { $0.id == item.id } }
