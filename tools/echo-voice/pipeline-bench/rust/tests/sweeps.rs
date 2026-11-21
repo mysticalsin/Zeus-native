@@ -1,4 +1,5 @@
 //! Sweep regressions. These are not the original red-first invariants.
+use haru_pipe::native::Ingest;
 use haru_pipe::stats::summary_json;
 
 #[test]
@@ -19,4 +20,16 @@ fn empty_summary_percentiles_are_null() {
     }
     assert!(s.contains("\"mean_ms\": null") || s.contains("\"mean_ms\": 0"), "{s}");
     assert!(!s.contains("-0"), "{s}");
+}
+
+/// EV-STREAM-1: a read split after 5 bytes must carry the trailing 1-3 bytes.
+#[test]
+fn five_byte_split_matches_single_read() {
+    let raw: Vec<u8> = (0..64).map(|i| i as u8).collect();
+    let mut whole = Ingest::new();
+    whole.feed_bytes(&raw);
+    let mut split = Ingest::new();
+    split.feed_bytes(&raw[..5]);
+    split.feed_bytes(&raw[5..]);
+    assert_eq!(whole.pending(), split.pending(), "pending samples diverged");
 }
