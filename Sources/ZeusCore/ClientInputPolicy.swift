@@ -29,17 +29,10 @@ public enum HookClientInput {
     /// The risk used for decisions: never lower than what the app computes from the tool and its
     /// input itself, whatever the client claimed.
     public static func effectiveRisk(claimed: HookEvent.Risk?, tool: String?, input: JSONValue?) -> HookEvent.Risk {
-        let own = CommandRisk.assess(tool: tool, input: input)
-        // No claim means medium, as the approval card always assumed.
+        let command = input?["command"]?.stringValue ?? ""
+        let own = ApprovalRisk.effective(tool: tool, input: input, command: command).risk
+        // No claim means medium, as the approval card always assumed. The claim cannot lower the card.
         let claim = claimed ?? .medium
-        return rank(claim) >= rank(own) ? claim : own
-    }
-
-    private static func rank(_ risk: HookEvent.Risk) -> Int {
-        switch risk {
-        case .low: return 0
-        case .medium: return 1
-        case .high: return 2
-        }
+        return max(claim, own)
     }
 }
