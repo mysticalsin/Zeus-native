@@ -36,7 +36,7 @@ The 8 s, 20 s, 45 s, 700 ms, and 90 s wake timeouts were not changed. `VoiceTTSC
 
 2026-11-21 06:11 UTC. Lens: a partial Kokoro failure must reach the talk turn, the voice-test row, and the worker WAV.
 
-1. **Done chime and caption.** `speaker.speak` used to drop `Played`. The pump now keeps `turnPartialFailure`. `VoiceTurnFinish.present` withholds the done chime and appends "Part of this reply did not play." The controller waits until the speaker is idle before that decision, so the flag is known.
+1. **Done chime and caption.** `speaker.speak` used to drop `Played`. The pump now keeps `turnPartialFailure`. `VoiceTurnFinish.present` withholds the done chime and appends "Part of this reply did not play." The controller waits until the speaker is idle before that decision, so the flag is known. A cancelled render is dropped. The blocking waits live in `KokoroClauseWait.swift`, called off the main actor.
 2. **Voice test row.** `VoiceTestScore.verdict` returns "partial failure" when `partialFailure` is set, even if first audio was inside the fast target.
 3. **Worker WAV.** `play` deletes every `zeus-kokoro-*.wav` the renderer returned, on success, a later failure, and cancel. The playback directory is still cleared.
 4. **Buffer speak cancel.** `KokoroClausePlayback.speak` forwards the cancel token to the scheduler.

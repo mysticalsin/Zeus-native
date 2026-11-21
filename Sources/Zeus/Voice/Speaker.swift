@@ -513,15 +513,18 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
                         deadline: deadline,
                         render: { chunk, _ in
                             if token.isCancelled { return nil }
-                            return Self.waitForKokoro(chunk, voice: engineVoice, speed: speed, began: began, token: token)
+                            guard let url = KokoroClauseWait.render(chunk, voice: engineVoice, speed: speed, began: began, token: token) else { return nil }
+                            guard SpeechAttemptPolicy.mayPlay(cancelled: token.isCancelled) else {
+                                try? FileManager.default.removeItem(at: url)
+                                return nil
+                            }
+                            return url
                         },
                         play: { url in
-                            DispatchQueue.main.sync {
-                                MainActor.assumeIsolated {
-                                    let ok = speaker.chain.scheduleFile(url)
-                                    if ok { speaker.markAudioReady() }
-                                    return ok
-                                }
+                            KokoroClauseWait.scheduleOnMain {
+                                let ok = speaker.chain.scheduleFile(url)
+                                if ok { speaker.markAudioReady() }
+                                return ok
                             }
                         })
                     continuation.resume(returning: played)
@@ -535,24 +538,6 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
 
     /// Renders one clause off the caller's wait. `scheduleFile` reads the shaped file and deletes it;
     /// originals are removed when `KokoroClausePlayback.play` returns.
-    private static func waitForKokoro(_ text: String, voice: String, speed: Double, began: Date, token: SpeechCancelToken) -> URL? {
-        let box = KokoroRenderBox()
-        let semaphore = DispatchSemaphore(value: 0)
-        Task { @MainActor in
-            if Task.isCancelled { token.cancel() }
-            box.url = await KokoroVoice.render(text, voice: voice, speed: speed)
-            // The same first-audio budget covers every clause, not only the one before playback starts.
-            if token.isCancelled || (box.url != nil && Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30) {
-                if let url = box.url { try? FileManager.default.removeItem(at: url) }
-                box.url = nil
-                token.cancel()
-            }
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return box.url
-    }
-
     private func speakChatterbox(_ text: String, began: Date) async -> Bool {
         guard let url = await ChatterboxVoice.render(text) else { return false }
         guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return false }
@@ -751,11 +736,6 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         guard let pick = UltronSystemVoicePick.pick(from: candidates, languageCode: languageCode) else { return nil }
         return AVSpeechSynthesisVoice(identifier: pick.identifier)
     }
-}
-
-/// Holds the WAV URL across `waitForKokoro`'s main-actor hop. The background caller reads it after the signal.
-private final class KokoroRenderBox: @unchecked Sendable {
-    var url: URL?
 }
 
 /// Schedules streamed PCM for one sentence with a one-buffer look-ahead, so the last buffer of the sentence
