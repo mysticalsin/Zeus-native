@@ -130,9 +130,9 @@ public struct SystemKeychain: KeychainBackend {
         quietly {
             guard let team = DevKeychain.teamIdentifier else { return false }
             let adapter = SecCredentialKeychain(teamIdentifier: team, legacyQuery: { self.legacyQuery($0, $1) })
-            let outcome = CredentialKeychainMigration.removeKeepingLegacy(
+            let outcome = CredentialKeychainMigration.removeEverywhere(
                 service: service, account: account, teamIdentifier: team, keychain: adapter)
-            return outcome == .migrated || outcome == .absent
+            return outcome == .absent
         }
     }
 }
@@ -188,16 +188,28 @@ private struct SecCredentialKeychain: CredentialKeychain {
 
     func writeLegacy(_ data: Data, service: String, account: String) -> Bool {
         let existing = legacyCandidates(service: service, account: account)
-        if let first = existing.first {
-            let query: [String: Any] = [kSecValuePersistentRef as String: first.persistentRef]
-            let update: [String: Any] = [kSecValueData as String: data]
-            return SecItemUpdate(query as CFDictionary, update as CFDictionary) == errSecSuccess
+        if let target = existing.first(where: { CredentialKeychainPolicy.aclIsOnlyZeus($0.facts, teamIdentifier: teamIdentifier) }) {
+            return updateLegacyItem(data, persistentRef: target.persistentRef)
         }
+        if !existing.isEmpty { return false }
         var add = legacyQuery(service, account)
         add[kSecValueData as String] = data
         add[kSecAttrLabel as String] = CredentialKeychainPolicy.zeusLabel
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        guard SecItemAdd(add as CFDictionary, nil) == errSecSuccess else { return false }
+        return legacyCandidates(service: service, account: account).contains { $0.data == data }
+    }
+
+    func updateLegacyItem(_ data: Data, persistentRef: Data) -> Bool {
+        let query: [String: Any] = [kSecValuePersistentRef as String: persistentRef]
+        let update: [String: Any] = [kSecValueData as String: data]
+        guard SecItemUpdate(query as CFDictionary, update as CFDictionary) == errSecSuccess else { return false }
+        var read = query
+        read[kSecReturnData as String] = true
+        read[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(read as CFDictionary, &result) == errSecSuccess, let found = result as? Data else { return false }
+        return found == data
     }
 
     func deleteLegacyItem(persistentRef: Data) -> Bool {

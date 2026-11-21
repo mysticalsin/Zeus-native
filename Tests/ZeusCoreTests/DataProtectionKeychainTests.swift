@@ -88,6 +88,19 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         return true
     }
 
+    func updateLegacyItem(_ data: Data, persistentRef: Data) -> Bool {
+        note("writeLegacy")
+        if persistentRef == primaryRef, case .value = legacy {
+            legacy = .value(data)
+            return true
+        }
+        if persistentRef == siblingRef, sibling != nil {
+            sibling = data
+            return true
+        }
+        return false
+    }
+
     func deleteProtected(service: String, account: String) -> Bool {
         note("deleteProtected")
         protected = .absent
@@ -422,7 +435,7 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
             _ = CredentialKeychainMigration.migrate(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
             _ = CredentialKeychainMigration.migrateOnce(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
             _ = CredentialKeychainMigration.write(data: unique, service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
-            _ = CredentialKeychainMigration.removeKeepingLegacy(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+            _ = CredentialKeychainMigration.removeEverywhere(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
         }
         #expect(!output.contains(unique))
         #expect(!store.log.contains("synthetic-key-value"))
@@ -499,15 +512,14 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
     }
 
     @Test func turningOffCopiesTheKeyBackBeforeDroppingTheProtectedItem() {
-        let store = RecordingCredentialKeychain(protected: .value(secret))
-        let other = Data("other-legacy-value".utf8)
-        store.sibling = other
-        let result = CredentialKeychainMigration.removeKeepingLegacy(
+        let store = RecordingCredentialKeychain(legacy: .value(Data("previous".utf8)), protected: .value(secret))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        let result = CredentialKeychainMigration.copyBackForDowngrade(
             service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
-        #expect(result.outcome == .migrated || result.outcome == .alreadyProtected)
+        #expect(result.outcome == .migrated)
         #expect(store.protected == .absent)
         #expect(store.legacy == .value(secret))
-        #expect(store.sibling == other)
     }
 
     private static let attackerRequirement = "identifier \"com.attacker.tool\" and certificate leaf[subject.OU] = \"ATKTEAM01\""
