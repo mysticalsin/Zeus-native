@@ -8,6 +8,40 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The browser extension is never built here. npm ci counts as an install and is refused
+# on a locked-down Mac. Pass a dist that was built elsewhere, or skip it on purpose.
+EXTENSION_MODE=""
+EXTENSION_ARTIFACT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --skip-extension)
+      if [ -n "$EXTENSION_MODE" ]; then
+        echo "error: pass only one of --skip-extension or --extension-artifact." >&2
+        exit 1
+      fi
+      EXTENSION_MODE=skip
+      shift
+      ;;
+    --extension-artifact)
+      if [ -n "$EXTENSION_MODE" ]; then
+        echo "error: pass only one of --skip-extension or --extension-artifact." >&2
+        exit 1
+      fi
+      if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "error: --extension-artifact needs the path of a prebuilt extension dist." >&2
+        exit 1
+      fi
+      EXTENSION_MODE=artifact
+      EXTENSION_ARTIFACT=$2
+      shift 2
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
 CONFIG="${CONFIG:-release}"
 if [ "${RELEASE:-0}" = 1 ] && [ "$CONFIG" != release ]; then
   echo "Release builds must use CONFIG=release (CONFIG=$CONFIG)." >&2
@@ -40,9 +74,28 @@ BIN="$(swift build -c "$CONFIG" --show-bin-path)"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Helpers" "$APP/Contents/Resources"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Add :ZeusBuildStamp string $(date +%Y%m%d%H%M%S)-$$" "$APP/Contents/Info.plist" >/dev/null
+GIT_SHA="${ZEUS_GIT_SHA:-}"
+if [ -z "$GIT_SHA" ]; then
+  GIT_SHA="$(git rev-parse --short=8 HEAD 2>/dev/null || true)"
+fi
+BUILD_NUMBER="${ZEUS_BUILD_NUMBER:-}"
+if [ -z "$BUILD_NUMBER" ]; then
+  BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || true)"
+fi
+STAMP="$(date +%Y%m%d%H%M%S)"
+if [ -n "$GIT_SHA" ]; then
+  STAMP="${STAMP}-${GIT_SHA}"
+fi
+STAMP="${STAMP}-$$"
+/usr/libexec/PlistBuddy -c "Add :ZeusBuildStamp string ${STAMP}" "$APP/Contents/Info.plist" >/dev/null
+if [ -n "$BUILD_NUMBER" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER}" "$APP/Contents/Info.plist" >/dev/null
+fi
+if [ -n "${ZEUS_MARKETING_VERSION:-}" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${ZEUS_MARKETING_VERSION}" "$APP/Contents/Info.plist" >/dev/null
+fi
 cp Resources/AppIcon.icns Resources/Logo.png Resources/Logo.pdf Resources/MenuBarTemplate.png Resources/MenuBarTemplate@2x.png \
-  Resources/NOTICES.txt \
+  Resources/NOTICES.txt Resources/PrivacyInfo.xcprivacy \
   "$APP/Contents/Resources/"
 cp "$BIN/Zeus" "$APP/Contents/MacOS/Zeus"
 cp "$BIN/zeus-hook" "$BIN/zeus-bridge" "$APP/Contents/Helpers/"
@@ -55,13 +108,38 @@ for bundle in "$BIN"/*.bundle; do
   cp -R "$bundle" "$APP/Contents/Resources/"
 done
 
-# The Chrome extension ships inside the app; "Connect Chrome" copies it out for Load unpacked.
-if command -v npm >/dev/null; then
-  (cd extension && { [ -d node_modules ] || npm ci --silent; } && npm run -s build)
-fi
-mkdir -p "$APP/Contents/Resources/ChromeExtension"
-cp extension/manifest.json "$APP/Contents/Resources/ChromeExtension/"
-cp -R extension/dist extension/icons extension/popup.html "$APP/Contents/Resources/ChromeExtension/"
+# The browser extension ships inside the app when a dist is already on disk.
+# This script never runs npm. A prebuilt dist is copied, or the skip is written into the bundle.
+MANIFEST="$APP/Contents/Resources/ZeusBundleManifest.txt"
+case "$EXTENSION_MODE" in
+  skip)
+    echo "warning: browser extension skipped (--skip-extension). extension: skipped. npm is never run by this script." >&2
+    printf 'extension: skipped\n' >"$MANIFEST"
+    /usr/libexec/PlistBuddy -c "Add :ZeusExtensionStatus string skipped" "$APP/Contents/Info.plist" >/dev/null
+    ;;
+  artifact)
+    if [ ! -d "$EXTENSION_ARTIFACT" ]; then
+      echo "error: --extension-artifact is not a directory: $EXTENSION_ARTIFACT" >&2
+      exit 1
+    fi
+    mkdir -p "$APP/Contents/Resources/ChromeExtension"
+    cp extension/manifest.json "$APP/Contents/Resources/ChromeExtension/"
+    cp -R "$EXTENSION_ARTIFACT" "$APP/Contents/Resources/ChromeExtension/dist"
+    cp -R extension/icons extension/popup.html "$APP/Contents/Resources/ChromeExtension/"
+    printf 'extension: artifact\n' >"$MANIFEST"
+    ;;
+  *)
+    if [ -d extension/node_modules ] && [ -d extension/dist ]; then
+      mkdir -p "$APP/Contents/Resources/ChromeExtension"
+      cp extension/manifest.json "$APP/Contents/Resources/ChromeExtension/"
+      cp -R extension/dist extension/icons extension/popup.html "$APP/Contents/Resources/ChromeExtension/"
+      printf 'extension: prebuilt\n' >"$MANIFEST"
+    else
+      echo "error: browser extension is not bundled. Pass --extension-artifact <dist> or --skip-extension. npm is never run by this script. node_modules is absent, so there is no prebuilt dist to copy." >&2
+      exit 1
+    fi
+    ;;
+esac
 
 # Lean install: debug info and local symbols are not needed to run. Dynamic symbols stay, so behaviour is
 # unchanged; dSYMs are never copied into the app. Done before signing, which seals the stripped files.
