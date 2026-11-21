@@ -462,11 +462,12 @@ impl<C: ChildControl> SessionHost<C> {
 
     /// Close. Starting becomes Closing, the child is killed, then Closed.
     /// Idle becomes Closed and does not spawn, so a later start is refused.
+    /// A child left alive by a restart is killed on this close too.
     pub fn close(&mut self) -> Result<(), SessionError> {
         let next = self.state.next(&SessionEvent::Close)?;
         self.apply(next);
+        self.kill_pid();
         if self.state == SessionState::Closing {
-            self.kill_pid();
             let closed = self.state.next(&SessionEvent::Closed)?;
             self.apply(closed);
         }
@@ -481,9 +482,10 @@ impl<C: ChildControl> SessionHost<C> {
     }
 
     /// Recovery is a new session, not a transition out of `failed`.
+    /// Any child still recorded for the old session is killed first.
     pub fn spawn_fresh_idle(&mut self) -> Result<(), SessionError> {
+        self.kill_pid();
         self.ever_streaming = false;
-        self.pid = None;
         self.apply(SessionState::Idle);
         self.spawn_child()?;
         Ok(())

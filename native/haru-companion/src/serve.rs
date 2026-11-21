@@ -45,6 +45,7 @@ where
     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
     let peer = peer_uid(&stream)?;
     if peer != current_uid() {
+        finish_session(engine);
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "peer uid",
@@ -53,7 +54,8 @@ where
     let mut stream = stream;
     let mut framer = FrameBuf::default();
     let mut buffer = [0u8; 8192];
-    loop {
+    let mut outcome = Ok(());
+    'read: loop {
         let read = stream.read(&mut buffer);
         let count = match read {
             Ok(0) => break,
@@ -64,18 +66,43 @@ where
             {
                 break
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                outcome = Err(error);
+                break;
+            }
         };
-        let frames = framer
-            .push(&buffer[..count])
-            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.code()))?;
+        let frames = match framer.push(&buffer[..count]) {
+            Ok(frames) => frames,
+            Err(error) => {
+                let _ = stream.write_all(&crate::protocol::protocol_error_frame(&error));
+                outcome = Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    error.code(),
+                ));
+                break;
+            }
+        };
         for raw in frames {
             for message in engine.handle_raw(&raw) {
-                stream.write_all(&message)?;
+                if let Err(error) = stream.write_all(&message) {
+                    outcome = Err(error);
+                    break 'read;
+                }
             }
         }
     }
-    Ok(())
+    finish_session(engine);
+    outcome
+}
+
+fn finish_session<B, C>(engine: &mut Engine<B, C>)
+where
+    B: ModelBackend,
+    C: ChildControl,
+{
+    if !engine.session().is_terminal() {
+        let _ = engine.close();
+    }
 }
 
 #[cfg(target_os = "linux")]
