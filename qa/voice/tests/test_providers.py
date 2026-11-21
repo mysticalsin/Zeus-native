@@ -450,3 +450,6 @@ class _Body:
 
     def read(self) -> bytes:
         return self._payload
+
+    def close(self) -> None:
+        return None
