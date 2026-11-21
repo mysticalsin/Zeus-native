@@ -24,7 +24,7 @@ Prepare a disposable preferences domain and a disposable chat folder. Point the 
 
 The acceptance fixture is a local process on the app's own socket. It is not a window. It sends sessions named Agent A and Agent B, project Fixture, with the ids in the steps. It can pin a session's start time so the first painted clock reads `0:05`. It can mark a destination as able to take typed text, or not. It answers a typed reply with success or failure. It never runs a real command and never contains a secret.
 
-Reduce Motion is off, and VoiceOver is off, for steps 1 through 93. Step 94 and step 95 are a second launch with Reduce Motion on. Step 96 is a third launch with VoiceOver on and Reduce Motion off.
+Reduce Motion is off, and VoiceOver is off, for steps 1 through 117. Steps 118 and 119 are a second launch with Reduce Motion on. Step 120 is a third launch with VoiceOver on and Reduce Motion off. Steps 94 through 117 also need the glass-settings pull requests named on each step. On a build that does not contain that pull request, the step is BLOCKED, the report names the pull request, and the chat steps are not failed because of it.
 
 ### Permissions that are already granted
 
@@ -652,7 +652,7 @@ Log: `hub      screen       connectionError`
 
 Open Settings from the menu-bar item "Settings…". The window is 1080 by 780 pt. The sidebar identifier of a row is `settings.sidebar.<id>`. Click the row. Do not click Allow, Connect, Open guide, Open System Settings, Activate a license, Export, Choose folder, or Restart. Do not type into a key field. Do not turn a toggle on or off, except the sound toggles already used in steps 59 and 64, which are restored by deleting the disposable domain.
 
-The twelve glass pages are the pages built with `GSPageHeading` in `Sources/Zeus/Settings/GlanceSettingsPages.swift`, not counting the hidden iPhone page. The sidebar shows nine more pages. Those nine are steps 84 through 92, so every shown pane is opened.
+The twelve glass pages already in this window are the pages built with `GSPageHeading` in `Sources/Zeus/Settings/GlanceSettingsPages.swift`, not counting the hidden iPhone page. The sidebar shows nine more pages. Those nine are steps 84 through 92, so every shown pane is opened. Steps 94 through 117 add the twelve sections from the glass shell, using each section's `.topbarTab` or `.cardOn` slot. Those steps keep the panes above. They do not replace them.
 
 ### 72. General
 
@@ -826,15 +826,263 @@ Log: `settings open         shelf`
 
 Action: look down the sidebar.
 
-Visible: there is no row "iPhone". The window is still 1080 by 780. Close the window with its close button. The panel, if it was open, is unchanged. No consent sheet appeared during steps 72 through 93.
+Visible: there is no row "iPhone". The window is still 1080 by 780 and stays open. No consent sheet appeared during steps 72 through 93.
 
-Log: `settings close        settings`
+Log: `settings open         sidebar`
+
+## Glass sections from the shell
+
+These twelve sections come from the glass shell and the section pull requests. A step runs only when the packaged app contains that pull request. Otherwise the report line is BLOCKED and names the pull request. The chat and agent steps do not depend on these.
+
+A `.topbarTab` section is a tab on the settings window's Topbar strip, not a row in the sidebar and not a tab in the notch. The index is zero-based. A `.cardOn` section is a card on the existing page named in the slot. The card id is `glass.<section>`.
+
+Each section has two steps. The first checks the key controls and does not ask for a permission. The second changes one setting, quits, relaunches, opens the same slot, and checks that the change is still there. Do not turn on precise location, speaker names, earbud battery, face verification, or nearby sending. Those ask for a permission this run does not hold.
+
+### 94. General card
+
+Needs #33 and #39 merged.
+
+Action: on the General page, find the card `glass.general` at `.cardOn(.general, 1)`.
+
+Visible: the card title is General. It shows Window appearance with System, Light, and Dark, one of them selected. It shows Background blur, Hide in full-screen apps, and Haptic feedback. Hide in full-screen apps and Haptic feedback are off. Background blur reads 40. Open guide is not clicked.
+
+Log: `settings open         glass.general`
+
+### 95. General blur survives relaunch
+
+Needs #33 and #39 merged.
+
+Action: set Background blur to 20. Quit. Launch. Open Settings and return to the same card.
+
+Visible: Background blur reads 20. Hide in full-screen apps and Haptic feedback are still off. Launch at login is unchanged.
+
+Log: `settings persist       general.backgroundBlur 20`
+
+### 96. Sensory tab
+
+Needs #33 and #40 merged.
+
+Action: click Topbar tab `.topbarTab(6)`.
+
+Visible: the page title is Sensory. Cards "Overlay" and "How it appears" are on the page. "How long it stays" reads "1.2 seconds". Label reads Icon, not Words. Replace the system overlay is not clicked. Preview is not clicked.
+
+Log: `settings open         glass.sensory`
+
+### 97. Sensory hold survives relaunch
+
+Needs #33 and #40 merged.
+
+Action: set "How long it stays" to 2. Quit. Launch. Open the same tab.
+
+Visible: "How long it stays" reads "2 seconds". Label is still Icon.
+
+Log: `settings persist       lights.hud.hold 2`
+
+### 98. Lock Screen tab
+
+Needs #33 and #41 merged.
+
+Action: click Topbar tab `.topbarTab(4)`.
+
+Visible: the page title is Lock Screen. The player card toggle is off. Lock sound and unlock sound read Off. Sound level reads Off. No button plays, pauses, or skips.
+
+Log: `settings open         glass.lockScreen`
+
+### 99. Lock Screen level survives relaunch
+
+Needs #33 and #41 merged.
+
+Action: set Sound level to Quiet. Leave the player card off. Quit. Launch. Open the same tab.
+
+Visible: Sound level reads Quiet. The player card is still off. No consent sheet appeared.
+
+Log: `settings persist       lockScreen.soundLevel Quiet`
+
+### 100. Weather tab
+
+Needs #33 and #42 merged.
+
+Action: click Topbar tab `.topbarTab(1)`.
+
+Visible: the page title is Weather. The city field is visible. Units show Celsius selected. Precise location is off and is not clicked. The preview names a swipe and does not name a click, a hold, or a right swipe.
+
+Log: `settings open         glass.weather`
+
+### 101. Weather units survive relaunch
+
+Needs #33 and #42 merged.
+
+Action: select Fahrenheit. Do not turn precise location on. Quit. Launch. Open the same tab.
+
+Visible: Fahrenheit is selected. Precise location is still off.
+
+Log: `settings persist       topBar.celsius false`
+
+### 102. Media tab
+
+Needs #33 and #43 merged.
+
+Action: click Topbar tab `.topbarTab(0)`.
+
+Visible: the page title is Media. Player look reads Art. Song tint, the like-colour switch, and the explicit badge are off. Synced lyrics is off and is not clicked. The left button reads Previous. Hide on pause reads Never.
+
+Log: `settings open         glass.media`
+
+### 103. Media look survives relaunch
+
+Needs #33 and #43 merged.
+
+Action: set Player look to Detailed. Do not turn synced lyrics or browser media on. Quit. Launch. Open the same tab.
+
+Visible: Player look reads Detailed. Synced lyrics is still off.
+
+Log: `settings persist       media.playerLook detailed`
+
+### 104. License card
+
+Needs #33 and #44 merged.
+
+Action: open the License page. Find the card `glass.license` at `.cardOn(.license, 1)`.
+
+Visible: the card is on the License page, under the page's own license card. It shows the trial or unlicensed state, a key field that is empty, and Release this Mac disarmed. The key field is not typed in. Copy is not clicked.
+
+Log: `settings open         glass.license`
+
+### 105. License field stays empty
+
+Needs #33 and #44 merged.
+
+Action: quit without typing a key. Launch. Open the License page and the same card.
+
+Visible: the key field is still empty. No license key was written. Release this Mac is still disarmed.
+
+Log: `settings persist       license.key absent`
+
+### 106. Accessory tab
+
+Needs #33 and #45 merged.
+
+Action: click Topbar tab `.topbarTab(5)`.
+
+Visible: the page title is Accessory. The earbuds overlay is off. Overlay style reads Off. Nearby speaker names is off and is not clicked. No local-network sheet appears.
+
+Log: `settings open         glass.accessory`
+
+### 107. Accessory style survives relaunch
+
+Needs #33 and #45 merged.
+
+Action: set Overlay style to Compact. Leave nearby speaker names off. Quit. Launch. Open the same tab.
+
+Visible: Overlay style reads Compact. Nearby speaker names is still off. No consent sheet appeared.
+
+Log: `settings persist       accessory.overlayStyle compact`
+
+### 108. Battery tab
+
+Needs #33 and #46 merged.
+
+Action: click Topbar tab `.topbarTab(2)`.
+
+Visible: the page title is Battery. The charge overlay follows the existing battery switch. Overlay style reads Gauge. Earbud battery is off and is not clicked. Left, Right, and Case read unknown, not 0.
+
+Log: `settings open         glass.battery`
+
+### 109. Battery style survives relaunch
+
+Needs #33 and #46 merged.
+
+Action: set Overlay style to Ring. Leave earbud battery off. Quit. Launch. Open the same tab.
+
+Visible: Overlay style reads Ring. Earbud battery is still off. No consent sheet appeared.
+
+Log: `settings persist       battery.overlayStyle ring`
+
+### 110. Focus tab
+
+Needs #33 and #47 merged.
+
+Action: click Topbar tab `.topbarTab(3)`.
+
+Visible: the page title is Focus. "Overlay when a Focus turns on" is off. "Show the Focus on the lock screen" is off. Neither is a prompt. The home widget row is visible.
+
+Log: `settings open         glass.focus`
+
+### 111. Focus overlay survives relaunch
+
+Needs #33 and #47 merged.
+
+Action: turn "Overlay when a Focus turns on" on. Do not turn on a row that asks to read the Focus name. Quit. Launch. Open the same tab.
+
+Visible: "Overlay when a Focus turns on" is on. No consent sheet appeared. "Show the Focus on the lock screen" is still off.
+
+Log: `settings persist       focus.transitionOverlay true`
+
+### 112. Face verification card
+
+Needs #33 and #48 merged.
+
+Action: open the Privacy page. Find the card `glass.faceID` at `.cardOn(.privacy, 1)`.
+
+Visible: the card title is Face ID. The approval switch is off. It is not clicked. Turning it on would ask for the camera, which this run does not do. Lock when away is visible and is not clicked.
+
+Log: `settings open         glass.faceID`
+
+### 113. Face verification stays off
+
+Needs #33 and #48 merged.
+
+Action: quit without turning the approval switch on. Launch. Open Privacy and the same card.
+
+Visible: the approval switch is still off. No camera sheet appeared. The card does not show a stored face sample.
+
+Log: `settings persist       face.approval false`
+
+### 114. Updates card
+
+Needs #33 and #49 merged.
+
+Action: open the About page. Find the card `glass.autoUpdate` at `.cardOn(.about, 1)`.
+
+Visible: the card shows Check automatically off, a Check now control, the current version, and What's new. The feed address and the public key are not shown as editable settings. Check now is not clicked. Install is not clicked.
+
+Log: `settings open         glass.autoUpdate`
+
+### 115. Automatic checks stay off
+
+Needs #33 and #49 merged.
+
+Action: leave Check automatically off. Quit. Launch. Open About and the same card.
+
+Visible: Check automatically is still off. Last checked is unchanged. No download started.
+
+Log: `settings persist       about.autoUpdate false`
+
+### 116. Portal tab
+
+Needs #33 and #50 merged.
+
+Action: click Topbar tab `.topbarTab(7)`.
+
+Visible: the page title is Portal. Nearby sending is off and is not clicked. The name row is visible. No local-network sheet appears. No second window opens.
+
+Log: `settings open         glass.portal`
+
+### 117. Portal name survives relaunch
+
+Needs #33 and #50 merged.
+
+Action: set the name shown to nearby machines to Fixture. Leave nearby sending off. Quit. Launch. Open the same tab.
+
+Visible: the name reads Fixture. Nearby sending is still off. No consent sheet appeared. Close the settings window.
+
+Log: `settings persist       fling.deviceName Fixture`
 
 ## Reduce Motion, then VoiceOver
 
 Quit the app. Turn Reduce Motion on in System Settings before the next launch. Do not change it from inside Zeus. VoiceOver stays off.
 
-### 94. The wave does not move
+### 118. The wave does not move
 
 Action: launch, open the socket, fixture sends one running session pinned at `0:05`, click the closed bar.
 
@@ -842,7 +1090,7 @@ Visible: the Agents page is on screen in one frame. It does not rise and it does
 
 Log: `session  running      s1`
 
-### 95. An approval appears in one frame
+### 119. An approval appears in one frame
 
 Action: fixture sends an approval.
 
@@ -852,7 +1100,7 @@ Log: `approval allow        s1`
 
 Quit. Turn Reduce Motion off. Turn VoiceOver on before the next launch.
 
-### 96. VoiceOver reads the row, and the panel stays
+### 120. VoiceOver reads the row, and the panel stays
 
 Action: launch, open one running session, click the closed bar, and move VoiceOver to the session row. Then move the pointer off the panel.
 

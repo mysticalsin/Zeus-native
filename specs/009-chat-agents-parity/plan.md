@@ -97,7 +97,7 @@ The command for PRs 1 through 7 is `swift test --filter <Suite>` for the suite t
 
 PR 11's frame budget is sampled while a synthetic transcript streams: the main-thread commit stays inside 16.6 ms at 60 Hz and 8.3 ms at 120 Hz. A static screenshot is not the motion check. Record the open and the approval grow with Reduce Motion off and on. The person's own OS consent is required for any capture. The checklist does not script a permission dialog.
 
-The packaged-app walk, one click at a time, is `native-acceptance.md`. A PR is not accepted on a Mac until the steps it owns in that script pass. The script does not replace the unit filters above.
+The packaged-app walk, one click at a time, is `native-acceptance.md`. A PR is not accepted on a Mac until the steps it owns in that script pass. The script does not replace the unit filters above. Steps 94 through 117 also walk the twelve glass sections from the shell and their section pull requests, on each section's `.topbarTab` or `.cardOn` slot, and they stay blocked until those pull requests are in the build.
 
 ## Acceptance
 
