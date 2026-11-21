@@ -334,7 +334,7 @@ struct HubDecisionTests {
         }
     }
 
-    /// ZB-031. A typed reply waiting on approval has no cancel, so the draft stays stuck.
+    /// ZB-031. Cancel returns a waiting typed reply to drafting and keeps the draft.
     @Test func aPendingTypedReplyCanBeCancelled() {
         let waiting = HubReplyState(status: .awaitingDecision, draft: "  keep   going\n")
         let context = HubReplyContext(destinationCanTakeText: true, trusted: true)
@@ -358,6 +358,108 @@ struct HubDecisionTests {
         #expect(resent.asksApproval)
         #expect(resent.script == nil)
         #expect(resent.state.script == nil)
+    }
+
+    @Test func cancelTransitionsAreExhaustive() {
+        let drafts = [
+            "",
+            " ",
+            "  keep   going\n",
+            " \n\t ",
+            "keep going",
+            "a\u{0}b\u{7}",
+            String(repeating: "n", count: 2_001),
+        ]
+        let scripts: [String?] = [nil, "", "keep going", String(repeating: "s", count: 2_000)]
+        let receipts: [HubReplyReceipt?] = [nil] + HubReplyReceipt.allCases.map { Optional.some($0) }
+        let contexts = [
+            HubReplyContext(text: "next", destinationCanTakeText: false, trusted: false),
+            HubReplyContext(text: "next", destinationCanTakeText: true, trusted: false),
+            HubReplyContext(text: "next", destinationCanTakeText: false, trusted: true),
+            HubReplyContext(text: "next", destinationCanTakeText: true, trusted: true),
+            HubReplyContext(),
+        ]
+        for status in HubReplyStatus.allCases {
+            for draft in drafts {
+                for receipt in receipts {
+                    for script in scripts {
+                        for context in contexts {
+                            for event in HubReplyCancel.allCases {
+                                let state = HubReplyState(
+                                    status: status, draft: draft, receipt: receipt, script: script)
+                                let outcome = HubDecision.reply(state, event, context: context)
+                                #expect(outcome == expectedCancel(state))
+                                #expect(outcome == HubDecision.reply(state, event))
+                                #expect(outcome.asksApproval == false)
+                                #expect(outcome.script == nil)
+                                #expect(outcome.state.draft == draft)
+                                switch event {
+                                case .cancel:
+                                    if status == .awaitingDecision {
+                                        #expect(outcome.state.status == .drafting)
+                                        #expect(outcome.state.receipt == nil)
+                                        #expect(outcome.state.script == nil)
+                                        let denied = HubDecision.reply(state, .denied, context: context)
+                                        let timed = HubDecision.reply(state, .timedOut, context: context)
+                                        let approved = HubDecision.reply(state, .approved, context: context)
+                                        #expect(outcome != denied)
+                                        #expect(outcome != timed)
+                                        #expect(outcome != approved)
+                                        #expect(denied.state.status == .idle)
+                                        #expect(denied.state.receipt == .notSent)
+                                        #expect(timed.state.receipt == .notSent)
+                                        #expect(outcome.state.receipt != .notSent)
+                                        #expect(outcome.state.status != .sending)
+                                        for replyEvent in HubReplyEvent.allCases {
+                                            let other = HubDecision.reply(state, replyEvent, context: context)
+                                            #expect(other.state.status != .drafting)
+                                        }
+                                    } else {
+                                        #expect(outcome.state == state)
+                                        #expect(outcome.state.receipt != .notSent || state.receipt == .notSent)
+                                        #expect(outcome.state.receipt != .sent || state.receipt == .sent)
+                                    }
+                                }
+                                let again = HubDecision.reply(outcome.state, event, context: context)
+                                #expect(again == outcome)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func cancelIsIdempotentAndNeverApprovesOrDenies() {
+        var rng = ReplyDraw(state: 0x7B03_1C00_0000_0031)
+        for _ in 0..<256 {
+            let state = rng.replyState()
+            let context = rng.replyContext()
+            let other = rng.replyContext()
+            let outcome = HubDecision.reply(state, HubReplyCancel.cancel, context: context)
+            #expect(outcome == HubDecision.reply(state, HubReplyCancel.cancel, context: other))
+            #expect(outcome == expectedCancel(state))
+            #expect(outcome.asksApproval == false)
+            #expect(outcome.script == nil)
+            #expect(outcome.state.draft == state.draft)
+            if state.status == .awaitingDecision {
+                #expect(outcome.state.status == .drafting)
+                #expect(outcome.state.receipt == nil)
+                #expect(outcome.state.script == nil)
+                #expect(outcome != HubDecision.reply(state, .denied, context: context))
+                #expect(outcome != HubDecision.reply(state, .timedOut, context: context))
+                #expect(outcome != HubDecision.reply(state, .approved, context: context))
+                #expect(HubDecision.reply(state, .denied, context: context).state.receipt == .notSent)
+                #expect(HubDecision.reply(state, .approved, context: context).script == nil
+                    || HubDecision.reply(state, .approved, context: context).state.status == .sending)
+            } else {
+                #expect(outcome.state == state)
+            }
+            let twice = HubDecision.reply(outcome.state, HubReplyCancel.cancel, context: other)
+            #expect(twice == outcome)
+            let thrice = HubDecision.reply(twice.state, HubReplyCancel.cancel, context: context)
+            #expect(thrice == outcome)
+        }
     }
 
     private func queue(showing id: String, allowsAsk: Bool = false, then next: String) -> HubApprovalQueue {
@@ -465,5 +567,69 @@ struct HubDecisionTests {
         default:
             return HubReplyOutcome(state: state, asksApproval: false, script: nil)
         }
+    }
+
+    /// Cancel from a waiting reply returns to drafting. Every other status stays.
+    private func expectedCancel(_ state: HubReplyState) -> HubReplyOutcome {
+        guard state.status == .awaitingDecision else {
+            return HubReplyOutcome(state: state, asksApproval: false, script: nil)
+        }
+        var next = state
+        next.status = .drafting
+        next.receipt = nil
+        next.script = nil
+        return HubReplyOutcome(state: next, asksApproval: false, script: nil)
+    }
+}
+
+/// A fixed generator so the cancel property is the same on every run.
+private struct ReplyDraw {
+    var state: UInt64
+
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
+    }
+
+    mutating func int(_ bound: Int) -> Int {
+        Int(next() % UInt64(bound))
+    }
+
+    mutating func text(_ count: Int) -> String {
+        var scalars: [Unicode.Scalar] = []
+        scalars.reserveCapacity(count)
+        for _ in 0..<count {
+            if let scalar = Unicode.Scalar(UInt32(int(128))) {
+                scalars.append(scalar)
+            }
+        }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
+    mutating func replyState() -> HubReplyState {
+        let drafts = [
+            "",
+            " ",
+            "  keep   going\n",
+            " \n\t ",
+            text(int(48)),
+            String(repeating: "a", count: int(8) == 0 ? 2_100 : int(12)),
+        ]
+        let status = HubReplyStatus.allCases[int(HubReplyStatus.allCases.count)]
+        let receipt: HubReplyReceipt? = int(HubReplyReceipt.allCases.count + 1) == 0
+            ? nil
+            : HubReplyReceipt.allCases[int(HubReplyReceipt.allCases.count)]
+        let script: String? = int(3) == 0 ? nil : text(int(20))
+        return HubReplyState(status: status, draft: drafts[int(drafts.count)], receipt: receipt, script: script)
+    }
+
+    mutating func replyContext() -> HubReplyContext {
+        HubReplyContext(
+            text: text(int(16)),
+            destinationCanTakeText: int(2) == 0,
+            trusted: int(2) == 0)
     }
 }
