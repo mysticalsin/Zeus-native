@@ -27,17 +27,21 @@ struct ScribeConnectingDeadlineTests {
     }
 
     private final class Session {
-        let clock = Clock()
-        let capture = Capture()
+        let clock: Clock
+        let capture: Capture
         let controller: ScribeController
         let suite: String
 
         init() throws {
-            suite = NSTemporaryDirectory() + "scribe-connecting-\(UUID().uuidString)"
+            let manualClock = Clock()
+            let manualCapture = Capture()
+            let suite = NSTemporaryDirectory() + "scribe-connecting-\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
-            let manualClock = clock
-            controller = ScribeController(
-                provider: capture,
+            self.suite = suite
+            self.clock = manualClock
+            self.capture = manualCapture
+            self.controller = ScribeController(
+                provider: manualCapture,
                 monotonicClock: { manualClock.time },
                 cancellationDefaults: defaults,
                 optInDefaults: defaults
