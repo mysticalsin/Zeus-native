@@ -153,17 +153,35 @@ public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
     }
 }
 
-/// A saved key is 8 to 256 characters after trimming, with no whitespace and no control character.
-/// Empty and malformed keys are refused before any request is built. The text of a refusal never includes the key.
+/// A saved key is at least 8 characters after trimming and at most 256 UTF-8 bytes.
+/// C0 controls, DEL, C1 controls (U+0080 through U+009F), whitespace, and the listed
+/// format characters are refused. Empty and malformed keys are refused before any request
+/// is built. The text of a refusal never includes the key.
 public enum VoiceProviderKeyPolicy {
+    /// Maximum UTF-8 byte length of a trimmed key.
     public static let maxLength = 256
+    public static let minimumCharacters = 8
 
     public static func accepts(_ key: String) -> Bool {
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 8, trimmed.count <= maxLength else { return false }
-        return trimmed.unicodeScalars.allSatisfy { scalar in
-            scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
-        }
+        let trimmed = key.trimmingCharacters(in: padding)
+        guard trimmed.count >= minimumCharacters else { return false }
+        guard trimmed.utf8.count <= maxLength else { return false }
+        return trimmed.unicodeScalars.allSatisfy(allows)
+    }
+
+    /// ASCII space, tab, and newline only. C1, line separators, and format characters stay in the key so they are rejected.
+    private static let padding = CharacterSet(charactersIn: " \t\n\r\u{000B}\u{000C}")
+
+    static func allows(_ scalar: Unicode.Scalar) -> Bool {
+        let value = scalar.value
+        if value < 0x20 || value == 0x7F { return false }
+        if (0x80...0x9F).contains(value) { return false }
+        if scalar.properties.isWhitespace { return false }
+        if (0x200B...0x200F).contains(value) { return false }
+        if (0x202A...0x202E).contains(value) { return false }
+        if (0x2060...0x2064).contains(value) { return false }
+        if value == 0xFEFF { return false }
+        return true
     }
 }
 

@@ -159,7 +159,7 @@ struct VoiceQualityGapTests {
     }
 
     private func speak(provider: Provider, text: String, credential: String, status: Int, body: Data?, alreadyUsed: Int = 0) async throws -> Outcome {
-        RouteHostStub.reset(reply: .init(status: status, body: body))
+        GapHostStub.reset(reply: .init(status: status, body: body))
         let directory = try temporaryDirectory()
         let meter = try VoiceQualityMeter(directory: directory)
         if alreadyUsed > 0 {
@@ -169,7 +169,7 @@ struct VoiceQualityGapTests {
         let lines = GapLog()
         let speaker = VoiceQualitySpeaker(
             meter: meter,
-            transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2),
+            transport: URLSessionProviderTransport(protocolClasses: [GapHostStub.self], timeout: 2),
             log: ProviderLog { lines.add($0) }
         )
         let keys = provider == .eleven ? VoiceQualitySpeakKeys(elevenLabs: true) : VoiceQualitySpeakKeys(googleCloud: true)
@@ -186,7 +186,7 @@ struct VoiceQualityGapTests {
         let surfaced = error ?? VoiceQualityError.providerOff
         let message = [String(describing: surfaced), String(reflecting: surfaced), VoiceQualityError.publicName(surfaced), lines.text].joined(separator: "\n")
         let id = provider == .eleven ? ElevenLabsTTSAdapter.id : GoogleCloudTTSAdapter.id
-        return Outcome(hosts: RouteHostStub.hosts, error: error, message: message, count: try meter.count(providerID: id))
+        return Outcome(hosts: GapHostStub.hosts, error: error, message: message, count: try meter.count(providerID: id))
     }
 
     private func firstError(_ synthesis: Synthesis) async -> Error? {
@@ -203,6 +203,44 @@ struct VoiceQualityGapTests {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+}
+
+private final class GapHostStub: URLProtocol, @unchecked Sendable {
+    struct Reply: Sendable {
+        var status: Int
+        var body: Data?
+    }
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var reply = Reply(status: 200)
+    nonisolated(unsafe) private static var seen: [String] = []
+
+    static var hosts: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return seen
+    }
+
+    static func reset(reply: Reply) {
+        lock.lock(); defer { lock.unlock() }
+        self.reply = reply
+        seen = []
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.lock.lock()
+        Self.seen.append(request.url?.host ?? "")
+        let reply = Self.reply
+        Self.lock.unlock()
+        let response = HTTPURLResponse(url: request.url ?? URL(string: "https://example.invalid/")!, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if let body = reply.body, !body.isEmpty { client?.urlProtocol(self, didLoad: body) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
 
 private final class GapLog: @unchecked Sendable {

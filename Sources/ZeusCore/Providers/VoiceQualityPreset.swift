@@ -45,7 +45,7 @@ public enum VoiceQualityError: Error, Equatable, Sendable, CustomStringConvertib
     }
 }
 
-/// A key is trimmed, then refused when a control character remains or it is longer than 256 characters.
+/// A key is trimmed, then refused when a control or format character remains or its UTF-8 form is longer than 256 bytes.
 /// The message is fixed. A longer key is never stored, logged, or placed in a header, so redaction stays bounded.
 /// Newline, carriage return, tab, and NUL cannot reach a header or the meter.
 public enum VoiceQualityKeyGate {
@@ -53,13 +53,14 @@ public enum VoiceQualityKeyGate {
     public static let maxLength = 256
 
     public static func accepted(_ raw: String) -> String? {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = raw.trimmingCharacters(in: CharacterSet(charactersIn: " \t\n\r\u{000B}\u{000C}"))
         guard VoiceProviderKeyPolicy.accepts(trimmed) else { return nil }
         return trimmed
     }
 }
 
-/// One speak request stays at or under 5,000 characters. The 50,000 figure is the cumulative meter.
+/// One speak request stays at or under 5,000 UTF-8 bytes. The 50,000 figure is the cumulative meter, also in UTF-8 bytes.
+/// ElevenLabs and Google bill by their own character counts. Bytes are the cap so combining marks cannot slip past it.
 public enum VoiceQualityRequestSize {
     public static let limit = 5_000
 
@@ -100,10 +101,12 @@ final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked S
     let delegate = VoiceQualityRedirectDelegate()
     let timeout: TimeInterval
     let log: ProviderLog
+    let protocolClasses: [AnyClass]
 
-    init(timeout: TimeInterval = ProviderHTTPBudget.requestTimeout, log: ProviderLog = ProviderLog()) {
+    init(timeout: TimeInterval = ProviderHTTPBudget.requestTimeout, log: ProviderLog = ProviderLog(), protocolClasses: [AnyClass] = []) {
         self.timeout = timeout
         self.log = log
+        self.protocolClasses = protocolClasses
     }
 
     func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse {
@@ -112,6 +115,7 @@ final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked S
         defer { session.finishTasksAndInvalidate() }
         let (data, response) = try await session.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
+        guard !(300...399).contains(http.statusCode) else { throw VoiceQualityError.endpointRefused }
         log.record("voice-quality \(request.method) \(request.url.host ?? "-") status=\(http.statusCode)")
         return ProviderHTTPResponse(status: http.statusCode, body: data)
     }
@@ -128,6 +132,7 @@ final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked S
                     defer { session.finishTasksAndInvalidate() }
                     let (data, httpResponse) = try await session.data(for: urlRequest)
                     guard let http = httpResponse as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
+                    guard !(300...399).contains(http.statusCode) else { throw VoiceQualityError.endpointRefused }
                     continuation.yield(.status(http.statusCode))
                     if !data.isEmpty { continuation.yield(.chunk(data)) }
                     continuation.finish()
@@ -145,6 +150,7 @@ final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked S
         configuration.timeoutIntervalForResource = timeout
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
+        if !protocolClasses.isEmpty { configuration.protocolClasses = protocolClasses }
         return configuration
     }
 }
@@ -446,7 +452,7 @@ public enum VoiceQualityRequestBuilder {
         guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
             throw VoiceQualityError.keyRejected
         }
-        guard VoiceQualityRequestSize.allows(VoiceQualityMarkup.spoken(text).count) else {
+        guard VoiceQualityRequestSize.allows(VoiceQualityMarkup.spoken(text).utf8.count) else {
             throw VoiceQualityError.requestTooLarge
         }
         let spoken = VoiceQualityMarkup.spoken(text)
@@ -569,8 +575,8 @@ public struct VoiceQualitySpeaker: Sendable {
         self.log = log
     }
 
-    /// A call that did not come through `VoiceQualityRoute`. It does not read the key or open a request.
-    public func synthesize(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
+    /// A call that did not come through `VoiceQualityRoute` or `synthesizeIfEnabled`. It does not read the key or open a request.
+    func synthesize(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
         _ = (text, preset, voiceID, credential)
         return Self.refused()
     }
@@ -594,11 +600,12 @@ public struct VoiceQualitySpeaker: Sendable {
                 throw VoiceQualityError.keyRejected
             }
             let spoken = VoiceQualityMarkup.spoken(text)
-            guard VoiceQualityRequestSize.allows(spoken.count) else { throw VoiceQualityError.requestTooLarge }
+            let bytes = spoken.utf8.count
+            guard VoiceQualityRequestSize.allows(bytes) else { throw VoiceQualityError.requestTooLarge }
             let clean = ProviderCredential(fields: [ProviderCredentialLocation.account: key])
             let request = try VoiceQualityRequestBuilder.make(text: text, preset: preset, voiceID: voice, credential: clean)
             guard VoiceQualityEndpoint.allows(request.url) else { throw VoiceQualityError.endpointRefused }
-            try meter.reserve(providerID: preset.providerID, characters: spoken.count)
+            try meter.reserve(providerID: preset.providerID, characters: bytes)
             let response = try await transport.send(request)
             log.record(
                 "voice-quality \(VoiceQualityCall(request: request).description) status=\(response.status)",

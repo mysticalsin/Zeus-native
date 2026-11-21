@@ -21,7 +21,7 @@ public enum VoiceProviderE2E {
         environment[environmentName]?.trimmingCharacters(in: .whitespacesAndNewlines) == "fail"
     }
 
-    /// Test-only Keychain service. The production service `app.zeus.voice-provider.<id>` is not used.
+    /// Test-only Keychain service. Production keys stay on `com.zeus.app`.
     public static func service(for providerID: String) -> String {
         let clean = providerID.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_" }
         return "app.zeus.voice-provider.e2e.\(clean)"

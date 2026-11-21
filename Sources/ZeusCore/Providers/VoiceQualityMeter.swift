@@ -5,12 +5,13 @@ import Darwin
 import Glibc
 #endif
 
-/// Dev-only character meter for opted-in cloud voices. The count is stored per provider in
+/// Dev-only meter for opted-in cloud voices. The count is stored per provider in
 /// Application Support. It is not a key, and this file never contains one.
 ///
-/// A request that would make the stored total reach 50,000 characters is refused, and the stored
-/// total is left unchanged. Unreadable or non-integral state fails closed: the request is not sent
-/// and the file is not rewritten.
+/// Counts are UTF-8 bytes of the sanitized text. A request that would make the stored total
+/// reach 50,000 bytes is refused, and the stored total is left unchanged. ElevenLabs and Google
+/// bill by their own character counts. Bytes fail closed when a combining sequence would slip
+/// past a character ceiling. Unreadable, linked, or non-regular state fails closed.
 public final class VoiceQualityMeter: @unchecked Sendable {
     public static let limit = 50_000
     public static let fileName = "voice-quality-meter.json"
@@ -19,6 +20,9 @@ public final class VoiceQualityMeter: @unchecked Sendable {
 
     private let lock = NSLock()
     private let fileURL: URL
+    var testingTemporaryName: String?
+    var testingBeforeDestinationCheck: (@Sendable (URL) -> Void)?
+    var testingSynchronizeParent: (@Sendable (Int32) -> Int32)?
 
     public init(directory: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -36,7 +40,7 @@ public final class VoiceQualityMeter: @unchecked Sendable {
         return try load()[providerID] ?? 0
     }
 
-    /// Counts `characters` before the request is sent. `characters` is the sanitized text length.
+    /// Reserves `characters` UTF-8 bytes before the request is sent.
     public func reserve(providerID: String, characters: Int) throws {
         lock.lock(); defer { lock.unlock() }
         guard characters >= 0 else { throw VoiceQualityError.meterCorrupt }
@@ -51,6 +55,8 @@ public final class VoiceQualityMeter: @unchecked Sendable {
     }
 
     private func load() throws -> [String: Int] {
+        let parent = try openParentDirectory()
+        defer { close(parent) }
         let data: Data
         do {
             guard let read = try Self.readNoFollow(fileURL) else { return [:] }
@@ -70,11 +76,14 @@ public final class VoiceQualityMeter: @unchecked Sendable {
     }
 
     private func store(_ counts: [String: Int]) throws {
+        let parent = try openParentDirectory()
+        defer { close(parent) }
         let data: Data
         do { data = try JSONSerialization.data(withJSONObject: counts, options: [.sortedKeys]) }
         catch { throw VoiceQualityError.meterCorrupt }
         guard data.count <= Self.maxFileBytes else { throw VoiceQualityError.meterCorrupt }
-        let temporary = fileURL.deletingLastPathComponent().appendingPathComponent(".voice-quality-meter-\(UUID().uuidString).tmp")
+        let name = testingTemporaryName ?? ".voice-quality-meter-\(UUID().uuidString).tmp"
+        let temporary = fileURL.deletingLastPathComponent().appendingPathComponent(name)
         let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode_t(0o600))
         if fd < 0 { throw VoiceQualityError.meterCorrupt }
         var failed = false
@@ -104,25 +113,50 @@ public final class VoiceQualityMeter: @unchecked Sendable {
             unlink(temporary.path)
             throw VoiceQualityError.meterCorrupt
         }
-        let check = open(fileURL.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        testingBeforeDestinationCheck?(fileURL)
+        let sync = testingSynchronizeParent ?? { fsync($0) }
+        if sync(parent) != 0 { throw VoiceQualityError.meterCorrupt }
+        let check = open(fileURL.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         if check < 0 { throw VoiceQualityError.meterCorrupt }
         var landed = stat()
         let landedOK = withUnsafeMutablePointer(to: &landed) { fstat(check, $0) } == 0
         close(check)
         let regular = (landed.st_mode & S_IFMT) == S_IFREG
-        guard landedOK, regular, landed.st_dev == written.st_dev, landed.st_ino == written.st_ino else {
+        let single = landed.st_nlink <= 1
+        guard landedOK, regular, single, landed.st_dev == written.st_dev, landed.st_ino == written.st_ino else {
             throw VoiceQualityError.meterCorrupt
         }
     }
 
-    /// `O_NOFOLLOW` so a swapped symlink is an error, not a read or write of another file.
+    /// The directory that holds the meter file. `O_NOFOLLOW` refuses a symlinked parent.
+    private func openParentDirectory() throws -> Int32 {
+        let parent = fileURL.deletingLastPathComponent().path
+        let fd = open(parent, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        if fd < 0 { throw VoiceQualityError.meterCorrupt }
+        var info = stat()
+        let ok = withUnsafeMutablePointer(to: &info) { fstat(fd, $0) } == 0
+        if !ok || (info.st_mode & S_IFMT) != S_IFDIR {
+            close(fd)
+            throw VoiceQualityError.meterCorrupt
+        }
+        return fd
+    }
+
+    /// `O_NOFOLLOW` so a swapped symlink is an error. Non-regular files and extra links are refused.
     private static func readNoFollow(_ url: URL) throws -> Data? {
-        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         if fd < 0 {
             if errno == ENOENT { return nil }
             throw VoiceQualityError.meterCorrupt
         }
         defer { close(fd) }
+        var info = stat()
+        guard withUnsafeMutablePointer(to: &info) { fstat(fd, $0) } == 0 else {
+            throw VoiceQualityError.meterCorrupt
+        }
+        guard (info.st_mode & S_IFMT) == S_IFREG, info.st_nlink <= 1 else {
+            throw VoiceQualityError.meterCorrupt
+        }
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 4096)
         while true {
@@ -146,3 +180,4 @@ public final class VoiceQualityMeter: @unchecked Sendable {
         return Int(double)
     }
 }
+
