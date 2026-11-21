@@ -73,11 +73,10 @@ fn serve_command(config: &ServeConfig) -> i32 {
 fn run_serve(socket: &std::path::Path, argv: &[String]) -> std::io::Result<()> {
     let listener = bind_socket(socket)?;
     let mut launcher = StdLauncher::new();
-    let _pid = launcher.spawn(argv)?;
-    // The Python child binds its own private socket. This process only accepts
-    // the Zeus client. Tests never call this path.
-    let _ = listener;
-    Ok(())
+    let spawned = launcher.spawn(argv);
+    drop(listener);
+    let _ = std::fs::remove_file(socket);
+    spawned.map(|_| ())
 }
 
 enum Command {

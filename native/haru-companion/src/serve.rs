@@ -5,11 +5,14 @@ use crate::engine::Engine;
 use crate::protocol::FrameBuf;
 use crate::session::ChildControl;
 use std::io::{Read, Write};
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::Duration;
+
+static BIND_UMASK: Mutex<()> = Mutex::new(());
 
 pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     if let Some(parent) = path.parent() {
@@ -17,11 +20,37 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
             std::fs::create_dir_all(parent)?;
         }
     }
-    if path.exists() {
-        std::fs::remove_file(path)?;
+    if let Ok(meta) = std::fs::symlink_metadata(path) {
+        let kind = meta.file_type();
+        if kind.is_symlink() || kind.is_socket() {
+            std::fs::remove_file(path)?;
+        } else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "refusing to replace a non-socket",
+            ));
+        }
     }
-    let listener = UnixListener::bind(path)?;
-    let mut permissions = std::fs::metadata(path)?.permissions();
+    let listener = {
+        let _guard = BIND_UMASK.lock().unwrap_or_else(|poison| poison.into_inner());
+        let old = unsafe { umask(0o077) };
+        let bound = UnixListener::bind(path);
+        unsafe { umask(old) };
+        bound?
+    };
+    if unsafe { fchmod(listener.as_raw_fd(), 0o600) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // fchmod on a listening socket fd does not change the directory entry on
+    // Linux. chmod the path only after it is the socket we just bound.
+    let meta = std::fs::symlink_metadata(path)?;
+    if !meta.file_type().is_socket() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "socket path changed during bind",
+        ));
+    }
+    let mut permissions = meta.permissions();
     permissions.set_mode(0o600);
     std::fs::set_permissions(path, permissions)?;
     Ok(listener)
@@ -183,6 +212,8 @@ const SO_PEERCRED: i32 = 17;
 
 extern "C" {
     fn geteuid() -> u32;
+    fn umask(mask: u32) -> u32;
+    fn fchmod(fd: i32, mode: u32) -> i32;
     #[cfg(target_os = "linux")]
     fn getsockopt(
         sockfd: i32,
