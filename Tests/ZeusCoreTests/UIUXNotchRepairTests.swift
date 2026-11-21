@@ -19,4 +19,16 @@ struct UIUXNotchRepairTests {
         #expect(open.isEmpty)
         #expect(!actual.contains { $0.kind == "dynamic-type" && $0.surface == "Notch" })
     }
+
+    /// The ramp has to size a real notch string. A discarded call on the edge wave does not.
+    @Test func dynamicTypeScalesARealNotchString() throws {
+        let root = try #require(UIUXRepo.root())
+        let edge = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Notch/EdgeWave.swift"), encoding: .utf8)
+        let notch = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Notch/NotchView.swift"), encoding: .utf8)
+        let ramp = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Notch/NotchDynamicType.swift"), encoding: .utf8)
+        #expect(!edge.contains("let _ = NotchDynamicType"))
+        #expect(notch.contains("NotchDynamicType.points("))
+        #expect(notch.contains("Text(model.approval?.agent ?? model.peekSession?.agent ?? \"Zeus\")"))
+        #expect(ramp.contains("case .large: 1"))
+    }
 }
