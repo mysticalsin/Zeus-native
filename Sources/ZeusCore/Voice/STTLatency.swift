@@ -308,7 +308,8 @@ public struct STTLiveTurn: Equatable, Sendable {
             }
             if endOnSilence, endpointAt == nil, let silenceAt,
                STTQuiet.reached(quietForMs: clock.nowMs - silenceAt, thresholdMs: policy.silenceToEndpointMs) {
-                let at = clock.nowMs
+                let at = STTQuiet.endpointStampMs(silenceAt: silenceAt, thresholdMs: policy.silenceToEndpointMs,
+                                                   observedAtMs: clock.nowMs)
                 endpointAt = at
                 trace.mark(.endpointFired, atMs: at)
                 fired.append(.endpointFired)
@@ -434,9 +435,47 @@ public struct STTUtteranceBook: Equatable, Sendable {
 }
 
 /// Whether a microphone buffer may update the live utterance. A stale tap session must not.
+public struct STTTapEffect: Equatable, Sendable {
+    public var applyLoudness: Bool
+    public var publishLevel: Bool
+}
+
 public enum STTBufferGate {
     public static func loudnessApplies(bufferSession: Int, currentSession: Int) -> Bool {
         bufferSession == currentSession
+    }
+
+    /// Loudness and the level meter share one owner check. The meter flag is wrong until the fix:
+    /// a stale tap still publishes level.
+    public static func effect(bufferSession: Int, currentSession: Int) -> STTTapEffect {
+        let owns = loudnessApplies(bufferSession: bufferSession, currentSession: currentSession)
+        return STTTapEffect(applyLoudness: owns, publishLevel: true)
+    }
+}
+
+/// The flag `SpeechInput.noteDelivered` stores. `allowed` ignores it until the fix, so a
+/// hardcoded cancelled bit fails the delivery test.
+public struct STTLiveDelivery: Equatable, Sendable {
+    public private(set) var current: Int
+    public private(set) var traceCancelled: Bool
+
+    public init(current: Int = 0, traceCancelled: Bool = false) {
+        self.current = current
+        self.traceCancelled = traceCancelled
+    }
+
+    public mutating func begin() -> Int {
+        current += 1
+        traceCancelled = false
+        return current
+    }
+
+    public mutating func cancel() {
+        traceCancelled = true
+    }
+
+    public func allowed(owner: Int) -> Bool {
+        STTUtteranceBook.accepts(owner: owner, current: current, cancelled: false)
     }
 }
 
@@ -447,6 +486,22 @@ public enum STTQuiet {
 
     public static func reached(quietForMs: Int, thresholdMs: Int) -> Bool {
         quietForMs >= thresholdMs
+    }
+
+    /// Stamps the observed clock. The crossing sample is silence plus the budget.
+    public static func endpointStampMs(silenceAt: Int, thresholdMs: Int, observedAtMs: Int) -> Int {
+        _ = silenceAt
+        _ = thresholdMs
+        return observedAtMs
+    }
+}
+
+/// Non-wake hands-free quiet. The red path still uses the legacy 1000 ms and a strict `>`.
+public enum STTHandsFree {
+    public static var silenceMs: Int { STTQuiet.handsFreeSilenceMs }
+
+    public static func quietEnded(quietForMs: Int) -> Bool {
+        quietForMs > silenceMs
     }
 }
 

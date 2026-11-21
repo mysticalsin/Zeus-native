@@ -22,7 +22,9 @@ struct STTLatencyTests {
         let endpoint = turn.trace.offset(.endpointFired)
         #expect(silence == 480)
         #expect(endpoint == 880)
-        #expect(endpoint! - silence! <= STTSessionPolicy.fixed.silenceToEndpointMs)
+        let gap = endpoint.flatMap { end in silence.map { end - $0 } }
+        #expect(gap != nil)
+        #expect((gap ?? (STTSessionPolicy.fixed.silenceToEndpointMs + 1)) <= STTSessionPolicy.fixed.silenceToEndpointMs)
     }
 
     @Test func theSameSilenceBudgetHoldsForMurmur() {
@@ -208,9 +210,10 @@ struct STTLatencyTests {
         turn.feed(clock: clock, rms: 0.001, partialToken: 1)
         let silence = turn.trace.offset(.silenceDetected)
         let endpoint = turn.trace.offset(.endpointFired)
+        let crossing = 100 + STTSessionPolicy.production.silenceToEndpointMs
         #expect(silence == 100)
-        #expect(endpoint == 10_000)
-        #expect(endpoint! >= 100 + STTSessionPolicy.fixed.silenceToEndpointMs)
+        #expect(endpoint == crossing)
+        #expect(endpoint != 10_000)
     }
 
     @Test func endpointBoundariesKillComparisonMutants() {
@@ -234,7 +237,8 @@ struct STTLatencyTests {
         let late = endpoint(at: silenceAt + budget + 1)
         #expect(early == nil)
         #expect(exact == silenceAt + budget)
-        #expect(late == silenceAt + budget + 1)
+        #expect(late == silenceAt + budget)
+        #expect(late != silenceAt + budget + 1)
     }
 
     @Test func aStaleMarkDoesNotWriteTheOpenUtterance() {
@@ -292,10 +296,18 @@ struct STTLatencyTests {
     }
 
     @Test func aCancelledDeliverIsRefused() {
-        let open = STTUtteranceBook.accepts(owner: 1, current: 1, cancelled: false)
-        let closed = STTUtteranceBook.accepts(owner: 1, current: 1, cancelled: true)
+        var live = STTLiveDelivery()
+        let owner = live.begin()
+        let open = live.allowed(owner: owner)
+        live.cancel()
+        let closed = live.allowed(owner: owner)
+        let next = live.begin()
+        let reopened = live.allowed(owner: next)
+        let stale = live.allowed(owner: owner)
         #expect(open)
         #expect(!closed)
+        #expect(reopened)
+        #expect(!stale)
     }
 
     @Test func aStaleBufferDoesNotSetSpeechOrSilence() {
@@ -313,13 +325,28 @@ struct STTLatencyTests {
     }
 
     @Test func quietReachesExactlyAtTheHandsFreeThreshold() {
-        let threshold = STTQuiet.handsFreeSilenceMs
-        let at = STTQuiet.reached(quietForMs: threshold, thresholdMs: threshold)
-        let before = STTQuiet.reached(quietForMs: threshold - 1, thresholdMs: threshold)
-        let after = STTQuiet.reached(quietForMs: threshold + 1, thresholdMs: threshold)
-        #expect(threshold == 1_000)
+        let threshold = STTHandsFree.silenceMs
+        let legacy = STTSessionPolicy.legacy.silenceToEndpointMs
+        let at = STTHandsFree.quietEnded(quietForMs: threshold)
+        let before = STTHandsFree.quietEnded(quietForMs: threshold - 1)
+        let after = STTHandsFree.quietEnded(quietForMs: threshold + 1)
+        #expect(threshold == 400)
+        #expect(threshold == STTSessionPolicy.production.silenceToEndpointMs)
+        #expect(threshold != 1_500)
+        #expect(threshold != legacy)
+        #expect(legacy == 1_000)
         #expect(at)
         #expect(!before)
         #expect(after)
+        #expect(STTSessionPolicy.production.endpointToFinalMs == 450)
+    }
+
+    @Test func aStaleTapDoesNotPublishLevel() {
+        let stale = STTBufferGate.effect(bufferSession: 3, currentSession: 4)
+        let live = STTBufferGate.effect(bufferSession: 4, currentSession: 4)
+        #expect(!stale.applyLoudness)
+        #expect(!stale.publishLevel)
+        #expect(live.applyLoudness)
+        #expect(live.publishLevel)
     }
 }
