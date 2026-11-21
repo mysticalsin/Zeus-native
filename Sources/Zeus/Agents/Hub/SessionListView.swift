@@ -35,8 +35,19 @@ enum SessionListAccessibility {
     }
 
     /// "Agent, project, Running, 3 minutes 12 seconds." Queued is the badge, after the clock.
-    static func rowLabel(name: String, project _: String, statusWord _: String, elapsedText _: String, queued _: Bool, hidesDetails _: Bool) -> String {
-        name
+    static func rowLabel(name: String, project: String, statusWord: String, elapsedText: String, queued: Bool, hidesDetails: Bool) -> String {
+        var parts: [String] = []
+        let agent = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !agent.isEmpty { parts.append(agent) }
+        if !hidesDetails {
+            let job = project.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !job.isEmpty { parts.append(job) }
+        }
+        let word = statusWord.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !word.isEmpty { parts.append(word) }
+        if let spoken = spokenElapsed(elapsedText) { parts.append(spoken) }
+        if queued { parts.append(queuedWord) }
+        return parts.joined(separator: ", ")
     }
 
     /// Header: name, count, expanded or collapsed, and the urgent clock when folded.
