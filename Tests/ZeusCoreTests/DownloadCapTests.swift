@@ -201,6 +201,12 @@ struct DownloadCapTests {
         try? FileManager.default.removeItem(at: root)
     }
 
+    @Test func theByteCapErrorTellsThePersonTheDownloadWasTooLarge() {
+        let error = DownloadCapExceeded()
+        #expect(error.errorDescription == "Download stopped: larger than expected")
+        #expect((error as Error).localizedDescription == "Download stopped: larger than expected")
+    }
+
     @Test func byteCapsAreThePinnedSizesPlusTwentyFivePercent() {
         #expect(PinnedModelBytes.whisperBaseEn == 147_964_211)
         #expect(PinnedModelBytes.whisperSmall == 487_601_967)
@@ -227,6 +233,78 @@ struct DownloadCapTests {
         #expect(within.cancelCount == 0)
         ok.evaluateWrite(written: 184_955_264, expected: -1, task: within)
         #expect(within.cancelCount == 1)
+    }
+
+    @Test func capMinusOneAndTheCapItselfDoNotCancel() {
+        let cap: Int64 = 100
+        let task = FakeDownloadTask()
+        let guardRail = DownloadTransferGuard(maximumBytes: cap, allowedHosts: PinnedDownloadHosts.whisper)
+        guardRail.evaluateWrite(written: cap - 1, expected: cap, task: task)
+        #expect(task.cancelCount == 0)
+        guardRail.evaluateWrite(written: cap, expected: cap, task: task)
+        #expect(task.cancelCount == 0)
+        let over = FakeDownloadTask()
+        let overGuard = DownloadTransferGuard(maximumBytes: cap, allowedHosts: PinnedDownloadHosts.whisper)
+        overGuard.evaluateWrite(written: cap + 1, expected: 10, task: over)
+        #expect(over.cancelCount == 1)
+    }
+
+    @Test func redirectsRequireAnExactHostWithNoUserAndTheDefaultPort() {
+        func followed(_ raw: String) -> Bool {
+            let guardRail = DownloadTransferGuard(maximumBytes: 100, allowedHosts: PinnedDownloadHosts.whisper)
+            let task = FakeDownloadTask()
+            var request: URLRequest?
+            guardRail.evaluateRedirect(URL(string: raw)!, task: task) { request = $0 }
+            return request != nil
+        }
+        #expect(followed("https://huggingface.co/model.bin"))
+        #expect(followed("https://huggingface.co:443/model.bin"))
+        #expect(followed("https://evilhuggingface.co/model.bin") == false)
+        #expect(followed("https://us.aws.cdn.hf.co.evil.com/model.bin") == false)
+        #expect(followed("https://huggingface.co@evil.example/model.bin") == false)
+        #expect(followed("https://evil.example@huggingface.co/model.bin") == false)
+        #expect(followed("https://huggingface.co:444/model.bin") == false)
+    }
+
+    @Test func aFailedDownloadRemovesThePartial() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-fail-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let partial = directory.appendingPathComponent("model.partial")
+        let result = await DownloadRunner.run(kind: .model, clock: { 0 }, partials: { [partial] }) {
+            try Data("partial".utf8).write(to: partial)
+            throw NSError(domain: "Zeus", code: 7)
+        }
+        guard case .failed = result else {
+            Issue.record("expected failed, got \(result)")
+            return
+        }
+        #expect(!FileManager.default.fileExists(atPath: partial.path))
+    }
+
+    @Test func theFinishedDownloadIsMovedInsideTheCallback() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-move-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("temp.bin")
+        let destination = directory.appendingPathComponent("model.partial")
+        try Data(count: 10).write(to: source)
+        let guardRail = DownloadTransferGuard(maximumBytes: 10, allowedHosts: PinnedDownloadHosts.whisper)
+        guardRail.destination = destination
+        guardRail.acceptFinishedDownload(at: source)
+        #expect(guardRail.keptURL == destination)
+        #expect(!FileManager.default.fileExists(atPath: source.path))
+        #expect(Data(contentsOf: destination).count == 10)
+
+        let big = directory.appendingPathComponent("big.bin")
+        try Data(count: 11).write(to: big)
+        let over = DownloadTransferGuard(maximumBytes: 10, allowedHosts: PinnedDownloadHosts.whisper)
+        over.destination = directory.appendingPathComponent("nope.partial")
+        over.acceptFinishedDownload(at: big)
+        #expect(over.keptURL == nil)
+        #expect(over.stopped)
+        #expect(!FileManager.default.fileExists(atPath: big.path))
+        #expect(!FileManager.default.fileExists(atPath: over.destination!.path))
     }
 
     @Test func redirectsStopAtFiveAndStayOnHttpsAllowlistedHosts() {
