@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Zeus
 
@@ -53,5 +54,44 @@ struct HubDecisionRowAccessibilityTests {
         #expect(HubDecisionRow.askIsButton == false)
         #expect(HubDecisionRow.queuedHint(thisRowIsQueued: false, count: 1) == "1 waiting")
         #expect(HubDecisionRow.queuedHint(thisRowIsQueued: false, count: 2) == "2 waiting")
+    }
+
+    /// ZB-UIUX-A11Y-030, 032, 033, 034: the approval controls had no accessibility identifier.
+    /// ZB-UIUX-DECISION-001: a decision row had none either.
+    /// ZB-UIUX-ESCAPE-001: Escape was not bound. Revision 3 binds Escape and 3 to Deny.
+    @Test func eachControlHasAStableIdentifierAndEscapeDenies() throws {
+        let source = try rowSource()
+        let identifiers = [
+            ("hub.decision.row", "ZB-UIUX-DECISION-001"),
+            ("hub.decision.allow-once", "ZB-UIUX-A11Y-030"),
+            ("hub.decision.allow-once", "ZB-UIUX-A11Y-034"),
+            ("hub.decision.deny.hidden", "ZB-UIUX-A11Y-032"),
+            ("hub.decision.deny", "ZB-UIUX-A11Y-033"),
+            ("hub.decision.allow-session", "ZB-UIUX-A11Y-034"),
+            ("hub.decision.deny-note", "ZB-UIUX-A11Y-033"),
+        ]
+        for (identifier, finding) in identifiers {
+            #expect(source.contains(identifier), "missing \(identifier) for \(finding)")
+            #expect(source.contains(finding), "missing finding \(finding)")
+            #expect(source.contains(".accessibilityIdentifier(\(identifierLiteral(identifier)))"))
+        }
+        #expect(source.contains("ZB-UIUX-ESCAPE-001"))
+        #expect(source.contains("kVK_Escape"))
+        #expect(source.contains("kVK_ANSI_3"))
+        #expect(HubDecisionContract.denyHint(answerKeysOn: true).contains("Escape"))
+        #expect(HubDecisionContract.denyHint(answerKeysOn: true).contains("3"))
+    }
+
+    private func identifierLiteral(_ identifier: String) -> String {
+        "\"\(identifier)\""
+    }
+
+    private func rowSource() throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let url = root.appendingPathComponent("Sources/Zeus/Agents/Hub/HubDecisionRow.swift")
+        return try String(contentsOf: url, encoding: .utf8)
     }
 }
