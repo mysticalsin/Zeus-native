@@ -88,7 +88,8 @@ enum PointingHTTP {
         let options = URLSessionConfiguration.ephemeral
         options.httpShouldSetCookies = false; options.httpCookieStorage = nil; options.urlCache = nil
         options.urlCredentialStorage = nil
-        options.timeoutIntervalForRequest = timeout; options.timeoutIntervalForResource = max(timeout, 180)
+        options.timeoutIntervalForRequest = timeout
+        options.timeoutIntervalForResource = SpeechTransportBudget.resourceTimeout(request: timeout)
         return options
     }
 
