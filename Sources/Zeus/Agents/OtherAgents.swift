@@ -118,6 +118,7 @@ struct OtherAgentsSection: View {
                     }
                 }
                 .disabled(!AgentHookInstaller.isAvailable(agent) && state.installed[agent] != true)
+                .accessibilityIdentifier("agents.other-agents.control")
             }
             if let problem = state.problem {
                 Text(problem).font(.callout).foregroundStyle(.red)

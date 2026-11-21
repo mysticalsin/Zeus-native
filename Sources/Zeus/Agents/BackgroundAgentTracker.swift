@@ -48,15 +48,23 @@ final class BackgroundAgentTracker {
 
 struct BackgroundAgentChipView: View {
     let session: BackgroundAgentSession
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(session.title).font(.system(size: 11, weight: .semibold, design: .rounded))
+            Text(session.title).font(.system(size: AgentsDynamicType.points(11, dynamicTypeSize: dynamicTypeSize), weight: .semibold, design: .rounded))
             ForEach(Array(session.steps.suffix(3).enumerated()), id: \.offset) { _, step in
-                Text(step.title).font(.system(size: 10, weight: .medium, design: .rounded)).lineLimit(1)
+                Text(step.title).font(.system(size: AgentsDynamicType.points(10, dynamicTypeSize: dynamicTypeSize), weight: .medium, design: .rounded)).lineLimit(1)
             }
         }
         .padding(8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background {
+            if reduceTransparency {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(nsColor: .windowBackgroundColor))
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.ultraThinMaterial)
+            }
+        }
     }
 }
