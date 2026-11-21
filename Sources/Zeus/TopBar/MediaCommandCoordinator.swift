@@ -1,91 +1,154 @@
-import AppKit
 import Foundation
-import os
 import ZeusCore
+#if canImport(AppKit)
+import AppKit
+#endif
+#if canImport(os)
+import os
+#endif
 
-/// Resumes a launch wait once: either the open finished, or the bound plus one second elapsed.
-private final class LaunchOnce: @unchecked Sendable {
+/// One shot for the open callback and the give-up sleep. The first value wins.
+private final class LaunchGate: @unchecked Sendable {
     private let lock = NSLock()
-    private var resumed = false
-    private let continuation: CheckedContinuation<Bool, Never>
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var value: Bool?
 
-    init(_ continuation: CheckedContinuation<Bool, Never>) {
-        self.continuation = continuation
+    func wait() async -> Bool {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if let value {
+                lock.unlock()
+                continuation.resume(returning: value)
+                return
+            }
+            self.continuation = continuation
+            lock.unlock()
+        }
     }
 
-    func resume(_ value: Bool) {
+    func resolve(_ opened: Bool) {
         lock.lock()
-        let first = !resumed
-        resumed = true
+        if value != nil {
+            lock.unlock()
+            return
+        }
+        value = opened
+        let continuation = self.continuation
+        self.continuation = nil
         lock.unlock()
-        if first { continuation.resume(returning: value) }
+        // Resume off this turn. The waiter is on the main actor, and resuming it inline
+        // from the open callback deadlocks that actor.
+        if let continuation {
+            Task.detached { continuation.resume(returning: opened) }
+        }
     }
 }
 
-private enum MediaCommandLog {
-    static let logger = Logger(subsystem: "app.zeus.mac", category: "media-playback")
-
-    static func write(_ message: String) {
-        logger.notice("\(message, privacy: .public)")
+enum MediaClockMath {
+    /// Seconds for the router. Snapped to 1/128 s, a fraction Double can subtract exactly,
+    /// so a full debounce window does not come back a hair under `debounceWindow`.
+    static func seconds(from duration: Duration) -> Double {
+        let parts = duration.components
+        let raw = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
+        let quantum = 1.0 / 128.0
+        return (raw / quantum).rounded() * quantum
     }
 }
 
-/// Runs the home and music transport through `MediaCommandRouter`.
-///
-/// A scripted player is told with an Apple Event, by bundle id, through the existing out-of-process
-/// script runner. A browser tab uses the feed already attached to the hub. `MPRemoteCommandCenter`
-/// cannot control another app, so it is not used. The private media-remote gate is off and fails closed,
-/// so that path is never taken.
+/// Monotonic instants for launch deadlines. `wall` can jump without moving `now`.
+/// Production reads `ContinuousClock`. A deadline never subtracts `wall`.
+protocol MediaCommandClock: Sendable {
+    var now: ContinuousClock.Instant { get }
+    var wall: Date { get }
+    func sleep(for duration: Duration) async throws
+}
+
+struct MediaSystemCommandClock: MediaCommandClock {
+    var now: ContinuousClock.Instant { ContinuousClock.now }
+    var wall: Date { Date() }
+
+    func sleep(for duration: Duration) async throws {
+        try await Task.sleep(for: duration, clock: ContinuousClock())
+    }
+}
+
+/// Starts an open and reports whether the process has finished launching.
+/// The driver owns the budget, so this does not sleep.
 @MainActor
-final class MediaCommandCoordinator {
-    private let model: TopBarModel
-    private let hub: NowPlayingHub
-    private let feed: MusicPlayerFeed
+protocol MediaPlayerLaunching: AnyObject {
+    func startOpen(bundleID: String, activates: Bool, done: @escaping @Sendable (Bool) -> Void)
+    func isFinishedLaunching(bundleID: String) -> Bool
+}
+
+/// Hands a command to the player and reads the real sample back.
+@MainActor
+protocol MediaCommandTransport: AnyObject {
+    func deliver(_ command: MediaControlCommand, route: MediaCommandRoute) async -> MediaCommandDelivery
+    func readBack(_ route: MediaCommandRoute) async
+}
+
+/// The transport router plus the launch wait. Deadlines use `clock.now`.
+/// The give-up sleep is cancelled when the open callback arrives, when a later command
+/// takes its place, and when `stop` runs. A late open after `stop` does not play.
+@MainActor
+final class MediaCommandDriver {
+    private let clock: any MediaCommandClock
+    private let opener: any MediaPlayerLaunching
+    private let transport: any MediaCommandTransport
+    private let origin: ContinuousClock.Instant
     private var router = MediaCommandRouter()
     private var generation = 0
+    private var gate: LaunchGate?
+    private var launchTask: Task<Void, Never>?
+    private var commandTask: Task<Void, Never>?
+    private var settled = 0
+    private var settleWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
+    private var launchFinished = false
+    private var launchWaiters: [CheckedContinuation<Void, Never>] = []
 
-    init(model: TopBarModel, hub: NowPlayingHub, feed: MusicPlayerFeed) {
-        self.model = model
-        self.hub = hub
-        self.feed = feed
+    private(set) var sent: [MediaControlCommand] = []
+    private(set) var pendingSleep: Task<Void, Never>?
+    var onLog: (@MainActor (String) -> Void)?
+    var onState: (@MainActor (MediaCommandState) -> Void)?
+    var onRecovery: (@MainActor () -> Void)?
+
+    var state: MediaCommandState { router.state }
+
+    init(clock: any MediaCommandClock, opener: any MediaPlayerLaunching, transport: any MediaCommandTransport) {
+        self.clock = clock
+        self.opener = opener
+        self.transport = transport
+        self.origin = clock.now
     }
 
-    func start() {
-        model.homeMediaPress = { [weak self] in self?.press($0) }
-        model.mediaRecovery = { [weak self] in self?.recover() }
-        model.resyncHomeMedia = { [weak self] in self?.resync($0) }
-        resync(model.nowPlaying)
+    func resync(_ sample: MediaNowPlayingSample?) {
+        _ = try? router.reduce(.info(sample), now: monotonicNow())
+        publish()
     }
 
-    func stop() {
-        generation += 1
-        model.homeMediaPress = { _ in }
-        model.mediaRecovery = {}
-        model.resyncHomeMedia = { _ in }
-    }
-
-    private func press(_ command: MediaControlCommand) {
+    func press(_ command: MediaControlCommand) {
         let effects: [MediaCommandEffect]
         do {
-            effects = try router.reduce(.press(command), now: clock())
+            effects = try router.reduce(.press(command), now: monotonicNow())
         } catch let rejection as MediaCommandRejection {
-            MediaCommandLog.write("command \(Self.word(command)) rejected \(Self.word(rejection.reason))")
+            onLog?("command \(Self.word(command)) rejected \(Self.word(rejection.reason))")
             return
         } catch {
             return
         }
         if effects.isEmpty, case .noSource = router.state {
-            MediaCommandLog.write("command \(Self.word(command)) nosource")
+            onLog?("command \(Self.word(command)) nosource")
             return
         }
+        if !effects.isEmpty { cancelPendingSleep() }
         publish()
         perform(effects)
     }
 
-    private func recover() {
+    func recover() {
         let effects: [MediaCommandEffect]
         do {
-            effects = try router.reduce(.recover, now: clock())
+            effects = try router.reduce(.recover, now: monotonicNow())
         } catch {
             return
         }
@@ -93,13 +156,75 @@ final class MediaCommandCoordinator {
         perform(effects)
     }
 
-    private func resync(_ playing: NowPlaying?) {
-        _ = try? router.reduce(.info(sample(playing)), now: clock())
-        publish()
+    func stop() {
+        generation += 1
+        cancelPendingSleep()
+        commandTask?.cancel()
+        gate?.resolve(false)
+        launchTask?.cancel()
+    }
+
+    /// Completes once the command that was just started has armed its sleep, or has finished without one.
+    func waitUntilParked() async {
+        if pendingSleep != nil { return }
+        let mark = settled
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if pendingSleep != nil || settled > mark {
+                continuation.resume()
+                return
+            }
+            settleWaiters.append((mark, continuation))
+        }
+    }
+
+    func waitUntilLaunchSettled() async {
+        if launchFinished { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            if launchFinished {
+                continuation.resume()
+                return
+            }
+            launchWaiters.append(continuation)
+        }
+    }
+
+    private func noteLaunchFinished() {
+        launchFinished = true
+        let waiters = launchWaiters
+        launchWaiters.removeAll()
+        for waiter in waiters {
+            Task.detached { waiter.resume() }
+        }
+    }
+
+    private func monotonicNow() -> Double {
+        MediaClockMath.seconds(from: clock.now - origin)
     }
 
     private func publish() {
-        if model.mediaPlayback != router.state { model.mediaPlayback = router.state }
+        onState?(router.state)
+    }
+
+    private func cancelPendingSleep() {
+        pendingSleep?.cancel()
+        pendingSleep = nil
+    }
+
+    private func noteSettled() {
+        settled += 1
+        var stay: [(Int, CheckedContinuation<Void, Never>)] = []
+        var ready: [CheckedContinuation<Void, Never>] = []
+        for (mark, waiter) in settleWaiters {
+            if settled > mark {
+                ready.append(waiter)
+            } else {
+                stay.append((mark, waiter))
+            }
+        }
+        settleWaiters = stay
+        for waiter in ready {
+            Task.detached { waiter.resume() }
+        }
     }
 
     private func perform(_ effects: [MediaCommandEffect]) {
@@ -113,8 +238,8 @@ final class MediaCommandCoordinator {
             case .resync(_, let delay):
                 after = delay
             case .openRecovery:
-                MediaCommandLog.write("recovery opened")
-                model.openPermissions()
+                onLog?("recovery opened")
+                onRecovery?()
             case .launch(let bundleID, let activates):
                 launch = (bundleID, activates)
             }
@@ -126,15 +251,34 @@ final class MediaCommandCoordinator {
         guard let (command, route) = send else { return }
         generation += 1
         let token = generation
-        Task { @MainActor [weak self] in
+        commandTask?.cancel()
+        commandTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let result = await self.deliver(command, route: route)
-            guard token == self.generation else { return }
+            guard token == self.generation, !Task.isCancelled else {
+                self.noteSettled()
+                return
+            }
+            self.sent.append(command)
+            let result = await self.transport.deliver(command, route: route)
+            guard token == self.generation, !Task.isCancelled else {
+                self.noteSettled()
+                return
+            }
             self.apply(.result(result))
-            guard result == .accepted else { return }
-            try? await Task.sleep(for: .seconds(after))
-            guard token == self.generation else { return }
-            await self.readBack(route)
+            guard result == .accepted else {
+                self.noteSettled()
+                return
+            }
+            let sleep = Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await self.clock.sleep(for: .seconds(after))
+            }
+            self.pendingSleep?.cancel()
+            self.pendingSleep = sleep
+            self.noteSettled()
+            await sleep.value
+            guard token == self.generation, !Task.isCancelled, !sleep.isCancelled else { return }
+            await self.transport.readBack(route)
         }
     }
 
@@ -142,74 +286,94 @@ final class MediaCommandCoordinator {
     private func launchPlayer(bundleID: String, activates: Bool) {
         generation += 1
         let token = generation
-        let started = clock()
-        MediaCommandLog.write("command play launched bundle=\(bundleID)")
-        Task { @MainActor [weak self] in
+        let startedInstant = clock.now
+        let started = monotonicNow()
+        let gate = LaunchGate()
+        self.gate = gate
+        launchFinished = false
+        onLog?("command play launched bundle=\(bundleID)")
+        pendingSleep = Task { @MainActor [weak self] in
             guard let self else { return }
-            let ready = await Self.openAndWait(bundleID: bundleID, activates: activates, budget: MediaCommandRouter.launchTimeout)
-            guard token == self.generation else { return }
-            let now = self.clock()
-            let event: MediaCommandEvent
-            let when: Double
-            if ready, MediaCommandRouter.launchAccepted(startedAt: started, now: now) {
-                event = .sourceReady
-                when = now
-            } else {
-                event = .launchClock
-                when = started + MediaCommandRouter.launchTimeout + 1
+            do {
+                try await self.clock.sleep(for: .seconds(MediaCommandRouter.launchTimeout + 1))
+            } catch {
+                return
             }
-            let effects = (try? self.router.reduce(event, now: when)) ?? []
-            if case .failed(.launchFailed) = self.router.state {
-                MediaCommandLog.write("command play launchFailed")
+            guard !Task.isCancelled else { return }
+            gate.resolve(false)
+        }
+        opener.startOpen(bundleID: bundleID, activates: activates) { [weak self] opened in
+            Task { @MainActor in
+                guard let self else { return }
+                self.pendingSleep?.cancel()
+                gate.resolve(opened)
             }
-            self.publish()
-            self.perform(effects)
+        }
+        launchTask = Task { @MainActor [weak self] in
+            await self?.finishLaunch(gate: gate, token: token, bundleID: bundleID,
+                                     startedInstant: startedInstant, started: started)
+            self?.noteLaunchFinished()
         }
     }
 
-    /// True when the player is running and finished launching before `budget` seconds.
-    /// The open itself gives up one second past the bound, so a callback that never arrives cannot wait forever.
-    private static func openAndWait(bundleID: String, activates: Bool, budget: Double) async -> Bool {
-        guard NowPlaying.Player(bundleID: bundleID) != nil,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return false }
-        let started = Date()
-        let opened: Bool = await withCheckedContinuation { continuation in
-            let once = LaunchOnce(continuation)
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = activates
-            configuration.addsToRecentItems = false
-            NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
-                once.resume(app != nil && error == nil)
-            }
-            Task {
-                try? await Task.sleep(for: .seconds(budget + 1))
-                once.resume(false)
-            }
+    private func finishLaunch(gate: LaunchGate, token: Int, bundleID: String,
+                              startedInstant: ContinuousClock.Instant, started: Double) async {
+        let opened = await gate.wait()
+        guard token == generation, !Task.isCancelled else { return }
+        let elapsed = MediaClockMath.seconds(from: clock.now - startedInstant)
+        let ready: Bool
+        if opened, elapsed <= MediaCommandRouter.launchTimeout {
+            ready = await pollReady(bundleID: bundleID, startedInstant: startedInstant)
+        } else {
+            ready = false
         }
-        guard opened, Date().timeIntervalSince(started) <= budget else { return false }
-        while Date().timeIntervalSince(started) <= budget {
-            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
-               app.isFinishedLaunching {
-                return true
+        guard token == generation, !Task.isCancelled else { return }
+        let now = monotonicNow()
+        let event: MediaCommandEvent
+        let when: Double
+        if ready, MediaCommandRouter.launchAccepted(startedAt: started, now: now) {
+            event = .sourceReady
+            when = now
+        } else {
+            event = .launchClock
+            when = started + MediaCommandRouter.launchTimeout + 1
+        }
+        let effects = (try? router.reduce(event, now: when)) ?? []
+        if case .failed(.launchFailed) = router.state {
+            onLog?("command play launchFailed")
+        }
+        publish()
+        perform(effects)
+    }
+
+    /// Polls until the player has finished launching, or the monotonic budget has passed.
+    /// The gap stays 50 milliseconds. The budget stays `launchTimeout`.
+    private func pollReady(bundleID: String, startedInstant: ContinuousClock.Instant) async -> Bool {
+        while MediaClockMath.seconds(from: clock.now - startedInstant) <= MediaCommandRouter.launchTimeout {
+            if Task.isCancelled { return false }
+            if opener.isFinishedLaunching(bundleID: bundleID) { return true }
+            do {
+                try await clock.sleep(for: .milliseconds(50))
+            } catch {
+                return false
             }
-            try? await Task.sleep(for: .milliseconds(50))
         }
         return false
     }
 
     private func apply(_ event: MediaCommandEvent) {
         let pending = Self.pending(router)
-        _ = try? router.reduce(event, now: clock())
+        _ = try? router.reduce(event, now: monotonicNow())
         if case .result(let delivery) = event, let pending {
             switch delivery {
             case .accepted:
-                MediaCommandLog.write("command \(pending.name) accepted\(pending.target)")
+                onLog?("command \(pending.name) accepted\(pending.target)")
             case .permissionDenied:
-                MediaCommandLog.write("command \(pending.name) permissionDenied")
+                onLog?("command \(pending.name) permissionDenied")
             case .unavailable:
-                MediaCommandLog.write("command \(pending.name) unavailable")
+                onLog?("command \(pending.name) unavailable")
             case .failed:
-                MediaCommandLog.write("command \(pending.name) failed")
+                onLog?("command \(pending.name) failed")
             }
         }
         publish()
@@ -245,41 +409,59 @@ final class MediaCommandCoordinator {
         case .blocked: "blocked"
         }
     }
+}
 
-    private func clock() -> Double { Date().timeIntervalSinceReferenceDate }
+#if canImport(AppKit)
+private enum MediaCommandLog {
+    #if canImport(os)
+    static let logger = Logger(subsystem: "app.zeus.mac", category: "media-playback")
 
-    // MARK: Delivery
+    static func write(_ message: String) {
+        logger.notice("\(message, privacy: .public)")
+    }
+    #else
+    static func write(_ message: String) {}
+    #endif
+}
 
-    private func deliver(_ command: MediaControlCommand, route: MediaCommandRoute) async -> MediaCommandDelivery {
-        // MediaRemoteCommandGate is off and fails closed. This path does not call it.
-        switch route.endpoint {
-        case .scriptedPlayer(let bundleID):
-            guard let player = NowPlaying.Player(bundleID: bundleID) else { return .unavailable }
-            return await feed.deliver(command, to: player)
-        case .browser(let tabID, let documentID):
-            guard let send = hub.browserCommand,
-                  case .browser(let key) = model.nowPlaying?.source,
-                  key.tabID == tabID, key.documentID == documentID else { return .unavailable }
-            let (kind, seconds) = Self.browserCommand(command)
-            send(kind, seconds, key)
-            return .accepted
+/// Runs the home and music transport through `MediaCommandRouter`.
+///
+/// A scripted player is told with an Apple Event, by bundle id, through the existing out-of-process
+/// script runner. A browser tab uses the feed already attached to the hub. `MPRemoteCommandCenter`
+/// cannot control another app, so it is not used. The private media-remote gate is off and fails closed,
+/// so that path is never taken.
+@MainActor
+final class MediaCommandCoordinator {
+    private let model: TopBarModel
+    private let driver: MediaCommandDriver
+
+    init(model: TopBarModel, hub: NowPlayingHub, feed: MusicPlayerFeed) {
+        self.model = model
+        let driver = MediaCommandDriver(
+            clock: MediaSystemCommandClock(),
+            opener: WorkspacePlayerLaunch(),
+            transport: FeedMediaTransport(model: model, hub: hub, feed: feed))
+        driver.onLog = { MediaCommandLog.write($0) }
+        driver.onState = { [weak model] state in
+            guard let model else { return }
+            if model.mediaPlayback != state { model.mediaPlayback = state }
         }
+        driver.onRecovery = { [weak model] in model?.openPermissions() }
+        self.driver = driver
     }
 
-    private func readBack(_ route: MediaCommandRoute) async {
-        switch route.endpoint {
-        case .scriptedPlayer(let bundleID):
-            guard let player = NowPlaying.Player(bundleID: bundleID) else { return }
-            guard feed.isPlayerRunning(player) else {
-                hub.update(.player(player), nil, announce: false)
-                return
-            }
-            if let playing = await feed.readPlayer(player) {
-                hub.update(.player(player), playing, announce: false)
-            }
-        case .browser:
-            break
-        }
+    func start() {
+        model.homeMediaPress = { [weak self] in self?.driver.press($0) }
+        model.mediaRecovery = { [weak self] in self?.driver.recover() }
+        model.resyncHomeMedia = { [weak self] in self?.driver.resync(self?.sample($0)) }
+        driver.resync(sample(model.nowPlaying))
+    }
+
+    func stop() {
+        driver.stop()
+        model.homeMediaPress = { _ in }
+        model.mediaRecovery = {}
+        model.resyncHomeMedia = { _ in }
     }
 
     private func sample(_ playing: NowPlaying?) -> MediaNowPlayingSample? {
@@ -299,6 +481,72 @@ final class MediaCommandCoordinator {
         return MediaNowPlayingSample(isPlaying: playing.isPlaying, position: playing.elapsed(),
                                      duration: playing.duration, route: route)
     }
+}
+
+@MainActor
+private final class WorkspacePlayerLaunch: MediaPlayerLaunching {
+    func startOpen(bundleID: String, activates: Bool, done: @escaping @Sendable (Bool) -> Void) {
+        guard NowPlaying.Player(bundleID: bundleID) != nil,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            done(false)
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = activates
+        configuration.addsToRecentItems = false
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+            done(app != nil && error == nil)
+        }
+    }
+
+    func isFinishedLaunching(bundleID: String) -> Bool {
+        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.isFinishedLaunching == true
+    }
+}
+
+@MainActor
+private final class FeedMediaTransport: MediaCommandTransport {
+    private let model: TopBarModel
+    private let hub: NowPlayingHub
+    private let feed: MusicPlayerFeed
+
+    init(model: TopBarModel, hub: NowPlayingHub, feed: MusicPlayerFeed) {
+        self.model = model
+        self.hub = hub
+        self.feed = feed
+    }
+
+    func deliver(_ command: MediaControlCommand, route: MediaCommandRoute) async -> MediaCommandDelivery {
+        // MediaRemoteCommandGate is off and fails closed. This path does not call it.
+        switch route.endpoint {
+        case .scriptedPlayer(let bundleID):
+            guard let player = NowPlaying.Player(bundleID: bundleID) else { return .unavailable }
+            return await feed.deliver(command, to: player)
+        case .browser(let tabID, let documentID):
+            guard let send = hub.browserCommand,
+                  case .browser(let key) = model.nowPlaying?.source,
+                  key.tabID == tabID, key.documentID == documentID else { return .unavailable }
+            let (kind, seconds) = Self.browserCommand(command)
+            send(kind, seconds, key)
+            return .accepted
+        }
+    }
+
+    func readBack(_ route: MediaCommandRoute) async {
+        switch route.endpoint {
+        case .scriptedPlayer(let bundleID):
+            guard let player = NowPlaying.Player(bundleID: bundleID) else { return }
+            guard feed.isPlayerRunning(player) else {
+                hub.update(.player(player), nil, announce: false)
+                return
+            }
+            if let playing = await feed.readPlayer(player) {
+                hub.update(.player(player), playing, announce: false)
+            }
+        case .browser:
+            break
+        }
+    }
 
     private static func browserCommand(_ command: MediaControlCommand) -> (MusicCommandKind, Double?) {
         switch command {
@@ -310,3 +558,4 @@ final class MediaCommandCoordinator {
         }
     }
 }
+#endif
