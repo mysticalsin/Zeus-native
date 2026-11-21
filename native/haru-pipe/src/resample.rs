@@ -55,6 +55,8 @@ pub fn firwin_kaiser(numtaps: usize, cutoff: f64, beta: f64) -> Vec<f64> {
 }
 
 /// Polyphase filter bank for a fixed (up, down) pair; reuse it across calls.
+static DESIGNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 pub struct Polyphase {
     up: usize,
     down: usize,
@@ -65,6 +67,7 @@ pub struct Polyphase {
 
 impl Polyphase {
     pub fn new(up: u64, down: u64) -> Self {
+        DESIGNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let g = gcd(up, down);
         let (up, down) = ((up / g) as usize, (down / g) as usize);
         let max_rate = up.max(down);
@@ -144,8 +147,21 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
     s
 }
 
+static BANKS: std::sync::Mutex<Vec<((u64, u64), Polyphase)>> = std::sync::Mutex::new(Vec::new());
+
 pub fn resample_poly(x: &[f32], up: u64, down: u64) -> Vec<f32> {
-    Polyphase::new(up, down).process(x)
+    let mut banks = BANKS.lock().expect("resampler bank");
+    if let Some(index) = banks.iter().position(|item| item.0 == (up, down)) {
+        return banks[index].1.process(x);
+    }
+    let bank = Polyphase::new(up, down);
+    let output = bank.process(x);
+    banks.push(((up, down), bank));
+    output
+}
+
+pub fn filter_designs() -> usize {
+    DESIGNS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Any rate -> 24 kHz, as `haru_mlx.audio.decode_audio` does.
