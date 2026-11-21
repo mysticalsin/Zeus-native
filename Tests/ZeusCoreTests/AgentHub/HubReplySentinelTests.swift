@@ -221,6 +221,7 @@ struct HubReplySentinelTests {
         #expect(type.contains("foregroundSnapshot"))
         #expect(!type.contains("approvedForeground"))
         #expect(!type.contains("last item"))
+        #expect(!type.contains("else { return true }"))
     }
 
     /// Terminal's process list does not say which process is in the foreground.

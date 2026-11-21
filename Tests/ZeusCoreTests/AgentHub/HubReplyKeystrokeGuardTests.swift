@@ -271,6 +271,47 @@ struct HubReplyJobGuardTests {
             snapshot: byPath, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [real]) == false)
     }
 
+    /// Typing is allowed before the terminal is frontmost. Return follows only if that app is frontmost afterwards.
+    @Test func returnFollowsTypingOnlyWhileTheTargetStaysFrontmost() throws {
+        let binary = try Self.file(named: "claude")
+        let before = HubReplyTTYSnapshot(
+            frontmostApp: nil,
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: before, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]))
+        let staying = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        let typed = HubReplyJobGuard.mayType(
+            snapshot: before, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary])
+        #expect(typed)
+        #expect(HubReplyJobGuard.maySubmit(
+            before: before, after: staying, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]))
+        let leaving = HubReplyTTYSnapshot(
+            frontmostApp: "Safari",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        #expect(typed && HubReplyJobGuard.maySubmit(
+            before: before, after: leaving, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    /// Two rows that name different foreground groups are unknown. Keeping the last group would allow the CLI.
+    @Test func disagreeingForegroundGroupsAreUnknown() throws {
+        let binary = try Self.file(named: "claude")
+        let output = """
+          10 10 10 Ss zsh
+          50 99 99 S claude
+        """
+        let snapshot = HubReplyTTYReader.snapshot(frontmostApp: "Terminal", ps: output) { pid in
+            pid == 50 ? binary : "/bin/zsh"
+        }
+        #expect(snapshot.foregroundPgid == nil)
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: snapshot, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
     /// The first name in the list is not the foreground group. An empty list and a failed read stay closed.
     @Test func theFirstNameAndAFailedReadDoNotType() throws {
         let binary = try Self.file(named: "claude")
