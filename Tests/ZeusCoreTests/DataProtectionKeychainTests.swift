@@ -17,6 +17,7 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
     var facts: LegacyItemFacts = .zeus
     /// A second legacy item with different bytes. `deleteLegacy(service:account:)` drops every match.
     var sibling: Data?
+    var siblingFacts: LegacyItemFacts?
     let primaryRef = Data("primary-ref".utf8)
     let siblingRef = Data("sibling-ref".utf8)
     private(set) var kinds: [String] = []
@@ -41,7 +42,7 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
             list.append(LegacyCandidate(persistentRef: primaryRef, data: data, facts: facts))
         }
         if let sibling {
-            list.append(LegacyCandidate(persistentRef: siblingRef, data: sibling, facts: facts))
+            list.append(LegacyCandidate(persistentRef: siblingRef, data: sibling, facts: siblingFacts ?? facts))
         }
         return list
     }
@@ -426,6 +427,75 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         #expect(!output.contains(unique))
         #expect(!store.log.contains("synthetic-key-value"))
         #expect(!CredentialKeychainMigration.logLine(account: "elevenlabs.api-key", outcome: .migrated).contains("synthetic-key-value"))
+    }
+
+    @Test func removeLeavesNoLegacyItem() {
+        let store = RecordingCredentialKeychain(legacy: .value(secret), protected: .value(secret))
+        let result = CredentialKeychainMigration.removeEverywhere(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+        #expect(result.outcome == .absent)
+        #expect(store.protected == .absent)
+        #expect(store.legacy == .absent)
+    }
+
+    @Test func cliOffLeavesNoOne() {
+        let on = Data("1".utf8)
+        let store = RecordingCredentialKeychain(legacy: .value(on), protected: .value(on))
+        let result = CredentialKeychainMigration.removeEverywhere(
+            service: service, account: CredentialKeychainPolicy.cliSwitchAccount, teamIdentifier: team, keychain: store)
+        #expect(result.outcome == .absent)
+        #expect(store.protected == .absent)
+        #expect(store.legacy == .absent)
+    }
+
+    @Test func clearingTheFlagDoesNotBringTheKeyBack() {
+        let store = RecordingCredentialKeychain(legacy: .value(secret), protected: .value(secret))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        #expect(CredentialKeychainMigration.removeEverywhere(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store).outcome == .absent)
+        let again = CredentialKeychainMigration.migrateOnce(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
+        #expect(again.outcome != .migrated)
+        #expect(store.protected == .absent)
+        #expect(store.legacy == .absent)
+    }
+
+    @Test func eraseLeavesNoVaultKeyInEitherStore() {
+        let vault = Data("vault-key-material".utf8)
+        let store = RecordingCredentialKeychain(legacy: .value(vault), protected: .value(vault))
+        let result = CredentialKeychainMigration.removeEverywhere(
+            service: service, account: "face.presence.vaultKey", teamIdentifier: team, keychain: store)
+        #expect(result.outcome == .absent)
+        #expect(store.protected == .absent)
+        #expect(store.legacy == .absent)
+        #expect(store.legacy != .value(vault))
+    }
+
+    @Test func downgradeCopyBackRefusesTheSwitchAndTheVaultAndVerifiesTheZeusItem() {
+        let zeus = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                    trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        let attacker = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                        trustedRequirements: [Self.attackerRequirement])
+        for blocked in [CredentialKeychainPolicy.cliSwitchAccount, "face.presence.vaultKey"] {
+            let store = RecordingCredentialKeychain(legacy: .value(Data("old".utf8)), protected: .value(secret))
+            store.facts = zeus
+            let result = CredentialKeychainMigration.copyBackForDowngrade(
+                service: service, account: blocked, teamIdentifier: team, keychain: store)
+            #expect(result.outcome != .migrated)
+            #expect(store.protected == .value(secret))
+            #expect(store.legacy == .value(Data("old".utf8)))
+        }
+        let store = RecordingCredentialKeychain(legacy: .value(Data("attacker-bytes".utf8)), protected: .value(secret))
+        store.facts = attacker
+        store.sibling = Data("zeus-bytes".utf8)
+        store.siblingFacts = zeus
+        let copied = CredentialKeychainMigration.copyBackForDowngrade(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+        #expect(copied.outcome == .migrated)
+        #expect(store.legacy == .value(Data("attacker-bytes".utf8)))
+        #expect(store.sibling == secret)
+        #expect(store.protected == .absent)
     }
 
     @Test func turningOffCopiesTheKeyBackBeforeDroppingTheProtectedItem() {
