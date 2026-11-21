@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="280" viewBox="0 0 640 280" role="img" aria-labelledby="title desc">
   <title id="title">Stream per-frame latency, Python, Rust, and Go</title>
-  <desc id="desc">Medians from pipeline-bench/results/summary.json. Python p50 0.124581 ms, Rust p50 0.018127499999999998 ms, Go p50 0.035847 ms.</desc>
+  <desc id="desc">Medians from pipeline-bench/results/summary.json. Python p50 0.124581 ms, p95 0.160699 ms. Rust p50 0.018127499999999998 ms, p95 0.02150425 ms. Go p50 0.035847 ms, p95 0.044256149999999994 ms.</desc>
   <style>
     .bar-py { animation: grow-py 1.4s linear forwards; }
     .bar-rs { animation: grow-rs 1.4s linear forwards; }

@@ -31,7 +31,7 @@ Notes:
 **Verdict**
 - **8-bit is the usable setting.** Real time with 40 % headroom (RTF ~0.60). bf16 English is not real time (RTF 1.06).
 - **The LM step is 56 % of the q8 frame.** Python glue is under 0.1 %.
-- **Rewriting the host loop in Rust is not justified for latency.** Confirmed by the pipeline benchmark: `/workspace/echo/pipeline-bench/REPORT.md`.
+- **Rewriting the host loop in Rust is not justified for latency.** Confirmed by the pipeline benchmark in [pipeline-bench/REPORT.md](../../pipeline-bench/REPORT.md).
 
 **Why the M5 is slower than the published 65 ms (M1 Max)**
 - The published "34.2 ms per step" was measured on an M1 Max (400 GB/s, 32-core GPU) with the native Swift app.

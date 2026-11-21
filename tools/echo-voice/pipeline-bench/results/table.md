@@ -1,3 +1,7 @@
+# Pipeline medians
+
+Host pipeline medians. The header row names the metric and the three implementations.
+
 | metric (median of runs) | Python (upstream code) | Rust | Go |
 |---|---|---|---|
 | Stream path per-frame p50 (ms) | 0.1246 | 0.0181 | 0.0358 |
