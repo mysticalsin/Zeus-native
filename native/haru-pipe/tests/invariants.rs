@@ -104,6 +104,15 @@ fn int16_round_trip_is_lossless_and_clips() {
     );
 }
 
+#[test]
+fn two_frames_design_the_resampler_once() {
+    let before = haru_pipe::resample::filter_designs();
+    let frame = vec![0.0f32; 64];
+    let _ = to_24k(&frame, 48_000);
+    let _ = to_24k(&frame, 48_000);
+    assert_eq!(haru_pipe::resample::filter_designs() - before, 1);
+}
+
 fn gcd(a: u64, b: u64) -> u64 {
     if b == 0 {
         a
