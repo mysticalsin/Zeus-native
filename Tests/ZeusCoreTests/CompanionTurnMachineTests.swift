@@ -322,6 +322,34 @@ struct CompanionTurnMachineTests {
         #expect((machine.keyUpToFirstAudio ?? 9) < 0.9)
     }
 
+    @Test func wallClockJumpDoesNotTripTheDeepSpokenCeiling() throws {
+        let source = try String(contentsOf: Self.repoRoot.appendingPathComponent("Sources/ZeusCore/Companion/CompanionTurnMachine.swift"), encoding: .utf8)
+        #expect(!source.contains("timeIntervalSinceReferenceDate"))
+        #expect(source.contains("systemUptime"))
+
+        let system = CompanionSystemClock()
+        let uptime = ProcessInfo.processInfo.systemUptime
+        #expect(abs(system.now() - uptime) < 0.05)
+        #expect(abs(system.now() - Date().timeIntervalSinceReferenceDate) > 86_400)
+
+        let clock = CompanionManualClock(now: 40)
+        var machine = CompanionTurnMachine(clock: clock)
+        machine.send(.keyDown)
+        machine.send(.keyUp)
+        machine.send(.finalTranscript("Point at the clock", instant: false))
+        #expect(machine.phase == .thinking)
+        let entered = machine.phaseEnteredAt
+        let jump = CompanionTurnMachine.deepSpokenCeiling + 3_600
+        clock.jumpWall(by: jump)
+        #expect(clock.wallNow() == 40 + jump)
+        #expect(clock.now() == entered)
+        #expect(machine.elapsedInPhase() == 0)
+        #expect(!machine.exceededDeepSpokenCeiling())
+        clock.advance(to: entered + 1)
+        #expect(machine.elapsedInPhase() == 1)
+        #expect(!machine.exceededDeepSpokenCeiling())
+    }
+
     @Test func existingFortyFiveAndTwentySecondTimeoutsAreReferenced() throws {
         let root = Self.repoRoot
         let controller = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/VoiceTurnController.swift"), encoding: .utf8)
