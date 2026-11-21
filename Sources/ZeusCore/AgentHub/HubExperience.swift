@@ -201,3 +201,35 @@ public enum HubExperience {
         return parts.isEmpty ? "0 seconds" : parts.joined(separator: " ")
     }
 }
+
+/// A clock the budget tests advance. It is not the display link.
+public struct HubManualClock: Equatable, Sendable {
+    public var milliseconds: Int
+
+    public init(milliseconds: Int = 0) { self.milliseconds = milliseconds }
+
+    public mutating func advance(milliseconds: Int) {
+        self.milliseconds += max(0, milliseconds)
+    }
+}
+
+public struct HubBudgetRun: Equatable, Sendable {
+    public var elapsedMilliseconds: Int
+    public var meetsBudget: Bool
+}
+
+extension HubExperience {
+    /// Times one open against the injected clock. The body advances the clock.
+    public static func measureOpen(clock: inout HubManualClock, _ work: (inout HubManualClock) -> Void) -> HubBudgetRun {
+        let start = clock.milliseconds
+        work(&clock)
+        let elapsed = clock.milliseconds - start
+        return HubBudgetRun(elapsedMilliseconds: elapsed, meetsBudget: meetsOpenBudget(milliseconds: elapsed))
+    }
+
+    /// Times a closed-panel sample. `windowMilliseconds` is how long the clock runs.
+    public static func measureIdle(clock: inout HubManualClock, windowMilliseconds: Int, sample: HubIdleSample) -> HubBudgetRun {
+        clock.advance(milliseconds: max(0, windowMilliseconds))
+        return HubBudgetRun(elapsedMilliseconds: max(0, windowMilliseconds), meetsBudget: isIdle(sample))
+    }
+}
