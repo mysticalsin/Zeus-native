@@ -30,6 +30,13 @@ final class BrainHTTPObserver: NSObject, URLSessionTaskDelegate, @unchecked Send
         }
         VoiceLog.log("brain", "http host=\(host) reused=\(reused) tls_ms=\(tlsMs)")
     }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(CredentialRedirect.apply(to: request, original: task.originalRequest?.url ?? response.url))
+    }
 }
 
 /// The warm-up actions are explicit so a cloud connection refresh cannot start a local voice worker.
