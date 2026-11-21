@@ -118,6 +118,54 @@ struct SessionMachineTests {
         #expect(HubSessionMachine.next(noPrevious, .timedOut) == noPrevious)
     }
 
+    /// ZB-028. Loading accepts a failure and a stall, with the same causes as running.
+    @Test func loadingFailureAndStallLeaveLoading() {
+        let loading = HubSessionState(status: .loading, clockGeneration: 2)
+        let failed = HubSessionMachine.next(loading, .failed)
+        #expect(failed.status == .error(.failed))
+        #expect(failed.clockPhase == .frozen)
+        #expect(failed.clockGeneration == loading.clockGeneration)
+        #expect(failed.previous == nil)
+
+        let quiet = HubSessionMachine.next(loading, .quietForTheStallLimit)
+        #expect(quiet.status == .error(.quiet))
+        #expect(quiet.clockPhase == .frozen)
+        #expect(quiet.clockGeneration == loading.clockGeneration)
+        #expect(quiet.previous == nil)
+    }
+
+    /// ZB-029. Approve restores a session that was waiting for input.
+    @Test func approveReturnsToWaitingForInput() {
+        let waiting = HubSessionState(status: .waitingForInput, clockGeneration: 3)
+        let approval = HubSessionMachine.next(waiting, .approvalRequested)
+        #expect(approval.status == .needsApproval)
+        #expect(approval.previous == .waitingForInput)
+        let approved = HubSessionMachine.next(approval, .approved)
+        #expect(approved.status == .waitingForInput)
+        #expect(approved.previous == nil)
+        #expect(approved.clockGeneration == waiting.clockGeneration)
+        #expect(approved.clockPhase == .ticking)
+
+        let running = HubSessionState(status: .running, clockGeneration: 3)
+        let fromRunning = HubSessionMachine.next(running, .approvalRequested)
+        let approvedRunning = HubSessionMachine.next(fromRunning, .approved)
+        #expect(approvedRunning.status == .running)
+        #expect(approvedRunning.previous == nil)
+        #expect(approvedRunning.clockGeneration == running.clockGeneration)
+    }
+
+    /// ZB-034. A failure while an approval is open leaves that state and drops the stored status.
+    @Test func failureDuringApprovalLeavesTheApprovalState() {
+        let running = HubSessionState(status: .running, clockGeneration: 4)
+        let approval = HubSessionMachine.next(running, .approvalRequested)
+        #expect(approval.previous == .running)
+        let failed = HubSessionMachine.next(approval, .failed)
+        #expect(failed.status == .error(.failed))
+        #expect(failed.previous == nil)
+        #expect(failed.clockGeneration == approval.clockGeneration)
+        #expect(failed.clockPhase == .frozen)
+    }
+
     @Test func everyPairFollowsTheSessionTableOrStays() {
         let listed = table.values.reduce(0) { $0 + $1.count }
         #expect(listed == 27)
