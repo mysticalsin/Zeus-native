@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// What a credentialed HTTP client may do with a redirect.
 public enum CredentialRedirect {
