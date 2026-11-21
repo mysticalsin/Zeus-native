@@ -250,7 +250,7 @@ final class SettingsStore {
         "notify.approvals", "notify.agentDone", "notify.reminders", "notify.focus", "notify.quietSharing",
         "sound.on", "sound.approval", "sound.done", "sound.todo", "sound.voiceStart", "sound.voiceStop", "sound.voiceDone", "sound.voiceError",
         "interview.hide", "avatar.alwaysInNotch", "showCaptions", "showMenuBarIcon",
-        "topBar.cues", "topBar.musicWings", "topBar.celsius",
+        "topBar.cues", "topBar.musicWings", "topBar.celsius", "notifications.mirror",
         "dictation.enabled", "dictation.autoSwitch", "dictation.pauseMedia", "dictation.restoreClipboard", "dictation.sounds",
         "dictation.preview", "dictation.engineForVoice", "dictation.alwaysType",
         "prompter.voice",
