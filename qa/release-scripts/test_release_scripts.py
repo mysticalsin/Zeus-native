@@ -254,8 +254,9 @@ class ReleaseScripts(unittest.TestCase):
 
         The only call is FileManager.attributesOfFileSystem systemFreeSize, read to decide
         whether a Fling can be written. That is reason E174.1. The byte count is not shown,
-        so 85F4.1 is not a reason for this call. Every other required-reason family that
-        Sources actually call must be declared too, and an unused family must not be.
+        so 85F4.1 is not a reason for this call. C617.1 does not apply: the app is not
+        sandboxed, so those files are not in an app container. CA92.1 does not apply:
+        the app also reads system UserDefaults domains. Neither code may be claimed.
         """
         hits = required_reason_hits(REPO / "Sources")
         self.assertTrue(hits["NSPrivacyAccessedAPICategoryDiskSpace"], "disk-space grep found nothing")
@@ -264,13 +265,14 @@ class ReleaseScripts(unittest.TestCase):
         self.assertTrue(manifest.is_file(), "disk-space APIs require Resources/PrivacyInfo.xcprivacy")
         declared = privacy_reasons(manifest)
         self.assertEqual(declared.get("NSPrivacyAccessedAPICategoryDiskSpace"), {"E174.1"})
-        for family, reasons in {
-            "NSPrivacyAccessedAPICategoryFileTimestamp": {"C617.1", "3B52.1"},
-            "NSPrivacyAccessedAPICategorySystemBootTime": {"35F9.1"},
-            "NSPrivacyAccessedAPICategoryUserDefaults": {"CA92.1"},
-        }.items():
-            self.assertTrue(hits[family], family)
-            self.assertEqual(declared.get(family), reasons, family)
+        self.assertNotIn("C617.1", manifest.read_text())
+        self.assertNotIn("CA92.1", manifest.read_text())
+        self.assertTrue(hits["NSPrivacyAccessedAPICategoryFileTimestamp"])
+        self.assertEqual(declared.get("NSPrivacyAccessedAPICategoryFileTimestamp"), {"3B52.1"})
+        self.assertTrue(hits["NSPrivacyAccessedAPICategorySystemBootTime"])
+        self.assertEqual(declared.get("NSPrivacyAccessedAPICategorySystemBootTime"), {"35F9.1"})
+        self.assertTrue(hits["NSPrivacyAccessedAPICategoryUserDefaults"])
+        self.assertNotIn("NSPrivacyAccessedAPICategoryUserDefaults", declared)
         self.assertFalse(hits["NSPrivacyAccessedAPICategoryActiveKeyboards"])
         self.assertNotIn("NSPrivacyAccessedAPICategoryActiveKeyboards", declared)
         self.bundle_fixture()
