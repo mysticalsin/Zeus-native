@@ -43,4 +43,53 @@ import Testing
         #expect(schedule.due(at: 0).isEmpty)
         #expect(schedule.due(at: 3).isEmpty)
     }
+
+    @Test func aMarkWithAFutureTimestampIsNotShownBeforeItsAudio() {
+        var schedule = SpeechMarkSchedule(marks: [
+            .init(id: "now", sentenceIndex: 0, dueSeconds: 0),
+            .init(id: "later", sentenceIndex: 0, dueSeconds: 2),
+        ])
+        let shown = schedule.apply(sentenceIndex: 0, audioStartSeconds: 0)
+        #expect(shown.map(\.id) == ["now"])
+        #expect(schedule.due(at: 1).map(\.id) == ["now"])
+        #expect(schedule.due(at: 2).map(\.id) == ["now", "later"])
+    }
+
+    @Test func aMarkMissingItsStartExpiresWithoutBecomingDue() {
+        var schedule = SpeechMarkSchedule(marks: [
+            .init(id: "lost", sentenceIndex: 3),
+        ])
+        #expect(schedule.due(at: 0).isEmpty)
+        #expect(schedule.pendingIDs(at: 0) == ["lost"])
+        let bound = SpeechMarkSchedule.missingStartExpirySeconds
+        #expect(schedule.pendingIDs(at: bound).isEmpty)
+        #expect(schedule.due(at: bound).isEmpty)
+        #expect(schedule.pendingIDs(at: bound - 0.001) == ["lost"])
+    }
+
+    @Test func bargeInCallsCancel() {
+        var schedule = SpeechMarkSchedule(marks: [
+            .init(id: "ring", sentenceIndex: 0, dueSeconds: 0),
+            .init(id: "later", sentenceIndex: 0, dueSeconds: 2),
+        ])
+        _ = schedule.apply(sentenceIndex: 0, audioStartSeconds: 0)
+        schedule.bargeIn()
+        #expect(schedule.due(at: 5).isEmpty)
+        #expect(schedule.apply(sentenceIndex: 1, audioStartSeconds: 1).isEmpty)
+    }
+
+    @Test func theWordEstimateIsOnlyAFallbackWhenRealTimingIsMissing() {
+        var schedule = SpeechMarkSchedule(marks: [
+            .init(id: "guessed", sentenceIndex: 0, wordIndex: 2),
+            .init(id: "real", sentenceIndex: 1, dueSeconds: 1),
+        ])
+        #expect(schedule.due(at: 0.2).isEmpty)
+        let guessed = schedule.due(at: 2 * 0.18)
+        #expect(guessed.map(\.id) == ["guessed"])
+        #expect(guessed.allSatisfy(\.estimated))
+        #expect(guessed.allSatisfy { $0.timingDisclosure == "0.18 s per word" })
+        let real = schedule.due(at: 1)
+        #expect(real.map(\.id) == ["real"])
+        #expect(real.allSatisfy { !$0.estimated && $0.timingDisclosure.isEmpty })
+    }
 }
