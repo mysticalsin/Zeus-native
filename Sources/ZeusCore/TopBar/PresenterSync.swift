@@ -673,7 +673,7 @@ public struct DeckNotesReader: Equatable, Sendable {
         case .bridgeDown(let link):
             switch state {
             case .checking:
-                state = .failed(.extensionOff)
+                state = .failed(link == .noReply ? .timedOut : .extensionOff)
                 return []
             case .reading:
                 let cancel = resumePolls == nil ? [] : [DeckNotesEffect.cancelWatch]
