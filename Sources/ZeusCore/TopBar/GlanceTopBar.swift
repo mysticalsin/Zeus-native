@@ -12,7 +12,7 @@ public enum GlanceTopBar {
     public static let closedBottomRadius: CGFloat = 6
 
     // Open body
-    public static let bodyWidth: CGFloat = 870
+    public static let bodyWidth: CGFloat = 1040
     public static let ear: CGFloat = 27.5
     public static let earHeight: CGFloat = 30
     public static let bottomRadius: CGFloat = 22
@@ -33,7 +33,7 @@ public enum GlanceTopBar {
     public static var plainTabSlot: CGFloat { tabIcon + 2 * tabPadding + tabSpacing }
     public static let moreSize: CGFloat = 30
     /// Fourteen tabs: the default row with Tiling and Agents after Home. At 8 pt spacing the widest selected label
-    /// ("Clipboard") with three 3-digit counts is 796.75 pt of the 803 pt `rowRoom`.
+    /// ("Clipboard") with three 3-digit counts fits inside the 973 pt `rowRoom` of the wider body.
     public static let maxTabs = 14
     /// Space after the "more" circle, to the body's right edge.
     public static let rowTrailing: CGFloat = 13
@@ -48,14 +48,14 @@ public enum GlanceTopBar {
     }
 
     // Cards
-    public static let cardTop: CGFloat = 82
-    public static let cardHeight: CGFloat = 114
+    public static let cardTop: CGFloat = 76
+    public static let cardHeight: CGFloat = 84
     public static let cardGap: CGFloat = 10.5
     public static let cardInset: CGFloat = 18
     public static let cardRadius: CGFloat = 22
-    public static let bottomGap: CGFloat = 14
-    /// Pages other than Home get more room under the tab row.
-    public static let tallPageHeight: CGFloat = 236
+    public static let bottomGap: CGFloat = 8
+    /// Pages other than Home get more room under the tab row, and stay shorter than the old tall page.
+    public static let tallPageHeight: CGFloat = 168
 
     // Motion. Open: fitted to Glance's 60 fps hover-open (parity/N7-glance.mp4, width along y 37),
     // rms 14 pt; it overshoots under 3 pt, as Glance does (871 to 873 on the 870 body). Close: a critically
