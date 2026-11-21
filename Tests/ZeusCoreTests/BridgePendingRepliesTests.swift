@@ -1,5 +1,10 @@
 import Foundation
 import Testing
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 @testable import ZeusCore
 
 @Suite("Chrome bridge reply ownership", .serialized)
@@ -128,6 +133,32 @@ struct BridgePendingRepliesTests {
         let response = try JSONDecoder().decode(BridgeResponse.self, from: #require(item))
         #expect(response.error?.code == "timeout" && pending.count == 0)
         #expect(!pending.complete(.success("deadline"), token: token))
+    }
+
+    /// The bridge socket admits a same-user peer inside the 3 second timeout already on main.
+    /// The kernel has to name that peer. A missing identity is a refusal, and the request ends with no reply.
+    @Test func aSameUserPeerIsAdmittedInsideTheExistingSocketDeadline() throws {
+        var pair = [Int32](repeating: 0, count: 2)
+        #if canImport(Darwin)
+        let stream = SOCK_STREAM
+        #else
+        let stream = Int32(SOCK_STREAM.rawValue)
+        #endif
+        try #require(socketpair(AF_UNIX, stream, 0, &pair) == 0)
+        defer { close(pair[0]); close(pair[1]) }
+        #expect(PeerCheck.identify(fd: pair[0])?.uid == UInt32(geteuid()))
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-br-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("peer.sock").path
+        let server = UnixSocketServer(path: path) { _, reply in
+            reply(Data("{\"ok\":true}".utf8))
+        }
+        try server.start()
+        defer { server.stop() }
+        let reply = UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 3)
+        #expect(reply == Data("{\"ok\":true}".utf8))
     }
 
 }
