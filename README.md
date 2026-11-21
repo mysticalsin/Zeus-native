@@ -1,322 +1,236 @@
-<p align="center">
-  <img src="docs/media/banner.png" alt="ZEUS: your Mac's notch as a voice and screen aware co-pilot" width="100%">
-</p>
+# Zeus
 
-<p align="center">
-  <b>Your Mac's notch, turned into a voice and screen aware co-pilot.</b><br>
-  Talk to it, point at things, watch your coding agents, record meetings, and stay in flow.
-</p>
+Zeus is a native macOS application. It lives in the menu bar, and on a display with a notch it also occupies the top centre of the screen. Hold a key to talk to it, dictate into the app you are already using, or keep a meeting transcript. Speech starts on this Mac. A networked model or voice runs only when you choose one, and its key stays in the Keychain.
 
-<p align="center">
-  <img alt="macOS app" src="https://img.shields.io/badge/macOS-app-000000?logo=apple&logoColor=white">
-  <img alt="macOS 14.2+" src="https://img.shields.io/badge/macOS-14.2%2B-000000?logo=apple&logoColor=white">
-  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
-  <img alt="No telemetry" src="https://img.shields.io/badge/telemetry-none-2ea44f">
-  <img alt="Keys in Keychain" src="https://img.shields.io/badge/keys-Keychain%20only-6f42c1">
-  <a href="https://github.com/mysticalsin/Zeus-native/releases"><img alt="Download" src="https://img.shields.io/badge/download-releases-0969da?logo=github"></a>
-</p>
+The five pictures named below are not in this repository. They are placeholders for captures made on a Mac. Nothing on this page is a substitute for the acceptance map in `qa/feature-map.json`.
 
-<p align="center">
-  <a href="#what-it-does">What it does</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#keyboard-shortcuts">Shortcuts</a> ·
-  <a href="#privacy">Privacy</a> ·
-  <a href="docs/SHOWCASE.md">Every screen</a> ·
-  <a href="#highlights">Highlights</a> ·
-  <a href="#download">Download</a> ·
-  <a href="#status">Status</a> ·
-  <a href="#layout">Layout</a> ·
-  <a href="#build">Build</a>
-</p>
+## What it is
 
-<p align="center">
-  <img src="docs/media/hero-island.gif" width="860" alt="The ZEUS notch island cycling through Home, Today, Agents, Music, Calendar, Focus, Teleprompter, Recordly, Scribe, Tiling, Shelf and Polyglot">
-</p>
+`AppDelegate` creates a menu-bar status item at launch and leaves it visible, including on displays that have no notch (`Sources/Zeus/App/AppDelegate.swift`). `NotchController` owns a borderless window per display, placed over the menu bar at the top centre. On a Mac without a hardware notch that window is a pill. While the panel is closed the window is click-through (`Sources/Zeus/Notch/NotchController.swift`).
 
-> ZEUS routes every request through **your own** AI tools (Claude Code, Codex, Gemini, cursor-agent, Ollama)
-> and the Dust API. No account, no cloud of ours, no telemetry.
+The closed shape opens into the top bar. The default trigger is hover; Settings can switch that to click (`notch.openTrigger` in `Sources/Zeus/App/SettingsCatalog.swift`, rules in `Sources/ZeusCore/TopBar/NotchOpenTrigger.swift`). The pages are `TopBarTab` (`Sources/ZeusCore/TopBar/TopBarLayout.swift`). Home stays first. The default row continues with tiling, agents, chat, alerts, clipboard, shelf, to-do, Murmure, prompter, insomnia, polyglot, record, and Scribe. Other pages stay available from Settings.
 
----
+A left click on the menu-bar icon opens a separate borderless panel under the icon (`MenuBarPanel` in `Sources/Zeus/App/MenuBarPanel.swift`). Escape closes that panel. A right click opens the menu that contains Settings.
 
-## What it does
+## Voice
 
-<table>
-<tr>
-<td width="50%" valign="top">
+A voice turn is one hold of a talk key. `HotkeyMonitor` feeds `VoiceKeyMachine`. The talk role calls `AppDelegate.talkKeyPressed`, which starts `VoiceTurnController` only when microphone access is already granted (`Sources/Zeus/Voice/HotkeyMonitor.swift`, `Sources/Zeus/App/VoiceTurnController.swift`). Release ends the hold. The transcript is routed by `Router` (`Sources/Zeus/Brain/Router.swift`). `Speaker` speaks the reply (`Sources/Zeus/Voice/Speaker.swift`). Live words are captioned beside the spark.
 
-### Talk, and it answers
-Hold your talk key, speak, let go. ZEUS hears you on device, thinks with the brain you chose, and answers out
-loud in its own voice, with a caption next to the spark.
+Two personalities are stored under `voice.personality` (`ZeusPersonality` in `Sources/ZeusCore/Persona/ZeusVoiceLines.swift`):
 
-<img src="docs/media/spark.gif" width="100%" alt="The spark following the pointer, listening, thinking, flying and striking">
+| Personality | Role |
+| --- | --- |
+| Ultron | Default. The instructions in `ZeusPersona` (`Sources/Zeus/Brain/ZeusPrompt.swift`) and the stock lines in `ZeusVoiceLines`. |
+| Plain | Short, neutral answers. |
 
-</td>
-<td width="50%" valign="top">
+Some replies are those stock lines and never leave the Mac. Anything that needs a model goes through a provider under `Sources/Zeus/Brain/Providers/` or a local command the router can reach. Provider secrets are read from the Keychain and are not written into the repository (`Sources/ZeusCore/Keychain/KeychainStore.swift`).
 
-### It lives in your notch
-Music, focus timer, weather, agenda, to-dos, clipboard, teleprompter, recording and more, one hover away.
-Pick a home style that fits your desk.
+The voice orb is the mark for that turn. Its drawing is Mascot, Ring, or Mono ring (`VoiceOrbStyle` in `Sources/ZeusCore/Voice/VoiceRingModel.swift`, painted from `Sources/Zeus/Avatar/Avatar.swift` and `Sources/Zeus/Voice/VoiceRingView.swift`). The setting is on the Voice page.
 
-<img src="docs/media/home-styles.gif" width="100%" alt="Six home styles for the notch island">
+### Talking to Zeus
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+Both talk keys start the same turn (`VoiceKey.owner` in `Sources/ZeusCore/VoiceKey.swift`).
 
-### Your coding agents, supervised
-Claude Code, Codex and Cursor report into the notch: running, done, stalled, failed. Risky commands wait
-for your **Approve** or **Deny**, with a countdown, and never block the rest of your screen.
+| Key | Default | Behaviour |
+| --- | --- | --- |
+| Talk to Zeus | Control-Option | Hold to ask, release to send (`ShortcutStore.talkDefault` in `Sources/ZeusCore/Shortcut.swift`). |
+| Second talk key | Right Option | The same hold, after a quarter of a second, so Option plus a letter still types (`ShortcutStore.secondTalkDefault`, `VoiceKey.secondKeyConfirm`). Double-tap keeps listening. |
+| Dictation | Right Command | Covered under Murmure. It is a different key, and it types instead of answering. |
 
-<img src="docs/media/agent-cards.gif" width="100%" alt="Agent cards in the notch: running, approval, plan, question, diff, done, failed, stalled">
+While VoiceOver is running, a Control-Option talk key moves to the first fallback that dictation and pointing are not using (`VoiceKey.effectiveTalkKey`). The second key gives way when it would repeat the talk key or collide with dictation. The Shortcuts page states the collision (`Sources/Zeus/Settings/GlanceSettingsPages.swift`).
 
-</td>
-<td width="50%" valign="top">
+If Screen Recording is allowed, and sight is left on, the turn can attach the screen. Without that permission the turn still runs (`VoiceKey.Owner.talk(screenAware:)`). Drawing marks on screen is a separate switch and is off unless turned on (`VoiceTurnController`).
 
-### Meetings, without the fuss
-Two minutes before a call, a compact card offers to record. Teams, Zoom and Meet links are found even
-inside Outlook Safe Links. Scribe transcribes on device and names the speakers.
+The phrase "Hey Zeus" is off until enabled (`wake.enabled` defaults to false in `Sources/Zeus/Voice/WakeWordController.swift`).
 
-<img src="docs/media/meeting-card.gif" width="100%" alt="The meeting card counting down and starting a recording">
+## Murmure
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+Murmure is dictation. The top-bar tab title is Murmure (`TopBarTab.dictation`). The default key is Right Command (`ShortcutStore.loadDictation`). The Shortcuts page says: hold to speak, let go to write it where the cursor is. Dictation is enabled by default (`DictationSettings` in `Sources/Zeus/Dictation/DictationController.swift`).
 
-### A face for every state
-Idle, listening, thinking, speaking, pointing, typing, browsing, waiting on an agent, done.
-You always know what ZEUS is doing at a glance.
+The dictation strip in the top bar reads `DictationDisplay`: phase, partial text, level, and a cue (`Sources/Zeus/Dictation/DictationDisplay.swift`). The pill's orb is `ThinkingOrbView`. It follows the microphone level, and under Reduce Motion it pulses instead of drawing the dotted sphere (`Sources/Zeus/Voice/ThinkingOrb.swift`).
 
-<img src="docs/media/avatar-states.gif" width="100%" alt="ZEUS avatar states in the notch">
+The Murmure settings page is `GSSection.murmure` (`Sources/Zeus/Settings/GlanceSettingsPages.swift`). It holds the enable switch, the speech engine, the shortcut link, language, and the start and stop cue. Microphone and Accessibility are required before dictation can type into another app.
 
-</td>
-<td width="50%" valign="top">
+## Scribe
 
-### Light that means something
-Halos and entrance lights for volume, copy, caps lock, battery, reminders and timers, tuned to stay out of
-your way and to respect Reduce Motion.
+Scribe listens to a meeting and writes notes (`TopBarTab.scribe`). `ScribeController.start` opens one session (`Sources/Zeus/Scribe/ScribeController.swift`). A second start is refused while a session is active. The default when a meeting is seen is Ask me (`ScribeAutoStartMode.ask` in `Sources/ZeusCore/Scribe/ScribeAutoStart.swift`). Starting automatically is a different choice, on the Scribe card in Settings › Features (`Sources/Zeus/Settings/GSFeaturesPage.swift`).
 
-<img src="docs/media/halos.gif" width="100%" alt="Notch halo and entrance light styles">
+An explicit Stop ends the session. A later suggestion that the call looks over does not stop capture by itself (`docs/SCRIBE-PRIVACY-AND-END-FLOW.md`). An optional on-device model can separate voices. Zeus does not ask for Accessibility on its own in order to read names from a call window (`Sources/Zeus/Settings/GSSpeakerRecognitionCard.swift`).
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+## Settings
 
-### Record your screen
-Recordly captures a display, window or area from the notch, with a countdown, a live timer and a Stop
-button. Cursor follow and a polished export are part of it.
+Settings is a window of 1080 by 780 points, with a sidebar and a page (`GlanceSettingsWindowController` in `Sources/Zeus/Settings/GlanceSettingsWindow.swift`). Open it from the menu-bar menu (Settings…), from the button on the menu-bar panel, or from the top bar. If the status item cannot be seen, opening Zeus again shows Settings (`AppDelegate.applicationShouldHandleReopen`).
 
-<img src="docs/media/recordly.gif" width="100%" alt="Recordly in the notch: pick a display, countdown, recording, saved">
+The sidebar groups are Settings, Your tools, and Zeus (`GSSection.Group`). The pages this README depends on:
 
-</td>
-<td width="50%" valign="top">
+| Page | What it controls |
+| --- | --- |
+| Shortcuts | Talk to Zeus, the Right Option second key, dictation. |
+| Murmure | Dictation on or off, engine, language, cues. |
+| Voice | Personality, orb, talk shortcut, microphone. |
+| Features | Scribe's "When a meeting starts". |
+| Privacy | Detail on cards, lyrics, driving the Mac, command-line control. |
+| Permissions | The system prompts Zeus can request. |
+| About | Version line and the privacy summary. |
 
-### Fling files to your other Mac
-Drop files on the Shelf, then send them to a nearby Mac. The receiving Mac gets a card with Accept or
-Decline, and an offer that nobody answers declines by itself.
+The iPhone page is hidden until pairing exists (`GSSection.iPhonePairingAvailable`).
 
-<img src="docs/media/fling.gif" width="100%" alt="Fling: an incoming transfer card, then the Shelf sending files to a nearby Mac">
+## Local speech, optional providers, keys
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+Dictation's engine list is `TranscriptionEngineKind` (`Sources/ZeusCore/Dictation/TranscriptionEngine.swift`). Engines are grouped "On this Mac" and "Cloud". Cloud engines are used only when chosen. Their audio leaves the Mac, and they read a key from the Keychain at the moment they run (`Sources/Zeus/Dictation/CloudSpeechEngines.swift`). The default dictation engine is the on-device choice stored by `DictationSettings`; until that model is present, the recognizer built into macOS fills in. Voice turns keep that recognizer unless "use the dictation engine for voice" is turned on (`dictation.engineForVoice` defaults to false).
 
-### Tile your windows
-Keyboard window layouts from the notch: move focus, swap windows, flip the split, adjust gaps, and pause
-or resume tiling when you need a free hand.
+Spoken replies use the Mac synthesizer. Networked voices are optional and run only when their key is already in the Keychain (`Speaker`).
 
-<img src="docs/media/tiling.gif" width="100%" alt="The Tiling page: layout preview, gap settings and key map">
+Every secret Zeus stores uses one Keychain service, `com.zeus.app` (`KeychainStore`). The cache is loaded at launch. Reads ask for no password dialog: a locked or foreign item comes back as missing. The About page states the rule in one place: audio and saved voices stay on this Mac unless a cloud engine is chosen, API keys stay in the Keychain, and Zeus has no telemetry (`AboutInfo.privacySummary` in `Sources/Zeus/Settings/GSAboutPage.swift`).
 
-</td>
-<td width="50%" valign="top">
+## Privacy and security
 
-### Dictate anywhere
-Hold the dictation key, speak, release to type. Pick Voice, Message, Email, Note or Agent prompt, and keep
-a short history you can copy from.
+Permission prompts belong to macOS. `PermissionsModel` tracks microphone, speech recognition, Accessibility, camera, screen recording, calendar, reminders, and automation (`Sources/Zeus/App/PermissionsModel.swift`). Tests, the closed-loop runner, and the capture script in this repository do not approve those prompts and do not relax them.
 
-<img src="docs/media/dictation.gif" width="100%" alt="Dictation in the notch: live waveform, modes and history, and a message preview">
+Other boundaries that are in the source:
 
-</td>
-</tr>
-</table>
+- `zeus-hook` forwards a coding tool's hook to the app and waits for a person to decide a permission request. If Zeus is not running, or nobody answers, it prints nothing. It does not allow the request itself (`Sources/zeus-hook/main.swift`).
+- Command-line control of sensitive actions is off by default and is stored in the Keychain, not in a preferences file (Privacy page in `Sources/Zeus/Settings/GlanceSettingsPages.swift`).
+- Synced lyrics send song metadata off the Mac and stay off until enabled (`privacy.lyrics`).
+- The wake phrase is off until enabled.
+- A QA launch (`--qa-startup`) keeps the status item and denies the notch, panel, dictation, voice turn, and the other services in `StartupPolicy` (`Sources/ZeusCore/StartupPolicy.swift`).
 
-### Approvals that respect your screen
+`zeus-bridge` is a native-messaging host. It relays framed messages to the app and does not call a provider (`Sources/zeus-bridge/main.swift`). The extension sources live in `extension/`.
 
-<p align="center">
-  <img src="docs/media/approval.png" width="760" alt="A Claude Code approval card in the notch with Deny and Approve">
-</p>
-
-### Your day, in one card
-
-<p align="center">
-  <img src="docs/media/brief-card.png" width="480" alt="The morning brief card with events and to-dos">
-</p>
-
-**[See every screen](docs/SHOWCASE.md)**: the full gallery, from notch pages to Settings and onboarding.
-
----
-
-## How it works
+## How a turn is put together
 
 ```mermaid
-flowchart LR
-    Key["Talk key"] --> Speech["On-device speech"]
-    Speech --> Brain["Brain CLI of your choice"]
-    Brain --> Tags["Reply tags (ZeusCore)"]
-    Tags --> Actions["Actions"]
-    Actions --> Speak["Speak"]
-    Actions --> Point["Point"]
-    Actions --> Chrome["Chrome via zeus-bridge"]
-    Actions --> Cards["Notch cards"]
-    Agents["Claude Code, Codex, Cursor"] --> Hook["zeus-hook"]
-    Hook --> App["Zeus app"]
-    App --> Approvals["Notch approvals"]
+flowchart TB
+  subgraph top [Top of the screen]
+    item[Menu bar status item]
+    notch[Notch window]
+    panel[Expanded top bar]
+  end
+  item --> menuPanel[Menu bar panel]
+  notch --> panel
+  keys[Hotkey monitor]
+  keys --> talk[Voice turn]
+  keys --> murmur[Murmure dictation]
+  talk --> hear[Speech on this Mac]
+  murmur --> hear
+  hear --> route[Brain router]
+  route --> spoken[Speaker and voice orb]
+  murmur --> typed[Text at the cursor]
+  scribe[Scribe session] --> hear
+  route --> secrets[Keychain service com.zeus.app]
+  settings[Settings window] --> keys
+  settings --> secrets
+  hook[zeus-hook] --> notch
+  bridge[zeus-bridge] --> notch
 ```
 
-The brain is one of Claude Code, Codex, Gemini, cursor-agent or Ollama, or the Dust API. The shared
-contracts (brain provider, reply tags, hook and bridge envelopes) live in `Sources/ZeusCore`, the menu-bar
-app is `Sources/Zeus`, coding agents call `Sources/zeus-hook`, and the Chrome extension in `extension/`
-talks to the app through `Sources/zeus-bridge`. See [Layout](#layout) for the full map.
+`ZeusCore` holds the contracts those boxes share: shortcuts, the voice-key machine, reply tags, hook and bridge envelopes, the speech-engine enum, and the Keychain store. The app target is the windows, the monitors, and the providers.
 
-## Keyboard shortcuts
+## Pictures
 
-| Keys | Action |
-| --- | --- |
-| Control+Option, right Option, right Command or Fn (your choice in Settings) | Talk key: hold, speak, let go |
-| Hold Control and draw | Show me: ZEUS sees what you circled |
-| Escape | Close the panel |
-| ⌘, | Open Settings |
+These files are not committed. Each block is a placeholder for one capture. The shot list, the opt-in, and the refusal rules are in [`docs/media/README.md`](docs/media/README.md) and `scripts/capture-readme-gifs.sh`.
 
-Control+Option is refused while VoiceOver is on, since VoiceOver uses it.
+<!-- media-placeholder: docs/media/idle-top-bar.gif -->
 
-## Privacy
+**Idle top bar.** `docs/media/idle-top-bar.gif`
 
-- No telemetry, and no account.
-- Keys live only in the macOS Keychain, never in the repo.
-- Nothing is captured without your OS consent. First launch asks for one permission per step, each
-  explained before macOS asks, and nothing is requested at launch.
-- Speech recognition and Scribe transcription run on device.
-- `zeus-hook` never answers `allow` on its own, and Chrome typing is never done into password or card fields.
+The closed notch, or the pill on a Mac without one. Nothing expanded. On a Mac: `scripts/capture-readme-gifs.sh --record idle-top-bar --region X,Y,W,H`.
 
----
+<!-- media-placeholder: docs/media/expanded-panel.gif -->
 
-## Highlights
+**Expanded panel.** `docs/media/expanded-panel.gif`
 
-| | |
-| --- | --- |
-| 🎙️ **Voice** | Push to talk on the key you choose, on-device recognition, ElevenLabs voice with Kokoro as an offline failsafe |
-| 👉 **Show me** | Hold Control and draw on screen; ZEUS sees what you circled |
-| 🤖 **Agents** | Live status, approvals, diffs and plans from Claude Code, Codex and Cursor |
-| 📝 **Scribe** | Meeting detection, compact start card, on-device transcription and speaker names |
-| 🎬 **Recordly** | Screen recording with cursor follow and a polished export |
-| 🌍 **Polyglot** | Listens and translates while it runs |
-| 📋 **Shelf and Fling** | Drop files in the notch, send them to your other Mac |
-| 🪟 **Tiling** | Keyboard window layouts from the notch |
-| 🔒 **Private by design** | No telemetry, keys only in the Keychain, nothing captured without your OS consent |
+The open top bar: tab row and one page. On a Mac: `scripts/capture-readme-gifs.sh --record expanded-panel --region X,Y,W,H`.
 
-## Download
+<!-- media-placeholder: docs/media/murmur-dictation.gif -->
 
-Builds are attached to the [GitHub releases](https://github.com/mysticalsin/Zeus-native/releases).
-Current DMGs are **local previews**: ad hoc signed and not yet notarized, so macOS asks for confirmation
-on first open. A notarized release follows the steps in [Release and installation](#release-and-installation).
+**Murmure dictation.** `docs/media/murmur-dictation.gif`
 
-## Status
+Right Command held, with the live words and the orb in the top bar. On a Mac: `scripts/capture-readme-gifs.sh --record murmur-dictation --region X,Y,W,H`.
 
-Development is in progress. A passing subset of tests does not establish native feature completion or a sellable release. The [acceptance map](qa/feature-map.json) and [closed-loop verification guide](docs/CLOSED-LOOP-QA.md) track what is executable, unverified, or still missing. Verification is automated; no manual click-through substitutes for a missing check.
+<!-- media-placeholder: docs/media/voice-orb.gif -->
 
-All images on this page are rendered by the app itself with `Zeus --snapshots <dir>` from built-in fixtures.
+**Voice orb.** `docs/media/voice-orb.gif`
 
-## Layout
+The orb while a talk turn is listening or speaking. Right Option is the default second talk key. On a Mac: `scripts/capture-readme-gifs.sh --record voice-orb --region X,Y,W,H`.
 
-| Path | What |
-| --- | --- |
-| `Sources/ZeusCore` | Shared contracts: brain provider, reply tags, hook and bridge envelopes, native-messaging framing |
-| `Sources/Zeus` | The menu-bar app (AppKit + SwiftUI) |
-| `Sources/zeus-hook` | CLI that Claude Code / Codex / Cursor hooks call |
-| `Sources/zeus-bridge` | Chrome native-messaging host `com.zeus.bridge` |
-| `extension/` | ZEUS Chrome extension (MV3, TypeScript, esbuild) |
-| `scripts/` | `test.sh`, `bundle.sh` |
+<!-- media-placeholder: docs/media/settings.gif -->
 
-## Build
+**Settings.** `docs/media/settings.gif`
 
-Runs on macOS 14.2+. Building the current sources requires Swift 6 and the macOS 26 SDK
-(Xcode 26.1.1 in CI); newer speech and translation features remain availability-gated at runtime.
+The Settings window, on Voice or Murmure. On a Mac: `scripts/capture-readme-gifs.sh --record settings --region X,Y,W,H`.
+
+## Modules
+
+From `Package.swift`. The tools version is Swift 6.0 and the platform is macOS 14.2.
+
+| Path | Product | Role |
+| --- | --- | --- |
+| `Sources/Zeus` | `Zeus` | The app. AppKit windows, SwiftUI pages, voice, dictation, Scribe, settings. |
+| `Sources/ZeusCore` | `ZeusCore` | Shared contracts and pure machines. No UI. |
+| `Sources/ZeusFling` | `ZeusFling` | Nearby-Mac file transfer. Swift 5 mode for the network callbacks. |
+| `Sources/ZeusObjCGuard` | `ZeusObjCGuard` | Catches Objective-C exceptions Swift cannot catch. |
+| `Sources/zeus-hook` | `zeus-hook` | Hook process. Forwards events. Never allows on its own. |
+| `Sources/zeus-bridge` | `zeus-bridge` | Native-messaging host for `extension/`. |
+| `Sources/zeus-cli` | `zeus-cli` | Installed as the `zeus` command. |
+| `Sources/zeus-silent-eval` | `zeus-silent-eval` | Evaluation helper. |
+| `qa/native-app-host` | `zeus-native-test-host` | Test-only AppKit host. Not part of the app bundle. |
+| `qa/fling-peer` | `zeus-fling-peer` | Test-only peer. Not part of the app bundle. |
+| `extension/` | | Browser extension sources. |
+| `Tests/ZeusCoreTests` | | Core tests. |
+| `Tests/ZeusAppTests` | | App tests. |
+
+Bundled avatar frames, fonts, sounds, and personality text are resources of the `Zeus` target.
+
+## Build and test
+
+Building the app needs macOS, Swift 6, and the platform declared in `Package.swift`. The app job in `.github/workflows/build.yml` selects its Xcode on `macos-15` and runs `swift build`. Linux cannot build the native application. The portable harness below is the check that runs there, and it does not prove the app.
+
+From the repository root, on a Mac:
 
 ```sh
 swift build
-scripts/test.sh                 # uses the selected Xcode/Command Line Tools toolchain
-scripts/bundle.sh               # → build/Zeus.app (ad-hoc signed)
-open build/Zeus.app
-cd extension && npm ci && npm run build
+scripts/test.sh
+swift test --filter SuiteName
+scripts/bundle.sh
 ```
 
-## Rules
+`scripts/test.sh` builds the test-only fling peer, then runs `swift test`. It deletes throwaway preference domains created by tests. It does not install Zeus and it does not answer a permission prompt.
 
-- No telemetry. Keys go in the macOS Keychain, never in the repo.
-- Nothing is copied from other apps: behaviour only, never assets, sounds, prompts or names.
-- Third-party code keeps its licence notice (see `NOTICES.md`).
-- `zeus-hook` never answers `allow` on its own.
+`scripts/bundle.sh` writes `build/Zeus.app` and signs it. A local preview is not a notarized release. Installing, signing for distribution, and notarizing stay outside ordinary build and test commands (`scripts/package.sh`, `scripts/install.sh`).
 
-## Chrome
+The extension is separate: `cd extension && npm ci && npm run build`.
 
-Click **Connect Chrome** in the ⚡ panel. It registers `zeus-bridge` as Chrome's `com.zeus.bridge`
-native host (only extension `dkpclhaealkdnnihlccglmonmmjfjobe` may start it) and opens
-chrome://extensions plus the `ChromeExtension` folder: turn on Developer mode → Load unpacked →
-pick that folder. Then, with Chrome in front, ZEUS reads the active tab, and can open pages,
-click and type (asked once per site in the notch, never into password or card fields), and send
-prompts to ChatGPT, Claude or Dust in your logged-in tabs.
+## QA
 
-Debug: `build/Zeus.app/Contents/MacOS/Zeus --chrome page.context` sends one raw bridge request.
-
-## Logo
-
-`Design/zeus-icon.svg` is the source: a Z drawn as a lightning bolt on a storm-dark tile. Rendered to
-`Resources/AppIcon.icns` (app), `Resources/MenuBarTemplate*.png` (template image, tinted by macOS),
-`Resources/Logo.png` (panel, setup) and `extension/icons/` (Chrome).
-
-## Ease of use (Apple HIG)
-
-- First launch opens **Set Up ZEUS**: one step per permission, each explained before macOS asks,
-  one Continue button, skippable, reopenable from the panel or the menu. Nothing is requested at launch.
-- Talk key is your choice (Settings): Control+Option, right Option, right Command or Fn. Control+Option
-  is refused while VoiceOver is on, since VoiceOver uses it.
-- Everything ZEUS says is also captioned next to the spark (Settings › Show captions).
-- Reduce Motion: the spark jumps instead of flying, the notch glows steadily, no strike ring.
-- Approvals show a countdown and what happens at zero; VoiceOver announces them; no default button.
-- Status uses symbol + word, not colour alone; text meets 4.5:1 contrast; buttons are 28 pt with press
-  and focus states; Escape closes the panel; ⌘, opens Settings; the menu bar icon can be hidden and
-  reopening ZEUS brings Settings back.
-
-## Tests
-
-- `scripts/test.sh`: unit tests.
-- `scripts/e2e.sh`: 27 end-to-end checks on the built app: the Chrome bridge in an isolated Chrome for
-  Testing profile, hook merge on a *copy* of your settings, real `claude` sessions approved and denied
-  in the notch, and real Claude turns emitting the right actions.
-- `Zeus --snapshots <dir>`: renders every notch, spark, panel and setup state to PNG.
-- `scripts/package.sh`: builds `build/ZEUS.dmg`.
-- `python3 qa/release-scripts/test_release_scripts.py`: release and rollback failure paths with mock tools; no real install or capture.
-
-## Release and installation
-
-Ordinary bundles and DMGs are local previews. They do not establish notarization or Gatekeeper readiness.
-After choosing the release version/build in `Resources/Info.plist`, configure your own Developer ID identity
-and a `notarytool` keychain profile on the signing Mac, then run:
+The gate is `./tools/check.sh`. It needs Python 3.11+ and Swift 6. With no arguments it runs development checks and prints a new evidence directory under `/tmp`. That directory is kept on success and on failure.
 
 ```sh
-RELEASE=1 SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE="zeus-release" scripts/package.sh
+./tools/check.sh
+./tools/check.sh development --output /tmp/zeus-development-NEW
+./tools/check.sh --mode full --output /tmp/zeus-full-NEW
 ```
 
-Release mode verifies hardened runtime, Developer ID and secure timestamps, submits the app and DMG,
-staples both, and assesses both with Gatekeeper before publishing `build/ZEUS.dmg`. Notary receipts and
-the DMG SHA-256 stay in `build/`. A failure preserves the previous DMG. This must still be followed by
-a clean-machine launch and feature QA using the user's own OS consent.
+Development mode runs the portable contracts and the gate's own tests. It can pass while native and device proof is still missing. Full mode evaluates every obligation in `qa/feature-map.json`. A missing native, device, or signing proof stays blocked or unimplemented, and the run fails. There is no switch that turns a missing proof into a pass (`qa/closed-loop/README.md`, `docs/CLOSED-LOOP-QA.md`).
 
-To install a prepared app, quit Zeus and run `scripts/install.sh build/Zeus.app`. It verifies the new
-bundle and creates a checked rollback copy under `~/Library/Application Support/Zeus/Rollbacks` before
-replacing `/Applications/Zeus.app`. It restores the previous app if replacement fails, never deletes
-old rollback copies, and does not launch the app or answer permission prompts.
+| Path | What it is |
+| --- | --- |
+| `qa/feature-map.json` | The acceptance obligations. A contract pass is not device acceptance. |
+| `qa/regressions.json` | Named guards. Each one points at a real test. |
+| `qa/closed-loop/` | The runner (`run.py`) and its tests. Output directories must be new. |
+| `qa/portable-core/` | Synthetic Swift packages for Linux and for the portable groups. |
+| `qa/release-scripts/` | Failure paths for packaging and install, with stand-in tools. |
+| `tools/check.sh` | The single entry the wrapper forwards to the runner. |
+
+The runner does not install Zeus, request permission, capture the screen, open a personal vault, or sign a release. An old receipt does not cover a new commit.
+
+## Contributing
+
+Cut the branch from `codex/integration-20261111`.
+
+1. Start red. Add a test that fails on the current tree and names the behaviour. `swift test --filter` that test before changing production code. A regression is recorded in `qa/regressions.json` with that test function, and a feature obligation stays bound in `qa/feature-map.json` (`docs/CLOSED-LOOP-QA.md`).
+2. Make the smallest change that turns the test green. Keep the diff on that behaviour.
+3. Run the suite that maps to the change. On a Mac that is `swift test` or `scripts/test.sh`. For a portable contract, run the matching `qa/portable-core` group. Then run `./tools/check.sh` and keep the evidence directory it prints.
+4. Open a draft pull request into `codex/integration-20261111`. Do not force-push. A reviewer reads the change and the evidence from this commit. A passing sentence, a test count, or an older receipt is not that evidence (`AGENTS.md`).
+
+Do not capture the microphone, the screen, or system audio as part of a test. Use synthetic records, generated audio, and a disposable vault. Do not open a personal vault, reuse a provider key, or send a message to a person. Leave installed copies of Zeus alone unless the task is an install, and keep a rollback copy before replacing one.
