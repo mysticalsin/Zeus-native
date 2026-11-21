@@ -155,6 +155,7 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         }
         let mut observation = Observation::quiet();
         observation.mem_gb = Some(gb);
+        observation.record_latency = false;
         observation.turn = self.turn.state();
         observation.streaming = matches!(self.host.state(), SessionState::Streaming);
         self.apply_watchdog(&observation);
@@ -298,12 +299,12 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         let played = if late {
             vec![0.0; FRAME_SAMPLES]
         } else {
-            model
+            model.clone()
         };
         if late {
             self.underruns = self.underruns.saturating_add(1);
         }
-        self.observe(&played, &text, step_ms, delay_ms);
+        self.observe(&played, &model, &text, step_ms, delay_ms);
         Ok(vec![OutFrame {
             seq,
             step_ms,
@@ -312,7 +313,14 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         }])
     }
 
-    fn observe(&mut self, played: &[f32], text: &str, step_ms: f32, stall_ms: u64) {
+    fn observe(
+        &mut self,
+        played: &[f32],
+        model: &[f32],
+        text: &str,
+        step_ms: f32,
+        stall_ms: u64,
+    ) {
         if !self.watchdog_on {
             return;
         }
@@ -321,7 +329,7 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
                 .extend(text.split_whitespace().map(str::to_string));
         }
         let loop_found = find_loop(&self.text_tokens, 3, 32, 3);
-        if is_garbage_frame(played) {
+        if is_garbage_frame(model) {
             self.garbage_run = self.garbage_run.saturating_add(1);
         } else {
             self.garbage_run = 0;
@@ -331,6 +339,7 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         let observation = Observation {
             turn,
             step_ms,
+            record_latency: true,
             loop_found,
             mem_gb: self.mem_gb.or(Some(1.0)),
             silent_turns: 0,

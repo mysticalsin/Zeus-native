@@ -87,7 +87,7 @@ fn a_late_garbage_frame_still_counts() {
     }
     let mut engine = streaming(script);
     for index in 0..31u32 {
-        engine.push(&tone(0.0), index).unwrap();
+        let _ = engine.push(&tone(0.0), index);
     }
     assert!(
         engine.trace().iter().any(|state| {

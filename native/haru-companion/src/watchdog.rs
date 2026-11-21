@@ -67,6 +67,10 @@ impl Default for WatchdogConfig {
 pub struct Observation {
     pub turn: Turn,
     pub step_ms: f32,
+    /// When false, `step_ms` is not a measured frame and must not enter the
+    /// latency window. Memory reports use this so a quiet sample cannot
+    /// complete the 225-frame budget.
+    pub record_latency: bool,
     pub loop_found: Option<(usize, usize)>,
     pub mem_gb: Option<f32>,
     pub silent_turns: u32,
@@ -80,6 +84,7 @@ impl Observation {
         Self {
             turn: Turn::Idle,
             step_ms: 1.0,
+            record_latency: true,
             loop_found: None,
             mem_gb: Some(1.0),
             silent_turns: 0,
@@ -129,17 +134,24 @@ impl Watchdog {
     }
 
     pub fn next(&mut self, obs: &Observation) -> WdState {
-        self.lat.push_back(obs.step_ms);
-        while self.lat.len() > self.cfg.latency_window {
-            self.lat.pop_front();
-        }
         if self.state == WdState::Cooldown {
+            if obs.record_latency && obs.step_ms.is_finite() {
+                self.record_step(obs.step_ms);
+            }
             self.cool = self.cool.saturating_sub(1);
             if self.cool == 0 {
                 self.state = WdState::Ok;
                 self.reason = None;
             }
             return self.state;
+        }
+        if obs.record_latency && !obs.step_ms.is_finite() {
+            self.state = WdState::Restart;
+            self.reason = Some(WatchdogReason::Latency);
+            return self.state;
+        }
+        if obs.record_latency {
+            self.record_step(obs.step_ms);
         }
         if let Some(reason) = self.hard(obs) {
             self.state = WdState::Restart;
@@ -178,6 +190,13 @@ impl Watchdog {
         obs.turn = turn;
         obs.loop_found = found;
         self.next(&obs)
+    }
+
+    fn record_step(&mut self, step_ms: f32) {
+        self.lat.push_back(step_ms);
+        while self.lat.len() > self.cfg.latency_window {
+            self.lat.pop_front();
+        }
     }
 
     fn hard(&self, obs: &Observation) -> Option<WatchdogReason> {
