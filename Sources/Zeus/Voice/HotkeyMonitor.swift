@@ -80,9 +80,6 @@ final class HotkeyMonitor {
     /// Control+Option hold, after the debounce. Separate from `onPress` so other shortcuts keep their path.
     var onTalkBegin: (() -> Void)?
     var onTalkEnd: (() -> Void)?
-    /// A solo right Command tap. Returns whether listening actually started. Nil leaves the tap inert,
-    /// so the dictation monitor does not also toggle.
-    var onRightCommandStart: (() -> Bool)?
     /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
     var onListenAccessMissing: (() -> Void)?
     var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
@@ -125,6 +122,9 @@ final class HotkeyMonitor {
     /// Of these ordinary keys, the ones the system reports down now. Nil until `start()` asks the keyboard itself, so a
     /// test that feeds keys with no key-up is not undone by the real keyboard.
     var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
+    /// Whether a modifier key code is physically down. Nil in tests, so a flags event is taken as the picture.
+    /// `start()` reads the hardware. A repeat while both sides are down is dropped only when this says the key is still down.
+    var modifierIsDown: ((UInt16) -> Bool)?
 
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
@@ -156,6 +156,9 @@ final class HotkeyMonitor {
 
     func start() {
         if keysStillDown == nil { keysStillDown = ordinaryKeysDownInTheSystem }
+        if modifierIsDown == nil {
+            modifierIsDown = { CGEventSource.keyState(.hidSystemState, key: CGKeyCode($0)) }
+        }
         observeConsumedKeys()
         observeSleep()
         KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
@@ -209,6 +212,7 @@ final class HotkeyMonitor {
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
         let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
+        if dropStillHeldRepeat(event) { return }
         rightCommandState.apply(event)
         driveRightCommand(event, at: at)
         // The talk chord's Space may be held by Carbon, which hides its key-down from the monitors. On a flags event the
@@ -229,7 +233,12 @@ final class HotkeyMonitor {
     func turnEnded() { send(.abandon(turn: ownerTurn)) }
 
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
-    func interrupt() { send(.interrupt(live: liveModifiers())) }
+    /// A Right Command press whose key-up was lost is cleared, so the next tap is a new press.
+    func interrupt() {
+        rightCommandDown = false
+        _ = rightCommand.hardwareRightCommandUp(at: now())
+        send(.interrupt(live: liveModifiers()))
+    }
 
     /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
     /// second key off in the middle of a hands-free turn must.
@@ -266,14 +275,35 @@ final class HotkeyMonitor {
     }
 
     private func tick() {
+        recoverMissedModifierUps()
         lookForALauncherSpace()
         send(.tick(at: now(), live: liveModifiers()))
     }
 
-    /// A solo right Command tap toggles listening. It runs beside the talk machine and does not replace it.
-    /// While a talk turn is open the tap is discarded.
+    /// A flags repeat while both sides are down and the hardware still holds this side. Dropping it
+    /// keeps the right-hand key from looking released.
+    private func dropStillHeldRepeat(_ event: ShortcutEvent) -> Bool {
+        guard let modifierIsDown, case .flags(let code, let mods) = event else { return false }
+        return ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: code, modifiers: mods, deviceKeys: pair.keys.deviceKeys, hardwareDown: modifierIsDown)
+    }
+
+    /// Modifier key-ups the event stream missed. Each one is fed as the flags event the release would have been.
+    private func recoverMissedModifierUps() {
+        guard let modifierIsDown else { return }
+        let missed = ModifierFlagsRepeat.missedReleases(
+            deviceKeys: pair.keys.deviceKeys, flagModifiers: pair.keys.flagModifiers, hardwareDown: modifierIsDown)
+        for event in missed {
+            feed(event, at: now())
+        }
+        if rightCommandDown, !modifierIsDown(RightCommandTap.rightKeyCode) {
+            rightCommandDown = false
+            _ = rightCommand.hardwareRightCommandUp(at: now())
+        }
+    }
+
+    /// A solo right Command tap is Murmur. Talk does not start from it. While a talk turn is open the tap is discarded.
     private func driveRightCommand(_ event: ShortcutEvent, at now: TimeInterval) {
-        guard onRightCommandStart != nil else { return }
         let owns = pair.owner != nil
         if owns, !rightCommandHoldOwned {
             _ = rightCommand.holdOwnsKeyboard()
@@ -296,7 +326,8 @@ final class HotkeyMonitor {
             let down = keys.deviceKeys.contains(code)
             if down, !rightCommandDown {
                 rightCommandDown = true
-                let other = !keys.keysDown.isEmpty || !keys.modifiers.subtracting(.command).isEmpty
+                let leftDown = keys.deviceKeys.contains(RightCommandTap.leftKeyCode)
+                let other = leftDown || !keys.keysDown.isEmpty || !keys.modifiers.subtracting(.command).isEmpty
                 _ = rightCommand.rightDown(at: now, otherKeyDown: other)
             } else if !down, rightCommandDown {
                 rightCommandDown = false
@@ -309,18 +340,12 @@ final class HotkeyMonitor {
         }
     }
 
+    /// Murmur belongs to the dictation monitor, which already saw this key. Starting talk here would be a second action.
     private func applyRightCommand(_ signals: [RightCommandTap.Signal]) {
         for signal in signals {
             switch signal {
-            case .toggle(let listening, _):
-                if listening {
-                    cues?.playStart()
-                    let started = onRightCommandStart?() ?? false
-                    if !started { rightCommand.noteStartRejected() }
-                } else {
-                    onRelease?()
-                    cues?.playEnd()
-                }
+            case .murmur:
+                break
             }
         }
     }
