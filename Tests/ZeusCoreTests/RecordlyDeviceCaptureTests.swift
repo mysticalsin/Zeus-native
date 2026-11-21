@@ -290,6 +290,58 @@ struct RecordlyDeviceCaptureTests {
         #expect(FileManager.default.fileExists(atPath: support.appendingPathComponent("escape.m4a").path) == false)
     }
 
+    @Test func theMicrophoneFlagHonorsTheChip() {
+        #expect(RecordlyPrimaryRecord.includeMicrophone(chipOn: true, permissionGranted: true))
+        #expect(!RecordlyPrimaryRecord.includeMicrophone(chipOn: false, permissionGranted: true))
+        #expect(!RecordlyPrimaryRecord.includeMicrophone(chipOn: true, permissionGranted: false))
+        #expect(!RecordlyPrimaryRecord.includeMicrophone(chipOn: false, permissionGranted: false))
+        var machine = RecordlyDeviceCaptureMachine()
+        #expect(!machine.permissionGranted(.microphone))
+        _ = machine.send(.select(.microphone))
+        #expect(!machine.permissionGranted(.microphone))
+        _ = machine.send(.permission(.microphoneGranted))
+        #expect(machine.permissionGranted(.microphone))
+        #expect(RecordlyPrimaryRecord.includeMicrophone(
+            chipOn: machine.selection.microphone,
+            permissionGranted: machine.permissionGranted(.microphone)
+        ))
+        #expect(RecordlyPrimaryRecord.startsDeviceCapture(phase: machine.phase))
+        _ = machine.send(.record(now: 1))
+        #expect(!RecordlyPrimaryRecord.startsDeviceCapture(phase: machine.phase))
+    }
+
+    /// One Record control. The status view does not grow a second Record button, and the primary
+    /// start reads the chip instead of forcing the microphone off.
+    @Test func oneRecordControlHonorsTheChip() throws {
+        let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
+        let status = try repoSource("Sources/Zeus/Recordly/RecordlyDeviceCaptureStatus.swift")
+        let page = try repoSource("Sources/Zeus/Recordly/RecordlyPage.swift")
+        #expect(controller.contains("RecordlyPrimaryRecord.includeMicrophone"))
+        #expect(!controller.contains("audio.microphone = false"))
+        #expect(controller.contains("RecordlyDeviceCaptureController.shared.record()"))
+        #expect(!status.contains("capture.record()"))
+        #expect(!status.contains("recordButtonTitle"))
+        #expect(page.contains("Press Record"))
+        #expect(!page.contains("accessibilityIdentifier(\"recordly.device.record\")"))
+    }
+
+    private func repoSource(_ relative: String) throws -> String {
+        if let root = ProcessInfo.processInfo.environment["ZEUS_REPO"], !root.isEmpty {
+            let url = URL(fileURLWithPath: root).appendingPathComponent(relative)
+            return try String(contentsOf: url, encoding: .utf8)
+        }
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<8 {
+            url.deleteLastPathComponent()
+            let candidate = url.appendingPathComponent(relative)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                return try String(contentsOf: candidate, encoding: .utf8)
+            }
+        }
+        Issue.record("Missing \(relative)")
+        return ""
+    }
+
     private func finishingMicrophone() -> RecordlyDeviceCaptureMachine {
         var machine = RecordlyDeviceCaptureMachine()
         _ = machine.send(.select(.microphone))
