@@ -22,7 +22,7 @@ extension LineSpeaking {
 @MainActor
 final class Speaker: SentenceSpeaking, LineSpeaking {
     /// Echo's polish replaces this. The identity default leaves samples unchanged.
-    var speechOutput: any SpeechOutputProcessing = IdentitySpeechOutput()
+    var speechOutput: any SpeechOutputProcessing = VoiceStreamPolish()
     nonisolated(unsafe) static var urlSession: URLSession = .shared
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
