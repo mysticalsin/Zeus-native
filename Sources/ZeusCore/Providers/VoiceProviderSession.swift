@@ -75,6 +75,7 @@ public enum VoiceProviderAccounts {
         switch raw {
         case VoiceTTSProvider.elevenLabs.rawValue: .provider(ElevenLabsTTSAdapter.id)
         case VoiceTTSProvider.googleCloud.rawValue: .provider(GoogleCloudTTSAdapter.id)
+        case let raw? where VoiceTTSProvider(rawValue: raw)?.needsKey == true: .provider(raw)
         default: .local
         }
     }
@@ -84,6 +85,7 @@ public enum VoiceProviderAccounts {
         case .local: VoiceTTSProvider.kokoro.rawValue
         case .provider(let id) where id == ElevenLabsTTSAdapter.id: VoiceTTSProvider.elevenLabs.rawValue
         case .provider(let id) where id == GoogleCloudTTSAdapter.id: VoiceTTSProvider.googleCloud.rawValue
+        case .provider(let id) where VoiceTTSProvider(rawValue: id)?.needsKey == true: id
         case .provider: VoiceTTSProvider.kokoro.rawValue
         }
     }

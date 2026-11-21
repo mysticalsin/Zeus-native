@@ -45,7 +45,7 @@ final class VoiceSettings {
     var ttsProvider: VoiceTTSProvider {
         // Only a person picking an engine in Settings reaches this (init assignments do not): that is an explicit choice.
         didSet {
-            defaults.set(ttsProvider.rawValue, forKey: "voice.ttsProvider")
+            VoiceProviderPreferences(defaults: defaults).choice = VoiceProviderAccounts.choice(fromTTSProvider: ttsProvider.rawValue)
             engineAuto = false
         }
     }
