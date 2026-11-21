@@ -24,7 +24,8 @@ enum KeyDownWarmer {
         func installed(_ tool: String) -> Bool {
             CLILocator.tools.first { $0.name == tool }.flatMap(CLILocator.locate) != nil
         }
-        return VoiceTurnKeys(anthropicKey: hasKey("assistant.key.anthropic"), openAIKey: hasKey("assistant.key.openai"),
+        _ = AssistantKeyAccount.migrateOpenAI(get: { Keychain.get($0) }, writeCanonical: { Keychain.set($0, for: AssistantKeyAccount.canonicalOpenAI) })
+        return VoiceTurnKeys(anthropicKey: hasKey("assistant.key.anthropic"), openAIKey: AssistantKeyAccount.readOpenAI({ Keychain.get($0) }) != nil,
                              claudeCLI: installed("claude"), codexCLI: installed("codex"))
     }
 
@@ -36,7 +37,7 @@ enum KeyDownWarmer {
                 case .anthropicAPI:
                     if due("anthropic", window: httpWindow) { await AnthropicAPIProvider().prewarm() }
                 case .openAIAPI:
-                    if due("openai", window: httpWindow), let key = Keychain.get("assistant.key.openai"),
+                    if due("openai", window: httpWindow), let key = AssistantKeyAccount.readOpenAI({ Keychain.get($0) }),
                        let model = ModelCap.httpModel(.openAI, tier: .fast) {
                         await OpenAICompatProvider.openAI(model: model, key: key).warmConnection()
                     }
