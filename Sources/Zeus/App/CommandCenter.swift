@@ -597,12 +597,15 @@ final class CommandCenter {
 enum CLIInstaller {
     static func install() {
         let source = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus")
-        let files = FileManager.default
-        guard files.isExecutableFile(atPath: source.path) else { return }
         let target = ZeusPaths.binDirectory.appendingPathComponent("zeus")
-        try? files.createDirectory(at: ZeusPaths.binDirectory, withIntermediateDirectories: true)
-        if files.contentsEqual(atPath: source.path, andPath: target.path) { return }
-        try? files.removeItem(at: target)
-        try? files.copyItem(at: source, to: target)
+        let directory = ZeusPaths.binDirectory
+        Task.detached(priority: .utility) {
+            let files = FileManager.default
+            guard files.isExecutableFile(atPath: source.path) else { return }
+            try? files.createDirectory(at: directory, withIntermediateDirectories: true)
+            if files.contentsEqual(atPath: source.path, andPath: target.path) { return }
+            try? files.removeItem(at: target)
+            try? files.copyItem(at: source, to: target)
+        }
     }
 }
