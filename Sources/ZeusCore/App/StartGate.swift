@@ -7,7 +7,8 @@ public struct StartGate: Equatable, Sendable {
     public init() {}
 
     public mutating func start() -> Bool {
-        // Red: every call installs another set of observers.
+        if started { return false }
+        started = true
         return true
     }
 }

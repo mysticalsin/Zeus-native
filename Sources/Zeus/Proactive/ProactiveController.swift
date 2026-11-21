@@ -33,10 +33,12 @@ final class ProactiveController {
     private let store = EKEventStore()
     private let settings = ProactiveSettings.shared
     private var observers: [NSObjectProtocol] = []
+    private var launch = StartGate()
     private var gate = FirstUnlockGate(lastShownDay: UserDefaults.standard.string(forKey: "proactive.lastBrief"))
     private let card = BriefCardWindow()
 
     func start() {
+        guard launch.start() else { return }
         let distributed = DistributedNotificationCenter.default()
         observers.append(distributed.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { ProactiveController.shared.unlocked() }

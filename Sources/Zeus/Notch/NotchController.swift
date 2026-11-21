@@ -34,6 +34,10 @@ final class NotchController {
     }
     private(set) var displays: [DisplayDescriptor] = []
     private var stallTimer: Timer?
+    private var launch = StartGate()
+    private var lifecycleObservers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var launch = StartGate()
+    private var lifecycleObservers: [(NotificationCenter, NSObjectProtocol)] = []
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
     /// Where the pointer is; tests replace it.
@@ -73,6 +77,7 @@ final class NotchController {
     }
 
     func start() {
+        guard launch.start() else { return }
         NotchControllerBridge.controller = self
         build()
         hoverMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
@@ -101,22 +106,28 @@ final class NotchController {
         dragMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDragged]) { [weak self] _ in
             MainActor.assumeIsolated { self?.mouseDragged() }
         } as Any)
-        NotificationCenter.default.addObserver(
+        let screenObserver =         let screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshDisplays(force: true) }
         }
+        lifecycleObservers.append((.default, screenObserver))
+        lifecycleObservers.append((.default, screenObserver))
         // Lock, unlock, wake and Space changes can leave the windows behind or on the wrong display.
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
-            workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            let token =             let token = workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshDisplays(force: false) }
             }
+            lifecycleObservers.append((workspace, token))
+            lifecycleObservers.append((workspace, token))
         }
         for name in ["com.apple.screenIsUnlocked", "com.apple.screenIsLocked"] {
-            DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
+            let token =             let token = DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshDisplays(force: false) }
             }
+            lifecycleObservers.append((DistributedNotificationCenter.default(), token))
+            lifecycleObservers.append((DistributedNotificationCenter.default(), token))
         }
         // Stalled agents: a quiet check every 20 seconds, nothing while no session works.
         let timer = Timer(timeInterval: 20, repeats: true) { [weak self] _ in
