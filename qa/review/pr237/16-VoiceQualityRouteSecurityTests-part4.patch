@@ -2,7 +2,41 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/Ze
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
-@@ -0,0 +346,59 @@
+@@ -0,0 +338,93 @@
++    private var values: [Bool] = []
++    func add(_ value: Bool) { lock.lock(); values.append(value); lock.unlock() }
++    var successes: Int { lock.lock(); defer { lock.unlock() }; return values.filter { $0 }.count }
++}
++
++private final class RouteLog: @unchecked Sendable {
++    private let lock = NSLock()
++    private var lines: [String] = []
++    var text: String { lock.lock(); defer { lock.unlock() }; return lines.joined(separator: "\n") }
++    func add(_ line: String) { lock.lock(); lines.append(line); lock.unlock() }
++}
++
++final class RouteHostStub: URLProtocol, @unchecked Sendable {
++    struct Reply: Sendable {
++        var status: Int
++        var body: Data?
++        var location: String?
++    }
++
++    private static let lock = NSLock()
++    nonisolated(unsafe) private static var reply = Reply(status: 200)
++    nonisolated(unsafe) private static var seen: [String] = []
++
++    static var hosts: [String] {
++        lock.lock(); defer { lock.unlock() }
++        return seen
++    }
++
++    static func reset(reply: Reply) {
++        lock.lock(); defer { lock.unlock() }
++        self.reply = reply
++        seen = []
++    }
++
 +    override class func canInit(with request: URLRequest) -> Bool { true }
 +    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 +

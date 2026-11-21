@@ -2,7 +2,12 @@ diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusC
 new file mode 100644
 --- /dev/null
 +++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
-@@ -0,0 +141,137 @@
+@@ -0,0 +138,139 @@
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++    ]
++
++    /// Google Cloud stock voices: Neural2, WaveNet, or Chirp HD only.
 +    /// Letter labels and star catalog names are generic. Myth and character names (Puck, Fenrir) are not listed.
 +    public static let google: [StockVoice] = [
 +        StockVoice(
@@ -137,6 +142,3 @@ new file mode 100644
 +    }
 +
 +    /// Neural2 uses speaking rate 0.92, the measured pace already used for the Mac voice, and pitch 0.
-+    /// WaveNet and Chirp HD stay at rate 1 and pitch 0 so the stock voice is not shifted.
-+    /// Every Google preset asks for LINEAR16 at 24 kHz. Chirp HD does not send rate or pitch:
-+    /// Google rejects those fields on Chirp 3 HD.

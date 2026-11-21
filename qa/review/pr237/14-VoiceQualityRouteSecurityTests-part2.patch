@@ -2,7 +2,7 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/Ze
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
-@@ -0,0 +98,103 @@
+@@ -0,0 +98,105 @@
 +            #expect((outcome.error as? VoiceQualityError)?.description == "The key is not valid.")
 +            #expect(!outcome.message.contains("tab-head-1100"))
 +            #expect(!outcome.message.contains("tab-tail-2200"))
@@ -10,6 +10,32 @@ new file mode 100644
 +            #expect(!outcome.message.contains("null-tail-4400"))
 +            #expect(outcome.count == 0)
 +        }
++    }
++
++    @Test func aKeyLongerThan256CharactersIsRefusedAndNotEchoed() async throws {
++        let marker = "LEN256-TAIL-7c"
++        let exact = String(repeating: "a", count: 256 - marker.count) + marker
++        #expect(exact.count == 256)
++        #expect(VoiceQualityKeyGate.accepted(exact) == exact)
++        let tooLong = exact + "Z"
++        #expect(tooLong.count == 257)
++        let refused = VoiceQualityKeyGate.accepted(tooLong) == nil
++        #expect(refused)
++        let trimmed = "\n" + exact + "\n"
++        #expect(VoiceQualityKeyGate.accepted(trimmed) == exact)
++        let trimmedTooLong = "\n" + tooLong
++        let trimmedRefused = VoiceQualityKeyGate.accepted(trimmedTooLong) == nil
++        #expect(trimmedRefused)
++
++        let outcome = try await rejectedKey(tooLong)
++        #expect(outcome.error as? VoiceQualityError == .keyRejected)
++        let description = (outcome.error as? VoiceQualityError)?.description ?? ""
++        #expect(description == "The key is not valid.")
++        #expect(!description.contains(marker))
++        #expect(!description.contains("Z"))
++        #expect(!outcome.message.contains(marker))
++        #expect(outcome.count == 0)
++        #expect(outcome.hosts.isEmpty)
 +    }
 +
 +    @Test func urlSessionAndHeaderErrorsDoNotEchoTheKey() {
@@ -82,27 +108,3 @@ new file mode 100644
 +        let link = directory.appendingPathComponent("voice-quality-meter.json")
 +        try Data("{\"elevenlabs\":10}".utf8).write(to: target)
 +        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
-+        let meter = try VoiceQualityMeter(directory: directory)
-+        #expect(throws: VoiceQualityError.meterCorrupt) {
-+            try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
-+        }
-+        #expect(try Data(contentsOf: target) == Data("{\"elevenlabs\":10}".utf8))
-+    }
-+
-+    @Test func oneRequestCannotExceedFiveThousandCharacters() async throws {
-+        let keys = PersonaSpeakKeys(elevenLabs: true)
-+        let directory = try temporaryDirectory()
-+        let meter = try VoiceQualityMeter(directory: directory)
-+        RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
-+        let speaker = VoiceQualitySpeaker(
-+            meter: meter,
-+            transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2)
-+        )
-+        let synthesis = speaker.synthesize(
-+            text: String(repeating: "a", count: 5_001),
-+            choice: .elevenLabs,
-+            keys: keys,
-+            preset: .elevenLabsFast,
-+            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
-+        )
-+        let error = await firstError(synthesis)

@@ -2,7 +2,11 @@ diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusC
 new file mode 100644
 --- /dev/null
 +++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
-@@ -0,0 +520,108 @@
+@@ -0,0 +518,112 @@
++            guard (200...299).contains(response.status) else {
++                throw ProviderFailure.fromHTTPStatus(response.status)
++            }
++            let audio = try Self.audio(from: response.body, preset: preset)
 +            guard !audio.isEmpty else { throw ProviderFailure.invalidResponse }
 +            return audio
 +        }
