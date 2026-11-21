@@ -17,10 +17,10 @@ existing type roles. No new colour, no new type size, no new motion.
 | Face presence | Switch | Stored as `face.presence`, default off. Off stops the camera at once. |
 | Status | One word, tabular numerals | Symbol in the icon column. The word changes in place. |
 | Face 1, Face 2 ... | Switch and a delete button | One row per enrolled face. A face that is switched off is kept and never matched. |
-| Enroll | Button | Enabled only in the watching, present and away states. |
+| Enroll | Button | Enabled only in the watching, present and away states. Under it: "Saving a face asks for Touch ID or the device passcode. Zeus does not keep the face print after it checks a match." |
 | Lock after absent for | Menu | Stored as `face.lockAfter`: 30 seconds, 1 minute, 2 minutes (default), 5 minutes, 10 minutes. |
 
-No tagline and no helper text under any row. The card says what each control is and nothing else.
+The Enroll line is the one sentence on the card, because that is what the keychain enforces. Saving and reading the face print ask the system for Touch ID or the device passcode. The print is not kept after a match. When the fingerprints on this Mac change, the card adds "Fingerprints on this Mac changed. Enroll this face again." No other helper text, and no preview of the camera.
 
 ## Status words and symbols
 
@@ -46,7 +46,9 @@ branch.
 ## Deleting and switching off
 
 Switching a face off or deleting it is immediate and asks nothing: it is one face of several, and enrolling again
-takes seconds. Deleting the last face removes the vault file and its Keychain key.
+takes seconds. Deleting the last face removes the template from the keychain. The template is a data-protection
+keychain item (`WhenUnlockedThisDeviceOnly`, current fingerprints or the device passcode). A cancelled prompt
+saves nothing and reads nothing. The card's names do not include the face print.
 
 ## Review fixtures
 

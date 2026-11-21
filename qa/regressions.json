@@ -5064,6 +5064,186 @@
       }
     },
     {
+      "id": "REG-991",
+      "failure": "A face template could be saved or read without the keychain access control, or a cancelled prompt still stored or returned the print.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "cancelledOrFailedSaveStoresNothing"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "An older face template was deleted before the new protected copy had been read back and matched, or a failed check still removed it.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "migrationKeepsTheOldCopyWhenVerificationFails"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A log line included face-template bytes, or a byte count next to whose face it was.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "logsNeverIncludeTemplateBytesOrASizeTiedToAnIdentity"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "Saving a face template deleted the stored item before the new copy was added, so a failed add lost the template. The real read also ignored the requested access control.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedReplaceKeepsTheStoredTemplate"
+      }
+    },
+    {
+      "id": "REG-998",
+      "failure": "An empty face-template domain state was stored and later matched another empty state, so a missing evaluation counted as the same fingerprints.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "emptyDomainStateIsUnavailableAndIsNeverStored"
+      }
+    },
+    {
+      "id": "REG-999",
+      "failure": "An unavailable current domain state deleted the stored face template instead of denying and leaving it in place.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "unavailableCurrentStateDeniesWithoutDeleting"
+      }
+    },
+    {
+      "id": "REG-1000",
+      "failure": "Replacing the face-template epoch deleted the old record before the new one was stored, so a failed add looked like a first enrollment.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedEpochAddKeepsThePreviousRecord"
+      }
+    },
+    {
+      "id": "REG-1001",
+      "failure": "An epoch read error or a failed first epoch write deleted the enrolled face template.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "epochReadErrorOrFailedFirstWriteKeepsTheTemplate"
+      }
+    },
+    {
+      "id": "REG-1002",
+      "failure": "A fingerprint change deleted the face template and left the old epoch, so the next enrollment was rejected as a change.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "reenrolmentAfterFingerprintChangeClearsTheEpoch"
+      }
+    },
+    {
+      "id": "REG-1003",
+      "failure": "A face-template write reported success when the epoch write failed, so the next check had no fingerprint set to compare.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "writeFailsWhenTheEpochWriteFails"
+      }
+    },
+    {
+      "id": "REG-1004",
+      "failure": "A failed epoch delete left the old fingerprint set, so the next enrollment was rejected as a change.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedEpochDeleteDoesNotLeaveAStaleEpoch"
+      }
+    },
+    {
+      "id": "REG-1005",
+      "failure": "The face-template policy reply waited with no deadline, so a prompt that never returned held the save.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyReplyWaitStopsAtTheExistingPromptTimeout"
+      }
+    },
+    {
+      "id": "REG-1006",
+      "failure": "A face-policy timeout left the prompt up and let a late reply overwrite the failure.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyTimeoutInvalidatesAndIgnoresALateReply"
+      }
+    },
+    {
+      "id": "REG-1007",
+      "failure": "A second face-policy reply replaced the first one, so the stored domain state was not the one that finished the prompt.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyReplySettlesOnceWithoutInvalidating"
+      }
+    },
+    {
+      "id": "REG-1008",
+      "failure": "The face-policy wait passed a Date to DispatchSemaphore.wait, which expects a DispatchTime.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyWaitDeadlineIsDispatchTime"
+      }
+    },
+    {
       "id": "REG-603",
       "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
       "features": [
