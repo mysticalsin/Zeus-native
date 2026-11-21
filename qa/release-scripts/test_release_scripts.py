@@ -316,7 +316,7 @@ class ReleaseScripts(unittest.TestCase):
         self.log.write_text("")
         result = self.run_script("verify-release-signature.sh", app)
         self.assertEqual(result.returncode, 0, result.stderr)
-        requirement = "certificate leaf[subject.OU] = TESTTEAM01"
+        requirement = '=anchor apple generic and certificate leaf[subject.OU] = "TESTTEAM01"'
         self.assertIn(["codesign", "--verify", "--strict", "-R", requirement, str(extra)], self.commands())
 
     def test_team_id_must_be_ten_uppercase_characters(self):
