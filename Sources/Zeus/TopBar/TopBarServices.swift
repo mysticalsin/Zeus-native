@@ -29,6 +29,8 @@ final class TopBarServices {
     private var keyMonitor: Any?
     private var systemKeyMonitor: Any?
     private var shiftGate = ShiftPeekGate()
+    /// The single sleep that asks the Shift gate whether the hold has lasted long enough.
+    private var shiftCheck: Task<Void, Never>?
     private var rainGate = RainAlertGate()
     private var hudMonitor: SystemHUDMonitor?
     private var intakeWatcher: AirDropScreenshotWatcher?
@@ -171,7 +173,7 @@ final class TopBarServices {
             let code = event.keyCode
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.shiftGate.otherKey()
+                self.performShift(ShiftPeekPolicy.otherKey(&self.shiftGate))
                 if code == 144 || code == 145 { self.brightnessChanged() }
                 guard command, let peek = ShortcutPeek.lookup(chars, shift: shift),
                       SettingsStore.shared.bool("lights.shortcutPeeks") else { return }
@@ -190,12 +192,34 @@ final class TopBarServices {
     }
 
     private func shift(down: Bool) {
-        shiftGate.shift(down: down, at: Date())
-        guard down else { return }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(520))
-            guard let self, self.shiftGate.fire(at: Date()) else { return }
-            self.model.flash(.shiftCrest)
+        let effects: [ShiftPeekPolicy.Effect]
+        if down {
+            effects = ShiftPeekPolicy.shiftDown(&shiftGate, at: Date())
+        } else {
+            let revealed = shiftGate.release()
+            effects = ShiftPeekPolicy.shiftedUp(revealed: revealed)
+        }
+        performShift(effects)
+    }
+
+    private func performShift(_ effects: [ShiftPeekPolicy.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .scheduleCheck:
+                shiftCheck?.cancel()
+                shiftCheck = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(ShiftPeekPolicy.checkAfter))
+                    guard let self, !Task.isCancelled else { return }
+                    self.performShift(ShiftPeekPolicy.checkDue(&self.shiftGate, at: Date()))
+                }
+            case .cancelPending:
+                shiftCheck?.cancel()
+                shiftCheck = nil
+            case .showCrest:
+                model.flash(.shiftCrest)
+            case .fadeExistingCrest:
+                break
+            }
         }
     }
 

@@ -8700,6 +8700,18 @@
         "file": "Tests/ZeusCoreTests/DictationPressTests.swift",
         "function": "aPressWhileTypingCancelsDictation"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A lone Shift hold armed the crest once. Releasing Shift cleared the key-down time and left the gate revealed, and the top bar never called release, so a second hold could not arm the crest.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ShiftPeekPolicyTests.swift",
+        "function": "aSecondShiftHoldFiresAfterRelease"
+      }
     }
   ]
 }
