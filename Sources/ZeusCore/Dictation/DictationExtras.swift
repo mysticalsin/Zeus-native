@@ -252,13 +252,23 @@ public enum ZeusDeepLink: Equatable, Sendable {
         case ("prompter", _), ("teleprompter", _): return .prompter
         case ("settings", _): return .settings(section: parts.dropFirst().first)
         case ("sticky", nil), ("sticky", "new"), ("note", "new"):
-            let text = query["text"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return .stickyNew(text: text?.isEmpty == false ? text : nil)
+            return .stickyNew(text: DeepLinkGate.boundedText(query["text"]))
         case ("chat", "open"), ("chat", nil):
-            let text = query["text"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return .chatOpen(prefill: text?.isEmpty == false ? text : nil)
+            return .chatOpen(prefill: DeepLinkGate.boundedText(query["text"]))
         default: return nil
         }
+    }
+
+    /// The `nonce` query item, when it is a short token. It is not part of the action.
+    public static func presentedNonce(in url: URL) -> String? {
+        guard url.scheme?.lowercased() == scheme,
+              let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name.lowercased() == "nonce" })?.value else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (1...80).contains(value.count) else { return nil }
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-")
+        guard value.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+        return value
     }
 }
 
