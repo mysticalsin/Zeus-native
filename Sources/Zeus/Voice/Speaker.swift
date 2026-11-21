@@ -88,7 +88,9 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
 
     var systemVoiceName: String { voice?.name ?? "default" }
 
-    var isSpeaking: Bool { synthesizer.isSpeaking || pump != nil || chain.isPlaying || systemRendering }
+    var isSpeaking: Bool {
+        ProviderSentencePump.isSpeaking(synthesizer: synthesizer.isSpeaking, pump: pump != nil, chainPlaying: chain.isPlaying, systemRendering: systemRendering, providerPlaying: ProviderPlaybackGate.shared.isPlaying)
+    }
 
     var engineDescription: String {
         let first = VoiceSettings.shared.routeDecisions().first
@@ -113,10 +115,10 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         pumpToken = token
         pump = Task { [weak self] in
             while let self, !Task.isCancelled {
-                if !self.queue.isEmpty {
+                if ProviderSentencePump.canDequeue(queueEmpty: self.queue.isEmpty, providerPlaying: ProviderPlaybackGate.shared.isPlaying) {
                     let line = self.queue.removeFirst()
                     _ = await self.speakLine(line.text, onStart: line.onStart)
-                } else if self.chain.isPlaying || self.systemRendering {
+                } else if ProviderSentencePump.holds(chainPlaying: self.chain.isPlaying, systemRendering: self.systemRendering, providerPlaying: ProviderPlaybackGate.shared.isPlaying) {
                     try? await Task.sleep(for: .milliseconds(40))
                 } else {
                     break
@@ -141,11 +143,12 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             if Task.isCancelled { break }
             let text = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
+            while ProviderPlaybackGate.shared.isPlaying, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
             let played = await speakLine(text, began: count == 0 ? began : Date())
             if first == nil { first = played }
             count += 1
         }
-        while (chain.isPlaying || systemRendering), !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
+        while ProviderSentencePump.holds(chainPlaying: chain.isPlaying, systemRendering: systemRendering, providerPlaying: ProviderPlaybackGate.shared.isPlaying), !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
         return SpeakOutcome(engine: first?.engine.logName ?? "none", voice: first?.voice ?? "", reason: first?.reason ?? "nothing was spoken",
                             firstAudioMs: first?.firstAudioMs, sentences: count)
     }
@@ -183,6 +186,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         pumpToken = nil
         chain.stop()
         synthesizer.stopSpeaking(at: .immediate)
+        PluginAudioPlay.stop()
         systemRendering = false
         endAnswer()
     }
@@ -645,7 +649,7 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             let name = await attempt(engine, line, settings: settings, began: began)
             let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
             let waitUntil = Date().addingTimeInterval(25)
-            while (chain.isPlaying || systemRendering || synthesizer.isSpeaking), Date() < waitUntil { try? await Task.sleep(for: .milliseconds(80)) }
+            while ProviderSentencePump.holds(chainPlaying: chain.isPlaying, systemRendering: systemRendering, providerPlaying: ProviderPlaybackGate.shared.isPlaying) || synthesizer.isSpeaking, Date() < waitUntil { try? await Task.sleep(for: .milliseconds(80)) }
             let reason = name.map { "spoke with \($0)" } ?? "engine produced no audio"
             rows.append(VoiceSelfTestRow(engine: engine.logName, available: true, reason: reason, spoke: name != nil && ms != nil, firstAudioMs: ms, effectPercent: percent))
         }

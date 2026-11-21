@@ -6,6 +6,7 @@ import ZeusCore
 @MainActor
 enum PluginAudioPlay {
     private static let synthesizer = AVSpeechSynthesizer()
+    private static let delegate = ProviderPlayerDelegate()
     private static var player: AVAudioPlayer?
 
     @discardableResult
@@ -13,8 +14,18 @@ enum PluginAudioPlay {
         guard !data.isEmpty else { return false }
         if data.starts(with: Data("RIFF".utf8)), playWithEngine(data) { return true }
         guard let next = try? AVAudioPlayer(data: data) else { return false }
+        next.delegate = delegate
         player = next
-        return next.play()
+        ProviderPlaybackGate.shared.begin(player: ObjectIdentifier(next))
+        let started = next.play()
+        if !started { ProviderPlaybackGate.shared.endPlayer(ObjectIdentifier(next)) }
+        return started
+    }
+
+    static func stop() {
+        player?.stop()
+        player = nil
+        ProviderPlaybackGate.shared.reset()
     }
 
     /// Schedules a WAV on `AVAudioEngine`. MP3 from a cloud provider uses `AVAudioPlayer`.
@@ -28,7 +39,10 @@ enum PluginAudioPlay {
             engine.attach(node)
             engine.connect(node, to: engine.mainMixerNode, format: file.processingFormat)
             try engine.start()
-            node.scheduleFile(file, at: nil)
+            let token = ProviderPlaybackGate.shared.begin()
+            node.scheduleFile(file, at: nil) {
+                Task { @MainActor in ProviderPlaybackGate.shared.end(token) }
+            }
             node.play()
             engines.append(engine)
             return true
@@ -37,12 +51,19 @@ enum PluginAudioPlay {
         }
     }
 
-    private static var engines: [AVAudioEngine] = []
-
     static func speakLocally(_ text: String) {
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         synthesizer.speak(utterance)
+    }
+
+    private static var engines: [AVAudioEngine] = []
+}
+
+@MainActor
+private final class ProviderPlayerDelegate: NSObject, AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        ProviderPlaybackGate.shared.endPlayer(ObjectIdentifier(player))
     }
 }
 
