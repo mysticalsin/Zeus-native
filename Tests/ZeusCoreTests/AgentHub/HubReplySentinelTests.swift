@@ -107,12 +107,16 @@ struct HubReplySentinelTests {
     }
 
     @Test func theForegroundQueryDoesNotTypeOrStartAShell() {
+        #expect(HubReplyTTYReader.executable == "/bin/ps")
+        let arguments = HubReplyTTYReader.arguments(forTTY: "/dev/ttys004")
+        #expect(arguments == ["-o", "pid=,pgid=,tpgid=,stat=,comm=", "-t", "/dev/ttys004"])
+        #expect(HubReplyTTYReader.arguments(forTTY: "/dev/ttys004;rm") == nil)
+        #expect(arguments?.contains("-c") == false)
         let terminal = HubReplyForeground.queryScript(bundleID: "com.apple.Terminal", tty: "/dev/ttys004")
-        #expect(terminal.contains("processes"))
-        #expect(terminal.contains("/dev/ttys004"))
         #expect(!terminal.contains("keystroke"))
         #expect(!terminal.contains("do script"))
         #expect(!terminal.contains("do shell script"))
+        #expect(!terminal.contains("last item"))
         let iterm = HubReplyForeground.queryScript(bundleID: "com.googlecode.iterm2", tty: "/dev/ttys004")
         #expect(iterm.contains("jobName"))
         #expect(!iterm.contains("keystroke"))
@@ -125,7 +129,7 @@ struct HubReplySentinelTests {
         #expect(approve.contains("HubReplyTargetGate"))
         #expect(approve.contains("seconds(30)") == false)
         let type = try #require(HubReplyWiringTests.functionBody("typeApprovedLine", in: hub))
-        #expect(type.contains("HubReplyForeground"))
+        #expect(type.contains("HubReplyJobGuard"))
         let wait = try #require(HubReplyWiringTests.functionBody("armReplyTimeout", in: hub))
         #expect(wait.contains("seconds(30)"))
         let page = try source("Sources/Zeus/TopBar/ChatPage.swift")
@@ -212,8 +216,11 @@ struct HubReplySentinelTests {
         let hub = try source("Sources/Zeus/Agents/AgentHub.swift")
         let type = try #require(HubReplyWiringTests.functionBody("typeApprovedLine", in: hub))
         #expect(type.contains("script(for: info, text: line, expectedCLI:"))
-        #expect(type.contains("foregroundName"))
+        #expect(type.contains("HubReplyJobGuard"))
+        #expect(type.contains("maySubmit"))
+        #expect(type.contains("foregroundSnapshot"))
         #expect(!type.contains("approvedForeground"))
+        #expect(!type.contains("last item"))
     }
 
     /// Terminal's process list does not say which process is in the foreground.

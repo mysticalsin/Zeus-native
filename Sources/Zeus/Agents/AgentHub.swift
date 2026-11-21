@@ -179,23 +179,29 @@ final class AgentHub {
         let typer = sender ?? liveSender
         guard let info = typer.terminal(sessionID) else { return false }
         let expected = replyGate.state.target?.expectedCLI ?? []
-        if sender == nil {
-            let name = foregroundName(info)
-            let path = name?.contains("/") == true ? name : nil
-            let verdict = HubReplyForeground.verdict(
-                name: name,
-                expected: expected,
-                executablePath: path,
-                allowedPaths: allowedAgentPaths(expected))
-            guard verdict == .agent else { return false }
+        if let sender {
+            guard let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return false }
+            guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
+            guard sessionID == selectedSession else { return false }
+            return await sender.run(script)
         }
+        let allowed = allowedAgentPaths(expected)
+        let appName = replyAppName(info)
+        let before = foregroundSnapshot(info, frontmost: nil)
+        guard HubReplyJobGuard.mayType(
+            snapshot: before, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
         guard let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return false }
         guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
         guard sessionID == selectedSession else { return false }
-        if let sender {
-            return await sender.run(script)
-        }
-        return await Self.runGuardedScript(script)
+        guard await Self.runGuardedScript(script) else { return false }
+        guard info.targetBundleID == "com.apple.Terminal" else { return true }
+        let after = foregroundSnapshot(info, frontmost: NSWorkspace.shared.frontmostApplication?.localizedName)
+        guard HubReplyJobGuard.maySubmit(
+            before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
+        guard let submit = AgentReply.submitScript(for: info) else { return false }
+        guard HubReplyScriptGuard.maySubmit(script: submit, approved: true) else { return false }
+        guard sessionID == selectedSession else { return false }
+        return await Self.runGuardedScript(submit)
     }
 
     private var liveSender: AgentReplySender {
@@ -206,35 +212,42 @@ final class AgentHub {
             run: { script in await Self.runGuardedScript(script) })
     }
 
-    /// Production asks the terminal what is in the foreground. An injected sender does not.
+    /// Production reads the tty foreground process group. An injected sender uses the test probe.
     private func foregroundVerdict(info: TerminalInfo?, expected: Set<String>) -> HubReplyForeground.Verdict? {
-        let name: String?
         if sender != nil {
-            name = info.flatMap { foregroundProbe?($0) }
-        } else {
-            name = info.flatMap(foregroundName)
+            guard foregroundProbe != nil else { return nil }
+            let name = info.flatMap { foregroundProbe?($0) }
+            return HubReplyForeground.verdict(name: name, expected: expected)
         }
-        guard sender == nil || foregroundProbe != nil else { return nil }
-        return HubReplyForeground.verdict(name: name, expected: expected)
+        guard let info else { return .unknown }
+        return HubReplyJobGuard.verdict(
+            snapshot: foregroundSnapshot(info, frontmost: nil),
+            expectedApp: replyAppName(info),
+            expectedCLI: expected,
+            allowedPaths: allowedAgentPaths(expected))
     }
 
-    /// Paths of the expected CLIs, resolved later against the process path when the terminal returns one.
-    /// A bare name from `processes` or `jobName` has no path to compare. See `HubReplyForeground`.
+    private func replyAppName(_ info: TerminalInfo) -> String {
+        switch info.targetBundleID {
+        case "com.apple.Terminal": "Terminal"
+        case "com.googlecode.iterm2": "iTerm2"
+        default: info.targetBundleID ?? ""
+        }
+    }
+
+    /// `frontmost` is nil before the typing script activates Terminal. The Return check passes the live app.
+    private func foregroundSnapshot(_ info: TerminalInfo, frontmost: String?) -> HubReplyTTYSnapshot {
+        guard let tty = info.tty else {
+            return HubReplyTTYSnapshot(frontmostApp: frontmost, foregroundPgid: nil, processes: [])
+        }
+        return HubReplyTTYReader.read(tty: tty, frontmostApp: frontmost)
+    }
+
+    /// Paths of the expected CLIs. The foreground pid's executable must resolve onto this set.
     private func allowedAgentPaths(_ expected: Set<String>) -> Set<String> {
         Set(CLILocator.tools.compactMap { tool in
             expected.contains(tool.name) ? CLILocator.locate(tool) : nil
         })
-    }
-
-    /// Terminal's `processes` or iTerm's `jobName`. The automation permission is the one the app already has.
-    private func foregroundName(_ info: TerminalInfo) -> String? {
-        guard let bundle = info.targetBundleID, let tty = info.tty else { return nil }
-        let script = HubReplyForeground.queryScript(bundleID: bundle, tty: tty)
-        guard !script.isEmpty else { return nil }
-        var error: NSDictionary?
-        let result = NSAppleScript(source: script)?.executeAndReturnError(&error)
-        guard error == nil, let text = result?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
-        return text
     }
 
     private static func runGuardedScript(_ script: String) async -> Bool {

@@ -19,8 +19,13 @@ struct HubReplyKeystrokeGuardTests {
         let rows = script.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
         #expect(!rows.contains { $0.hasPrefix("do script") })
         #expect(rows.contains("keystroke \"\(line)\""))
-        #expect(rows.contains("keystroke return"))
+        #expect(!rows.contains("keystroke return"))
         #expect(HubReplyScriptGuard.mayRun(script: script, line: line, approved: true))
+        let submit = try #require(AgentReply.submitScript(for: terminal))
+        #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: true))
+        #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: false) == false)
+        let glued = script + "\nkeystroke return\n"
+        #expect(HubReplyScriptGuard.mayRun(script: glued, line: line, approved: true) == false)
     }
 
     @Test func approvalIsStillRequired() throws {
@@ -47,15 +52,19 @@ struct HubReplyKeystrokeGuardTests {
     @Test func onlyTheStrippedLineAndReturnAreTyped() throws {
         let line = "hi $(id)"
         let script = try #require(AgentReply.script(for: terminal, text: line))
-        let extra = script.replacingOccurrences(of: "keystroke return", with: "keystroke return\n                    keystroke \"rm\"")
+        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let extra = script + "\nkeystroke \"rm\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: extra, line: line, approved: true) == false)
-        let commandReturn = script.replacingOccurrences(of: "keystroke return", with: "keystroke return using command down")
-        #expect(HubReplyScriptGuard.mayRun(script: commandReturn, line: line, approved: true) == false)
-        let keyCode = script.replacingOccurrences(of: "keystroke return", with: "key code 36")
-        #expect(HubReplyScriptGuard.mayRun(script: keyCode, line: line, approved: true) == false)
+        let extraReturn = submit + "\nkeystroke \"rm\"\n"
+        #expect(HubReplyScriptGuard.maySubmit(script: extraReturn, approved: true) == false)
+        let commandReturn = submit.replacingOccurrences(of: "keystroke return", with: "keystroke return using command down")
+        #expect(HubReplyScriptGuard.maySubmit(script: commandReturn, approved: true) == false)
+        let keyCode = submit.replacingOccurrences(of: "keystroke return", with: "key code 36")
+        #expect(HubReplyScriptGuard.maySubmit(script: keyCode, approved: true) == false)
         let shell = script.replacingOccurrences(of: "activate", with: "do shell script \"id\"")
         #expect(HubReplyScriptGuard.mayRun(script: shell, line: line, approved: true) == false)
         #expect(HubReplyScriptGuard.mayRun(script: script, line: "other", approved: true) == false)
+        #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: true))
     }
 
     @Test func quotesAndLongLinesStayInsideKeystrokes() throws {
@@ -98,6 +107,26 @@ struct HubReplyKeystrokeGuardTests {
         }
         let written = "tell application \"Host\"\nwrite text \"hi\"\nDo script \"id\"\nend tell\n"
         #expect(HubReplyScriptGuard.mayRun(script: written, line: "hi", approved: true) == false)
+    }
+
+    /// A dotted I, a combining mark, or zero-width glue must not hide a command from the guard.
+    @Test func dottedICombiningMarksAndZeroWidthGlueDoNotPass() throws {
+        let line = "hi $(id)"
+        let script = try #require(AgentReply.script(for: terminal, text: line))
+        let extras = [
+            "do scr\u{0130}pt \"id\"",
+            "do scri\u{0301}pt \"id\"",
+            "do scr\u{200D}ipt \"id\"",
+            "do scr\u{034F}ipt \"id\"",
+        ]
+        for extra in extras {
+            let tainted = script.replacingOccurrences(of: "activate", with: extra)
+            #expect(HubReplyScriptGuard.mayRun(script: tainted, line: line, approved: true) == false)
+        }
+        let written = "tell application \"Host\"\nwrite text \"hi\"\ndo scr\u{0130}pt \"id\"\nend tell\n"
+        #expect(HubReplyScriptGuard.mayRun(script: written, line: "hi", approved: true) == false)
+        let glued = "tell application \"Host\"\nwrite text \"hi\"\ndo scr\u{200D}ipt \"id\"\nend tell\n"
+        #expect(HubReplyScriptGuard.mayRun(script: glued, line: "hi", approved: true) == false)
         let spaced = "tell application \"Host\"\nwrite text \"hi\"\ndo\u{00A0}script \"id\"\nend tell\n"
         #expect(HubReplyScriptGuard.mayRun(script: spaced, line: "hi", approved: true) == false)
     }
@@ -109,9 +138,16 @@ struct HubReplyKeystrokeGuardTests {
         let before = String(script[..<key.lowerBound])
         #expect(before.contains("frontmost"))
         #expect(before.contains("return false"))
-        #expect(before.contains("processes"))
+        #expect(!before.contains("processes"))
+        #expect(!script.contains("last item"))
         #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
         #expect(!before.contains("keystroke"))
+        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let returnKey = try #require(submit.range(of: "keystroke return"))
+        let again = String(submit[..<returnKey.lowerBound])
+        #expect(again.contains("frontmost"))
+        #expect(again.contains("/dev/ttys004"))
+        #expect(again.contains("return false"))
     }
 
     /// A job that exited is read again in the script, before `write text` can reach a shell.
@@ -125,9 +161,10 @@ struct HubReplyKeystrokeGuardTests {
         let script = try #require(AgentReply.script(for: iterm, text: "go"))
         let write = try #require(script.range(of: "write text"))
         let before = String(script[..<write.lowerBound])
-        #expect(before.contains("jobName"))
         #expect(before.contains("frontmost"))
         #expect(before.contains("return false"))
+        #expect(!before.contains("try"))
+        #expect(!script.contains("last item"))
         #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
     }
 
@@ -135,12 +172,13 @@ struct HubReplyKeystrokeGuardTests {
         let line = "hi $(id)"
         let script = try #require(AgentReply.script(for: terminal, text: line, expectedCLI: ["claude"]))
         #expect(HubReplyScriptGuard.mayRun(script: script, line: line, approved: true))
-        let key = try #require(script.range(of: "keystroke"))
-        #expect(String(script[..<key.lowerBound]).contains("fg is \"claude\""))
+        #expect(!script.contains("fg is \"claude\""))
+        #expect(!script.contains("last item"))
         let iterm = TerminalInfo(bundleID: "com.googlecode.iterm2", program: nil, sessionID: "w0t1p0:ABCD-1234", tty: "/dev/ttys004")
         let written = try #require(AgentReply.script(for: iterm, text: "go", expectedCLI: ["claude"]))
         #expect(HubReplyScriptGuard.mayRun(script: written, line: "go", approved: true))
-        #expect(written.contains("fg is \"claude\""))
+        #expect(!written.contains("try"))
+        #expect(!written.contains("last item"))
     }
 }
 
@@ -231,6 +269,29 @@ struct HubReplyJobGuardTests {
             processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: evil)])
         #expect(HubReplyJobGuard.mayType(
             snapshot: byPath, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [real]) == false)
+    }
+
+    /// The first name in the list is not the foreground group. An empty list and a failed read stay closed.
+    @Test func theFirstNameAndAFailedReadDoNotType() throws {
+        let binary = try Self.file(named: "claude")
+        let firstIsTheCLI = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 10,
+            processes: [
+                Self.process(pid: 50, pgid: 50, name: "claude", path: binary),
+                Self.process(pid: 10, pgid: 10, name: "zsh", path: "/bin/zsh"),
+            ])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: firstIsTheCLI, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+        let empty = HubReplyTTYSnapshot(frontmostApp: "Terminal", foregroundPgid: 10, processes: [])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: empty, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+        let failedRead = HubReplyTTYSnapshot(
+            frontmostApp: "iTerm2",
+            foregroundPgid: nil,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: failedRead, expectedApp: "iTerm2", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
     }
 
     private static func process(pid: Int32, pgid: Int32, name: String, path: String, stopped: Bool = false) -> HubReplyProcessFact {

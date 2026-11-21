@@ -62,6 +62,8 @@ public enum HubReplyHidden {
             return true
         case 0xFE00...0xFE0F, 0xE0000...0xE007F, 0xE0100...0xE01EF:
             return true
+        case 0x034F, 0x115F, 0x1160, 0x2800, 0x3164, 0xFFA0:
+            return true
         default:
             return false
         }
@@ -70,12 +72,11 @@ public enum HubReplyHidden {
 
 /// The process in the target tab, read with the terminal's own AppleScript. A shell prompt is not an agent.
 ///
-/// Terminal's `processes` and iTerm's `jobName` are process names, not executable paths. A bare name is
-/// matched against `expected` and the shell set. That is the limit of those dictionaries: a renamed
-/// binary can still match a name, and this type cannot see the inode behind it.
-/// When `executablePath` is set, or `name` itself contains a slash, the path is resolved with `realpath`
-/// and must be one of `allowedPaths` after the same resolution. A path that does not resolve, or is not
-/// on that allowlist, is `.unknown`. A shell stays `.bareShell` even when a path is allowlisted.
+/// A bare process name is not enough to type. `HubReplyJobGuard` requires the tty foreground process
+/// group and the foreground pid's executable, resolved with `proc_pidpath` (or `/proc/<pid>/exe`) and
+/// checked against the allowlist. `verdict(name:)` still classifies a name. When `executablePath` is
+/// set, or `name` itself contains a slash, `realpath` must land on `allowedPaths`. A shell stays
+/// `.bareShell` even when a path is allowlisted.
 public enum HubReplyForeground {
     public enum Verdict: Equatable, Sendable {
         case agent
@@ -84,6 +85,10 @@ public enum HubReplyForeground {
     }
 
     private static let shells: Set<String> = ["bash", "zsh", "sh", "fish", "dash", "ksh", "tcsh", "csh"]
+
+    static func isShell(_ name: String) -> Bool {
+        shells.contains(name)
+    }
 
     /// `name` is the foreground process, or nil when the query could not see one.
     /// A shell is refused. Any other process that is not the expected CLI is unknown, and also refused.
@@ -137,28 +142,15 @@ public enum HubReplyForeground {
         }
     }
 
-    /// A read of the foreground process. It does not type and it does not start a shell.
-    /// Terminal uses the tab's `processes`. iTerm2 uses the session's `jobName`.
-    /// Both are the apps' existing AppleScript dictionaries. An unsafe tty produces an empty script.
+    /// A read that does not type and does not start a shell.
+    /// Terminal's foreground process group is `HubReplyTTYReader`, not this script.
+    /// iTerm2 may still read `jobName`. An unsafe tty produces an empty script.
     public static func queryScript(bundleID: String, tty: String) -> String {
         guard let tty = TerminalTabScript.safe(tty) else { return "" }
         switch bundleID {
         case "com.apple.Terminal":
-            return """
-            tell application "Terminal"
-                repeat with w in windows
-                    repeat with t in tabs of w
-                        if tty of t is "\(tty)" then
-                            -- `processes` is an unordered list. It does not mark the foreground process,
-                            -- so the last item is not that process. Fail closed.
-                            set names to processes of t
-                            return ""
-                        end if
-                    end repeat
-                end repeat
-            end tell
+            _ = tty
             return ""
-            """
         case "com.googlecode.iterm2":
             return """
             tell application "iTerm2"
@@ -210,8 +202,9 @@ public struct HubReplyTTYSnapshot: Equatable, Sendable {
     }
 }
 
-/// Decides whether a reply may be typed into this tty.
-/// This build still trusts the last process name. The tests that follow reject that guess.
+/// Whether the tty's foreground process group is the expected CLI.
+/// The last name in a process list is not used. A stopped job, a background job, an empty CLI
+/// list, an unknown process group, and a binary that is not on the allowlist are refused.
 public enum HubReplyJobGuard {
     public static func mayType(
         snapshot: HubReplyTTYSnapshot,
@@ -219,16 +212,21 @@ public enum HubReplyJobGuard {
         expectedCLI: Set<String>,
         allowedPaths: Set<String>
     ) -> Bool {
-        _ = expectedApp
-        _ = allowedPaths
-        _ = snapshot.foregroundPgid
-        guard let name = snapshot.processes.last.flatMap({ HubReplyForeground.normalizedToken($0.name) }) else {
-            return false
+        guard !expectedCLI.isEmpty else { return false }
+        if let front = snapshot.frontmostApp, front != expectedApp { return false }
+        guard let pgid = snapshot.foregroundPgid else { return false }
+        let foreground = snapshot.processes.filter { $0.pgid == pgid && !$0.stopped }
+        guard !foreground.isEmpty else { return false }
+        return foreground.contains { process in
+            guard let name = HubReplyForeground.normalizedToken(process.name), expectedCLI.contains(name) else { return false }
+            guard !HubReplyForeground.isShell(name) else { return false }
+            guard let path = process.executablePath, !path.isEmpty else { return false }
+            return HubReplyForeground.verdict(
+                name: name, expected: expectedCLI, executablePath: path, allowedPaths: allowedPaths) == .agent
         }
-        if expectedCLI.isEmpty { return true }
-        return expectedCLI.contains(name)
     }
 
+    /// Return is safe only when the front app and the foreground process group are unchanged, and both reads still allow typing.
     public static func maySubmit(
         before: HubReplyTTYSnapshot,
         after: HubReplyTTYSnapshot,
@@ -236,7 +234,121 @@ public enum HubReplyJobGuard {
         expectedCLI: Set<String>,
         allowedPaths: Set<String>
     ) -> Bool {
-        _ = (before, after, expectedApp, expectedCLI, allowedPaths)
-        return true
+        guard let beforeGroup = before.foregroundPgid, beforeGroup == after.foregroundPgid else { return false }
+        guard before.frontmostApp == expectedApp, after.frontmostApp == expectedApp else { return false }
+        return mayType(snapshot: before, expectedApp: expectedApp, expectedCLI: expectedCLI, allowedPaths: allowedPaths)
+            && mayType(snapshot: after, expectedApp: expectedApp, expectedCLI: expectedCLI, allowedPaths: allowedPaths)
+    }
+
+    /// `.agent` when the foreground group is the allowlisted CLI. `.bareShell` when that group is a shell.
+    /// Anything else, including an unknown group, is `.unknown`.
+    public static func verdict(
+        snapshot: HubReplyTTYSnapshot,
+        expectedApp: String,
+        expectedCLI: Set<String>,
+        allowedPaths: Set<String>
+    ) -> HubReplyForeground.Verdict {
+        if mayType(snapshot: snapshot, expectedApp: expectedApp, expectedCLI: expectedCLI, allowedPaths: allowedPaths) {
+            return .agent
+        }
+        guard let pgid = snapshot.foregroundPgid else { return .unknown }
+        let foreground = snapshot.processes.filter { $0.pgid == pgid && !$0.stopped }
+        let shell = foreground.contains { process in
+            HubReplyForeground.isShell(HubReplyForeground.normalizedToken(process.name) ?? "")
+        }
+        return shell ? .bareShell : .unknown
     }
 }
+
+/// Reads the tty foreground process group with `/bin/ps` and a fixed argument vector. No shell is started.
+public enum HubReplyTTYReader {
+    public static let executable = "/bin/ps"
+
+    /// Nil when `tty` is not a plain device path, so the argument vector is never built for it.
+    public static func arguments(forTTY tty: String) -> [String]? {
+        guard let tty = TerminalTabScript.safe(tty), tty.hasPrefix("/dev/") else { return nil }
+        return ["-o", "pid=,pgid=,tpgid=,stat=,comm=", "-t", tty]
+    }
+
+    /// `ps` rows into a snapshot. `pathForPID` is `proc_pidpath` on macOS and `/proc/<pid>/exe` elsewhere.
+    /// Rows that disagree about the tty's foreground process group produce an unknown group.
+    public static func snapshot(
+        frontmostApp: String?,
+        ps output: String,
+        pathForPID: (Int32) -> String? = { _ in nil }
+    ) -> HubReplyTTYSnapshot {
+        var processes: [HubReplyProcessFact] = []
+        var group: Int32?
+        var disagreed = false
+        for line in output.split(whereSeparator: \.isNewline) {
+            let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
+            guard fields.count >= 5,
+                  let pid = Int32(fields[0]),
+                  let pgid = Int32(fields[1]),
+                  let tpgid = Int32(fields[2]),
+                  tpgid > 0 else { continue }
+            if let seen = group, seen != tpgid { disagreed = true }
+            group = tpgid
+            let stat = fields[3]
+            let name = fields.dropFirst(4).joined(separator: " ")
+            processes.append(HubReplyProcessFact(
+                pid: pid,
+                pgid: pgid,
+                name: name,
+                executablePath: pathForPID(pid),
+                stopped: stat.contains("T")))
+        }
+        return HubReplyTTYSnapshot(
+            frontmostApp: frontmostApp,
+            foregroundPgid: disagreed ? nil : group,
+            processes: processes)
+    }
+
+    /// The live read. `frontmostApp` is supplied by the caller. An unsafe tty is an unknown group.
+    public static func read(tty: String, frontmostApp: String?) -> HubReplyTTYSnapshot {
+        guard let arguments = arguments(forTTY: tty), let output = run(arguments) else {
+            return HubReplyTTYSnapshot(frontmostApp: frontmostApp, foregroundPgid: nil, processes: [])
+        }
+        return snapshot(frontmostApp: frontmostApp, ps: output, pathForPID: executablePath(pid:))
+    }
+
+    private static func run(_ arguments: [String]) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+        process.standardInput = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// `proc_pidpath` on macOS. On Linux, the `/proc/<pid>/exe` link.
+    public static func executablePath(pid: Int32) -> String? {
+        #if os(macOS)
+        var buffer = [UInt8](repeating: 0, count: Int(PATH_MAX))
+        let length = buffer.withUnsafeMutableBytes { raw -> Int32 in
+            guard let base = raw.baseAddress else { return 0 }
+            return proc_pidpath(pid, base, UInt32(raw.count))
+        }
+        guard length > 0 else { return nil }
+        let bytes = buffer.prefix(Int(length)).prefix { $0 != 0 }
+        return String(decoding: bytes, as: UTF8.self)
+        #else
+        return HubReplyForeground.resolve("/proc/\(pid)/exe")
+        #endif
+    }
+}
+
+#if os(macOS)
+@_silgen_name("proc_pidpath")
+private func proc_pidpath(_ pid: Int32, _ buffer: UnsafeMutableRawPointer, _ buffersize: UInt32) -> Int32
+#endif

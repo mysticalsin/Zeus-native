@@ -30,13 +30,12 @@ public enum AgentReply {
         return script(for: info, text: "x") != nil
     }
 
-    /// The AppleScript that types `text` and Return into the session's exact tab.
-    /// Terminal receives literal keystrokes in the tab that is already open. The text is not a new shell command.
-    /// Immediately before those keystrokes the script checks that Terminal is frontmost, that the front tab's
-    /// tty is still `info.tty`, and that the tab's foreground process is still one of `expectedCLI`.
-    /// Any other front app, tty, or process returns false and types nothing.
-    /// iTerm checks the same facts immediately before `write text`.
-    /// `expectedCLI` empty fails closed: the script returns before it types.
+    /// The AppleScript that types `text` into the session's exact tab. Return is `submitScript`, so the caller
+    /// can read the tty foreground process group again before Return. A line is at most 2,000 characters,
+    /// which is 100 keystroke chunks of 20 UTF-16 units.
+    /// Immediately before the first keystroke the script checks that Terminal is frontmost and that the front
+    /// tab's tty is still the stored tty. It does not guess a foreground process from `processes`.
+    /// iTerm checks the front app, the tty, and `jobName` immediately before `write text`.
     public static func script(for info: TerminalInfo, text: String, expectedCLI: Set<String> = []) -> String? {
         guard let line = sanitize(text), !HubReplyHidden.containsMark(line) else { return nil }
         let escaped = appleScriptString(line)
@@ -45,7 +44,6 @@ public enum AgentReply {
             guard let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
             let strokes = literalKeystrokes(line)
             guard !strokes.isEmpty else { return nil }
-            let guardLines = foregroundGuard(expected: expectedCLI)
             return """
             tell application "Terminal"
                 repeat with w in windows
@@ -56,15 +54,10 @@ public enum AgentReply {
                             activate
                             if frontmost is false then return false
                             if (tty of selected tab of front window) is not "\(tty)" then return false
-                            -- `processes` does not mark the foreground process. The last item is not that process.
-                            set fgNames to processes of selected tab of front window
-                            set fg to ""
-                            \(guardLines)
                             tell application "System Events"
                                 if (name of first application process whose frontmost is true) is not "Terminal" then return false
                                 tell process "Terminal"
                                     \(strokes)
-                                    keystroke return
                                 end tell
                             end tell
                             return true
@@ -81,7 +74,7 @@ public enum AgentReply {
             let test = [uuid.map { "unique id of s is \"\($0)\"" }, tty.map { "tty of s is \"\($0)\"" }]
                 .compactMap { $0 }.joined(separator: " or ")
             let ttyAgain = tty.map { "if tty of s is not \"\($0)\" then return false" } ?? ""
-            let guardLines = foregroundGuard(expected: expectedCLI)
+            _ = expectedCLI
             return """
             tell application "iTerm2"
                 repeat with w in windows
@@ -90,11 +83,6 @@ public enum AgentReply {
                             if \(test) then
                                 if frontmost is false then return false
                                 \(ttyAgain)
-                                set fg to ""
-                                try
-                                    set fg to variable named "jobName" of s as text
-                                end try
-                                \(guardLines)
                                 tell s to write text "\(escaped)"
                                 return true
                             end if
@@ -109,24 +97,22 @@ public enum AgentReply {
         }
     }
 
-    /// Normalizes the process name the terminal just returned and refuses a shell or an unexpected CLI.
-    /// The name read is the one taken in this same script, after the frontmost and tty checks.
-    private static func foregroundGuard(expected: Set<String>) -> String {
-        let names = expected.compactMap(TerminalTabScript.safe).sorted()
-        let allowed = names.isEmpty
-            ? "if true then return false"
-            : "if not (\(names.map { "fg is \"\($0)\"" }.joined(separator: " or "))) then return false"
+    /// Return, after a fresh frontmost and tty check. The caller reads the foreground process group before running this.
+    public static func submitScript(for info: TerminalInfo) -> String? {
+        guard info.targetBundleID == "com.apple.Terminal", let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
         return """
-        if fg is "" then return false
-        if fg starts with "-" then set fg to text 2 thru -1 of fg
-        if fg contains "/" then
-            set savedDelimiters to AppleScript's text item delimiters
-            set AppleScript's text item delimiters to "/"
-            set fg to last text item of fg
-            set AppleScript's text item delimiters to savedDelimiters
-        end if
-        if fg is "bash" or fg is "zsh" or fg is "sh" or fg is "fish" or fg is "dash" or fg is "ksh" or fg is "tcsh" or fg is "csh" then return false
-        \(allowed)
+        tell application "Terminal"
+            if frontmost is false then return false
+            if (tty of selected tab of front window) is not "\(tty)" then return false
+            tell application "System Events"
+                if (name of first application process whose frontmost is true) is not "Terminal" then return false
+                tell process "Terminal"
+                    keystroke return
+                end tell
+            end tell
+            return true
+        end tell
+        return false
         """
     }
 

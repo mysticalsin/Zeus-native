@@ -257,7 +257,16 @@ public enum HubReplyScriptGuard {
         return acceptsWriteText(script: script, escaped: escaped)
     }
 
-    /// The keystroke lines Z-03 builds: each chunk of the stripped line, then one Return.
+    /// The Return script, and nothing else that types. Frontmost was checked again in the script before Return.
+    public static func maySubmit(script: String, approved: Bool) -> Bool {
+        guard approved else { return false }
+        guard typingLines(script) == ["keystroke return"] else { return false }
+        guard let key = script.range(of: "keystroke return") else { return false }
+        let before = script[..<key.lowerBound]
+        return before.contains("frontmost") && before.contains("return false")
+    }
+
+    /// The keystroke lines Z-03 builds: each chunk of the stripped line. Return is a separate script.
     private static func literalKeystrokes(_ line: String) -> [String]? {
         let pieces = KeystrokeTyping.pieces(line, limit: 20)
         guard !pieces.isEmpty else { return nil }
@@ -266,7 +275,6 @@ public enum HubReplyScriptGuard {
             guard case .text(let chunk) = piece, !chunk.isEmpty, let escaped = HubReplyTyping.escape(chunk) else { return nil }
             statements.append("keystroke \"\(escaped)\"")
         }
-        statements.append("keystroke return")
         return statements
     }
 
