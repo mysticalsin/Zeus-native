@@ -24,6 +24,38 @@ import Testing
         #expect(settle.tick(at: now.addingTimeInterval(0.35), point: NotchClickPoint(x: 40, y: 0)) == .ignore)
     }
 
+    @Test func aPointExactlyOnTheSlopStillOpens() {
+        var onTheEdge = NotchClickSettle()
+        _ = onTheEdge.pointerDown(at: now, point: NotchClickPoint(x: 0, y: 0))
+        let edge = onTheEdge.tick(
+            at: now.addingTimeInterval(NotchClickSettle.delay),
+            point: NotchClickPoint(x: NotchClickSettle.slop, y: 0))
+        #expect(edge == .open)
+        var past = NotchClickSettle()
+        _ = past.pointerDown(at: now, point: NotchClickPoint(x: 0, y: 0))
+        let outside = past.tick(
+            at: now.addingTimeInterval(NotchClickSettle.delay),
+            point: NotchClickPoint(x: NotchClickSettle.slop + 0.01, y: 0))
+        #expect(outside == .ignore)
+    }
+
+    /// Mouse-down must arm the wait. Opening before that sleep is the failure.
+    @Test func openOnClickDoesNotFinishBeforeTheWait() throws {
+        let source = try repoSource("Sources/Zeus/Notch/NotchController.swift")
+        let open = source.components(separatedBy: "private func openOnClick()").dropFirst().first ?? ""
+        let openBody = open.components(separatedBy: "private func armClickSettle").first ?? open
+        #expect(!openBody.contains("finishSettledClick"))
+        let arm = source.components(separatedBy: "private func armClickSettle").dropFirst().first ?? ""
+        let armBody = arm.components(separatedBy: "private func finishSettledClick").first ?? arm
+        let sleep = armBody.range(of: "Task.sleep")
+        let finish = armBody.range(of: "finishSettledClick")
+        #expect(sleep != nil)
+        #expect(finish != nil)
+        if let sleep, let finish {
+            #expect(sleep.lowerBound < finish.lowerBound)
+        }
+    }
+
     @Test func openOnClickUsesTheSettleClock() throws {
         let source = try repoSource("Sources/Zeus/Notch/NotchController.swift")
         #expect(source.contains("NotchClickSettle"))
