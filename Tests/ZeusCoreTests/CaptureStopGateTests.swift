@@ -5,9 +5,11 @@ import Testing
 @Suite struct CaptureStopGateTests {
     @Test func startWaitsUntilStopFinishes() {
         var gate = CaptureStopGate()
-        #expect(gate.start())
+        let opened = gate.start()
+        #expect(opened)
         gate.requestStop()
-        #expect(gate.start() == false)
+        let blocked = gate.start()
+        #expect(blocked == false)
         #expect(gate.running == false)
         gate.stopFinished()
         let started = gate.start()
@@ -42,7 +44,8 @@ import Testing
         for _ in 0..<400 {
             _ = gate.start()
             gate.requestStop()
-            #expect(gate.start() == false)
+            let blocked = gate.start()
+            #expect(blocked == false)
             gate.stopFinished()
             let started = gate.start()
             #expect(started)
