@@ -33,7 +33,9 @@ enum SpokenQuantities {
         var result = ""
         var index = text.startIndex
         while index < text.endIndex {
-            if SpokenText.startsToken(text, at: index),
+            // Copying the tail for every word is quadratic. Only a digit, a price
+            // sign, or a version marker can start a quantity, so other words are copied as-is.
+            if SpokenText.startsToken(text, at: index), looksQuantitative(text, at: index),
                let hit = match(String(text[index...]), language: language),
                hit.characters > 0 {
                 result += hit.replacement
@@ -44,6 +46,15 @@ enum SpokenQuantities {
             index = text.index(after: index)
         }
         return result
+    }
+
+    private static func looksQuantitative(_ text: String, at index: String.Index) -> Bool {
+        let character = text[index]
+        if character.isNumber || character == "€" || character == "$" || character == "£" { return true }
+        guard character == "v" || character == "V" else { return false }
+        let next = text.index(after: index)
+        if next < text.endIndex, text[next].isNumber { return true }
+        return text[index...].prefix(7).lowercased().hasPrefix("version")
     }
 
     private static func match(_ rest: String, language: SpokenLanguage) -> Hit? {

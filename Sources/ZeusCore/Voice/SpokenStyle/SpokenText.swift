@@ -30,6 +30,11 @@ enum SpokenText {
         return String(first).uppercased() + text.dropFirst()
     }
 
+    static func lowercasingFirst(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return String(first).lowercased() + text.dropFirst()
+    }
+
     static func startsToken(_ text: String, at index: String.Index) -> Bool {
         guard index > text.startIndex else { return true }
         let previous = text[text.index(before: index)]

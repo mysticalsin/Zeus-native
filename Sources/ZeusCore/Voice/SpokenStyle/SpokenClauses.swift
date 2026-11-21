@@ -4,7 +4,7 @@ enum SpokenClauses {
     private static let abbreviations: Set<String> = ["mr", "mrs", "ms", "dr", "st", "vs", "etc", "e.g", "i.e"]
 
     static func apply(_ draft: SpokenDraft) -> SpokenDraft {
-        let text = SpokenText.collapse(draft.text)
+        let text = SpokenText.collapse(normalizingBreaks(draft.text))
         if text.isEmpty { return SpokenDraft(text: "", runs: []) }
         var runs: [SpokenRun] = []
         for sentence in sentences(in: text) {
@@ -65,7 +65,7 @@ enum SpokenClauses {
         } else {
             mark = "."
         }
-        let pieces = clauses(in: body)
+        let pieces = limited(clauses(in: body))
         if pieces.isEmpty { return [] }
         let groups = packed(pieces)
         var runs: [SpokenRun] = []
@@ -108,6 +108,76 @@ enum SpokenClauses {
         }
         append(current, to: &parts)
         return parts
+    }
+
+    /// An ellipsis is a breath, not a row of dots. Extra ! and ? are one stop.
+    private static func normalizingBreaks(_ text: String) -> String {
+        var result = ""
+        var index = text.startIndex
+        while index < text.endIndex {
+            let character = text[index]
+            if character == "\u{2026}" {
+                result += ". "
+                index = text.index(after: index)
+                appendCapitalizedWord(text, index: &index, into: &result)
+                continue
+            }
+            if character == "." {
+                var next = index
+                var count = 0
+                while next < text.endIndex, text[next] == "." {
+                    count += 1
+                    next = text.index(after: next)
+                }
+                if count >= 3 {
+                    result += ". "
+                    index = next
+                    appendCapitalizedWord(text, index: &index, into: &result)
+                    continue
+                }
+            }
+            if character == "!" || character == "?" {
+                result.append(character)
+                var next = text.index(after: index)
+                while next < text.endIndex, text[next] == character {
+                    next = text.index(after: next)
+                }
+                index = next
+                continue
+            }
+            result.append(character)
+            index = text.index(after: index)
+        }
+        return result
+    }
+
+    private static func appendCapitalizedWord(_ text: String, index: inout String.Index, into result: inout String) {
+        while index < text.endIndex, text[index].isWhitespace {
+            index = text.index(after: index)
+        }
+        guard index < text.endIndex else { return }
+        let character = text[index]
+        if character.isLowercase {
+            result += String(character).uppercased()
+            index = text.index(after: index)
+        }
+    }
+
+    /// A clause with no comma is still too long to say in one breath. Cut it into
+    /// pieces of at most `SpokenStyle.maxWordsPerSentence` words.
+    private static func limited(_ pieces: [String]) -> [String] {
+        pieces.flatMap { piece in
+            let words = piece.split(whereSeparator: \.isWhitespace).map(String.init)
+            guard words.count > SpokenStyle.maxWordsPerSentence else { return [piece] }
+            var chunks: [String] = []
+            var start = 0
+            while start < words.count {
+                let end = min(start + SpokenStyle.maxWordsPerSentence, words.count)
+                chunks.append(words[start..<end].joined(separator: " "))
+                start = end
+            }
+            return chunks
+        }
     }
 
     private static func append(_ text: String, to parts: inout [String]) {

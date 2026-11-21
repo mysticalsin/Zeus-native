@@ -66,11 +66,10 @@ enum SpokenContractions {
 
     private static func match(_ text: String, at index: String.Index) -> (characters: Int, replacement: String)? {
         if index > text.startIndex, text[text.index(before: index)].isLetter { return nil }
-        let rest = text[index...]
         for (source, replacement) in pairs {
-            guard rest.count >= source.count else { continue }
-            let end = rest.index(rest.startIndex, offsetBy: source.count)
-            let slice = rest[..<end]
+            // `count` on the tail is linear, and doing it at every word makes a long reply quadratic.
+            guard let end = text.index(index, offsetBy: source.count, limitedBy: text.endIndex) else { continue }
+            let slice = text[index..<end]
             guard String(slice).compare(source, options: .caseInsensitive) == .orderedSame else { continue }
             if end < text.endIndex, text[end].isLetter { continue }
             guard let spoken = cased(String(slice), template: replacement) else { continue }

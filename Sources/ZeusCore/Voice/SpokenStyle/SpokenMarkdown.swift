@@ -4,13 +4,29 @@ enum SpokenMarkdown {
     static func apply(_ draft: SpokenDraft, language: SpokenLanguage) -> SpokenDraft {
         var text = draft.text.replacingOccurrences(of: "\r\n", with: "\n")
         text = strippingPresentation(text)
+        text = unshouting(text)
         text = replacingFences(text, language: language)
         text = replacingInlineCode(text)
+        text = replacingStrikethrough(text)
         text = replacingImages(text, language: language)
         text = replacingLinks(text)
+        text = replacingAutolinks(text)
+        text = replacingBreakTags(text)
+        text = replacingTags(text)
+        text = replacingAmpersands(text, language: language)
+        text = replacingParentheses(text)
         text = replacingEmphasis(text)
         text = replacingHeadersAndLists(text, language: language)
         return SpokenDraft(text: SpokenText.collapse(text), runs: [])
+    }
+
+    /// Two or more fully capitalized words are shouted. The voice says them in sentence case.
+    /// A one-word acknowledgement such as "OK" stays.
+    private static func unshouting(_ text: String) -> String {
+        SpokenText.rewrite(text, pattern: #"\b[A-Z][A-Z']*(?:\s+[A-Z][A-Z']*)+\b"#) { match, source in
+            let shouted = SpokenText.group(match, 0, in: source)
+            return SpokenText.capitalizingFirst(shouted.lowercased())
+        }
     }
 
     /// Emoji and skin-tone modifiers are pictures, not words. Digits, letters, and currency
@@ -36,8 +52,22 @@ enum SpokenMarkdown {
 
     private static func replacingFences(_ text: String, language: SpokenLanguage) -> String {
         let summary = "\n\(codeSummary(language))\n"
-        let closed = SpokenText.rewrite(text, pattern: #"```[^\n]*\n[\s\S]*?```"#) { _, _ in summary }
-        return SpokenText.rewrite(closed, pattern: #"```[^\n]*\n[\s\S]*$"#) { _, _ in summary }
+        var text = text
+        let patterns = [
+            #"```[^\n]*\n[\s\S]*?```"#,
+            #"~{3,}[^\n]*\n[\s\S]*?~{3,}"#,
+            #"```[^\n]*\n[\s\S]*$"#,
+            #"~{3,}[^\n]*\n[\s\S]*$"#,
+        ]
+        for pattern in patterns {
+            text = SpokenText.rewrite(text, pattern: pattern) { _, _ in summary }
+        }
+        return text
+    }
+
+    /// Struck words are retracted. The voice does not read the tildes or the deleted text.
+    private static func replacingStrikethrough(_ text: String) -> String {
+        SpokenText.rewrite(text, pattern: #"~~[^~\n]*~~"#) { _, _ in "" }
     }
 
     private static func replacingInlineCode(_ text: String) -> String {
@@ -75,6 +105,60 @@ enum SpokenMarkdown {
         return lower.contains("://") || lower.hasPrefix("www.")
     }
 
+    /// `<https://example.com/docs>` is an autolink. The brackets are markup, not words.
+    private static func replacingAutolinks(_ text: String) -> String {
+        SpokenText.rewrite(text, pattern: #"<\s*((?:https?://|www\.)[^>\s]+)\s*>"#) { match, source in
+            SpokenText.group(match, 1, in: source)
+        }
+    }
+
+    /// `<br>` is a line break the voice should hear as a new sentence.
+    private static func replacingBreakTags(_ text: String) -> String {
+        let expression = SpokenText.regex(#"<\s*br\s*/?\s*>"#, options: [.caseInsensitive])
+        let matches = expression.matches(in: text, range: NSRange(text.startIndex..., in: text))
+        if matches.isEmpty { return text }
+        var result = ""
+        var cursor = text.startIndex
+        for match in matches {
+            guard let range = Range(match.range, in: text) else { continue }
+            result += text[cursor..<range.lowerBound]
+            result += ". "
+            var next = range.upperBound
+            while next < text.endIndex, text[next].isWhitespace { next = text.index(after: next) }
+            if next < text.endIndex, text[next].isLowercase {
+                result += String(text[next]).uppercased()
+                next = text.index(after: next)
+            }
+            cursor = next
+        }
+        result += text[cursor...]
+        return result
+    }
+
+    private static func replacingTags(_ text: String) -> String {
+        SpokenText.rewrite(text, pattern: #"</?[A-Za-z][^>]*>"#) { _, _ in "" }
+    }
+
+    private static func replacingAmpersands(_ text: String, language: SpokenLanguage) -> String {
+        let word: String
+        switch language {
+        case .english: word = " and "
+        case .french: word = " et "
+        }
+        var text = text.replacingOccurrences(of: "&nbsp;", with: " ", options: .caseInsensitive)
+        text = text.replacingOccurrences(of: "&amp;", with: word, options: .caseInsensitive)
+        return text.replacingOccurrences(of: " & ", with: word)
+    }
+
+    /// A parenthetical aside is a clause, not the words "open parenthesis".
+    private static func replacingParentheses(_ text: String) -> String {
+        SpokenText.rewrite(text, pattern: #"\(([^()\n]+)\)"#) { match, source in
+            let inner = SpokenText.group(match, 1, in: source).trimmingCharacters(in: .whitespacesAndNewlines)
+            if inner.isEmpty { return "" }
+            return ", \(inner),"
+        }
+    }
+
     private static func replacingEmphasis(_ text: String) -> String {
         var current = text
         for _ in 0..<4 {
@@ -100,26 +184,83 @@ enum SpokenMarkdown {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         var output: [String] = []
         var index = 0
+        var lowerNext = false
         while index < lines.count {
-            if let item = listItem(lines[index]) {
-                var items = [item]
-                index += 1
-                while index < lines.count, let next = listItem(lines[index]) {
-                    items.append(next)
+            if isListLine(lines[index]) {
+                var items: [String] = []
+                while index < lines.count, let item = listItem(lines[index], language: language) {
+                    items.append(item)
                     index += 1
                 }
+                lowerNext = false
                 output.append(sequence(items, language: language))
                 continue
             }
-            output.append(plainLine(lines[index]))
+            if let title = headingTitle(lines[index]), proseFollows(lines, after: index) {
+                output.append(title + ",")
+                lowerNext = true
+                index += 1
+                continue
+            }
+            var line = plainLine(lines[index])
+            if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                output.append(line)
+                index += 1
+                continue
+            }
+            if lowerNext {
+                line = SpokenText.lowercasingFirst(line)
+                lowerNext = false
+            }
+            output.append(line)
             index += 1
         }
         return output.joined(separator: "\n")
     }
 
-    private static func listItem(_ line: String) -> String? {
-        guard let groups = SpokenText.prefixMatch(#"^\s*(?:[-*+]|\d+[.)])\s+(.+)$"#, in: line) else { return nil }
-        return groups.count > 1 ? groups[1] : nil
+    /// A heading with a paragraph after it is a lead-in, not the whole answer. Alone, it stays a sentence.
+    private static func proseFollows(_ lines: [String], after index: Int) -> Bool {
+        var cursor = index + 1
+        while cursor < lines.count {
+            if lines[cursor].trimmingCharacters(in: .whitespaces).isEmpty {
+                cursor += 1
+                continue
+            }
+            if isListLine(lines[cursor]) || headingTitle(lines[cursor]) != nil { return false }
+            return true
+        }
+        return false
+    }
+
+    private static func headingTitle(_ line: String) -> String? {
+        guard let groups = SpokenText.prefixMatch(#"^\s*#{1,6}\s+(.+?)\s*$"#, in: line), groups.count > 1 else { return nil }
+        var title = groups[1]
+        while title.last == "#" || title.last == " " { title.removeLast() }
+        let text = bare(title)
+        return text.isEmpty ? nil : text
+    }
+
+    private static func isListLine(_ line: String) -> Bool {
+        SpokenText.prefixMatch(#"^\s*(?:[-*+]|\d+[.)])\s+(.+)$"#, in: line) != nil
+    }
+
+    private static func listItem(_ line: String, language: SpokenLanguage) -> String? {
+        guard let groups = SpokenText.prefixMatch(#"^\s*(?:[-*+]|\d+[.)])\s+(.+)$"#, in: line), groups.count > 1 else {
+            return nil
+        }
+        return spokenCheckbox(groups[1], language: language) ?? groups[1]
+    }
+
+    private static func spokenCheckbox(_ body: String, language: SpokenLanguage) -> String? {
+        guard let groups = SpokenText.prefixMatch(#"^\[([ xX])\]\s+(.+)$"#, in: body), groups.count > 2 else { return nil }
+        let done = groups[1].lowercased() == "x"
+        let item = groups[2]
+        switch language {
+        case .english:
+            return done ? "\(item), done" : "\(item), still open"
+        case .french:
+            return done ? "\(item), fait" : "\(item), encore ouvert"
+        }
     }
 
     private static func plainLine(_ line: String) -> String {

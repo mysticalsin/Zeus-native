@@ -322,11 +322,12 @@ struct SpokenStyleTests {
         ])
     }
 
-    @Test func longSentenceWithoutABoundaryStaysWhole() {
+    @Test func longSentenceWithoutABoundaryIsSplitByWords() {
         let transcript = hear("This sentence has many words but no clause boundary so it stays together as one spoken sentence today.")
-        #expect(transcript.runs.count == 1)
-        #expect(transcript.runs[0].pauseAfter == .sentence)
-        #expect(transcript.spokenText == "This sentence has many words but no clause boundary so it stays together as one spoken sentence today.")
+        #expect(transcript.runs == [
+            SpokenRun(text: "This sentence has many words but no clause boundary so it stays together as one spoken.", pauseAfter: .sentence),
+            SpokenRun(text: "Sentence today.", pauseAfter: .sentence),
+        ])
     }
 
     @Test func answerFirstKeepsTheOpeningSentence() {
@@ -524,6 +525,7 @@ struct SpokenStyleTests {
     @Test func shoutedSentenceIsSpokenCalmly() {
         #expect(hear("THE BUILD PASSED.").spokenText == "The build passed.")
         #expect(hear("I AM READY.").spokenText == "I'm ready.")
+        #expect(hear("THE BUILD PASSED... details can wait.").spokenText == "The build passed. Details can wait.")
     }
 
     @Test func aWallOfWordsIsCutIntoShortSentences() {
