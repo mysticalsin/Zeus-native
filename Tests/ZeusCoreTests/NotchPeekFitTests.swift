@@ -12,6 +12,11 @@ import Testing
         let notch = try repoSource("Sources/Zeus/Notch/NotchView.swift")
         #expect(notch.contains("NotchPeekFit.barHeight"))
         #expect(notch.contains("minimumScaleFactor") || notch.contains("lineLimit(2)"))
+        let status = notch.components(separatedBy: "Text(peekStatusText)").dropFirst().first ?? ""
+        let block = status.components(separatedBy: "ElapsedText").first ?? status
+        #expect(block.contains("scaledTitle") || block.contains("NotchDynamicType.points"))
+        #expect(!block.contains("size: 12"))
+        #expect(block.contains("minimumScaleFactor"))
     }
 
     private func repoSource(_ relative: String) throws -> String {
