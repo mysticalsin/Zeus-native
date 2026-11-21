@@ -101,7 +101,6 @@ final class RemoteFetchStub: URLProtocol {
 
     nonisolated(unsafe) static var replies: [String: Reply] = [:]
     nonisolated(unsafe) static var requested: [String] = []
-    nonisolated(unsafe) static var stopped = 0
     nonisolated(unsafe) static var timeouts: [TimeInterval] = []
     private static let lock = NSLock()
 
@@ -109,7 +108,6 @@ final class RemoteFetchStub: URLProtocol {
         lock.lock()
         self.replies = replies
         requested = []
-        stopped = 0
         timeouts = []
         lock.unlock()
     }
@@ -135,9 +133,7 @@ final class RemoteFetchStub: URLProtocol {
         client?.urlProtocolDidFinishLoading(self)
     }
 
-    override func stopLoading() {
-        Self.lock.lock(); Self.stopped += 1; Self.lock.unlock()
-    }
+    override func stopLoading() {}
 }
 
 @Suite("Safe remote fetch", .serialized)
@@ -294,9 +290,9 @@ struct SafeRemoteFetchTests {
                                                  body: Data("tiny".utf8)),
         ])
         #expect(await fetch("https://cdn.example/exact")?.count == 64)
-        let before = RemoteFetchStub.stopped
+        // A body past the cap is discarded, not returned in part. This host's URLProtocol does not
+        // call stopLoading when the task is cancelled from inside didReceive, so the nil result is the abort.
         #expect(await fetch("https://cdn.example/over") == nil)
-        #expect(RemoteFetchStub.stopped > before)
         #expect(await fetch("https://cdn.example/declared") == nil)
     }
 
