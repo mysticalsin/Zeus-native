@@ -271,6 +271,57 @@ struct HubReplyJobGuardTests {
             snapshot: byPath, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [real]) == false)
     }
 
+    /// A shell in the CLI's process group must not be typed into, even when the CLI is also in that group.
+    @Test func aShellChildInTheAllowlistedGroupIsRefused() throws {
+        let binary = try Self.file(named: "claude")
+        let snapshot = HubReplyTTYSnapshot(
+            frontmostApp: "Terminal",
+            foregroundPgid: 50,
+            processes: [
+                Self.process(pid: 50, pgid: 50, name: "claude", path: binary),
+                Self.process(pid: 51, pgid: 50, name: "zsh", path: "/bin/zsh"),
+            ])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: snapshot, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    /// A known front app that is not the target blocks typing. Nil is only the not-yet-activated case.
+    @Test func aDifferentFrontAppBeforeTypingIsRefused() throws {
+        let binary = try Self.file(named: "claude")
+        let before = HubReplyTTYSnapshot(
+            frontmostApp: "Safari",
+            foregroundPgid: 50,
+            processes: [Self.process(pid: 50, pgid: 50, name: "claude", path: binary)])
+        #expect(HubReplyJobGuard.mayType(
+            snapshot: before, expectedApp: "Terminal", expectedCLI: ["claude"], allowedPaths: [binary]) == false)
+    }
+
+    /// Return is produced only after the process group is verified again.
+    @Test func returnIsWithheldUntilTheProcessGroupIsVerified() throws {
+        let terminal = TerminalInfo(bundleID: "com.apple.Terminal", program: "Apple_Terminal", sessionID: nil, tty: "/dev/ttys004")
+        #expect(AgentReply.submitScript(for: terminal, verified: false) == nil)
+        let script = try #require(AgentReply.submitScript(for: terminal, verified: true))
+        let key = try #require(script.range(of: "keystroke return"))
+        #expect(String(script[..<key.lowerBound]).contains("frontmost"))
+    }
+
+    /// iTerm must read the session job and refuse before write text.
+    @Test func iTermChecksTheJobBeforeWriting() throws {
+        let iterm = TerminalInfo(
+            bundleID: "com.googlecode.iterm2",
+            program: nil,
+            sessionID: "w0t1p0:ABCD-1234",
+            tty: "/dev/ttys004"
+        )
+        let script = try #require(AgentReply.script(for: iterm, text: "go", expectedCLI: ["claude"]))
+        let write = try #require(script.range(of: "write text"))
+        let before = String(script[..<write.lowerBound])
+        #expect(before.contains("jobName"))
+        #expect(before.contains("return false"))
+        #expect(!before.contains("try"))
+        #expect(HubReplyScriptGuard.mayRun(script: script, line: "go", approved: true))
+    }
+
     /// Typing is allowed before the terminal is frontmost. Return follows only if that app is frontmost afterwards.
     @Test func returnFollowsTypingOnlyWhileTheTargetStaysFrontmost() throws {
         let binary = try Self.file(named: "claude")

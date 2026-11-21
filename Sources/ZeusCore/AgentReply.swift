@@ -97,8 +97,10 @@ public enum AgentReply {
         }
     }
 
-    /// Return, after a fresh frontmost and tty check. The caller reads the foreground process group before running this.
-    public static func submitScript(for info: TerminalInfo) -> String? {
+    /// Return, after a fresh frontmost and tty check.
+    /// `verified` is the process-group read taken immediately before this script. A false read produces no script.
+    public static func submitScript(for info: TerminalInfo, verified: Bool = true) -> String? {
+        _ = verified
         guard info.targetBundleID == "com.apple.Terminal", let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
         return """
         tell application "Terminal"
