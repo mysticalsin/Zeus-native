@@ -1,6 +1,6 @@
 # Right Option talk key plan: hold Right Option alone to talk, beside Control+Option
 
-Base: `codex/ultron-chord-20261115` at committed HEAD `3cd2e03` (`/Users/tony/AI-Brain-build/zeus-ultron`). This was read-only research: nothing was built, run or edited, and uncommitted files were ignored.
+Base: `codex/ultron-chord-20261115` at committed HEAD `3cd2e03` (`<models-dir>/zeus-ultron`). This was read-only research: nothing was built, run or edited, and uncommitted files were ignored.
 
 ## 0. Verified facts (file:line, at HEAD)
 
@@ -313,7 +313,7 @@ o(S,'Talk to Zeus','Second talk key','recorder','-','Hold Right Option alone to 
 
 **8. Catalog.** The row above. Regenerate; `scripts/check-settings-catalog.sh` must be green.
 
-**9. QA records.** REG-637 to 644 (confirm with `~/AI-Brain-build/zeus-merge-reg.py` at merge; if taken, use the gap REG-385 to 389 and then 396 to 399). All use `native-ZeusCoreTests`:
+**9. QA records.** REG-637 to 644 (confirm with `<models-dir>/zeus-merge-reg.py` at merge; if taken, use the gap REG-385 to 389 and then 396 to 399). All use `native-ZeusCoreTests`:
 
 | Id | Features | Guard |
 |---|---|---|

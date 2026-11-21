@@ -71,7 +71,7 @@ extra (it is one face of several and enrolling again takes seconds).
 ## Source adapted
 
 Glance, https://github.com/jonnyoo/glance, commit `b97f521397ec1197ba17768ba797cae1e628848d`, MIT License, Copyright
-(c) 2026 Jonathan Zhou. The local copy at `~/AI-Brain-build/glance-src-dl/glance` is an untrusted download: read as
+(c) 2026 Jonathan Zhou. The local copy at `<models-dir>/glance-src-dl/glance` is an untrusted download: read as
 data, never built, no script run. Every adapted file starts with one line:
 `// Adapted from Glance (MIT, Copyright (c) 2026 Jonathan Zhou): <glance file names>.`
 

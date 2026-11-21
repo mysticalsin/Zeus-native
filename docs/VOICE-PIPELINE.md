@@ -70,6 +70,6 @@ cancelled; `SpeakOutcome` carries the engine, voice, reason and time to first au
 ## Self-test
 
 `bash scripts/voice-selftest.sh [--silent] [<Zeus.app>]` runs `Zeus --voice-engine-selftest`: one fixed line through
-each available engine with the effect, then a receipt in `~/AI-Brain-build/voice-selftest/` listing engine,
+each available engine with the effect, then a receipt in `<models-dir>/voice-selftest/` listing engine,
 availability reason, spoke or not, and time to first audio in ms. It exits 0 when the Mac voice spoke through the
 effect and was not Samantha. It refuses to run in CI. `--silent` runs the chain with the volume at zero.

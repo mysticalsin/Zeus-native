@@ -36,7 +36,7 @@ E6 in parallel (E6 draws from the E0 protocols through fakes). E7 last, because 
 
 ## Step zero, on the owner's Mac, before E4 and E5 are scheduled
 
-Two throwaway probes, kept in `~/AI-Brain-build/earbuds-probe/`, outside every worktree and never committed. No ticket
+Two throwaway probes, kept in `<models-dir>/earbuds-probe/`, outside every worktree and never committed. No ticket
 owns them; the orchestrator writes them, the owner runs them, and the results are written under "Verification".
 
 Probe A is a tiny signed `.app` with its own bundle id and its own `NSBluetoothAlwaysUsageDescription`, opened from the
@@ -454,14 +454,14 @@ No raw defaults key is added: nothing about a device is stored.
 
 `test_earbuds_lint.py` is created by ER1, extended by E4 after it and by E7 last, never by two tickets at once. Every
 ticket appends its own rows to `qa/regressions.json` (last id on the base is REG-409, line 4359); this wave holds
-REG-510 to REG-529 and clashes go through `~/AI-Brain-build/zeus-merge-reg.py`. Core guards bind to
+REG-510 to REG-529 and clashes go through `<models-dir>/zeus-merge-reg.py`. Core guards bind to
 `native-ZeusCoreTests`, the lints to `closed-loop-selftests`. E4, E5 and E6 each add one `qa/feature-map.json`
-entry; they merge in that order and the later ones rebase. Builds go in `~/AI-Brain-build/<name>-build`, never
+entry; they merge in that order and the later ones rebase. Builds go in `<models-dir>/<name>-build`, never
 inside OneDrive.
 
 ## Sibling plans and merge order
 
-Five plans were written the same day against the same commit (`~/AI-Brain-build/zeus-plans/`). Shared files are
+Five plans were written the same day against the same commit (`<models-dir>/zeus-plans/`). Shared files are
 rebased in merge order and never hand-merged; generated files are regenerated on the merged base.
 
 | Plan | Same files and lines | Order |
@@ -528,7 +528,7 @@ Nothing third-party is bundled, so no licence duty arises from this wave.
 1. Tests are committed before the code and shown failing on the base (the build fails on the missing names).
 2. `swift build --build-tests`, then `swift test --filter` for `DefaultOutputWatchTests`, `MusicTopBlockTests`, `EarbudsTypesTests`, `EarbudsBatteryTests`, `EarbudsPresenceTests`, `ListeningModeTests`, `EarbudsDisplayTests`, `EarbudsCuePolicyTests`, `EarbudsPresenceControllerTests`, `ListeningModeControllerTests`, `EarbudsSurfaceTests`, `EarbudsSettingsTests`, and the pinned `SystemNotificationServiceTests`.
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared.
-4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the settings generator and its check, `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the settings generator and its check, `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 5. A real compile on a Mac before any ticket is called done (TYPE-012).
 6. An independent review of each diff, reading the consent door, the guarded reads and the write path line by line.
 7. Owed on a real Mac, by the owner, with real earbuds:

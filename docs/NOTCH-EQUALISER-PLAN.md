@@ -374,8 +374,8 @@ The music plan adds rows to the same generator, so B4 rebases onto it. Raw keys,
 
 B2b and B4 build in parallel but share `qa/feature-map.json` and `qa/regressions.json`: B2b merges first, and B4
 rebases its one feature-map entry. Every ticket claims REG ids in merge order; collisions are resolved with
-`~/AI-Brain-build/zeus-merge-reg.py`. Core guards bind to `native-ZeusCoreTests`, the new lints to
-`closed-loop-selftests`. Builds go in `~/AI-Brain-build/<name>-build`, never inside OneDrive.
+`<models-dir>/zeus-merge-reg.py`. Core guards bind to `native-ZeusCoreTests`, the new lints to
+`closed-loop-selftests`. Builds go in `<models-dir>/<name>-build`, never inside OneDrive.
 
 ## Measured limits the build must hold
 
@@ -394,7 +394,7 @@ rebases its one feature-map entry. Every ticket claims REG ids in merge order; c
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared, with known failures recounted after the
    earlier waves merge.
 4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the settings generator and its check,
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 5. A real compile on a Mac before any ticket is called done; agent sandboxes have not compiled Swift (TYPE-012).
 6. An independent review of each diff, reading the realtime rules, stream usage and teardown order line by line.
 7. Owed on a real Mac by the owner:

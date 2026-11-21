@@ -13,10 +13,12 @@ enum KokoroWorker {
         var out: String
     }
 
-    static let defaultModelDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("AI-Brain-build/jarvis-laya-backend/models", isDirectory: true)
-    static let jarvisPython = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("AI-Brain-build/jarvis-laya-backend/.venv/bin/python")
+    static var defaultModelDir: URL {
+        LocalHome.appending("AI-Brain-build/jarvis-laya-backend/models", isDirectory: true)
+    }
+    static var jarvisPython: URL {
+        LocalHome.appending("AI-Brain-build/jarvis-laya-backend/.venv/bin/python")
+    }
 
     static func modelDir(from defaults: UserDefaults = .standard) -> URL {
         if let path = defaults.string(forKey: "voice.kokoro.modelDir"), !path.isEmpty {

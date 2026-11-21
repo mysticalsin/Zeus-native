@@ -14,7 +14,7 @@ stops working 72 hours after it was made. It shows one plain window with seven r
 kill test that two plans share. Each row says what it will do, waits for Continue, measures what it can by itself,
 walks the owner through the steps that need a hand, and puts back what it changed. One report file then holds 45
 answers as facts and yes or no values. The six hand procedures and their throwaway probes
-(`~/AI-Brain-build/zeus-lock-probe`, `~/AI-Brain-build/earbuds-probe/`, the P1.0 throwaway) are not written; one
+(`<models-dir>/zeus-lock-probe`, `<models-dir>/earbuds-probe/`, the P1.0 throwaway) are not written; one
 sitting of about 90 minutes on macOS 27.2 replaces them, plus a shorter run on one macOS 26 Mac that the lock plan
 requires.
 
@@ -55,17 +55,17 @@ Worktrees and order:
 | Z7 | new `Sources/ZeusCore/StepZero/StepZeroFocusFacts.swift`, new `Sources/Zeus/SystemFocus/SystemFocusStoreReader.swift` (lowest layer), `Sources/Zeus/StepZero/FocusSection.swift`, new `qa/closed-loop/tests/test_step_zero_focus_lint.py`, `Tests/ZeusCoreTests/StepZeroFocusFactsTests.swift`, `Tests/ZeusAppTests/StepZeroFocusWatchTests.swift` | After Z2, parallel |
 | Z8 | new `Sources/ZeusCore/StepZero/StepZeroSoundFacts.swift`, new `Sources/Zeus/TopBar/SpeakerBrowser.swift` (lowest layer), `Sources/Zeus/StepZero/OutputSection.swift`, `MusicPositionSection.swift`, new `qa/closed-loop/tests/test_step_zero_output_lint.py`, `Tests/ZeusCoreTests/StepZeroSoundFactsTests.swift` | After Z2, parallel |
 | ZK | `Sources/Zeus/StepZero/KillTestSection.swift` (replaces its stub), `Tests/ZeusAppTests/StepZeroKillTests.swift` | After Z4 and Z5 |
-| Z9 | Nothing in the repo. The reports, copied by the owner to `~/AI-Brain-build/zeus-plans/step-zero/` | Last. Owner at the Mac |
+| Z9 | Nothing in the repo. The reports, copied by the owner to `<models-dir>/zeus-plans/step-zero/` | Last. Owner at the Mac |
 
 Shared files, said plainly. No two tickets that run together share a Swift, Objective-C or lint file: each parallel
 ticket has its own lint file, as `qa/closed-loop/tests/test_alerts_lint.py` is the alerts wave's own, so
 `test_source_lint.py` is not touched. Two files are shared by every ticket and merged in the fixed order Z0, Z1, Z2,
 Z3, Z4, Z5, Z6, Z7, Z8, ZK, each later branch rebasing: `qa/feature-map.json` (one `native-<Suite>` row per App
-suite) and `qa/regressions.json` (clashes go through `~/AI-Brain-build/zeus-merge-reg.py`). Two are shared in
+suite) and `qa/regressions.json` (clashes go through `<models-dir>/zeus-merge-reg.py`). Two are shared in
 sequence, never at once: `scripts/bundle.sh` and `test_release_scripts.py` (Z1, then Z3). Regression ids come from
 the block REG-580 to REG-599, all used: Z0 580 to 583, Z1 584 to 587, Z2 588 and 589, Z3 590 and 591, Z4 592, Z5 593
 and 594, Z6 595 and 596, Z7 597, Z8 598, ZK 599. The highest id in the tree is REG-409. Feature `F13`. Branch names
-`codex/step-zero-<ticket>-YYYYMMDD`; builds in `~/AI-Brain-build/<name>-build`, never inside OneDrive.
+`codex/step-zero-<ticket>-YYYYMMDD`; builds in `<models-dir>/<name>-build`, never inside OneDrive.
 
 ## Open source checked first
 
@@ -575,7 +575,7 @@ the Owner questions L9 to L11 and O4, F3 and F9, the two extra signatures of P3 
    command again. If the card still stays, log out and in.
 6. Kill test: when the window says so, run the same `open` command; then restart the Mac, log in, and run it once
    more. The probe resumes from its journal each time and asks before it puts anything back.
-7. Press "Show report". Copy the file to `~/AI-Brain-build/zeus-plans/step-zero/` with the digest from the last
+7. Press "Show report". Copy the file to `<models-dir>/zeus-plans/step-zero/` with the digest from the last
    screen in its name. Write the earbuds model beside it by hand.
 8. Quit the probe. Move `/Applications/Zeus.app` (the marked build) to the Trash, then put the normal app back:
    `ditto` the rollback copy from step 2 to `/Applications/Zeus.app`, or run `scripts/install.sh` with a normal build
@@ -584,7 +584,7 @@ the Owner questions L9 to L11 and O4, F3 and F9, the two extra signatures of P3 
    back on.
 9. P3, the other two signatures. Build twice more with the marker: `SIGN_IDENTITY=-` for ad hoc, and with no
    `SIGN_IDENTITY` for the local identity when the development keychain exists (`bundle.sh:21-25`). Copy each to its
-   own path, `~/AI-Brain-build/step-zero-p3/adhoc/Zeus.app` and `.../local/Zeus.app`, never to `/Applications`. With
+   own path, `<models-dir>/step-zero-p3/adhoc/Zeus.app` and `.../local/Zeus.app`, never to `/Applications`. With
    no Zeus running, `open -n <that path> --args --step-zero-probe`: only the System source row is offered. Copy both
    reports, then move both builds to the Trash.
 10. The macOS 26 Mac, required for the lock plan: steps 1 to 8 there, Lock screen and Kill test rows at least. A
@@ -672,7 +672,7 @@ After the reports, as inputs and trade-offs, not verdicts:
 2. `swift build --build-tests`, then `swift test --filter` for each suite named above: ten in `ZeusCoreTests`, nine
    in `ZeusAppTests`.
 3. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the release-scripts tests, and
-   `./tools/check.sh` in development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` in development mode from a worktree under `<models-dir>`.
 4. An independent review of each diff, reading the gate, the writer, every restore, every limit and every journal
    step line by line, and a search of the built report for any string longer than a code.
 5. Seen on a Mac, by the builder of Z1: an unmarked build started with the flag exits with 64 and shows nothing; a
@@ -754,4 +754,4 @@ decision 10.
 
 Not verified in this session: anything marked unverified above, every behaviour of macOS, and every licence. All
 code citations were read on `3757de2`; plan citations were read in `docs/` on the same commit. The plan file sits in
-an untracked folder of `~/AI-Brain-build` and no Zeus worktree was touched.
+an untracked folder of `<models-dir>` and no Zeus worktree was touched.

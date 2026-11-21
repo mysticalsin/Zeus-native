@@ -23,6 +23,24 @@ import Testing
         #expect(!args[2].contains(dir.path))
     }
 
+    @Test func derivedPathsMatchHistoricalLiteralsWhenHomeIsOwner() {
+        let previous = getenv("HOME").map { String(cString: $0) }
+        setenv("HOME", "/Users/tony", 1)
+        defer {
+            if let previous {
+                setenv("HOME", previous, 1)
+            } else {
+                unsetenv("HOME")
+            }
+        }
+        #expect(KokoroWorker.defaultModelDir.path == "/Users/tony/AI-Brain-build/jarvis-laya-backend/models")
+        #expect(KokoroWorker.jarvisPython.path == "/Users/tony/AI-Brain-build/jarvis-laya-backend/.venv/bin/python")
+        let now = Date(timeIntervalSince1970: 1_732_156_800)
+        let stamp = ISO8601DateFormatter().string(from: now).replacingOccurrences(of: ":", with: "")
+        let receipt = VoiceSelfTest.defaultReceiptURL(now: now)
+        #expect(receipt.path == "/Users/tony/AI-Brain-build/voice-selftest/receipt-\(stamp).json")
+    }
+
     @Test func isSetUpFalseWhenModelMissing() {
         let name = NSTemporaryDirectory() + "zeus.kokoro.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

@@ -55,7 +55,7 @@ Shared, with a merge order, because two tickets of this plan or a ticket of the 
 D3 merges before D2 because D3 adds the seam (`GSContext.drawnNotch`, nil until set, and the card is not placed
 while it is nil) and D2, rebased on it, sets it in one line. Feature `F13`. Regression ids: this plan holds REG-560
 to REG-579, claimed in merge order (D0 560-561, D1 562-565, D2 566-569, D3 570-571, D4 572-573, P1 and P2 574-578,
-579 spare). Builds go in `~/AI-Brain-build/<name>-build`, never inside OneDrive.
+579 spare). Builds go in `<models-dir>/<name>-build`, never inside OneDrive.
 
 ## How it works today (verified)
 
@@ -554,7 +554,7 @@ them (`:281-282`). `notch.shapeWithoutNotch` is the one row an import may not se
    suites, `:8-290`, and its name matches nothing), so a filtered run that reports zero tests does not count.
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared, with known failures recounted.
 4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the settings generator and its check,
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 5. D0 alone: snapshots rendered on the base and on the branch are compared and identical.
 6. An independent review of each diff, reading the anchored functions and the mouse-taking rule line by line.
 7. Still owed on a real Mac, by a person, per ticket:

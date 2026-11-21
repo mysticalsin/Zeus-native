@@ -586,7 +586,7 @@
       "id": "native-KokoroWorkerTests",
       "kind": "native-fixture",
       "tier": "native-integration",
-      "scope": "Pure worker line encoding and model-path argv plus a missing-model check in a disposable preferences suite. No process launch, installed model, provider, playback or capture.",
+      "scope": "Pure worker line encoding and model-path argv, a missing-model check in a disposable preferences suite, and the home-derived model, interpreter and voice-receipt paths. No process launch, installed model, provider, playback or capture.",
       "suite": "KokoroWorkerTests",
       "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift"
     },
@@ -5082,8 +5082,12 @@
         {
           "id": "F11.local-worker-protocol",
           "check": "native-KokoroWorkerTests",
-          "acceptance": "Worker line encoding preserves the protocol, quoted model paths travel as separate arguments, and missing-model setup fails in an isolated preferences suite. Actual installed-model availability and synthesis are not proved.",
+          "acceptance": "Worker line encoding preserves the protocol, quoted model paths travel as separate arguments, missing-model setup fails in an isolated preferences suite, and the default model, interpreter and voice-receipt paths equal their historical absolute paths when HOME is the owner's home. Actual installed-model availability and synthesis are not proved.",
           "cases": [
+            {
+              "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift",
+              "function": "derivedPathsMatchHistoricalLiteralsWhenHomeIsOwner"
+            },
             {
               "file": "Tests/ZeusAppTests/KokoroWorkerTests.swift",
               "function": "jsonLineEncodingRoundTrip"

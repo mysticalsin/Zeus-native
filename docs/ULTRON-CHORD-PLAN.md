@@ -1,6 +1,6 @@
 # Ultron chord plan: Control+Option+Space talks, Chat moves to Control+Option+C
 
-Base 9ffe84e (`/Users/tony/AI-Brain-build/zeus-mdf`). Research was read-only: nothing was built, run or edited.
+Base 9ffe84e (`<models-dir>/zeus-mdf`). Research was read-only: nothing was built, run or edited.
 
 ## 0. Verified facts (file:line)
 
@@ -286,7 +286,7 @@ The machine also honours the chord only for role `.talk` in mode `.hold`. Dictat
     - New row `o('shortcuts','Global shortcut','Open the chat window','menu','-','Opens the chat window from any app.','missing','chat.hotkey','choice',['Off','Control-Option-Space','Option-Space','Option-Shift-Space','Command-Shift-Space','Control-Option-C'],'Control-Option-C','custom','Carbon hot key; an explicit choice is kept.')`
     - Regenerate both outputs; `scripts/check-settings-catalog.sh` must be green.
 15. **QA records.**
-    - `qa/regressions.json`: REG-628 to REG-635 (the next free after 627; confirm through `~/AI-Brain-build/zeus-merge-reg.py` at merge). If they are taken, use the unclaimed gap REG-385 to 389, then 396 to 399. All rows use `native-ZeusCoreTests`:
+    - `qa/regressions.json`: REG-628 to REG-635 (the next free after 627; confirm through `<models-dir>/zeus-merge-reg.py` at merge). If they are taken, use the unclaimed gap REG-385 to 389, then 396 to 399. All rows use `native-ZeusCoreTests`:
 
       | Id | Features | Guard |
       |---|---|---|

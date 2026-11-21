@@ -47,7 +47,7 @@ No file appears in two tickets of this plan, except the two append-only register
 suites need no row, because that module is bound whole (`qa/feature-map.json:398-402`). P1f shares
 `SettingsStore.swift`, `GlanceSettingsPages.swift` and the generator with A3; whichever merges second rebases. This
 plan reserves REG-470 to REG-489: P1a 470 to 472, P1b 473 to 478, P1c 479 and 480, P1d 481 to 483, P1e 484 to 487,
-P1f 488 and 489. Clashes go through `~/AI-Brain-build/zeus-merge-reg.py`. The highest id in the tree today is REG-409.
+P1f 488 and 489. Clashes go through `<models-dir>/zeus-merge-reg.py`. The highest id in the tree today is REG-409.
 
 ## Open source checked first
 
@@ -543,7 +543,7 @@ These are inputs and trade-offs, not verdicts. The writer is not a lawyer; licen
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared (known failures recounted after the
    earlier waves merge). `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`.
    `python3 qa/release-scripts/test_release_scripts.py` (P1d). The settings generator and its check.
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 4. A real compile on a Mac before any ticket is called done. An independent review of each diff, reading the
    reducer transitions, the launch arguments, the preflight and the helper's symbol table line by line.
 5. Still owed on a real Mac, by the owner, in a release-signed build. P1b closes none alone: its rules are seen

@@ -50,12 +50,12 @@ one entry, as `docs/NOTCH-EQUALISER-PLAN.md:371-372` does. `AppDelegate.swift`, 
 `test_source_lint.py` are also edited by the sources and equaliser waves: rebase on whichever merged first, never
 hand-merge `SettingsCatalog.swift` or the inventory. REG-490 to REG-509 are reserved and all used: L0 490 to 493, L1
 494 to 497, L2 498 to 501, L3 502 and 503, L4 504, L5 505 to 508, L6 509; clashes go through
-`~/AI-Brain-build/zeus-merge-reg.py`. Feature `F13`. Builds go in `~/AI-Brain-build/<name>-build`, never in OneDrive.
+`<models-dir>/zeus-merge-reg.py`. Feature `F13`. Builds go in `<models-dir>/<name>-build`, never in OneDrive.
 
 ## Step zero, on a Mac, before L3 and L5 are scheduled
 
 L0, L1, L2, L4 and L6 are safe to build at once: none of them makes a private call. L3 and L5 wait for a throwaway
-probe (outside the repo, in `~/AI-Brain-build/zeus-lock-probe`, never merged) that the owner runs on macOS 27.2 and on
+probe (outside the repo, in `<models-dir>/zeus-lock-probe`, never merged) that the owner runs on macOS 27.2 and on
 one macOS 26 Mac. It answers, with a note per line:
 
 1. The seven symbols in L3 resolve, and whether a window removal function is needed at all (question 5).
@@ -540,7 +540,7 @@ their `native-` check in `qa/feature-map.json` here. The flip-only hook is seen 
    `AtticusCleanRoomTests`, `NowPlayingTests`, `LyricsTests`.
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared.
 4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the settings generator and its check,
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 5. An independent review of each diff. For L3 and L5 the reviewer reads the symbol table, the open and close order
    and the marker line by line.
 6. Still owed on a real Mac by the owner, on macOS 27.2 and one macOS 26 Mac:

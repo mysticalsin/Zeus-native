@@ -239,8 +239,8 @@ private func journal(end: Date? = start.addingTimeInterval(3600), changes: [Inso
     }
 
     @Test func installScriptValidatesThenInstallsRootWheel0440() {
-        let script = InsomniaAdminScript.install(ruleFile: "/tmp/x y.sudoers", plist: "/Users/tony/Library/LaunchAgents/com.zeus.insomnia.backstop.plist", uid: 501)
-        #expect(script == "/usr/sbin/visudo -cf '/tmp/x y.sudoers' && /usr/bin/install -m 0440 -o root -g wheel '/tmp/x y.sudoers' '/etc/sudoers.d/zeus-insomnia' && /usr/sbin/visudo -cf '/etc/sudoers.d/zeus-insomnia' && (/bin/launchctl bootout gui/501/com.zeus.insomnia.backstop 2>/dev/null || true) && /bin/launchctl bootstrap gui/501 '/Users/tony/Library/LaunchAgents/com.zeus.insomnia.backstop.plist'")
+        let script = InsomniaAdminScript.install(ruleFile: "/tmp/x y.sudoers", plist: "/Users/example/Library/LaunchAgents/com.zeus.insomnia.backstop.plist", uid: 501)
+        #expect(script == "/usr/sbin/visudo -cf '/tmp/x y.sudoers' && /usr/bin/install -m 0440 -o root -g wheel '/tmp/x y.sudoers' '/etc/sudoers.d/zeus-insomnia' && /usr/sbin/visudo -cf '/etc/sudoers.d/zeus-insomnia' && (/bin/launchctl bootout gui/501/com.zeus.insomnia.backstop 2>/dev/null || true) && /bin/launchctl bootstrap gui/501 '/Users/example/Library/LaunchAgents/com.zeus.insomnia.backstop.plist'")
         let uninstall = InsomniaAdminScript.uninstall(plist: "/p.plist", uid: 501)
         #expect(uninstall == "/bin/launchctl bootout gui/501/com.zeus.insomnia.backstop 2>/dev/null; /bin/rm -f '/p.plist'; /bin/rm -f '/etc/sudoers.d/zeus-insomnia'")
     }
@@ -253,12 +253,12 @@ private func journal(end: Date? = start.addingTimeInterval(3600), changes: [Inso
     }
 
     @Test func backstopPlistRunsTheGuardEveryMinute() throws {
-        let data = try InsomniaBackstop.plist(cliPath: "/Users/tony/Library/Application Support/Zeus/bin/zeus", logPath: "/tmp/log")
+        let data = try InsomniaBackstop.plist(cliPath: "/Users/example/Library/Application Support/Zeus/bin/zeus", logPath: "/tmp/log")
         let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         #expect(plist?["Label"] as? String == "com.zeus.insomnia.backstop")
-        #expect(plist?["ProgramArguments"] as? [String] == ["/Users/tony/Library/Application Support/Zeus/bin/zeus", "insomnia-guard"])
+        #expect(plist?["ProgramArguments"] as? [String] == ["/Users/example/Library/Application Support/Zeus/bin/zeus", "insomnia-guard"])
         #expect(plist?["StartInterval"] as? Int == 60)
-        #expect(InsomniaBackstop.plistURL(home: URL(fileURLWithPath: "/Users/tony")).path == "/Users/tony/Library/LaunchAgents/com.zeus.insomnia.backstop.plist")
+        #expect(InsomniaBackstop.plistURL(home: URL(fileURLWithPath: "/Users/example")).path == "/Users/example/Library/LaunchAgents/com.zeus.insomnia.backstop.plist")
     }
 
     @Test func commandLinesAreExact() {

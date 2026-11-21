@@ -41,8 +41,8 @@ Worktrees and order:
 
 Every branch appends to `qa/regressions.json`. This plan reserves REG-530 to REG-539 (the file ends at REG-409 today);
 feature `F13`, as REG-217 uses for the Focus usage string (`qa/regressions.json:2621`). Clashes go through
-`~/AI-Brain-build/zeus-merge-reg.py`. The settings files are regenerated, never hand-merged. Builds go in
-`~/AI-Brain-build/<name>-build`, never inside OneDrive. Lints live in this plan's own two files, as
+`<models-dir>/zeus-merge-reg.py`. The settings files are regenerated, never hand-merged. Builds go in
+`<models-dir>/<name>-build`, never inside OneDrive. Lints live in this plan's own two files, as
 `qa/closed-loop/tests/test_alerts_lint.py` does, so `test_source_lint.py` is not touched.
 
 Files shared with plans in flight, rebased in merge order and never hand-merged: `TopBarViews.swift`,
@@ -541,7 +541,7 @@ Nothing is bundled, so no licence duty is owed.
    `SystemFocusRowTests`, and the pinned `ProactiveTests`, `PermissionSweepTests`, `SystemNotificationServiceTests`.
 3. The whole `ZeusCoreTests` module on the branch and on the base, compared.
 4. `python3 -m unittest discover -s qa/closed-loop/tests -p 'test_*.py'`, the settings generator and its check,
-   `./tools/check.sh` development mode from a worktree under `~/AI-Brain-build`.
+   `./tools/check.sh` development mode from a worktree under `<models-dir>`.
 5. An independent review of each diff, reading the open flags, the size cap, the handler isolation and every place
    the name travels, and checking that the wave adds no `Process` launch, no tool and no agent path.
 6. Still owed on a real Mac by the owner:
