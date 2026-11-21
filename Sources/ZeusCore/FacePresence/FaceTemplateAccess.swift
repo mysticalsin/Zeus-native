@@ -290,6 +290,41 @@ public enum FaceTemplateEpochWrite {
         _ = epoch
         return nil
     }
+
+    /// A saved template is not a successful write unless the epoch was stored too.
+    public static func reported(template: Result<Void, FaceTemplateFailure>, epochSaved: Bool) -> Result<Void, FaceTemplateFailure> {
+        switch template {
+        case .failure(let error):
+            return .failure(error)
+        case .success:
+            return epochSaved ? .success(()) : .failure(.unavailable)
+        }
+    }
+}
+
+/// A failed epoch delete is retried once. If it is still there and no template is enrolled, a read ignores it.
+public enum FaceTemplateEpochDelete {
+    public static let attempts = 2
+
+    public static func cleared(_ results: [Bool]) -> Bool {
+        results.contains(true)
+    }
+
+    public static func binding(epoch: Data?, enrolled: Bool) -> Data? {
+        guard enrolled, let epoch, !epoch.isEmpty else { return nil }
+        return epoch
+    }
+}
+
+/// The reply form of `evaluatePolicy` has no deadline. The wait reuses the existing prompt timeout.
+public enum FaceTemplatePolicyWait {
+    public static var promptTimeout: TimeInterval { FlingLimits.promptTimeout }
+    public static var limit: TimeInterval { promptTimeout }
+
+    public static func evaluation(replied: Bool, waited: TimeInterval, state: Data?) -> FaceTemplateEvaluation {
+        guard replied, waited < limit else { return .failed }
+        return .succeeded(state)
+    }
 }
 
 /// Query fields for the face-template item. The group is `CredentialKeychainPolicy.accessGroup`.

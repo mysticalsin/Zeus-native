@@ -28,8 +28,8 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         case .allow(let state):
             guard let context = evaluation.context else { return .failure(.unavailable) }
             let saved = FaceTemplateSecureSession.write(record, items: Items(context: context))
-            if case .success = saved { _ = Self.rememberEpoch(state) }
-            return saved
+            let epochSaved = if case .success = saved { Self.rememberEpoch(state) } else { false }
+            return FaceTemplateEpochWrite.reported(template: saved, epochSaved: epochSaved)
         }
     }
 
@@ -52,7 +52,14 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         let status = deleteItem(account: account)
         guard status == errSecSuccess || status == errSecItemNotFound else { return .failure(.unavailable) }
         if account != Self.epochAccount {
-            _ = deleteItem(Self.epochAccount)
+            var results: [Bool] = []
+            for _ in 0..<FaceTemplateEpochDelete.attempts {
+                let epoch = deleteItem(account: Self.epochAccount)
+                let cleared = epoch == errSecSuccess || epoch == errSecItemNotFound
+                results.append(cleared)
+                if cleared { break }
+            }
+            guard FaceTemplateEpochDelete.cleared(results) else { return .failure(.unavailable) }
         }
         return .success(())
     }
@@ -181,6 +188,7 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     }
 
     /// There is no synchronous `evaluatePolicy`. The reply form is the one that sets the domain state.
+    /// The wait stops at `FaceTemplatePolicyWait.limit`, which is the existing prompt timeout.
     private static func evaluate() -> Evaluation {
         let context = LAContext()
         let reason = "Confirm it is you before Zeus uses the saved face."
@@ -189,29 +197,39 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         }
         let box = Box()
         let done = DispatchSemaphore(value: 0)
+        let started = Date()
         context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, error in
             if success, error == nil {
                 box.value = Evaluation(value: .succeeded(context.evaluatedPolicyDomainState), context: context)
             }
             done.signal()
         }
-        if Thread.isMainThread {
-            while done.wait(timeout: .now()) == .timedOut {
-                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
-            }
-        } else {
-            done.wait()
+        let deadline = started.addingTimeInterval(FaceTemplatePolicyWait.limit)
+        let replied = Thread.isMainThread ? waitOnMain(done, until: deadline) : done.wait(timeout: deadline) == .success
+        let waited = Date().timeIntervalSince(started)
+        let state: Data?
+        if case .succeeded(let value) = box.value.value { state = value } else { state = nil }
+        let evaluation = FaceTemplatePolicyWait.evaluation(replied: replied && box.value.context != nil, waited: waited, state: state)
+        guard case .succeeded = evaluation else { return Evaluation(value: .failed, context: nil) }
+        return Evaluation(value: evaluation, context: box.value.context)
+    }
+
+    private static func waitOnMain(_ done: DispatchSemaphore, until deadline: Date) -> Bool {
+        while Date() < deadline {
+            if done.wait(timeout: .now()) == .success { return true }
+            RunLoop.current.run(mode: .default, before: min(deadline, Date(timeIntervalSinceNow: 0.02)))
         }
-        return box.value
+        return done.wait(timeout: .now()) == .success
     }
 
     private static func decision(evaluation: Evaluation, account: String) -> FaceTemplateDomainEffect {
+        let enrolled = Items(context: evaluation.context ?? LAContext()).probe(account: account) != .missing
         let read = epochRead()
         let stored: Data?
         let unreadable: Bool
         switch read {
         case .value(let data):
-            stored = data
+            stored = FaceTemplateEpochDelete.binding(epoch: data, enrolled: enrolled)
             unreadable = false
         case .missing:
             stored = nil
@@ -220,7 +238,6 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
             stored = nil
             unreadable = true
         }
-        let enrolled = Items(context: evaluation.context ?? LAContext()).probe(account: account) != .missing
         return FaceTemplateDomainGate.effect(stored: stored, evaluation: evaluation.value, enrolled: enrolled, epochUnreadable: unreadable)
     }
 

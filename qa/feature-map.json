@@ -8918,6 +8918,18 @@
             {
               "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
               "function": "reenrolmentAfterFingerprintChangeClearsTheEpoch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "writeFailsWhenTheEpochWriteFails"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "failedEpochDeleteDoesNotLeaveAStaleEpoch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyReplyWaitStopsAtTheExistingPromptTimeout"
             }
           ]
         }

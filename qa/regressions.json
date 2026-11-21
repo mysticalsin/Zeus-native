@@ -5172,6 +5172,42 @@
       }
     },
     {
+      "id": "REG-1003",
+      "failure": "A face-template write reported success when the epoch write failed, so the next check had no fingerprint set to compare.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "writeFailsWhenTheEpochWriteFails"
+      }
+    },
+    {
+      "id": "REG-1004",
+      "failure": "A failed epoch delete left the old fingerprint set, so the next enrollment was rejected as a change.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedEpochDeleteDoesNotLeaveAStaleEpoch"
+      }
+    },
+    {
+      "id": "REG-1005",
+      "failure": "The face-template policy reply waited with no deadline, so a prompt that never returned held the save.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyReplyWaitStopsAtTheExistingPromptTimeout"
+      }
+    },
+    {
       "id": "REG-603",
       "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
       "features": [
