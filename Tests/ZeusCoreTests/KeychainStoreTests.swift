@@ -336,6 +336,39 @@ import Testing
         #expect(dropped == "sk-canonical")
         #expect(stored[AssistantKeyAccount.aliasOpenAI] == nil)
     }
+
+    /// A failed canonical write is not a migration. Nil is the only result that says it did not happen.
+    @Test func migrateOpenAIReturnsNilWhenTheCanonicalWriteFails() {
+        var stored = [AssistantKeyAccount.aliasOpenAI: "sk-legacy"]
+        var deleted = false
+        let result = AssistantKeyAccount.migrateOpenAI(
+            get: { stored[$0] },
+            writeCanonical: { _ in false },
+            deleteAlias: { deleted = true; return true })
+        #expect(result == nil)
+        #expect(!deleted)
+        #expect(stored[AssistantKeyAccount.canonicalOpenAI] == nil)
+        #expect(stored[AssistantKeyAccount.aliasOpenAI] == "sk-legacy")
+    }
+
+    /// A locked keychain lists no accounts and refuses the delete. The item is still there, so removal failed.
+    @Test func lockedKeychainDeleteDoesNotReportSuccessWhileTheItemStays() {
+        let backend = LockedListingKeychain(["com.zeus.app|license.key": "secret"])
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.remove("license.key") == false)
+        #expect(backend.items["com.zeus.app|license.key"] == "secret")
+    }
+}
+
+/// Lists nothing and refuses deletion, the way a locked keychain reports an error as an empty list
+/// while the item remains.
+final class LockedListingKeychain: KeychainBackend, @unchecked Sendable {
+    var items: [String: String]
+    init(_ items: [String: String]) { self.items = items }
+    func accounts(service: String) -> [String] { [] }
+    func read(service: String, account: String) -> String? { items["\(service)|\(account)"] }
+    func write(_ value: String, service: String, account: String) -> Bool { false }
+    func delete(service: String, account: String) -> Bool { false }
 }
 
 /// A keychain whose deletes can fail while the item stays, and whose missing items can report failure.
