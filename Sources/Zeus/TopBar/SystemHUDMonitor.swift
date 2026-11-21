@@ -48,6 +48,8 @@ final class SystemHUDMonitor {
         })
         schedulePoll()
         AccessibilityGate.whenTrusted { [weak self] in self?.refreshEventTap() }
+        AccessibilityGate.whenRevoked { [weak self] in self?.eventTap?.update(enabled: false) }
+        AccessibilityGate.whenRegained { [weak self] in self?.refreshEventTap() }
     }
 
     func refreshEventTap() {

@@ -62,6 +62,8 @@ final class TilingKeyLayer {
 
     init(environment: Environment = .live) {
         self.environment = environment
+        AccessibilityGate.whenRevoked { [weak self] in self?.removeTap() }
+        AccessibilityGate.whenRegained { [weak self] in self?.install() }
     }
 
     /// Whether the tap is installed right now.
