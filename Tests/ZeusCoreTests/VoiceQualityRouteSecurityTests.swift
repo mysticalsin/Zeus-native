@@ -130,6 +130,52 @@ struct VoiceQualityRouteSecurityTests {
         #expect(outcome.hosts.isEmpty)
     }
 
+    @Test func aNonRouteSynthesizeIsRefused() async throws {
+        RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
+        let directory = try temporaryDirectory()
+        let meter = try VoiceQualityMeter(directory: directory)
+        let transport = URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2)
+        let speaker = VoiceQualitySpeaker(meter: meter, transport: transport)
+        let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
+        let synthesis = speaker.synthesize(text: "Hello", preset: .elevenLabsFast, voiceID: "EXAVITQu4vr4xnSDxMaL", credential: credential)
+        let error = await firstError(synthesis)
+        #expect(error as? VoiceQualityError == .providerOff)
+        #expect(RouteHostStub.hosts.isEmpty)
+        let adapter = VoiceQualityTTSAdapter(preset: .elevenLabsFast, meter: meter)
+        let adapted = adapter.synthesize(
+            text: "Hello",
+            voice: ProviderVoice(id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", language: nil),
+            credential: credential,
+            using: transport
+        )
+        if let adapted {
+            let adaptedError = await firstError(adapted)
+            #expect(adaptedError as? VoiceQualityError == .providerOff)
+        }
+        #expect(RouteHostStub.hosts.isEmpty)
+        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 0)
+    }
+
+    @Test func voiceProviderKeyPolicyRejectsEmptyWhitespaceControlsAndKeysPast256() {
+        #expect(!VoiceProviderKeyPolicy.accepts(""))
+        #expect(!VoiceProviderKeyPolicy.accepts("   "))
+        #expect(!VoiceProviderKeyPolicy.accepts("short"))
+        #expect(!VoiceProviderKeyPolicy.accepts("abcd efgh"))
+        let marker = "POLICY-TAIL-7c"
+        let exact = String(repeating: "p", count: 256 - marker.count) + marker
+        #expect(exact.count == 256)
+        #expect(VoiceProviderKeyPolicy.accepts(exact))
+        let tooLong = exact + "Q"
+        let refused = !VoiceProviderKeyPolicy.accepts(tooLong)
+        #expect(refused)
+        let withNull = "abcdefgh\u{0}ijklmnop"
+        let nullRefused = !VoiceProviderKeyPolicy.accepts(withNull)
+        #expect(nullRefused)
+        #expect(!VoiceProviderKeyPolicy.accepts("line\nbreak-key"))
+        #expect(!VoiceProviderKeyPolicy.accepts("tab\tbreak-key"))
+        #expect(VoiceProviderKeyPolicy.accepts("  \(exact)  "))
+    }
+
     @Test func urlSessionAndHeaderErrorsDoNotEchoTheKey() {
         let sentinel = "header-sentinel-key-55aa"
         let underlying = NSError(
