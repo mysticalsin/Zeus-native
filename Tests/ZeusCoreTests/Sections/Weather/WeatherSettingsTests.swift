@@ -67,6 +67,14 @@ import Testing
         #expect(WeatherTemperatureUnit.degrees(celsius: -.infinity, unit: .celsius) == nil)
     }
 
+    @Test func aFiniteReadingPastIntMaxReturnsNil() {
+        #expect(WeatherTemperatureUnit.degrees(celsius: 1e20, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: 1e20, unit: .fahrenheit) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: -1e20, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: 1e20, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: 1e20, unit: .fahrenheit) == nil)
+    }
+
     @Test func integerCelsiusRoundTripsAndFahrenheitFollowsTheSameRounding() {
         for celsius in -80...80 {
             let value = Double(celsius)
@@ -571,6 +579,32 @@ import Testing
         }
         let failed = await broken.load(city: "Lisbon", unit: .celsius, layout: .summary)
         #expect(failed == .failed("Weather is unavailable right now."))
+    }
+}
+
+@Suite struct WeatherPreviewClaimTests {
+    @Test func thePreviewNamesOnlyTheSwipeThatIsWired() throws {
+        let source = try String(contentsOf: Self.sectionSource, encoding: .utf8)
+        let lowered = source.lowercased()
+        #expect(lowered.contains("horizontal swipe"))
+        #expect(!lowered.contains("right swipe"))
+        #expect(!lowered.contains("double click"))
+        #expect(!lowered.contains("triple click"))
+        #expect(!lowered.contains("a hold"))
+        #expect(source.contains("TopBarPointerSample(.trackpad"))
+        #expect(!source.contains("TopBarPointerSample(.down"))
+        #expect(!source.contains("TopBarPointerSample(.hold"))
+        #expect(!source.contains("TopBarPointerSample(.swipeRight"))
+    }
+
+    private static var sectionSource: URL {
+        var url = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()
+        while url.path != "/" {
+            let candidate = url.appendingPathComponent("Sources/Zeus/Settings/GlassShell/Sections/WeatherSettingsSection.swift")
+            if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+            url.deleteLastPathComponent()
+        }
+        return URL(fileURLWithPath: #filePath)
     }
 }
 
