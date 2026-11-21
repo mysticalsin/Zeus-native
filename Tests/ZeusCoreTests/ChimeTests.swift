@@ -78,9 +78,8 @@ import Testing
             cluster.receive(.willSleep, at: 9),
             cluster.receive(.willPowerOff, at: 9.05),
             cluster.receive(.screensDidSleep, at: 9.1),
-            cluster.receive(.didWake, at: 9.2),
         ]
-        #expect(together == [.play(.close), .cancel, .none, .none])
+        #expect(together == [.play(.close), .cancel, .none])
         #expect(ChimeDebouncer.settled(together) == nil)
     }
 

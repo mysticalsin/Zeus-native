@@ -45,6 +45,7 @@ public struct ChimeDebouncer: Sendable {
 
     private var armed = false
     private var poweringOff = false
+    private var powerOffAt: TimeInterval?
     private var lastPlay: (event: ChimeEvent, at: TimeInterval)?
     private var closeStartedAt: TimeInterval?
 
@@ -59,6 +60,7 @@ public struct ChimeDebouncer: Sendable {
         guard armed else { return .none }
         if signal == .willPowerOff {
             poweringOff = true
+            powerOffAt = time
             if let started = closeStartedAt, time >= started, time - started <= Self.clusterWindow {
                 closeStartedAt = nil
                 lastPlay = nil
@@ -66,7 +68,19 @@ public struct ChimeDebouncer: Sendable {
             }
             return .none
         }
-        guard !poweringOff, let event = signal.event else { return .none }
+        if poweringOff {
+            // A wake means the Mac came back. A notice after the cluster means shutdown was cancelled
+            // and this process is still here. Either one clears the latch.
+            let woke = signal.event == .open
+            let cancelled = powerOffAt.map { time >= $0 && time - $0 > Self.clusterWindow } ?? false
+            if woke || cancelled {
+                poweringOff = false
+                powerOffAt = nil
+            } else {
+                return .none
+            }
+        }
+        guard let event = signal.event else { return .none }
         if let previous = lastPlay, previous.event == event, time >= previous.at, time - previous.at <= Self.clusterWindow {
             return .none
         }
@@ -91,10 +105,10 @@ public struct ChimeDebouncer: Sendable {
 
 /// Whether a chime may start. Focus is a separate input so this stays free of system frameworks.
 public enum ChimePlaybackGate {
-    /// `soundFeedback`, `meeting`, and `focusKnown` are accepted so tests can name them.
-    /// They do not change the decision yet.
+    /// Sound feedback off, a meeting, or an unknown Focus state keeps the chime quiet.
+    /// Focus suppresses only when it is known to be on. The caller must not ask for Focus permission.
     public static func allows(enabled: Bool, focusActive: Bool, soundFeedback: Bool = true, meeting: Bool = false, focusKnown: Bool = true) -> Bool {
-        _ = (soundFeedback, meeting, focusKnown)
-        return enabled && !focusActive
+        guard enabled, soundFeedback, !meeting, focusKnown else { return false }
+        return !focusActive
     }
 }

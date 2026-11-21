@@ -8,7 +8,7 @@ struct LockWakeChimesCard: View {
     var body: some View {
         GSCard("Lock and wake") {
             GSToggleRow(symbol: "lock.laptopcomputer", title: "Lock and wake chimes",
-                        text: "A soft chime when the Mac locks or sleeps, and another when it wakes.",
+                        text: "A soft chime when the Mac locks or sleeps, and another when it wakes. Quiet while Sound feedback is off, during a meeting, or when Focus status is not available. Zeus does not ask for Focus.",
                         isOn: store.boolBinding(ChimeSettingsKey.enabled))
             GSDivider()
             GSRow(symbol: "speaker.wave.1", title: "Volume", text: "How loud these chimes are. The Mac's output volume still applies.") {
@@ -40,6 +40,7 @@ struct LockWakeChimesCard: View {
             HStack(spacing: 8) {
                 Button("Play") { LockChimeController.shared.preview(event) }
                     .buttonStyle(GSButtonStyle())
+                    .disabled(!store.bool(ChimeSettingsKey.enabled))
                     .accessibilityLabel("Play the \(title.lowercased()) chime")
                 Button("Choose sound...") { LockChimeController.shared.chooseFile(for: event) }
                     .buttonStyle(GSButtonStyle())

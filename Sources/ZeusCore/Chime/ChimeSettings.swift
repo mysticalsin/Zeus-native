@@ -129,10 +129,13 @@ public enum ChimeSettingsPersistence {
 /// The closure is accepted so older call sites compile; it is not used to accept a path.
 public enum ChimeSettingsImport {
     /// The string a person stores from the file picker. Empty means the built-in chime.
+    /// A path is stored only when it is a regular file, not a symlink, within the size cap, and short enough.
+    /// The check opens the file. The sandbox is off, so the path itself is what gets measured.
     public static func storedPath(path: String, readable: Bool, seconds: Double = 0, maxBytes: Int = ChimeAudioLimits.maxFileBytes) -> String {
-        _ = (seconds, maxBytes)
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, readable else { return "" }
+        guard seconds.isFinite, seconds > 0, seconds <= ChimeAudioLimits.maxSeconds else { return "" }
+        guard case .success = ChimeFileAccess.measureRegularFile(at: trimmed, maxBytes: maxBytes) else { return "" }
         return trimmed
     }
 

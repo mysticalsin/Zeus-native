@@ -348,7 +348,7 @@ final class SettingsStore {
     /// microphone are plain names and travel like any other choice. A chime file path is never exported: it
     /// contains this Mac's account name, and another Mac must not play it.
     static func isExportable(id: String, value: String) -> Bool {
-        guard ChimeSettingsExport.includes(id) else { return false }
+        guard ChimeSettingsExport.includes(id: id) else { return false }
         return !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
     }
 

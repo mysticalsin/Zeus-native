@@ -8,11 +8,10 @@ import ZeusCore
 
 /// Plays one short chime when the Mac locks or sleeps, and one when it wakes.
 ///
-/// The samples are ready before the notice arrives. `willSleep` and the lock notice run this
-/// handler on the posting thread, which is the main thread, so the chime starts before sleep
-/// continues. The handler only starts audio that is already in memory. It does not read a file,
-/// and it does not change the system output volume: the player gain is the chime slider, and
-/// macOS still applies the menu-bar volume.
+/// The samples are ready before the notice arrives. Lock and wake notices are handled on the main
+/// queue, the same way the notch watches them. The handler only starts audio that is already in
+/// memory. It does not read a file, and it does not change the system output volume: the player
+/// gain is the chime slider, and macOS still applies the menu-bar volume.
 @MainActor
 final class LockChimeController {
     static let shared = LockChimeController()
@@ -76,7 +75,7 @@ final class LockChimeController {
             settings = ChimeSettingsPersistence.load(defaults: .standard)
             installChosenFiles()
         }
-        startPlayback(event, obeySettings: false)
+        startPlayback(event, obeySettings: true)
     }
 
     func chooseFile(for event: ChimeEvent) {
@@ -88,16 +87,31 @@ final class LockChimeController {
         panel.prompt = "Choose sound"
         panel.message = "Zeus reads this file when it plays. The file stays where it is."
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        // Open and fstat before remembering the path. A symlink is refused here.
         guard case .success = ChimeFileAccess.measureRegularFile(at: url.path) else {
             log.error("chosen chime file is not a regular audio file. Keeping the built-in chime.")
+            return
+        }
+        let seconds = Self.duration(of: url)
+        let stored = ChimeSettingsImport.storedPath(path: url.path, readable: true, seconds: seconds)
+        guard !stored.isEmpty else {
+            log.error("chosen chime file is not a short regular audio file. Keeping the built-in chime.")
             return
         }
         let bookmark = (try? url.bookmarkData(options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess]))
             ?? (try? url.bookmarkData())
         ChimeSettingsPersistence.saveBookmark(bookmark, event: event, defaults: .standard)
-        SettingsStore.shared.set(ChimeSettingsKey.pathID(event), url.path)
+        SettingsStore.shared.set(ChimeSettingsKey.pathID(event), stored)
         reload()
+    }
+
+    /// Header length only. Zero when the file cannot be read as audio, so it is not stored.
+    private static func duration(of url: URL) -> Double {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        guard let audio = try? AVAudioFile(forReading: url) else { return 0 }
+        let rate = audio.processingFormat.sampleRate
+        guard rate.isFinite, rate > 0 else { return 0 }
+        return Double(audio.length) / rate
     }
 
     func useDefault(for event: ChimeEvent) {
@@ -108,9 +122,10 @@ final class LockChimeController {
 
     // MARK: Notices
 
-    /// `queue: nil` runs the block before the poster returns, so a close chime starts inside willSleep.
+    /// The main queue, same as the notch's lock and wake observers. An off-main notice is queued
+    /// instead of trapping in `MainActor.assumeIsolated`.
     private func watch(_ center: NotificationCenter, _ name: Notification.Name, _ signal: ChimeSignal) {
-        let token = center.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
+        let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.handle(signal) }
         }
         tokens.append((center, token))
@@ -127,7 +142,12 @@ final class LockChimeController {
     // MARK: Audio
 
     private func startPlayback(_ event: ChimeEvent, obeySettings: Bool) {
-        if obeySettings, !ChimePlaybackGate.allows(enabled: settings.enabled, focusActive: Self.focusIsActive) { return }
+        if obeySettings, !ChimePlaybackGate.allows(
+            enabled: settings.enabled,
+            focusActive: Self.focusIsActive,
+            soundFeedback: ExtraPreferences.shared.soundsOn,
+            meeting: MeetingState.active,
+            focusKnown: Self.focusIsKnown) { return }
         guard let buffer = chosen[event] ?? builtIn[event], prepareEngine() else { return }
         player.volume = Float(min(max(settings.volume, 0), 1))
         if !engine.isRunning {
@@ -141,8 +161,13 @@ final class LockChimeController {
     }
 
     /// Focus status, only when Zeus may already read it. This does not ask for permission.
+    /// Unknown status fails quiet: `focusIsKnown` is false and the gate does not play.
+    private static var focusIsKnown: Bool {
+        INFocusStatusCenter.default.authorizationStatus == .authorized
+    }
+
     private static var focusIsActive: Bool {
-        guard INFocusStatusCenter.default.authorizationStatus == .authorized else { return false }
+        guard focusIsKnown else { return false }
         return INFocusStatusCenter.default.focusStatus.isFocused == true
     }
 
