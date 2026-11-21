@@ -127,25 +127,67 @@ public enum InstallFootprint {
         return tops.sorted().map { tree.appendingPathComponent($0) }
     }
 
-    /// Bytes of regular files this setup added. Symlinks are not followed, so a venv alias is not counted twice.
-    public static func producedBytes(tree: URL, treeExisted: Bool, before: Set<String>) -> Int64 {
-        let rootPath = tree.path
-        guard !rootPath.isEmpty else { return 0 }
+    /// File sizes under `root`. Nil when the directory cannot be listed, a size cannot be read, or a path is outside `root`.
+    public static func sizeSnapshot(_ root: URL) -> [String: Int64]? {
+        var sizes: [String: Int64] = [:]
+        let rootPath = root.path
+        guard !rootPath.isEmpty else { return nil }
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        guard let walker = FileManager.default.enumerator(at: tree, includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey, .fileSizeKey], options: []) else {
-            return 0
-        }
+        guard walk(root, prefix: prefix, into: &sizes) else { return nil }
+        return sizes
+    }
+
+    /// Bytes added since `before`. An overwritten file counts only the growth.
+    /// Nil means the size could not be measured. A missing tree that did not exist measures 0.
+    public static func producedBytes(tree: URL, treeExisted: Bool, before: [String: Int64]) -> Int64? {
+        let rootPath = tree.path
+        guard !rootPath.isEmpty else { return nil }
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: rootPath, isDirectory: &isDirectory)
+        if !exists { return treeExisted ? nil : 0 }
+        if !isDirectory.boolValue { return nil }
+        guard let current = sizeSnapshot(tree) else { return nil }
         var total: Int64 = 0
-        for case let url as URL in walker {
-            let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .fileSizeKey])
-            if values?.isSymbolicLink == true || values?.isDirectory == true { continue }
-            let path = url.path
-            guard path.hasPrefix(prefix) else { continue }
-            let relative = String(path.dropFirst(prefix.count))
-            if treeExisted && before.contains(relative) { continue }
-            total += Int64(values?.fileSize ?? 0)
+        for (relative, size) in current {
+            if let old = before[relative] {
+                if size > old { total += size - old }
+            } else {
+                total += size
+            }
         }
         return total
+    }
+
+    private static func walk(_ root: URL, prefix: String, into sizes: inout [String: Int64]) -> Bool {
+        let children: [URL]
+        do {
+            children = try FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey, .fileSizeKey],
+                options: []
+            )
+        } catch {
+            return false
+        }
+        for child in children {
+            let path = child.path
+            guard path.hasPrefix(prefix) else { return false }
+            let relative = String(path.dropFirst(prefix.count))
+            let values: URLResourceValues
+            do {
+                values = try child.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .fileSizeKey])
+            } catch {
+                return false
+            }
+            if values.isSymbolicLink == true { continue }
+            if values.isDirectory == true {
+                if !walk(child, prefix: prefix, into: &sizes) { return false }
+                continue
+            }
+            guard let fileSize = values.fileSize else { return false }
+            sizes[relative] = Int64(fileSize)
+        }
+        return true
     }
 }
 
@@ -161,8 +203,9 @@ public enum PartialFiles {
     }
 }
 
-public struct DownloadCapExceeded: Error, Equatable, Sendable {
+public struct DownloadCapExceeded: Error, Equatable, LocalizedError, Sendable {
     public init() {}
+    public var errorDescription: String? { "Download stopped: larger than expected" }
 }
 
 public enum DownloadRunResult: Equatable, Sendable {
@@ -209,7 +252,11 @@ public enum DownloadRunner {
             while await group.next() != nil {}
             return first
         }
-        if outcome == .tookTooLong || outcome == .cancelled || outcome == .capped {
+        let stopped = outcome == .tookTooLong || outcome == .cancelled || outcome == .capped || {
+            if case .failed = outcome { return true }
+            return false
+        }()
+        if stopped {
             let left = PartialFiles.remove(partials())
             if !left.isEmpty {
                 return .failed("Partial files remained after the download stopped.")

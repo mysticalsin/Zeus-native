@@ -108,23 +108,26 @@ enum WhisperModelDownloader {
         let maximum = PinnedModelBytes.cap(known)
         let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial] }) {
             let transfer = DownloadTransferGuard(maximumBytes: maximum, allowedHosts: PinnedDownloadHosts.whisper, report: progress)
+            transfer.destination = partial
             let session = URLSession(configuration: .default, delegate: transfer, delegateQueue: nil)
             try await withTaskCancellationHandler {
                 do {
-                    let (temp, response) = try await session.download(from: model.url)
-                    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-                    let size = ((try? FileManager.default.attributesOfItem(atPath: temp.path))?[.size] as? NSNumber)?.int64Value ?? 0
-                    if transfer.stopped || size > maximum || (ArchiveUnpackCap.isArchive(model.file) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
-                        try? FileManager.default.removeItem(at: temp)
-                        throw DownloadCapExceeded()
-                    }
-                    try? FileManager.default.removeItem(at: partial)
-                    try FileManager.default.moveItem(at: temp, to: partial)
+                    let (_, response) = try await session.download(from: model.url)
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? transfer.statusCode ?? 0
+                    guard code == 200 else { throw URLError(.badServerResponse) }
                 } catch is DownloadCapExceeded {
                     throw DownloadCapExceeded()
                 } catch {
-                    if transfer.stopped { throw DownloadCapExceeded() }
-                    throw error
+                    if transfer.keptURL == nil {
+                        if transfer.stopped { throw DownloadCapExceeded() }
+                        throw error
+                    }
+                }
+                if transfer.stopped || transfer.keptURL == nil { throw DownloadCapExceeded() }
+                let kept = transfer.keptURL!
+                let size = ((try? FileManager.default.attributesOfItem(atPath: kept.path))?[.size] as? NSNumber)?.int64Value ?? 0
+                if size > maximum || (ArchiveUnpackCap.isArchive(model.file) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
+                    throw DownloadCapExceeded()
                 }
                 session.finishTasksAndInvalidate()
             } onCancel: {
@@ -186,6 +189,15 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
         let rootExisted = FileManager.default.fileExists(atPath: pythonRoot.path)
         let treeExisted = FileManager.default.fileExists(atPath: tree.path)
         let before = treeExisted ? InstallFootprint.snapshot(tree) : []
+        let beforeSizes: [String: Int64]
+        if treeExisted {
+            guard let sizes = InstallFootprint.sizeSnapshot(tree) else {
+                throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not measure the Python environment."])
+            }
+            beforeSizes = sizes
+        } else {
+            beforeSizes = [:]
+        }
         let gate = InstallSettlement()
         let worker = Task.detached {
             let failure = LocalPython.install(["faster-whisper"])
@@ -199,7 +211,9 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
         }) {
             let failure = await worker.value
             if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
-            let produced = InstallFootprint.producedBytes(tree: tree, treeExisted: treeExisted, before: before)
+            guard let produced = InstallFootprint.producedBytes(tree: tree, treeExisted: treeExisted, before: beforeSizes) else {
+                throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not measure the Python environment."])
+            }
             if ArchiveUnpackCap.exceeds(producedBytes: produced, maximumBytes: FasterWhisperUnpack.maximumBytes) {
                 throw DownloadCapExceeded()
             }

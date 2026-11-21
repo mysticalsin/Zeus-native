@@ -71,6 +71,10 @@ public final class DownloadTransferGuard: NSObject, @unchecked Sendable {
     public let report: (@Sendable (Double) -> Void)?
     public private(set) var redirectCount = 0
     public private(set) var stopped = false
+    /// Where `didFinishDownloadingTo` moves the file before macOS deletes the temp.
+    public var destination: URL?
+    public private(set) var keptURL: URL?
+    public private(set) var statusCode: Int?
 
     public init(maximumBytes: Int64, allowedHosts: Set<String>, report: (@Sendable (Double) -> Void)? = nil) {
         self.maximumBytes = maximumBytes
@@ -81,8 +85,12 @@ public final class DownloadTransferGuard: NSObject, @unchecked Sendable {
     public func evaluateRedirect(_ url: URL, task: DownloadTransferTask, completion: (URLRequest?) -> Void) {
         redirectCount += 1
         let host = url.host?.lowercased()
+        let portOK = url.port == nil || url.port == 443
+        let userOK = url.user == nil && url.password == nil
         let allowed = redirectCount <= Self.redirectLimit
             && url.scheme == "https"
+            && portOK
+            && userOK
             && host.map { allowedHosts.contains($0) } == true
         if allowed {
             completion(URLRequest(url: url))
@@ -102,6 +110,26 @@ public final class DownloadTransferGuard: NSObject, @unchecked Sendable {
         }
         if expected > 0 {
             report?(min(Double(written) / Double(expected), 1))
+        }
+    }
+
+    /// Moves the finished download to `destination` before the caller returns.
+    /// macOS deletes the temp file when `didFinishDownloadingTo` returns, so the move happens here.
+    public func acceptFinishedDownload(at location: URL) {
+        let size = (try? FileManager.default.attributesOfItem(atPath: location.path))?[.size] as? NSNumber
+        let bytes = size?.int64Value ?? 0
+        guard let destination, bytes <= maximumBytes else {
+            stopped = true
+            try? FileManager.default.removeItem(at: location)
+            return
+        }
+        try? FileManager.default.removeItem(at: destination)
+        do {
+            try FileManager.default.moveItem(at: location, to: destination)
+            keptURL = destination
+        } catch {
+            stopped = true
+            try? FileManager.default.removeItem(at: location)
         }
     }
 
@@ -139,6 +167,11 @@ extension DownloadTransferGuard: URLSessionDownloadDelegate {
         evaluateWrite(written: totalBytesWritten, expected: totalBytesExpectedToWrite, task: downloadTask)
     }
 
-    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        if let http = downloadTask.response as? HTTPURLResponse {
+            statusCode = http.statusCode
+        }
+        acceptFinishedDownload(at: location)
+    }
 }
 #endif

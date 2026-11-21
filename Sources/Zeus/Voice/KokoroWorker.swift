@@ -112,27 +112,34 @@ enum KokoroWorker {
             let maximum = PinnedModelBytes.cap(source.knownBytes)
             let outcome = await DownloadRunner.run(kind: .voice, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial] }) {
                 let transfer = DownloadTransferGuard(maximumBytes: maximum, allowedHosts: PinnedDownloadHosts.kokoro)
+                transfer.destination = partial
                 let session = URLSession(configuration: .default, delegate: transfer, delegateQueue: nil)
-                defer { session.finishTasksAndInvalidate() }
-                do {
-                    let (temp, response) = try await session.download(from: url)
-                    defer { try? FileManager.default.removeItem(at: temp) }
-                    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                try await withTaskCancellationHandler {
+                    var code = 0
+                    do {
+                        let (_, response) = try await session.download(from: url)
+                        code = (response as? HTTPURLResponse)?.statusCode ?? transfer.statusCode ?? 0
+                    } catch is DownloadCapExceeded {
+                        throw DownloadCapExceeded()
+                    } catch {
+                        if transfer.keptURL == nil {
+                            if transfer.stopped { throw DownloadCapExceeded() }
+                            throw error
+                        }
+                        code = transfer.statusCode ?? 0
+                    }
                     guard code == 200 else { throw NSError(domain: "Zeus", code: code, userInfo: [NSLocalizedDescriptionKey: "Downloading \(source.name) failed: the server answered \(code)."]) }
-                    let size = fileSize(temp)
+                    if transfer.stopped || transfer.keptURL == nil { throw DownloadCapExceeded() }
+                    let size = fileSize(transfer.keptURL!)
                     guard size >= source.minBytes else {
                         throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: "Downloading \(source.name) stopped early. Try again."])
                     }
-                    if transfer.stopped || size > maximum || (ArchiveUnpackCap.isArchive(source.name) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
+                    if size > maximum || (ArchiveUnpackCap.isArchive(source.name) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
                         throw DownloadCapExceeded()
                     }
-                    try? FileManager.default.removeItem(at: partial)
-                    try FileManager.default.moveItem(at: temp, to: partial)
-                } catch is DownloadCapExceeded {
-                    throw DownloadCapExceeded()
-                } catch {
-                    if transfer.stopped { throw DownloadCapExceeded() }
-                    throw error
+                    session.finishTasksAndInvalidate()
+                } onCancel: {
+                    session.invalidateAndCancel()
                 }
             }
             switch outcome {
