@@ -1085,6 +1085,7 @@ def analyze(run: Path, write=True) -> dict:
         "checkpoints": {}, "frames_logged": len(frames), "torn_lines": {"frames": torn_f, "mem": torn_m, "events": torn_e}}
     restarts = [e for e in events if e["event"] == "restart"]
     loops = [e for e in events if e["event"] == "loop"]
+    per_turn = []  # a warm-up-only run never enters the checkpoint body; replies.jsonl is then empty
     for cp in sorted({m for m in (10, 30, 60) if m <= meta["minutes"] + 1e-9} | {meta["minutes"]}):
         kmax = int(cp * 60 / FRAME_S)
         fr = [f for f in frames if f["k"] <= kmax and f["k"] > 16 and f.get("ms") is not None]  # skip warm-up + error frames
