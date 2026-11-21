@@ -1,11 +1,14 @@
 import Foundation
 import ZeusCore
 
+#if DEBUG
 /// DEBUG builds may retarget an HTTP provider at a loopback stub.
-/// Off unless `ZEUS_DEBUG_PROVIDER_STUB` is `1`. Release builds ignore both variables.
+/// Off unless `ZEUS_DEBUG_PROVIDER_STUB` is `1`. A set key stays on the production URL.
 enum ProviderEndpointOverride {
-    static func resolved(production: URL, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
-        #if DEBUG
+    static func resolved(production: URL, key: String?, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let key, !key.isEmpty {
+            return production
+        }
         guard environment["ZEUS_DEBUG_PROVIDER_STUB"] == "1",
               let raw = environment["ZEUS_DEBUG_PROVIDER_BASE_URL"],
               let url = URL(string: raw),
@@ -14,12 +17,9 @@ enum ProviderEndpointOverride {
             return production
         }
         return url
-        #else
-        _ = environment
-        return production
-        #endif
     }
 }
+#endif
 
 /// OpenAI-compatible streaming chat. Ollama on this Mac is the default. Anthropic stays on its own provider.
 /// A key, when one is set, is read from the Keychain and never logged.
@@ -44,12 +44,22 @@ final class OpenAICompatProvider: BrainProvider, @unchecked Sendable {
 
     static func ollama(model: String = ModelCap.httpModel(.ollama, tier: .fast) ?? "llama3.2") -> OpenAICompatProvider {
         let production = URL(string: "http://127.0.0.1:11434/v1")!
-        return OpenAICompatProvider(id: .ollama, baseURL: ProviderEndpointOverride.resolved(production: production), model: model, key: nil, keepAlive: "45m")
+        #if DEBUG
+        let baseURL = ProviderEndpointOverride.resolved(production: production, key: nil)
+        #else
+        let baseURL = production
+        #endif
+        return OpenAICompatProvider(id: .ollama, baseURL: baseURL, model: model, key: nil, keepAlive: "45m")
     }
 
     static func openAI(model: String, key: String) -> OpenAICompatProvider {
         let production = URL(string: "https://api.openai.com/v1")!
-        return OpenAICompatProvider(id: .openAIAPI, baseURL: ProviderEndpointOverride.resolved(production: production), model: model, key: key, keepAlive: nil)
+        #if DEBUG
+        let baseURL = ProviderEndpointOverride.resolved(production: production, key: key)
+        #else
+        let baseURL = production
+        #endif
+        return OpenAICompatProvider(id: .openAIAPI, baseURL: baseURL, model: model, key: key, keepAlive: nil)
     }
 
     func healthCheck() async -> ProviderHealth { .ready(version: model) }
