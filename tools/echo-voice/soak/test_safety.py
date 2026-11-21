@@ -33,28 +33,40 @@ class ShortRunTests(unittest.TestCase):
             self.assertTrue((out / "replies.jsonl").is_file())
 
 
+def _load_pipe():
+    import importlib.util
+    import types
+    audio = types.ModuleType("haru_mlx.audio")
+    native = types.ModuleType("haru_mlx.native")
+    audio.load_audio = lambda *a, **k: None
+    audio.save_audio = lambda *a, **k: None
+    native.upsample_2x = lambda x: x
+    native.downsample_2x = lambda x: x
+    sys.modules["haru_mlx"] = types.ModuleType("haru_mlx")
+    sys.modules["haru_mlx.audio"] = audio
+    sys.modules["haru_mlx.native"] = native
+    path = SOAK.parent / "pipeline-bench" / "python" / "pipe.py"
+    spec = importlib.util.spec_from_file_location("echo_pipe_under_test", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 class EmptyStatsTests(unittest.TestCase):
     def test_python_reference_stats_empty_is_finite(self):
-        import types
-        audio = types.ModuleType("haru_mlx.audio")
-        native = types.ModuleType("haru_mlx.native")
-        audio.load_audio = lambda *a, **k: None
-        audio.save_audio = lambda *a, **k: None
-        native.upsample_2x = lambda x: x
-        native.downsample_2x = lambda x: x
-        sys.modules["haru_mlx"] = types.ModuleType("haru_mlx")
-        sys.modules["haru_mlx.audio"] = audio
-        sys.modules["haru_mlx.native"] = native
-        import importlib.util
-        path = SOAK.parent / "pipeline-bench" / "python" / "pipe.py"
-        spec = importlib.util.spec_from_file_location("echo_pipe_under_test", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        mod = _load_pipe()
         got = mod.stats([])
         self.assertEqual(got["n"], 0)
         for key in ("p50_ms", "p95_ms", "p99_ms", "max_ms", "mean_ms"):
             self.assertEqual(got[key], got[key])  # not NaN
             self.assertNotEqual(abs(got[key]), float("inf"))
+
+
+class PythonRingTests(unittest.TestCase):
+    def test_zero_capacity_empty_push_is_noop(self):
+        ring = _load_pipe().Ring(0)
+        ring.push([])
+        self.assertEqual(ring.n, 0)
 
 
 class SignalTests(unittest.TestCase):
