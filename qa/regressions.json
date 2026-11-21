@@ -5208,6 +5208,42 @@
       }
     },
     {
+      "id": "REG-1006",
+      "failure": "A face-policy timeout left the prompt up and let a late reply overwrite the failure.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyTimeoutInvalidatesAndIgnoresALateReply"
+      }
+    },
+    {
+      "id": "REG-1007",
+      "failure": "A second face-policy reply replaced the first one, so the stored domain state was not the one that finished the prompt.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyReplySettlesOnceWithoutInvalidating"
+      }
+    },
+    {
+      "id": "REG-1008",
+      "failure": "The face-policy wait passed a Date to DispatchSemaphore.wait, which expects a DispatchTime.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "policyWaitDeadlineIsDispatchTime"
+      }
+    },
+    {
       "id": "REG-603",
       "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
       "features": [

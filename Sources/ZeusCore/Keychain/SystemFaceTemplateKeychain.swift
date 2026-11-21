@@ -188,36 +188,46 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     }
 
     /// There is no synchronous `evaluatePolicy`. The reply form is the one that sets the domain state.
-    /// The wait stops at `FaceTemplatePolicyWait.limit`, which is the existing prompt timeout.
+    /// The wait stops at `FaceTemplatePolicyWait.limit`. A timeout dismisses the prompt, and the
+    /// reply is stored once so a late closure cannot overwrite it.
     private static func evaluate() -> Evaluation {
         let context = LAContext()
         let reason = "Confirm it is you before Zeus uses the saved face."
-        final class Box: @unchecked Sendable {
-            var value = Evaluation(value: .failed, context: nil)
-        }
-        let box = Box()
+        let reply = FaceTemplatePolicyReply()
         let done = DispatchSemaphore(value: 0)
         let started = Date()
         context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, error in
             if success, error == nil {
-                box.value = Evaluation(value: .succeeded(context.evaluatedPolicyDomainState), context: context)
+                reply.finish(.succeeded(context.evaluatedPolicyDomainState))
+            } else {
+                reply.finish(.failed)
             }
             done.signal()
         }
-        let deadline = started.addingTimeInterval(FaceTemplatePolicyWait.limit)
+        let deadline = FaceTemplatePolicyWait.dispatchDeadline(after: FaceTemplatePolicyWait.limit)
         let replied = Thread.isMainThread ? waitOnMain(done, until: deadline) : done.wait(timeout: deadline) == .success
+        if !replied {
+            let claim = reply.claimTimeout()
+            if reply.shouldInvalidate { context.invalidate() }
+            if case .reply(.succeeded(let state)) = claim {
+                let waited = Date().timeIntervalSince(started)
+                let evaluation = FaceTemplatePolicyWait.evaluation(replied: true, waited: waited, state: state)
+                guard case .succeeded = evaluation else { return Evaluation(value: .failed, context: nil) }
+                return Evaluation(value: evaluation, context: context)
+            }
+            return Evaluation(value: .failed, context: nil)
+        }
         let waited = Date().timeIntervalSince(started)
-        let state: Data?
-        if case .succeeded(let value) = box.value.value { state = value } else { state = nil }
-        let evaluation = FaceTemplatePolicyWait.evaluation(replied: replied && box.value.context != nil, waited: waited, state: state)
+        guard case .succeeded(let state) = reply.evaluation else { return Evaluation(value: .failed, context: nil) }
+        let evaluation = FaceTemplatePolicyWait.evaluation(replied: true, waited: waited, state: state)
         guard case .succeeded = evaluation else { return Evaluation(value: .failed, context: nil) }
-        return Evaluation(value: evaluation, context: box.value.context)
+        return Evaluation(value: evaluation, context: context)
     }
 
-    private static func waitOnMain(_ done: DispatchSemaphore, until deadline: Date) -> Bool {
-        while Date() < deadline {
+    private static func waitOnMain(_ done: DispatchSemaphore, until deadline: DispatchTime) -> Bool {
+        while DispatchTime.now() < deadline {
             if done.wait(timeout: .now()) == .success { return true }
-            RunLoop.current.run(mode: .default, before: min(deadline, Date(timeIntervalSinceNow: 0.02)))
+            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
         }
         return done.wait(timeout: .now()) == .success
     }

@@ -325,6 +325,61 @@ public enum FaceTemplatePolicyWait {
         guard replied, waited < limit else { return .failed }
         return .succeeded(state)
     }
+
+    /// `DispatchSemaphore.wait` takes a `DispatchTime`. A `Date` does not compile.
+    public static func dispatchDeadline(after seconds: TimeInterval) -> DispatchTime {
+        .now() + seconds
+    }
+}
+
+/// One policy reply. The first finish or timeout wins, and a later write is ignored.
+public final class FaceTemplatePolicyReply: @unchecked Sendable {
+    public enum Claim: Equatable, Sendable {
+        case reply(FaceTemplateEvaluation)
+        case timedOut
+    }
+
+    private let lock = NSLock()
+    private var settled = false
+    private var stored: FaceTemplateEvaluation = .failed
+    private var invalidated = false
+
+    public init() {}
+
+    /// Stores the reply unless a timeout or an earlier reply already won.
+    @discardableResult
+    public func finish(_ evaluation: FaceTemplateEvaluation) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !settled else { return false }
+        stored = evaluation
+        settled = true
+        return true
+    }
+
+    /// Marks a timeout only when no reply has been stored. The winner is the value already stored.
+    public func claimTimeout() -> Claim {
+        lock.lock()
+        defer { lock.unlock() }
+        if settled { return .reply(stored) }
+        settled = true
+        stored = .failed
+        invalidated = true
+        return .timedOut
+    }
+
+    public var evaluation: FaceTemplateEvaluation {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    /// True only when the timeout won, so the caller dismisses the prompt.
+    public var shouldInvalidate: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return invalidated
+    }
 }
 
 /// Query fields for the face-template item. The group is `CredentialKeychainPolicy.accessGroup`.

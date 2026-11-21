@@ -8930,6 +8930,18 @@
             {
               "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
               "function": "policyReplyWaitStopsAtTheExistingPromptTimeout"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyTimeoutInvalidatesAndIgnoresALateReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyReplySettlesOnceWithoutInvalidating"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyWaitDeadlineIsDispatchTime"
             }
           ]
         }
