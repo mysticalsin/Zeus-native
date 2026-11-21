@@ -147,8 +147,17 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
     s
 }
 
+static BANKS: std::sync::Mutex<Vec<((u64, u64), Polyphase)>> = std::sync::Mutex::new(Vec::new());
+
 pub fn resample_poly(x: &[f32], up: u64, down: u64) -> Vec<f32> {
-    Polyphase::new(up, down).process(x)
+    let mut banks = BANKS.lock().expect("resampler bank");
+    if let Some(index) = banks.iter().position(|item| item.0 == (up, down)) {
+        return banks[index].1.process(x);
+    }
+    let bank = Polyphase::new(up, down);
+    let output = bank.process(x);
+    banks.push(((up, down), bank));
+    output
 }
 
 pub fn filter_designs() -> usize {

@@ -238,20 +238,19 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         let before = self.host.trace().len();
         match self.push(samples, seq) {
             Ok(frames) => {
-                let mut out: Vec<Vec<u8>> = frames
-                    .iter()
-                    .map(|frame| {
+                let mut out: Vec<Vec<u8>> = Vec::new();
+                for frame in frames {
+                    let text = frame.text;
+                    out.push(
                         ServerMessage::Frame {
                             seq: frame.seq,
                             step_ms: frame.step_ms,
-                            samples: frame.samples.clone(),
+                            samples: frame.samples,
                         }
-                        .encode()
-                    })
-                    .collect();
-                for frame in &frames {
-                    if !frame.text.is_empty() {
-                        out.push(protocol::frame(protocol::TEXT, frame.text.as_bytes()));
+                        .encode(),
+                    );
+                    if !text.is_empty() {
+                        out.push(protocol::frame(protocol::TEXT, text.as_bytes()));
                     }
                 }
                 out.extend(self.trace_states_since(before));
