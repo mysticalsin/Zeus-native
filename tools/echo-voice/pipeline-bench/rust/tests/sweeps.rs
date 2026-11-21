@@ -3,7 +3,8 @@ use haru_pipe::bench::{stream_run, Stream};
 use haru_pipe::native::Ingest;
 use std::time::Duration;
 use haru_pipe::resample::{resample_poly, BadRatio};
-use haru_pipe::stats::summary_json;
+use haru_pipe::rng::XorShift32;
+use haru_pipe::stats::{percentile, summary_json};
 
 #[test]
 fn empty_summary_is_finite_json() {
@@ -81,6 +82,55 @@ fn wav_pcm(rate: u32, ch: u16, bits: u16, payload: &[u8]) -> Vec<u8> {
     out.extend_from_slice(b"WAVE");
     out.extend(body);
     out
+}
+
+#[test]
+fn seeded_chunkings_match_one_read() {
+    let mut raw = vec![0u8; 6_400 * 4];
+    for (i, b) in raw.iter_mut().enumerate() { *b = (i * 3) as u8; }
+    let mut one = Stream::new(Duration::ZERO, 0);
+    one.feed(&raw, || {});
+    let mut split = Stream::new(Duration::ZERO, 0);
+    let mut state = 0x1234_5678u32;
+    let mut i = 0;
+    while i < raw.len() {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let n = 1 + (state as usize % 17);
+        let end = (i + n).min(raw.len());
+        split.feed(&raw[i..end], || {});
+        i = end;
+    }
+    assert_eq!(one.index, split.index);
+    assert_eq!(one.msgs, split.msgs);
+}
+
+#[test]
+fn eof_mid_frame_emits_no_frame() {
+    let raw = vec![1u8; 100];
+    let mut st = Stream::new(Duration::ZERO, 0);
+    let mut n = 0;
+    st.feed(&raw, || n += 1);
+    assert_eq!(n, 0);
+    assert_eq!(st.index, 1);
+}
+
+#[test]
+fn xorshift_chunks_match_the_shared_sequence() {
+    let mut r = XorShift32::new();
+    for expect in [1575usize, 1505, 999, 908, 752, 1875, 851, 404] {
+        assert_eq!(r.chunk_samples(), expect);
+    }
+}
+
+#[test]
+fn percentile_matches_numpy_linear() {
+    // numpy.percentile(..., method="linear") on these arrays.
+    let a = [1.0, 2.0, 3.0, 4.0, 10.0];
+    assert!((percentile(&a, 50.0) - 3.0).abs() < 1e-9);
+    assert!((percentile(&a, 95.0) - 8.8).abs() < 1e-9);
+    assert!((percentile(&[1.0, 1.0, 1.0], 95.0) - 1.0).abs() < 1e-9);
+    assert!((percentile(&[1.0, 4.0], 95.0) - 3.85).abs() < 1e-9);
+    assert!((percentile(&[1.0], 50.0) - 1.0).abs() < 1e-9);
 }
 
 #[test]

@@ -31,6 +31,30 @@ func pcmWav(tag, bits, ch uint16, rate uint32, payload []byte) []byte {
 	return append(append(out, []byte("WAVE")...), body...)
 }
 
+func TestSeededChunkingsMatchOneRead(t *testing.T) {
+	raw := make([]byte, 6400*4)
+	for i := range raw {
+		raw[i] = byte(i * 3)
+	}
+	one := NewStream(0, 0)
+	one.Feed(raw, func() {})
+	split := NewStream(0, 0)
+	state := uint32(0x12345678)
+	for i := 0; i < len(raw); {
+		state = state*1664525 + 1013904223
+		n := 1 + int(state%17)
+		end := i + n
+		if end > len(raw) {
+			end = len(raw)
+		}
+		split.Feed(raw[i:end], func() {})
+		i = end
+	}
+	if one.Index != split.Index || string(one.Msgs) != string(split.Msgs) {
+		t.Fatalf("index %d/%d msgs %d/%d", one.Index, split.Index, len(one.Msgs), len(split.Msgs))
+	}
+}
+
 func TestLargeReadDoesNotOverflow(t *testing.T) {
 	raw := make([]byte, 9*6400*4)
 	st := NewStream(0, 0)
