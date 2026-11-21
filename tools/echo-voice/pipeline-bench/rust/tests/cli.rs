@@ -97,5 +97,8 @@ fn manifest_escape_is_refused() {
     run_case("subdir/../../../../keep/SENTINEL");
     run_case(abs_wav.to_str().unwrap());
     run_case("");
+    let link = wl.join("subdir/escape.wav");
+    std::os::unix::fs::symlink(&sentinel, &link).unwrap();
+    run_case("subdir/escape.wav");
     let _ = fs::remove_dir_all(&root);
 }

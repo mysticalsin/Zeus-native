@@ -78,6 +78,18 @@ fn confined(base: &Path, name: &str) -> PathBuf {
     if full != base && !full.starts_with(&base) {
         die(&format!("refusing manifest path {name:?}"));
     }
+    // A symlink under the base can still leave it. Resolve every existing
+    // ancestor and refuse a target outside the canonical base.
+    let mut existing = full.clone();
+    while !existing.exists() {
+        if !existing.pop() {
+            die(&format!("refusing manifest path {name:?}"));
+        }
+    }
+    let resolved = std::fs::canonicalize(&existing).unwrap_or_else(|e| die(&e.to_string()));
+    if resolved != base && !resolved.starts_with(&base) {
+        die(&format!("refusing manifest path {name:?}"));
+    }
     full
 }
 

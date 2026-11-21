@@ -36,13 +36,35 @@ func manifestPath(base, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	absBase = filepath.Clean(absBase)
-	full := filepath.Clean(filepath.Join(absBase, name))
-	prefix := absBase + string(filepath.Separator)
-	if full != absBase && !strings.HasPrefix(full, prefix) {
+	realBase, err := filepath.EvalSymlinks(absBase)
+	if err != nil {
+		return "", err
+	}
+	realBase = filepath.Clean(realBase)
+	full := filepath.Clean(filepath.Join(realBase, name))
+	prefix := realBase + string(filepath.Separator)
+	if full != realBase && !strings.HasPrefix(full, prefix) {
 		return "", fmt.Errorf("refusing manifest path %q", name)
 	}
-	return full, nil
+	existing := full
+	for {
+		resolved, err := filepath.EvalSymlinks(existing)
+		if err == nil {
+			resolved = filepath.Clean(resolved)
+			if resolved != realBase && !strings.HasPrefix(resolved, prefix) {
+				return "", fmt.Errorf("refusing manifest path %q", name)
+			}
+			return full, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(existing)
+		if parent == existing {
+			return "", fmt.Errorf("refusing manifest path %q", name)
+		}
+		existing = parent
+	}
 }
 
 func fileOne(src, dst string) (map[string]any, []int64, float64) {
