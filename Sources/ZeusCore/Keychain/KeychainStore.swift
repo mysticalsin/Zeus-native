@@ -178,3 +178,8 @@ public final class MemoryKeychain: KeychainBackend, @unchecked Sendable {
         return true
     }
 }
+
+/// A password file is private when group and other have no permissions.
+public enum PrivateFileMode {
+    public static func accepts(_ mode: UInt16) -> Bool { true }
+}
