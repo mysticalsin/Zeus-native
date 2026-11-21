@@ -1460,6 +1460,8 @@ struct AgentsPage: Equatable, Sendable {
     var requestDetails: [String: AgentsPageRequest]
     /// Request id to session id. Written only after the duplicate check.
     var requestSessionIDs: [String: String]
+    /// Spoken by the revision machine. Nil until a step keeps it.
+    var announcement: String?
 
     static let countdownStart = 12
     static let undoSeconds = 2
@@ -1500,7 +1502,8 @@ struct AgentsPage: Equatable, Sendable {
             firstFrameMilliseconds: nil,
             revision: HubRevision3State(),
             requestDetails: [:],
-            requestSessionIDs: [:]
+            requestSessionIDs: [:],
+            announcement: nil
         )
     }
 
@@ -2007,6 +2010,45 @@ struct AgentsPageCardGate: Equatable, Sendable {
 }
 
 /// The card on screen. Its id is the approval id, not the session id.
+/// Destructive controls. The stub leaves the button empty: activate changes nothing, and only a long press holds.
+enum AgentsPageDestructive {
+    static func activate(_ page: AgentsPage) -> AgentsPageHook.Step {
+        AgentsPageHook.Step(page: page, sends: [])
+    }
+
+    static func confirm(_ page: AgentsPage, action: HubDecisionAction) -> AgentsPageHook.Step {
+        _ = action
+        return AgentsPageHook.Step(page: page, sends: [])
+    }
+
+    static func keyboard(_ page: AgentsPage, key: HubDecisionKey) -> AgentsPageHook.Step {
+        AgentsPageHook.press(page, key)
+    }
+
+    static func voiceOverConfirmLabel(_ action: HubDecisionAction) -> String {
+        "Confirm \(action.title)"
+    }
+}
+
+/// Hold progress. The stub never fills and always animates.
+struct AgentsPageHoldFill: Equatable, Sendable {
+    var fraction: Double
+    var animates: Bool
+
+    static func progress(heldMilliseconds: Int, reduceMotion: Bool) -> AgentsPageHoldFill {
+        _ = (heldMilliseconds, reduceMotion)
+        return AgentsPageHoldFill(fraction: 0, animates: true)
+    }
+}
+
+/// The Undo chip. The stub has no countdown.
+enum AgentsPageUndoChip {
+    static func countdown(_ page: AgentsPage) -> String? {
+        _ = page
+        return nil
+    }
+}
+
 enum AgentsPageLive {
     static func request(approvalID: String, sessionID: String?, tool: String, highRisk: Bool, command: String?) -> AgentsPageRequest {
         AgentsPageRequest(

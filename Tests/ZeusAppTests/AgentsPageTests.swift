@@ -424,6 +424,41 @@ struct AgentsPageTests {
         #expect(kept.1 == [.allow])
     }
 
+    @Test func aDestructiveActivateDeniesAndConfirmHolds() {
+        var destructive = page(.approval)
+        if var showing = destructive.revision.showing {
+            showing.tier = .destructive
+            destructive.revision.showing = showing
+        }
+        let tapped = AgentsPageDestructive.activate(destructive)
+        #expect(tapped.page.revision.pending?.action == .deny)
+        #expect(tapped.page.revision.pending?.action.isApproval == false)
+        let keys = AgentsPageDestructive.keyboard(destructive, key: .return)
+        #expect(keys.page.revision.pending?.action == .allowOnce)
+        #expect(keys.page.revision.pending?.holdMilliseconds == HubRevision3Timing.destructiveHoldMilliseconds)
+        let spoken = AgentsPageDestructive.confirm(destructive, action: .allowOnce)
+        #expect(AgentsPageDestructive.voiceOverConfirmLabel(.allowOnce) == "Confirm Allow once")
+        #expect(spoken.page.revision.pending?.action == .allowOnce)
+        #expect(spoken.page.revision.pending?.holdMilliseconds == HubRevision3Timing.destructiveHoldMilliseconds)
+    }
+
+    @Test func theHoldFillStepsUnderReduceMotionAndUndoShowsItsCountdown() {
+        let early = AgentsPageHoldFill.progress(heldMilliseconds: 600, reduceMotion: false)
+        #expect(early.fraction == 0.5)
+        #expect(early.animates)
+        let stepped = AgentsPageHoldFill.progress(heldMilliseconds: 600, reduceMotion: true)
+        #expect(stepped.fraction == 0)
+        #expect(stepped.animates == false)
+        let done = AgentsPageHoldFill.progress(heldMilliseconds: HubRevision3Timing.destructiveHoldMilliseconds, reduceMotion: true)
+        #expect(done.fraction == 1)
+        #expect(done.animates == false)
+        let pending = page(.approval).applying(.approve)
+        #expect(AgentsPageUndoChip.countdown(pending) == "2 s")
+        #expect(pending.announcement == HubRevision3Speech.pending(.allowOnce, deniesAllQueued: false))
+        #expect(HubRevision3Timing.undoMilliseconds == 2_000)
+        #expect(HubRevision3Timing.destructiveHoldMilliseconds == 1_200)
+    }
+
     @Test func exhaustiveTransitionTable() {
         let failures = AgentsPageOracle.failures()
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")
