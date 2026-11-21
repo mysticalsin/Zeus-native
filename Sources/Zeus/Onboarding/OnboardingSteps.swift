@@ -331,8 +331,6 @@ private struct ControlStep: View {
             StepHeading(title: "Stay in control.", subtitle: "")
                 .frame(width: 420, alignment: .leading)
             OBRowList(pitch: Self.pitch) {
-                toggleRow("hand.raised", "Permission requests", options.boolBinding("notify.approvals"))
-                toggleRow("checkmark.circle", "Finished tasks", options.boolBinding("notify.agentDone"))
                 toggleRow("exclamationmark.triangle", "Errors and stuck agents", options.boolBinding("notify.errors"))
             }
             .frame(width: 420)
