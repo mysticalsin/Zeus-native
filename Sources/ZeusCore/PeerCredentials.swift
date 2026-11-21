@@ -93,8 +93,8 @@ public enum PeerCheck {
         }
     }
 
-    /// Reads the connected peer's uid (getpeereid, the LOCAL_PEERCRED data), pid (LOCAL_PEERPID)
-    /// and executable path. Nil when the kernel will not say.
+    /// Reads the connected peer's uid, pid and executable path. macOS uses getpeereid and
+    /// LOCAL_PEERPID. Other platforms use SO_PEERCRED and `/proc/<pid>/exe`. Nil when the kernel will not say.
     public static func identify(fd: Int32) -> PeerIdentity? {
         #if canImport(Darwin)
         var uid: uid_t = 0
@@ -110,7 +110,21 @@ public enum PeerCheck {
         identity.auditToken = auditToken(fd: fd)
         return identity
         #else
-        return nil
+        // SO_PEERCRED is the kernel's uid and pid for this connection. The Swift overlay does not
+        // import `ucred`, so this matches the 12-byte Linux layout. A failed read stays unidentified,
+        // and an unidentified peer is refused.
+        struct SocketPeerCredentials { var pid: Int32; var uid: UInt32; var gid: UInt32 }
+        var credentials = SocketPeerCredentials(pid: 0, uid: 0, gid: 0)
+        var size = socklen_t(MemoryLayout<SocketPeerCredentials>.size)
+        guard MemoryLayout<SocketPeerCredentials>.size == 12,
+              getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &credentials, &size) == 0,
+              size == 12 else { return nil }
+        var identity = PeerIdentity(uid: UInt32(credentials.uid))
+        if credentials.pid > 0 {
+            identity.pid = Int32(credentials.pid)
+            identity.executablePath = executablePath(pid: credentials.pid)
+        }
+        return identity
         #endif
     }
 
@@ -140,6 +154,16 @@ public enum PeerCheck {
         let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
         guard length > 0 else { return nil }
         return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+    #else
+    /// The path the kernel records for this pid. A truncated read is discarded.
+    static func executablePath(pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let length = readlink("/proc/\(pid)/exe", &buffer, buffer.count)
+        guard length > 0, length < buffer.count else { return nil }
+        let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
+        let path = String(decoding: bytes, as: UTF8.self)
+        return path.isEmpty ? nil : path
     }
     #endif
 }

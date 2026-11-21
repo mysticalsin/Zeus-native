@@ -179,3 +179,11 @@ public enum NativeMessagingFrame {
         }
     }
 }
+
+#if !canImport(Darwin)
+extension PeerSigning {
+    /// There is no code signature to keep on this platform. The bridge still calls this before it serves peers.
+    @discardableResult
+    public static func captureOwnIdentity() -> CodeSignature? { nil }
+}
+#endif
