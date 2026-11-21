@@ -179,6 +179,10 @@ fn read_upstream<S: Read>(
         if pending.len() >= 5 {
             let kind = pending[0];
             let len = u32::from_le_bytes([pending[1], pending[2], pending[3], pending[4]]) as usize;
+            if len > crate::protocol::MAX_FRAME_BYTES {
+                pending.clear();
+                return Err(ReadFault::Exited);
+            }
             if pending.len() >= 5 + len {
                 for _ in 0..5 {
                     pending.pop_front();

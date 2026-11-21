@@ -13,6 +13,8 @@ use crate::watchdog::{
 };
 use std::time::Instant;
 
+const MAX_TEXT_TOKENS: usize = 4_096;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct OutFrame {
     pub seq: u32,
@@ -320,6 +322,10 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         if !text.is_empty() {
             self.text_tokens
                 .extend(text.split_whitespace().map(str::to_string));
+            if self.text_tokens.len() > MAX_TEXT_TOKENS {
+                let extra = self.text_tokens.len() - MAX_TEXT_TOKENS;
+                self.text_tokens.drain(..extra);
+            }
         }
         let loop_found = find_loop(&self.text_tokens, 3, 32, 3);
         if is_garbage_frame(model) {
