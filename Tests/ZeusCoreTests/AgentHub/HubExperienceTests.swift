@@ -57,6 +57,35 @@ struct HubExperienceTests {
         }
     }
 
+    @Test func anInjectedClockTimesTheOpenAndTheIdleSample() {
+        var clock = HubManualClock()
+        let slow = HubExperience.measureOpen(clock: &clock) { $0.advance(milliseconds: 101) }
+        #expect(slow.elapsedMilliseconds == 101)
+        #expect(slow.meetsBudget == false)
+
+        var exact = HubManualClock()
+        let onBudget = HubExperience.measureOpen(clock: &exact) { $0.advance(milliseconds: 100) }
+        #expect(onBudget.meetsBudget)
+
+        let quiet = HubIdleSample(
+            panelClosed: true, approvalShowing: false, socketReadInProgress: false,
+            oneSecondTimerScheduled: false, waveDisplayLinkRunning: false, percentOfOneCore: 1)
+        var idleClock = HubManualClock()
+        let held = HubExperience.measureIdle(clock: &idleClock, windowMilliseconds: 60_000, sample: quiet)
+        #expect(held.elapsedMilliseconds == 60_000)
+        #expect(held.meetsBudget)
+
+        var hot = quiet
+        hot.percentOfOneCore = 1.1
+        let over = HubExperience.measureIdle(clock: &idleClock, windowMilliseconds: 60_000, sample: hot)
+        #expect(over.meetsBudget == false)
+
+        var ticking = quiet
+        ticking.oneSecondTimerScheduled = true
+        let timer = HubExperience.measureIdle(clock: &idleClock, windowMilliseconds: 60_000, sample: ticking)
+        #expect(timer.meetsBudget == false)
+    }
+
     @Test func openAndIdleBudgetsHoldAtTheBudgetAndFailOnePastIt() {
         let open = HubExperience.openBudgetMilliseconds
         #expect(open == 100)

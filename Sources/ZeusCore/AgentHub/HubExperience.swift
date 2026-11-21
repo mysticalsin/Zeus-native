@@ -224,12 +224,12 @@ extension HubExperience {
         let start = clock.milliseconds
         work(&clock)
         let elapsed = clock.milliseconds - start
-        return HubBudgetRun(elapsedMilliseconds: elapsed, meetsBudget: true)
+        return HubBudgetRun(elapsedMilliseconds: elapsed, meetsBudget: meetsOpenBudget(milliseconds: elapsed))
     }
 
     /// Times a closed-panel sample. `windowMilliseconds` is how long the clock runs.
     public static func measureIdle(clock: inout HubManualClock, windowMilliseconds: Int, sample: HubIdleSample) -> HubBudgetRun {
         clock.advance(milliseconds: max(0, windowMilliseconds))
-        return HubBudgetRun(elapsedMilliseconds: max(0, windowMilliseconds), meetsBudget: true)
+        return HubBudgetRun(elapsedMilliseconds: max(0, windowMilliseconds), meetsBudget: isIdle(sample))
     }
 }
