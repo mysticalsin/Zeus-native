@@ -4,9 +4,9 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 214 of 214 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 214 in scope). 203 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 215 of 215 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 215 in scope). 203 are wired to real behaviour (94%). 12 are labelled stubs with a TODO. 0 are excluded.
 
-**Before this round:** has 19, partial 27, missing 163.
+**Before this round:** has 19, partial 27, missing 164.
 
 Status key: **live** wired this round, **custom** an existing hand-built Zeus row, **stub** stored, exported and labelled "Coming" with a TODO, **excluded** not built on purpose.
 
@@ -201,6 +201,7 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Face presence | Face presence | toggle | - | Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on. | missing | live | `face.presence` | Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on. |
 | Face presence | Lock after absent for | menu | - | How long no enrolled face may be missing before the Mac locks. | missing | live | `face.lockAfter` | Zeus addition. Counted from the last time an enrolled face was seen. |
 | Face presence | Status | status | - |  | missing | custom | `face.status` | Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away. |
+| Tasks and agenda | Tasks and agenda from this Mac | toggle | - | Shows tasks and the day's agenda from Microsoft accounts already on this Mac. Off until you turn it on. Read only. | missing | stub | `todo.microsoftLocal` | Zeus addition. Off by default. Stored, not shown, until the top bar wiring is approved. Reads calendars and reminders the Mac already has. No sign-in. |
 | Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
 
 ## Interview
