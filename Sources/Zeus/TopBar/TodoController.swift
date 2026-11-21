@@ -70,7 +70,11 @@ final class TodoController {
 
     init() {
         let defaults = UserDefaults.standard
-        let connection = defaults.data(forKey: "todo.connection").flatMap { try? JSONDecoder().decode(BrainConnection.self, from: $0) }
+        let connection: BrainConnection?
+        switch TodoConnectionBlob.load(defaults.data(forKey: "todo.connection")) {
+        case .connected(let value): connection = value
+        case .absent, .corrupt: connection = nil
+        }
         sync = TodoSync(storeFile: ZeusPaths.supportDirectory.appendingPathComponent("todos.json"), connection: connection)
         remindersMirror = defaults.bool(forKey: "todo.reminders")
         reminderIDs = defaults.dictionary(forKey: "todo.reminderIDs") as? [String: String] ?? [:]
@@ -119,7 +123,16 @@ final class TodoController {
     func connect(_ connection: BrainConnection?) {
         sync.connection = connection
         if !TopBarStyle.isSnapshot {
-            UserDefaults.standard.set(connection.flatMap { try? JSONEncoder().encode($0) }, forKey: "todo.connection")
+            let defaults = UserDefaults.standard
+            do {
+                if let data = try TodoConnectionBlob.persisted(existing: defaults.data(forKey: "todo.connection"), connection: connection) {
+                    defaults.set(data, forKey: "todo.connection")
+                } else {
+                    defaults.removeObject(forKey: "todo.connection")
+                }
+            } catch {
+                // Leave the previous blob in place.
+            }
         }
         if !sync.pull() { save() }
         publishSyncState()
