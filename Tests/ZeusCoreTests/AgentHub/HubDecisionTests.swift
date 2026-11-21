@@ -128,6 +128,16 @@ struct HubDecisionTests {
         let smuggled = HubDecision.approval(HubApprovalQueue(), .approve, request: HubApprovalRequest(id: "a", sessionID: "session-a"))
         #expect(smuggled.queue.phase == .idle)
         #expect(smuggled.verdict == nil)
+
+        let unboundShowing = HubApprovalQueue(showing: HubApprovalRequest(id: "a", sessionID: " "))
+        let unboundVerdict = HubDecision.approval(unboundShowing, .approve)
+        #expect(unboundVerdict.verdict == nil)
+        #expect(unboundVerdict.queue == unboundShowing)
+
+        let unboundWaiting = HubApprovalQueue(waiting: [HubApprovalRequest(id: " ", sessionID: "session")])
+        let stuck = HubDecision.approval(unboundWaiting, .showingClosed)
+        #expect(stuck.verdict == nil)
+        #expect(stuck.queue == unboundWaiting)
     }
 
     @Test func approvalTableIsTotal() {
@@ -373,7 +383,7 @@ struct HubDecisionTests {
     private func expectedReply(_ state: HubReplyState, _ event: HubReplyEvent, context: HubReplyContext) -> HubReplyOutcome {
         switch (state.status, event) {
         case (.idle, .textChanged):
-            HubReplyOutcome(
+            return HubReplyOutcome(
                 state: HubReplyState(status: .drafting, draft: context.text, receipt: nil, script: nil),
                 asksApproval: false,
                 script: nil)
@@ -427,7 +437,7 @@ struct HubDecisionTests {
             next.script = nil
             return HubReplyOutcome(state: next, asksApproval: false, script: nil)
         default:
-            HubReplyOutcome(state: state, asksApproval: false, script: nil)
+            return HubReplyOutcome(state: state, asksApproval: false, script: nil)
         }
     }
 }
