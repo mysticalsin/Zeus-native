@@ -82,6 +82,22 @@ where
                 break;
             }
         };
+        if let Some(error) = framer.take_error() {
+            for raw in frames {
+                for message in engine.handle_raw(&raw) {
+                    if let Err(error) = stream.write_all(&message) {
+                        outcome = Err(error);
+                        break 'read;
+                    }
+                }
+            }
+            let _ = stream.write_all(&crate::protocol::protocol_error_frame(&error));
+            outcome = Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                error.code(),
+            ));
+            break;
+        }
         for raw in frames {
             for message in engine.handle_raw(&raw) {
                 if let Err(error) = stream.write_all(&message) {

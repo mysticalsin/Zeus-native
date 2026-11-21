@@ -258,13 +258,24 @@ pub struct RawFrame {
     pub payload: Vec<u8>,
 }
 
+pub const MAX_FRAME_BYTES: usize = 8 * 1024 * 1024;
+
 #[derive(Debug, Default)]
 pub struct FrameBuf {
     buf: Vec<u8>,
+    error: Option<ProtocolError>,
 }
 
 impl FrameBuf {
+    /// Bytes already accepted. An oversized length is rejected without
+    /// waiting for its payload, and the buffer is cleared so a later frame
+    /// can be parsed. A valid frame that shared the buffer with that length
+    /// is still returned.
     pub fn push(&mut self, bytes: &[u8]) -> Result<Vec<RawFrame>, ProtocolError> {
+        if self.buf.len().saturating_add(bytes.len()) > MAX_FRAME_BYTES.saturating_add(5) {
+            self.buf.clear();
+            return Err(ProtocolError::Oversized);
+        }
         self.buf.extend_from_slice(bytes);
         let mut out = Vec::new();
         loop {
@@ -274,8 +285,13 @@ impl FrameBuf {
             let kind = self.buf[0];
             let len =
                 u32::from_le_bytes([self.buf[1], self.buf[2], self.buf[3], self.buf[4]]) as usize;
-            if len > 8 * 1024 * 1024 {
-                return Err(ProtocolError::Oversized);
+            if len > MAX_FRAME_BYTES {
+                self.buf.clear();
+                if out.is_empty() {
+                    return Err(ProtocolError::Oversized);
+                }
+                self.error = Some(ProtocolError::Oversized);
+                return Ok(out);
             }
             if self.buf.len() < 5 + len {
                 break;
@@ -285,6 +301,10 @@ impl FrameBuf {
             out.push(RawFrame { kind, payload });
         }
         Ok(out)
+    }
+
+    pub fn take_error(&mut self) -> Option<ProtocolError> {
+        self.error.take()
     }
 }
 
