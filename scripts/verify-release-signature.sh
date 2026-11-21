@@ -23,7 +23,7 @@ if ! [[ "$EXPECTED_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
   echo "Release signature rejected: EXPECTED_TEAM_ID must be 10 characters from A-Z and 0-9." >&2
   exit 1
 fi
-requirement="certificate leaf[subject.OU] = ${EXPECTED_TEAM_ID}"
+requirement="=anchor apple generic and certificate leaf[subject.OU] = \"${EXPECTED_TEAM_ID}\""
 codesign --verify --deep --strict -R "$requirement" "$APP"
 for binary in "$APP" "$APP"/Contents/Helpers/* "$APP"/Contents/Resources/zeus-now-playing; do
   if [ ! -e "$binary" ]; then
