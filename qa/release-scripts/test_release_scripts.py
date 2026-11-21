@@ -107,7 +107,7 @@ class ReleaseScripts(unittest.TestCase):
         # Only substitute the macOS-only absolute PlistBuddy path; all shell control flow is original.
         bundle = self.root / "scripts/bundle.sh"
         bundle.write_text(bundle.read_text().replace("/usr/libexec/PlistBuddy", "plistbuddy"))
-        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements"):
+        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements", "PrivacyInfo.xcprivacy"):
             (self.root / "Resources" / name).write_text("fixture")
         for name in ("dist", "icons", "node_modules"):
             (self.root / "extension" / name).mkdir(parents=True)
@@ -241,6 +241,11 @@ class ReleaseScripts(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual((target / "Contents/MacOS/Zeus").read_text(), "previous-app")
         self.assertFalse((self.root / "Rollbacks").exists())
+
+    def test_bundle_flag_parsing(self):
+        script = REPO / "qa/release-scripts/test_bundle_flags.sh"
+        result = subprocess.run(["bash", str(script)], cwd=REPO, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_test_defaults_cleanup_reaches_matching_domains_only(self):
         result = self.run_script("test.sh")
