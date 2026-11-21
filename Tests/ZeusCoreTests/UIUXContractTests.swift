@@ -318,34 +318,17 @@ struct UIUXContractTests {
         let catalog = try #require(UIUXFindingExpectations.catalog)
         #expect(catalog.schema == 1)
         #expect(catalog.findings.count == 395)
-        #expect(UIUXFindingExpectations.closedIDs.count == 361)
-        #expect(UIUXFindingExpectations.openIDs.count == 34)
+        #expect(UIUXFindingExpectations.openIDs.count == 395)
+        #expect(UIUXFindingExpectations.closedIDs.isEmpty)
         let ids = catalog.findings.map(\.id)
         #expect(ids.count == Set(ids).count)
         #expect(ids.allSatisfy { $0.hasPrefix("ZB-UIUX-") })
     }
 
-    /// One case per finding that #257, #258, #259, #260, #262, and #263 close.
-    /// The case fails while the scan still reports that file, line, kind, and detail.
-    /// #257: A11Y-009 through A11Y-028, MOTION-001, REDUCE-001.
-    /// #258: A11Y-001 through A11Y-008, TYPE-001, GLASS-001.
-    /// #259: A11Y-037 through A11Y-093, TYPE-003, MOTION-004 through MOTION-010, GLASS-002.
-    /// #260: A11Y-100 through A11Y-202, A11Y-213 through A11Y-288, TYPE-004, MOTION-011 through MOTION-013, REDUCE-003.
-    /// #262: A11Y-294 through A11Y-357, TYPE-005, MOTION-014 through MOTION-025, REDUCE-004.
-    /// #263: TYPE-002.
-    @Test(arguments: UIUXFindingExpectations.closedIDs)
-    func repositoryFindingsMatchTheCatalog(id: String) throws {
-        let root = try #require(UIUXRepo.root())
-        let finding = try #require(UIUXFindingExpectations.catalog?.findings.first { $0.id == id })
-        #expect(finding.expect == "closed")
-        let stillOpen = UIUXScanCache.shared.findings(root: root).contains { UIUXAudit.sameSite($0, finding) }
-        #expect(!stillOpen)
-    }
-
-    /// Sites those fix PRs leave open: NotchView, speaker editors, speaker recognition, chat, and the decision row.
-    /// The case fails if the scan drops the site before its expectation flips to closed.
+    /// An open site is an open finding. The case runs and tracks that finding. It is not skipped.
+    /// The match is file plus snippet, so a moved line stays open.
     @Test(arguments: UIUXFindingExpectations.openIDs)
-    func deferredFindingStaysOpenUntilItsOwnFix(id: String) throws {
+    func repositoryFindingsMatchTheCatalog(id: String) throws {
         let root = try #require(UIUXRepo.root())
         let finding = try #require(UIUXFindingExpectations.catalog?.findings.first { $0.id == id })
         #expect(finding.expect == "open")

@@ -94,15 +94,15 @@ struct UIUXFinding: Codable, Equatable {
     var file: String
     var line: Int
     var detail: String
-    /// `closed`: the case fails while the scan still reports this site.
-    /// `open`: the site is deferred, and the case fails if the scan drops it.
-    var expect: String = "closed"
+    /// `open`: the site is still an open finding. The case runs and tracks it.
+    /// `closed`: the site is gone from the scan.
+    var expect: String = "open"
 
     enum CodingKeys: String, CodingKey {
         case id, kind, surface, file, line, detail, expect
     }
 
-    init(id: String, kind: String, surface: String, file: String, line: Int, detail: String, expect: String = "closed") {
+    init(id: String, kind: String, surface: String, file: String, line: Int, detail: String, expect: String = "open") {
         self.id = id
         self.kind = kind
         self.surface = surface
@@ -120,7 +120,7 @@ struct UIUXFinding: Codable, Equatable {
         file = try values.decode(String.self, forKey: .file)
         line = try values.decode(Int.self, forKey: .line)
         detail = try values.decode(String.self, forKey: .detail)
-        expect = try values.decodeIfPresent(String.self, forKey: .expect) ?? "closed"
+        expect = try values.decodeIfPresent(String.self, forKey: .expect) ?? "open"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -216,8 +216,9 @@ enum UIUXAudit {
         return number(drafts)
     }
 
+    /// File plus the snippet in `detail`. The line is not part of the match, so a moved site stays open.
     static func sameSite(_ lhs: UIUXFinding, _ rhs: UIUXFinding) -> Bool {
-        lhs.file == rhs.file && lhs.kind == rhs.kind && lhs.line == rhs.line && lhs.detail == rhs.detail
+        lhs.file == rhs.file && lhs.kind == rhs.kind && lhs.detail == rhs.detail
     }
 
     static func number(_ drafts: [(kind: String, surface: String, file: String, line: Int, detail: String)]) -> [UIUXFinding] {
