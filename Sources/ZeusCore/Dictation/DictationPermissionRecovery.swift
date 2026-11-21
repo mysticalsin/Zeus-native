@@ -24,12 +24,18 @@ public enum DictationPermissionGate {
     public static let microphonePane = "Privacy_Microphone"
     public static let speechPane = "Privacy_SpeechRecognition"
 
-    /// Current behavior, kept so the failing test can name it: every refusal is text, and nothing asks.
+    /// A refused permission opens its privacy pane. A permission that was never asked is prompted.
+    /// A local engine does not need speech recognition.
     public static func decide(microphone: DictationAccess, speech: DictationAccess, localEngineReady: Bool) -> DictationPermissionRecovery {
-        if microphone != .authorized {
-            return .showSettings(message: "Dictation needs the microphone", pane: nil)
+        switch microphone {
+        case .notDetermined:
+            return .prompt(.microphone)
+        case .denied:
+            return .showSettings(message: "Dictation needs the microphone.", pane: microphonePane)
+        case .authorized:
+            if localEngineReady || speech == .authorized { return .start }
+            if speech == .notDetermined { return .prompt(.speech) }
+            return .showSettings(message: "Dictation needs speech recognition.", pane: speechPane)
         }
-        if localEngineReady || speech == .authorized { return .start }
-        return .showSettings(message: "Speech recognition is unavailable", pane: nil)
     }
 }
