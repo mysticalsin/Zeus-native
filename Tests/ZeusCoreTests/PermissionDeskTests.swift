@@ -42,6 +42,17 @@ struct PermissionDeskTests {
         #expect(gone.reason == "Unavailable")
     }
 
+    @Test func aDeniedPromptableRowOpensSettings() {
+        let calendar = PermissionDesk.can(resource: .calendar, action: .advance, status: .denied)
+        #expect(calendar.can)
+        #expect(calendar.reason == "Open Settings")
+        let microphone = PermissionDesk.can(resource: .microphone, action: .advance, status: .denied)
+        #expect(microphone.reason == "Open Settings")
+        #expect(PermissionDesk.observed(authorized: false, denied: true) == .denied)
+        #expect(PermissionDesk.observed(authorized: true, denied: true) == .allowed)
+        #expect(PermissionDesk.observed(authorized: false, denied: false) == .unknown)
+    }
+
     @Test func theCalendarReaderRunsOnlyWhenThatRowIsTapped() {
         #expect(PermissionDesk.readsCalendar(kind: .calendar, tapped: true))
         #expect(PermissionDesk.readsCalendar(kind: .calendar, tapped: false) == false)

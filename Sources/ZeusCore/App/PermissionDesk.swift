@@ -89,4 +89,9 @@ public enum PermissionDesk {
             return Decision(can: true, reason: prompts ? "Allow" : "Open Settings")
         }
     }
+
+    /// Red: a denial is stored as not asked.
+    public static func observed(authorized: Bool, denied: Bool) -> Status {
+        authorized ? .allowed : .unknown
+    }
 }
