@@ -56,7 +56,7 @@ GROUPS = {
     ),
     "keychain": (
         core("Keychain/KeychainStore.swift"),
-        tests("KeychainStoreTests"),
+        tests("KeychainStoreTests", "DataProtectionKeychainTests"),
     ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
