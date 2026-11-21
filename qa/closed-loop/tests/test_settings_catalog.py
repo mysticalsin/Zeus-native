@@ -102,6 +102,21 @@ class SettingsGenerationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'explicit opt-in'):
             module.validate_table()
 
+    def test_local_agenda_switch_lives_on_the_todo_page_and_stays_off(self):
+        module = generator()
+        index = next(i for i, row in enumerate(module.R) if row[7] == 'todo.microsoftLocal')
+        row = module.R[index]
+        self.assertEqual(row[0], 'todo')
+        self.assertEqual(row[8], 'toggle')
+        self.assertEqual(row[10], 'false')
+        self.assertEqual(row[11], 'live')
+        self.assertIn('import never turns it on', row[12])
+        hidden = list(row)
+        hidden[11] = 'stub'
+        module.R[index] = tuple(hidden)
+        with self.assertRaisesRegex(ValueError, 'stays off until turned on, and the switch lives on the To-do page'):
+            module.validate_table()
+
     def test_later_duplicate_cannot_conceal_the_emitted_unsafe_default(self):
         module = generator()
         index = next(i for i, row in enumerate(module.R) if row[7] == 'voice.heyZeus')

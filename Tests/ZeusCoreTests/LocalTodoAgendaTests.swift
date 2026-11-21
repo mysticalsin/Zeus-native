@@ -114,15 +114,17 @@ struct LocalTodoAgendaTests {
         #expect(stayed.1.isEmpty)
     }
 
-    @Test func theCatalogKeepsTheSwitchOffAndHidden() throws {
+    @Test func theCatalogKeepsTheSwitchOffOnTheTodoPage() throws {
         let catalog = try repoText("Sources/Zeus/App/SettingsCatalog.swift")
         let line = catalog.split(separator: "\n").first { $0.contains("id: \"\(LocalTodoAgendaSetting.id)\"") }
         let row = try #require(line.map(String.init))
+        #expect(row.contains("section: .todo"))
         #expect(row.contains("defaultValue: \"false\""))
-        #expect(row.contains("state: .stub"))
+        #expect(row.contains("state: .live"))
+        #expect(!row.contains(".privacy"))
         let generator = try repoText("scripts/gen-settings-catalog.py")
         #expect(generator.contains("'\(LocalTodoAgendaSetting.id)'"))
-        #expect(generator.contains("todo.microsoftLocal stays off and hidden"))
+        #expect(generator.contains("todo.microsoftLocal stays off until turned on, and the switch lives on the To-do page"))
     }
 
     @Test func accessMapsAReadGrantAndTreatsWriteOnlyAsDenied() {

@@ -1,22 +1,22 @@
 # Local tasks and agenda
 
-**Branch:** `zeus-bot/local-todo-agenda`
+**Branch:** `zeus-bot/local-todo-agenda-ui`
 
-**Base:** `codex/integration-20261111`
+**Base:** `zeus-bot/local-todo-agenda` (pull request #163)
 
-**Status:** Draft. The top bar is not wired. Tony approves the mock-up before that follow-up.
+**Status:** Draft. Tony approved the mock-up and all six defaults (card t2039s8490). The existing To-do page shows the read. The switch is on the To-do settings page.
 
 ## Ticket
 
 Tony, verbatim (t1990u): "the to-do section can actually pull my to-dos from Microsoft To Do on my Mac, and it could also pull, like, my agenda from my Outlook on my Mac without necessarily connecting to Microsoft Entra ID."
 
-The packaged build of this slice has the read, the off switch, and the states. It does not yet show them in the notch.
+The packaged build has the read, the off switch, and the states. This branch shows them in the existing To-do page.
 
 ## Done when
 
 - The read is local and read-only. No Entra, MSAL, or Graph sign-in. No network call, token, cookie, or Keychain read. No write to a task or an event.
 - Nothing reads another app's container or Group Container.
-- The feature stays off until `todo.microsoftLocal` is turned on. That id lives in the settings catalog, default `false`, state `stub`, so the row is stored and not shown.
+- The feature stays off until `todo.microsoftLocal` is turned on. That id lives in the settings catalog, default `false`, state `live`, on the To-do settings page. A settings import cannot turn it on.
 - Missing apps, a denied prompt, and an empty day each have their own phase. The phase switch has no `default`.
 - Tests use synthetic records. The red commit is `7adc28b26f57decfae7c70a68ba8fb59cae396e2`.
 
@@ -40,7 +40,7 @@ Bundle identifiers used only as a presence probe, through `NSWorkspace.urlForApp
 
 ## Decision
 
-**Primary route:** EventKit, read-only, and only for sources that are Exchange or whose name is Outlook or Exchange (exact, or the prefix `outlook ` / `exchange `). That is the account the Mac already has. Zeus does not sign in.
+**Primary route:** EventKit, read-only, for a source whose kind is Exchange or whose name is Outlook or Exchange (exact, or the prefix `outlook ` / `exchange `). That check is a source-name and source-kind filter. It is not account scoping. Zeus does not sign in.
 
 **Not built, and why:**
 
@@ -86,30 +86,29 @@ The pull takes a clock. Tests pass a fixed instant. There is no `Date()` inside 
 
 There is no type named `SettingsSectionRegistry` on `codex/integration-20261111`. The registry that exists is `SettingsCatalog`, generated from `scripts/gen-settings-catalog.py`.
 
-`todo.microsoftLocal` is a privacy toggle, default `false`, state `stub`. Stub rows are stored and exported and `isShown` is false, so Settings does not draw the row. The generator rejects a `true` default and rejects showing the row early. The follow-up changes `stub` to a visible row after the mock-up is approved. An import must not turn it on; the default stays false, same as the other opt-ins in that table.
+`todo.microsoftLocal` is a toggle on the To-do settings page, default `false`, state `live`. The generator rejects a `true` default and rejects hiding the row or moving it off that page. An import must not turn it on; the default stays false, same as the other opt-ins in that table.
 
 ## Privacy
 
-- Prompts, when the follow-up wires them, are `requestFullAccessToEvents` and `requestFullAccessToReminders`. Those are the ordinary system prompts. Nothing edits TCC.
+Agenda data is never sent to an LLM or the network unless the user explicitly asks.
+
+- Prompts are `requestFullAccessToEvents` and `requestFullAccessToReminders`, and only after the switch is on. Those are the ordinary system prompts. Nothing edits TCC. Switching off cancels any in-flight read and drops the reader and the `EKEventStore`.
+- `Resources/Zeus.entitlements` does not contain `com.apple.security.personal-information.calendars`. Apple lists that key among the hardened-runtime resource entitlements for calendar access. This change does not add it. The prompt text is the existing `NSCalendarsFullAccessUsageDescription` and `NSRemindersFullAccessUsageDescription`. Whether a signed hardened build shows the sheet without that key is unverified here.
 - The usage strings already in `Resources/Info.plist` are the ones those prompts show. This slice does not change them.
 - The EventKit file is behind `canImport(EventKit)`. Its source is scanned for save, remove, commit, AppleScript, URL sessions, MSAL, Entra, Keychain, cookies, Graph, and container paths.
 - Presence uses a bundle identifier lookup. It does not open the app or its container.
 
-## Follow-up
+## Approved defaults
 
-Branch suggestion: `zeus-bot/local-todo-agenda-ui`, after Tony accepts `mockup.md`.
+Tony approved these on card t2039s8490:
 
-- Change `todo.microsoftLocal` from `stub` to a visible row on the existing Privacy page, or on the existing To-do settings page if he prefers that home.
-- Fill the existing To-do page and the existing Agenda list. No new window.
-- Ask for Calendar and Reminders only after the switch is on.
-- Keep Reduce Motion and VoiceOver as the mock-up describes.
-- Do not script Outlook or To Do in that PR either, unless Tony has approved that prompt.
+1. EventKit only.
+2. The legacy AppleScript path stays deferred.
+3. No Full Disk Access.
+4. Calendars that are not Exchange or Outlook come later. This slice keeps the source-name and source-kind filter. It is not account scoping.
+5. Undated tasks are included, in a separate group.
+6. The switch lives on the To-do settings page.
 
-## Open questions
+## This branch
 
-1. Is EventKit enough when new Outlook keeps a calendar that Internet Accounts does not have?
-2. Do you want the legacy-Outlook Apple Event investigated after this, knowing new Outlook will not answer it?
-3. Is Full Disk Access in or out? This slice leaves it out.
-4. Agenda is only the Exchange or Outlook sources. Should a later slice show the other calendars too?
-5. Undated Microsoft tasks are included. Should the list be today and overdue only?
-6. Privacy is the catalog home because the row reads personal data and stays hidden for now. The To-do settings page is the other place it could sit.
+`zeus-bot/local-todo-agenda-ui` fills the existing To-do page. There is no new window and no new tab. Calendar and Reminders are asked only after the switch is on. Reduce Motion holds the loading bar still. VoiceOver uses the state name plus "To-do and Agenda". Outlook and To Do are not scripted.

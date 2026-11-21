@@ -7,8 +7,35 @@ struct TodoPage: View {
     let topBar: TopBarModel
     let todo: TodoController
 
-    var body: some View { list.onDisappear { todo.endVoice() } }
-    private var list: some View {
+    var body: some View {
+        let page = LocalTodoAgendaSurfaceMap.make(
+            phase: LocalTodoAgendaController.shared.phase,
+            ownItems: todo.open.map { LocalTodoAgendaOwnItem(title: $0.title, meta: $0.due ?? "Today") },
+            reduceMotion: Motion.reduced)
+        arranged(page)
+            .onAppear { LocalTodoAgendaController.shared.syncFromSettings() }
+            .onDisappear { todo.endVoice() }
+    }
+
+    /// Off keeps the existing list. Every other phase replaces it with the read. The tab row and page motion stay as they are.
+    @ViewBuilder
+    private func arranged(_ page: LocalTodoAgendaSurface) -> some View {
+        Group {
+            if page.showsOwnList {
+                HStack(alignment: .top, spacing: 10) {
+                    list(note: page.left.note)
+                    LocalTodoAgendaColumnView(column: page.right, moves: page.loadingBarMoves)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(page.voiceOverLabel)
+            } else {
+                LocalTodoAgendaPanels(surface: page)
+            }
+        }
+        .animation(nil, value: page.voiceOverLabel)
+    }
+
+    private func list(note: String?) -> some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
                 TodoInput(todo: todo)
@@ -50,6 +77,13 @@ struct TodoPage: View {
                         ForEach(todo.visible) { item in TodoRow(item: item, topBar: topBar, todo: todo) }
                     }
                 }
+            }
+            if let note {
+                Text(note)
+                    .font(TopBarStyle.label(11.5))
+                    .foregroundStyle(Color.white.opacity(0.60))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(note)
             }
             HStack(spacing: 8) {
                 Image(systemName: todo.noteName == nil ? "internaldrive" : "diamond.fill")

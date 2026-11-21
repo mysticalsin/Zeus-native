@@ -33,6 +33,6 @@ Each drawing is a group whose label is the state name plus "To-do and Agenda". T
 
 When this is wired, focus stays in the open notch. Turning the feature on moves VoiceOver to the new status line. A denied or missing state does not trap focus. The system permission sheet is macOS's, and Zeus does not speak over it.
 
-## Not in this branch
+## Wired
 
-No SwiftUI view reads these states. The follow-up is in `spec.md`.
+The To-do page reads these states. The drawing is still not an app screenshot. Linux cannot show the notch.

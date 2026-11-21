@@ -4,7 +4,7 @@ Source: a reference app (build 26) from app-71mb.dmg, studied on the box: the fr
 
 Sidebar (the reference app order): General, Appearance, Notifications, Sounds, Voice, Dictation, Shortcut, Integrations, Permissions, Privacy, Interview, iPhone, Diagnostics, License. The Assistant (ChatGPT sign-in) strings exist but have no sidebar icon in 0.3.1.
 
-**Coverage:** 215 of 215 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 215 in scope). 203 are wired to real behaviour (94%). 12 are labelled stubs with a TODO. 0 are excluded.
+**Coverage:** 215 of 215 the reference app options are in Zeus Settings with a matching control (100% of all, 100% of the 215 in scope). 204 are wired to real behaviour (94%). 11 are labelled stubs with a TODO. 0 are excluded.
 
 **Before this round:** has 19, partial 27, missing 164.
 
@@ -201,7 +201,6 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Face presence | Face presence | toggle | - | Locks the Mac when no enrolled face has been seen for the time you pick. Off until you turn it on. | missing | live | `face.presence` | Zeus addition (docs/FACE-PRESENCE-PLAN.md). The camera opens only after the switch is on, and stops on lock, sleep and switch off. Zeus never unlocks the Mac, never types a login password and keeps no image. An import never turns it on. |
 | Face presence | Lock after absent for | menu | - | How long no enrolled face may be missing before the Mac locks. | missing | live | `face.lockAfter` | Zeus addition. Counted from the last time an enrolled face was seen. |
 | Face presence | Status | status | - |  | missing | custom | `face.status` | Zeus addition. Hand-built row on the card: one word and a symbol, with the time left while away. |
-| Tasks and agenda | Tasks and agenda from this Mac | toggle | - | Shows tasks and the day's agenda from Microsoft accounts already on this Mac. Off until you turn it on. Read only. | missing | stub | `todo.microsoftLocal` | Zeus addition. Off by default. Stored, not shown, until the top bar wiring is approved. Reads calendars and reminders the Mac already has. No sign-in. |
 | Access | Open Accessibility settings | button | - | Jumps to System Settings. | has | live | `privacy.openAccessibility` |  |
 
 ## Interview
@@ -335,6 +334,12 @@ Status key: **live** wired this round, **custom** an existing hand-built Zeus ro
 | Fling | Flick sensitivity | segmented | - | How fast a drag must be to count as a flick toward a nearby Mac. | missing | live | `fling.flickSensitivity` | Zeus addition. 1800, 1200 or 800 points per second over the last 80 ms. |
 | Fling | Open received links in the browser | toggle | - | A link from a paired Mac opens in your browser when it arrives. Only http and https links. | missing | live | `fling.openLinks` | Zeus addition. A link from a Mac that is not paired is kept as a file and never opened. |
 | Fling | Paired Macs | button | - | The Macs you paired. Remove one and it must pair again before it can send. | missing | custom | `fling.pairedMacs` | Zeus addition. Hand-built list on the Shelf page; Remove deletes the key from the Keychain. |
+
+## To-do
+
+| Group | Reference option | Control | Reference default | What it does | Zeus before | Zeus now | Zeus id | Note |
+|---|---|---|---|---|---|---|---|---|
+| Tasks and agenda | Tasks and agenda from this Mac | toggle | - | Shows tasks and the day's agenda from the calendars and reminders already on this Mac. Off until you turn it on. Read only. Zeus does not sign in. | missing | live | `todo.microsoftLocal` | Zeus addition. Off by default. The switch is on the To-do settings page. A settings import never turns it on. Reads calendars and reminders the Mac already has. Agenda data is never sent to an LLM or the network unless the user explicitly asks. No sign-in. No Full Disk Access. |
 
 ## Zeus additions beyond the reference app
 
