@@ -287,6 +287,32 @@ struct FaceTemplateAccessTests {
         #expect(FaceTemplateDomainGate.effect(stored: nil, evaluation: .succeeded(new), enrolled: false) == .allow(new))
     }
 
+    @Test func writeFailsWhenTheEpochWriteFails() {
+        #expect(FaceTemplateEpochWrite.reported(template: .success(()), epochSaved: false) == .failure(.unavailable))
+        #expect(FaceTemplateEpochWrite.reported(template: .success(()), epochSaved: true) == .success(()))
+        #expect(FaceTemplateEpochWrite.reported(template: .failure(.cancelled), epochSaved: false) == .failure(.cancelled))
+    }
+
+    @Test func failedEpochDeleteDoesNotLeaveAStaleEpoch() {
+        let stale = Data("epoch-a".utf8)
+        let now = Data("epoch-b".utf8)
+        #expect(FaceTemplateEpochDelete.cleared([false, true]))
+        #expect(!FaceTemplateEpochDelete.cleared([false]))
+        #expect(FaceTemplateEpochDelete.binding(epoch: stale, enrolled: false) == nil)
+        let stored = FaceTemplateEpochDelete.binding(epoch: stale, enrolled: false)
+        #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .succeeded(now), enrolled: false) == .allow(now))
+        #expect(FaceTemplateEpochDelete.binding(epoch: stale, enrolled: true) == stale)
+    }
+
+    @Test func policyReplyWaitStopsAtTheExistingPromptTimeout() {
+        let state = Data("epoch-a".utf8)
+        #expect(FaceTemplatePolicyWait.limit == FaceTemplatePolicyWait.promptTimeout)
+        #expect(FaceTemplatePolicyWait.limit == FlingLimits.promptTimeout)
+        #expect(FaceTemplatePolicyWait.evaluation(replied: true, waited: FaceTemplatePolicyWait.limit, state: state) == .failed)
+        #expect(FaceTemplatePolicyWait.evaluation(replied: true, waited: 0, state: state) == .succeeded(state))
+        #expect(FaceTemplatePolicyWait.evaluation(replied: false, waited: 0, state: state) == .failed)
+    }
+
     @Test func failedEpochAddKeepsThePreviousRecord() {
         let existing = Data("epoch-a".utf8)
         let next = Data("epoch-b".utf8)
