@@ -57,16 +57,21 @@ final class VoiceTurnController {
     @MainActor struct Seams {
         /// The key-press warm-ups (brain, voice, local-model probe) stay written in `press()`; tests turn them off.
         var warmsOnPress = true
-        var duckBegin: @MainActor () -> Void = { SystemAudioDucker.begin() }
-        var duckEnd: @MainActor () -> Void = { SystemAudioDucker.end() }
+        var duckBegin: @MainActor () -> Int = { SystemAudioDucker.begin() }
+        var duckEnd: @MainActor (Int) -> Void = { SystemAudioDucker.end($0) }
+        var duckEndAll: @MainActor () -> Void = { SystemAudioDucker.endAll() }
         var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureAll() }
         var speechStart: @MainActor (SpeechInput) throws -> Int = { try $0.start() }
-        var speechStop: @MainActor (SpeechInput) async -> String = { await $0.stop() }
-        static func silent() -> Seams { Seams(warmsOnPress: false, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
+        var speechStop: @MainActor (SpeechInput, Int?) async -> String = { await $0.stop(ifSession: $1) }
+        static func silent() -> Seams {
+            Seams(warmsOnPress: false, duckBegin: { 0 }, duckEnd: { _ in }, duckEndAll: {}, captureScreens: { [] })
+        }
     }
     var seams = Seams()
     /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
     private var talkSession: Int?
+    /// The duck holder for the turn that is listening or speaking. A newer holder wins.
+    private var duckToken = 0
     /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
     private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
@@ -186,7 +191,7 @@ final class VoiceTurnController {
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
         speaker.stop()
-        seams.duckEnd()
+        seams.duckEndAll()
         wakeConversationActive = false
         buddy.model.captionVisible = false
         buddy.idle()
@@ -256,7 +261,7 @@ final class VoiceTurnController {
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
         ZeusSound.play(.listenStart)
-        seams.duckBegin()
+        duckToken = seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
         FastPath.shared.reset()
@@ -280,18 +285,18 @@ final class VoiceTurnController {
         }
         listening = false
         speech.onCaptureFailure = nil
+        let session = talkSession
         talkSession = nil
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
         ZeusSound.play(.listenStop)
-        seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil
         buddy.think()
         let run = turnRun.begin()
         turnTask = Task {
-            let result = await finishTurn()
+            let result = await finishTurn(speechSession: session)
             let live = turnRun.finish(run)
             if live, wakeConversationActive, result.error == nil, !result.cancelled {
                 handsFree()
@@ -350,7 +355,7 @@ final class VoiceTurnController {
         tabTask?.cancel()
         tabTask = nil
         turnEngine = nil
-        seams.duckEnd()
+        seams.duckEnd(duckToken)
         liveWords.clear()
         buddy.model.audioLevel = nil
         buddy.model.captionVisible = false
@@ -449,8 +454,8 @@ final class VoiceTurnController {
         Task { await brain.cancel(turn: turn) }
     }
 
-    private func finishTurn() async -> TurnResult {
-        var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
+    private func finishTurn(speechSession: Int?) async -> TurnResult {
+        var transcript = await seams.speechStop(speech, speechSession).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
             transcript = await dictation.transcribeVoice(samples: samples, live: transcript, with: engine)
@@ -458,7 +463,16 @@ final class VoiceTurnController {
         }
         turnEngine = nil
         buddy.model.audioLevel = nil
-        return await complete(transcript: transcript, finalAt: .now)
+        let result = await complete(transcript: transcript, finalAt: .now)
+        await releaseDuckAfterSpeech()
+        return result
+    }
+
+    /// The listen duck stays up through the spoken reply. It drops when this turn's holder is still
+    /// the newest one and the speaker has gone quiet.
+    private func releaseDuckAfterSpeech() async {
+        while speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
+        seams.duckEnd(duckToken)
     }
 
     /// A finished transcript: approval answers, walkthrough steering, the fast path, then the LLM.
@@ -1272,12 +1286,13 @@ final class VoiceTurnController {
     func say(_ text: String) {
         VoiceLog.logContent("spoken", text)
         if SettingsStore.shared.bool("voice.speakReplies") {
-            seams.duckBegin()
+            let token = seams.duckBegin()
+            duckToken = token
             speaker.speak(Self.voiced(text))
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 while self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
-                self.seams.duckEnd()
+                self.seams.duckEnd(token)
             }
         }
         buddy.showCaption(text)

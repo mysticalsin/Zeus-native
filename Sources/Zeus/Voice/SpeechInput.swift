@@ -674,11 +674,13 @@ final class SpeechInput: @unchecked Sendable {
     /// Without Apple recognition it returns at once with an empty transcript.
     /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
     /// final text, so release must not wait for Apple's second pass).
-    func stop(waitForFinal: Bool = true) async -> String {
-        let (session, capture) = lock.withLock { () -> (Int, Capture) in
+    func stop(waitForFinal: Bool = true, ifSession only: Int? = nil) async -> String {
+        let taken = lock.withLock { () -> (Int, Capture)? in
+            if let only, !SpeechSessionStop.affectsCurrent(stopSession: only, current: generation) { return nil }
             stopRequested = true
             return (generation, takeCapture())
         }
+        guard let (session, capture) = taken else { return "" }
         beforeStopAudioForTesting?()
         release(capture)
         guard recognizes else { return "" }

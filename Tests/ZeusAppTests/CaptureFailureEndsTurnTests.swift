@@ -47,7 +47,11 @@ struct CaptureFailureEndsTurnTests {
             mic.session = session
             return session
         }
-        seams.speechStop = { _ in mic.stops += 1; return mic.heard }
+        seams.speechStop = { _, session in
+            if let session, session != mic.session { return mic.heard }
+            mic.stops += 1
+            return mic.heard
+        }
         controller.seams = seams
         return (controller, bar)
     }
