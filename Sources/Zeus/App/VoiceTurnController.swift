@@ -931,12 +931,14 @@ final class VoiceTurnController {
         func handle(_ output: ZeusTagStreamParser.Output) {
             switch output {
             case .tag(.point(let target?)):
+                fillerGate.noteToolOrPointer()
                 ActionSpeedLog.shared.mark(.firstToolDecision)
                 if let point = globalPoint(x: target.x, y: target.y, screen: target.screen, in: shots) {
                     buddy.point(to: point, label: target.label ?? "right here")
                     pointed = true
                 }
             case .tag(.highlight(let area)):
+                fillerGate.noteToolOrPointer()
                 ActionSpeedLog.shared.mark(.firstToolDecision)
                 if let point = globalPoint(x: area.x + area.width / 2, y: area.y + area.height / 2,
                                            screen: area.screen, in: shots) {
@@ -945,6 +947,7 @@ final class VoiceTurnController {
                 }
             case .tag(.action(let action)):
                 actionStarted = true
+                fillerGate.noteToolOrPointer()
                 ActionSpeedLog.shared.mark(.firstToolDecision)
                 if restricted {
                     // Refused at the boundary: nothing is run, and the reply says so.
@@ -1012,6 +1015,7 @@ final class VoiceTurnController {
             case .tag(.point(nil)):
                 break
             case .tag(.draw(let draw)):
+                fillerGate.noteToolOrPointer()
                 ActionSpeedLog.shared.mark(.firstToolDecision)
                 guard drawing, !drawBegun, let shot = shots.first,
                       TalkSightPolicy.drawAllowed(winner: winnerID, request: request,
@@ -1122,7 +1126,7 @@ final class VoiceTurnController {
                     deepTier: deepTier, deepReason: deepReason,
                     callbacks: FastRaceRun.Callbacks(
                         filler: { [weak self] in
-                            guard speak, let self, fillerGate.take() else { return }
+                            guard speak, let self, !ActFirst.suppressesFiller(transcript), fillerGate.take() else { return }
                             let line = AckLines.filler(personality: ZeusPersonality.current())
                             VoiceLog.log("timing", "filler at \(msSinceRelease()) ms, nothing streamed yet")
                             self.say(line)
