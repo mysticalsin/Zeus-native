@@ -800,6 +800,9 @@ private struct TopBarPanelBody: View {
     let topBar: TopBarModel
     let barHeight: CGFloat
     let notchWidth: CGFloat
+    @State private var agentsPage = AgentsPage.fresh()
+    @State private var agentsReply = ""
+    @FocusState private var agentsApprovalFocused: Bool
 
     /// Glance's layout (TOPBAR-SPEC §2-4): the notch row stays empty, the tab capsule sits at
     /// y 41 (24 in from the body), the page starts at y 82 (18 in), 14 above the bottom. Ambient
@@ -815,7 +818,7 @@ private struct TopBarPanelBody: View {
                     .padding(.trailing, GlanceTopBar.rowTrailing)
                 Color.clear.frame(height: GlanceTopBar.cardTop - GlanceTopBar.tabRowTop - GlanceTopBar.tabRowHeight)
                 VStack(alignment: .leading, spacing: 8) {
-                    if let approval = model.approval {
+                    if let approval = model.approval, topBar.selectedTab != .agents {
                         ApprovalBody(approval: approval, compact: false)
                             .padding(12)
                             .background(Theme.ember.opacity(0.08), in: RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous))
@@ -836,18 +839,57 @@ private struct TopBarPanelBody: View {
     }
 
     private var agents: some View {
-        PageScroll(.vertical) {
-            VStack(spacing: 8) {
-                if model.sessions.isEmpty {
-                    VStack(spacing: 6) {
-                        Image(systemName: "bolt.horizontal.circle").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.cloudQuiet)
-                        Text("No agents running. Start Claude Code and it shows up here.")
-                            .font(.system(size: 11.5, design: .rounded)).foregroundStyle(Theme.cloudSecondary)
-                    }
-                    .frame(maxWidth: .infinity).padding(.top, 34)
+        Group {
+            if agentsPage.schedulesOneSecondTimer {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    agentsStack(now: context.date)
+                        .onChange(of: context.date) { _, _ in agentsPage = agentsPage.applying(.tick) }
                 }
-                ForEach(Array(model.sessions.enumerated()), id: \.element.id) { index, session in
-                    AgentCard(session: session, onStop: model.stopHandlers[session.id], picked: model.picker?.index == index)
+            } else {
+                agentsStack(now: .now)
+            }
+        }
+        .onAppear { syncAgents(now: .now) }
+        .onChange(of: model.sessions) { _, _ in syncAgents(now: .now) }
+        .onChange(of: model.approval?.id) { _, _ in syncAgents(now: .now) }
+        .onChange(of: model.presentation) { _, _ in syncAgents(now: .now) }
+    }
+
+    private func agentsStack(now: Date) -> some View {
+        let copy = HubScreenMachine.copy(agentsPage.screen)
+        let selected = agentsPage.selectedID
+        return PageScroll(.vertical) {
+            VStack(alignment: .leading, spacing: 8) {
+                if agentsPage.screen.screen != .ready || agentsPage.roster.isEmpty {
+                    agentsNotice(copy)
+                }
+                if agentsPage.screen.screen == .ready || (agentsPage.screen.screen == .connectionError && !agentsPage.roster.isEmpty) {
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            SessionListView(
+                                groups: agentListGroups(now: now),
+                                selectedID: selected,
+                                hidesDetails: MeetingState.hideDetails,
+                                reduceMotionOverride: agentsPage.reduceMotion,
+                                onToggleGroup: { agentsPage = agentsPage.applying(.toggleGroup($0)) },
+                                onSelectRow: { agentsPage = agentsPage.applying(.select($0)) },
+                                onOpenRow: { openAgent($0) }
+                            )
+                            if agentsPage.approvalGrown {
+                                approvalRow
+                            }
+                            if agentsPage.undoTicksLeft > 0 {
+                                NotchButton(title: "Undo", tint: Theme.cloudSecondary, filled: false) {
+                                    agentsPage = agentsPage.applying(.undo)
+                                }
+                                .accessibilityLabel("Undo")
+                            }
+                        }
+                        .frame(width: selected == nil ? nil : 270, alignment: .leading)
+                        if let selected {
+                            agentDetail(selected)
+                        }
+                    }
                 }
                 if model.picker != nil {
                     Text("Up and Down pick  ·  Return opens the terminal  ·  Esc closes")
@@ -855,6 +897,249 @@ private struct TopBarPanelBody: View {
                 }
             }
         }
+    }
+
+    private func agentsNotice(_ copy: HubScreenCopy) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: "bolt.horizontal.circle").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.cloudQuiet)
+            if let sentence = copy.sentence {
+                Text(sentence)
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .multilineTextAlignment(.center)
+            }
+            if let detail = copy.detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: 11.5, design: .rounded))
+                    .foregroundStyle(Theme.cloudSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            if copy.actionTitle == "New chat" {
+                NotchButton(title: "New chat", tint: Theme.cloudSecondary, filled: false) { openNewChat() }
+                    .accessibilityLabel("New chat")
+            }
+            if agentsPage.showsTryAgain {
+                NotchButton(title: "Try again", tint: Theme.cloudSecondary, filled: false) {
+                    agentsPage = agentsPage.applying(.tryAgain)
+                }
+                .accessibilityLabel("Try again")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 34)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var approvalRow: some View {
+        HubDecisionRow(
+            request: decisionRequest,
+            queue: HubDecisionQueue(thisRowIsQueued: false, count: agentsPage.queuedRequests.count),
+            scope: .approval,
+            reply: $agentsReply,
+            answerKeysOn: SettingsStore.shared.bool("shortcut.answerKeys"),
+            detailsHidden: MeetingState.hideDetails,
+            reduceMotion: agentsPage.reduceMotion,
+            onVerdict: resolveApproval
+        )
+        .focused($agentsApprovalFocused)
+        .onHover { agentsPage = agentsPage.applying(.hover($0)) }
+        .onChange(of: agentsApprovalFocused) { _, focused in agentsPage = agentsPage.applying(.focus(focused)) }
+    }
+
+    private var decisionRequest: HubDecisionRequest? {
+        guard let request = agentsPage.showingRequest else { return nil }
+        return HubDecisionRequest(
+            tool: request.tool,
+            highRisk: request.highRisk,
+            command: request.command,
+            secondsLeft: agentsPage.secondsLeft,
+            allowsAsk: true
+        )
+    }
+
+    private func agentDetail(_ id: String) -> some View {
+        let session = agentsPage.roster.first { $0.id == id }
+        let status = agentsPage.sessions[id]?.status
+        let transcript = agentTranscript(id)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(session?.agent ?? "")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(Theme.cloudPrimary)
+            if !MeetingState.hideDetails, let project = session?.project, !project.isEmpty {
+                Text(project).font(.system(size: 11, design: .rounded)).foregroundStyle(Theme.cloudQuiet)
+            }
+            if let word = status?.visibleWord {
+                Text(word).font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(Theme.cloudSecondary)
+            }
+            if let command = agentsPage.showingRequest?.command, agentsPage.showingRequest?.sessionID == id {
+                Text(command)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HubTranscriptView(lines: transcript.lines, status: transcript.status, prefersReducedMotion: agentsPage.reduceMotion)
+            HStack(spacing: 8) {
+                if let title = agentsPage.dismissTitle {
+                    NotchButton(title: title, tint: Theme.cloudSecondary, filled: false) { dismissError() }
+                        .accessibilityLabel(title)
+                }
+                if AgentTerminals.shared.canJump(to: id) {
+                    NotchButton(title: "Open", tint: Theme.cloudSecondary, filled: false) { openAgent(id) }
+                        .accessibilityLabel("Open")
+                }
+            }
+            if agentsPage.selectedID != nil {
+                HubDecisionRow(
+                    request: nil,
+                    queue: .none,
+                    scope: .reply,
+                    reply: $agentsReply,
+                    answerKeysOn: false,
+                    detailsHidden: MeetingState.hideDetails,
+                    reduceMotion: agentsPage.reduceMotion,
+                    onVerdict: { _ in },
+                    onSend: {}
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func agentListGroups(now: Date) -> [SessionListGroup] {
+        agentsPage.groups.groups.map { group in
+            let rows = group.projects.flatMap(\.sessions).map { session in
+                SessionListRow(
+                    id: session.id,
+                    name: session.agent,
+                    project: session.project,
+                    task: agentsPage.tasks[session.id] ?? agentsPage.reasons[session.id] ?? "",
+                    status: session.status,
+                    elapsedText: elapsedClock(liveElapsed(session, now: now)),
+                    queuedApproval: agentsPage.queuedRequests.contains { $0.sessionID == session.id },
+                    canOpen: AgentTerminals.shared.canJump(to: session.id)
+                )
+            }
+            return SessionListGroup(id: group.agent, name: group.agent, expanded: group.status == .expanded, rows: rows)
+        }
+    }
+
+    private func agentTranscript(_ id: String) -> (lines: [HubTranscriptLine], status: HubTranscriptStatus) {
+        if let reason = agentsPage.reasons[id] {
+            return ([HubTranscriptLine(id: "\(id).reason", role: .failed, text: reason)], .failed)
+        }
+        if agentsPage.sessions[id]?.clockPhase == .ticking {
+            return ([], .streaming)
+        }
+        return ([], .idle)
+    }
+
+    private func elapsedClock(_ seconds: Int?) -> String {
+        guard let seconds else { return "" }
+        let clamped = max(0, seconds)
+        return "\(clamped / 60):" + String(format: "%02d", clamped % 60)
+    }
+
+    private func openAgent(_ id: String) {
+        agentsPage = agentsPage.applying(.open(id))
+        guard agentsPage.jumpSessionID == id else { return }
+        AgentTerminals.shared.jump(to: id)
+    }
+
+    private func openNewChat() {
+        agentsPage = agentsPage.applying(.newChat(onChatTab: true))
+        topBar.selectedTab = .chat
+        AgentHub.shared.beginNewChat()
+    }
+
+    private func dismissError() {
+        let id = agentsPage.selectedID
+        agentsPage = agentsPage.applying(.dismiss)
+        guard let id, let index = model.sessions.firstIndex(where: { $0.id == id }) else { return }
+        model.sessions[index].status = .done
+    }
+
+    private func resolveApproval(_ verdict: HubApprovalVerdict) {
+        switch verdict {
+        case .allow:
+            agentsPage = agentsPage.applying(.approve)
+            model.approval?.resolve(HookDecision.Verdict.allow)
+        case .deny:
+            agentsPage = agentsPage.applying(.deny)
+            model.approval?.resolve(HookDecision.Verdict.deny)
+        case .ask:
+            model.approval?.resolve(HookDecision.Verdict.ask)
+        }
+    }
+
+    private func syncAgents(now: Date) {
+        var page = agentsPage
+        page.reduceMotion = Motion.reduced
+        page.panelClosed = model.presentation != .panel
+        page.oneSecondTimerScheduled = page.panelClosed ? false : page.schedulesOneSecondTimer
+        page.waveDisplayLinkRunning = false
+        let roster = model.sessions.map { session in
+            HubGroupSession(
+                id: session.id,
+                agent: session.agent,
+                project: session.project,
+                status: hubStatus(session),
+                elapsedSeconds: elapsedSeconds(session, now: now)
+            )
+        }
+        for session in model.sessions {
+            page.tasks[session.id] = session.task
+            if session.status == .failed || session.status == .stalled {
+                page.reasons[session.id] = session.reason ?? session.task
+            }
+        }
+        page = page.applying(.sessionsReplaced(roster))
+        if let approval = model.approval {
+            let id = approval.sessionID ?? roster.first?.id ?? approval.id
+            let req = AgentsPageRequest(
+                sessionID: id,
+                tool: approval.tool,
+                highRisk: approval.risk == .high,
+                command: approval.command.isEmpty ? nil : approval.command
+            )
+            if page.showingRequest?.sessionID != id {
+                page = page.applying(.approvalRequested(req))
+            }
+            if page.showingRequest == nil {
+                page.showingRequest = req
+                page.approvalGrown = true
+                page.cardAbovePage = false
+                page.secondsLeft = AgentsPage.countdownStart
+            }
+            if let deadline = approval.deadline {
+                page.secondsLeft = max(0, Int(deadline.timeIntervalSinceNow.rounded(.down)))
+            }
+        }
+        page.entry = .tab
+        agentsPage = page
+    }
+
+    private func hubStatus(_ session: NotchModel.Session) -> HubSessionStatus {
+        switch session.status {
+        case .idle: return .loading
+        case .working: return .running
+        case .needsYou: return .waitingForInput
+        case .done: return .done
+        case .failed: return .error(.failed)
+        case .stalled: return .error(.quiet)
+        }
+    }
+
+    private func liveElapsed(_ session: HubGroupSession, now: Date) -> Int? {
+        if let live = model.sessions.first(where: { $0.id == session.id }) {
+            return elapsedSeconds(live, now: now)
+        }
+        return session.elapsedSeconds
+    }
+
+    private func elapsedSeconds(_ session: NotchModel.Session, now: Date) -> Int {
+        let frozen = session.status == .done || session.status == .failed || session.status == .stalled
+        let end = frozen ? session.lastEventAt : now
+        return max(0, Int(end.timeIntervalSince(session.startedAt)))
     }
 }
 
@@ -1138,17 +1423,379 @@ struct AgentsPage: Equatable, Sendable {
     static func holdSeconds(highRisk: Bool) -> Double? { nil }
 
     /// The keys the existing focus events already name. Return and Escape are not approval keys.
-    static func verdict(forKey event: HubFocusEvent) -> HubApprovalVerdict? { nil }
+    static func verdict(forKey event: HubFocusEvent) -> HubApprovalVerdict? {
+        switch event {
+        case .approveKey: return .allow
+        case .denyKey: return .deny
+        case .askKey: return .ask
+        case .pageOpened, .activate, .up, .down, .return, .escape: return nil
+        }
+    }
 
-    static func approvalOffset(reduceMotion: Bool) -> Double { 8 }
+    static func approvalOffset(reduceMotion: Bool) -> Double { reduceMotion ? 0 : 8 }
 
-    static func approvalScale(reduceMotion: Bool) -> Double { 0.985 }
+    static func approvalScale(reduceMotion: Bool) -> Double { reduceMotion ? 1 : 0.985 }
 
-    func applying(_ signal: AgentsPageSignal) -> AgentsPage { self }
+    func applying(_ signal: AgentsPageSignal) -> AgentsPage {
+        switch signal {
+        case .show(let entry):
+            guard self.entry != entry else { return self }
+            var next = self
+            next.entry = entry
+            return next
+        case .socketOpening:
+            return stepScreen(.socketOpening, count: roster.count, sentence: nil, onChatTab: false)
+        case .socketOpened(let count, let sentence):
+            let event: HubScreenEvent
+            if screen.screen == .connectionError {
+                event = .socketOpened
+            } else if count == 0 {
+                event = .socketOpenedNoSessions
+            } else if screen.screen == .loading {
+                event = .atLeastOneSession
+            } else if screen.screen == .empty {
+                event = .sessionArrived
+            } else {
+                return self
+            }
+            return stepScreen(event, count: count, sentence: sentence, onChatTab: false)
+        case .socketFailed(let sentence):
+            return stepScreen(.socketFailed, count: roster.count, sentence: sentence, onChatTab: false)
+        case .sessionArrived(let session):
+            var rows = roster
+            if let index = rows.firstIndex(where: { $0.id == session.id }) {
+                rows[index] = session
+            } else {
+                rows.append(session)
+            }
+            return replaceRoster(rows)
+        case .sessionsReplaced(let rows):
+            return replaceRoster(rows)
+        case .lastSessionEnded:
+            return endLastSession()
+        case .tryAgain:
+            return stepScreen(.tryAgain, count: roster.count, sentence: nil, onChatTab: false)
+        case .select(let id):
+            return select(id)
+        case .toggleGroup(let name):
+            let nextGroups = HubGroupMachine.next(groups, .activateHeader, header: name)
+            guard nextGroups != groups else { return self }
+            var next = self
+            next.groups = nextGroups
+            return next
+        case .approvalRequested(let request):
+            return requestApproval(request)
+        case .approve:
+            return finishApproval(.allow, .approved)
+        case .deny:
+            return finishApproval(.deny, .denied)
+        case .dismiss:
+            return dismissSelected()
+        case .activity(let id):
+            return stepSession(id, .activity, clearReasonOnRunning: true)
+        case .session(let id, let event):
+            return stepSession(id, event, clearReasonOnRunning: event == .activity || event == .promptStarted)
+        case .open(let id):
+            guard roster.contains(where: { $0.id == id }) else { return self }
+            var next = self
+            next.jumpSessionID = id
+            next.openedWindow = false
+            return next
+        case .hover(let hovering):
+            guard showingRequest != nil, approvalHovered != hovering else { return self }
+            var next = self
+            next.approvalHovered = hovering
+            return next
+        case .focus(let focused):
+            guard showingRequest != nil, approvalFocused != focused else { return self }
+            var next = self
+            next.approvalFocused = focused
+            return next
+        case .tick:
+            return tick()
+        case .undo:
+            return undoDecision()
+        case .panel(let closed):
+            return setPanel(closed: closed)
+        case .newChat(let onChatTab):
+            return stepScreen(.newChat, count: roster.count, sentence: screen.reason, onChatTab: onChatTab)
+        }
+    }
 
-    func meetsOpenBudget(_ milliseconds: Int) -> Bool { true }
+    func meetsOpenBudget(_ milliseconds: Int) -> Bool {
+        milliseconds >= 0 && milliseconds <= Self.openBudgetMilliseconds
+    }
 
-    func isIdle(percentOfOneCore: Double) -> Bool { true }
+    func isIdle(percentOfOneCore: Double) -> Bool {
+        guard panelClosed, showingRequest == nil, !socketReadInProgress, !oneSecondTimerScheduled, !waveDisplayLinkRunning else {
+            return false
+        }
+        guard percentOfOneCore.isFinite, percentOfOneCore >= 0, percentOfOneCore <= Self.idleBudgetPercentOfOneCore else {
+            return false
+        }
+        return true
+    }
+
+    private func stepScreen(_ event: HubScreenEvent, count: Int, sentence: String?, onChatTab: Bool) -> AgentsPage {
+        let context = HubScreenContext(sessionCount: count, onChatTab: onChatTab, failureSentence: sentence)
+        let nextScreen = HubScreenMachine.next(screen, event, context: context)
+        guard nextScreen != screen else { return self }
+        var next = self
+        next.screen = nextScreen
+        next.openedWindow = false
+        return next
+    }
+
+    private func endLastSession() -> AgentsPage {
+        let nextScreen = HubScreenMachine.next(screen, .lastSessionEnded, context: HubScreenContext(sessionCount: roster.count))
+        guard nextScreen != screen else { return self }
+        var next = self
+        next.screen = nextScreen
+        next.openedWindow = false
+        guard nextScreen.screen == .empty else { return next }
+        next.roster = []
+        next.sessions = [:]
+        next.groups = HubGroupState()
+        next.loadedGroups = false
+        next.selectedID = nil
+        next.showingRequest = nil
+        next.queuedRequests = []
+        next.approvalGrown = false
+        next.secondsLeft = 0
+        next.approvalHovered = false
+        next.approvalFocused = false
+        return next
+    }
+
+    private func select(_ id: String?) -> AgentsPage {
+        guard screen.screen == .ready || screen.screen == .connectionError else { return self }
+        if let id, !roster.contains(where: { $0.id == id }) { return self }
+        guard selectedID != id else { return self }
+        var next = self
+        next.selectedID = id
+        return next
+    }
+
+    private func requestApproval(_ request: AgentsPageRequest) -> AgentsPage {
+        if showingRequest?.sessionID == request.sessionID { return self }
+        if queuedRequests.contains(where: { $0.sessionID == request.sessionID }) { return self }
+        guard sessions[request.sessionID] != nil else { return self }
+        if showingRequest != nil {
+            var next = self
+            next.queuedRequests.append(request)
+            next.openedWindow = false
+            return next
+        }
+        let stepped = HubSessionMachine.next(sessions[request.sessionID] ?? HubSessionState(), .approvalRequested)
+        guard stepped.status == .needsApproval else { return self }
+        var next = self
+        next.sessions[request.sessionID] = stepped
+        next.showingRequest = request
+        next.approvalGrown = true
+        next.cardAbovePage = false
+        next.secondsLeft = Self.countdownStart
+        next.approvalHovered = false
+        next.approvalFocused = false
+        next.openedWindow = false
+        if next.selectedID == nil { next.selectedID = request.sessionID }
+        next.syncRoster()
+        return next
+    }
+
+    private func finishApproval(_ verdict: HubApprovalVerdict, _ event: HubSessionEvent) -> AgentsPage {
+        guard let showing = showingRequest else { return self }
+        var next = self
+        next.undo = next.makeUndo()
+        if let state = next.sessions[showing.sessionID] {
+            next.sessions[showing.sessionID] = HubSessionMachine.next(state, event)
+        }
+        next.lastVerdict = verdict
+        next.openedWindow = false
+        next.cardAbovePage = false
+        if next.queuedRequests.isEmpty {
+            next.showingRequest = nil
+            next.approvalGrown = false
+            next.secondsLeft = 0
+            next.approvalHovered = false
+            next.approvalFocused = false
+        } else {
+            let promoted = next.queuedRequests.removeFirst()
+            next.showingRequest = promoted
+            if let state = next.sessions[promoted.sessionID] {
+                next.sessions[promoted.sessionID] = HubSessionMachine.next(state, .approvalRequested)
+            }
+            next.approvalGrown = true
+            next.secondsLeft = Self.countdownStart
+            next.approvalHovered = false
+            next.approvalFocused = false
+        }
+        next.undoTicksLeft = Self.undoSeconds
+        next.syncRoster()
+        return next
+    }
+
+    private func dismissSelected() -> AgentsPage {
+        guard let id = selectedID, sessions[id]?.status == .error(.failed), let state = sessions[id] else { return self }
+        var next = self
+        next.sessions[id] = HubSessionMachine.next(state, .dismissed)
+        next.openedWindow = false
+        next.syncRoster()
+        return next
+    }
+
+    private func stepSession(_ id: String, _ event: HubSessionEvent, clearReasonOnRunning: Bool) -> AgentsPage {
+        guard let state = sessions[id] else { return self }
+        let stepped = HubSessionMachine.next(state, event)
+        guard stepped != state else { return self }
+        var next = self
+        next.sessions[id] = stepped
+        if clearReasonOnRunning, stepped.status == .running { next.reasons[id] = nil }
+        if stepped.status == .absent {
+            next.roster.removeAll { $0.id == id }
+            if next.selectedID == id { next.selectedID = nil }
+        }
+        next.syncRoster()
+        return next
+    }
+
+    private func tick() -> AgentsPage {
+        var next = self
+        if next.showingRequest != nil, next.secondsLeft > 0, !next.countdownPaused {
+            next.secondsLeft -= 1
+            if next.secondsLeft == 0 {
+                return next.finishApproval(.deny, .timedOut)
+            }
+            if next.undoTicksLeft > 0 {
+                next.undoTicksLeft -= 1
+                if next.undoTicksLeft == 0 { next.undo = nil }
+            }
+            return next
+        }
+        guard next.undoTicksLeft > 0 else { return self }
+        next.undoTicksLeft -= 1
+        if next.undoTicksLeft == 0 { next.undo = nil }
+        return next
+    }
+
+    private func undoDecision() -> AgentsPage {
+        guard undoTicksLeft > 0, let undo else { return self }
+        var next = self
+        next.sessions = undo.sessions
+        next.roster = undo.roster
+        next.groups = undo.groups
+        next.loadedGroups = undo.loadedGroups
+        next.selectedID = undo.selectedID
+        next.showingRequest = undo.showingRequest
+        next.queuedRequests = undo.queuedRequests
+        next.approvalGrown = undo.approvalGrown
+        next.secondsLeft = undo.secondsLeft
+        next.approvalHovered = undo.approvalHovered
+        next.approvalFocused = undo.approvalFocused
+        next.undo = nil
+        next.undoTicksLeft = 0
+        next.lastVerdict = nil
+        next.openedWindow = false
+        return next
+    }
+
+    private func setPanel(closed: Bool) -> AgentsPage {
+        var next = self
+        next.panelClosed = closed
+        if closed {
+            next.oneSecondTimerScheduled = false
+            next.waveDisplayLinkRunning = false
+        } else {
+            next.oneSecondTimerScheduled = next.schedulesOneSecondTimer
+        }
+        return next == self ? self : next
+    }
+
+    private func replaceRoster(_ rows: [HubGroupSession]) -> AgentsPage {
+        var next = self
+        let visible = rows.filter { $0.status != .absent }
+        let ids = Set(visible.map(\.id))
+        var kept: [String: HubSessionState] = [:]
+        for row in visible {
+            if var existing = sessions[row.id] {
+                if existing.status != row.status {
+                    existing.status = row.status
+                }
+                kept[row.id] = existing
+            } else {
+                let generation = row.status.clockPhase == .notStarted || row.status.clockPhase == nil ? 0 : 1
+                kept[row.id] = HubSessionState(status: row.status, clockGeneration: generation)
+            }
+        }
+        for id in sessions.keys where !ids.contains(id) {
+            next.reasons[id] = nil
+            next.tasks[id] = nil
+        }
+        next.sessions = kept
+        next.roster = visible.map { row in
+            var copy = row
+            if let status = kept[row.id]?.status { copy.status = status }
+            return copy
+        }
+        if let selectedID, !ids.contains(selectedID) { next.selectedID = nil }
+        if let showing = next.showingRequest, !ids.contains(showing.sessionID) {
+            next.showingRequest = nil
+            next.approvalGrown = false
+            next.secondsLeft = 0
+        }
+        next.queuedRequests.removeAll { !ids.contains($0.sessionID) }
+        next.reconcileScreen()
+        next.syncRoster()
+        next.openedWindow = false
+        return next == self ? self : next
+    }
+
+    private mutating func reconcileScreen() {
+        guard screen.screen != .connectionError else { return }
+        let count = roster.count
+        if roster.isEmpty, screen.screen == .ready {
+            screen = HubScreenMachine.next(screen, .lastSessionEnded, context: HubScreenContext(sessionCount: 0))
+        } else if !roster.isEmpty, screen.screen == .empty {
+            screen = HubScreenMachine.next(screen, .sessionArrived, context: HubScreenContext(sessionCount: count))
+        } else if !roster.isEmpty, screen.screen == .loading {
+            screen = HubScreenMachine.next(screen, .atLeastOneSession, context: HubScreenContext(sessionCount: count))
+        }
+    }
+
+    private mutating func syncRoster() {
+        roster = roster.compactMap { row in
+            guard let status = sessions[row.id]?.status, status != .absent else { return nil }
+            var copy = row
+            copy.status = status
+            return copy
+        }
+        if roster.isEmpty {
+            groups = HubGroupState()
+            loadedGroups = false
+            return
+        }
+        if !loadedGroups {
+            groups = HubGroupMachine.next(HubGroupState(), .firstLoad, sessions: roster)
+            loadedGroups = true
+        } else {
+            groups = HubGroupMachine.next(groups, .sessionsChanged, sessions: roster)
+        }
+    }
+
+    private func makeUndo() -> AgentsPageUndo {
+        AgentsPageUndo(
+            sessions: sessions,
+            roster: roster,
+            groups: groups,
+            loadedGroups: loadedGroups,
+            selectedID: selectedID,
+            showingRequest: showingRequest,
+            queuedRequests: queuedRequests,
+            approvalGrown: approvalGrown,
+            secondsLeft: secondsLeft,
+            approvalHovered: approvalHovered,
+            approvalFocused: approvalFocused
+        )
+    }
 
     var copy: HubScreenCopy { HubScreenMachine.copy(screen) }
 
