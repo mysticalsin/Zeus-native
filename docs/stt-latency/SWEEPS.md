@@ -23,3 +23,25 @@ The 8 s, 20 s, and 45 s timeouts were not changed. No new dependencies.
 Red `d88e83d`. `python3 qa/portable-core/prepare.py --group regressions --output /tmp/zeus-stt-ux-red2 --run` on Linux, Swift 6.0.3: `Test run with 89 tests failed after 0.017 seconds with 44 issues.` Failing: `aMidPhrasePauseDoesNotBecomeTheEndpointSilence` (silence 200, gap 700), `aLateDeliveryDoesNotCloseTheNextUtterance`, `rapidStartStopCyclesDoNotCrossDeliver` (38 issues), `cancelDropsALateDeliver`. `aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample` passed.
 
 Green `2e1c380`. Same command, output `/tmp/zeus-stt-ux-green`: `Test run with 89 tests passed after 0.015 seconds.` Suite "STT latency" passed after 0.012 seconds.
+
+## 2026-11-21 06:10 UTC — Inspector APP-FIT at be52c054
+
+Inspector FAILed head `be52c054` (APP-FIT STALE, report sha 6c4d2ba5). No push until this round. The 450 ms final wait was not changed. The 8 s, 20 s, 45 s, 700 ms, and 90 s timeouts were not changed.
+
+### Findings
+
+1. `SpeechInput.noteDelivered` passed `traceCancelled`, but `aCancelledDeliverIsRefused` called `accepts` with literal Bools. Hardcoding true or false stayed green.
+2. The hands-free poll called `STTQuiet.reached` with a threshold chosen in the app, so a poll-local `>` stayed green. Effective silence was the legacy 1000 ms, not the 400 ms production budget.
+3. A late sample stamped `clock.nowMs`. Silence at 100 ms and the next sample at 10_000 ms recorded 10_000 ms. The crossing sample is 500 ms. SWEEPS line 13 said 500 ms while the test expected 10_000 ms.
+4. The quiet comment still said hands-free stays at 1000 ms. The eight gate tests were not bound on `F01.stt-latency`.
+5. `endpoint!` at the budget test crashed if the stamp was missing. A stale tap updated `onLevel` after the loudness gate refused the buffer.
+
+### Fixes
+
+`noteDelivered` calls `STTLiveDelivery.allowed`, which reads the stored flag. Non-wake hands-free calls `STTHandsFree.quietEnded` (`>=` against `STTSessionPolicy.production.silenceToEndpointMs`, 400). The legacy policy still records 1000 ms and is not effective. Pending Tony. One-line revert of that decision: `git revert --no-edit 3f885233f938584e6ed41a74c4a54eff7f692747`. The endpoint stamp is silence plus the budget. The level meter uses the same owner check as loudness. The eight tests are on `F01.stt-latency`.
+
+### Evidence
+
+Red `f3c0b03897caa7120496830b5a41507948d85f6c`. `python3 qa/portable-core/prepare.py --group regressions --output /tmp/zeus-stt-inspector-red --run --jobs 4` on Linux, Swift 6.0.3: `Test run with 98 tests failed after 0.020 seconds with 10 issues.` Failing: `quietReachesExactlyAtTheHandsFreeThreshold` (threshold 1000, exact 400 did not count), `endpointBoundariesKillComparisonMutants` (late stamp 501), `aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample` (stamp 10000), `aCancelledDeliverIsRefused`, `aStaleTapDoesNotPublishLevel`.
+
+Green `3f885233f938584e6ed41a74c4a54eff7f692747`. Same command, output `/tmp/zeus-stt-inspector-green`: `Test run with 98 tests passed after 0.020 seconds.` Suite "STT latency" passed after 0.012 seconds.
