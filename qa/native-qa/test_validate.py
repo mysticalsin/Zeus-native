@@ -1,13 +1,16 @@
 """Fail-closed checks for the native hands-on QA receipt.
 
-A pass needs every public step, a real screenshot, and result "passed".
-Missing, skipped, and failed steps are not a pass. No app is launched.
+A pass needs every public step, a real PNG screenshot, and result PASS.
+MANUAL, FAIL, and a stand-in image are not a pass. The harness does not open Zeus.
 """
+import json
 from pathlib import Path
 import shutil
+import struct
 import sys
 import tempfile
 import unittest
+import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "qa" / "closed-loop"))
@@ -40,10 +43,30 @@ def load():
     return validate
 
 
+def write_png(path, width, height, paint):
+    """Minimal 8-bit RGB PNG. paint(x, y) returns three bytes."""
+    raw = bytearray()
+    for y in range(height):
+        raw.append(0)
+        for x in range(width):
+            raw.extend(paint(x, y))
+
+    def chunk(tag, data):
+        crc = zlib.crc32(tag + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", crc)
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    blob = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(bytes(raw))) + chunk(b"IEND", b"")
+    Path(path).write_bytes(blob)
+    return Path(path)
+
+
 def png(folder, name="shot.png"):
-    path = Path(folder) / name
-    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"x" * 32)
-    return path
+    """A 200x100 screenshot with two colours. One colour must not pass."""
+    return write_png(
+        Path(folder) / name, 200, 100,
+        lambda x, _y: b"\x00\x00\x00" if x < 100 else b"\xff\x00\x00",
+    )
 
 
 class Catalog(unittest.TestCase):
@@ -78,17 +101,25 @@ class ReceiptSlots(unittest.TestCase):
         self.dir = Path(self.tmp.name)
         self.v = load()
         self.fills = 0
+        self.app = self.dir / "Zeus-latest-2722dcb7.app"
+        macos = self.app / "Contents" / "MacOS"
+        macos.mkdir(parents=True)
+        (macos / "Zeus").write_text("binary\n")
 
     def filled(self, **overrides):
-        app = self.dir / "Zeus-latest-2722dcb7.app"
+        app = self.app
         receipt = self.v.blank_receipt(HEAD, str(app))
+        receipt["manual_run"] = True
+        receipt["opened_by_harness"] = False
+        receipt["runtime_app_pid"] = 4242
+        receipt["runtime_app_bundle"] = str(app)
         self.fills += 1
         shots = self.dir / f"shots-{self.fills}"
         shots.mkdir()
         for index, step in enumerate(receipt["steps"]):
             shot = png(shots, f"{index}.png")
             step["screenshot"] = str(shot)
-            step["result"] = "passed"
+            step["result"] = "PASS"
         for sid, fields in overrides.items():
             for step in receipt["steps"]:
                 if step["id"] == sid:
@@ -122,11 +153,67 @@ class ReceiptSlots(unittest.TestCase):
         self.assertEqual(verdict, "fail")
         self.assertTrue(any("record.countdown" in reason for reason in reasons))
 
-    def test_skipped_failed_and_not_run_are_not_a_pass(self):
-        for result in ("skipped", "failed", "not-run", "PASS", "pass", ""):
+    def test_manual_fail_and_legacy_passed_are_not_a_pass(self):
+        self.assertEqual(human_qa.STATUSES, ("PASS", "FAIL", "MANUAL"))
+        for result in ("passed", "MANUAL", "FAIL", "skipped", "failed", "not-run", "pass", ""):
             verdict, reasons = self.v.judge(self.filled(**{"talk.voice": {"result": result}}), self.dir)
             self.assertEqual(verdict, "fail", result)
             self.assertTrue(any("talk.voice" in reason for reason in reasons), result)
+
+    def test_one_byte_file_is_not_a_png_screenshot(self):
+        receipt = self.filled()
+        for step in receipt["steps"]:
+            if step["id"] == "launch.window":
+                Path(step["screenshot"]).write_bytes(b"x")
+        verdict, reasons = self.v.judge(receipt, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("launch.window" in reason and "PNG" in reason for reason in reasons))
+
+    def test_small_or_one_colour_png_is_not_a_screenshot(self):
+        cases = (
+            (199, 100, lambda x, _y: b"\x00\x00\x00" if x < 50 else b"\xff\x00\x00", "200x100"),
+            (200, 99, lambda x, _y: b"\x00\x00\x00" if x < 50 else b"\xff\x00\x00", "200x100"),
+            (200, 100, lambda _x, _y: b"\x0a\x14\x1e", "colour"),
+        )
+        for width, height, paint, needle in cases:
+            receipt = self.filled()
+            for step in receipt["steps"]:
+                if step["id"] == "launch.window":
+                    write_png(step["screenshot"], width, height, paint)
+            verdict, reasons = self.v.judge(receipt, self.dir)
+            self.assertEqual(verdict, "fail", (width, height, needle))
+            self.assertTrue(any("launch.window" in reason and needle in reason for reason in reasons), reasons)
+
+    def test_runtime_pid_or_bundle_is_required(self):
+        missing = self.filled()
+        missing["runtime_app_pid"] = None
+        missing["runtime_app_bundle"] = None
+        verdict, reasons = self.v.judge(missing, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("runtime" in reason.lower() for reason in reasons))
+        pid_only = self.filled()
+        pid_only["runtime_app_bundle"] = None
+        pid_only["runtime_app_pid"] = 5151
+        verdict, reasons = self.v.judge(pid_only, self.dir)
+        self.assertEqual(reasons, [])
+        self.assertEqual(verdict, "pass")
+        bundle_only = self.filled()
+        bundle_only["runtime_app_pid"] = None
+        verdict, reasons = self.v.judge(bundle_only, self.dir)
+        self.assertEqual(reasons, [])
+        self.assertEqual(verdict, "pass")
+
+    def test_opening_zeus_or_a_fail_mark_is_not_a_pass(self):
+        opened = self.filled()
+        opened["opened_by_harness"] = True
+        verdict, reasons = self.v.judge(opened, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("open" in reason.lower() for reason in reasons))
+        marked = self.filled()
+        marked["verdict"] = "FAIL"
+        verdict, reasons = self.v.judge(marked, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any(reason.startswith("receipt is marked FAIL") for reason in reasons))
 
     def test_a_passed_step_without_a_real_screenshot_is_not_a_pass(self):
         missing = self.filled(**{"launch.window": {"screenshot": str(self.dir / "gone.png")}})
@@ -294,7 +381,65 @@ class SourceRules(unittest.TestCase):
         harness = (ROOT / "qa" / "native-qa" / "harness.py").read_text()
         self.assertIn("refuse_if_installed", harness)
         self.assertIn("/Applications/Zeus.app", harness)
+        self.assertIn("manual-run", harness)
         self.assertNotIn("shell=True", harness)
+        self.assertNotIn("open -n", harness)
+        self.assertNotIn("open -a", harness)
+
+
+class ManualRun(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name) / "home"
+        (self.home / "Desktop").mkdir(parents=True)
+        self.v = load()
+        import harness
+        self.harness = harness
+
+    def bundle(self):
+        dest = self.home / "Desktop" / "Zeus-latest-2722dcb7.app"
+        macos = dest / "Contents" / "MacOS"
+        macos.mkdir(parents=True)
+        (macos / "Zeus").write_text("binary\n")
+        return dest
+
+    def test_capture_never_accepts_the_installed_app(self):
+        with self.assertRaises(self.harness.Refused):
+            self.harness.capture_runtime(
+                Path("/Applications/Zeus.app"),
+                [{"pid": 9, "bundle": "/Applications/Zeus.app"}],
+            )
+        dest = self.bundle()
+        found = self.harness.capture_runtime(dest, [{"pid": 9, "bundle": str(dest)}])
+        self.assertEqual(found, {"pid": 9, "bundle": str(dest)})
+        self.assertIsNone(self.harness.capture_runtime(dest, [{"pid": 9, "bundle": "/Applications/Zeus.app"}]))
+
+    def test_failed_run_writes_fail_or_nothing(self):
+        dest = self.bundle()
+        receipt = self.v.blank_receipt(HEAD, str(dest))
+        out, code = self.harness.record_manual_run(receipt, dest, None)
+        self.assertNotEqual(code, 0)
+        if out is None:
+            self.assertEqual(list(dest.parent.glob("*.qa-receipt.json")), [])
+            return
+        written = json.loads(Path(out).read_text())
+        self.assertEqual(written["verdict"], "FAIL")
+        self.assertIs(written["manual_run"], True)
+        self.assertIs(written["opened_by_harness"], False)
+        verdict, _reasons = self.v.judge(written, dest.parent)
+        self.assertEqual(verdict, "fail")
+        captured = self.harness.record_manual_run(
+            receipt, dest, {"pid": 77, "bundle": str(dest)}
+        )
+        out2, code2 = captured
+        self.assertNotEqual(code2, 0)
+        body = json.loads(Path(out2).read_text())
+        self.assertEqual(body["verdict"], "FAIL")
+        self.assertEqual(body["runtime_app_pid"], 77)
+        self.assertEqual(body["runtime_app_bundle"], str(dest))
+        verdict, _reasons = self.v.judge(body, dest.parent)
+        self.assertEqual(verdict, "fail")
 
 
 if __name__ == "__main__":
