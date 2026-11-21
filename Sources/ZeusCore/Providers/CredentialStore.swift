@@ -3,7 +3,7 @@ import Foundation
 /// Whether an update of an existing provider secret also sets the accessibility class.
 /// A planted item must not keep a weaker class.
 public enum ProviderKeychainPolicy {
-    public static let updateIncludesAccessibility = false
+    public static let updateIncludesAccessibility = true
 }
 
 public protocol CredentialStore: Sendable {
