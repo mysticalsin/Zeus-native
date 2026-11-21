@@ -68,6 +68,7 @@ struct GSPageView: View {
             case .beamer: BeamerSettingsPage(context: context)
             case .tiling: TilingSettingsPage()
             case .shelf: ShelfSettingsPage()
+            case .assistant: AssistantSettingsPage()
             case .license:
                 VStack(alignment: .leading, spacing: CGFloat(GlassSettingsMetrics.cardSpacing)) {
                     LicensePage(navigation: navigation)
