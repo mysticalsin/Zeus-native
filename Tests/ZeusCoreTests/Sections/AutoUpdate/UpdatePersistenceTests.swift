@@ -146,9 +146,9 @@ struct UpdatePersistenceTests {
     }
 
     private static func freshDefaults() -> UserDefaults {
-        let name = "zeus.update.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
-        defaults.removePersistentDomain(forName: name)
+        let suite = NSTemporaryDirectory() + "zeus.update.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
         return defaults
     }
 }
