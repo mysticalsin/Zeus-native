@@ -200,16 +200,17 @@ public enum VoiceProviderCopy {
     public static let sample = "This is Zeus."
 }
 
-/// Voice-leg and direct-stream ceilings. `voiceLegMs` is the existing Settings test-button budget
-/// (`VoiceLatencyTargets.voiceLegMs` in VoiceLatencyTrace.swift). The 900 ms and 1,400 ms figures are
-/// the direct-stream p50 and p95 in specs/007-companion-parity/perf-budgets.md. This path does not
-/// change the existing 20 s and 45 s request ceilings.
+/// Voice-leg and first-audio ceilings. `voiceLegMs` is the existing Settings test-button budget
+/// (`VoiceLatencyTargets.voiceLegMs` in VoiceLatencyTrace.swift). `firstAudioP50Ms` is the on-device
+/// first-audio p50 in the companion parity budgets. `directStreamP95Ms` is that spec's direct-stream p95.
+/// This path does not change the existing 20 s and 45 s request ceilings.
 public enum ProviderLatencyVerdict {
     public static let voiceLegMs = 600
-    public static let directStreamP50Ms = 900
+    public static let firstAudioP50Ms = 700
     public static let directStreamP95Ms = 1_400
 
     public static func meetsVoiceLeg(_ milliseconds: Int) -> Bool { milliseconds <= voiceLegMs }
+    public static func meetsFirstAudioP50(_ milliseconds: Int) -> Bool { milliseconds <= firstAudioP50Ms }
     public static func meetsDirectStreamP95(_ milliseconds: Int) -> Bool { milliseconds <= directStreamP95Ms }
 }
 

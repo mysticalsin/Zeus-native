@@ -51,8 +51,8 @@ Preferences store the selected id and the voice id. The key goes to the credenti
 ## First audio
 
 `voice.first-audio` starts when a turn starts speaking and ends on the first cloud chunk or
-on the local voice's return. The verdict compares that interval with 600 ms, 900 ms, and
-1,400 ms. Those numbers are the existing voice-leg budget and the direct-stream percentiles.
+on the local voice's return. The verdict compares that interval with 600 ms, the single
+first-audio p50 constant of 700 ms, and 1,400 ms. 700 ms is the on-device first-audio p50.
 This slice does not loosen them and does not claim a live percentile.
 
 ## Built in

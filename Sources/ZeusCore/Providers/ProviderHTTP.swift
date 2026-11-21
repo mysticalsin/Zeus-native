@@ -65,7 +65,7 @@ public final class URLSessionProviderTransport: ProviderHTTPTransport, @unchecke
 
     public func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse {
         let urlRequest = try request.urlRequest(timeout: timeout)
-        let session = makeSession(delegate: nil)
+        let session = makeSession(delegate: ProviderHTTPSessionDelegate())
         defer { session.finishTasksAndInvalidate() }
         do {
             let (data, response) = try await session.data(for: urlRequest)
@@ -153,6 +153,21 @@ private final class StreamBridge: NSObject, URLSessionDataDelegate, @unchecked S
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        completionHandler(nil)
+        completionHandler(ProviderHTTPRedirect.forwarded(request, from: self.request.url))
+    }
+}
+
+/// `xi-api-key` and `X-Goog-Api-Key` are custom headers, so a redirect would replay them.
+/// Both `send` and `stream` refuse every redirect, including one that stays on the same host.
+enum ProviderHTTPRedirect {
+    static func forwarded(_ proposed: URLRequest, from original: URL?) -> URLRequest? {
+        guard proposed.url != nil, original != nil else { return nil }
+        return nil
+    }
+}
+
+final class ProviderHTTPSessionDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(ProviderHTTPRedirect.forwarded(request, from: task.originalRequest?.url ?? response.url))
     }
 }

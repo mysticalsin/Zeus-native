@@ -219,7 +219,7 @@ struct VoiceProviderE2EJourneyTests {
         let sorted = samples.sorted()
         let p50 = sorted[14]
         let p95 = sorted[28]
-        #expect(p50 <= ProviderLatencyVerdict.directStreamP50Ms)
+        #expect(p50 <= ProviderLatencyVerdict.firstAudioP50Ms)
         #expect(p95 <= ProviderLatencyVerdict.directStreamP95Ms)
         #expect(p50 <= ProviderLatencyVerdict.voiceLegMs)
         #expect(p95 <= 1_400)
@@ -293,7 +293,8 @@ struct VoiceProviderE2EJourneyTests {
         #expect(!ProviderLatencyVerdict.meetsVoiceLeg(601))
         #expect(ProviderLatencyVerdict.meetsDirectStreamP95(1_400))
         #expect(!ProviderLatencyVerdict.meetsDirectStreamP95(1_401))
-        #expect(ProviderLatencyVerdict.directStreamP50Ms == 900)
+        #expect(ProviderLatencyVerdict.meetsFirstAudioP50(ProviderLatencyVerdict.firstAudioP50Ms))
+        #expect(!ProviderLatencyVerdict.meetsFirstAudioP50(ProviderLatencyVerdict.firstAudioP50Ms + 1))
         #expect(!VoiceProviderKeyPolicy.accepts("1234567"))
         #expect(VoiceProviderKeyPolicy.accepts("12345678"))
         #expect(!VoiceProviderKeyPolicy.accepts("1234 6789"))

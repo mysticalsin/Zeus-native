@@ -26,7 +26,7 @@ Exit 0 is pass. Exit 1 is a product failure. Exit 2 is infrastructure: the Swift
 
 The fake key and the prefixes `zeus-e2e-fake-key`, `zeus-e2e-fake`, and `zeus-e2e` must be absent from the test log, the xUnit file, the latency file, the unified-log export, and the crash scan. The live command adds the same check for the environment values and never writes those values into `summary.json`.
 
-Forge checks in `summary.json`: `verifierOwnedProperty` (the property walk lives in the test file), `skipGate` (zero unexplained skips; a live skip is explained only when its env var is unset), `specBoundaries` (600/601 ms, 1,400/1,401 ms, key length 7/8), and `timeoutIsInfrastructure`.
+Forge checks in `summary.json`: `verifierOwnedProperty` (the property walk lives in the test file), `skipGate` (zero unexplained skips; a live skip is explained only when its env var is unset), `specBoundaries` (voice leg 600/601 ms, first-audio p50 at `firstAudioP50Ms` and one millisecond past it, direct-stream p95 1,400/1,401 ms, key length 7/8), and `timeoutIsInfrastructure`.
 
 Journeys the fake command asserts:
 
@@ -42,7 +42,7 @@ Journeys the fake command asserts:
 - Network down (`NSURLErrorNotConnectedToInternet`) uses the local voice, then the Mac voice when the local voice returns nothing.
 - A first byte later than the injected budget falls back.
 - A truncated stream and a buffer that is not WAV or MP3 fall back.
-- Thirty fast replies: p50 at or under 900 ms and p95 at or under 1,400 ms. The sorted p50 is the 15th sample and the p95 is the 29th.
+- Thirty fast replies: p50 at or under `ProviderLatencyVerdict.firstAudioP50Ms` (700 ms) and p95 at or under 1,400 ms. The sorted p50 is the 15th sample and the p95 is the 29th. The p50 check passes at the constant and fails at the constant plus one.
 - Every listed readiness transition, including the illegal ones, matches the table in `everyTransitionIsListed`.
 
 The Mac Accessibility walk below is the same product, driven by `scripts/human-qa.sh` when a person is at the machine. It is not a second implementation. The repository still has no Xcode project and no XCUITest target. Playwright does not drive the app.

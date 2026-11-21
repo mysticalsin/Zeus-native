@@ -86,9 +86,10 @@ Otherwise the local voice speaks and the transport is not asked to carry the tex
 
 First audio is an `OSSignposter` interval named `voice.first-audio` on macOS, and the same
 name in `ProviderSignposter` everywhere. Metadata is only `provider` and `route`. The pass
-thresholds are the existing voice-leg budget of 600 ms (`VoiceLatencyTargets.voiceLegMs`)
-and the direct-stream p50 of 900 ms and p95 of 1,400 ms from
-`specs/007-companion-parity/perf-budgets.md` on `zeus-bot/companion-parity-spec`. A fast
+thresholds are the existing voice-leg budget of 600 ms (`VoiceLatencyTargets.voiceLegMs`),
+the on-device first-audio p50 of 700 ms (`ProviderLatencyVerdict.firstAudioP50Ms`), and the
+direct-stream p95 of 1,400 ms from `specs/007-companion-parity/perf-budgets.md` on
+`zeus-bot/companion-parity-spec`. A fast
 stub must come in under both. A live percentile on a Mac is MAC-PENDING. Linux cannot
 record one.
 

@@ -18,7 +18,7 @@ from pathlib import Path
 
 FAKE_PATTERNS = ("zeus-e2e-fake-key", "zeus-e2e-fake", "zeus-e2e")
 EXPLAINED_LIVE = {"elevenLabsListsVoicesAndReturnsAudio", "googleCloudListsVoicesAndReturnsAudio"}
-BUDGET_P50 = 900
+BUDGET_P50 = 700  # ProviderLatencyVerdict.firstAudioP50Ms
 BUDGET_P95 = 1400
 SWIFT_TIMEOUT = int(os.environ.get("ZEUS_E2E_TIMEOUT", "180"))
 
