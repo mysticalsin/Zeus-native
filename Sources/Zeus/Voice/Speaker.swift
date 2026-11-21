@@ -201,41 +201,80 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         lineOnStart = onStart
         lineBase = chain.ledger.scheduled
         defer { lineOnStart = nil }
-        switch await PluginVoiceBridge.speak(text) {
-        case .passthrough:
-            break
-        case .spoken(let engine, let voice, let reason, let firstAudioMs):
-            armLineStart()
-            if let firstAudioMs { settings.recordFirstAudio(engine, ms: firstAudioMs) }
-            logSpoken(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
-            return Played(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
-        case .localFallback(let reason):
-            let localReady = settings.kokoroReady
-            for name in SyntheticFallbackOrder.engines {
-                if name == "kokoro", !localReady { continue }
-                let engine: UltronEngine = name == "kokoro" ? .kokoro : .system
-                if Task.isCancelled { return nil }
-                audioReadyAt = nil
-                guard let voiceName = await attempt(engine, text, settings: settings, began: began) else { continue }
-                armLineStart()
-                let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
-                if let ms { settings.recordFirstAudio(engine, ms: ms) }
-                logSpoken(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
-                return Played(engine: engine, voice: voiceName, reason: reason, firstAudioMs: ms)
-            }
-            return nil
-        }
-        for decision in settings.routeDecisions() {
+        let personaVoice = PersonaSpeakRoute.resolvedVoiceID(for: PersonaCatalog.current())
+        let steps = Self.personaSteps(settings)
+        VoiceLog.log("speak", PersonaSpeakRoute.logLine(voiceID: personaVoice, steps: steps))
+        for step in steps {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
-            guard let voiceName = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
-            armLineStart() // Engines that never reported a first buffer have still queued their audio by now.
-            let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
-            if let ms { settings.recordFirstAudio(decision.engine, ms: ms) }
-            logSpoken(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
-            return Played(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
+            switch step {
+            case .synthetic:
+                guard settings.kokoroReady, !settings.isProviderPaused(.kokoro) else { continue }
+                guard await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) else { continue }
+                return played(.kokoro, voice: personaVoice, reason: "zeus.synthetic local voice", began: began, settings: settings)
+            case .kokoro:
+                guard await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) else { continue }
+                return played(.kokoro, voice: settings.kokoroVoice, reason: "Kokoro", began: began, settings: settings)
+            case .mac:
+                guard let voiceName = await speakSystem(text) else { continue }
+                return played(.system, voice: voiceName, reason: "Mac voice offline fallback", began: began, settings: settings)
+            case .chatterbox:
+                guard await speakChatterbox(text, began: began) else { continue }
+                return played(.chatterbox, voice: "reference", reason: "chosen in Settings", began: began, settings: settings)
+            case .elevenLabs, .googleCloud:
+                switch await PluginVoiceBridge.speak(text) {
+                case .passthrough:
+                    if step == .elevenLabs, let voiceName = await attempt(.elevenLabs, text, settings: settings, began: began) {
+                        return played(.elevenLabs, voice: voiceName, reason: "chosen in Settings", began: began, settings: settings)
+                    }
+                case .spoken(let engine, let voice, let reason, let firstAudioMs):
+                    armLineStart()
+                    if let firstAudioMs { settings.recordFirstAudio(engine, ms: firstAudioMs) }
+                    logSpoken(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
+                    return Played(engine: engine, voice: voice, reason: reason, firstAudioMs: firstAudioMs)
+                case .localFallback:
+                    break
+                }
+            case .openAI:
+                guard let voiceName = await attempt(.openAI, text, settings: settings, began: began) else { continue }
+                return played(.openAI, voice: voiceName, reason: "chosen in Settings", began: began, settings: settings)
+            case .gemini:
+                guard let voiceName = await attempt(.gemini, text, settings: settings, began: began) else { continue }
+                return played(.gemini, voice: voiceName, reason: "chosen in Settings", began: began, settings: settings)
+            }
         }
         return nil
+    }
+
+    private static func personaSteps(_ settings: VoiceSettings) -> [PersonaSpeakStep] {
+        let choice: PersonaSpeakChoice
+        if settings.engineAuto {
+            choice = .automatic
+        } else {
+            switch settings.ttsProvider {
+            case .elevenLabs: choice = .elevenLabs
+            case .openAICompatible: choice = .openAI
+            case .gemini: choice = .gemini
+            case .googleCloud: choice = .googleCloud
+            case .kokoro: choice = .kokoro
+            case .chatterbox: choice = .chatterbox
+            }
+        }
+        let keys = PersonaSpeakKeys(
+            elevenLabs: settings.elevenKeySaved && !settings.isProviderPaused(.elevenLabs),
+            openAI: settings.openAIKeySaved && !settings.openAIRetired() && !settings.isProviderPaused(.openAICompatible),
+            gemini: settings.geminiKeySaved && !settings.isProviderPaused(.gemini),
+            googleCloud: Keychain.get(VoiceTTSProvider.googleCloud.keychainAccount) != nil,
+            kokoroReady: settings.kokoroReady && !settings.isProviderPaused(.kokoro))
+        return PersonaSpeakRoute.chain(choice: choice, keys: keys, providerFailed: false)
+    }
+
+    private func played(_ engine: UltronEngine, voice: String, reason: String, began: Date, settings: VoiceSettings) -> Played {
+        armLineStart()
+        let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
+        if let ms { settings.recordFirstAudio(engine, ms: ms) }
+        logSpoken(engine: engine, voice: voice, reason: reason, firstAudioMs: ms)
+        return Played(engine: engine, voice: voice, reason: reason, firstAudioMs: ms)
     }
 
     /// One engine, one sentence. The voice name on success, nil when this engine could not speak it.
