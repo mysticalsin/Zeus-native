@@ -15,13 +15,12 @@ public enum LocalWorkerWatch {
         public var holdLaunch: Bool
     }
 
-    /// Red: a child that misses the reap window disables the local voice until relaunch.
+    /// A child that is still alive holds the next launch. It does not disable the voice after it exits.
     public static func afterReap(exited: Bool) -> Reap {
-        Reap(blockFutureLaunches: !exited, holdLaunch: !exited)
+        Reap(blockFutureLaunches: false, holdLaunch: !exited)
     }
 
-    /// Red: a silent worker is never treated as hung.
     public static func hung(started: TimeInterval, now: TimeInterval, budget: TimeInterval) -> Bool {
-        false
+        now - started >= budget
     }
 }

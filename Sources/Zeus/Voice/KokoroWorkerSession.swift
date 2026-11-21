@@ -36,6 +36,7 @@ actor KokoroWorkerSession {
     private var closing: Task<Bool, Never>?
     private var idle: Task<Void, Never>?
     private var closed = false
+    private var unreaped: Process?
 
     private final class Cancellation: @unchecked Sendable {
         private let lock = NSLock()
@@ -65,7 +66,7 @@ actor KokoroWorkerSession {
         let python = KokoroWorker.pythonExecutable()
         guard KokoroWorker.kokoroOnnxImportWorks(python: python) else { return nil }
         return Launch(executable: python, arguments: KokoroWorker.argv(python: python, modelDir: KokoroWorker.modelDir()))
-    }, requestTimeout: TimeInterval = 120, idleTimeout: TimeInterval = 120,
+    }, requestTimeout: TimeInterval = LocalWorkerWatch.budget(), idleTimeout: TimeInterval = 120,
          temporaryDirectory: URL = FileManager.default.temporaryDirectory,
          launchQueue: DispatchQueue? = nil,
          launchProcess: @escaping @Sendable (Process) throws -> Void = { try $0.run() },
@@ -100,6 +101,10 @@ actor KokoroWorkerSession {
     }
 
     func render(_ text: String, voice: String, speed: Double) async -> URL? {
+        if let pendingChild = unreaped {
+            if pendingChild.isRunning { return nil }
+            unreaped = nil
+        }
         guard !closed, !Task.isCancelled, pending == nil, closing == nil, launching == nil,
               !text.isEmpty, text.utf8.count <= Self.maximumTextBytes,
               !voice.isEmpty, voice.utf8.count <= 128,
@@ -359,6 +364,7 @@ actor KokoroWorkerSession {
         input = nil; output = nil; buffer.removeAll(keepingCapacity: false)
         guard let process = child else { return }
         child = nil
+        unreaped = process
         let cleanup = Task { await Self.finishChild(process) }
         closing = cleanup
         Task { [weak self] in
@@ -368,7 +374,9 @@ actor KokoroWorkerSession {
     }
 
     private func finishedClosing(_ exited: Bool) {
-        if !exited { closed = true } // Never spawn a replacement while the previous child may still exist.
+        let reap = LocalWorkerWatch.afterReap(exited: exited)
+        if reap.blockFutureLaunches { closed = true }
+        if !reap.holdLaunch { unreaped = nil }
         closing = nil
     }
 
