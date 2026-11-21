@@ -45,7 +45,7 @@ final class VoiceTestModel {
                 let outcome = await speaker.speak(sentenceStream: stream)
                 rows.append(Row(language: line.language, engine: outcome.engine, model: speaker.modelDescription(engine: outcome.engine),
                                 voice: outcome.voice.isEmpty ? "-" : outcome.voice, firstAudioMs: outcome.firstAudioMs,
-                                verdict: outcome.firstAudioMs.map(VoiceLatencyTargets.voiceLegVerdict) ?? "nothing played"))
+                                verdict: VoiceTestScore.verdict(firstAudioMs: outcome.firstAudioMs, partialFailure: outcome.partialFailure, success: VoiceLatencyTargets.voiceLegVerdict)))
             }
             running = false
         }

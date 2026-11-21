@@ -734,7 +734,36 @@ public enum TruePeakLimiter {
         0.017115155028976117, 0.010605090076805452, 1.1214237028997423e-17,
         -0.0080261254612654948, -0.0097908339711988944, -0.0059320518437837163,
         -6.9891223043616017e-18, 0.0042523190668551066, 0.0050185309234718218,
-        0.002926514108961888, 3.7090410940238969e-18, -0.0019016679348927714,
+        0.002926514108961888, 3.7090410940238969e-18,         -0.0019016679348927714,
         -0.0021031678617178763, -0.001130597579184462, -1.4319646207876959e-18,
     ]
+}
+
+/// How the talk turn closes. A partial failure keeps the spoken caption, adds a short note,
+/// and does not play the done chime.
+public struct VoiceTurnClose: Equatable, Sendable {
+    public var caption: String
+    public var playDoneChime: Bool
+}
+
+public enum VoiceTurnFinish {
+    public static let failureNote = "Part of this reply did not play."
+
+    public static func present(caption: String, partialFailure: Bool) -> VoiceTurnClose {
+        guard partialFailure else {
+            return VoiceTurnClose(caption: caption, playDoneChime: true)
+        }
+        let body = caption.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shown = body.isEmpty ? failureNote : body + " " + failureNote
+        return VoiceTurnClose(caption: shown, playDoneChime: false)
+    }
+}
+
+/// The Settings voice-test row. A partial failure fails the row even when first audio was fast.
+public enum VoiceTestScore {
+    public static func verdict(firstAudioMs: Int?, partialFailure: Bool, success: (Int) -> String) -> String {
+        if partialFailure { return "partial failure" }
+        guard let ms = firstAudioMs else { return "nothing played" }
+        return success(ms)
+    }
 }

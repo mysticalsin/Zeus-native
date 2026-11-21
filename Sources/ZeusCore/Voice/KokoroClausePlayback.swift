@@ -39,6 +39,7 @@ public enum KokoroClausePlayback {
         sampleRate: Double,
         clock: inout SpeechManualClock,
         output: any SpeechOutputProcessing,
+        token: SpeechCancelToken? = nil,
         synthesize: (String, inout SpeechManualClock) -> [Float],
         schedule: ([Float], Double) -> Void
     ) -> KokoroClauseReceipt {
@@ -57,6 +58,7 @@ public enum KokoroClausePlayback {
             sampleRate: sampleRate,
             clock: &clock,
             output: output,
+            token: token,
             synthesize: synthesize,
             schedule: { samples, at in
                 scheduledBuffers.append(samples)
@@ -86,7 +88,11 @@ public enum KokoroClausePlayback {
         render: (String, inout SpeechManualClock) -> URL?,
         play: (URL) -> Bool
     ) -> KokoroPlayReceipt {
-        defer { removeFiles(in: directory) }
+        var rendered: [URL] = []
+        defer {
+            removeFiles(in: directory)
+            for url in rendered { removeWorkerWAV(url) }
+        }
         guard OriginalSyntheticVoice.accepts(personaVoiceID) else {
             return KokoroPlayReceipt(succeeded: false, scheduledCount: 0, fallThrough: true)
         }
@@ -108,6 +114,7 @@ public enum KokoroClausePlayback {
                     token.cancel()
                     return []
                 }
+                rendered.append(url)
                 if let deadline, clock.seconds > deadline {
                     failed = true
                     token.cancel()
@@ -198,6 +205,14 @@ public enum KokoroTurn {
 }
 
 extension KokoroClausePlayback {
+    /// The worker publishes `zeus-kokoro-<id>.wav` outside the playback directory.
+    /// Every path that received one deletes it, including success, a later failure, and cancel.
+    public static func removeWorkerWAV(_ url: URL) {
+        let name = url.lastPathComponent
+        guard name.hasPrefix("zeus-kokoro-"), url.pathExtension == "wav" else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
     public static func removeFiles(in directory: URL) {
         guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
         for file in files {

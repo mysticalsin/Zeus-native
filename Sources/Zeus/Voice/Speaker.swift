@@ -60,6 +60,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     /// How many times the shared output engine has been started (the tests check a key press starts none).
     var outputEngineStarts: Int { chain.engineStarts }
     var attemptOverride: (@MainActor (String) async -> String?)?
+    /// Set when a queued line played some audio and then failed. The talk turn reads this before the done chime.
+    private(set) var turnPartialFailure = false
     private var pump: Task<Void, Never>?
     private var pumpToken: UUID?
     private var systemRendering = false
@@ -116,6 +118,11 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
 
     // MARK: Entry points
 
+    /// Clears the partial-failure flag for a new talk turn.
+    func prepareTurn() {
+        turnPartialFailure = false
+    }
+
     /// `onStart` runs once, on the main actor, when this line's audio starts, before the next line begins.
     func speak(_ text: String, onStart: (@MainActor () -> Void)? = nil) {
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -127,7 +134,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             while let self, !Task.isCancelled {
                 if !self.queue.isEmpty {
                     let line = self.queue.removeFirst()
-                    _ = await self.speakLine(line.text, onStart: line.onStart)
+                    let played = await self.speakLine(line.text, onStart: line.onStart)
+                    if played?.partialFailure == true { self.turnPartialFailure = true }
                 } else if self.chain.isPlaying || self.systemRendering {
                     try? await Task.sleep(for: .milliseconds(40))
                 } else {
