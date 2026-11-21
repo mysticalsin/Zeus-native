@@ -35,17 +35,19 @@ struct SpokenStyleTests {
         #expect(hear("  \n\t  ").runs.isEmpty)
     }
 
-    @Test func emojiIsNotSpoken() {
-        #expect(hear("Ship it 🚀 now.").spokenText == "Ship it now.")
+    @Test func emojiIsSpokenByName() {
+        #expect(hear("Ship it 🚀 now.").spokenText == "Ship it rocket now.")
+        #expect(hear("🚀").spokenText == "rocket.")
+        #expect(hear("Envoie 🚀.", .french).spokenText == "Envoie fusée.")
     }
 
-    @Test func emojiAloneIsSilent() {
-        #expect(hear("🚀").runs.isEmpty)
-        #expect(hear("🚀", .french).spokenText.isEmpty)
+    @Test func skinToneEmojiIsSpokenWithoutTheTone() {
+        #expect(hear("OK 👍🏽").spokenText == "OK thumbs up.")
     }
 
-    @Test func skinToneEmojiIsNotSpoken() {
-        #expect(hear("OK 👍🏽").spokenText == "OK.")
+    @Test func unmappedEmojiIsAnnounced() {
+        #expect(hear("See 🙂 please.").spokenText == "See an emoji please.")
+        #expect(!hear("See 🙂 please.").spokenText.isEmpty)
     }
 
     @Test func inlineCodeLosesBackticks() {
@@ -211,24 +213,24 @@ struct SpokenStyleTests {
 
     @Test func urlIsSpokenByDomain() {
         let transcript = hear("See https://example.com/docs?x=1 for it.")
-        #expect(transcript.spokenText == "See example dot com for it.")
+        #expect(transcript.spokenText == "See example dot com slash docs for it.")
         #expect(!transcript.spokenText.contains("https"))
-        #expect(!transcript.spokenText.contains("docs"))
+        #expect(transcript.spokenText.contains("docs"))
         #expect(!transcript.spokenText.contains("x=1"))
     }
 
     @Test func frenchUrlUsesPoint() {
         let transcript = hear("https://example.com/docs", .french)
-        #expect(transcript.spokenText == "example point com.")
+        #expect(transcript.spokenText == "example point com barre oblique docs.")
         #expect(!transcript.spokenText.contains("https"))
     }
 
     @Test func wwwPrefixIsDropped() {
-        #expect(hear("www.example.com/a").spokenText == "example dot com.")
+        #expect(hear("www.example.com/a").spokenText == "example dot com slash a.")
     }
 
     @Test func ipAddressIsALink() {
-        #expect(hear("http://127.0.0.1/status").spokenText == "a link.")
+        #expect(hear("http://127.0.0.1/status").spokenText == "a link slash status.")
     }
 
     @Test func markdownLinkKeepsTheLabel() {
@@ -240,17 +242,17 @@ struct SpokenStyleTests {
 
     @Test func filePathIsNotRead() {
         let transcript = hear("Open Sources/Zeus/Voice/Speaker.swift please.")
-        #expect(transcript.spokenText == "Open a file please.")
-        #expect(!transcript.spokenText.contains("Speaker"))
-        #expect(!transcript.spokenText.contains("swift"))
+        #expect(transcript.spokenText == "Open file Speaker dot swift please.")
+        #expect(!transcript.spokenText.contains("Sources"))
+        #expect(!transcript.spokenText.contains("/"))
     }
 
     @Test func frenchFilePath() {
-        #expect(hear("Sources/Zeus/Voice/Speaker.swift", .french).spokenText == "un fichier.")
+        #expect(hear("Sources/Zeus/Voice/Speaker.swift", .french).spokenText == "fichier Speaker point swift.")
     }
 
     @Test func windowsPathIsNotRead() {
-        #expect(hear("Open C:\\notes.txt now.").spokenText == "Open a file now.")
+        #expect(hear("Open C:\\notes.txt now.").spokenText == "Open file notes dot txt now.")
     }
 
     @Test func hashIsNotRead() {
@@ -260,6 +262,9 @@ struct SpokenStyleTests {
         #expect(!transcript.spokenText.contains(digest))
         #expect(hear("Mark deadbeef done.").spokenText == "Mark a hash done.")
         #expect(hear("See 0xdeadbeef now.").spokenText == "See a hash now.")
+        #expect(hear("Mark abcdef now.").spokenText == "Mark abcdef now.")
+        #expect(hear("Mark abcdefg now.").spokenText == "Mark a hash now.")
+        #expect(hear("Mark abcdefgh now.").spokenText == "Mark a hash now.")
     }
 
     @Test func frenchHashIsUneEmpreinte() {
@@ -457,9 +462,9 @@ struct SpokenStyleTests {
     }
 
     @Test func headingDoesNotSpendTheWholeBudget() {
-        let transcript = hear("# Status\n\nThe build passed. The logs can wait.", maxSentences: 1)
-        #expect(transcript.spokenText == "Status the build passed.")
-        #expect(!transcript.spokenText.contains("logs"))
+        let words = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen"
+        let transcript = hear("# Status\n\n\(words).", maxSentences: 1)
+        #expect(transcript.spokenText == "Status \(words).")
     }
 
     @Test func checkboxListIsSpokenAsDoneOrOpen() {
@@ -474,10 +479,13 @@ struct SpokenStyleTests {
         #expect(!transcript.spokenText.contains("["))
     }
 
-    @Test func strikethroughIsNotRead() {
+    @Test func strikethroughKeepsTheWords() {
         let transcript = hear("The ~~old~~ plan is ready.")
-        #expect(transcript.spokenText == "The plan is ready.")
+        #expect(transcript.spokenText == "The old struck through plan is ready.")
         #expect(!transcript.spokenText.contains("~"))
+        #expect(hear("L'~~ancien~~ plan est prêt.", .french).spokenText == "L'ancien barré plan est prêt.")
+        #expect(hear("**~~old~~**").spokenText == "old struck through.")
+        #expect(!hear("**hello").spokenText.contains("*"))
     }
 
     @Test func parenthesesBecomeAnAside() {
@@ -498,9 +506,9 @@ struct SpokenStyleTests {
 
     @Test func autolinkBracketsAreNotSpoken() {
         let transcript = hear("See <https://example.com/docs> now.")
-        #expect(transcript.spokenText == "See example dot com now.")
+        #expect(transcript.spokenText == "See example dot com slash docs now.")
         #expect(!transcript.spokenText.contains("<"))
-        #expect(!transcript.spokenText.contains("docs"))
+        #expect(!transcript.spokenText.contains("https"))
     }
 
     @Test func tildeFenceHidesTheCode() {
@@ -520,12 +528,17 @@ struct SpokenStyleTests {
     @Test func ampersandIsSpokenAsAnd() {
         #expect(hear("A & B are ready.").spokenText == "A and B are ready.")
         #expect(hear("A & B sont prêts.", .french).spokenText == "A et B sont prêts.")
+        #expect(hear("1&2").spokenText == "one and two.")
+        #expect(hear("Q&A").spokenText == "Q and A.")
+        #expect(hear("A &amp; B are ready.").spokenText == "A and B are ready.")
     }
 
     @Test func shoutedSentenceIsSpokenCalmly() {
         #expect(hear("THE BUILD PASSED.").spokenText == "The build passed.")
         #expect(hear("I AM READY.").spokenText == "I'm ready.")
         #expect(hear("THE BUILD PASSED... details can wait.").spokenText == "The build passed. Details can wait.")
+        #expect(hear("NASA API failed.").spokenText == "NASA API failed.")
+        #expect(hear("NASA failed.").spokenText == "NASA failed.")
     }
 
     @Test func aWallOfWordsIsCutIntoShortSentences() {
@@ -545,5 +558,47 @@ struct SpokenStyleTests {
         for run in transcript.runs {
             #expect(run.text.split(whereSeparator: \.isWhitespace).count <= SpokenStyle.maxWordsPerSentence)
         }
+    }
+
+    @Test func tenThousandTildesFinishQuickly() {
+        let text = String(repeating: "~", count: 10_000)
+        let start = ContinuousClock.now
+        _ = hear(text)
+        #expect(ContinuousClock.now - start < .milliseconds(50))
+    }
+
+    @Test func unclosedFenceKeepsLaterProse() {
+        let text = "Wait.\n```\nsecret\nThe build passed."
+        let transcript = hear(text)
+        #expect(transcript.spokenText.contains("The build passed"))
+        #expect(transcript.spokenText != "Here's the code.")
+    }
+
+    @Test func htmlCommentsAreNotSpoken() {
+        #expect(hear("Hello <!-- secret --> there.").spokenText == "Hello there.")
+        #expect(!hear("Hello <!-- secret --> there.").spokenText.contains("secret"))
+        let unclosed = "Before <!-- hidden\nThe build passed."
+        #expect(hear(unclosed).spokenText.contains("The build passed"))
+        #expect(!hear(unclosed).spokenText.contains("hidden"))
+    }
+
+    @Test func checkboxWithoutASpaceIsSpoken() {
+        #expect(hear("- [x]Ship it.").spokenText == "Ship it done.")
+    }
+
+    @Test func doubleDotEndsTheSentence() {
+        #expect(hear("Wait.. done.").spokenText == "Wait. Done.")
+    }
+
+    @Test func degreesCelsiusAreSpoken() {
+        #expect(hear("It is 20°C outside.").spokenText == "It's twenty degrees Celsius outside.")
+        #expect(hear("Il fait 20°C.", .french).spokenText == "Il fait vingt degrés Celsius.")
+    }
+
+    @Test func bidiAndKeycapStayReadable() {
+        #expect(hear("OK\u{202E}go").spokenText == "OKgo.")
+        #expect(hear("OK\u{200B}.").spokenText == "OK.")
+        #expect(hear("\u{0031}\u{FE0F}\u{20E3}").spokenText == "one.")
+        #expect(!hear("\u{0031}\u{FE0F}\u{20E3}").spokenText.contains("emoji"))
     }
 }
