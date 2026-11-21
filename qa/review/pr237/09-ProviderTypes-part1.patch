@@ -1,0 +1,163 @@
+diff --git a/Sources/ZeusCore/Providers/ProviderTypes.swift b/Sources/ZeusCore/Providers/ProviderTypes.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/ProviderTypes.swift
+@@ -0,0 +1,158 @@
++import Foundation
++
++/// What a plug-in can do. Speech and language are reserved so a later adapter can register
++/// without a second registry. Only text-to-speech has adapters today.
++public enum ProviderKind: String, Sendable, CaseIterable, Equatable, Hashable {
++    case tts
++    case stt
++    case llm
++}
++
++public struct ProviderCapabilities: OptionSet, Sendable, Equatable, Hashable {
++    public let rawValue: Int
++    public init(rawValue: Int) { self.rawValue = rawValue }
++    public static let listVoices = ProviderCapabilities(rawValue: 1 << 0)
++    public static let streamingSynthesis = ProviderCapabilities(rawValue: 1 << 1)
++    public static let validateCredential = ProviderCapabilities(rawValue: 1 << 2)
++}
++
++public struct CredentialField: Equatable, Sendable, Identifiable, Hashable {
++    public var id: String
++    public var label: String
++    public var masked: Bool
++    public init(id: String, label: String, masked: Bool) {
++        self.id = id
++        self.label = label
++        self.masked = masked
++    }
++}
++
++public struct ProviderDescriptor: Equatable, Sendable, Identifiable, Hashable {
++    public var id: String
++    public var displayName: String
++    public var kind: ProviderKind
++    public var credentialFields: [CredentialField]
++    public var docsURL: URL
++    public var capabilities: ProviderCapabilities
++    public init(id: String, displayName: String, kind: ProviderKind, credentialFields: [CredentialField], docsURL: URL, capabilities: ProviderCapabilities) {
++        self.id = id
++        self.displayName = displayName
++        self.kind = kind
++        self.credentialFields = credentialFields
++        self.docsURL = docsURL
++        self.capabilities = capabilities
++    }
++}
++
++public struct ProviderVoice: Equatable, Sendable, Identifiable, Hashable {
++    public var id: String
++    public var name: String
++    public var language: String?
++    public init(id: String, name: String, language: String?) {
++        self.id = id
++        self.name = name
++        self.language = language
++    }
++}
++
++public struct AudioChunk: Equatable, Sendable {
++    public var data: Data
++    public var index: Int
++    public var isLast: Bool
++    public init(data: Data, index: Int, isLast: Bool) {
++        self.data = data
++        self.index = index
++        self.isLast = isLast
++    }
++}
++
++public struct ProviderCredential: Equatable, Sendable {
++    public var fields: [String: String]
++    public init(fields: [String: String]) { self.fields = fields }
++    public func value(_ id: String) -> String? {
++        let trimmed = fields[id]?.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard let trimmed, !trimmed.isEmpty else { return nil }
++        return trimmed
++    }
++}
++
++public enum ProviderFailure: Error, Equatable, Sendable, Hashable {
++    case unauthorized
++    case creditsUsedUp
++    case badVoice
++    case rateLimited
++    case server(Int)
++    case timedOut
++    case cancelled
++    case invalidResponse
++    case notHTTPS
++    case missingCredential
++    case notRegistered
++    case offline
++
++    public var logName: String {
++        switch self {
++        case .unauthorized: "unauthorized"
++        case .creditsUsedUp: "credits-used-up"
++        case .badVoice: "bad-voice"
++        case .rateLimited: "rate-limited"
++        case .server(let status): "server-\(status)"
++        case .timedOut: "timed-out"
++        case .cancelled: "cancelled"
++        case .invalidResponse: "invalid-response"
++        case .notHTTPS: "not-https"
++        case .missingCredential: "missing-credential"
++        case .notRegistered: "not-registered"
++        case .offline: "offline"
++        }
++    }
++
++    public var pill: String {
++        switch self {
++        case .unauthorized: "Key rejected"
++        case .creditsUsedUp: "Credits are used up"
++        case .badVoice: "That voice isn't available"
++        case .rateLimited: "Rate limited"
++        case .server: "Provider unavailable"
++        case .timedOut: "Timed out"
++        case .cancelled: "Cancelled"
++        case .invalidResponse: "No audio"
++        case .notHTTPS: "Blocked"
++        case .missingCredential: "Needs a key"
++        case .notRegistered: "Unavailable"
++        case .offline: "Offline"
++        }
++    }
++
++    /// Maps a status code. A 400 counts as a rejected key only while validating, because a synthesize
++    /// call can return 400 for a bad voice name.
++    public static func fromHTTPStatus(_ status: Int, validating: Bool = false) -> ProviderFailure {
++        switch status {
++        case 0: .offline
++        case 401, 403: .unauthorized
++        case 402: .creditsUsedUp
++        case 400 where validating: .unauthorized
++        case 400: .badVoice
++        case 429: .rateLimited
++        case 500...599: .server(status)
++        default: .invalidResponse
++        }
++    }
++
++    public static func wrap(_ error: Error) -> ProviderFailure {
++        if let failure = error as? ProviderFailure { return failure }
++        if error is CancellationError { return .cancelled }
++        let ns = error as NSError
++        if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorTimedOut { return .timedOut }
++        if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return .cancelled }
++        if ns.domain == NSURLErrorDomain && (ns.code == NSURLErrorNotConnectedToInternet || ns.code == NSURLErrorNetworkConnectionLost
++            || ns.code == NSURLErrorCannotFindHost || ns.code == NSURLErrorCannotConnectToHost || ns.code == NSURLErrorDNSLookupFailed) {
++            return .offline
++        }
++        return .invalidResponse
++    }
++}
++
++/// A saved key is 8 to 256 characters after trimming, with no whitespace and no control character.
++/// Empty and malformed keys are refused before any request is built. The text of a refusal never includes the key.
++public enum VoiceProviderKeyPolicy {
