@@ -14,6 +14,19 @@ public enum BundledHelperLaunchDecision: Equatable, Sendable {
     case refuse(String)
 }
 
+/// How the running app is signed. Developer ID has a team. Zeus Local Dev has a leaf certificate and no team.
+public enum HelperSigningAnchor: Equatable, Sendable {
+    case developerID(teamIdentifier: String)
+    case localDev(leafSHA1: String)
+}
+
+/// The Security framework reports which anchor the running app carries, and whether a helper meets one requirement.
+public protocol BundledHelperAnchorChecking: Sendable {
+    func signingAnchor() -> HelperSigningAnchor?
+    /// True only when `path` satisfies the requirement for `anchor` and `signingIdentifier`. Any failure is false.
+    func helperSatisfies(anchor: HelperSigningAnchor, signingIdentifier: String, at path: String) -> Bool
+}
+
 /// Whether Zeus may start a bundled helper. Failure refuses the launch.
 public enum BundledHelperLaunchPolicy {
     /// `scripts/bundle.sh` signs `zeus-bridge` without `--identifier`, so the signing identifier is the file name.
@@ -32,6 +45,32 @@ public enum BundledHelperLaunchPolicy {
         return "anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\" and identifier \"\(signingIdentifier)\""
     }
 
+    /// Developer ID pins the Apple anchor and the team. A local-dev leaf is a different requirement.
+    public static func requirementText(anchor: HelperSigningAnchor, signingIdentifier: String) -> String? {
+        switch anchor {
+        case .developerID(let team):
+            return requirementText(teamIdentifier: team, signingIdentifier: signingIdentifier)
+        case .localDev(let leaf):
+            guard isLeafSHA1(leaf), isToken(signingIdentifier, allowing: "._-") else { return nil }
+            return "anchor apple generic and certificate leaf = H\"\(leaf.lowercased())\" and identifier \"\(signingIdentifier)\""
+        }
+    }
+
+    /// Launch when the helper's file name is a known signing identifier and `checker` accepts the
+    /// requirement for the running app's anchor. No anchor, or a failed check, refuses.
+    public static func decide(helperPath: String, signingIdentifier: String, checker: some BundledHelperAnchorChecking) -> BundledHelperLaunchDecision {
+        let path = helperPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let identifier = signingIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !path.isEmpty, knownSigningIdentifiers.contains(identifier),
+              Self.signingIdentifier(forExecutablePath: path) == identifier,
+              let anchor = checker.signingAnchor(),
+              requirementText(anchor: anchor, signingIdentifier: identifier) != nil,
+              checker.helperSatisfies(anchor: anchor, signingIdentifier: identifier, at: path) else {
+            return .refuse(refusalSentence)
+        }
+        return .launch
+    }
+
     /// Launch only when the helper's file name is its signing identifier, that identifier is one of
     /// the bundled helpers, and `checker` reports that a designated requirement pinning the running
     /// app's team and that identifier succeeded. Every other case refuses.
@@ -46,6 +85,11 @@ public enum BundledHelperLaunchPolicy {
             return .refuse(refusalSentence)
         }
         return .launch
+    }
+
+    static func isLeafSHA1(_ text: String) -> Bool {
+        let leaf = text.lowercased()
+        return leaf.count == 40 && leaf.allSatisfy(\.isHexDigit)
     }
 
     /// Letters, digits and the given extras only, so a value cannot add a requirement clause.

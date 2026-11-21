@@ -88,4 +88,92 @@ private struct FakeSignature: BundledHelperSignatureChecking {
         #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
                                                 signingIdentifier: "zeus-bridge", checker: checker) == .launch)
     }
+
+    @Test func developerIDRequirementUsesTheAppleAnchorAndLaunchesWhenItMatches() {
+        let expected = "anchor apple generic and certificate leaf[subject.OU] = \"ABCDE12345\" and identifier \"zeus-bridge\""
+        let text = BundledHelperLaunchPolicy.requirementText(anchor: .developerID(teamIdentifier: "ABCDE12345"), signingIdentifier: "zeus-bridge")
+        #expect(text == expected)
+        let checker = AnchorFake(anchor: .developerID(teamIdentifier: "ABCDE12345"), accepted: expected)
+        #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
+                                                signingIdentifier: "zeus-bridge", checker: checker) == .launch)
+    }
+
+    @Test func localDevRequirementOmitsTheAppleAnchorAndLaunchesWhenTheLeafMatches() {
+        let leaf = "0123456789abcdef0123456789abcdef01234567"
+        let expected = "certificate leaf = H\"\(leaf)\" and identifier \"zeus-bridge\""
+        let text = BundledHelperLaunchPolicy.requirementText(anchor: .localDev(leafSHA1: leaf), signingIdentifier: "zeus-bridge")
+        #expect(text == expected)
+        #expect(text?.contains("anchor apple generic") == false)
+        let checker = AnchorFake(anchor: .localDev(leafSHA1: leaf), accepted: expected)
+        #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
+                                                signingIdentifier: "zeus-bridge", checker: checker) == .launch)
+    }
+
+    @Test func aMissingAnchorStillRefuses() {
+        let checker = AnchorFake(anchor: nil, accepted: "")
+        #expect(BundledHelperLaunchPolicy.decide(helperPath: "/Applications/Zeus.app/Contents/Helpers/zeus-bridge",
+                                                signingIdentifier: "zeus-bridge", checker: checker)
+                == .refuse(BundledHelperLaunchPolicy.refusalSentence))
+    }
 }
+
+private struct AnchorFake: BundledHelperAnchorChecking {
+    var anchor: HelperSigningAnchor?
+    var accepted: String
+    func signingAnchor() -> HelperSigningAnchor? { anchor }
+    func helperSatisfies(anchor: HelperSigningAnchor, signingIdentifier: String, at path: String) -> Bool {
+        BundledHelperLaunchPolicy.requirementText(anchor: anchor, signingIdentifier: signingIdentifier) == accepted
+    }
+}
+
+@Suite struct BridgePublishTests {
+    private func directory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-bridge-publish-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @Test func aRejectedStageLeavesThePreviousBridgeAndRegistration() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let destination = root.appendingPathComponent("zeus-bridge")
+        let registration = root.appendingPathComponent("com.zeus.bridge.json")
+        let staged = root.appendingPathComponent("zeus-bridge.new")
+        try Data("previous-bridge".utf8).write(to: destination)
+        try Data("previous-registration".utf8).write(to: registration)
+        try Data("rejected-stage".utf8).write(to: staged)
+        let outcome = BundledHelperPublish.replaceIfAccepted(staged: staged, destination: destination, registration: registration,
+                                                             accept: { _ in false }, writeRegistration: { throw TestWrite.failed })
+        guard case .failure(.rejected) = outcome else {
+            Issue.record("expected the stage to be rejected")
+            return
+        }
+        #expect(try Data(contentsOf: destination) == Data("previous-bridge".utf8))
+        #expect(try Data(contentsOf: registration) == Data("previous-registration".utf8))
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+    }
+
+    @Test func anAcceptedStageReplacesTheBridgeAndThenWritesTheRegistration() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let destination = root.appendingPathComponent("zeus-bridge")
+        let registration = root.appendingPathComponent("com.zeus.bridge.json")
+        let staged = root.appendingPathComponent("zeus-bridge.new")
+        try Data("previous-bridge".utf8).write(to: destination)
+        try Data("previous-registration".utf8).write(to: registration)
+        try Data("new-bridge".utf8).write(to: staged)
+        let outcome = BundledHelperPublish.replaceIfAccepted(staged: staged, destination: destination, registration: registration,
+                                                             accept: { _ in true }, writeRegistration: {
+                                                                 try Data("new-registration".utf8).write(to: registration)
+                                                             })
+        guard case .success = outcome else {
+            Issue.record("expected the stage to be published")
+            return
+        }
+        #expect(try Data(contentsOf: destination) == Data("new-bridge".utf8))
+        #expect(try Data(contentsOf: registration) == Data("new-registration".utf8))
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+    }
+}
+
+private enum TestWrite: Error { case failed }
