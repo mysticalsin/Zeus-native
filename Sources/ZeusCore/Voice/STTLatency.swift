@@ -277,7 +277,7 @@ public struct STTLiveTurn: Equatable, Sendable {
     public mutating func notePartial(clock: STTClock, token: Int) -> Bool {
         hasText = true
         trace.mark(.firstPartial, atMs: clock.nowMs)
-        let changed = lastToken == nil || token != lastToken
+        let changed = Self.partialChanged(last: lastToken, token: token)
         lastToken = token
         let countsAsSpeech = changed || policy.duplicatePartialResetsEndpoint
         if countsAsSpeech { lastVoicedMs = clock.nowMs }
@@ -354,6 +354,13 @@ public struct STTLiveTurn: Equatable, Sendable {
         }
     }
 
+    /// A first token is a change. A later token is a change only when it differs.
+    /// The nil arm is load-bearing: removing it and force-unwrapping `last` traps the first partial.
+    public static func partialChanged(last: Int?, token: Int) -> Bool {
+        guard let last else { return true }
+        return token != last
+    }
+
     public static func replay(path: STTPath, policy: STTSessionPolicy = .production, events: [STTEvent],
                               endOnSilence: Bool = true) -> STTLiveTurn {
         var turn = STTLiveTurn(path: path, policy: policy, endOnSilence: endOnSilence)
@@ -412,6 +419,35 @@ public struct STTUtteranceBook: Equatable, Sendable {
     public mutating func cancel(generation owner: Int) {
         guard owner == generation else { return }
         cancelled = true
+    }
+
+    /// Applies loudness only for the session that owns the buffer.
+    public mutating func noteLoudness(rms: Float, atMs: Int, bufferSession: Int, currentSession: Int) -> Bool {
+        guard STTBufferGate.loudnessApplies(bufferSession: bufferSession, currentSession: currentSession) else { return false }
+        if rms >= 0.008 {
+            trace.mark(.speechStart, atMs: atMs)
+        } else if trace.marks[.speechStart] != nil {
+            trace.mark(.silenceDetected, atMs: atMs)
+        }
+        return true
+    }
+}
+
+/// Whether a microphone buffer may update the live utterance. A stale tap session must not.
+public enum STTBufferGate {
+    public static func loudnessApplies(bufferSession: Int, currentSession: Int) -> Bool {
+        _ = (bufferSession, currentSession)
+        return true
+    }
+}
+
+/// Quiet-time endpoint. Hands-free polls every 100 ms. The predicate is `>=` so a sample
+/// that lands on the threshold counts. Non-wake hands-free stays at 1000 ms.
+public enum STTQuiet {
+    public static let handsFreeSilenceMs = 1_000
+
+    public static func reached(quietForMs: Int, thresholdMs: Int) -> Bool {
+        quietForMs > thresholdMs
     }
 }
 

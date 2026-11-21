@@ -212,4 +212,114 @@ struct STTLatencyTests {
         #expect(endpoint == 100 + STTSessionPolicy.fixed.silenceToEndpointMs)
         #expect(endpoint != 10_000)
     }
+
+    @Test func endpointBoundariesKillComparisonMutants() {
+        let budget = STTSessionPolicy.fixed.silenceToEndpointMs
+        let silenceAt = 100
+        func endpoint(at sample: Int) -> Int? {
+            var clock = STTClock()
+            var turn = STTLiveTurn(path: .talkHold, policy: .fixed, endOnSilence: true)
+            clock.advance(to: 0)
+            turn.keyDown(clock: clock)
+            clock.advance(to: 40)
+            turn.feed(clock: clock, rms: 0.05, partialToken: 1)
+            clock.advance(to: silenceAt)
+            turn.feed(clock: clock, rms: 0.001, partialToken: 1)
+            clock.advance(to: sample)
+            turn.feed(clock: clock, rms: 0.001, partialToken: 1)
+            return turn.trace.offset(.endpointFired)
+        }
+        let early = endpoint(at: silenceAt + budget - 1)
+        let exact = endpoint(at: silenceAt + budget)
+        let late = endpoint(at: silenceAt + budget + 1)
+        #expect(early == nil)
+        #expect(exact == silenceAt + budget)
+        #expect(late == silenceAt + budget + 1)
+    }
+
+    @Test func aStaleMarkDoesNotWriteTheOpenUtterance() {
+        var book = STTUtteranceBook()
+        let first = book.begin(path: .talkHold, atMs: 0)
+        let second = book.begin(path: .murmurTap, atMs: 100)
+        let wrote = book.mark(.speechStart, atMs: 150, generation: first)
+        let speech = book.trace.offset(.speechStart)
+        #expect(second == first + 1)
+        #expect(!wrote)
+        #expect(speech == nil)
+    }
+
+    @Test func generationZeroIsNotAnOpenUtterance() {
+        var book = STTUtteranceBook()
+        let wrote = book.deliver(generation: 0, atMs: 10)
+        let delivered = book.trace.offset(.deliveredToUI)
+        let allowed = STTUtteranceBook.accepts(owner: 0, current: 0, cancelled: false)
+        #expect(!wrote)
+        #expect(delivered == nil)
+        #expect(!allowed)
+    }
+
+    @Test func anOlderCancelDoesNotCloseTheNewerUtterance() {
+        var book = STTUtteranceBook()
+        let first = book.begin(path: .talkHold, atMs: 0)
+        let second = book.begin(path: .murmurTap, atMs: 100)
+        book.cancel(generation: first)
+        let wrote = book.deliver(generation: second, atMs: 140)
+        let delivered = book.trace.offset(.deliveredToUI)
+        #expect(wrote)
+        #expect(delivered == 40)
+        #expect(!book.cancelled)
+    }
+
+    @Test func aChangedTokenDuringSilenceIsSpeechOnTheFixedPolicy() {
+        let budget = STTSessionPolicy.fixed.silenceToEndpointMs
+        var clock = STTClock()
+        var turn = STTLiveTurn(path: .talkHold, policy: .fixed, endOnSilence: true)
+        clock.advance(to: 0)
+        turn.keyDown(clock: clock)
+        clock.advance(to: 40)
+        turn.feed(clock: clock, rms: 0.05, partialToken: 1)
+        clock.advance(to: 100)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 1)
+        clock.advance(to: 100 + budget - 1)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 2)
+        clock.advance(to: 100 + budget)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 2)
+        let endpoint = turn.trace.offset(.endpointFired)
+        #expect(STTLiveTurn.partialChanged(last: nil, token: 1))
+        #expect(!STTLiveTurn.partialChanged(last: 1, token: 1))
+        #expect(STTLiveTurn.partialChanged(last: 1, token: 2))
+        #expect(endpoint == nil)
+    }
+
+    @Test func aCancelledDeliverIsRefused() {
+        let open = STTUtteranceBook.accepts(owner: 1, current: 1, cancelled: false)
+        let closed = STTUtteranceBook.accepts(owner: 1, current: 1, cancelled: true)
+        #expect(open)
+        #expect(!closed)
+    }
+
+    @Test func aStaleBufferDoesNotSetSpeechOrSilence() {
+        var book = STTUtteranceBook()
+        _ = book.begin(path: .talkHold, atMs: 0)
+        let speech = book.noteLoudness(rms: 0.05, atMs: 20, bufferSession: 3, currentSession: 4)
+        let silence = book.noteLoudness(rms: 0.0, atMs: 40, bufferSession: 3, currentSession: 4)
+        #expect(!speech)
+        #expect(!silence)
+        #expect(book.trace.offset(.speechStart) == nil)
+        #expect(book.trace.offset(.silenceDetected) == nil)
+        let live = book.noteLoudness(rms: 0.05, atMs: 60, bufferSession: 4, currentSession: 4)
+        #expect(live)
+        #expect(book.trace.offset(.speechStart) == 60)
+    }
+
+    @Test func quietReachesExactlyAtTheHandsFreeThreshold() {
+        let threshold = STTQuiet.handsFreeSilenceMs
+        let at = STTQuiet.reached(quietForMs: threshold, thresholdMs: threshold)
+        let before = STTQuiet.reached(quietForMs: threshold - 1, thresholdMs: threshold)
+        let after = STTQuiet.reached(quietForMs: threshold + 1, thresholdMs: threshold)
+        #expect(threshold == 1_000)
+        #expect(at)
+        #expect(!before)
+        #expect(after)
+    }
 }
