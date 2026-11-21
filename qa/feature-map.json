@@ -6914,6 +6914,10 @@
             },
             {
               "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+              "function": "failedWriteBackDoesNotCacheASecretTheBackendNoLongerHolds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
               "function": "restoreOfTheAliasRemovedAtLoadDoesNotIgnoreAFailedWrite"
             },
             {

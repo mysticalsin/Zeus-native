@@ -236,8 +236,6 @@ public final class KeychainStore: @unchecked Sendable {
         for prior in removed.reversed() {
             if verifiedWrite(prior.value, account: prior.account) || verifiedWrite(prior.value, account: prior.account) {
                 cache[prior.account] = prior.value
-            } else {
-                cache[prior.account] = prior.value
             }
         }
     }

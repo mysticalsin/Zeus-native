@@ -33,6 +33,16 @@
       }
     },
     {
+      "id": "REG-Z277-6",
+      "failure": "A failed write-back left the deleted secret in the cache, so get returned it after the backend no longer held it.",
+      "features": ["F13"],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "failedWriteBackDoesNotCacheASecretTheBackendNoLongerHolds"
+      }
+    },
+    {
       "id": "REG-Z277-4",
       "failure": "Restoring the alias removed at load ignored a failed write, so the secret stayed deleted.",
       "features": ["F13"],
