@@ -2,6 +2,7 @@
 
 use crate::session::ChildControl;
 use std::collections::BTreeSet;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Child;
 
@@ -449,15 +450,19 @@ impl<C: ChildControl> Supervisor<C> {
 }
 
 /// Real process table. Used only after [`decide`] allows a launch.
+///
+/// Children are in their own shutdown path: SIGTERM, a short grace, then
+/// SIGKILL. On Linux each child is armed with `PR_SET_PDEATHSIG` so a
+/// crashed supervisor does not leave `python -m haru_mlx.native` running.
 pub struct StdLauncher {
-    children: Vec<Child>,
+    children: std::cell::RefCell<Vec<Child>>,
     spawns: u32,
 }
 
 impl StdLauncher {
     pub fn new() -> Self {
         Self {
-            children: Vec::new(),
+            children: std::cell::RefCell::new(Vec::new()),
             spawns: 0,
         }
     }
@@ -469,6 +474,15 @@ impl Default for StdLauncher {
     }
 }
 
+impl Drop for StdLauncher {
+    fn drop(&mut self) {
+        let children: Vec<Child> = self.children.borrow_mut().drain(..).collect();
+        for mut child in children {
+            terminate_child(&mut child);
+        }
+    }
+}
+
 impl ChildControl for StdLauncher {
     fn spawn(&mut self, argv: &[String]) -> std::io::Result<u32> {
         let mut command =
@@ -476,28 +490,87 @@ impl ChildControl for StdLauncher {
         if argv.len() > 1 {
             command.args(&argv[1..]);
         }
+        // Safety: the hook runs after fork and only calls the async-signal-safe
+        // prctl/getppid/raise sequence. It does not allocate or touch locks.
+        unsafe {
+            command.pre_exec(|| {
+                arm_parent_death();
+                Ok(())
+            });
+        }
         let child = command.spawn()?;
         let pid = child.id();
-        self.children.push(child);
+        self.children.borrow_mut().push(child);
         self.spawns = self.spawns.saturating_add(1);
         Ok(pid)
     }
 
     fn kill(&mut self, pid: u32) {
-        if let Some(index) = self.children.iter().position(|child| child.id() == pid) {
-            let mut child = self.children.swap_remove(index);
-            let _ = child.kill();
-            let _ = child.wait();
+        let index = self
+            .children
+            .borrow()
+            .iter()
+            .position(|child| child.id() == pid);
+        if let Some(index) = index {
+            let mut child = self.children.borrow_mut().swap_remove(index);
+            terminate_child(&mut child);
         }
     }
 
     fn alive(&self) -> Vec<u32> {
-        self.children.iter().map(Child::id).collect()
+        let mut children = self.children.borrow_mut();
+        children.retain_mut(|child| match child.try_wait() {
+            Ok(Some(_)) => false,
+            Ok(None) => true,
+            Err(_) => false,
+        });
+        children.iter().map(Child::id).collect()
     }
 
     fn spawn_count(&self) -> u32 {
         self.spawns
     }
+}
+
+const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_millis(200);
+const SIGTERM: i32 = 15;
+const SIGKILL: i32 = 9;
+
+fn terminate_child(child: &mut Child) {
+    let pid = child.id() as i32;
+    unsafe { kill(pid, SIGTERM) };
+    let deadline = std::time::Instant::now() + SHUTDOWN_GRACE;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) if std::time::Instant::now() >= deadline => break,
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(10)),
+            Err(_) => break,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn arm_parent_death() {
+    #[cfg(target_os = "linux")]
+    unsafe {
+        let parent = getppid();
+        let _ = prctl(1, SIGKILL as usize, 0, 0, 0);
+        if getppid() != parent {
+            raise(SIGKILL);
+        }
+    }
+}
+
+extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+    #[cfg(target_os = "linux")]
+    fn prctl(option: i32, arg2: usize, arg3: usize, arg4: usize, arg5: usize) -> i32;
+    #[cfg(target_os = "linux")]
+    fn getppid() -> i32;
+    #[cfg(target_os = "linux")]
+    fn raise(sig: i32) -> i32;
 }
 
 pub struct StdBinder;

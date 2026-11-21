@@ -76,6 +76,7 @@ fn kill_sends_sigterm_before_sigkill() {
     std::fs::create_dir_all(&dir).unwrap();
     let script = dir.join("term.py");
     let flag = dir.join("caught");
+    let ready = dir.join("ready");
     std::fs::write(
         &script,
         format!(
@@ -84,6 +85,7 @@ fn kill_sends_sigterm_before_sigkill() {
              \topen({flag:?}, 'w').write('term')\n\
              \tsys.exit(0)\n\
              signal.signal(signal.SIGTERM, stop)\n\
+             open({ready:?}, 'w').write('up')\n\
              time.sleep(30)\n"
         ),
     )
@@ -94,7 +96,10 @@ fn kill_sends_sigterm_before_sigkill() {
         .spawn(&["python3".into(), script.display().to_string()])
         .expect("spawn script");
     let _guard = KillOnDrop(pid);
-    assert!(wait_until(Duration::from_secs(2), || proc_alive(pid)));
+    assert!(
+        wait_until(Duration::from_secs(2), || ready.exists()),
+        "helper did not install its SIGTERM handler"
+    );
     launcher.kill(pid);
     assert!(
         wait_until(Duration::from_secs(2), || flag.exists()),
