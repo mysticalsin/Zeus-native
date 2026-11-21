@@ -11,20 +11,19 @@ public enum TalkMissingSetup {
     public static let cliSentence = "Not found on this Mac. Install shows the official command."
     /// Engine row when no key is saved.
     public static let keySentence = "No key saved. Commands go to the assistant."
-    public static let brainSentence = cliSentence
 
-    /// Red stub: still returns only the first gap, and the key shares the install line.
+    /// Microphone, then the screen, then the key, then the command-line tool. Each gap has its own sentence.
     public static func sentences(mic: Bool, screen: Bool, brainKey: Bool, cli: Bool) -> [String] {
-        if let one = sentence(mic: mic, screen: screen, brainKey: brainKey, cli: cli) { return [one] }
-        return []
+        var lines: [String] = []
+        if !mic { lines.append(microphoneSentence) }
+        if !screen { lines.append(screenSentence) }
+        if !brainKey { lines.append(keySentence) }
+        if !cli { lines.append(cliSentence) }
+        return lines
     }
 
-    /// Microphone first, then the screen, then a brain with neither a key nor a command-line tool.
-    /// A saved key or a command-line tool is enough for the brain. All present returns no sentence.
+    /// The first gap, in the same order as `sentences`. No gap returns nil.
     public static func sentence(mic: Bool, screen: Bool, brainKey: Bool, cli: Bool) -> String? {
-        if !mic { return microphoneSentence }
-        if !screen { return screenSentence }
-        if !brainKey && !cli { return cliSentence }
-        return nil
+        sentences(mic: mic, screen: screen, brainKey: brainKey, cli: cli).first
     }
 }

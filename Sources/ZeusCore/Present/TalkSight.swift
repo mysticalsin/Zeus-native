@@ -151,13 +151,16 @@ public struct ScreenSightNotice: Sendable {
     public static let message = "I can't see your screen yet. Turn on Screen Recording for Zeus in System Settings, under Privacy and Security."
 
     private var told = false
+    /// Settings sentences for the gaps on the turn that used the notice. The spoken line stays `message`.
+    public private(set) var settingsGaps: [String] = []
 
     public init() {}
 
     /// The notice to give now, or nil. A granted permission never uses the notice up.
-    public mutating func take(permissionGranted: Bool) -> String? {
+    public mutating func take(permissionGranted: Bool, mic: Bool = true, brainKey: Bool = true, cli: Bool = true) -> String? {
         guard !permissionGranted, !told else { return nil }
         told = true
+        settingsGaps = TalkMissingSetup.sentences(mic: mic, screen: false, brainKey: brainKey, cli: cli)
         return Self.message
     }
 }
