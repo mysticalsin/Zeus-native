@@ -57,6 +57,42 @@ fn push_with_3199_or_3201_samples_is_rejected() {
 }
 
 #[test]
+fn start_accepts_only_english_and_french() {
+    for language in ["en", "fr"] {
+        let payload =
+            format!(r#"{{"language":"{language}","system_prompt":"hi","speak_first":false}}"#);
+        let framed = haru_companion::protocol::frame(0x22, payload.as_bytes());
+        match decode_client(&framed).unwrap() {
+            ClientMessage::Start { language: got, .. } => assert_eq!(got, language),
+            other => panic!("{other:?}"),
+        }
+        ClientMessage::Start {
+            language: language.into(),
+            system_prompt: "hi".into(),
+            speak_first: false,
+        }
+        .encode()
+        .expect("en and fr encode");
+    }
+    let payload = br#"{"language":"de","system_prompt":"hi","speak_first":false}"#;
+    let framed = haru_companion::protocol::frame(0x22, payload);
+    assert_eq!(
+        decode_client(&framed).unwrap_err(),
+        haru_companion::protocol::ProtocolError::BadLanguage
+    );
+    assert_eq!(
+        ClientMessage::Start {
+            language: "de".into(),
+            system_prompt: "hi".into(),
+            speak_first: false,
+        }
+        .encode()
+        .unwrap_err(),
+        haru_companion::protocol::ProtocolError::BadLanguage
+    );
+}
+
+#[test]
 fn start_with_reference_path_is_rejected() {
     let payload = br#"{"language":"en","system_prompt":"hi","speak_first":false,"reference_path":"/tmp/voice.wav"}"#;
     let framed = haru_companion::protocol::frame(0x22, payload);
