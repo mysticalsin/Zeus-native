@@ -125,6 +125,7 @@ final class SpeechInput: @unchecked Sendable {
     /// Stage clock for this turn. Milliseconds from key-down. Never stores transcript text.
     private var trace = STTLatencyTrace(path: .talkHold)
     private var traceArmed = false
+    private var armedGeneration = 0
     private var keyDownUptime: TimeInterval?
     private var heardSpeech = false
     private var silenceMarked = false
@@ -538,13 +539,13 @@ final class SpeechInput: @unchecked Sendable {
                         return effects
                     }
                     if effects.contains(.finishTurn) {
-                        self.finish(ifSession: turn.sessionID, recognizerFinished: true)
+                        self.finish(ifSession: turn.sessionID, recognizerFinished: true, owner: self.armedGeneration)
                     } else if effects.contains(.restart) {
                         let stillOpen = self.lock.withLock { !self.stopRequested && self.generation == turn.sessionID }
                         if stillOpen {
                             self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
                         } else {
-                            self.finish(ifSession: turn.sessionID, recognizerFinished: true)
+                            self.finish(ifSession: turn.sessionID, recognizerFinished: true, owner: self.armedGeneration)
                         }
                     }
                 }
@@ -566,13 +567,14 @@ final class SpeechInput: @unchecked Sendable {
                     return effects
                 }
                 if effects.contains(.finishTurn) {
-                    self.finish(ifSession: turn.sessionID, recognizerFinished: false)
+                    let owner = self.lock.withLock { self.armedGeneration }
+                    self.finish(ifSession: turn.sessionID, recognizerFinished: false, owner: owner)
                 } else if effects.contains(.restart) {
                     let stillOpen = self.lock.withLock { !self.stopRequested && self.generation == turn.sessionID }
                     if stillOpen {
                         self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
                     } else {
-                        self.finish(ifSession: turn.sessionID, recognizerFinished: false)
+                        self.finish(ifSession: turn.sessionID, recognizerFinished: false, owner: self.armedGeneration)
                     }
                 }
             }
@@ -723,15 +725,15 @@ final class SpeechInput: @unchecked Sendable {
     /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
     /// final text, so release must not wait for Apple's second pass).
     func stop(waitForFinal: Bool = true) async -> String {
-        let (session, capture) = lock.withLock { () -> (Int, Capture) in
+        let (session, capture, owner) = lock.withLock { () -> (Int, Capture, Int) in
             stopRequested = true
-            return (generation, takeCapture())
+            return (generation, takeCapture(), armedGeneration)
         }
         beforeStopAudioForTesting?()
-        markTrace(.endpointFired)
+        markTrace(.endpointFired, owner: owner)
         release(capture)
         guard recognizes else {
-            noteFinal(recognizerFinished: false)
+            noteFinal(recognizerFinished: false, owner: owner)
             return ""
         }
         let (alreadyDone, text) = lock.withLock { () -> (Bool, String) in
@@ -741,7 +743,7 @@ final class SpeechInput: @unchecked Sendable {
         if alreadyDone || !waitForFinal {
             if !alreadyDone {
                 cancelRecognitionTask()
-                noteFinal(recognizerFinished: false)
+                noteFinal(recognizerFinished: false, owner: owner)
             }
             return text
         }
@@ -759,7 +761,7 @@ final class SpeechInput: @unchecked Sendable {
             let wait = Double(STTSessionPolicy.production.endpointToFinalMs) / 1000
             DispatchQueue.global().asyncAfter(deadline: .now() + wait) { [weak self] in
                 guard let self else { return }
-                self.finish(ifSession: session, recognizerFinished: false)
+                self.finish(ifSession: session, recognizerFinished: false, owner: owner)
             }
         }
     }
@@ -875,11 +877,16 @@ final class SpeechInput: @unchecked Sendable {
     }
 
     /// Key down for one path. Capture, VAD, recognition and delivery are marked from here.
-    func noteKeyDown(path: STTPath) {
+    /// The returned generation is the only one allowed to deliver this utterance.
+    @discardableResult
+    func noteKeyDown(path: STTPath) -> Int {
         let now = ProcessInfo.processInfo.systemUptime
+        let generation: Int
         lock.lock()
         keyDownUptime = now
         traceArmed = true
+        armedGeneration += 1
+        generation = armedGeneration
         heardSpeech = false
         silenceMarked = false
         lastEmittedPartial = ""
@@ -889,20 +896,23 @@ final class SpeechInput: @unchecked Sendable {
         if modelGate.ready { trace.mark(.modelReady, atMs: 0) }
         lock.unlock()
         STTSignpost.event("key_down")
+        return generation
     }
 
-    /// The controller has the transcript. This is the delivery stage, still with no text in the log.
-    func noteDelivered() {
-        guard lock.withLock({ traceArmed }) else { return }
+    /// The controller has the transcript. A generation from an older press does not write this one.
+    func noteDelivered(generation: Int) {
         let ms = elapsedMs()
-        let (path, failure, report) = lock.withLock { () -> (STTPath, STTFailure, String) in
+        let snapshot: (STTPath, STTFailure, String)? = lock.withLock {
+            guard STTUtteranceBook.accepts(owner: generation, current: armedGeneration, cancelled: false) else { return nil }
             if trace.marks[.finalTranscript] == nil {
                 trace.mark(.finalTranscript, atMs: ms)
                 turnFailure = heardSpeech ? .emptyText : .noText
             }
+            guard trace.marks[.deliveredToUI] == nil else { return nil }
             trace.mark(.deliveredToUI, atMs: ms)
             return (trace.path, turnFailure, trace.grouped(failure: turnFailure))
         }
+        guard let (path, failure, report) = snapshot else { return }
         let rate = STTFailureLog.shared.record(path: path, failure: failure)
         VoiceLog.log("stt-latency", report.replacingOccurrences(of: "\n", with: " | "))
         VoiceLog.log("stt-failure", rate)
@@ -915,9 +925,10 @@ final class SpeechInput: @unchecked Sendable {
         return max(0, Int(((now - start) * 1000).rounded()))
     }
 
-    private func markTrace(_ stage: STTLatencyTrace.Stage) {
+    private func markTrace(_ stage: STTLatencyTrace.Stage, owner: Int? = nil) {
         let ms = elapsedMs()
         let fresh = lock.withLock { () -> Bool in
+            if let owner, owner != armedGeneration { return false }
             let fresh = trace.marks[stage] == nil
             trace.mark(stage, atMs: ms)
             return fresh
@@ -941,7 +952,10 @@ final class SpeechInput: @unchecked Sendable {
         let stage: STTLatencyTrace.Stage? = lock.withLock {
             if rms >= 0.008 {
                 heardSpeech = true
-                silenceMarked = false
+                if silenceMarked {
+                    silenceMarked = false
+                    trace.reviseSilence(speechResumed: true, endpointAlreadyFired: trace.marks[.endpointFired] != nil)
+                }
                 let fresh = trace.marks[.speechStart] == nil
                 trace.mark(.speechStart, atMs: ms)
                 return fresh ? .speechStart : nil
@@ -955,9 +969,10 @@ final class SpeechInput: @unchecked Sendable {
         if stage == .silenceDetected { STTSignpost.event("silence_detected") }
     }
 
-    private func noteFinal(recognizerFinished: Bool) {
+    private func noteFinal(recognizerFinished: Bool, owner: Int) {
         let ms = elapsedMs()
         lock.lock()
+        guard owner == armedGeneration else { lock.unlock(); return }
         trace.mark(.finalTranscript, atMs: ms)
         let text = latest.trimmingCharacters(in: .whitespacesAndNewlines)
         turnFailure = STTOutcome.failure(hadSpeech: heardSpeech, hasText: !text.isEmpty,
@@ -1005,7 +1020,7 @@ final class SpeechInput: @unchecked Sendable {
         return buffer
     }
 
-    private func finish(ifSession session: Int, recognizerFinished: Bool) {
+    private func finish(ifSession session: Int, recognizerFinished: Bool, owner: Int) {
         lock.lock()
         let pending = Self.finishWaitersIfOwned(session: session, current: generation,
                                                 finished: &finished, waiters: &waiters)
@@ -1014,7 +1029,7 @@ final class SpeechInput: @unchecked Sendable {
         if pending != nil, STTSessionPolicy.production.cancelsTaskWhenAudioEnds { task = nil }
         lock.unlock()
         if STTSessionPolicy.production.cancelsTaskWhenAudioEnds { running?.cancel() }
-        if pending != nil { noteFinal(recognizerFinished: recognizerFinished) }
+        if pending != nil { noteFinal(recognizerFinished: recognizerFinished, owner: owner) }
         pending?.forEach { $0.resume(returning: text) }
     }
 

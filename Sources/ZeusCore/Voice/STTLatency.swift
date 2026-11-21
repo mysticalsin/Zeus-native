@@ -57,6 +57,12 @@ public struct STTLatencyTrace: Equatable, Sendable {
         marks[stage] = max(0, atMs)
     }
 
+    /// Drops the silence mark when speech resumes, so a pause in the middle is not the endpoint silence.
+    public mutating func reviseSilence(speechResumed: Bool, endpointAlreadyFired: Bool) {
+        guard speechResumed, !endpointAlreadyFired else { return }
+        marks[.silenceDetected] = nil
+    }
+
     /// Milliseconds after key-down. Nil when the stage has not happened.
     public func offset(_ stage: Stage) -> Int? {
         guard let mark = marks[stage] else { return nil }
@@ -290,7 +296,10 @@ public struct STTLiveTurn: Equatable, Sendable {
                 fired.append(.speechStart)
             }
             lastVoicedMs = clock.nowMs
-            silenceAt = nil
+            if endpointAt == nil {
+                silenceAt = nil
+                trace.reviseSilence(speechResumed: true, endpointAlreadyFired: false)
+            }
         } else if heardSpeech {
             if silenceAt == nil {
                 silenceAt = clock.nowMs
@@ -361,8 +370,8 @@ public struct STTLiveTurn: Equatable, Sendable {
     }
 }
 
-/// The one live utterance. A newer begin replaces the trace. Delivery is still applied to
-/// whatever utterance is current, which is what a late stop does today.
+/// The one live utterance. A newer begin replaces the trace. A deliver or cancel for an older
+/// generation does not write the replacement.
 public struct STTUtteranceBook: Equatable, Sendable {
     public private(set) var generation = 0
     public private(set) var trace = STTLatencyTrace(path: .talkHold)
@@ -387,11 +396,17 @@ public struct STTUtteranceBook: Equatable, Sendable {
         return true
     }
 
+    /// True when `owner` is still the open utterance and this call wrote `delivered_to_ui`.
+    public static func accepts(owner: Int, current: Int, cancelled: Bool) -> Bool {
+        owner > 0 && owner == current && !cancelled
+    }
+
     /// True when this call wrote `delivered_to_ui`.
     public mutating func deliver(generation owner: Int, atMs: Int) -> Bool {
-        guard !cancelled else { return false }
+        guard Self.accepts(owner: owner, current: generation, cancelled: cancelled) else { return false }
+        guard trace.marks[.deliveredToUI] == nil else { return false }
         trace.mark(.deliveredToUI, atMs: atMs)
-        return trace.marks[.deliveredToUI] != nil
+        return true
     }
 
     public mutating func cancel(generation owner: Int) {

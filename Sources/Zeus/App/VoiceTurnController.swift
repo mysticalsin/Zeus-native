@@ -86,6 +86,8 @@ final class VoiceTurnController {
     private var turnRun = LatestRun()
     /// When the recogniser last changed its live transcript (hands-free turns end on silence).
     private var lastPartialAt: ContinuousClock.Instant?
+    /// The speech-trace generation opened by the current press. A late deliver from an older turn ignores it.
+    private var speechGeneration = 0
     private var liveWords = LiveWordsHUD()
     private var heardSomething = false
     private var handsFreeTask: Task<Void, Never>?
@@ -204,7 +206,7 @@ final class VoiceTurnController {
 
     @discardableResult
     func press(builtinCue: Bool = true) -> Bool {
-        speech.noteKeyDown(path: .talkHold)
+        speechGeneration = speech.noteKeyDown(path: .talkHold)
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -245,7 +247,7 @@ final class VoiceTurnController {
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
             if !listening { speech.onCaptureFailure = nil }
-            speech.noteDelivered()
+            speech.noteDelivered(generation: speechGeneration)
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -452,6 +454,7 @@ final class VoiceTurnController {
     }
 
     private func finishTurn() async -> TurnResult {
+        let generation = speechGeneration
         var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
@@ -460,7 +463,7 @@ final class VoiceTurnController {
         }
         turnEngine = nil
         buddy.model.audioLevel = nil
-        speech.noteDelivered()
+        speech.noteDelivered(generation: generation)
         return await complete(transcript: transcript, finalAt: .now)
     }
 
