@@ -45,3 +45,25 @@ Inspector FAILed head `be52c054` (APP-FIT STALE, report sha 6c4d2ba5). No push u
 Red `f3c0b03897caa7120496830b5a41507948d85f6c`. `python3 qa/portable-core/prepare.py --group regressions --output /tmp/zeus-stt-inspector-red --run --jobs 4` on Linux, Swift 6.0.3: `Test run with 98 tests failed after 0.020 seconds with 10 issues.` Failing: `quietReachesExactlyAtTheHandsFreeThreshold` (threshold 1000, exact 400 did not count), `endpointBoundariesKillComparisonMutants` (late stamp 501), `aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample` (stamp 10000), `aCancelledDeliverIsRefused`, `aStaleTapDoesNotPublishLevel`.
 
 Green `3f885233f938584e6ed41a74c4a54eff7f692747`. Same command, output `/tmp/zeus-stt-inspector-green`: `Test run with 98 tests passed after 0.020 seconds.` Suite "STT latency" passed after 0.012 seconds.
+
+## 2026-11-21 06:14 UTC — Devin gate r31fb46ae on be52c054
+
+Folded into the inspector round. The 450 ms final wait and the 8 s, 20 s, 45 s, 700 ms, and 90 s timeouts were not changed. Hands-free silence stays the 400 ms production budget, pending Tony. The 450 ms final wait is pending Tony confirmation.
+
+### Findings
+
+1. `batchGiveUpMs` for 1 s of audio was only bounded by `<= 2000`. An `audio * 2` mutant returns 2000 ms and still passed.
+2. Deleting the `hangGiveUpMs >= 30_000` branch still passed. The 30000 ms floor was measured on red `c880bb0` and not on the green suite.
+3. `STTUtteranceBook.mark` without `!cancelled` still passed. The stale-generation test does not cancel the open utterance.
+4. `OffMainAudioCallbacks.recognizeFinal` scheduled its cancel from an inline expression. Linux cannot run the Speech task. The wait itself is a pure function of the production budget.
+5. SWEEPS line 13 now states the measured crossing sample: silence at 100 ms, next sample at 10_000 ms, endpoint 500 ms.
+
+### Fixes
+
+The production formula is `min(2_000, max(hangGiveUpMs, audio / 2))`. One second of audio is 800 ms. The legacy floor is `max(30_000, audio * 3)`. A cancelled utterance refuses `mark`. `STTFileGiveUp.seconds` is what the file timer calls. For the 4_000 ms stand-in that is 2 s.
+
+### Evidence
+
+Red `b8ccf6ccb033a4a6b99d3f88f2aa844ff6dcd2eb`. `python3 qa/portable-core/prepare.py --group regressions --output /tmp/zeus-stt-devin-red --run --jobs 4` on Linux, Swift 6.0.3: `Test run with 102 tests failed after 0.020 seconds with 9 issues.` Failing: `batchGiveUpPinsTheExactFormula` (1 s audio gave 2000), `legacyBatchGiveUpKeepsTheThirtySecondFloor` (short 2000, long 2000), `aCancelledMarkDoesNotWriteTheOpenUtterance` (mark wrote speech at 40 ms), `fileRecognitionGiveUpUsesTheProductionBudget` (30 s).
+
+Green `67ae56755af96b6f3f92392785cb7326fb0ffce7`. Same command, output `/tmp/zeus-stt-devin-green`: `Test run with 102 tests passed after 0.016 seconds.` Suite "STT latency" passed after 0.014 seconds.
