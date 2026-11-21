@@ -51,7 +51,8 @@ private final class Signals: @unchecked Sendable {
         defer { try? FileManager.default.removeItem(at: home); try? FileManager.default.removeItem(at: tmp) }
         let runner = ScriptedRunner { _ in .init(status: 0) }
         let installer = InsomniaInstaller(runner: runner, user: "tony", uid: 501, home: home, temporaryDirectory: tmp,
-                                          cliPath: "/Z/bin/zeus", logPath: tmp.appendingPathComponent("g.log").path, fileExists: { _ in true })
+                                          cliPath: "/Z/bin/zeus", logPath: tmp.appendingPathComponent("g.log").path,                                           fileExists: { _ in true },
+                                          authorizeHelper: { _ in .launch }) // signature decision is covered by SupportOverrideResolverTests
         #expect(installer.install() == .done("Set up. Close the lid and agents keep working."))
         let osascript = runner.lines.filter { $0.hasPrefix("/usr/bin/osascript") }
         #expect(osascript.count == 1)
@@ -71,8 +72,21 @@ private final class Signals: @unchecked Sendable {
         let runner = ScriptedRunner { line in
             line.hasPrefix("/usr/bin/osascript") ? .init(status: 1, stderr: "execution error: User canceled. (-128)") : .init(status: 0)
         }
-        let installer = InsomniaInstaller(runner: runner, user: "tony", uid: 501, home: home, cliPath: "/z", logPath: home.appendingPathComponent("l").path, fileExists: { _ in false })
+        let installer = InsomniaInstaller(runner: runner, user: "tony", uid: 501, home: home, cliPath: "/z", logPath: home.appendingPathComponent("l").path,                                           fileExists: { _ in false },
+                                          authorizeHelper: { _ in .launch }) // signature decision is covered by SupportOverrideResolverTests
         #expect(installer.install() == .cancelled)
+        #expect(!FileManager.default.fileExists(atPath: installer.plistURL.path))
+    }
+
+    @Test func aRefusedHelperWritesNothingAndDoesNotAskForAdmin() {
+        let home = temp()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let runner = ScriptedRunner { _ in .init(status: 0) }
+        let installer = InsomniaInstaller(runner: runner, user: "tony", uid: 501, home: home, cliPath: "/tmp/zeus",
+                                          logPath: home.appendingPathComponent("l").path, fileExists: { _ in false },
+                                          authorizeHelper: { _ in .refuse(BundledHelperLaunchPolicy.refusalSentence) })
+        #expect(installer.install() == .failed(BundledHelperLaunchPolicy.refusalSentence))
+        #expect(runner.lines.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: installer.plistURL.path))
     }
 }

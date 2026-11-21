@@ -7,10 +7,10 @@ public enum ZeusPaths {
     /// unpacked extension is loaded from.
     public static let extensionID = "dkpclhaealkdnnihlccglmonmmjfjobe"
 
-    /// ~/Library/Application Support/Zeus. `ZEUS_SUPPORT_DIR` moves it (tests, a second build),
-    /// so a ZEUS you are running is never touched.
+    /// ~/Library/Application Support/Zeus. Debug and test builds honour `ZEUS_SUPPORT_DIR`
+    /// (tests, a second build) so a ZEUS you are running is never touched. Release builds ignore it.
     public static var supportDirectory: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_SUPPORT_DIR"], !override.isEmpty {
+        if let override = SupportOverride.resolved("ZEUS_SUPPORT_DIR") {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         return FileManager.default.homeDirectoryForCurrentUser
@@ -18,9 +18,9 @@ public enum ZeusPaths {
     }
 
     /// Unix socket shared by the app, `zeus-hook` and `zeus-bridge`.
-    /// `ZEUS_SOCKET` moves just the socket.
+    /// Debug and test builds honour `ZEUS_SOCKET`. Release builds ignore it.
     public static var socket: URL {
-        if let override = ProcessInfo.processInfo.environment["ZEUS_SOCKET"], !override.isEmpty {
+        if let override = SupportOverride.resolved("ZEUS_SOCKET") {
             return URL(fileURLWithPath: override)
         }
         return supportDirectory.appendingPathComponent("zeus.sock")

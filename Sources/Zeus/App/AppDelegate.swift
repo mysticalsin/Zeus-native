@@ -240,8 +240,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if on(.helperRefresh) {
             if ClaudeHookInstaller.isInstalled() { try? ClaudeHookInstaller.refreshHelper() }
-            if ChromeInstaller.isInstalled() {
-                try? HelperInstaller.refresh("zeus-bridge")
+            if ChromeInstaller.hasManifest() {
+                switch ChromeInstaller.authorizeInstalledBridge() {
+                case .success:
+                    break
+                case .failure(let error):
+                    if case .registrationNotRemoved = error {
+                        BundledHelperLaunchLog.registrationRemovalFailed()
+                    }
+                }
                 try? ChromeInstaller.refreshExtension()
             }
         }

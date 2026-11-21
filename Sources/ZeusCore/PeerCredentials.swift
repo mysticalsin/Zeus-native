@@ -157,11 +157,14 @@ public enum ChromeSocketPeers {
     /// bridge alone also accepts the app bundle that ships a bridge of its name (an ad hoc development build).
     public static let verifier: PeerVerifier = { PeerSigning.verifyApp(auditToken: $0, expectedPeerIdentifier: expectedPeerIdentifier, trustShippingBundle: true) }
 
-    /// The policy for this bridge process. A bridge started with `ZEUS_SUPPORT_DIR` set serves a
-    /// relocated socket (tests, a second build) that the installed app never talks to, so only the
-    /// same-user rule applies there. Whoever can set the bridge's environment can already move the socket.
+    /// The policy for this bridge process. A debug or test bridge started with `ZEUS_SUPPORT_DIR`
+    /// set serves a relocated socket (tests, a second build) that the installed app never talks to,
+    /// so only the same-user rule applies there. Release builds ignore that variable and keep the
+    /// program-name rule.
     public static func policy(environment: [String: String]) -> PeerPolicy {
-        if let override = environment["ZEUS_SUPPORT_DIR"], !override.isEmpty { return .sameUser }
+        if SupportOverride.resolved("ZEUS_SUPPORT_DIR", environment: SupportOverrideMap(environment)) != nil {
+            return .sameUser
+        }
         return .sameUserExecutable(allowedExecutables)
     }
 }

@@ -19,15 +19,16 @@ enum VoiceLog {
             || ["xctest", "swiftpm-testing-helper"].contains { ProcessInfo.processInfo.processName.contains($0) }
     }()
 
-    /// `ZEUS_LOG_DIR` wins. Otherwise the owner's `~/Library/Logs/Zeus`, except under tests, which write to a
-    /// temporary folder so a test run never adds lines to the real log.
+    /// In a debug or test build, `ZEUS_LOG_DIR` wins. Release builds ignore it. Otherwise the owner's
+    /// `~/Library/Logs/Zeus`, except under tests, which write to a temporary folder so a test run never
+    /// adds lines to the real log.
     static func logDirectory(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         runningTests: Bool = isRunningTests,
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
         temporary: URL = FileManager.default.temporaryDirectory
     ) -> URL {
-        if let override = environment["ZEUS_LOG_DIR"], !override.isEmpty {
+        if let override = SupportOverride.resolved("ZEUS_LOG_DIR", environment: SupportOverrideMap(environment)) {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         if runningTests {

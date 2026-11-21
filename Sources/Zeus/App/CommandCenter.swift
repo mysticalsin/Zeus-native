@@ -584,7 +584,7 @@ final class CommandCenter {
             text = String(tail[space...]).trimmingCharacters(in: .whitespacesAndNewlines)
             vault = URL(fileURLWithPath: path)
         }
-        if vault == nil, let env = ProcessInfo.processInfo.environment["ZEUS_BRAIN_FIXTURE"], !env.isEmpty {
+        if vault == nil, let env = SupportOverride.resolved("ZEUS_BRAIN_FIXTURE") {
             vault = URL(fileURLWithPath: env)
         }
         if vault == nil, let root = BrainToday.defaultRoot() { vault = root }
@@ -597,8 +597,14 @@ final class CommandCenter {
 enum CLIInstaller {
     static func install() {
         let source = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus")
+        let decision = BundledHelperLaunch.decide(path: source.path, signingIdentifier: "zeus")
+        guard let published = BundledHelperLaunchPolicy.publishedExecutable(checkedPath: source.path, helperName: "zeus", decision: decision),
+              published == source.path else {
+            BundledHelperLaunchLog.refused(path: source.path)
+            return
+        }
         let files = FileManager.default
-        guard files.isExecutableFile(atPath: source.path) else { return }
+        guard files.isExecutableFile(atPath: published) else { return }
         let target = ZeusPaths.binDirectory.appendingPathComponent("zeus")
         try? files.createDirectory(at: ZeusPaths.binDirectory, withIntermediateDirectories: true)
         if files.contentsEqual(atPath: source.path, andPath: target.path) { return }

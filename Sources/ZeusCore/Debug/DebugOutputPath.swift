@@ -20,10 +20,11 @@ public enum DebugOutputPath {
         case outsideAllowedFolders
     }
 
-    /// The environment variable that names one more allowed folder. The environment is read when Zeus
-    /// starts. It is set by whoever launched Zeus, or by the login session's environment, which any
-    /// program of this user can change for the next start, so the folder is also checked against the
-    /// broad folders above and a request still has to name a file strictly inside it.
+    /// The environment variable that names one more allowed folder. Debug and test builds read it
+    /// when Zeus starts. Release builds ignore it. It is set by whoever launched Zeus, or by the login
+    /// session's environment, which any program of this user can change for the next start, so the
+    /// folder is also checked against the broad folders above and a request still has to name a file
+    /// strictly inside it.
     public static let ownerFolderVariable = "ZEUS_DEBUG_SCREENSHOT_DIR"
 
     /// Caches folder of the app plus, when the owner chose one at launch, that folder.
@@ -33,7 +34,8 @@ public enum DebugOutputPath {
                                       homeDirectory: String = NSHomeDirectory(),
                                       resolve: (String) -> String? = realPath) -> [String] {
         var folders = [appCachesFolder(cachesDirectory: cachesDirectory)]
-        if let chosen = environment[ownerFolderVariable], let parts = PathContainment.components(chosen), !parts.isEmpty {
+        if let chosen = SupportOverride.resolved(ownerFolderVariable, environment: SupportOverrideMap(environment)),
+           let parts = PathContainment.components(chosen), !parts.isEmpty {
             // The resolved path is both checked and kept, so the check judges the folder that is later used.
             let path = resolved("/" + parts.joined(separator: "/"), resolve: resolve)
             if !isBroad(path, home: resolved(homeDirectory, resolve: resolve)) { folders.append(path) }
