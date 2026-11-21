@@ -137,18 +137,31 @@ final class SettingsStore {
     }
 
     func set(_ id: String, _ value: String, origin: ChangeOrigin = .person) {
+        var blockedEnable = false
         if id == ZeusScreenSharePolicy.showInSharingKey, value == "true" || value == "false" {
-            if !TopBarStyle.isSnapshot { ZeusScreenSharePolicy.setShown(value == "true", defaults: defaults) }
-            guard values[id] != value else { return }
-            values[id] = value
-            onChange?(id)
-            return
+            let requestedTrue = value == "true"
+            if ZeusScreenSharePolicy.persistsShow(requestedTrue: requestedTrue, origin: Self.screenShareOrigin(origin)) {
+                if !TopBarStyle.isSnapshot { ZeusScreenSharePolicy.setShown(requestedTrue, defaults: defaults) }
+            } else {
+                // Import, reset, agent, and migration cannot enable showing. Leave the stored choice.
+                blockedEnable = true
+            }
         }
+        // This stays reachable for every id. The screen-share branch must not return before it.
         if id == ScribeAutoStartMode.settingID { applyAutoStartChoice(value, origin: origin) }
+        if blockedEnable { return }
         guard values[id] != value else { return }
         values[id] = value
         if !TopBarStyle.isSnapshot { defaults.set(value, forKey: Self.key(id)) }
         onChange?(id)
+    }
+
+    private static func screenShareOrigin(_ origin: ChangeOrigin) -> ZeusScreenSharePolicy.WriteOrigin {
+        switch origin {
+        case .person: .person
+        case .reset: .reset
+        case .importFile: .importFile
+        }
     }
 
     /// The one seam for the opt-in to automatic recording. It runs before the unchanged-value check, so a click on

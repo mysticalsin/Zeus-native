@@ -7,6 +7,19 @@ public enum ZeusScreenSharePolicy {
     public static let storedKey = "opt.general.showInScreenSharing"
     public static let legacyHideKey = "interview.hide"
 
+    /// Who is writing the screen-share choice. Only `person` may turn showing on.
+    /// Import, reset, agent, and migration may turn it off. That is a downgrade: Zeus becomes
+    /// harder to see in a share, never easier. A legacy visible flag is not promoted to "true".
+    public enum WriteOrigin: Sendable, Equatable {
+        case person, reset, importFile, agent, migration
+    }
+
+    /// True when this origin may persist `show == true`. A request to hide is always persisted.
+    public static func persistsShow(requestedTrue: Bool, origin: WriteOrigin) -> Bool {
+        if requestedTrue { return origin == .person }
+        return true
+    }
+
     /// The live string wins. Otherwise a Boolean at the bare key, otherwise the inverse of an
     /// explicit hide flag. A missing pair stays hidden. A read does not write.
     public static func showInScreenSharing(from defaults: UserDefaults) -> Bool {
@@ -22,21 +35,29 @@ public enum ZeusScreenSharePolicy {
         return false
     }
 
-    /// Copies an older Boolean into the live string when that string is absent. Does not delete
-    /// the older key and does not overwrite a string that is already stored.
+    /// Copies an older hidden choice into the live string when that string is absent.
+    /// Does not delete the older key and does not overwrite a string that is already stored.
+    ///
+    /// Downgrade: migration never writes `"true"`. A legacy Boolean that would show, or a legacy
+    /// hide flag of false, is stored as hidden (`"false"`). An absent pair is left absent, so a
+    /// migration does not invent a choice. A live string already set by a person is left alone,
+    /// including `"true"`.
     @discardableResult
     public static func migrate(_ defaults: UserDefaults) -> Bool {
         guard defaults.string(forKey: storedKey) == nil else { return false }
-        if let stored = defaults.object(forKey: showInSharingKey) as? Bool {
-            defaults.set(stored ? "true" : "false", forKey: storedKey)
-            return true
-        }
-        if defaults.object(forKey: legacyHideKey) != nil {
-            let show = !defaults.bool(forKey: legacyHideKey)
-            defaults.set(show ? "true" : "false", forKey: storedKey)
-            return true
-        }
-        return false
+        let hasLegacyBoolean = defaults.object(forKey: showInSharingKey) as? Bool != nil
+        let hasLegacyHide = defaults.object(forKey: legacyHideKey) != nil
+        guard hasLegacyBoolean || hasLegacyHide else { return false }
+        defaults.set("false", forKey: storedKey)
+        return true
+    }
+
+    /// Forgets `keys`. When `interview.hide` is among them, the live show string is forced to
+    /// `"false"` so dropping the legacy flag cannot leave Zeus visible.
+    public static func reset(_ keys: [String], defaults: UserDefaults) {
+        let forcesHidden = keys.contains(legacyHideKey)
+        for key in keys { defaults.removeObject(forKey: key) }
+        if forcesHidden { defaults.set("false", forKey: storedKey) }
     }
 
     /// Writes the live string and the legacy hide flag to the same choice. Neither key is removed.

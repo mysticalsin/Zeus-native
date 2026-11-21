@@ -92,8 +92,9 @@ final class ExtraPreferences {
     }
 
     /// Forgets the given keys, then reads every value again (section reset).
+    /// Resetting `interview.hide` also forces the live screen-share string to hidden.
     func reset(_ keys: [String]) {
-        if !TopBarStyle.isSnapshot { keys.forEach { defaults.removeObject(forKey: $0) } }
+        if !TopBarStyle.isSnapshot { ZeusScreenSharePolicy.reset(keys, defaults: defaults) }
         if TopBarStyle.isSnapshot { return }
         reload()
     }
