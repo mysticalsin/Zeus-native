@@ -333,6 +333,31 @@ struct RecordlyDeviceCaptureTests {
         #expect(!branch.contains(".record()"))
     }
 
+    /// The screen file drops microphone samples and has no camera. Copy must not say otherwise.
+    /// A literal `chipOn: false` is not a substitute for the chip.
+    @Test func theScreenCopyDoesNotOverClaimAndTheChipIsLive() throws {
+        #expect(RecordlySampleRoute.track(for: .microphone) == .drop)
+        let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
+        let page = try repoSource("Sources/Zeus/Recordly/RecordlyPage.swift")
+        #expect(controller.contains("audio.microphone = RecordlyPrimaryRecord.screenFileIncludesMicrophone"))
+        #expect(!controller.contains("chipOn: false"))
+        #expect(!controller.contains("chipOn: true"))
+        if controller.contains("includeMicrophone") {
+            #expect(controller.contains("chipOn: devices.selection.microphone"))
+        }
+        #expect(!page.contains("and the \\(capture.selection.deviceName)"))
+    }
+
+    /// `phase != .idle` just after `guard phase == .idle` is always false, so a device
+    /// that is already recording does not block the screen session.
+    @Test func aLiveDeviceRecordingBlocksTheScreenSession() throws {
+        let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
+        let press = controller.components(separatedBy: "func pressRecord").dropFirst().first ?? ""
+        let body = press.components(separatedBy: "func cancelCountdown").first ?? press
+        #expect(!body.contains("screenSessionActive: phase != .idle"))
+        #expect(body.contains("blocksScreenStart"))
+    }
+
     /// One Record control. The status view does not grow a second Record button, and the primary
     /// start reads the chip instead of forcing the microphone off.
     @Test func oneRecordControlHonorsTheChip() throws {
