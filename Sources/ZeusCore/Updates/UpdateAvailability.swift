@@ -12,14 +12,30 @@ public struct ZeusVersion: Equatable, Sendable, Comparable {
         self.patch = patch
     }
 
+    /// A release is one to three dot-separated components, each entirely ASCII digits.
+    /// `2.0.0-rc1`, `2.0.0+build`, a sign, an empty component and a fourth component are rejected
+    /// rather than coerced to a number.
     public init?(parsing string: String) {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false).prefix(3)
-        guard !parts.isEmpty else { return nil }
-        let nums = parts.map { Int($0) ?? 0 }
-        self.major = nums[safe: 0] ?? 0
-        self.minor = nums[safe: 1] ?? 0
-        self.patch = nums[safe: 2] ?? 0
+        guard !trimmed.isEmpty else { return nil }
+        let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        guard (1...3).contains(parts.count) else { return nil }
+        var numbers: [Int] = []
+        numbers.reserveCapacity(parts.count)
+        for part in parts {
+            guard let value = Self.wholeComponent(part) else { return nil }
+            numbers.append(value)
+        }
+        self.major = numbers[0]
+        self.minor = numbers.count > 1 ? numbers[1] : 0
+        self.patch = numbers.count > 2 ? numbers[2] : 0
+    }
+
+    /// Digits only. `Int` would accept a sign, a leading plus and surrounding spaces, then the old
+    /// `?? 0` turned the rejected token into zero.
+    private static func wholeComponent(_ part: Substring) -> Int? {
+        guard !part.isEmpty, part.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }) else { return nil }
+        return Int(part)
     }
 
     public static func < (lhs: ZeusVersion, rhs: ZeusVersion) -> Bool {
@@ -30,12 +46,6 @@ public struct ZeusVersion: Equatable, Sendable, Comparable {
 
     public var displayShort: String { "\(major).\(minor)" }
     public var displayFull: String { "\(major).\(minor).\(patch)" }
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
 }
 
 public struct UpdateOffer: Equatable, Sendable {
