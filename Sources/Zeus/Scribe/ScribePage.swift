@@ -191,7 +191,10 @@ private struct ScribeStage: View {
                 ScribeIdle(scribe: scribe)
             }
         case .connecting:
+            // This view does not keep a timer. Appearing asks the controller to arm the bounded
+            // connecting clock, which hands its instant to the session machine.
             ScribeConnecting(scribe: scribe, state: state)
+                .onAppear { scribe.armConnectingClockIfNeeded() }
         case .recording:
             ScribeRecording(scribe: scribe, state: state, reduceMotion: reduceMotion)
         case .confirmingEnd:
