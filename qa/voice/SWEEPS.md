@@ -19,3 +19,12 @@ Root `SWEEPS.md` is added by other open pull requests. This log stays under `qa/
 - Red: `2a2bfae7c03dc0c6387c3a3ed93bed3ecd5bb956`. That file was 7 failed in 0.66s.
 - Green: `50ae2a348f900317a68dcdf8e4f4ceecbeb11a8e`.
 - Tests after the fix: `qa/voice/tests` 43 passed in 2.45s. Command: `/tmp/voice-qa-venv/bin/python -m pytest qa/voice/tests -q`.
+
+## 2026-11-21T06:12:18Z
+
+- Lens: Devin gate r5c865b8c.
+- Findings: `render_avspeech.swift` kept rate 0.92, pitch 0.82, and the empty-text `exit(2)` where no test read or ran the file. The gap cell's `math.isfinite` and `not isinstance(item, bool)` checks had no test. Three Kokoro comments used em dashes. No key, network, provider, ledger, or meter file is part of this delta.
+- Fixes: Rate, pitch, and the empty-text exit moved to `qa/voice/mac/avspeech_plan.py`, which pytest runs on Linux. The Swift script reads that plan and no longer owns the three literals. NaN, infinity, True, and False are rejected as gap lengths. The em dashes in `render_kokoro.py` are gone. A search of `qa/voice` found no em dash or en dash.
+- Red: `9c266a8bf1f39b642a55550bb6d061a555051da9`. The new plan test failed because the plan file was missing. The gap test was already 1 passed.
+- Green: `70b0fdc12ef5098714f0add6e8f562a11cdd6e1a`.
+- Tests after the fix: `qa/voice/tests` 45 passed in 1.98s. Command: `/tmp/voice-qa-venv/bin/python -m pytest qa/voice/tests -q`.
