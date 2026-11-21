@@ -25,3 +25,12 @@ Code head: `f00007895b6091afc7cfa33dee3ceede290ef7d0`
 
 `git blob` is `git rev-parse HEAD:path` for that source at the code head.
 
+
+## Inherited files edited after the slices
+
+These patches are the key-policy and Keychain edits. Code head: `f6fcba50dcaedfa791e9fd5291009d34a76a4856`.
+
+| Patch | Source | Bytes | sha256 | git blob |
+| --- | --- | --- | --- | --- |
+| `17-ProviderTypes.patch` | `Sources/ZeusCore/Providers/ProviderTypes.swift` | 1317 | `97ca92de7765b8f6438a6698b8dbe64dc6f6caa97af2e9840e6ce0921d275b40` | `c03e46c7a22f607a3df10067f208f5642a024b25` |
+| `18-CredentialStore.patch` | `Sources/ZeusCore/Providers/CredentialStore.swift` | 945 | `56a85a658086610bbef0bd5f74f1091b23ab568c4c6d3b9fd901f446eafe8670` | `f0793dfc982cdd60b72ca5de593dc926e2c14455` |

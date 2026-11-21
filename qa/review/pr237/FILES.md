@@ -35,7 +35,7 @@ PR-authored means the blob at this head is not the blob from #116, #139, or #229
 | `Sources/ZeusCore/Providers/ElevenLabsTTSAdapter.swift` | inherited #139, #229 |
 | `Sources/ZeusCore/Providers/GoogleCloudTTSAdapter.swift` | inherited #139, #229 |
 | `Sources/ZeusCore/Providers/ProviderPlaybackGate.swift` | inherited #116 |
-| `Sources/ZeusCore/Providers/ProviderTypes.swift` | inherited #139, #229 |
+| `Sources/ZeusCore/Providers/ProviderTypes.swift` | PR-authored edit of inherited #139, #229 |
 | `Sources/ZeusCore/Providers/VoiceProviderSession.swift` | inherited #139, #229 |
 | `Sources/ZeusCore/Providers/VoiceQualityMeter.swift` | PR-authored |
 | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | PR-authored |
