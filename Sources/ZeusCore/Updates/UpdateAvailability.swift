@@ -87,10 +87,10 @@ public enum UpdateHUDPresentation {
 public enum UpdateBadgeLogic {
     public static func badgeState(current: ZeusVersion, offer: UpdateOffer?, feedEnabled: Bool, debugFake: String?, defaults: UserDefaults) -> UpdateBadgeState {
         let effective: UpdateOffer?
-        if let debugFake, let v = ZeusVersion(parsing: debugFake) {
-            effective = UpdateOffer(latest: v)
-        } else if feedEnabled, let offer {
+        if feedEnabled, let offer {
             effective = offer
+        } else if let debugFake, let v = ZeusVersion(parsing: debugFake) {
+            effective = UpdateOffer(latest: v)
         } else {
             effective = nil
         }
@@ -144,7 +144,10 @@ public enum UpdateFeedPolicy {
 
     /// A redirect the feed client may follow. Same host and HTTPS only.
     public static func redirected(_ proposed: URL, from original: URL) -> URL? {
-        guard isSecure(proposed) else { return nil }
+        guard isSecure(proposed), isSecure(original),
+              let proposedHost = proposed.host?.lowercased(),
+              let originalHost = original.host?.lowercased(),
+              proposedHost == originalHost else { return nil }
         return proposed
     }
 }
@@ -153,7 +156,13 @@ public enum UpdateFeedPolicy {
 final class HTTPSOnlyRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        completionHandler(request.url.map(UpdateFeedPolicy.isSecure) == true ? request : nil)
+        guard let original = task.originalRequest?.url ?? response.url,
+              let proposed = request.url,
+              UpdateFeedPolicy.redirected(proposed, from: original) != nil else {
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
     }
 }
 
