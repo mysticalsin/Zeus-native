@@ -4,6 +4,82 @@ Spec only. Tony approved this in his words: "Build 3: in-browser deck-notes read
 
 The drawing is `mockup.md` and `mockup.html` beside this file.
 
+## Before any build
+
+These constraints are part of the spec. An implementation commit that does not meet them is not this feature. No application code in this change.
+
+### Capture, screenshots, and accessibility
+
+Speaker notes are always excluded from screen capture and from Zeus's own screenshots. The setting `general.showInScreenSharing` does not apply to them. When that setting shows other Zeus surfaces, the notes stay out of capture and out of any screenshot Zeus takes of itself. A view that draws the notes uses a capture mode that hides it, including when the rest of the top bar is visible to a share.
+
+The notes string is not an accessibility value. It is not exposed on an element another process can read through the accessibility tree. The VoiceOver name of the region is "Speaker notes, slide N of M" and does not include the notes body.
+
+### Deck URL
+
+A URL is a deck only when every part below holds. The comparison is exact. A suffix, a prefix, or a lookalike host is not a match.
+
+- The scheme is `https`. No other scheme matches, including `http`.
+- The host, lowercased and without a trailing dot, is exactly `docs.google.com`. No userinfo. No port other than an empty port or 443.
+- The path begins with `/presentation/`.
+
+The extension applies this same allowlist itself, immediately before `executeScript`. An allow decision from the app is not enough.
+
+These URLs are rejected. A later test lists them and expects rejection:
+
+| URL | Why it is not a deck |
+| --- | --- |
+| `http://docs.google.com/presentation/d/abc` | scheme is not https |
+| `https://docs.google.com.evil.example/presentation/d/abc` | host is not exact |
+| `https://docs.google.com.evil.example/presentation/d/abc/present` | host is not exact |
+| `https://evil.docs.google.com/presentation/d/abc` | host is not exact |
+| `https://docs.google.com.attacker.test/presentation/d/abc` | host is not exact |
+| `https://user:secret@docs.google.com/presentation/d/abc` | userinfo |
+| `https://docs.google.com:444/presentation/d/abc` | port is not 443 |
+| `https://docs.google.com./presentation/d/abc` | trailing dot |
+| `https://docs.google.com%2e.evil.example/presentation/d/abc` | encoded dot in the host |
+| `https://docs.google.com%00.evil.example/presentation/d/abc` | encoded NUL in the host |
+| `https://docs.google.com%2f.evil.example/presentation/d/abc` | encoded slash in the host |
+| `https://evil.example/presentation/d/abc?next=https://docs.google.com/presentation/d/abc` | host is the other site |
+| `https://evil.example\@docs.google.com/presentation/d/abc` | host confusion |
+| `javascript:https://docs.google.com/presentation/d/abc` | scheme is not https |
+| `data:text/html,https://docs.google.com/presentation/d/abc` | scheme is not https |
+| `//docs.google.com/presentation/d/abc` | no https scheme |
+| `https://docs.google.com/presentation` | path lacks `/presentation/` |
+| `https://docs.google.com/presentations/d/abc` | path is a different word |
+| `https://127.0.0.1/presentation/d/abc` | host is not exact |
+
+`https://docs.google.com/presentation/d/abc/edit` and `https://docs.google.com/presentation/d/abc/present` match. A query or a fragment on an otherwise exact URL may match. Nothing else in the table does.
+
+### Page script
+
+`executeScript` runs in the isolated world, never the page's own world. The target frame is frame id 0, the top frame only. Child frames are not injected.
+
+The reader uses a named selector list for that site. The selector that is not in the list is not tried. Zero matches, or more than the one field the list names, fails closed: `notesNotOnPage` or `unreadable`, and the buffer stays empty. The script does not fall back to the page's visible text.
+
+The extension test installs traps on the calls that would change the page or leave it: click, write, assignment to the document body, navigation, and fetch. The reader runs against a fixture. Any trap firing fails the test. A read that only returns the named field passes.
+
+### Host, socket, and frame size
+
+The native-host manifest `allowed_origins` lists one origin: the Zeus extension, `chrome-extension://` plus its id and a trailing slash. No wildcard and no second origin.
+
+The local socket is mode `0600`. The owner can read and write it. No other user can.
+
+A frame longer than the host already accepts is rejected before it is parsed. The limits that already exist stay: 1_048_576 bytes of JSON from the host to the browser, and 4_194_304 bytes from the browser to the host. This feature does not raise them. The notes payload is still at most 8,000 characters.
+
+### Follow
+
+Follow polls on the interval the spec already uses, 0.5 seconds, and it stops after 120 polls. Each poll re-checks the tab URL against the predicate above and re-checks the private-window flag before any script runs. A URL that no longer matches, a private window, or an unknown private flag cancels the watch and drops the notes. The 120th poll is the last even when both checks still pass.
+
+### Text leaving the page
+
+Before the notes or the title are held or drawn, bidi and zero-width characters are stripped. That includes U+200B, U+200C, U+200D, U+200E, U+200F, U+202A through U+202E, U+2066 through U+2069, and U+FEFF. The remaining text is what the page shows.
+
+The extension does not write the notes, the title, or the URL to its console or to its storage.
+
+### Private windows
+
+Private-window detection is per browser. The extension reads the private-window bit that the browser it is running in exposes for that tab. A browser this build does not have a named check for is unknown. A missing bit, a thrown query, or a value that is neither private nor not-private is unknown. Unknown is refused: the state is `privateWindow` and no script runs.
+
 ## Finding
 
 S04-11, P2, Prompter notes. Sweep 04 is PR #94, `qa/sweeps/sweep-04-completeness.md`, read against `codex/integration-20261111` at `2722dcb7497d5415fbc1fcb1f65c49629966a281`.
