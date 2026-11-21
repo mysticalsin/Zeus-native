@@ -1,5 +1,7 @@
 # Voice QA harness
 
+OFFLINE ENGINE COMPARISON of Kokoro, ElevenLabs non-streaming, and Google Cloud TTS. This is not the live Zeus provider order (ElevenLabs > OpenAI > Gemini). It does not drive Murmure or Scribe.
+
 This directory measures rendered speech. It does not change the app. The scripts are original fixture text. They are not transcripts of anyone.
 
 Python 3.12. From the repository root:
