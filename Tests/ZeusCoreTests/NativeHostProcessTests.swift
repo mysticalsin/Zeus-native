@@ -7,6 +7,13 @@ import Glibc
 #endif
 @testable import ZeusCore
 
+private final class PipeWriteFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func mark() { lock.withLock { value = true } }
+    var isSet: Bool { lock.withLock { value } }
+}
+
 /// Exact built native-host process, synthetic frames and an isolated support directory only.
 /// Does not register/open Chrome, invoke a browser action, or inspect user settings or credentials.
 @Suite("Native host process boundaries", .serialized)
@@ -97,6 +104,27 @@ struct NativeHostProcessTests {
             } while process.isRunning && ContinuousClock.now < deadline
             return false
         }
+    }
+
+    /// Chrome's framed stdin is larger than a pipe. `FileHandle.write` does not return until that
+    /// pipe drains, so a host that has not armed its reader yet freezes the suite on the caller.
+    @Test func unreadStdinPipeWriteReturnsBeforeTheReaderDrains() async throws {
+        let pipe = Pipe()
+        let payload = Data(repeating: 0x61, count: 512 * 1024)
+        let done = PipeWriteFlag()
+        let worker = Task.detached {
+            // A closed reader must surface EPIPE. The default SIGPIPE disposition kills the suite.
+            let previous = signal(SIGPIPE, SIG_IGN)
+            try? pipe.fileHandleForWriting.write(contentsOf: payload)
+            _ = signal(SIGPIPE, previous)
+            done.mark()
+        }
+        try await Task.sleep(for: .seconds(1))
+        let finished = done.isSet
+        // Unblock the blocking writer so this case can report the failure instead of keeping the process.
+        try? pipe.fileHandleForReading.close()
+        _ = await worker.value
+        #expect(finished)
     }
 
     @Test func oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled() async throws {
