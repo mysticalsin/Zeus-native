@@ -31,6 +31,15 @@ func pcmWav(tag, bits, ch uint16, rate uint32, payload []byte) []byte {
 	return append(append(out, []byte("WAVE")...), body...)
 }
 
+func TestLargeReadDoesNotOverflow(t *testing.T) {
+	raw := make([]byte, 9*6400*4)
+	st := NewStream(0, 0)
+	st.Feed(raw, func() {})
+	if st.Index != 10 {
+		t.Fatalf("index %d", st.Index)
+	}
+}
+
 func TestDecode24And32BitPCM(t *testing.T) {
 	var data24 []byte
 	for _, s := range []int32{1, -1, 8388607, -8388608} {

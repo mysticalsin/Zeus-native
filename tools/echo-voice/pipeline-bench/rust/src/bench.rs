@@ -91,6 +91,7 @@ impl Stream {
         self.out.push(&self.pcm48).expect("jitter buffer overflow");
         while self.out.len() >= CLIENT_BLOCK { self.out.pop_into(&mut self.block).unwrap(); self.drained += CLIENT_BLOCK; }
     }
+    pub fn input_capacity(&self) -> usize { self.ingest.capacity() }
     pub fn feed(&mut self, payload: &[u8], mut on_frame: impl FnMut()) {
         self.ingest.feed_bytes(payload);
         while self.ingest.pop_into(&mut self.frame) { self.emit(); on_frame(); }

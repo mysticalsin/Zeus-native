@@ -62,4 +62,8 @@ impl Framer {
         self.ring.pop_into(f.as_mut_slice()).is_ok()
     }
     pub fn pending(&self) -> usize { self.ring.len() }
+    pub fn capacity(&self) -> usize { self.ring.capacity() }
+    pub fn free(&self) -> usize { self.ring.capacity() - self.ring.len() }
+    /// Push without growing. `x` must fit in [`Framer::free`].
+    pub fn push_fit(&mut self, x: &[f32]) { self.ring.push(x).expect("push within capacity"); }
 }

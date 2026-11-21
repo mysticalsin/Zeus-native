@@ -67,6 +67,7 @@ impl Ingest {
     }
     pub fn pop_into(&mut self, f: &mut Frame) -> bool { self.framer.pop_into(f) }
     pub fn pending(&self) -> usize { self.framer.pending() }
+    pub fn capacity(&self) -> usize { self.framer.capacity() }
 }
 
 pub const FRAME_SAMPLES_48K: usize = 2 * FRAME_SAMPLES;

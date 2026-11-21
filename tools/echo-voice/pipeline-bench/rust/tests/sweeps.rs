@@ -1,5 +1,5 @@
 //! Sweep regressions. These are not the original red-first invariants.
-use haru_pipe::bench::stream_run;
+use haru_pipe::bench::{stream_run, Stream};
 use haru_pipe::native::Ingest;
 use std::time::Duration;
 use haru_pipe::resample::{resample_poly, BadRatio};
@@ -81,6 +81,15 @@ fn wav_pcm(rate: u32, ch: u16, bits: u16, payload: &[u8]) -> Vec<u8> {
     out.extend_from_slice(b"WAVE");
     out.extend(body);
     out
+}
+
+#[test]
+fn large_read_keeps_a_bounded_input_ring() {
+    let raw = vec![0u8; 9 * 6_400 * 4];
+    let mut st = Stream::new(Duration::ZERO, 0);
+    st.feed(&raw, || {});
+    assert_eq!(st.index, 10, "nine frames from a cold index of 1");
+    assert!(st.input_capacity() <= 8 * 3_200, "ring grew to {}", st.input_capacity());
 }
 
 #[test]
