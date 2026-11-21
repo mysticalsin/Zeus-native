@@ -29,6 +29,7 @@ from pathlib import Path
 MAX_CHARACTERS = 49_999
 MAX_REQUEST_CHARACTERS = 5_000
 MAX_ERROR_BODY = 200
+MAX_KEY_CHARACTERS = 256
 LEDGER_ENV = "ZEUS_VOICE_QA_LEDGER"
 PROVIDERS = ("elevenlabs", "google")
 BANNED_LABELS = ("clone", "cloned", "celebrity", "character")
@@ -126,17 +127,22 @@ def read_key(env_name: str, environ: dict | None = None) -> str:
     cleaned = value.strip()
     if not cleaned:
         raise MeterError("API key is missing")
-    if _has_control(cleaned):
+    if _has_control(cleaned) or len(cleaned) > MAX_KEY_CHARACTERS:
         raise MeterError("API key refused")
     return cleaned
 
 
 def redact(text: str, secrets) -> str:
     needles = []
+    exact = []
     for secret in secrets:
         if not isinstance(secret, str) or not secret:
             continue
-        variants = {secret, secret.strip()}
+        stripped = secret.strip()
+        if len(secret) > MAX_KEY_CHARACTERS or len(stripped) > MAX_KEY_CHARACTERS:
+            exact.extend(item for item in (secret, stripped) if item)
+            continue
+        variants = {secret, stripped}
         escaped = set()
         for item in variants:
             if not item:
@@ -152,6 +158,8 @@ def redact(text: str, secrets) -> str:
                 for start in range(0, len(item) - size + 1):
                     needles.append(item[start:start + size])
     cleaned = text
+    for needle in exact:
+        cleaned = cleaned.replace(needle, "[REDACTED]")
     for needle in sorted(set(needles), key=len, reverse=True):
         if needle:
             cleaned = cleaned.replace(needle, "[REDACTED]")
@@ -248,7 +256,9 @@ def _has_control(value: str) -> bool:
 def _safe_headers(headers: dict) -> dict:
     safe = {}
     for name, value in headers.items():
-        if not isinstance(name, str) or not isinstance(value, str) or _has_control(name) or _has_control(value):
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise MeterError("request refused")
+        if _has_control(name) or _has_control(value) or len(name) > MAX_KEY_CHARACTERS or len(value) > MAX_KEY_CHARACTERS:
             raise MeterError("request refused")
         safe[name] = value
     return safe
