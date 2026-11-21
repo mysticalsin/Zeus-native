@@ -680,6 +680,12 @@ final class ScribeController {
         } else {
             provider.start(session: id, frames: frames, events: captureEvents)
         }
+        // Connecting has its own deadline. Arm the session clock now, on the tap that entered
+        // `.starting`, and not only after capture is acknowledged. A provider that already
+        // acknowledged or failed has moved the phase and armed or stopped the clock itself.
+        if case .starting = machine.phase {
+            startClock()
+        }
     }
 
     /// Explicit Stop starts a nine-second end window. Only the provider's acknowledgment ends capture.
@@ -1868,7 +1874,7 @@ final class ScribeController {
         micSharedAnnounced = false
     }
 
-    // MARK: Clock text (display only)
+    // MARK: Session clock
 
     private func clearCompletedNotice() {
         completedNoticeTask?.cancel()
@@ -1892,11 +1898,17 @@ final class ScribeController {
         tickTimer = nil
     }
 
-    /// True after connecting begins, until the session leaves `.starting` or capture is acknowledged.
+    /// True while the session timer is scheduled. A tap arms it for connecting. Acknowledgement keeps a timer for the elapsed text.
     var isSessionClockRunning: Bool { tickTimer != nil }
 
     /// Same deterministic tick used by the timer and automated lifecycle scenarios with an injected clock.
+    /// While `.starting`, this is the machine input that can end connecting. It does not start a session.
+    /// Elapsed text after acknowledgement is still display only.
     func tickClock() {
+        let now = nowSeconds()
+        if case .starting = machine.phase {
+            run { $0.tick(now: now) }
+        }
         guard let since = recordingSince else { return }
         switch machine.phase {
         case .recording, .ending: elapsed = max(0, nowSeconds() - since)
