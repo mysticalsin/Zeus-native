@@ -20,6 +20,8 @@ enum PersonalityAssets {
 
     /// Hands the dialogue asset to the stock-line bank. A missing file leaves the compiled lines in use.
     static func installDialogue() {
-        ZeusVoiceLines.shared.setDialogue(dialogue())
+        Task.detached(priority: .userInitiated) {
+            ZeusVoiceLines.shared.setDialogue(dialogue())
+        }
     }
 }

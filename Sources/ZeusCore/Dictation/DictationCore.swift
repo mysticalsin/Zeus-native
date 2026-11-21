@@ -240,11 +240,13 @@ public struct DictationStore: Sendable {
         return encoder
     }
 
-    private static func decoder() -> JSONDecoder {
+    private static func decoder() -> JSONDecoder { storedDecoder }
+
+    private static let storedDecoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
-    }
+    }()
 
     public func save(_ record: DictationRecord) throws {
         let folder = historyDir.appendingPathComponent(record.id, isDirectory: true)
@@ -274,29 +276,35 @@ public struct DictationStore: Sendable {
     /// An injected source is read in full, then trimmed. The file path does the same.
     public func loadHistory(limit: Int = 200, now: Date = Date(), source: DictationHistorySource? = nil) -> DictationHistoryLoad {
         if let source {
-            let decoder = Self.decoder()
+            let decoder = Self.storedDecoder
+            let ranked = source.entries().sorted { $0.modified > $1.modified }
             var records: [DictationRecord] = []
-            for entry in source.entries() {
+            for entry in ranked.prefix(max(0, limit)) {
                 guard let data = source.read(entry.url),
                       let record = try? decoder.decode(DictationRecord.self, from: data) else { continue }
                 records.append(record)
             }
-            return DictationHistoryLoad(records: Array(records.sorted { $0.datetime > $1.datetime }.prefix(max(0, limit))), problems: [])
+            return DictationHistoryLoad(records: records, problems: [])
         }
         let fm = FileManager.default
-        let folders = (try? fm.contentsOfDirectory(at: historyDir, includingPropertiesForKeys: nil)) ?? []
+        let folders = (try? fm.contentsOfDirectory(at: historyDir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let ranked: [(URL, Date)] = folders.compactMap { folder in
+            let meta = folder.appendingPathComponent("meta.json")
+            guard fm.fileExists(atPath: meta.path) else { return nil }
+            let modified = (try? meta.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            return (meta, modified)
+        }.sorted { $0.1 > $1.1 }
+        let decoder = Self.storedDecoder
         var records: [DictationRecord] = []
         var problems: [URL] = []
-        for folder in folders {
-            let meta = folder.appendingPathComponent("meta.json")
-            guard fm.fileExists(atPath: meta.path) else { continue }
-            if let data = try? Data(contentsOf: meta), let record = try? Self.decoder().decode(DictationRecord.self, from: data) {
+        for (meta, _) in ranked.prefix(max(0, limit)) {
+            if let data = try? Data(contentsOf: meta), let record = try? decoder.decode(DictationRecord.self, from: data) {
                 records.append(record)
             } else {
                 problems.append(Self.quarantine(meta, now: now))
             }
         }
-        return DictationHistoryLoad(records: Array(records.sorted { $0.datetime > $1.datetime }.prefix(limit)), problems: problems)
+        return DictationHistoryLoad(records: records, problems: problems)
     }
 
     /// Moves a bad file next to itself as a `.corrupt` backup. Returns the backup, or the original

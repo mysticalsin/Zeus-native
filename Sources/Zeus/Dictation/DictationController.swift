@@ -370,8 +370,26 @@ final class DictationController {
     func start() {
         DictationHub.shared.controller = self
         RecorderPill.shared.attach(topBar)
-        // Pruning only follows a clean read: a corrupt history file is set aside, never pruned around.
-        if reloadModesAndHistory() { store.prune(olderThanDays: settings.keepDays) }
+        // The history scan stays off the main thread. The hotkey is installed without waiting for it.
+        let store = self.store
+        let keepDays = settings.keepDays
+        Task.detached(priority: .utility) {
+            let modes = store.modes()
+            let load = store.loadHistory(limit: 50)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.topBar.dictationModes = modes
+                self.topBar.dictationHistory = load.records
+                guard !load.isClean else {
+                    self.store.prune(olderThanDays: keepDays)
+                    return
+                }
+                let count = load.problems.count
+                self.topBar.show(.dictation(count == 1
+                    ? "A dictation history file was damaged. Saved as .corrupt, nothing deleted"
+                    : "\(count) dictation history files were damaged. Saved as .corrupt, nothing deleted"))
+            }
+        }
         hotkey.keyProvider = { [weak self] in
             guard let self, self.settings.enabled, let key = self.settings.key else { return nil }
             return key
