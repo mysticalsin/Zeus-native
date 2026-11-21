@@ -200,4 +200,87 @@ public enum HubExperience {
         else if secs > 1 { parts.append("\(secs) seconds") }
         return parts.isEmpty ? "0 seconds" : parts.joined(separator: " ")
     }
+
+    /// Revision 3 actions, in VoiceOver order. The older deny and approve targets stay on the focus enum.
+    public static func revision3DecisionOrder() -> [String] {
+        ["Allow once", "Allow for this session", "Deny", "Deny with note"]
+    }
+
+    /// The 12 second countdown ends in Deny. It never approves.
+    public static let revision3CountdownExpiresByApproving = false
+    public static let revision3CountdownSeconds = 12
+    public static let revision3UndoSeconds = 2
+    /// Destructive approval holds for 1.2 seconds.
+    public static let revision3DestructiveHoldSeconds = 1.2
+    public static let revision3NoteCharacterLimit = 280
+    /// Command is never a shortcut.
+    public static let revision3CommandKeyIsShortcut = false
+    public static let revision3PauseReasons = ["hover", "focus", "VoiceOver focus"]
+
+    /// Reduce Motion keeps the countdown text and does not animate it.
+    public static func revision3CountdownAnimates(reduceMotion: Bool) -> Bool { !reduceMotion }
+
+    public static func revision3CountdownTextRemains(reduceMotion: Bool) -> Bool { reduceMotion || true }
+
+    /// The same page motion. Reduce Motion is zero offset and scale 1. The spring is unchanged.
+    public static func revision3Motion(reduceMotion: Bool) -> HubMotionRequest {
+        motionRequest(reduceMotion: reduceMotion)
+    }
+
+    public static func revision3KeysActive(decisionShowing: Bool) -> Bool { decisionShowing }
+
+    /// Escape and 3 deny. Keys do nothing unless a decision, or the undo window, is showing.
+    /// A command modifier is not a shortcut. ZB-UIUX-ESCAPE-001.
+    public static func revision3Key(
+        _ key: String,
+        command: Bool,
+        decisionShowing: Bool = false,
+        undoShowing: Bool = false
+    ) -> String? {
+        if command { return nil }
+        if undoShowing, key == "u" { return "Undo" }
+        guard decisionShowing else { return nil }
+        switch key {
+        case "return": return "Allow once"
+        case "2": return "Allow for this session"
+        case "escape", "3": return "Deny"
+        case "4": return "Deny with note"
+        case "shiftEscape": return "Deny all queued"
+        default: return nil
+        }
+    }
+
+    public static func revision3QueueCount(_ count: Int) -> String {
+        count == 1 ? "1 waiting" : "\(max(count, 0)) waiting"
+    }
+
+    public static func revision3CountdownSentence(seconds: Int, paused: Bool) -> String {
+        let body = "\(max(seconds, 0)) s left, then it's denied."
+        return paused ? "Countdown paused. \(body)" : body
+    }
+
+    /// Identifiers for the unlabeled approval controls.
+    /// ZB-UIUX-A11Y-030 Accept and ZB-UIUX-A11Y-034 Approve are Allow once.
+    /// ZB-UIUX-A11Y-032 is Deny when details are hidden. ZB-UIUX-A11Y-033 is Deny.
+    /// ZB-UIUX-ESCAPE-001 is the same Deny. ZB-UIUX-DECISION-001 is the row.
+    public static func revision3Identifier(forFinding finding: String) -> String? {
+        switch finding {
+        case "ZB-UIUX-DECISION-001": return "hub.decision.row"
+        case "ZB-UIUX-A11Y-030", "ZB-UIUX-A11Y-034": return "hub.decision.allow-once"
+        case "ZB-UIUX-A11Y-032": return "hub.decision.deny.hidden"
+        case "ZB-UIUX-A11Y-033", "ZB-UIUX-ESCAPE-001": return "hub.decision.deny"
+        default: return nil
+        }
+    }
+
+    public static func revision3VoiceOverLabel(forIdentifier identifier: String) -> String? {
+        switch identifier {
+        case "hub.decision.allow-once": return "Allow once"
+        case "hub.decision.allow-session": return "Allow for this session"
+        case "hub.decision.deny", "hub.decision.deny.hidden": return "Deny"
+        case "hub.decision.deny-note": return "Deny with note"
+        case "hub.decision.row": return "Decision"
+        default: return nil
+        }
+    }
 }
