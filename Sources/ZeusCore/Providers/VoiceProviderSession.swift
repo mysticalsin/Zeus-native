@@ -9,7 +9,8 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
         nonmutating set { storeChoice(newValue) }
     }
 
-    /// A read never writes. Assigning local does not replace a raw value this card does not own.
+    /// A read never writes. Choosing local stores kokoro over every cloud engine and over an unknown string.
+    /// Another local engine, such as the on-device alternate, is left as it was.
     private func storeChoice(_ choice: VoiceProviderChoice) {
         let key = Self.selectionKey
         let current = defaults.string(forKey: key)
@@ -22,17 +23,11 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
         }
     }
 
-    /// True for a stored engine this card must leave untouched. Empty, local, and the two adapters are writable.
+    /// True only for a non-default local engine. Cloud engines and unknown strings are not preserved:
+    /// choosing local maps them to kokoro.
     static func preserves(_ raw: String?) -> Bool {
-        guard let raw, !raw.isEmpty else { return false }
-        switch raw {
-        case VoiceTTSProvider.kokoro.rawValue,
-             VoiceTTSProvider.elevenLabs.rawValue,
-             VoiceTTSProvider.googleCloud.rawValue:
-            return false
-        default:
-            return true
-        }
+        guard let raw, !raw.isEmpty, let provider = VoiceTTSProvider(rawValue: raw) else { return false }
+        return !provider.needsKey && provider != .kokoro
     }
 
     public func voiceID(for providerID: String) -> String? {
