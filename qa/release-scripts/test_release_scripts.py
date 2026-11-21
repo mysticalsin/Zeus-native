@@ -242,6 +242,11 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual((target / "Contents/MacOS/Zeus").read_text(), "previous-app")
         self.assertFalse((self.root / "Rollbacks").exists())
 
+    def test_bundle_flag_parsing(self):
+        script = REPO / "qa/release-scripts/test_bundle_flags.sh"
+        result = subprocess.run(["bash", str(script)], cwd=REPO, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_test_defaults_cleanup_reaches_matching_domains_only(self):
         result = self.run_script("test.sh")
         self.assertEqual(result.returncode, 0, result.stderr)
