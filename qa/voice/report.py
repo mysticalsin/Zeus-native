@@ -51,7 +51,7 @@ def render_markdown(rows: list[dict]) -> str:
     rule = "| " + " | ".join("---" for _ in COLUMNS) + " |"
     body = [header, rule]
     for row in rows:
-        body.append("| " + " | ".join(_cell(row.get(column)) for column in COLUMNS) + " |")
+        body.append("| " + " | ".join(_cell(column, row.get(column)) for column in COLUMNS) + " |")
     if len(body) == 2:
         body.append("| " + " | ".join("" for _ in COLUMNS) + " |")
     lines = [
@@ -76,7 +76,15 @@ def write_report(rows: list[dict], output_dir: str | Path) -> tuple[Path, Path]:
     return metrics_path, report_path
 
 
-def _cell(value) -> str:
+def _cell(column: str, value) -> str:
+    if column == "barge_in_stop_latency_s" and value is None:
+        return "not measured"
+    if column == "inter_chunk_gaps_s" and isinstance(value, list):
+        if not value:
+            return ""
+        longest = max(value)
+        noun = "gap" if len(value) == 1 else "gaps"
+        return f"{len(value)} {noun}, longest {longest:.2f}s"
     if value is None:
         return ""
     if isinstance(value, bool):
@@ -86,7 +94,7 @@ def _cell(value) -> str:
             return "-inf" if value < 0 else "inf"
         return f"{value:.2f}"
     if isinstance(value, list):
-        return ", ".join(_cell(item) for item in value)
+        return ", ".join(_cell("", item) for item in value)
     return str(value).replace("|", "\\|")
 
 

@@ -92,7 +92,8 @@ def reserve(path: Path, provider: str, characters: int) -> int:
         data = _read(path)
         updated = data["providers"][provider] + characters
         if updated > MAX_CHARACTERS:
-            raise MeterError("character cap reached")
+            remaining = MAX_CHARACTERS - data["providers"][provider]
+            raise MeterError(f"character cap reached: {characters} requested, {remaining} remaining")
         data["providers"][provider] = updated
         _atomic_write(path, json.dumps(data, indent=2, sort_keys=True) + "\n")
         return updated
@@ -297,21 +298,21 @@ def _read(path: Path) -> dict:
     except OSError:
         raise MeterError("ledger unreadable") from None
     except UnicodeError:
-        raise MeterError("ledger corrupt") from None
+        raise MeterError("ledger corrupt: no call made") from None
     finally:
         os.close(fd)
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        raise MeterError("ledger corrupt") from None
+        raise MeterError("ledger corrupt: no call made") from None
     providers = data.get("providers") if isinstance(data, dict) else None
     if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(providers, dict):
-        raise MeterError("ledger corrupt")
+        raise MeterError("ledger corrupt: no call made")
     if set(providers) != set(PROVIDERS):
-        raise MeterError("ledger corrupt")
+        raise MeterError("ledger corrupt: no call made")
     for value in providers.values():
         if type(value) is not int or value < 0 or value > MAX_CHARACTERS:
-            raise MeterError("ledger corrupt")
+            raise MeterError("ledger corrupt: no call made")
     return data
 
 
