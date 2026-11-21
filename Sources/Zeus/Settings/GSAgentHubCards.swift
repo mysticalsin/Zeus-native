@@ -9,7 +9,6 @@ struct GSOtherAppsCards: View {
     private var store: SettingsStore { .shared }
 
     var body: some View {
-        MeetingHeadsUpCard()
         GSCard("Other apps") {
             GSToggleRow(symbol: "bell.and.waves.left.and.right", title: "Show notifications from other apps in the notch",
                         text: "Reads Notification Center on this Mac. Needs Full Disk Access; nothing leaves your Mac.",

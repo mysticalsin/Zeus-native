@@ -293,6 +293,9 @@ final class ScribeCallWatcher {
 
     var isRunning: Bool { running }
 
+    /// Slots the last scan already holds. Read only: no calendar read and no recording start.
+    func slotsAlreadyRead() -> [ScribeCalendarSlot] { lastSlots }
+
     /// True while the watcher runs and a call in progress has a browser as its main process. Read only.
     var browserCallPresent: Bool {
         isRunning && latestCalls.contains { $0.pid.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }.map(ScribeCallDetection.isBrowser) ?? false }

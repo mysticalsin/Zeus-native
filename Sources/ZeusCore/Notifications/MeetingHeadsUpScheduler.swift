@@ -95,16 +95,35 @@ public struct MeetingHeadsUpSettings: Equatable, Sendable {
 public enum MeetingHeadsUpScheduler {
     public static let createsCalendarEvents = false
 
-    public static func plan(settings: MeetingHeadsUpSettings, occasions: [InAppOccasion], now: Date) -> MeetingHeadsUpPlan {
+    public static func plan(
+        settings: MeetingHeadsUpSettings,
+        occasions: [InAppOccasion],
+        now: Date,
+        scribeWatchedIDs: Set<String> = []
+    ) -> MeetingHeadsUpPlan {
         guard settings.enabled else {
             return MeetingHeadsUpPlan(phase: .off, cues: [], createdEvents: [])
         }
         var cues: [HeadsUpCue] = []
         for occasion in occasions {
+            if occasion.kind == .meeting, scribeWatchedIDs.contains(occasion.id) { continue }
             guard let fireAt = fireDate(settings: settings, occasion: occasion) else { continue }
             cues.append(HeadsUpCue(occasionID: occasion.id, title: occasion.title, kind: occasion.kind, fireAt: fireAt))
         }
         return MeetingHeadsUpPlan(phase: phase(cues: cues, occasions: occasions, now: now), cues: cues, createdEvents: [])
+    }
+
+    /// Meeting ids Scribe already covers inside its lead window. Reminders and focus are not included.
+    /// This reads the slots it is given. It does not read a calendar and it does not start Scribe.
+    public static func scribeWatchedIDs(slots: [ScribeCalendarSlot], now: Date) -> Set<String> {
+        var ids = Set<String>()
+        if let slot = ScribeMeetingStartPolicy.upcomingSlot(in: slots, at: now) {
+            ids.insert(slot.id)
+        }
+        if let slot = ScribeMeetingStartPolicy.startedSlot(in: slots, at: now) {
+            ids.insert(slot.id)
+        }
+        return ids
     }
 
     private static func fireDate(settings: MeetingHeadsUpSettings, occasion: InAppOccasion) -> Date? {

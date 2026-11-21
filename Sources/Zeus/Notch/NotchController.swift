@@ -168,6 +168,7 @@ final class NotchController {
         model.presentation = presentation
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
+        if presentation == .peek { refreshMeetingHeadsUp() }
         setIgnoresMouse(ignoresMouse(for: presentation))
         // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
         model.alerts.setSuspended(presentation != .closed, now: now())
@@ -201,6 +202,27 @@ final class NotchController {
 
     /// Told every time the notch changes shape (the buddy hides over the open panel).
     var onPresentationChange: (NotchModel.Presentation) -> Void = { _ in }
+
+    /// Plans in-app heads-up from slots Scribe already read. Does not start Scribe and does not write a calendar event.
+    private func refreshMeetingHeadsUp() {
+        let prefs = ExtraPreferences.shared
+        let settings = MeetingHeadsUpSettings(
+            enabled: prefs.meetingHeadsUp,
+            calendarLeadMinutes: prefs.calendarLeadMinutes,
+            reminders: prefs.peekReminders,
+            focus: prefs.peekFocusDone
+        )
+        let now = Date()
+        let slots = ScribeCallWatcher.shared.slotsAlreadyRead()
+        let occasions = slots.map { InAppOccasion(id: $0.id, title: $0.title, start: $0.start, kind: .meeting) }
+        let watched = MeetingHeadsUpScheduler.scribeWatchedIDs(slots: slots, now: now)
+        model.meetingHeadsUp = MeetingHeadsUpScheduler.plan(
+            settings: settings,
+            occasions: occasions,
+            now: now,
+            scribeWatchedIDs: watched
+        )
+    }
 
     func startSession(id: String, agent: String, project: String, task: String) {
         let session = NotchModel.Session(id: id, agent: agent, project: project, task: task, status: .working, startedAt: Date())
