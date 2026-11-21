@@ -3,7 +3,7 @@
 
 use crate::backend::FakeBackend;
 use crate::engine::{selftest_report, Engine};
-use crate::serve::{bind_socket, serve_one};
+use crate::serve::{accept_authorized, bind_socket, serve_one, OsPeer};
 use crate::session::ChildControl;
 use crate::supervisor::{
     apply, child_argv, decide, LaunchDecision, LaunchRequest, NetGate, SocketBind, SpyBinder,
@@ -56,7 +56,7 @@ fn serve_command(config: &ServeConfig) -> i32 {
                 config.watchdog, config.kv_window, config.reanchor_minutes
             );
             let argv = child_argv(&python, &model, &private_socket, quantize);
-            match run_serve(&socket, &argv, config.watchdog) {
+            match run_serve(&socket, &private_socket, &argv, config.watchdog) {
                 Ok(()) => 0,
                 Err(error) => {
                     eprintln!("haru-companion: {error}");
@@ -67,15 +67,34 @@ fn serve_command(config: &ServeConfig) -> i32 {
     }
 }
 
-fn run_serve(socket: &std::path::Path, argv: &[String], watchdog: bool) -> std::io::Result<()> {
+fn run_serve(
+    socket: &std::path::Path,
+    private_socket: &std::path::Path,
+    argv: &[String],
+    watchdog: bool,
+) -> std::io::Result<()> {
     let listener = bind_socket(socket)?;
+    let child_listener = match bind_socket(private_socket) {
+        Ok(listener) => listener,
+        Err(error) => {
+            drop(listener);
+            let _ = std::fs::remove_file(socket);
+            return Err(error);
+        }
+    };
     let mut probe = StdLauncher::new();
     if let Err(error) = probe.spawn(argv) {
         drop(listener);
+        drop(child_listener);
         let _ = std::fs::remove_file(socket);
+        let _ = std::fs::remove_file(private_socket);
         return Err(error);
     }
     drop(probe);
+    let wake = private_socket.to_path_buf();
+    let child_gate = std::thread::spawn(move || {
+        let _ = accept_authorized(child_listener, &OsPeer);
+    });
     let mut engine = Engine::new(
         FakeBackend::quiet(),
         StdLauncher::new(),
@@ -83,7 +102,10 @@ fn run_serve(socket: &std::path::Path, argv: &[String], watchdog: bool) -> std::
         watchdog,
     );
     let served = serve_one(listener, &mut engine);
+    let _ = std::os::unix::net::UnixStream::connect(&wake);
+    let _ = child_gate.join();
     let _ = std::fs::remove_file(socket);
+    let _ = std::fs::remove_file(private_socket);
     served
 }
 

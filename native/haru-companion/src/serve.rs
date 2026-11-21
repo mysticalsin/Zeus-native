@@ -15,11 +15,6 @@ use std::time::Duration;
 static BIND_UMASK: Mutex<()> = Mutex::new(());
 
 pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)?;
-        }
-    }
     if let Ok(meta) = std::fs::symlink_metadata(path) {
         let kind = meta.file_type();
         if kind.is_socket() {
@@ -49,8 +44,17 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
         let _guard = BIND_UMASK
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
-        // 0777 & ~0177 = 0600, so the directory entry is created private
-        // and a later chmod of the path cannot follow a swapped symlink.
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                // 0777 & ~0077 = 0700. A directory we create is private from the start.
+                let old = unsafe { umask(0o077) };
+                let created = std::fs::create_dir_all(parent);
+                unsafe { umask(old) };
+                created?;
+            }
+        }
+        // 0777 & ~0177 = 0600. The socket mode is set before the name is visible
+        // to a chmod of the path.
         let old = unsafe { umask(0o177) };
         let bound = UnixListener::bind(path);
         unsafe { umask(old) };
@@ -129,26 +133,12 @@ where
     C: ChildControl,
     P: PeerCheck,
 {
-    // The injected check is not applied yet. A scripted foreign uid is accepted.
-    let _ = peer;
-    serve_one_os(listener, engine)
-}
-
-fn serve_one_os<B, C>(listener: UnixListener, engine: &mut Engine<B, C>) -> std::io::Result<()>
-where
-    B: ModelBackend,
-    C: ChildControl,
-{
     let (stream, _) = listener.accept()?;
     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
-    let peer = peer_uid(&stream)?;
-    if peer != current_uid() {
+    if let Err(error) = peer.allow(&stream) {
         finish_session(engine);
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            "peer uid",
-        ));
+        return Err(error);
     }
     let mut stream = stream;
     let mut framer = FrameBuf::default();
@@ -208,6 +198,16 @@ where
     }
     finish_session(engine);
     outcome
+}
+
+pub(crate) fn accept_authorized<P: PeerCheck>(
+    listener: UnixListener,
+    peer: &P,
+) -> std::io::Result<()> {
+    let (stream, _) = listener.accept()?;
+    peer.allow(&stream)?;
+    drop(stream);
+    Ok(())
 }
 
 fn finish_session<B, C>(engine: &mut Engine<B, C>)

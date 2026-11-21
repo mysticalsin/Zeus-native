@@ -22,7 +22,11 @@ fn scratch(name: &str) -> std::path::PathBuf {
 }
 
 fn mode(path: &std::path::Path) -> u32 {
-    std::fs::symlink_metadata(path).unwrap().permissions().mode() & 0o777
+    std::fs::symlink_metadata(path)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777
 }
 
 #[test]
@@ -92,16 +96,20 @@ fn e02_injected_foreign_uid_is_refused() {
             vec!["fake-haru".into()],
             false,
         );
-        let result = serve_one_with(listener, &mut engine, &FixedPeer { peer: 42, owner: 1000 });
-        let _ = tx.send(result.map(|()| ()).map_err(|error| error.kind()));
+        let result = serve_one_with(
+            listener,
+            &mut engine,
+            &FixedPeer {
+                peer: 42,
+                owner: 1000,
+            },
+        );
+        let _ = tx.send(result.map_err(|error| error.kind()));
     });
     let _client = UnixStream::connect(&path).unwrap();
     let outcome = rx.recv_timeout(Duration::from_secs(2));
     assert!(
-        matches!(
-            outcome,
-            Ok(Err(std::io::ErrorKind::PermissionDenied))
-        ),
+        matches!(outcome, Ok(Err(std::io::ErrorKind::PermissionDenied))),
         "a foreign uid was not refused: {outcome:?}"
     );
     let _ = std::fs::remove_dir_all(&root);
