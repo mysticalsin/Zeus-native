@@ -87,7 +87,8 @@ if [ "${RELEASE:-0}" = 1 ]; then scripts/verify-release-signature.sh "$APP"; fi
 if [ "$LOCAL_IDENTITY" = 1 ]; then
   HASHES="$HOME/.zeus-dev/codesign/cdhashes"
   touch "$HASHES"
-  for bin in "$APP/Contents/MacOS/Zeus" "$APP/Contents/Helpers/"*; do
+  for bin in "$APP/Contents/MacOS/Zeus" "$APP/Contents/Helpers/"* "$APP/Contents/Resources/zeus-now-playing"; do
+    [ -e "$bin" ] || continue
     codesign -dvvv "$bin" 2>&1 | awk -F= '/^CDHash=/{print "cdhash:"$2}' >> "$HASHES"
   done
   tail -n 16 "$HASHES" | awk '!seen[$0]++' > "$HASHES.tmp" && mv "$HASHES.tmp" "$HASHES"
