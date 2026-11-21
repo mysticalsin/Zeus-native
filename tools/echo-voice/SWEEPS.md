@@ -240,3 +240,14 @@ Checked against `ee9de8e`. Soak files were not edited. Red commit `71fdbc0`. Fix
 - Finding: the go line was `go 1.22`.
 - Test: `test_go_directive_is_at_least_1_23_10`. Commit `71fdbc0`.
 - Fix: commit `955a377`. The go line is `go 1.23.10`, which selects toolchain go1.23.10. `go env GOVERSION` is `go1.23.10`, and `go test ./...` plus `go vet ./...` exit 0. A separate `toolchain go1.23.10` line is not kept: go 1.23.10 treats it as implied by the go line, `go mod tidy` deletes it, and `go test` refuses to run while it is present.
+
+## 25. UX polish and motion
+
+- Time: 2026-11-21T05:21:17Z.
+- Lens: UX polish and motion.
+- Checked: `docs/stream-latency.svg` against `pipeline-bench/results/summary.json`, and `python/pipe.py bench` on a non-JSON manifest, a missing manifest, `{}`, and a file bench with an empty `files` list. No review comments and no Devin notes on PR #84. E-01, E-03, and E-05 were already fixed at `955a377`. On `839e81c`, `extension` and `release-scripts` had completed success; `app` and `feature-map` were still queued, with no failed check. Soak files and the other open PRs' paths were not edited.
+- Findings:
+  - The three p50 bars were `width="0"` and grew only through SMIL `<animate>`. There was no `prefers-reduced-motion` rule, so a static viewer or reduced motion showed empty bars. The measured resting widths are Python 248.1 px, Rust 36.1 px, Go 71.4 px, with 320 px equal to the Python p95 0.160699 ms. The p95 ticks were at 42.8, 88.1, and 320 px.
+  - `pipe.py` exited 1 and printed a traceback for those four manifests. Go and Rust already exited 2 with a `haru-pipe:` line for the non-JSON file (`haru-pipe: invalid character...` and `haru-pipe: manifest has no stream`).
+- Fixes: chart red `c1aa744`, green `f098f5f`. Manifest text red `50ef82e`, green `92e401b`. The chart's resting widths are those p50 lengths, CSS grows them, and `@media (prefers-reduced-motion: reduce)` sets `animation: none`. `pipe.py` prints one `haru-pipe:` line and exits 2.
+- Tests, all exit 0: `test_stream_chart.py` 1, `test_pipe_messages.py` 1, `test_security.py` 3, `test_reported_numbers.py` 4, `test_notice.py` 1. Ten tests.
