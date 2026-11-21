@@ -399,6 +399,16 @@ public enum RecordlyPrimaryRecord {
     public static func startsDeviceCapture(phase: RecordlyDeviceCapturePhase) -> Bool {
         phase == .ready
     }
+
+    /// A screen session that is already recording is the recorder. A chip must not open another.
+    public static func blocksAnotherRecorder(screenSessionActive: Bool) -> Bool {
+        screenSessionActive
+    }
+
+    /// Ready, and no screen session is already writing a file.
+    public static func mayStartDeviceRecorder(phase: RecordlyDeviceCapturePhase, screenSessionActive: Bool) -> Bool {
+        startsDeviceCapture(phase: phase) && !blocksAnotherRecorder(screenSessionActive: screenSessionActive)
+    }
 }
 
 public struct RecordlyDeviceCaptureReceipt: Equatable, Sendable {

@@ -437,8 +437,9 @@ final class RecordlyController {
     func pressRecord(topBar: TopBarModel?) {
         guard phase == .idle else { return }
         countdownTopBar = topBar
-        let devicesReady = RecordlyPrimaryRecord.startsDeviceCapture(
-            phase: RecordlyDeviceCaptureController.shared.phase)
+        let devicesReady = RecordlyPrimaryRecord.mayStartDeviceRecorder(
+            phase: RecordlyDeviceCaptureController.shared.phase,
+            screenSessionActive: phase != .idle)
         if !isCountingDown {
             screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
             // No display to record: the same Record control starts the one device file.
@@ -607,9 +608,7 @@ final class RecordlyController {
         timeout.cancel()
         switch outcome {
         case .started(let attempt, let resolved):
-            if RecordlyPrimaryRecord.startsDeviceCapture(phase: devices.phase) {
-                devices.record()
-            }
+            // The screen session is the recorder. A ready chip stays on the microphone flag and does not open a second file.
             let captureSource = RecordlySourceSelection.CaptureAdapter(resolved).source
             source = captureSource
             currentAttemptID = attempt.id
