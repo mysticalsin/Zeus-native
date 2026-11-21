@@ -804,6 +804,7 @@ private struct TopBarPanelBody: View {
     @State private var agentsReply = ""
     @State private var agentsNote = ""
     @State private var cardGate = AgentsPageCardGate()
+    @State private var destructiveHold: AgentsPageHoldClock?
     @FocusState private var agentsApprovalFocused: Bool
 
     /// Glance's layout (TOPBAR-SPEC §2-4): the notch row stays empty, the tab capsule sits at
@@ -860,6 +861,10 @@ private struct TopBarPanelBody: View {
         .onChange(of: model.sessions) { _, _ in syncAgents(now: .now) }
         .onChange(of: model.approval?.id) { _, _ in syncAgents(now: .now) }
         .onChange(of: model.presentation) { _, _ in syncAgents(now: .now) }
+        .onChange(of: agentsPage.announcement) { _, spoken in
+            guard let spoken else { return }
+            AccessibilityNotification.Announcement(spoken).post()
+        }
     }
 
     private func agentsStack(now: Date) -> some View {
@@ -887,10 +892,19 @@ private struct TopBarPanelBody: View {
                                 revisionActions
                             }
                             if agentsPage.undoTicksLeft > 0 {
-                                NotchButton(title: "Undo", tint: Theme.cloudSecondary, filled: false) {
-                                    adopt(AgentsPageHook.undo(agentsPage))
+                                let countdown = AgentsPageUndoChip.countdown(agentsPage)
+                                HStack(spacing: 6) {
+                                    NotchButton(title: "Undo", tint: Theme.cloudSecondary, filled: false) {
+                                        adopt(AgentsPageHook.undo(agentsPage))
+                                    }
+                                    .accessibilityLabel("Undo")
+                                    if let countdown {
+                                        Text(countdown)
+                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(Theme.cloudSecondary)
+                                            .accessibilityLabel("Undo \(countdown)")
+                                    }
                                 }
-                                .accessibilityLabel("Undo")
                             }
                         }
                         .frame(width: selected == nil ? nil : 270, alignment: .leading)
@@ -988,16 +1002,75 @@ private struct TopBarPanelBody: View {
                     .accessibilityLabel(HubRevision3Speech.queue(agentsPage.revision.waitingCount))
             }
         }
+        .focusable(destructive)
+        .onKeyPress(.return) {
+            guard destructive else { return .ignored }
+            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .return))
+            return .handled
+        }
+        .onKeyPress(KeyEquivalent("2")) {
+            guard destructive else { return .ignored }
+            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .two))
+            return .handled
+        }
     }
 
     private func revisionHold(_ action: HubDecisionAction) -> some View {
-        NotchButton(title: action.title, tint: Theme.cloudSecondary, filled: false) {}
-            .onLongPressGesture(minimumDuration: Double(HubRevision3Timing.destructiveHoldMilliseconds) / 1_000) {
-                adopt(AgentsPageHook.hold(
-                    agentsPage, action: action, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds))
-            }
-            .accessibilityLabel(action.title)
-            .accessibilityHint("Press and hold")
+        TimelineView(.animation(minimumInterval: agentsPage.reduceMotion ? 0.2 : 1.0 / 30.0, paused: destructiveHold?.action != action)) { context in
+            revisionHoldControl(action, now: context.date)
+        }
+    }
+
+    private func revisionHoldControl(_ action: HubDecisionAction, now: Date) -> some View {
+        let fill = AgentsPageHoldFill.progress(
+            heldMilliseconds: holdMilliseconds(for: action, now: now),
+            reduceMotion: agentsPage.reduceMotion)
+        return NotchButton(title: action.title, tint: Theme.cloudSecondary, filled: false) {
+            adopt(AgentsPageDestructive.activate(agentsPage))
+        }
+        .background(alignment: .leading) {
+            Capsule()
+                .fill(Color.white.opacity(0.28))
+                .scaleEffect(x: fill.fraction, y: 1, anchor: .leading)
+                .opacity(fill.fraction > 0 ? 1 : 0)
+                .allowsHitTesting(false)
+        }
+        .animation(fill.animates ? .linear(duration: 0.08) : nil, value: fill.fraction)
+        .onLongPressGesture(minimumDuration: Double(HubRevision3Timing.destructiveHoldMilliseconds) / 1_000) {
+            destructiveHold = nil
+            adopt(AgentsPageHook.hold(
+                agentsPage, action: action, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds))
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if destructiveHold?.action != action {
+                        destructiveHold = AgentsPageHoldClock(action: action, started: Date())
+                    }
+                }
+                .onEnded { _ in
+                    destructiveHold = nil
+                }
+        )
+        .onKeyPress(.return) {
+            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .return))
+            return .handled
+        }
+        .onKeyPress(KeyEquivalent("2")) {
+            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .two))
+            return .handled
+        }
+        .accessibilityLabel(action.title)
+        .accessibilityHint("Press and hold. \(AgentsPageDestructive.voiceOverConfirmLabel(action)) approves.")
+        .accessibilityAction(named: AgentsPageDestructive.voiceOverConfirmLabel(action)) {
+            destructiveHold = nil
+            adopt(AgentsPageDestructive.confirm(agentsPage, action: action))
+        }
+    }
+
+    private func holdMilliseconds(for action: HubDecisionAction, now: Date) -> Int {
+        guard let clock = destructiveHold, clock.action == action else { return 0 }
+        return max(0, Int(now.timeIntervalSince(clock.started) * 1_000))
     }
 
     private var approvalRow: some View {
@@ -1711,6 +1784,7 @@ struct AgentsPage: Equatable, Sendable {
         guard outcome.state != revision else { return self }
         var next = self
         next.revision = outcome.state
+        next.announcement = outcome.announcement
         next.applyExecutions(since: before)
         next.mirrorRevision()
         next.restoreDetails()
@@ -2010,19 +2084,21 @@ struct AgentsPageCardGate: Equatable, Sendable {
 }
 
 /// The card on screen. Its id is the approval id, not the session id.
-/// Destructive controls. The stub leaves the button empty: activate changes nothing, and only a long press holds.
+/// Destructive controls. A click denies. Return, 2, and the VoiceOver confirm action hold for the spec duration.
 enum AgentsPageDestructive {
     static func activate(_ page: AgentsPage) -> AgentsPageHook.Step {
-        AgentsPageHook.Step(page: page, sends: [])
+        AgentsPageHook.tapDeny(page)
     }
 
     static func confirm(_ page: AgentsPage, action: HubDecisionAction) -> AgentsPageHook.Step {
-        _ = action
-        return AgentsPageHook.Step(page: page, sends: [])
+        AgentsPageHook.hold(page, action: action, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds)
     }
 
     static func keyboard(_ page: AgentsPage, key: HubDecisionKey) -> AgentsPageHook.Step {
-        AgentsPageHook.press(page, key)
+        if page.revision.showing?.tier == .destructive, let action = key.action, action.isApproval {
+            return confirm(page, action: action)
+        }
+        return AgentsPageHook.press(page, key)
     }
 
     static func voiceOverConfirmLabel(_ action: HubDecisionAction) -> String {
@@ -2030,23 +2106,33 @@ enum AgentsPageDestructive {
     }
 }
 
-/// Hold progress. The stub never fills and always animates.
+/// Hold progress. Reduce Motion snaps from empty to full. Motion fills in proportion to the hold.
 struct AgentsPageHoldFill: Equatable, Sendable {
     var fraction: Double
     var animates: Bool
 
     static func progress(heldMilliseconds: Int, reduceMotion: Bool) -> AgentsPageHoldFill {
-        _ = (heldMilliseconds, reduceMotion)
-        return AgentsPageHoldFill(fraction: 0, animates: true)
+        let required = max(HubRevision3Timing.destructiveHoldMilliseconds, 1)
+        let clamped = min(required, max(0, heldMilliseconds))
+        if reduceMotion {
+            return AgentsPageHoldFill(fraction: clamped >= required ? 1 : 0, animates: false)
+        }
+        return AgentsPageHoldFill(fraction: Double(clamped) / Double(required), animates: true)
     }
 }
 
-/// The Undo chip. The stub has no countdown.
+/// The Undo chip. Whole seconds left in the pending window.
 enum AgentsPageUndoChip {
     static func countdown(_ page: AgentsPage) -> String? {
-        _ = page
-        return nil
+        guard let pending = page.revision.pending else { return nil }
+        let remaining = max(0, pending.undoUntil - page.revision.clock)
+        return "\(remaining / 1_000) s"
     }
+}
+
+private struct AgentsPageHoldClock: Equatable {
+    var action: HubDecisionAction
+    var started: Date
 }
 
 enum AgentsPageLive {
