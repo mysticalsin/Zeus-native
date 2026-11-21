@@ -14,6 +14,14 @@ public enum DevKeychain {
         [NSHomeDirectory() + "/.zeus/devkeychain.pass", NSHomeDirectory() + "/.zeus-dev/codesign/keychain-pass"]
     }
 
+    /// Group or other access matches the refusal used for an imported key file.
+    static func passwordFileIsPrivate(_ path: String) -> Bool {
+        guard FileManager.default.isReadableFile(atPath: path),
+              let mode = (try? FileManager.default.attributesOfItem(atPath: path))?[.posixPermissions] as? NSNumber
+        else { return false }
+        return PrivateFileMode.accepts(mode.uint16Value)
+    }
+
     /// True when this process's signature carries no Team ID (ad hoc or self-signed).
     public static var isLocalBuild: Bool {
         var code: SecCode?
@@ -30,7 +38,7 @@ public enum DevKeychain {
     nonisolated(unsafe) public static let shared: SecKeychain? = {
         guard ProcessInfo.processInfo.environment["ZEUS_LOGIN_KEYCHAIN"] == nil, isLocalBuild,
               FileManager.default.fileExists(atPath: path),
-              let file = passwordFiles.first(where: { FileManager.default.isReadableFile(atPath: $0) }),
+              let file = passwordFiles.first(where: { Self.passwordFileIsPrivate($0) }),
               let raw = try? String(contentsOfFile: file, encoding: .utf8) else { return nil }
         let password = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         var keychain: SecKeychain?
