@@ -65,7 +65,11 @@ final class PresenterNotesController {
     /// A status poll in flight, so a slow app never piles requests up.
     private var polling = false
     /// Move to the next slide when you finish reading a slide's notes.
-    var advanceSlides = UserDefaults.standard.object(forKey: "prompter.advanceSlides") as? Bool ?? true
+    var advanceSlides: Bool {
+        let defaults = UserDefaults.standard
+        PrompterAdvancePreference.migrate(defaults)
+        return PrompterAdvancePreference.isOn(defaults)
+    }
     /// A problem to show in the teleprompter (a failed slide change).
     var onProblem: (String) -> Void = { _ in }
 
