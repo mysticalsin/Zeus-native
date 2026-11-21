@@ -14,23 +14,21 @@ enum SpokenLinks {
         SpokenText.rewrite(text, pattern: #"(?i)\b(?:https?://|www\.)[^\s<>\[\]()]+"#) { match, source in
             let raw = SpokenText.group(match, 0, in: source)
             let pieces = peelingPunctuation(raw)
-            return domain(of: pieces.core, language: language) + pieces.punctuation
+            return spokenLink(pieces.core, language: language) + pieces.punctuation
         }
     }
 
     private static func replacingWindowsPaths(_ text: String, language: SpokenLanguage) -> String {
         SpokenText.rewrite(text, pattern: #"[A-Za-z]:\\[^\s]+"#) { match, source in
-            let raw = SpokenText.group(match, 0, in: source)
-            let pieces = peelingPunctuation(raw)
-            return fileWord(language) + pieces.punctuation
+            spokenFile(SpokenText.group(match, 0, in: source), language: language)
         }
     }
 
     /// A slash path with a file extension. `and/or` and `12/11/2026` have no extension, so they stay.
     private static func replacingUnixPaths(_ text: String, language: SpokenLanguage) -> String {
         let pattern = #"(?<![A-Za-z0-9_])(?:\.\./|\./|/)?[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)+\.[A-Za-z0-9]{1,12}\b"#
-        return SpokenText.rewrite(text, pattern: pattern) { _, _ in
-            fileWord(language)
+        return SpokenText.rewrite(text, pattern: pattern) { match, source in
+            spokenFile(SpokenText.group(match, 0, in: source), language: language)
         }
     }
 
@@ -65,7 +63,8 @@ enum SpokenLinks {
         return (core, punctuation)
     }
 
-    private static func domain(of url: String, language: SpokenLanguage) -> String {
+    /// Host and path are spoken. The query string stays out.
+    private static func spokenLink(_ url: String, language: SpokenLanguage) -> String {
         var body = url
         let lower = body.lowercased()
         if lower.hasPrefix("https://") {
@@ -80,25 +79,55 @@ enum SpokenLinks {
             host = String(host[..<colon])
         }
         let labels = host.split(separator: ".").map(String.init).filter { !$0.isEmpty }
+        let joiner: String
+        let slash: String
+        switch language {
+        case .english:
+            joiner = " dot "
+            slash = " slash "
+        case .french:
+            joiner = " point "
+            slash = " barre oblique "
+        }
+        let hostWords: String
         if labels.isEmpty || labels.allSatisfy({ $0.allSatisfy(\.isNumber) }) {
             switch language {
-            case .english: return "a link"
-            case .french: return "un lien"
+            case .english: hostWords = "a link"
+            case .french: hostWords = "un lien"
             }
+        } else {
+            hostWords = labels.joined(separator: joiner)
         }
-        let joiner: String
-        switch language {
-        case .english: joiner = " dot "
-        case .french: joiner = " point "
-        }
-        return labels.joined(separator: joiner)
+        let pathText = String(body[hostEnd...])
+        let pathEnd = pathText.firstIndex { "?#".contains($0) } ?? pathText.endIndex
+        let segments = pathText[..<pathEnd].split(separator: "/").map(String.init).filter { !$0.isEmpty }
+        if segments.isEmpty { return hostWords }
+        return hostWords + slash + segments.joined(separator: slash)
     }
 
-    private static func fileWord(_ language: SpokenLanguage) -> String {
+    /// The directories stay quiet. The file name is what a screen reader needs.
+    private static func spokenFile(_ path: String, language: SpokenLanguage) -> String {
+        let pieces = peelingPunctuation(path)
+        let name = pieces.core.split { $0 == "/" || $0 == "\\" }.last.map(String.init) ?? pieces.core
+        let noun: String
+        let dotWord: String
         switch language {
-        case .english: "a file"
-        case .french: "un fichier"
+        case .english:
+            noun = "file"
+            dotWord = "dot"
+        case .french:
+            noun = "fichier"
+            dotWord = "point"
         }
+        let spoken: String
+        if let dot = name.lastIndex(of: "."), dot != name.startIndex {
+            let base = String(name[..<dot])
+            let ext = String(name[name.index(after: dot)...])
+            spoken = ext.isEmpty ? "\(noun) \(base)" : "\(noun) \(base) \(dotWord) \(ext)"
+        } else {
+            spoken = "\(noun) \(name)"
+        }
+        return spoken + pieces.punctuation
     }
 
     private static func hashWord(_ language: SpokenLanguage) -> String {

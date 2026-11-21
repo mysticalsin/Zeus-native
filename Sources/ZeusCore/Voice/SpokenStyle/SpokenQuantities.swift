@@ -2,7 +2,8 @@ import Foundation
 
 enum SpokenQuantities {
     static func apply(_ draft: SpokenDraft, language: SpokenLanguage) -> SpokenDraft {
-        SpokenDraft(text: SpokenText.collapse(verbalizing(draft.text, language: language)), runs: [])
+        let spoken = expandingUnits(verbalizing(draft.text, language: language), language: language)
+        return SpokenDraft(text: SpokenText.collapse(spoken), runs: [])
     }
 
     private struct NumberToken {
@@ -46,6 +47,32 @@ enum SpokenQuantities {
             index = text.index(after: index)
         }
         return result
+    }
+
+    private static func expandingUnits(_ text: String, language: SpokenLanguage) -> String {
+        let celsius: String
+        let fahrenheit: String
+        switch language {
+        case .english:
+            celsius = " degrees Celsius"
+            fahrenheit = " degrees Fahrenheit"
+        case .french:
+            celsius = " degrés Celsius"
+            fahrenheit = " degrés Fahrenheit"
+        }
+        var text = text.replacingOccurrences(of: "°C", with: celsius)
+        text = text.replacingOccurrences(of: "°F", with: fahrenheit)
+        let pairs: [(String, String)]
+        switch language {
+        case .english:
+            pairs = [("km", "kilometers"), ("kg", "kilograms")]
+        case .french:
+            pairs = [("km", "kilomètres"), ("kg", "kilogrammes")]
+        }
+        for (token, spoken) in pairs {
+            text = SpokenText.rewrite(text, pattern: "(?i)\\b\(token)\\b") { _, _ in spoken }
+        }
+        return text
     }
 
     private static func looksQuantitative(_ text: String, at index: String.Index) -> Bool {

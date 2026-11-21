@@ -129,7 +129,7 @@ enum SpokenClauses {
                     count += 1
                     next = text.index(after: next)
                 }
-                if count >= 3 {
+                if count >= 2 {
                     result += ". "
                     index = next
                     appendCapitalizedWord(text, index: &index, into: &result)
@@ -193,7 +193,22 @@ enum SpokenClauses {
         var count = 0
         for clause in clauses {
             let words = SpokenText.words(in: clause)
-            if !current.isEmpty, count + words > SpokenStyle.maxWordsPerSentence {
+            // A short lead-in such as a heading does not count toward the breath limit,
+            // and it must not become its own sentence that spends the reply budget.
+            let leadOnly = current.count == 1 && count <= 3
+            let counted = leadOnly ? 0 : count
+            if !current.isEmpty, counted + words > SpokenStyle.maxWordsPerSentence {
+                let room = SpokenStyle.maxWordsPerSentence - counted
+                if leadOnly, room >= 1, words > room {
+                    let parts = clause.split(whereSeparator: \.isWhitespace).map(String.init)
+                    let head = parts.prefix(room).joined(separator: " ")
+                    let tail = parts.dropFirst(room).joined(separator: " ")
+                    current.append(head)
+                    groups.append(current)
+                    current = [SpokenText.capitalizingFirst(tail)]
+                    count = SpokenText.words(in: tail)
+                    continue
+                }
                 groups.append(current)
                 current = [SpokenText.capitalizingFirst(clause)]
                 count = words

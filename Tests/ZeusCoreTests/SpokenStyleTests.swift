@@ -263,8 +263,8 @@ struct SpokenStyleTests {
         #expect(hear("Mark deadbeef done.").spokenText == "Mark a hash done.")
         #expect(hear("See 0xdeadbeef now.").spokenText == "See a hash now.")
         #expect(hear("Mark abcdef now.").spokenText == "Mark abcdef now.")
-        #expect(hear("Mark abcdefg now.").spokenText == "Mark a hash now.")
-        #expect(hear("Mark abcdefgh now.").spokenText == "Mark a hash now.")
+        #expect(hear("Mark deadbee now.").spokenText == "Mark a hash now.")
+        #expect(hear("Mark abcdef01 now.").spokenText == "Mark a hash now.")
     }
 
     @Test func frenchHashIsUneEmpreinte() {
@@ -407,7 +407,7 @@ struct SpokenStyleTests {
             language: .english,
             maxSentences: nil
         )
-        #expect(out.text == "See example dot com.")
+        #expect(out.text == "See example dot com slash docs.")
         #expect(out.runs.isEmpty)
     }
 
