@@ -415,6 +415,7 @@ func SpinUntil(deadline time.Time) {
 type Stream struct {
 	leftover    float32
 	hasLeftover bool
+	byteCarry   []byte // 0–3 bytes of an incomplete little-endian f32
 	scratch     []float32
 	half        []float32
 	in, out     *Ring
@@ -451,13 +452,17 @@ func (s *Stream) emit() {
 }
 
 func (s *Stream) Feed(payload []byte, onFrame func()) {
+	buf := append(append([]byte{}, s.byteCarry...), payload...)
+	n := len(buf) - len(buf)%4
+	s.byteCarry = append([]byte{}, buf[n:]...)
+	aligned := buf[:n]
 	s.scratch = s.scratch[:0]
 	if s.hasLeftover {
 		s.scratch = append(s.scratch, s.leftover)
 		s.hasLeftover = false
 	}
-	for i := 0; i+4 <= len(payload); i += 4 {
-		s.scratch = append(s.scratch, math.Float32frombits(binary.LittleEndian.Uint32(payload[i:])))
+	for i := 0; i+4 <= len(aligned); i += 4 {
+		s.scratch = append(s.scratch, math.Float32frombits(binary.LittleEndian.Uint32(aligned[i:])))
 	}
 	even := len(s.scratch) / 2 * 2
 	if even < len(s.scratch) {

@@ -36,17 +36,30 @@ pub fn encode_frame_msg(index: u32, step_ms: f32, pcm48: &[f32], out: &mut Vec<u
 }
 
 /// Server-side ingest of client AUDIO payloads into 24 kHz model frames.
-pub struct Ingest { leftover: Option<f32>, scratch: Vec<f32>, half: Vec<f32>, framer: Framer }
+pub struct Ingest {
+    leftover: Option<f32>,
+    /// 0–3 bytes that did not complete a little-endian f32. Carried to the next read.
+    byte_carry: Vec<u8>,
+    scratch: Vec<f32>,
+    half: Vec<f32>,
+    framer: Framer,
+}
 
 impl Default for Ingest { fn default() -> Self { Self::new() } }
 
 impl Ingest {
-    pub fn new() -> Self { Ingest { leftover: None, scratch: Vec::new(), half: Vec::new(), framer: Framer::new() } }
-    /// Feed raw little-endian f32 bytes (any length that is a multiple of 4).
+    pub fn new() -> Self {
+        Ingest { leftover: None, byte_carry: Vec::new(), scratch: Vec::new(), half: Vec::new(), framer: Framer::new() }
+    }
+    /// Feed raw little-endian f32 bytes. A trailing 1–3 bytes is kept for the next call.
     pub fn feed_bytes(&mut self, payload: &[u8]) {
+        let mut bytes = std::mem::take(&mut self.byte_carry);
+        bytes.extend_from_slice(payload);
+        let n = bytes.len() - bytes.len() % 4;
+        self.byte_carry = bytes[n..].to_vec();
         self.scratch.clear();
         if let Some(l) = self.leftover.take() { self.scratch.push(l); }
-        self.scratch.extend(payload.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])));
+        self.scratch.extend(bytes[..n].chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])));
         let even = self.scratch.len() / 2 * 2;
         if even < self.scratch.len() { self.leftover = Some(self.scratch[even]); }
         downsample_2x_into(&self.scratch[..even], &mut self.half);
