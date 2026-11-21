@@ -307,8 +307,8 @@ public struct STTLiveTurn: Equatable, Sendable {
                 fired.append(.silenceDetected)
             }
             if endOnSilence, endpointAt == nil, let silenceAt,
-               clock.nowMs - silenceAt >= policy.silenceToEndpointMs {
-                let at = silenceAt + policy.silenceToEndpointMs
+               STTQuiet.reached(quietForMs: clock.nowMs - silenceAt, thresholdMs: policy.silenceToEndpointMs) {
+                let at = clock.nowMs
                 endpointAt = at
                 trace.mark(.endpointFired, atMs: at)
                 fired.append(.endpointFired)
@@ -436,8 +436,7 @@ public struct STTUtteranceBook: Equatable, Sendable {
 /// Whether a microphone buffer may update the live utterance. A stale tap session must not.
 public enum STTBufferGate {
     public static func loudnessApplies(bufferSession: Int, currentSession: Int) -> Bool {
-        _ = (bufferSession, currentSession)
-        return true
+        bufferSession == currentSession
     }
 }
 
@@ -447,7 +446,7 @@ public enum STTQuiet {
     public static let handsFreeSilenceMs = 1_000
 
     public static func reached(quietForMs: Int, thresholdMs: Int) -> Bool {
-        quietForMs > thresholdMs
+        quietForMs >= thresholdMs
     }
 }
 

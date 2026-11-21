@@ -126,6 +126,7 @@ final class SpeechInput: @unchecked Sendable {
     private var trace = STTLatencyTrace(path: .talkHold)
     private var traceArmed = false
     private var armedGeneration = 0
+    private var traceCancelled = false
     private var keyDownUptime: TimeInterval?
     private var heardSpeech = false
     private var silenceMarked = false
@@ -351,7 +352,10 @@ final class SpeechInput: @unchecked Sendable {
                 var sum: Float = 0
                 for index in 0..<Int(buffer.frameLength) { sum += samples[index] * samples[index] }
                 let rms = sqrt(sum / Float(buffer.frameLength))
-                self.noteLoudness(rms)
+                let live = self.lock.withLock { self.generation }
+                if STTBufferGate.loudnessApplies(bufferSession: current, currentSession: live) {
+                    self.noteLoudness(rms)
+                }
                 self.onLevel?(Double(min(max((rms - 0.008) * 10.2, 0), 1)))
             }
         }
@@ -656,7 +660,10 @@ final class SpeechInput: @unchecked Sendable {
             if let samples = chunk.floatChannelData?[0], length > 0 {
                 var sum: Float = 0
                 for index in 0..<Int(length) { sum += samples[index] * samples[index] }
-                noteLoudness((sum / Float(length)).squareRoot())
+                let live = lock.withLock { generation }
+                if STTBufferGate.loudnessApplies(bufferSession: owner, currentSession: live) {
+                    noteLoudness((sum / Float(length)).squareRoot())
+                }
             }
             chunksSent += 1
             offset += length
@@ -775,6 +782,7 @@ final class SpeechInput: @unchecked Sendable {
         let taken = lock.withLock { () -> (SFSpeechRecognitionTask?, Capture)? in
             if let only, generation != only { return nil }
             stopRequested = true
+            traceCancelled = true
             defer { task = nil }
             return (task, takeCapture())
         }
@@ -887,6 +895,7 @@ final class SpeechInput: @unchecked Sendable {
         traceArmed = true
         armedGeneration += 1
         generation = armedGeneration
+        traceCancelled = false
         heardSpeech = false
         silenceMarked = false
         lastEmittedPartial = ""
@@ -903,7 +912,7 @@ final class SpeechInput: @unchecked Sendable {
     func noteDelivered(generation: Int) {
         let ms = elapsedMs()
         let snapshot: (STTPath, STTFailure, String)? = lock.withLock {
-            guard STTUtteranceBook.accepts(owner: generation, current: armedGeneration, cancelled: false) else { return nil }
+            guard STTUtteranceBook.accepts(owner: generation, current: armedGeneration, cancelled: traceCancelled) else { return nil }
             if trace.marks[.finalTranscript] == nil {
                 trace.mark(.finalTranscript, atMs: ms)
                 turnFailure = heardSpeech ? .emptyText : .noText
