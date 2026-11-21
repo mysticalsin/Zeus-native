@@ -66,6 +66,19 @@ private struct FakeWorkspace {
 
     // MARK: The press reaches a sink
 
+    @Test func playWhileZeusIsSpeakingIsBlocked() throws {
+        var router = try pausedRouter()
+        #expect(try router.reduce(.speech(true), now: 1).isEmpty)
+        #expect(throws: MediaCommandRejection(.blocked)) {
+            try router.reduce(.press(.play), now: 2)
+        }
+        #expect(router.state == .paused)
+        _ = try router.reduce(.speech(false), now: 3)
+        var sink = MediaCommandSink()
+        sink.take(try router.reduce(.press(.play), now: 4))
+        #expect(sink.commands == [.play])
+    }
+
     @Test func playOnAPausedPlayerReachesTheSink() throws {
         var router = try pausedRouter()
         var sink = MediaCommandSink()
