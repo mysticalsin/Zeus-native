@@ -101,6 +101,7 @@ private struct TilingControls: View {
                     .padding(.horizontal, 10).padding(.vertical, 3)
                     .background(Capsule().fill(Theme.bolt))
                     .accessibilityHint("Opens Settings, Permissions. Zeus never asks from here.")
+                    .accessibilityIdentifier("topbar.tiling-page.open-permissions")
             }
         }
         .accessibilityElement(children: .contain)
@@ -137,6 +138,7 @@ private struct TilingControls: View {
                 .buttonStyle(PressableStyle())
                 .accessibilityLabel(base.label)
                 .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityIdentifier("topbar.tiling-page.checkmark")
             }
         }
     }
@@ -160,6 +162,7 @@ private struct TilingSwitch: View {
         .buttonStyle(PressableStyle())
         .accessibilityLabel("Arrange my windows from the keyboard")
         .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityIdentifier("topbar.tiling-page.arrange-my-windows-from-the-keyboard")
     }
 }
 

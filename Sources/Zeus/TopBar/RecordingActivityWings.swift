@@ -40,6 +40,7 @@ enum RecordingActivityWings {
                     NotchActionButton(title: "Stop", tint: TopBarStyle.rec, action: onStop)
                         .accessibilityLabel(presentation.accessibility.stopLabel)
                         .accessibilityHint(presentation.accessibility.stopHint)
+                        .accessibilityIdentifier("topbar.recording-activity-wings.stop")
                 }
             }
         }

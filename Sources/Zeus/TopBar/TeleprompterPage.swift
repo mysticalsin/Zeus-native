@@ -76,11 +76,15 @@ private struct PrompterSetup: View {
                     Spacer(minLength: 0)
                     HStack(spacing: 6) {
                         NotchActionButton(title: "Edit", tint: Theme.cloudPrimary, filled: false) { topBar.editScript() }
+                            .accessibilityIdentifier("topbar.teleprompter-page.edit")
                         NotchActionButton(title: "Paste", tint: Theme.cloudPrimary, filled: false) { PrompterPaste.run(topBar) }
+                            .accessibilityIdentifier("topbar.teleprompter-page.paste")
                         NotchActionButton(title: "Window", tint: Theme.cloudPrimary, filled: false) { PrompterHub.shared.toggle() }
                             .accessibilityHint("Opens the floating teleprompter under the camera.")
+                            .accessibilityIdentifier("topbar.teleprompter-page.window")
                         NotchActionButton(title: "Slides", tint: Theme.cloudPrimary, filled: false) { PrompterHub.shared.followSlides() }
                             .accessibilityHint("Shows the speaker notes of the Keynote or PowerPoint slide on screen, above the slideshow.")
+                            .accessibilityIdentifier("topbar.teleprompter-page.slides")
                     }
                 }
             }
@@ -108,6 +112,7 @@ private struct PrompterSetup: View {
                     Spacer(minLength: 0)
                     NotchActionButton(title: "Start  3 · 2 · 1", tint: Theme.bolt) { topBar.startPrompter() }
                         .disabled(script.blocks.isEmpty)
+                        .accessibilityIdentifier("topbar.teleprompter-page.start-3-2-1")
                     Text("Hidden from screen sharing while it runs.").font(TopBarStyle.label(9.5)).foregroundStyle(Theme.cloudQuiet)
                 }
             }
@@ -129,6 +134,7 @@ private struct PrompterSetup: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityValue(on ? "On" : "Off")
+        .accessibilityIdentifier("topbar.teleprompter-page.on")
     }
 }
 

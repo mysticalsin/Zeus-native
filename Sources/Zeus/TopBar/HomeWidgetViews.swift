@@ -829,6 +829,7 @@ struct MiniMonth: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open Calendar")
+                .accessibilityIdentifier("topbar.home-widget-views.open-calendar")
             }
             HStack(spacing: 0) {
                 ForEach(Array(initials.enumerated()), id: \.offset) { _, initial in

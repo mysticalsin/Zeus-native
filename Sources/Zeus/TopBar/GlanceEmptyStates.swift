@@ -58,6 +58,7 @@ struct GlanceSplitEmpty: View {
                                 .background(Capsule().fill(.white))
                         }
                         .buttonStyle(PressableStyle())
+                        .accessibilityIdentifier("topbar.glance-empty-states.control.2")
                     }
                     if let secondary {
                         Button(action: secondaryAction) {
@@ -69,6 +70,7 @@ struct GlanceSplitEmpty: View {
                                 .background(Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
                         }
                         .buttonStyle(PressableStyle())
+                        .accessibilityIdentifier("topbar.glance-empty-states.control")
                     }
                 }
                 Spacer(minLength: 0)

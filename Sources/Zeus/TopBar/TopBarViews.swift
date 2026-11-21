@@ -16,8 +16,12 @@ enum TopBarStyle {
     @MainActor static var openSpring: Animation? { Motion.live(MotionTokens.panelOpen) }
     @MainActor static var closeMotion: Animation? { Motion.reducible(Motion.panelClose) }
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
-    static var tabLabel: Font {
-        GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)
+    static var tabLabel: Font { tabLabel(dynamicTypeSize: .large) }
+
+    /// Tab label at a Dynamic Type step. `.large` stays 12.5 pt, the size the row already draws.
+    static func tabLabel(dynamicTypeSize: DynamicTypeSize) -> Font {
+        let size = TopBarDynamicType.points(12.5, dynamicTypeSize: dynamicTypeSize)
+        return GlassFonts.registered ? .custom(GlassFonts.family, size: size).weight(.semibold) : .system(size: size, weight: .semibold)
     }
     @MainActor static var openHeightSpring: Animation? { Motion.live(MotionTokens.panelOpenHeight) }
     @MainActor static var pageSpring: Animation? { Motion.page(reduceMotion: Motion.reduced) }
@@ -92,6 +96,7 @@ struct GlyphButton: View {
         .help(label)
         .accessibilityLabel(label)
         .accessibilityValue(value ?? "")
+        .accessibilityIdentifier("topbar.top-bar-views.control.7")
     }
 }
 
@@ -138,8 +143,8 @@ struct AlbumTile: View {
             }
         }
         .frame(width: size, height: size)
-        .animation(Motion.reduced ? nil : .easeInOut(duration: 0.35), value: art != nil)
-        .animation(Motion.reduced ? nil : .easeInOut(duration: 0.35), value: store.currentKey)
+        .animation(Motion.reduced ? nil : .easeInOut(duration: MotionTokens.topBarArtwork), value: art != nil)
+        .animation(Motion.reduced ? nil : .easeInOut(duration: MotionTokens.topBarArtwork), value: store.currentKey)
     }
 }
 
@@ -199,7 +204,7 @@ struct HUDSegmentBar: View {
                     .frame(width: 3, height: index < filled ? 10 : 6)
             }
         }
-        .animation(Motion.reduced ? nil : .easeOut(duration: 0.08), value: filled)
+        .animation(Motion.reduced ? nil : .easeOut(duration: MotionTokens.pageOutDuration), value: filled)
     }
 }
 
@@ -236,7 +241,7 @@ struct ProgressLine: View {
                 })
         }
         .frame(height: onSeek == nil ? 3 : 16)
-        .animation(Motion.reduced ? nil : .easeOut(duration: 0.12), value: dragging == nil)
+        .animation(Motion.reduced ? nil : .easeOut(duration: MotionTokens.crossfadeDuration), value: dragging == nil)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(onSeek == nil ? "Progress" : "Playback position")
         .accessibilityValue("\(Int(shown * 100)) percent")
@@ -258,6 +263,7 @@ struct TopBarHeader: View {
     let notchWidth: CGFloat
     let height: CGFloat
     @Namespace private var pill
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var reduceMotion: Bool { Motion.reduced }
 
     /// Glance's layout: the menu-bar row stays clear around the notch (Mini ZEUS sits left of it),
@@ -324,15 +330,15 @@ struct TopBarHeader: View {
                     // Glance's geometric label (12.5 pt: its "Home" is 35 pt wide). Appears at once;
                     // the outgoing label blurs out (parity/N9 right column).
                     Text(tab.title)
-                        .font(TopBarStyle.tabLabel)
+                        .font(TopBarStyle.tabLabel(dynamicTypeSize: dynamicTypeSize))
                         .foregroundStyle(Color.white)
                         .lineLimit(1)
                         .fixedSize()
                         .transition(reduceMotion ? .identity : .asymmetric(
-                            insertion: .opacity.animation(.easeOut(duration: 0.05)),
+                            insertion: .opacity.animation(.easeOut(duration: MotionTokens.topBarLabelIn)),
                             removal: .modifier(active: TabLabelBlur(blur: 5, opacity: 0),
                                                identity: TabLabelBlur(blur: 0, opacity: 1))
-                                .animation(.easeOut(duration: 0.18))
+                                .animation(.easeOut(duration: MotionTokens.topBarLabelOut))
                         ))
                 }
                 if let text = TabBadge.text(count(for: tab) ?? 0) {
@@ -353,7 +359,7 @@ struct TopBarHeader: View {
                         .overlay(Capsule().strokeBorder(GlanceTint.pillRim, lineWidth: 1))
                         .matchedGeometryEffect(id: "pill", in: pill, properties: reduceMotion ? [] : .frame)
                         // Pill lags the label by about 3 frames at 60 fps, then springs (~420 ms).
-                        .animation(Motion.page(reduceMotion: reduceMotion)?.delay(0.05), value: topBar.selectedTab)
+                        .animation(Motion.page(reduceMotion: reduceMotion)?.delay(MotionTokens.topBarPillDelay), value: topBar.selectedTab)
                 }
             }
             .contentShape(Capsule())
@@ -680,6 +686,7 @@ struct OutputDeviceMenu: View {
         .buttonStyle(PressableStyle())
         .help("Output device")
         .accessibilityLabel("Choose the output device")
+        .accessibilityIdentifier("topbar.top-bar-views.choose-the-output-device")
     }
 }
 
@@ -733,6 +740,7 @@ private struct QuickAddEventBar: View {
             .buttonStyle(PressableStyle())
             .disabled(topBar.quickAddText.trimmingCharacters(in: .whitespaces).isEmpty)
             .accessibilityLabel("Add event")
+            .accessibilityIdentifier("topbar.top-bar-views.add-event")
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
@@ -766,6 +774,7 @@ private struct CalendarMonthGrid: View {
                         .padding(.horizontal, 7).frame(height: 20).background(Capsule().fill(Color.white.opacity(0.08)))
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("topbar.top-bar-views.today")
                 navButton("chevron.right", "Next month") { topBar.showMonth(offset: 1) }
             }
             HStack(spacing: 0) {
@@ -789,6 +798,7 @@ private struct CalendarMonthGrid: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel(label)
+        .accessibilityIdentifier("topbar.top-bar-views.control.6")
     }
 
     private func dayCell(_ day: Date, month: Int, today: Date, calendar: Calendar) -> some View {
@@ -814,6 +824,7 @@ private struct CalendarMonthGrid: View {
         .buttonStyle(.plain)
         .accessibilityLabel(day.formatted(ZeusDates.style.weekday(.wide).day().month(.wide)))
         .accessibilityAddTraits(picked ? .isSelected : [])
+        .accessibilityIdentifier("topbar.top-bar-views.control.5")
     }
 }
 
@@ -838,6 +849,8 @@ private struct CalendarDayList: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Shows the details.")
+                        .accessibilityLabel(event.title)
+                        .accessibilityIdentifier("topbar.top-bar-views.event-title")
                     }
                 }
             }
@@ -866,8 +879,10 @@ private struct CalendarSidePanel: View {
                 HStack(spacing: 6) {
                     if let url = event.meetingURL {
                         NotchActionButton(title: "Join", tint: Theme.leaf) { topBar.openURL(url) }
+                            .accessibilityIdentifier("topbar.top-bar-views.join.2")
                     }
                     NotchActionButton(title: "Close", tint: Theme.cloudSecondary, filled: false) { topBar.calendarDetailID = nil }
+                        .accessibilityIdentifier("topbar.top-bar-views.close")
                 }
             }
         } else {
@@ -877,6 +892,7 @@ private struct CalendarSidePanel: View {
                 if !remindersAllowed {
                     Text("Allow Reminders to see them here.").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudQuiet)
                     NotchActionButton(title: "Allow Reminders", tint: Theme.bolt) { topBar.openPermissions() }
+                        .accessibilityIdentifier("topbar.top-bar-views.allow-reminders")
                 } else if topBar.openReminders.isEmpty {
                     Text("All done").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudQuiet)
                 }
@@ -921,6 +937,7 @@ private struct EventRow: View {
                     .padding(.horizontal, 10).padding(.vertical, 4)
                     .background(Capsule().fill(Theme.leaf))
                     .accessibilityLabel("Join \(event.title)")
+                    .accessibilityIdentifier("topbar.top-bar-views.join")
             }
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
@@ -1013,6 +1030,7 @@ struct ClipboardPage: View {
                                 .background(Capsule().fill(Color.white.opacity(topBar.clipboardFilter == item ? 0.16 : 0.06)))
                         }
                         .buttonStyle(PressableStyle())
+                        .accessibilityIdentifier("topbar.top-bar-views.control.4")
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "magnifyingglass").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.cloudQuiet)
@@ -1113,7 +1131,10 @@ private struct ClipboardRow: View {
         .accessibilityAction(named: "Remove") { removeEntry() }
         .contextMenu {
             Button(entry.pinned ? "Unpin" : "Pin") { topBar.clipboard.togglePin(entry.id) }
+                .accessibilityLabel(entry.pinned ? "Unpin" : "Pin")
+                .accessibilityIdentifier("topbar.top-bar-views.unpin")
             Button("Remove", role: .destructive) { removeEntry() }
+                .accessibilityIdentifier("topbar.top-bar-views.remove.2")
         }
     }
 
@@ -1267,11 +1288,14 @@ struct FocusPage: View {
                     HStack(spacing: 8) {
                         if timer.phase == .idle {
                             NotchActionButton(title: "Start focus", tint: TopBarStyle.violet) { topBar.focus.start() }
+                                .accessibilityIdentifier("topbar.top-bar-views.start-focus")
                         } else {
                             NotchActionButton(title: timer.isPaused ? "Resume" : "Pause", tint: TopBarStyle.violet) {
                                 timer.isPaused ? topBar.focus.resume() : topBar.focus.pause()
                             }
+                                .accessibilityIdentifier("topbar.top-bar-views.resume")
                             NotchActionButton(title: "Stop", tint: Theme.cloudSecondary, filled: false) { topBar.focus.stop() }
+                                .accessibilityIdentifier("topbar.top-bar-views.stop")
                         }
                     }
                 }
@@ -1288,6 +1312,7 @@ struct FocusPage: View {
                 .background(Capsule().fill(selected ? TopBarStyle.violet : Color.white.opacity(0.08)))
         }
         .buttonStyle(PressableStyle())
+        .accessibilityIdentifier("topbar.top-bar-views.control.3")
     }
 }
 
@@ -1316,6 +1341,8 @@ struct DictationPage: View {
                         Label("Transcribe a file…", systemImage: "doc.text.magnifyingglass").font(TopBarStyle.label(11, .semibold))
                     }
                     .buttonStyle(PressableStyle()).foregroundStyle(Theme.sky)
+                    .accessibilityLabel("Transcribe a file…")
+                    .accessibilityIdentifier("topbar.top-bar-views.transcribe-a-file")
                 }
             }
             .frame(width: 360)
@@ -1394,6 +1421,8 @@ private struct FlowChips: View {
                         }
                         .buttonStyle(PressableStyle())
                         .help(mode.usesAI ? "Rewrites with your Claude plan" : "Plain voice to text, fully on your Mac")
+                        .accessibilityLabel(mode.name)
+                        .accessibilityIdentifier("topbar.top-bar-views.rewrites-with-your-claude-plan")
                     }
                 }
             }
@@ -1414,7 +1443,8 @@ struct AccessPrompt: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).font(TopBarStyle.label(14, .bold)).foregroundStyle(Theme.cloudPrimary)
                 Text(detail).font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary).fixedSize(horizontal: false, vertical: true)
-                if let button { NotchActionButton(title: button, tint: Theme.bolt, action: action) }
+                if let button { NotchActionButton(title: button, tint: Theme.bolt, action: action)
+                    .accessibilityIdentifier("topbar.top-bar-views.control.2") }
             }
             Spacer()
         }
@@ -1442,6 +1472,7 @@ struct NotchActionButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityIdentifier("topbar.top-bar-views.control")
     }
 }
 
@@ -1451,6 +1482,8 @@ struct NotchActionButton: View {
 /// dictation, a focus countdown or the track that's playing (in that order of importance).
 struct ClosedWings: View {
     let topBar: TopBarModel
+    /// Reads `accessibilityReduceMotion`. The setting is never written.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The width between the wings: the footprint's wing base, so the gap is exactly the notch.
     var notchGap: CGFloat = NotchClosedBodyLayout.noNotchGap
 
@@ -1541,7 +1574,7 @@ struct ClosedWings: View {
                 if state != .idle {
                     Text(state.short).font(TopBarStyle.label(10.5, .semibold)).foregroundStyle(.white.opacity(0.88))
                         .lineLimit(1).contentTransition(.opacity)
-                        .animation(.easeInOut(duration: 0.2), value: state)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: MotionTokens.windowFadeInDuration), value: state)
                 }
             }
         case .focus:
@@ -1672,6 +1705,7 @@ struct ClosedWings: View {
                 }
                 .buttonStyle(.plain).font(TopBarStyle.label(10.5, .bold)).foregroundStyle(Theme.bolt)
                 .accessibilityLabel("Open System Settings")
+                .accessibilityIdentifier("topbar.top-bar-views.open-system-settings")
             }.frame(width: 250, alignment: .trailing)
         case .trackChanged(let title, let artist, let source, let sourceChanged):
             Text(NowPlayingDisplay.cueText(title: title, artist: artist, source: source, sourceChanged: sourceChanged)).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary)
@@ -1740,7 +1774,7 @@ enum ScribeWings {
                 }
             }
             .frame(height: 18)
-            .animation(reduceMotion ? nil : .linear(duration: 0.06), value: levels)
+            .animation(reduceMotion ? nil : .linear(duration: MotionTokens.topBarWingLevel), value: levels)
             .accessibilityHidden(true)
         }
     }
@@ -1763,6 +1797,7 @@ enum ScribeWings {
             .accessibilityValue(RecordingMotion.spokenElapsed(scribe.elapsed) ?? "Elapsed time unavailable")
             .accessibilityHint("Opens Scribe, where you can end the meeting.")
             .accessibilityAction { topBar.onOpenTab(.scribe) }
+            .accessibilityIdentifier("topbar.top-bar-views.scribe-recording")
         }
 
         /// The clock for the words' pacing runs only while this wing is on screen (that is, while recording).
@@ -1866,7 +1901,7 @@ struct DictationWave: View {
             }
         }
         .frame(height: 18)
-        .animation(Motion.reduced ? nil : .linear(duration: 0.08), value: levels)
+        .animation(Motion.reduced ? nil : .linear(duration: MotionTokens.pageOutDuration), value: levels)
     }
 }
 
@@ -2057,6 +2092,7 @@ struct TabEditorRow: View {
                 .buttonStyle(.plain)
                 .offset(x: 4, y: -3)
                 .accessibilityLabel("Remove \(tab.title)")
+                .accessibilityIdentifier("topbar.top-bar-views.remove")
             }
         }
         .help(isHome ? "Home stays first" : "\(tab.title): drag to reorder")
@@ -2086,6 +2122,7 @@ struct TabEditorRow: View {
         .help("Add a tab")
         .accessibilityLabel("Add a tab")
         .opacity(topBar.layout.removedTabs.isEmpty ? 0.35 : 1)
+        .accessibilityIdentifier("topbar.top-bar-views.add-a-tab")
     }
 }
 
