@@ -30,11 +30,7 @@ class StreamChartTests(unittest.TestCase):
             width = float(rects[0].get("width"))
             self.assertEqual(width, px(summary[impl]["stream_frame_p50_ms"], scale), impl)
             self.assertGreater(width, 0, impl)
-        for impl in FILLS:
-            lines = [
-                el for el in root.iterfind(".//svg:line", NS)
-                if el.get("stroke") == "#1c1917"
-            ]
+        lines = [el for el in root.iterfind(".//svg:line", NS) if el.get("stroke") == "#1c1917"]
         self.assertEqual(len(lines), 3)
         ticks = sorted(float(el.get("x1")) for el in lines)
         expect = [
