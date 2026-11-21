@@ -194,7 +194,9 @@ final class CLIEngineProvider: BrainProvider, @unchecked Sendable {
             do {
                 try process.run()
                 lock.withLock { running[request.turn] = process }
-                StdinFeeder.feed(Data(Self.prompt(for: request).utf8), to: stdin.fileHandleForWriting)
+                StdinFeeder.feed(Data(Self.prompt(for: request).utf8), to: stdin.fileHandleForWriting) { problem in
+                    continuation.finish(throwing: ClaudeCLIProvider.ProviderError.failed("The prompt could not be sent: \(problem)"))
+                }
             } catch {
                 continuation.finish(throwing: error)
             }
