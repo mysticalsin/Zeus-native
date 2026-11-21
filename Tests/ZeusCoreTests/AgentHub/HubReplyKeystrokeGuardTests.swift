@@ -21,7 +21,7 @@ struct HubReplyKeystrokeGuardTests {
         #expect(rows.contains("keystroke \"\(line)\""))
         #expect(!rows.contains("keystroke return"))
         #expect(HubReplyScriptGuard.mayRun(script: script, line: line, approved: true))
-        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let submit = try #require(AgentReply.submitScript(for: terminal, verified: true))
         #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: true))
         #expect(HubReplyScriptGuard.maySubmit(script: submit, approved: false) == false)
         let glued = script + "\nkeystroke return\n"
@@ -52,7 +52,7 @@ struct HubReplyKeystrokeGuardTests {
     @Test func onlyTheStrippedLineAndReturnAreTyped() throws {
         let line = "hi $(id)"
         let script = try #require(AgentReply.script(for: terminal, text: line))
-        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let submit = try #require(AgentReply.submitScript(for: terminal, verified: true))
         let extra = script + "\nkeystroke \"rm\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: extra, line: line, approved: true) == false)
         let extraReturn = submit + "\nkeystroke \"rm\"\n"
@@ -142,7 +142,7 @@ struct HubReplyKeystrokeGuardTests {
         #expect(!script.contains("last item"))
         #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
         #expect(!before.contains("keystroke"))
-        let submit = try #require(AgentReply.submitScript(for: terminal))
+        let submit = try #require(AgentReply.submitScript(for: terminal, verified: true))
         let returnKey = try #require(submit.range(of: "keystroke return"))
         let again = String(submit[..<returnKey.lowerBound])
         #expect(again.contains("frontmost"))
