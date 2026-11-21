@@ -36,9 +36,9 @@ enum AgentHookInstaller {
     static func install(_ agent: AgentHookConfig.Agent) throws {
         // Read first: a file that doesn't parse stops here, before anything is written.
         let config = try read(agent)
-        try ClaudeHookInstaller.refreshHelper()
+        let helper = try ClaudeHookInstaller.referencedHookPath()
         try backup(agent)
-        try write(AgentHookConfig.install(into: config, agent: agent, helper: ClaudeHookInstaller.installedHook.path), to: agent)
+        try write(AgentHookConfig.install(into: config, agent: agent, helper: helper), to: agent)
     }
 
     static func uninstall(_ agent: AgentHookConfig.Agent) throws {

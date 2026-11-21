@@ -7,10 +7,12 @@ import ZeusCore
 enum ClaudeHookInstaller {
     enum InstallError: LocalizedError {
         case unreadableSettings(String)
+        case helperRefused(String)
 
         var errorDescription: String? {
             switch self {
             case .unreadableSettings(let reason): "Could not read ~/.claude/settings.json: \(reason)"
+            case .helperRefused(let sentence): sentence
             }
         }
     }
@@ -24,17 +26,32 @@ enum ClaudeHookInstaller {
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
     }
 
-    /// A stable copy outside the app bundle, so rebuilding or moving ZEUS never breaks Claude Code.
-    static var installedHook: URL {
-        ZeusPaths.binDirectory.appendingPathComponent("zeus-hook")
+    /// The helper inside the signed app bundle. Hook configs name this path, which is the path
+    /// the signature check reads. A copy under Application Support is not referenced.
+    static var bundledHook: URL {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus-hook")
     }
 
-    static let marker = "Zeus/bin/zeus-hook"
+    static let marker = "zeus-hook"
 
-    /// Guarded so Claude Code is unaffected if ZEUS is ever deleted.
-    static var command: String {
-        let path = "$HOME/Library/Application Support/Zeus/bin/zeus-hook"
-        return "/bin/sh -c '[ -x \"\(path)\" ] && \"\(path)\" --source claude-code || true'"
+    /// Guarded so the agent is unaffected if ZEUS is ever deleted. Nil when `hookPath` is not
+    /// the checked bundle helper, or when it could break out of the shell quotes.
+    static func command(hookPath: String) -> String? {
+        guard BundledHelperLaunchPolicy.executableToPublish(checkedPath: hookPath, helperName: "zeus-hook") == hookPath else { return nil }
+        guard hookPath.rangeOfCharacter(from: CharacterSet(charactersIn: "\"'`$\\\n")) == nil else { return nil }
+        return "/bin/sh -c '[ -x \"\(hookPath)\" ] && \"\(hookPath)\" --source claude-code || true'"
+    }
+
+    /// Signature-checks the bundle helper and returns that same path. A failure refuses.
+    static func referencedHookPath() throws -> String {
+        let path = bundledHook.path
+        let decision = BundledHelperLaunch.decide(path: path, signingIdentifier: "zeus-hook")
+        guard let published = BundledHelperLaunchPolicy.publishedExecutable(checkedPath: path, helperName: "zeus-hook", decision: decision),
+              published == path, command(hookPath: published) != nil else {
+            BundledHelperLaunchLog.refused(path: path)
+            throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
+        }
+        return published
     }
 
     /// (event, matcher, waits for a decision)
@@ -48,9 +65,19 @@ enum ClaudeHookInstaller {
         ("SessionEnd", "", false),
     ]
 
-    /// Copies the bundled helper to its stable location. Safe to call on every launch.
+    /// Re-checks the bundle helper. When an installed config still names another path, rewrites
+    /// Zeus's entries to the checked path. A failed check removes those entries.
     static func refreshHelper() throws {
-        try HelperInstaller.refresh("zeus-hook")
+        let path: String
+        do {
+            path = try referencedHookPath()
+        } catch {
+            if isInstalled() { try? uninstall() }
+            throw error
+        }
+        guard isInstalled() else { return }
+        let text = (try? String(contentsOf: settingsURL, encoding: .utf8)) ?? ""
+        if !text.contains(path) { _ = try install() }
     }
 
     static func isInstalled() -> Bool {
@@ -61,7 +88,10 @@ enum ClaudeHookInstaller {
     /// Returns the backup's location.
     @discardableResult
     static func install() throws -> URL? {
-        try refreshHelper()
+        let path = try referencedHookPath()
+        guard let command = command(hookPath: path) else {
+            throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
+        }
         var settings = try readSettings()
         var hooks = (settings["hooks"] as? [String: Any]) ?? [:]
         hooks = removingZeusEntries(from: hooks)

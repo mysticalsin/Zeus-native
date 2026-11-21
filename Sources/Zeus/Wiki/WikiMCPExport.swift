@@ -189,14 +189,14 @@ final class WikiMCPExportModel: Identifiable {
         guard let url, FileManager.default.isExecutableFile(atPath: url.path) else {
             throw WikiExportError.destination("The bundled Memory export helper is missing. Rebuild or update Zeus before exporting.")
         }
-        switch BundledHelperLaunch.decide(path: url.path, signingIdentifier: BundledHelperLaunchPolicy.signingIdentifier(forExecutablePath: url.path)) {
-        case .launch:
-            break
-        case .refuse(let sentence):
+        let identifier = BundledHelperLaunchPolicy.signingIdentifier(forExecutablePath: url.path)
+        let decision = BundledHelperLaunch.decide(path: url.path, signingIdentifier: identifier)
+        guard let published = BundledHelperLaunchPolicy.publishedExecutable(checkedPath: url.path, helperName: identifier, decision: decision),
+              published == url.path else {
             BundledHelperLaunchLog.refused(path: url.path)
-            throw WikiExportError.destination(sentence)
+            throw WikiExportError.destination(BundledHelperLaunchPolicy.refusalSentence)
         }
-        return MCPStdioClient(launch: .init(executable: url.path,
+        return MCPStdioClient(launch: .init(executable: published,
             arguments: ["memory-mcp", "--vault", destination.rootPath, "--inbox", destination.inbox, "--identity", destination.rootIdentity],
             environment: ["LANG": "en_US.UTF-8"], currentDirectory: nil))
     }

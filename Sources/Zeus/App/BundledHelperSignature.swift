@@ -24,10 +24,32 @@ struct SecBundledHelperSignature: BundledHelperSignatureChecking {
         var requirement: SecRequirement?
         guard SecRequirementCreateWithString(text as CFString, SecCSFlags(), &requirement) == errSecSuccess,
               let requirement else { return false }
-        guard SecStaticCodeCheckValidity(staticCode, SecCSFlags(), requirement) == errSecSuccess else { return false }
+        guard let flags = Self.validityFlags() else { return false }
+        guard SecStaticCodeCheckValidity(staticCode, flags, requirement) == errSecSuccess else { return false }
         guard Self.fact(staticCode, key: kSecCodeInfoTeamIdentifier) == teamIdentifier else { return false }
         guard Self.fact(staticCode, key: kSecCodeInfoIdentifier) == signingIdentifier else { return false }
         return true
+    }
+
+    /// Strict, nested, and every architecture. A missing or extra flag name fails closed.
+    /// Revocation stays off: see `BundledHelperLaunchPolicy.omittedValidityFlags`.
+    private static func validityFlags() -> SecCSFlags? {
+        var mask: UInt32 = 0
+        var seen = 0
+        for name in BundledHelperLaunchPolicy.requiredValidityFlags {
+            let bit: UInt32
+            switch name {
+            case "kSecCSStrictValidate": bit = UInt32(kSecCSStrictValidate)
+            case "kSecCSCheckNestedCode": bit = UInt32(kSecCSCheckNestedCode)
+            case "kSecCSCheckAllArchitectures": bit = UInt32(kSecCSCheckAllArchitectures)
+            default: return nil
+            }
+            guard bit != 0 else { return nil }
+            mask |= bit
+            seen += 1
+        }
+        guard seen == BundledHelperLaunchPolicy.requiredValidityFlags.count, mask != 0 else { return nil }
+        return SecCSFlags(rawValue: mask)
     }
 
     private static func fact(_ code: SecStaticCode, key: CFString) -> String? {

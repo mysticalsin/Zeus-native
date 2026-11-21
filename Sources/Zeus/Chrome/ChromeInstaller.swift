@@ -17,32 +17,52 @@ enum ChromeInstaller {
         }
     }
 
-    static var installedBridge: URL { ZeusPaths.binDirectory.appendingPathComponent("zeus-bridge") }
+    /// The helper inside the signed app bundle. The native-messaging manifest names this path,
+    /// the same path the signature check reads. A copy under Application Support is not used.
+    static var bridgeExecutable: URL {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus-bridge")
+    }
     static var bundledExtension: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/ChromeExtension") }
 
-    static func isInstalled() -> Bool {
-        guard let data = try? Data(contentsOf: ZeusPaths.chromeNativeHostManifest),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        return object["path"] as? String == installedBridge.path
+    static func hasManifest() -> Bool {
+        FileManager.default.fileExists(atPath: ZeusPaths.chromeNativeHostManifest.path)
     }
 
-    /// Refuses to leave `zeus-bridge` installed unless its signature pins this app's team and the
-    /// bridge signing identifier. On failure the installed copy and the Chrome host registration
-    /// are removed, so Chrome is not left a path to launch.
+    static func manifestExecutable() -> String? {
+        guard let data = try? Data(contentsOf: ZeusPaths.chromeNativeHostManifest),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return object["path"] as? String
+    }
+
+    static func isInstalled() -> Bool {
+        manifestExecutable() == bridgeExecutable.path
+    }
+
+    /// Refuses to leave the bridge registered unless its signature pins this app's team and the
+    /// bridge signing identifier. The manifest is pointed at that same bundle path. On failure
+    /// the host registration is removed, so the browser is not left a path to launch.
     static func authorizeInstalledBridge() -> Result<Void, InstallError> {
-        switch BundledHelperLaunch.decide(path: installedBridge.path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier) {
-        case .launch:
-            return .success(())
-        case .refuse(let sentence):
-            BundledHelperLaunchLog.refused(path: installedBridge.path)
-            try? FileManager.default.removeItem(at: installedBridge)
+        let path = bridgeExecutable.path
+        let decision = BundledHelperLaunch.decide(path: path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier)
+        guard let published = BundledHelperLaunchPolicy.publishedExecutable(
+            checkedPath: path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier, decision: decision),
+              published == path else {
+            BundledHelperLaunchLog.refused(path: path)
+            removeSupportCopy()
             try? uninstall()
-            return .failure(.helperRefused(sentence))
+            return .failure(.helperRefused(BundledHelperLaunchPolicy.refusalSentence))
         }
+        removeSupportCopy()
+        if hasManifest(), manifestExecutable() != published {
+            do { try writeManifest(path: published) } catch {
+                try? uninstall()
+                return .failure(.helperRefused(BundledHelperLaunchPolicy.refusalSentence))
+            }
+        }
+        return .success(())
     }
 
     static func install() throws {
-        try HelperInstaller.refresh("zeus-bridge")
         switch authorizeInstalledBridge() {
         case .success:
             break
@@ -50,11 +70,18 @@ enum ChromeInstaller {
             throw error
         }
         try refreshExtension()
+        let path = bridgeExecutable.path
+        guard BundledHelperLaunchPolicy.executableToPublish(checkedPath: path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier) == path else {
+            throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
+        }
+        try writeManifest(path: path)
+    }
 
+    private static func writeManifest(path: String) throws {
         let manifest: [String: Any] = [
             "name": ZeusPaths.nativeHostName,
             "description": "Zeus browser bridge",
-            "path": installedBridge.path,
+            "path": path,
             "type": "stdio",
             "allowed_origins": ["chrome-extension://\(ZeusPaths.extensionID)/"],
         ]
@@ -62,6 +89,14 @@ enum ChromeInstaller {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try data.write(to: url, options: .atomic)
+    }
+
+    /// Drops a support-directory copy so a stale manifest cannot be the thing the browser runs.
+    private static func removeSupportCopy() {
+        let copy = ZeusPaths.binDirectory.appendingPathComponent(BundledHelperLaunchPolicy.bridgeSigningIdentifier)
+        if FileManager.default.fileExists(atPath: copy.path) {
+            try? FileManager.default.removeItem(at: copy)
+        }
     }
 
     static func uninstall() throws {
@@ -107,21 +142,30 @@ enum ChromeInstaller {
     }
 }
 
-/// Copies a helper from Contents/Helpers to ~/Library/Application Support/Zeus/bin, so
-/// rebuilding or moving ZEUS never breaks Claude Code or Chrome.
+/// Copies a helper out of Contents/Helpers only after the same signature gate the launch
+/// sites use. Native-messaging hosts and hook configs are not pointed at the copy.
 enum HelperInstaller {
     enum HelperError: LocalizedError {
         case missing(String)
+        case refused(String)
         var errorDescription: String? {
             switch self {
             case .missing(let path): "\((path as NSString).lastPathComponent) was not found at \(path). Run Zeus from its app bundle."
+            case .refused(let sentence): sentence
             }
         }
     }
 
     static func refresh(_ name: String) throws {
         let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/\(name)")
-        guard FileManager.default.isExecutableFile(atPath: bundled.path) else { throw HelperError.missing(bundled.path) }
+        let identifier = BundledHelperLaunchPolicy.signingIdentifier(forExecutablePath: bundled.path)
+        let decision = BundledHelperLaunch.decide(path: bundled.path, signingIdentifier: identifier)
+        guard let published = BundledHelperLaunchPolicy.publishedExecutable(checkedPath: bundled.path, helperName: identifier, decision: decision),
+              published == bundled.path else {
+            BundledHelperLaunchLog.refused(path: bundled.path)
+            throw HelperError.refused(BundledHelperLaunchPolicy.refusalSentence)
+        }
+        guard FileManager.default.isExecutableFile(atPath: published) else { throw HelperError.missing(published) }
         let directory = ZeusPaths.binDirectory
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let installed = directory.appendingPathComponent(name)

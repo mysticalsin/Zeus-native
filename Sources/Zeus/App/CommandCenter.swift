@@ -597,8 +597,14 @@ final class CommandCenter {
 enum CLIInstaller {
     static func install() {
         let source = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus")
+        let decision = BundledHelperLaunch.decide(path: source.path, signingIdentifier: "zeus")
+        guard let published = BundledHelperLaunchPolicy.publishedExecutable(checkedPath: source.path, helperName: "zeus", decision: decision),
+              published == source.path else {
+            BundledHelperLaunchLog.refused(path: source.path)
+            return
+        }
         let files = FileManager.default
-        guard files.isExecutableFile(atPath: source.path) else { return }
+        guard files.isExecutableFile(atPath: published) else { return }
         let target = ZeusPaths.binDirectory.appendingPathComponent("zeus")
         try? files.createDirectory(at: ZeusPaths.binDirectory, withIntermediateDirectories: true)
         if files.contentsEqual(atPath: source.path, andPath: target.path) { return }

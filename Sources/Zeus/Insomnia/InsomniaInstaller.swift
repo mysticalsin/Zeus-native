@@ -68,13 +68,20 @@ struct InsomniaInstaller: Sendable {
         self.authorizeHelper = authorizeHelper
     }
 
-    /// The `zeus` CLI copy in Zeus's bin folder, else the one in the bundle, else next to this binary (dev).
+    /// The `zeus` CLI inside the app bundle, else the unpackaged `zeus-cli` beside this binary.
+    /// A copy under Application Support is not handed to the launch agent.
     static func defaultCLIPath() -> String {
-        let installed = ZeusPaths.binDirectory.appendingPathComponent("zeus").path
-        if FileManager.default.isExecutableFile(atPath: installed) { return installed }
         let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus").path
-        if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
-        return Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("zeus-cli").path ?? installed
+        if FileManager.default.isExecutableFile(atPath: bundled),
+           BundledHelperLaunchPolicy.executableToPublish(checkedPath: bundled, helperName: "zeus") == bundled {
+            return bundled
+        }
+        let development = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("zeus-cli").path
+        if let development, FileManager.default.isExecutableFile(atPath: development),
+           BundledHelperLaunchPolicy.executableToPublish(checkedPath: development, helperName: "zeus-cli") == development {
+            return development
+        }
+        return bundled
     }
 
     var plistURL: URL { InsomniaBackstop.plistURL(home: home) }

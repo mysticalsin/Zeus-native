@@ -29,6 +29,51 @@ import Testing
         #expect(policy.contains("not offline-safe"))
     }
 
+    @Test func requiredValidityFlagsAreTheThreeOfflineSafeChecks() {
+        #expect(BundledHelperLaunchPolicy.requiredValidityFlags == [
+            "kSecCSStrictValidate",
+            "kSecCSCheckNestedCode",
+            "kSecCSCheckAllArchitectures",
+        ])
+        #expect(BundledHelperLaunchPolicy.omittedValidityFlags == ["kSecCSEnforceRevocationChecks"])
+        #expect(Set(BundledHelperLaunchPolicy.requiredValidityFlags)
+            .isDisjoint(with: Set(BundledHelperLaunchPolicy.omittedValidityFlags)))
+    }
+
+    @Test func aSupportDirectoryCopyIsNotThePublishedExecutable() {
+        let bridge = "/Users/tony/Library/Application Support/Zeus/bin/zeus-bridge"
+        let hook = "$HOME/Library/Application Support/Zeus/bin/zeus-hook"
+        #expect(BundledHelperLaunchPolicy.isUserWritableHelperCopy(bridge))
+        #expect(BundledHelperLaunchPolicy.isUserWritableHelperCopy(hook))
+        #expect(BundledHelperLaunchPolicy.isUserWritableHelperCopy("~/Library/Application Support/Zeus/bin/zeus"))
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: bridge, helperName: "zeus-bridge") == nil)
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: hook, helperName: "zeus-hook") == nil)
+        #expect(BundledHelperLaunchPolicy.isUserWritableHelperCopy("/usr/bin/pmset") == false)
+
+        let bundledBridge = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        let bundledHook = "/Applications/Zeus.app/Contents/Helpers/zeus-hook"
+        let bundledCLI = "/Applications/Zeus.app/Contents/Helpers/zeus"
+        let development = "/src/.build/debug/zeus-cli"
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: bundledBridge, helperName: "zeus-bridge") == bundledBridge)
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: bundledHook, helperName: "zeus-hook") == bundledHook)
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: bundledCLI, helperName: "zeus") == bundledCLI)
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: development, helperName: "zeus-cli") == development)
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: bundledBridge, helperName: "zeus-hook") == nil)
+        #expect(BundledHelperLaunchPolicy.executableToPublish(checkedPath: bundledBridge + "/extra", helperName: "zeus-bridge") == nil)
+    }
+
+    @Test func aRefusalPublishesNoExecutable() {
+        let bundledBridge = "/Applications/Zeus.app/Contents/Helpers/zeus-bridge"
+        #expect(BundledHelperLaunchPolicy.publishedExecutable(
+            checkedPath: bundledBridge, helperName: "zeus-bridge", decision: .launch) == bundledBridge)
+        #expect(BundledHelperLaunchPolicy.publishedExecutable(
+            checkedPath: bundledBridge, helperName: "zeus-bridge",
+            decision: .refuse(BundledHelperLaunchPolicy.refusalSentence)) == nil)
+        let support = "/Users/tony/Library/Application Support/Zeus/bin/zeus-bridge"
+        #expect(BundledHelperLaunchPolicy.publishedExecutable(
+            checkedPath: support, helperName: "zeus-bridge", decision: .launch) == nil)
+    }
+
     @Test func insomniaRootCommandsRunSystemPmset() {
         #expect(InsomniaSudoers.commands == [
             "/usr/bin/pmset -a disablesleep 1",
