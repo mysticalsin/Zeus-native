@@ -36,10 +36,11 @@ index and `NSWorkspace`’s running applications. It does not scan the disk on t
 transcript path, and it does not know whether a document is dirty, so it passes
 `nil`. Quit therefore asks on a real Mac.
 
-The spoken catalog is not every installed app. A row is kept only when its path
-is `/Applications` or the user's Applications folder (`~/Applications`), or a
-path inside one of those two roots. The path must equal the root or continue
-with `/`. These are left out:
+The spoken catalog is not every installed app. A row is kept only when its path,
+after `.` and `..` are resolved, is `/Applications`, `/System/Applications`, or
+the user's Applications folder (`~/Applications`), or a path inside one of those
+roots. The path must equal the root or continue with `/`. `/System/Applications`
+stays so a name such as Terminal resolves to the system copy. These are left out:
 
 - `/System/Applications` and anything under it
 - `/System/Library/CoreServices`

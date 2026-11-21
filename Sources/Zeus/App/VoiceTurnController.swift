@@ -467,13 +467,7 @@ final class VoiceTurnController {
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
         // A quit question asked on the previous turn dies here if this turn did not confirm it.
         // A question asked during this turn is armed for the turn after it.
-        defer {
-            if localCommands.quitExpiresAtEndOfNextTurn {
-                localCommands.endTurn()
-            } else if localCommands.isConfirmingQuit {
-                localCommands.armQuitExpiryAtEndOfNextTurn()
-            }
-        }
+        defer { localCommands.finishTurn() }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
         guard !transcript.isEmpty else {
             VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")

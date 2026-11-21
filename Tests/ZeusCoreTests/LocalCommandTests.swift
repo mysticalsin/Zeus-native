@@ -357,7 +357,7 @@ import Testing
     }
 
     /// The pending quit lasts 10 seconds, or until the next turn ends, whichever comes first.
-    @Test func quitConfirmationExpiresAtTenSecondsOrTheNextTurn() throws {
+    @Test func quitConfirmationExpiresAtTenSecondsOrTheNextTurn() {
         let unsaved = Self.harbor.withUnsaved(nil)
         let askedAt = Self.origin.advanced(by: .milliseconds(6))
 
@@ -387,11 +387,15 @@ import Testing
         _ = ended.complete("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
         let afterTurn = askedAt.advanced(by: .seconds(2))
         _ = ended.complete("", finalAt: afterTurn, clock: Self.clock(at: afterTurn), apps: [unsaved])
-        let ignored = try #require(ended.complete("yes", finalAt: afterTurn.advanced(by: .milliseconds(-4)),
-                                                   clock: Self.clock(at: afterTurn), apps: [unsaved]))
-        #expect(Self.performed(ignored) == nil)
-        #expect(ignored.effects == [.fallThrough])
+        let ignored = ended.complete("yes", finalAt: afterTurn.advanced(by: .milliseconds(-4)),
+                                      clock: Self.clock(at: afterTurn), apps: [unsaved])
+        #expect(Self.performed(ignored!) == nil)
+        #expect(ignored?.effects == [.fallThrough])
         #expect(ended.machine.state == .idle)
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let controller = (try? String(contentsOf: root.appendingPathComponent("Sources/Zeus/App/VoiceTurnController.swift"), encoding: .utf8)) ?? ""
+        #expect(controller.contains("localCommands.finishTurn()"))
     }
 
     /// "ok" is not a confirmation in any case. "Okay" is, in any case.
@@ -402,13 +406,13 @@ import Testing
             var turn = LocalCommandTurn()
             _ = turn.complete("quit harbor", finalAt: Self.origin, clock: clock, apps: [unsaved])
             let reply = turn.complete(phrase, finalAt: Self.origin, clock: clock, apps: [unsaved])
-            #expect(Self.performed(reply!) == nil, phrase)
+            #expect(Self.performed(reply!) == nil, "\(phrase) must not quit")
         }
         for phrase in ["okay", "Okay", "OKAY"] {
             var turn = LocalCommandTurn()
             _ = turn.complete("quit harbor", finalAt: Self.origin, clock: clock, apps: [unsaved])
             let reply = turn.complete(phrase, finalAt: Self.origin, clock: clock, apps: [unsaved])
-            #expect(Self.performed(reply!) == .quit(unsaved), phrase)
+            #expect(Self.performed(reply!) == .quit(unsaved), "\(phrase) must quit")
         }
     }
 

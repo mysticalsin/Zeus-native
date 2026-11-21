@@ -1,5 +1,14 @@
 import Foundation
 
+/// How a local quit is delivered. The save dialog needs the Quit Apple event, not `terminate()`.
+public enum LocalQuitAction: Equatable, Sendable {
+    case appleEvent(interact: Bool, waitForReply: Bool)
+}
+
+public enum LocalQuit {
+    public static let action = LocalQuitAction.appleEvent(interact: true, waitForReply: false)
+}
+
 /// One installed app, supplied by the caller. The machine never looks a name up itself.
 public struct LocalApp: Equatable, Sendable {
     public var name: String
@@ -76,7 +85,25 @@ public enum LocalAppCatalog {
     /// A path that only shares a prefix with those roots is left out.
     public static func included(_ path: String, home: String) -> Bool {
         guard !path.isEmpty, !home.isEmpty else { return false }
-        return inside(path, root: "/Applications") || inside(path, root: userApplications(home))
+        return inside(path, root: "/Applications")
+            || inside(path, root: "/System/Applications")
+            || inside(path, root: userApplications(home))
+    }
+
+    /// Lexical `..` and `.` are resolved before a root check, so a prefix cannot climb out.
+    public static func standardized(_ path: String) -> String {
+        let absolute = path.hasPrefix("/")
+        var parts: [String] = []
+        for part in path.split(separator: "/", omittingEmptySubsequences: true) {
+            if part == "." { continue }
+            if part == ".." {
+                if !parts.isEmpty { parts.removeLast() }
+                continue
+            }
+            parts.append(String(part))
+        }
+        let joined = parts.joined(separator: "/")
+        return absolute ? "/" + joined : joined
     }
 
     public static func userApplications(_ home: String) -> String {
@@ -85,7 +112,9 @@ public enum LocalAppCatalog {
     }
 
     private static func inside(_ path: String, root: String) -> Bool {
-        let root = root.hasSuffix("/") ? String(root.dropLast()) : root
+        let path = standardized(path)
+        var root = standardized(root)
+        if root.hasSuffix("/") { root = String(root.dropLast()) }
         return path == root || path.hasPrefix(root + "/")
     }
 }
@@ -129,6 +158,16 @@ public struct LocalCommandMachine: Equatable, Sendable {
     /// The question was asked on this turn. The next turn's `endTurn` drops it if it is still waiting.
     public mutating func armQuitExpiryAtEndOfNextTurn() {
         quitExpiresAtEndOfNextTurn = isConfirmingQuit
+    }
+
+    /// What a finished voice turn does. The controller calls this from the end of the turn.
+    /// A question asked on this turn is armed. A question armed on the previous turn is dropped.
+    public mutating func finishTurn() {
+        if quitExpiresAtEndOfNextTurn {
+            endTurn()
+        } else if isConfirmingQuit {
+            armQuitExpiryAtEndOfNextTurn()
+        }
     }
 
     public mutating func receive(_ transcript: String, finalAt: ContinuousClock.Instant,
@@ -353,5 +392,21 @@ public struct LocalCommandMachine: Equatable, Sendable {
         let components = (now - finalAt).components
         let milliseconds = components.seconds * 1000 + components.attoseconds / 1_000_000_000_000_000
         return Int(max(0, milliseconds))
+    }
+}
+
+/// One finished transcript. The turn itself arms or drops a quit confirmation.
+public struct LocalCommandTurn: Equatable, Sendable {
+    public var machine = LocalCommandMachine()
+
+    public init() {}
+
+    @discardableResult
+    public mutating func complete(_ transcript: String, finalAt: ContinuousClock.Instant,
+                                  clock: LocalCommandClock, apps: [LocalApp]) -> LocalCommandDecision? {
+        defer { machine.finishTurn() }
+        let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return machine.receive(trimmed, finalAt: finalAt, clock: clock, apps: apps)
     }
 }

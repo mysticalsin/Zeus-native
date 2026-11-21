@@ -24,9 +24,9 @@ enum LocalCommandWorkspace {
         case .open(let app), .switchTo(let app):
             bringForward(app)
         case .quit(let app):
-            if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == app.bundleID }) {
-                quitAllowingSavePrompt(running)
-            }
+            guard LocalQuit.action == .appleEvent(interact: true, waitForReply: false),
+                  let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == app.bundleID }) else { return }
+            quitAllowingSavePrompt(running)
         case .media(let command):
             switch command {
             case .play, .pause: MediaKeys.post(.play)
