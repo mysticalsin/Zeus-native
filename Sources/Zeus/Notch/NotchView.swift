@@ -844,7 +844,7 @@ private struct TopBarPanelBody: View {
             if agentsPage.schedulesOneSecondTimer {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     agentsStack(now: context.date)
-                        .onChange(of: context.date) { _, _ in agentsPage = agentsPage.applying(.tick) }
+                        .onChange(of: context.date) { _, _ in adopt(AgentsPageHook.advance(agentsPage, ticks: 1)) }
                 }
             } else {
                 agentsStack(now: .now)
@@ -887,7 +887,7 @@ private struct TopBarPanelBody: View {
                             }
                             if agentsPage.undoTicksLeft > 0 {
                                 NotchButton(title: "Undo", tint: Theme.cloudSecondary, filled: false) {
-                                    agentsPage = agentsPage.applying(.undo)
+                                    adopt(AgentsPageHook.undo(agentsPage))
                                 }
                                 .accessibilityLabel("Undo")
                             }
@@ -954,12 +954,12 @@ private struct TopBarPanelBody: View {
                         revisionHold(HubDecisionAction.allowForThisSession)
                     } else {
                         NotchButton(title: HubDecisionAction.allowForThisSession.title, tint: Theme.cloudSecondary, filled: false) {
-                            agentsPage = agentsPage.applying(.key(.two, command: false))
+                            adopt(AgentsPageHook.press(agentsPage, .two))
                         }
                         .accessibilityLabel(HubDecisionAction.allowForThisSession.title)
                     }
                     NotchButton(title: HubDecisionAction.denyWithNote.title, tint: Theme.cloudSecondary, filled: false) {
-                        agentsPage = agentsPage.applying(.key(.four, command: false))
+                        adopt(AgentsPageHook.press(agentsPage, .four))
                     }
                     .accessibilityLabel(HubDecisionAction.denyWithNote.title)
                 }
@@ -992,7 +992,8 @@ private struct TopBarPanelBody: View {
     private func revisionHold(_ action: HubDecisionAction) -> some View {
         NotchButton(title: action.title, tint: Theme.cloudSecondary, filled: false) {}
             .onLongPressGesture(minimumDuration: Double(HubRevision3Timing.destructiveHoldMilliseconds) / 1_000) {
-                agentsPage = agentsPage.applying(.holdBegan(action)).applying(.holdReleased(after: HubRevision3Timing.destructiveHoldMilliseconds))
+                adopt(AgentsPageHook.hold(
+                    agentsPage, action: action, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds))
             }
             .accessibilityLabel(action.title)
             .accessibilityHint("Press and hold")
@@ -1129,13 +1130,23 @@ private struct TopBarPanelBody: View {
     private func resolveApproval(_ verdict: HubApprovalVerdict) {
         switch verdict {
         case .allow:
-            agentsPage = agentsPage.applying(.approve)
-            model.approval?.resolve(HookDecision.Verdict.allow)
+            adopt(AgentsPageHook.tapAllow(agentsPage))
         case .deny:
-            agentsPage = agentsPage.applying(.deny)
-            model.approval?.resolve(HookDecision.Verdict.deny)
+            adopt(AgentsPageHook.tapDeny(agentsPage))
         case .ask:
             model.approval?.resolve(HookDecision.Verdict.ask)
+        }
+    }
+
+    /// Hands a verdict to the hook only when the undo window has closed without an undo.
+    private func adopt(_ step: AgentsPageHook.Step) {
+        agentsPage = step.page
+        for verdict in step.sends {
+            switch verdict {
+            case .allow: model.approval?.resolve(HookDecision.Verdict.allow)
+            case .deny: model.approval?.resolve(HookDecision.Verdict.deny)
+            case .ask: model.approval?.resolve(HookDecision.Verdict.ask)
+            }
         }
     }
 
@@ -1442,6 +1453,8 @@ struct AgentsPage: Equatable, Sendable {
     /// The revision 3 decision. Tiers, keys, the countdown, and undo live here.
     var revision: HubRevision3State
     var requestDetails: [String: AgentsPageRequest]
+    /// Request id to session id. Written only after the duplicate check.
+    var requestSessionIDs: [String: String]
 
     static let countdownStart = 12
     static let undoSeconds = 2
@@ -1481,7 +1494,8 @@ struct AgentsPage: Equatable, Sendable {
             tasks: [:],
             firstFrameMilliseconds: nil,
             revision: HubRevision3State(),
-            requestDetails: [:]
+            requestDetails: [:],
+            requestSessionIDs: [:]
         )
     }
 
@@ -1640,6 +1654,7 @@ struct AgentsPage: Equatable, Sendable {
         next.approvalFocused = false
         next.revision = HubRevision3State()
         next.requestDetails = [:]
+        next.requestSessionIDs = [:]
         return next
     }
 
@@ -1654,18 +1669,24 @@ struct AgentsPage: Equatable, Sendable {
 
     private func requestApproval(_ request: AgentsPageRequest) -> AgentsPage {
         guard let state = sessions[request.sessionID] else { return self }
+        let requestID = request.boundID
+        if revision.showing?.id == requestID || revision.waiting.contains(where: { $0.id == requestID }) {
+            return self
+        }
         if revision.showing == nil, revision.pending == nil, revision.waiting.isEmpty {
             guard HubSessionMachine.next(state, .approvalRequested).status == .needsApproval else { return self }
         }
         let tier = request.tier == .low && request.highRisk ? HubRiskTier.high : request.tier
         var stored = request
+        stored.id = requestID
         stored.tier = tier
         stored.highRisk = tier == .high || tier == .destructive
         var next = self
-        next.requestDetails[request.sessionID] = stored
-        let wasShowing = revision.showing?.sessionID
-        next = next.applyRevision(.request(HubRevision3Request(id: request.sessionID, sessionID: request.sessionID, tier: tier)))
-        guard next.revision.showing?.sessionID == request.sessionID, wasShowing != request.sessionID else { return next }
+        next.requestDetails[requestID] = stored
+        next.requestSessionIDs[requestID] = request.sessionID
+        let wasShowing = revision.showing?.id
+        next = next.applyRevision(.request(HubRevision3Request(id: requestID, sessionID: request.sessionID, tier: tier)))
+        guard next.revision.showing?.id == requestID, wasShowing != requestID else { return next }
         guard let state = next.sessions[request.sessionID] else { return next }
         let stepped = HubSessionMachine.next(state, .approvalRequested)
         guard stepped.status == .needsApproval else { return next }
@@ -1695,8 +1716,9 @@ struct AgentsPage: Equatable, Sendable {
         for execution in revision.executed.dropFirst(previousCount) {
             let event: HubSessionEvent = execution.action.isApproval ? .approved : (execution.fromCountdown ? .timedOut : .denied)
             for id in execution.requestIDs {
-                if let state = sessions[id] {
-                    sessions[id] = HubSessionMachine.next(state, event)
+                let sessionID = requestSessionIDs[id] ?? id
+                if let state = sessions[sessionID] {
+                    sessions[sessionID] = HubSessionMachine.next(state, event)
                 }
             }
             lastVerdict = execution.action.isApproval ? .allow : .deny
@@ -1722,16 +1744,24 @@ struct AgentsPage: Equatable, Sendable {
 
     private mutating func restoreDetails() {
         if let showing = revision.showing {
-            showingRequest = requestDetails[showing.sessionID] ?? AgentsPageRequest(
+            var detail = requestDetails[showing.id] ?? AgentsPageRequest(
                 sessionID: showing.sessionID, tool: "", highRisk: showing.tier != .low, command: nil, tier: showing.tier)
-            showingRequest?.tier = showing.tier
-            showingRequest?.highRisk = showing.tier == .high || showing.tier == .destructive
+            detail.id = showing.id
+            detail.sessionID = showing.sessionID
+            detail.tier = showing.tier
+            detail.highRisk = showing.tier == .high || showing.tier == .destructive
+            showingRequest = detail
         } else if revision.pending == nil {
             showingRequest = nil
         }
         queuedRequests = revision.waiting.map { waiting in
-            requestDetails[waiting.sessionID] ?? AgentsPageRequest(
+            var detail = requestDetails[waiting.id] ?? AgentsPageRequest(
                 sessionID: waiting.sessionID, tool: "", highRisk: waiting.tier != .low, command: nil, tier: waiting.tier)
+            detail.id = waiting.id
+            detail.sessionID = waiting.sessionID
+            detail.tier = waiting.tier
+            detail.highRisk = waiting.tier == .high || waiting.tier == .destructive
+            return detail
         }
     }
 
@@ -1900,24 +1930,52 @@ enum AgentsPageHook {
     }
 
     static func tapAllow(_ page: AgentsPage) -> Step {
-        Step(page: page.applying(.approve), sends: [.allow])
+        if page.revision.showing?.tier == .destructive {
+            return Step(page: page, sends: [])
+        }
+        return stepped(page, page.applying(.approve))
+    }
+
+    static func tapDeny(_ page: AgentsPage) -> Step {
+        stepped(page, page.applying(.deny))
     }
 
     static func undo(_ page: AgentsPage) -> Step {
-        Step(page: page.applying(.undo), sends: [])
+        stepped(page, page.applying(.undo))
+    }
+
+    static func press(_ page: AgentsPage, _ key: HubDecisionKey) -> Step {
+        stepped(page, page.applying(.key(key, command: false)))
     }
 
     static func hold(_ page: AgentsPage, action: HubDecisionAction, milliseconds: Int) -> Step {
         let began = page.applying(.holdBegan(action))
         let released = began.applying(.holdReleased(after: milliseconds))
-        let sends: [AgentsPageHookVerdict] = milliseconds >= HubRevision3Timing.destructiveHoldMilliseconds ? [.allow] : []
-        return Step(page: released, sends: sends)
+        return stepped(page, released)
     }
 
     static func advance(_ page: AgentsPage, ticks: Int) -> Step {
         var current = page
-        for _ in 0..<ticks { current = current.applying(.tick) }
-        return Step(page: current, sends: [])
+        var sends: [AgentsPageHookVerdict] = []
+        for _ in 0..<ticks {
+            let next = current.applying(.tick)
+            sends.append(contentsOf: appeared(from: current, to: next))
+            current = next
+        }
+        return Step(page: current, sends: sends)
+    }
+
+    private static func stepped(_ before: AgentsPage, _ after: AgentsPage) -> Step {
+        Step(page: after, sends: appeared(from: before, to: after))
+    }
+
+    /// Verdicts whose undo window closed between the two pages. Undo drops the pending action, so nothing here is sent.
+    private static func appeared(from: AgentsPage, to: AgentsPage) -> [AgentsPageHookVerdict] {
+        let start = from.revision.executed.count
+        guard to.revision.executed.count > start else { return [] }
+        return to.revision.executed.dropFirst(start).map { execution in
+            execution.action.isApproval ? .allow : .deny
+        }
     }
 }
 
