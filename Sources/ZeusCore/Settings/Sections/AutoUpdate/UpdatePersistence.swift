@@ -49,7 +49,7 @@ public enum UpdateSettingsStore {
             .map(String.init)
         return UpdatePersistedState(
             automaticChecks: defaults.string(forKey: key(automaticChecksID)) == "true",
-            automaticInstall: false,
+            automaticInstall: defaults.string(forKey: key(automaticInstallID)) == "true",
             lastChecked: defaults.string(forKey: key(lastCheckedID)).flatMap(UpdateClock.date(from:)),
             status: defaults.string(forKey: key(statusID)) ?? "",
             notes: notes
@@ -58,7 +58,7 @@ public enum UpdateSettingsStore {
 
     public static func save(_ state: UpdatePersistedState, to defaults: UserDefaults) {
         defaults.set(state.automaticChecks ? "true" : "false", forKey: key(automaticChecksID))
-        defaults.set("false", forKey: key(automaticInstallID))
+        defaults.set(state.automaticInstall ? "true" : "false", forKey: key(automaticInstallID))
         if let lastChecked = state.lastChecked {
             defaults.set(UpdateClock.checkedLine(lastChecked), forKey: key(lastCheckedID))
         } else {
