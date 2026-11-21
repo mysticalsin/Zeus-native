@@ -1,0 +1,14 @@
+{
+  "provider": "kokoro",
+  "script": "05-error",
+  "voice": "bm_george",
+  "speed": 0.88,
+  "lang": "en-gb",
+  "text": "The voice engine failed: the model file is missing and the request returned code E-41.",
+  "request_start_s": 0.0,
+  "wav_origin_s": 0.0,
+  "first_audio_s": 0.8990088770000284,
+  "ttfa_note": "Wall clock of Kokoro.create. The call returns the whole utterance; this engine does not stream.",
+  "sample_rate": 24000,
+  "barge_in_marker_char": null
+}

@@ -1,0 +1,1 @@
+See the note at https://example.com/voice/qa#metrics and the list: **ready**, `render()`, and [docs](https://example.com/docs).

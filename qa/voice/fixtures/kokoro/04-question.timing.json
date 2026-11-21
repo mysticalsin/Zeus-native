@@ -1,0 +1,14 @@
+{
+  "provider": "kokoro",
+  "script": "04-question",
+  "voice": "bm_george",
+  "speed": 0.88,
+  "lang": "en-gb",
+  "text": "Should the fallback voice speak this line?",
+  "request_start_s": 0.0,
+  "wav_origin_s": 0.0,
+  "first_audio_s": 0.43179259800001546,
+  "ttfa_note": "Wall clock of Kokoro.create. The call returns the whole utterance; this engine does not stream.",
+  "sample_rate": 24000,
+  "barge_in_marker_char": null
+}

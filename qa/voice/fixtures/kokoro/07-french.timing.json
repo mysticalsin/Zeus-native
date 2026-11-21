@@ -1,0 +1,14 @@
+{
+  "provider": "kokoro",
+  "script": "07-french",
+  "voice": "bm_george",
+  "speed": 0.88,
+  "lang": "fr-fr",
+  "text": "Bonjour. Le syst\u00e8me est pr\u00eat. Trois fichiers sont en place, et la r\u00e9ponse reste courte.",
+  "request_start_s": 0.0,
+  "wav_origin_s": 0.0,
+  "first_audio_s": 0.8737022340000067,
+  "ttfa_note": "Wall clock of Kokoro.create. The call returns the whole utterance; this engine does not stream.",
+  "sample_rate": 24000,
+  "barge_in_marker_char": null
+}
