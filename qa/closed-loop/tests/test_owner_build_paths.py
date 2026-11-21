@@ -44,10 +44,25 @@ class OwnerBuildPaths(unittest.TestCase):
     def test_trusted_journey_passes_those_directories_to_the_runner(self):
         text = (ROOT / "scripts/trusted-ax-journey.sh").read_text()
         self.assertIn('exec python3 qa/closed-loop/trusted_ax.py --build-dir "$BUILD_DIR" --receipts "$RECEIPTS_DIR"', text)
+
+    def test_trusted_ax_defaults_equal_the_swift_build_paths(self):
+        """The Python defaults are $HOME-relative and equal the directories the Swift build script uses."""
         runner = (ROOT / "qa/closed-loop/trusted_ax.py").read_text()
-        self.assertIn('default=Path("<models-dir>/zeus-native-build")', runner)
-        self.assertIn('default=Path("<models-dir>/zeus-trusted-ax")', runner)
-        self.assertNotIn("AI-Brain-build", runner)
+        self.assertIn("os.path.expanduser('~/AI-Brain-build/zeus-native-build')", runner)
+        self.assertIn("os.path.expanduser('~/AI-Brain-build/zeus-trusted-ax')", runner)
+        env = dict(**{k: v for k, v in __import__("os").environ.items()}, HOME="/Users/example")
+        completed = subprocess.run(
+            [__import__("sys").executable, "-c",
+             "import trusted_ax\n"
+             "args = trusted_ax.build_parser().parse_args([])\n"
+             "print(args.build_dir)\n"
+             "print(args.receipts)\n"],
+            cwd=ROOT / "qa/closed-loop", env=env, text=True, capture_output=True, check=True)
+        build, receipts = completed.stdout.splitlines()
+        self.assertEqual(build, "/Users/example/AI-Brain-build/zeus-native-build")
+        self.assertEqual(receipts, "/Users/example/AI-Brain-build/zeus-trusted-ax")
+        self.assertEqual(build, expand('"$HOME/AI-Brain-build/zeus-native-build"'))
+        self.assertEqual(receipts, expand('"$HOME/AI-Brain-build/zeus-trusted-ax"'))
 
     def test_swift_suffixes_join_to_the_historical_absolute_paths(self):
         home = (ROOT / "Sources/Zeus/Voice/LocalHome.swift").read_text()
