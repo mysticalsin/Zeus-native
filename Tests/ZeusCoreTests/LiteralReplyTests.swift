@@ -36,4 +36,25 @@ struct LiteralReplyTests {
         #expect(strokes.count == 3)
         #expect(!script.contains("do script"))
     }
+
+    @Test @MainActor func senderRunsTheKeystrokeScript() async {
+        final class Fake: @unchecked Sendable { var ran: [String] = [] }
+        let fake = Fake()
+        let sender = AgentReplySender(terminal: { _ in self.terminal },
+                                      approve: { _, _ in true },
+                                      run: { script in fake.ran.append(script); return true })
+        let outcome = await sender.send("keep going", to: "s1", agent: "Claude Code")
+        #expect(outcome == .sent)
+        #expect(fake.ran.count == 1)
+        #expect(fake.ran[0].contains("keystroke \"keep going\""))
+        #expect(!fake.ran[0].contains("do script"))
+    }
+
+    @Test func iTermStillWritesTheLiteralLine() throws {
+        let iterm = TerminalInfo(bundleID: "com.googlecode.iterm2", program: nil, sessionID: "w0t1p0:ABCD-1234", tty: nil)
+        let script = try #require(AgentReply.script(for: iterm, text: "go"))
+        #expect(script.contains(#"write text "go""#))
+        #expect(!script.contains("do script"))
+        #expect(!script.contains("keystroke"))
+    }
 }
