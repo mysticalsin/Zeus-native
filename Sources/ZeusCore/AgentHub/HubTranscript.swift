@@ -191,8 +191,13 @@ public struct HubTranscriptStore: Sendable {
 
     public func write(_ transcript: HubTranscript) throws {
         guard !transcript.isEmpty else { return }
+        var copy = transcript
+        let kept = HubTranscriptBudget.keptLines(copy.lines.count)
+        if copy.lines.count > kept {
+            copy.lines.removeFirst(copy.lines.count - kept)
+        }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Self.encoder().encode(transcript).write(to: url(for: transcript.id), options: .atomic)
+        try Self.encoder().encode(copy).write(to: url(for: transcript.id), options: .atomic)
     }
 
     /// A missing file is nil. A second store on the same directory reads what an earlier one wrote.
@@ -207,11 +212,15 @@ public struct HubTranscriptStore: Sendable {
         directory.appendingPathComponent("\(id.uuidString).json")
     }
 
-    private static func encoder() -> JSONEncoder {
+    private static func encoder() -> JSONEncoder { storedEncoder }
+
+    private static let storedEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = HubTranscriptBudget.prettyPrinted
+            ? [.prettyPrinted, .sortedKeys]
+            : [.sortedKeys]
         return encoder
-    }
+    }()
 
     private static func decoder() -> JSONDecoder { JSONDecoder() }
 }
