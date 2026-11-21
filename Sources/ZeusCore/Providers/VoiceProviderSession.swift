@@ -6,7 +6,33 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
 
     public var choice: VoiceProviderChoice {
         get { VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: Self.selectionKey)) }
-        nonmutating set { defaults.set(VoiceProviderAccounts.ttsProviderRaw(for: newValue), forKey: Self.selectionKey) }
+        nonmutating set { storeChoice(newValue) }
+    }
+
+    /// A read never writes. Assigning local does not replace a raw value this card does not own.
+    private func storeChoice(_ choice: VoiceProviderChoice) {
+        let key = Self.selectionKey
+        let current = defaults.string(forKey: key)
+        switch choice {
+        case .local:
+            if Self.preserves(current) { return }
+            defaults.set(VoiceTTSProvider.kokoro.rawValue, forKey: key)
+        case .provider:
+            defaults.set(VoiceProviderAccounts.ttsProviderRaw(for: choice), forKey: key)
+        }
+    }
+
+    /// True for a stored engine this card must leave untouched. Empty, local, and the two adapters are writable.
+    static func preserves(_ raw: String?) -> Bool {
+        guard let raw, !raw.isEmpty else { return false }
+        switch raw {
+        case VoiceTTSProvider.kokoro.rawValue,
+             VoiceTTSProvider.elevenLabs.rawValue,
+             VoiceTTSProvider.googleCloud.rawValue:
+            return false
+        default:
+            return true
+        }
     }
 
     public func voiceID(for providerID: String) -> String? {
