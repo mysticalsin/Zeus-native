@@ -373,4 +373,25 @@ struct WikiExportTests {
         #expect(transaction.outcome(for: original.id)?.state == .verified)
         #expect(await client.writes == 1)
     }
+
+    /// Many drafts at once. Each one formats a stamp and scans the page, which compiles the
+    /// sensitive-info patterns. Those compilations have to be safe to run together, and the
+    /// scan still has to report the health term in the page.
+    @Test func concurrentDraftsCompileEachPatternOnce() throws {
+        let fixture = try ExportFixture()
+        var page = fixture.page
+        page.body = "Dana Whitfield diagnosis at 12 Elm Street. Call +1 415 555 0134 or ada@example.com. The salary and mortgage stay private."
+        let snapshot = fixture.snapshot(pages: [page])
+        let ids: Set<String> = [page.id]
+        let now = fixture.now
+        DispatchQueue.concurrentPerform(iterations: 8) { _ in
+            for _ in 0..<12 {
+                let draft = try? WikiExportDraft.make(selectedIDs: ids, snapshot: snapshot, now: now)
+                precondition(draft?.sensitiveFindingCount ?? 0 > 0)
+            }
+        }
+        let draft = try WikiExportDraft.make(selectedIDs: ids, snapshot: snapshot, now: now)
+        #expect(draft.sensitiveFindingCount > 0)
+        #expect(draft.markdown.contains("diagnosis"))
+    }
 }

@@ -8676,6 +8676,30 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Scribe opt-in tests shared a file-backed UserDefaults domain under parallel runs, so aStaleStampWithAskMeIsRemovedAtLaunch still saw the stamp it had removed. Each test now uses an in-memory UserDefaults, which also stays out of the owner's preferences.",
+      "features": [
+        "F03"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+        "function": "parallelFreshSuitesDoNotKeepAStaleStamp"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "portable-wiki-export died with signal 11 while one thread compiled a scanner regular expression and another opened an ICU calendar for the export stamp. Patterns are compiled once under a lock shared with that stamp.",
+      "features": [
+        "F10"
+      ],
+      "check": "portable-wiki-export",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/WikiExportTests.swift",
+        "function": "concurrentDraftsCompileEachPatternOnce"
+      }
     }
-]
+  ]
 }
