@@ -12,7 +12,6 @@ public struct SnapshotGate: Equatable, Sendable {
     }
 
     public func accepts(_ token: UInt64) -> Bool {
-        // Red: a slower fetch from an earlier begin still writes.
-        token != 0
+        token != 0 && token == generation
     }
 }

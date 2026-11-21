@@ -27,6 +27,7 @@ final class TopBarServices {
     private var volumeBook = VolumeListenerBook()
     private var volumeHooks: [VolumeHook] = []
     private var outputWatch: AudioObjectPropertyListenerBlock?
+    private var reminderSnapshots = SnapshotGate()
 
     private struct VolumeHook {
         var id: VolumeListenerID
@@ -416,12 +417,16 @@ final class TopBarServices {
         model.refreshCalendarMonth()
         guard EKEventStore.authorizationStatus(for: .reminder) == .fullAccess else { return }
         let reminderPredicate = eventStore.predicateForIncompleteReminders(withDueDateStarting: nil, ending: end, calendars: nil)
+        let token = reminderSnapshots.begin()
         eventStore.fetchReminders(matching: reminderPredicate) { [weak self] reminders in
             let items = (reminders ?? []).prefix(20).map {
                 TopBarModel.ReminderItem(id: $0.calendarItemIdentifier, title: $0.title ?? "Reminder",
                                          due: $0.dueDateComponents?.date, done: $0.isCompleted)
             }
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.model.reminders = Array(items) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                guard let self, self.reminderSnapshots.accepts(token) else { return }
+                self.model.reminders = Array(items)
+            } }
         }
     }
 
