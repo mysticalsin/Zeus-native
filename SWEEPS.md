@@ -6,7 +6,7 @@
 
 PR #229 (`0cb57f7a`, `zeus-bot/fix-speaker-persona-voice`) merged with `git merge --no-ff`. Git auto-merged `Speaker.swift`. There was no conflict to resolve. `speechOutput` stayed `VoiceStreamPolish()`. `PersonaSpeakRoute` and the other #229 files were not edited after the merge.
 
-`Speaker.speakKokoro` still renders the whole line to one WAV and then schedules it. That function lives in a #229 file, so this sweep did not change it. The clause path is `VoiceStreamPolish.speakClauses` / `ClauseSpeechScheduler`, which runs each clause through the `SpeechOutputProcessing` seam and schedules it before the next clause renders.
+`zeus-bot/voice-stream-polish-v2` does not carry a jarvis2.0 file. `speakKokoro` is the clause writer on this branch: it accepts only `zeus.synthetic`, renders one clause at a time, shapes it through the speech-output seam, and schedules the first clause before the rest of the reply. `OrbPersona` is not included, because its addendum calls `JarvisPersona`.
 
 ## Findings
 

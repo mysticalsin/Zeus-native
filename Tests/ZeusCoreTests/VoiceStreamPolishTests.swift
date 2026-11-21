@@ -281,7 +281,7 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(calls == 2)
     }
 
-    @Test func speakKokoroSchedulesTheFirstClauseInsideTheOneSecondBudget() {
+    @Test func speakKokoroSchedulesTheFirstClauseInsideTheOneSecondBudget() throws {
         let text = longAnswer
         var clock = SpeechManualClock()
         let fullCost = 5.31
@@ -349,10 +349,10 @@ private let chunkCases: [(name: String, language: String, text: String, expected
                     return [Float](repeating: 0.2, count: 800)
                 },
                 schedule: { _, _ in scheduled += 1 })
-            #expect(!receipt.accepted, voiceID)
-            #expect(receipt.scheduled.isEmpty, voiceID)
-            #expect(scheduled == 0, voiceID)
-            #expect(clock.seconds == 0, voiceID)
+            #expect(receipt.accepted == false)
+            #expect(receipt.scheduled.isEmpty)
+            #expect(scheduled == 0)
+            #expect(clock.seconds == 0)
         }
         #expect(OriginalSyntheticVoice.accepts("zeus.synthetic"))
         #expect(!OriginalSyntheticVoice.accepts("am_michael"))

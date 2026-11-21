@@ -237,9 +237,9 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             if Self.countsAsFailure() { settings.noteProviderFailure(.gemini, reason: .offline) }
             return nil
         case .kokoro:
-            if await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) {
+            if await speakKokoro(text, voice: OriginalSyntheticVoice.id, speed: settings.kokoroSpeed, began: began) {
                 settings.clearProviderPause(.kokoro)
-                return settings.kokoroVoice
+                return OriginalSyntheticVoice.id
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.kokoro, reason: .missingModel) }
             return nil
@@ -446,17 +446,41 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         }
     }
 
+    /// `voice` is the persona voice id. Only `zeus.synthetic` is played. The Kokoro pack voice
+    /// stays the engine voice. Clauses render one at a time and the first is scheduled before the rest.
     private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> Bool {
-        guard let url = await KokoroVoice.render(text, voice: voice, speed: speed) else { return false }
-        // Rendering takes seconds: if the owner interrupted meanwhile, the finished line is thrown away, never played.
-        guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return false }
-        if Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
-            try? FileManager.default.removeItem(at: url)
-            return false
+        guard OriginalSyntheticVoice.accepts(voice) else { return false }
+        let chunks = SpeechClauseChunker.chunks(of: text)
+        guard !chunks.isEmpty else { return false }
+        let engineVoice = VoiceSettings.shared.kokoroVoice
+        var played = false
+        for chunk in chunks {
+            if Task.isCancelled { return played }
+            guard let url = await KokoroVoice.render(chunk, voice: engineVoice, speed: speed) else { return played }
+            guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else {
+                try? FileManager.default.removeItem(at: url)
+                return false
+            }
+            if !played, Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
+                try? FileManager.default.removeItem(at: url)
+                return false
+            }
+            let shapedURL = Self.shapedClauseWAV(from: url, output: speechOutput) ?? url
+            guard chain.scheduleFile(shapedURL) else { return played }
+            if !played {
+                markAudioReady()
+                played = true
+            }
         }
-        guard chain.scheduleFile(url) else { return false }
-        markAudioReady()
-        return true
+        return played
+    }
+
+    private static func shapedClauseWAV(from url: URL, output: any SpeechOutputProcessing) -> URL? {
+        guard let decoded = PCMWav.readFloats(from: url) else { return nil }
+        let shaped = KokoroClausePlayback.shape(decoded.samples, sampleRate: decoded.sampleRate, output: output)
+        let destination = url.deletingLastPathComponent().appendingPathComponent("zeus-kokoro-clause.wav")
+        guard PCMWav.write(shaped, sampleRate: decoded.sampleRate, to: destination) else { return nil }
+        return destination
     }
 
     private func speakChatterbox(_ text: String, began: Date) async -> Bool {
