@@ -74,6 +74,12 @@ struct GlyphButton: View {
     var active = false
     /// Spoken state for a toggle ("on", "all"); none for a plain button.
     var value: String?
+    /// VoiceOver name when it should differ from the tooltip.
+    var spoken: String? = nil
+    /// VoiceOver hint. Omitted when nil, so existing buttons stay as they are.
+    var hint: String? = nil
+    /// Forces Reduce Motion for this press. Nil follows the system setting, as before.
+    var reduceMotion: Bool? = nil
     let action: () -> Void
 
 
@@ -87,11 +93,29 @@ struct GlyphButton: View {
                 .overlay(Capsule().strokeBorder(Color.white.opacity(ToggleOnLook.stroke(active: active)), lineWidth: 1))
                 .contentShape(Circle())
         }
-        .buttonStyle(PressableStyle())
-
+        .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
         .help(label)
-        .accessibilityLabel(label)
+        .accessibilityLabel(spoken ?? label)
         .accessibilityValue(value ?? "")
+        .modifier(AccessibilityHintIfSet(hint: hint))
+    }
+}
+
+struct AccessibilityHintIfSet: ViewModifier {
+    var hint: String?
+
+    func body(content: Content) -> some View {
+        if let hint, !hint.isEmpty { content.accessibilityHint(hint) }
+        else { content }
+    }
+}
+
+struct AccessibilityValueIfSet: ViewModifier {
+    var value: String?
+
+    func body(content: Content) -> some View {
+        if let value, !value.isEmpty { content.accessibilityValue(value) }
+        else { content }
     }
 }
 
@@ -238,7 +262,8 @@ struct ProgressLine: View {
         .frame(height: onSeek == nil ? 3 : 16)
         .animation(Motion.reduced ? nil : .easeOut(duration: 0.12), value: dragging == nil)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(onSeek == nil ? "Progress" : "Playback position")
+        .accessibilityLabel(onSeek == nil ? "Progress" : MediaControlPresentation.seekLabel)
+        .modifier(AccessibilityHintIfSet(hint: onSeek == nil ? nil : MediaControlPresentation.seekHint))
         .accessibilityValue("\(Int(shown * 100)) percent")
         .accessibilityAdjustableAction { direction in
             guard let onSeek else { return }
@@ -551,6 +576,9 @@ struct MusicControls: View {
         // Until the player has answered, a mode control is drawn subdued; it still takes a press.
         let known = Theme.cloudPrimary
         let unknown = Theme.cloudSecondary.opacity(0.5)
+        let state = topBar.mediaPlayback
+        let playing = topBar.nowPlaying?.isPlaying == true
+        let access = MediaControlPresentation.accessibility(for: state, fallbackPlaying: playing)
         HStack(spacing: 4) {
             Spacer(minLength: 0)
             if shown.contains(.shuffle) {
@@ -558,15 +586,26 @@ struct MusicControls: View {
                             active: modes.shuffle == true, value: MusicModeRules.spokenShuffle(modes.shuffle)) { topBar.musicCommand(.toggleShuffle) }
             }
             if shown.contains(.previous) {
-                GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
+                GlyphButton(symbol: "backward.fill", size: size, label: "Previous", spoken: access.previousLabel,
+                            hint: access.previousHint, reduceMotion: Motion.reduced) { topBar.homeMediaPress(.previous) }
             }
             if shown.contains(.playPause) {
-                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
-                    topBar.musicCommand(.playPause)
+                let recovery = MediaControlPresentation.showsRecovery(state)
+                let pause = MediaControlPresentation.showsPause(state, fallbackPlaying: playing)
+                GlyphButton(symbol: pause ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause",
+                            value: access.value,
+                            spoken: recovery ? access.recoveryLabel : (pause ? access.pauseLabel : access.playLabel),
+                            hint: recovery ? access.recoveryHint : (pause ? access.pauseHint : access.playHint),
+                            reduceMotion: Motion.reduced) {
+                    switch MediaControlPresentation.activation(state, fallbackPlaying: playing) {
+                    case .recover: topBar.mediaRecovery()
+                    case .press(let command): topBar.homeMediaPress(command)
+                    }
                 }
             }
             if shown.contains(.next) {
-                GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
+                GlyphButton(symbol: "forward.fill", size: size, label: "Next", spoken: access.nextLabel,
+                            hint: access.nextHint, reduceMotion: Motion.reduced) { topBar.homeMediaPress(.next) }
             }
             if shown.contains(.repeatMode) {
                 GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
@@ -619,6 +658,9 @@ struct MusicPage: View {
                                 .font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
                         }
                     }
+                    if let guidance = MediaControlPresentation.guidance(for: topBar.mediaPlayback) {
+                        Text(guidance).font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
+                    }
                 }
                 Spacer(minLength: 0)
                 if let playing = topBar.nowPlaying {
@@ -629,7 +671,9 @@ struct MusicPage: View {
                             ProgressLine(fraction: MusicSeek.fraction(elapsed: playing.elapsed(at: context.date), duration: playing.duration),
                                          tint: tint,
                                          onSeek: shown.contains(.scrub) ? { fraction in
-                                             if let seconds = MusicSeek.seconds(fraction: fraction, duration: playing.duration) { topBar.seek(seconds) }
+                                             if let seconds = MusicSeek.seconds(fraction: fraction, duration: playing.duration) {
+                                                 topBar.homeMediaPress(.seek(seconds))
+                                             }
                                          } : nil)
                             HStack {
                                 Text(FocusTimer.format(elapsed))
@@ -658,6 +702,7 @@ struct MusicPage: View {
             }
         }
         .padding(.vertical, 6)
+        .modifier(MediaRecoveryAction(shown: MediaControlPresentation.showsRecovery(topBar.mediaPlayback)) { topBar.mediaRecovery() })
         .onAppear { topBar.musicPageVisible = true }
         .onDisappear { topBar.musicPageVisible = false }
     }

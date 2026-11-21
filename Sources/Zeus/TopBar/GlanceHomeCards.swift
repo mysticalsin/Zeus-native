@@ -92,6 +92,10 @@ struct GlanceRoundButton: View {
     var size: CGFloat = 30
     var filled = false
     let label: String
+    var hint: String? = nil
+    var value: String? = nil
+    /// Nil follows the system Reduce Motion setting. A media control passes the live value.
+    var reduceMotion: Bool? = nil
     let action: () -> Void
 
     var body: some View {
@@ -104,9 +108,25 @@ struct GlanceRoundButton: View {
                 .overlay(Circle().strokeBorder(Color.white.opacity(filled ? 0 : 0.15), lineWidth: 1))
                 .contentShape(Circle())
         }
-        .buttonStyle(PressableStyle())
+        .buttonStyle(PressableStyle(reduceMotion: reduceMotion))
         .accessibilityLabel(label)
+        .modifier(AccessibilityValueIfSet(value: value))
+        .modifier(AccessibilityHintIfSet(hint: hint))
         .help(label)
+    }
+}
+
+/// VoiceOver's recovery action, present only while playback control is blocked.
+struct MediaRecoveryAction: ViewModifier {
+    var shown: Bool
+    var run: () -> Void
+
+    func body(content: Content) -> some View {
+        if shown {
+            content.accessibilityAction(named: Text(MediaControlPresentation.recoveryLabel)) { run() }
+        } else {
+            content
+        }
     }
 }
 

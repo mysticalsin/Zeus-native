@@ -135,6 +135,7 @@ final class NowPlayingHub {
         }
         publishCommandTarget()
         ports.requestArtwork(model.nowPlaying)
+        model.resyncHomeMedia(model.nowPlaying)
     }
 
     private func publishCommandTarget() {

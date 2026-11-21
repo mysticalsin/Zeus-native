@@ -257,4 +257,47 @@ final class MusicPlayerFeed {
         guard musicModesRevision == revision, !Task.isCancelled, isRunning(player) else { return }
         model.musicModes = MusicModeRules.resolved(output: output, player: player, current: model.musicModes, afterPress: false)
     }
+
+    // MARK: Transport for the command router
+
+    func isPlayerRunning(_ player: NowPlaying.Player) -> Bool { isRunning(player) }
+
+    /// Sends one transport command. Never prompts and never launches a player. A cold permission
+    /// check gets one short recheck inside the time the controls have to reflect the real state.
+    func deliver(_ command: MediaControlCommand, to player: NowPlaying.Player) async -> MediaCommandDelivery {
+        guard isRunning(player) else { return .unavailable }
+        if !Automation.allowed(player.bundleID) {
+            if Automation.accessByTarget[player.bundleID] == .refused { return .permissionDenied }
+            let deadline = Date().addingTimeInterval(Automation.checkTimeout)
+            while !Automation.allowed(player.bundleID), Date() < deadline {
+                if Task.isCancelled { return .failed }
+                if Automation.accessByTarget[player.bundleID] == .refused { return .permissionDenied }
+                guard isRunning(player) else { return .unavailable }
+                try? await Task.sleep(for: .seconds(MediaCommandRouter.permissionRecheck))
+            }
+            guard isRunning(player) else { return .unavailable }
+            guard Automation.allowed(player.bundleID) else { return .permissionDenied }
+        }
+        let script: String
+        switch command {
+        case .play:
+            script = "tell application id \"\(player.bundleID)\" to play"
+        case .pause:
+            script = "tell application id \"\(player.bundleID)\" to pause"
+        case .next:
+            script = "tell application id \"\(player.bundleID)\" to next track"
+        case .previous:
+            script = "tell application id \"\(player.bundleID)\" to previous track"
+        case .seek(let seconds):
+            script = MusicSeek.script(player: player, seconds: seconds)
+        }
+        return await SpotifyPlayer.osascript(script) == nil ? .failed : .accepted
+    }
+
+    /// One bounded read of the player. Nil when it cannot be read; the caller decides whether that means it quit.
+    func readPlayer(_ player: NowPlaying.Player) async -> NowPlaying? {
+        guard isRunning(player), Automation.allowed(player.bundleID) else { return nil }
+        let output = await SpotifyPlayer.osascript(NowPlaying.probeScript(player: player))
+        return NowPlaying.parseProbe(output, player: player)
+    }
 }

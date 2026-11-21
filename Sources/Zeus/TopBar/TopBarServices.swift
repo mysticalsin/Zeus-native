@@ -14,6 +14,7 @@ final class TopBarServices {
     let nowPlayingHub: NowPlayingHub
     private let musicFeed: MusicPlayerFeed
     private let browserFeed: BrowserMediaFeed
+    private let mediaCoordinator: MediaCommandCoordinator
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
     var onTimerFinished: () -> Void = {}
     private var timers: [Timer] = []
@@ -43,6 +44,7 @@ final class TopBarServices {
         nowPlayingHub = NowPlayingHub(model: model, ports: NowPlayingHub.livePorts(model: model))
         musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
         browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
+        mediaCoordinator = MediaCommandCoordinator(model: model, hub: nowPlayingHub, feed: musicFeed)
     }
 
     func start() {
@@ -55,6 +57,7 @@ final class TopBarServices {
 
         musicFeed.start()
         browserFeed.start()
+        mediaCoordinator.start()
         observeClipboard()
         observeCapsLock()
         observeVolume()
@@ -85,6 +88,7 @@ final class TopBarServices {
 
     /// Removes the music observers, stops pending music reads and takes the players and tabs off the notch.
     func stop() {
+        mediaCoordinator.stop()
         browserFeed.stop()
         musicFeed.stop()
     }
