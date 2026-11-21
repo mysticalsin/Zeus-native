@@ -5,9 +5,12 @@ import Testing
 @Suite struct ReplyLedgerTests {
     @Test func releaseReportsTheOpenIds() {
         var ledger = ReplyLedger()
-        #expect(ledger.open(1))
-        #expect(ledger.open(2))
-        #expect(ledger.finish(2))
+        let opened1 = ledger.open(1)
+        let opened2 = ledger.open(2)
+        let finished2 = ledger.finish(2)
+        #expect(opened1)
+        #expect(opened2)
+        #expect(finished2)
         let dropped = ledger.failOutstanding()
         #expect(dropped == [1])
         #expect(ledger.open(3) == false)
@@ -19,9 +22,12 @@ import Testing
         do {
             let table = ReplyDrop()
             table.onDrop = { box.ids = $0 }
-            #expect(table.open(7))
-            #expect(table.open(8))
-            #expect(table.finish(8))
+            let opened7 = table.open(7)
+            let opened8 = table.open(8)
+            let finished8 = table.finish(8)
+            #expect(opened7)
+            #expect(opened8)
+            #expect(finished8)
         }
         #expect(box.ids == [7])
     }
@@ -35,9 +41,11 @@ import Testing
                 if rng.next() % 2 == 0 {
                     if ledger.open(step) { live.insert(step) }
                 } else if let id = live.first {
-                    #expect(ledger.finish(id))
+                    let finished = ledger.finish(id)
+                    #expect(finished)
                     live.remove(id)
-                    #expect(ledger.finish(id) == false)
+                    let again = ledger.finish(id)
+                    #expect(again == false)
                 }
             }
             let dropped = ledger.failOutstanding()
@@ -48,7 +56,10 @@ import Testing
 
     @Test func stressAHundredOpenIdsAllFailOnce() {
         var ledger = ReplyLedger()
-        for id in 0..<100 { #expect(ledger.open(id)) }
+        for id in 0..<100 {
+            let opened = ledger.open(id)
+            #expect(opened)
+        }
         let dropped = ledger.failOutstanding()
         #expect(dropped.count == 100)
         #expect(ledger.failOutstanding().isEmpty)
