@@ -98,6 +98,7 @@ struct ScribePermissionBanner: View {
             Spacer(minLength: 0)
             NotchActionButton(title: actionTitle, tint: Theme.cloudPrimary, filled: false, action: action)
                 .accessibilityHint(hint)
+                .accessibilityIdentifier("scribe.scribe-idle-view.control.2")
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.ember.opacity(0.14)))
@@ -162,6 +163,7 @@ private struct ScribeUpNextContent: View {
             Spacer(minLength: 0)
             NotchActionButton(title: "Take notes", tint: Theme.accent) { startWith(meeting) }
                 .accessibilityHint("Starts Scribe with the title and guests of this meeting.")
+                .accessibilityIdentifier("scribe.scribe-idle-view.take-notes")
         }
     }
 
@@ -349,6 +351,7 @@ private struct ScribeSourceChipView: View {
                 .help(chip.detail)
                 .accessibilityLabel("\(chip.kind.title), \(chip.status.label)")
                 .accessibilityHint(chip.detail)
+                .accessibilityIdentifier("scribe.scribe-idle-view.control")
         } else {
             label
                 .help(chip.detail)
@@ -459,12 +462,14 @@ private struct ScribeRecentCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open notes for \(recap.title)")
                 .accessibilityHint("Shows the summary, action items, private notes and transcript.")
+                .accessibilityIdentifier("scribe.scribe-idle-view.open-notes-for")
                 Button { scribe.requestDelete(recap.id) } label: {
                     Image(systemName: "trash").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.cloudSecondary)
                         .frame(width: 20, height: 20).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Delete \(recap.title) permanently")
+                .accessibilityIdentifier("scribe.scribe-idle-view.delete-permanently")
                 Button { scribe.dismissRecap(recap.id) } label: {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.cloudSecondary)
                         .frame(width: 20, height: 20).contentShape(Rectangle())
@@ -472,6 +477,7 @@ private struct ScribeRecentCard: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Remove \(recap.title) from recent meetings")
                 .accessibilityHint("Hides it from this list. The saved meeting stays on this Mac until you delete it permanently.")
+                .accessibilityIdentifier("scribe.scribe-idle-view.remove-from-recent-meetings")
             }
             if scribe.pendingDeleteID == recap.id {
                 ScribeDeleteConfirm(scribe: scribe, id: recap.id)
