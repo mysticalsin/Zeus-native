@@ -464,7 +464,8 @@ struct DeckNotesReaderTests {
 
         let notes = "# Leave this line\nSecond"
         #expect(DeckNotesPage.displayedNotes(notes) == notes)
-        #expect(PrompterScript(notes).blocks.contains(where: \.isCue))
+        let markIsACueInTheScript = PrompterScript(notes).blocks.contains { $0.isCue }
+        #expect(markIsACueInTheScript)
         #expect(DeckNotesScriptGuard.floatingScript(existing: "Already here", notes: Self.sentence) == "Already here")
     }
 
