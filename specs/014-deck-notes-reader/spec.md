@@ -169,17 +169,17 @@ Prompter page, Read
   → the notes string is held in the top-bar state and drawn on the Prompter page
 ```
 
-Follow, after the person presses Follow, repeats `deck.index` every 0.5 s while the top bar stays open. That interval matches the existing presenting poll. A changed slide number sends one `deck.notes` for the new slide. The same number sends nothing further. One request is in flight at a time. A late reply for an older document is dropped.
+Follow, after the person presses Follow, repeats `deck.index` every 0.5 s and stops after 120 polls, whichever bound comes first. That interval matches the existing presenting poll. Each poll re-checks the tab URL against the deck predicate and re-checks the private-window flag before any script runs. A failed check cancels the watch and drops the notes. A changed slide number sends one `deck.notes` for the new slide. The same number sends nothing further. One request is in flight at a time. A late reply for an older document is dropped.
 
 What leaves the page is the payload, or the two integers from `deck.index`. The URL is used to choose the tab and to detect a navigation. The machine keeps it until the read ends. It is not shown, and it is not written to disk or to a log. The tab title is not shown. The deck name on screen comes from the payload.
 
 Local only. The new commands make no network request. The page's own requests are untouched. Nothing is sent to a model, a provider, or another machine.
 
-Nothing is stored. The string lives in the reader state until Clear, Escape, a failure, a document change, leaving the Prompter page, or closing the bar. Then it is dropped. Reopening the bar does not restore it. The string is not written to defaults, a file, the vault, the clipboard, the existing script, or a log line.
+Nothing is stored. The string lives in the reader state until Clear, Escape, a failure, a document change, leaving the Prompter page, or closing the bar. Then it is dropped. Reopening the bar does not restore it. The string is not written to defaults, a file, the vault, the clipboard, the existing script, a log line, the extension console, or extension storage. Bidi and zero-width characters are stripped before the string is held.
 
 The only log line is the state name (`showing`, `notesNotOnPage`, and the other names below). The line does not include the notes, the title, the URL, or the document id.
 
-The top bar keeps the capture policy it already has. This feature does not open a window and does not change that policy.
+The notes are excluded from capture and from Zeus's own screenshots even when `general.showInScreenSharing` shows the rest of the top bar. The notes string is not an accessibility value another process can read. This feature does not open a window. It does not change the capture policy of any surface that is not drawing the notes.
 
 Threats the machine closes:
 
@@ -187,7 +187,7 @@ Threats the machine closes:
 | --- | --- |
 | A page returns extra fields, markup, or the slide body | The parser accepts only the fields in the table. Anything else is `unreadable`, and the text is dropped |
 | The notes contain instructions meant for a model | They are drawn as plain text. No command runs them and no model receives them |
-| The extension's broad host access is pointed at another tab | The match is the active tab in a normal window. A background tab is ignored. A private window is `privateWindow` and no script runs |
+| The extension's broad host access is pointed at another tab | The match is the active tab in a normal window. A background tab is ignored. A private window, or an unknown private-window bit, is `privateWindow` and no script runs. The extension checks its own allowlist before `executeScript` |
 | The tab navigates after the read | The document check fails, the state becomes `deckChanged`, and the text is dropped |
 | A second process speaks on the socket | The existing bridge checks its peer. This feature adds no second listener |
 | A log, a crash report, or a test printer records the notes | Production effects have no field a logger is allowed to print. Tests use the synthetic sentence in the mock-up and a disposable state |
@@ -248,7 +248,7 @@ Each failure is a title and one line, in words, on the Prompter page. None of th
 
 The empty-slide caption is "No notes on slide N" and "Read again when you move on." The loading line, used for `checking` and `reading`, is "Reading speaker notes". The showing kicker is "Speaker notes". The position is "N / M" in tabular figures. A truncated payload adds the caption "Truncated".
 
-VoiceOver on the notes region: "Speaker notes, slide N of M". The notes are static text, not a field. Read is the default button. Follow is a separate button. Clear and Escape return to `idle`.
+VoiceOver on the notes region: "Speaker notes, slide N of M". That name does not include the notes body, and the body is not an accessibility value. The notes are static text, not a field. Read is the default button. Follow is a separate button. Clear and Escape return to `idle`.
 
 With Reduce Motion, a new slide replaces the text in place. There is no roll and no crossfade. The buttons keep a visible pressed state without scaling.
 
@@ -260,20 +260,20 @@ The test that currently expects the in-browser provider's `load` to throw stays 
 
 1. **Route table.** Rank, TCC, and eligibility match the table in this spec. Only rank 1 is eligible. The feature's prompt flag is false for every route.
 2. **Parser.** A payload of title, slide, count, notes, and `notesInDocument` parses. An extra field, a missing field, a slide of 0, a slide above the count, or notes that are not a string is `unreadable`. The 8,001st character is absent and `truncated` is set. Line breaks inside the 8,000 are kept.
-3. **Predicate.** A URL the existing predicate accepts can be matched. A URL it rejects, and an empty string, become `noMatch`. The test calls the predicate already in `PresenterSync.swift` and does not reimplement it.
+3. **Predicate.** The predicate is the one in "Before any build": `https`, exact host `docs.google.com`, path prefix `/presentation/`, no userinfo, no other port. Every URL in the hostile list is rejected, and an empty string is `noMatch`. The two edit and present examples match. The extension test applies that same allowlist before `executeScript`.
 4. **Idle read.** `read` from `idle` yields `checking` and `findDeck`. No `readNotes`.
 5. **Choose the tab.** `bridgeDown`, `activePrivate`, and `noMatch` yield the three failures and no `readNotes`. `matched` yields `reading` and one `readNotes` for that target.
 6. **Show.** A payload with notes yields `showing` and those strings. An empty notes string with the field present yields `showing` and the empty-slide caption. `notesInDocument` false yields `notesNotOnPage` and an empty buffer.
 7. **Refuse the page.** A malformed payload yields `unreadable`. A stale document yields `deckChanged`. In both, the buffer is empty.
 8. **One in flight.** A second `read` during `checking` or `reading` yields no new effect.
-9. **Follow.** `follow` from `showing` yields `following` and `watchIndex`. The same index yields no `readNotes`. A new index yields `reading` and one `readNotes`. `stop` returns to `showing` and cancels the watch. `follow` from `idle` yields nothing.
+9. **Follow.** `follow` from `showing` yields `following` and `watchIndex`. The same index yields no `readNotes`. A new index yields `reading` and one `readNotes`. `stop` returns to `showing` and cancels the watch. `follow` from `idle` yields nothing. The 121st poll does not run. A poll whose URL fails the predicate, or whose private-window bit is private or unknown, cancels the watch and drops the notes.
 10. **Drop.** `clear` and `dismiss` from `showing`, `following`, and every failure yield `idle`, an empty buffer, and `cancelWatch` when a watch was running. A later `showing` is possible only after a new `read`.
 11. **Effects.** The effect set is the four names above. A walk of a whole session (read, show, follow, index change, dismiss) never produces another effect.
 12. **Log name.** The description of every state is the state name and, for a failure, the failure name. Building it from a state that holds the sample sentence does not include that sentence, the sample title, or a URL.
 13. **Desktop path stays.** When a presentation app is the running source, the browser machine is not sent `read` by the selector. The selector test feeds "app running" and "app not running" as inputs. It does not launch an app.
 14. **Copy.** The titles and lines in the failure table, the empty-slide caption, and "Reading speaker notes" are the strings the view is specified to use.
 
-A later extension test, `extension/tests/deck-notes.test.mjs`, is red until the commands exist. It feeds a fixture document and asserts three things: `deck.notes` returns the five fields and no other text, a non-presentation URL and a private window run no script, and the fixture function does not call click, write, or fetch. That file is not part of the first red commit.
+A later extension test, `extension/tests/deck-notes.test.mjs`, is red until the commands exist. It feeds a fixture document and asserts: `deck.notes` returns the five fields and no other text; a non-presentation URL, a private window, and an unknown private-window bit run no script; the script runs in the isolated world on frame id 0; a selector miss fails closed; traps on click, write, body assignment, navigation, and fetch do not fire; bidi and zero-width characters are stripped; and the notes are absent from the extension console and from extension storage. That file is not part of the first red commit.
 
 A Mac pass, after the suite is green, checks the Prompter page with the pointer and the keyboard: Read, Follow, Stop, Clear, Escape, Return, a private window, the extension off, a deck with no notes field, and Reduce Motion. The notes region exposes the VoiceOver name above. That pass is the visual acceptance. This mock-up is not that pass.
 
