@@ -314,6 +314,7 @@ final class NotchController {
     }
 
     /// Cards the arrows can show. Allow and Deny use whichever one is on screen.
+    static let maxPendingApprovals = 40
     private(set) var pendingApprovals: [NotchModel.Approval] = []
     /// Cards whose verdict was already delivered. A later Allow does not approve a different command.
     private var settledApprovalIDs: Set<String> = []
@@ -340,6 +341,10 @@ final class NotchController {
             card.commitAnswers = { [weak self] inside in self?.commitDisplayedAnswers(inside: inside) }
             card.releasePlan = { [weak self] inside in self?.releaseDisplayedPlan(inside: inside) }
             card.liveGesture = { [weak self] in self?.displayedGesture() ?? .tap }
+            if pendingApprovals.count >= Self.maxPendingApprovals {
+                deliver(.deny)
+                continue
+            }
             pendingApprovals.append(card)
         }
         guard let first = pendingApprovals.first else { model.approval = nil; return }
@@ -422,6 +427,8 @@ final class NotchController {
     private func remember(_ card: NotchModel.Approval) {
         if let index = pendingApprovals.firstIndex(where: { $0.id == card.id }) {
             pendingApprovals[index] = card
+        } else if pendingApprovals.count >= Self.maxPendingApprovals {
+            card.resolve(.deny)
         } else {
             pendingApprovals.append(card)
         }
