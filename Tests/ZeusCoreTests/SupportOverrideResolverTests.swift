@@ -178,6 +178,16 @@ private struct AnchorFake: BundledHelperAnchorChecking {
 
 private enum TestWrite: Error { case failed }
 
+@Suite struct HookRefreshPolicyTests {
+    @Test func aFailedHookCheckLeavesPriorEntries() {
+        let prior = #"{"Stop":"/Applications/Zeus.app/Contents/Helpers/zeus-hook","other":"/usr/bin/true"}"#
+        let effect = HookRefreshPolicy.effect(decision: .refuse(BundledHelperLaunchPolicy.refusalSentence),
+                                              current: prior,
+                                              publishedPath: "/Applications/Zeus.app/Contents/Helpers/zeus-hook")
+        #expect(effect == .leave)
+    }
+}
+
 @Suite struct NativeHostRegistrationTests {
     private func directory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-host-reg-\(UUID().uuidString)", isDirectory: true)
