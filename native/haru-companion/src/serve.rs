@@ -70,7 +70,71 @@ pub fn peer_uid(stream: &UnixStream) -> std::io::Result<u32> {
     peer_uid_fd(stream.as_raw_fd())
 }
 
+/// Injected credentials for tests. Production accept uses [`OsPeer`].
+pub trait PeerCheck {
+    fn allow(&self, stream: &UnixStream) -> std::io::Result<()>;
+}
+
+/// Real `SO_PEERCRED` / `getpeereid` compared with `geteuid`.
+pub struct OsPeer;
+
+impl PeerCheck for OsPeer {
+    fn allow(&self, stream: &UnixStream) -> std::io::Result<()> {
+        let peer = peer_uid(stream)?;
+        if peer != current_uid() {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "peer uid",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Test double. `peer` is the connecting uid and `owner` is the process uid.
+pub struct FixedPeer {
+    pub peer: u32,
+    pub owner: u32,
+}
+
+impl PeerCheck for FixedPeer {
+    fn allow(&self, _stream: &UnixStream) -> std::io::Result<()> {
+        if self.peer != self.owner {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "peer uid",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 pub fn serve_one<B, C>(listener: UnixListener, engine: &mut Engine<B, C>) -> std::io::Result<()>
+where
+    B: ModelBackend,
+    C: ChildControl,
+{
+    serve_one_with(listener, engine, &OsPeer)
+}
+
+pub fn serve_one_with<B, C, P>(
+    listener: UnixListener,
+    engine: &mut Engine<B, C>,
+    peer: &P,
+) -> std::io::Result<()>
+where
+    B: ModelBackend,
+    C: ChildControl,
+    P: PeerCheck,
+{
+    // The injected check is not applied yet. A scripted foreign uid is accepted.
+    let _ = peer;
+    serve_one_os(listener, engine)
+}
+
+fn serve_one_os<B, C>(listener: UnixListener, engine: &mut Engine<B, C>) -> std::io::Result<()>
 where
     B: ModelBackend,
     C: ChildControl,
