@@ -114,4 +114,15 @@ struct ModifierFlagsRepeatTests {
             deviceKeys: [63], flagModifiers: .function, hardwareDown: { _ in false })
         #expect(events == [.flags(keyCode: 63, modifiers: [])])
     }
+
+    /// Sentinel L-1 on #112. A Right Option release must not wait on a hardware read.
+    /// Key codes 54 and 55 are the only ones this path may hold back.
+    @Test func aRightOptionReleaseDoesNotWaitOnHardware() {
+        var reads = 0
+        let held = ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: 61, modifiers: .option, deviceKeys: [58, 61],
+            hardwareDown: { _ in reads += 1; return true })
+        #expect(!held)
+        #expect(reads == 0)
+    }
 }
