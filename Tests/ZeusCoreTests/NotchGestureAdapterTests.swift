@@ -73,6 +73,33 @@ struct NotchGestureAdapterTests {
         #expect(dragged.phase == .idle)
     }
 
+    @Test func aSecondDownWithClickCountOneStillCountsAsADouble() {
+        var adapter = Adapter()
+        _ = adapter.reduce(.down(at: start, x: 0, y: 0, clickCount: 1))
+        _ = adapter.reduce(.up(at: start.addingTimeInterval(0.05), x: 0, y: 0, clickCount: 1))
+        let again = adapter.reduce(.down(at: start.addingTimeInterval(0.2), x: 0, y: 0, clickCount: 1))
+        #expect(kinds(again) == [.down(clickCount: 2)])
+    }
+
+    @Test func aDownWhilePressedRecoversALostMouseUp() {
+        var adapter = Adapter()
+        _ = adapter.reduce(.down(at: start, x: 0, y: 0, clickCount: 1))
+        let again = adapter.reduce(.down(at: start.addingTimeInterval(1), x: 4, y: 4, clickCount: 1))
+        #expect(kinds(again) == [.down(clickCount: 1)])
+        if case .pressed = adapter.phase {} else { Issue.record("the new press is down") }
+        let up = adapter.reduce(.up(at: start.addingTimeInterval(1.1), x: 4, y: 4, clickCount: 1))
+        #expect(kinds(up) == [.up(clickCount: 1)])
+    }
+
+    @Test func cancelDuringSettleStillEmitsTheClick() {
+        var adapter = Adapter()
+        _ = adapter.reduce(.down(at: start, x: 0, y: 0, clickCount: 1))
+        _ = adapter.reduce(.up(at: start.addingTimeInterval(0.05), x: 0, y: 0, clickCount: 1))
+        let cancelled = adapter.reduce(.cancel)
+        #expect(kinds(cancelled) == [.settle(elapsed: Adapter.settleAfter)])
+        #expect(adapter.phase == .idle)
+    }
+
     @Test func cancelDropsAPressThatIsStillWaiting() {
         var adapter = Adapter()
         _ = adapter.reduce(.down(at: start, x: 0, y: 0, clickCount: 1))
