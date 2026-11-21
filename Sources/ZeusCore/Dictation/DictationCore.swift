@@ -257,10 +257,32 @@ public struct DictationStore: Sendable {
         loadHistory(limit: limit).records
     }
 
+    /// One history folder and the time used to pick the newest records.
+    public struct DictationHistorySource: Sendable {
+        public var entries: @Sendable () -> [(url: URL, modified: Date)]
+        public var read: @Sendable (URL) -> Data?
+
+        public init(entries: @escaping @Sendable () -> [(url: URL, modified: Date)], read: @escaping @Sendable (URL) -> Data?) {
+            self.entries = entries
+            self.read = read
+        }
+    }
+
     /// Newest first, plus any metadata file that could not be read. An unreadable `meta.json` is moved
     /// aside to `meta.json.<timestamp>.corrupt` (0600) so it is never overwritten, and listed in
     /// `problems`. Folders with no `meta.json` are not an error.
-    public func loadHistory(limit: Int = 200, now: Date = Date()) -> DictationHistoryLoad {
+    /// An injected source is read in full, then trimmed. The file path does the same.
+    public func loadHistory(limit: Int = 200, now: Date = Date(), source: DictationHistorySource? = nil) -> DictationHistoryLoad {
+        if let source {
+            let decoder = Self.decoder()
+            var records: [DictationRecord] = []
+            for entry in source.entries() {
+                guard let data = source.read(entry.url),
+                      let record = try? decoder.decode(DictationRecord.self, from: data) else { continue }
+                records.append(record)
+            }
+            return DictationHistoryLoad(records: Array(records.sorted { $0.datetime > $1.datetime }.prefix(max(0, limit))), problems: [])
+        }
         let fm = FileManager.default
         let folders = (try? fm.contentsOfDirectory(at: historyDir, includingPropertiesForKeys: nil)) ?? []
         var records: [DictationRecord] = []
