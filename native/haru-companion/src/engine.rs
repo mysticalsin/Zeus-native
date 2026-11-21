@@ -215,11 +215,8 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
     }
 
     fn handle_start(&mut self) -> Vec<Vec<u8>> {
-        if self.begin_model_load().is_err() {
-            return vec![protocol::error_frame(&SessionError::IllegalTransition {
-                from: Box::new(self.host.state().clone()),
-                event: Box::new(SessionEvent::Start),
-            })];
+        if let Err(error) = self.begin_model_load() {
+            return vec![protocol::error_frame(&error)];
         }
         let starting = self.state_message();
         if self.finish_model_load().is_err() {

@@ -438,10 +438,18 @@ impl<C: ChildControl> SessionHost<C> {
     }
 
     /// Idle -> Starting, then spawn. Returns while the load is still in progress.
+    /// A spawn error is `process_exited` and moves the session to `failed`.
+    /// A child already adopted for this session is kept; a second process is not spawned.
     pub fn begin_model_load(&mut self) -> Result<(), SessionError> {
         let next = self.state.next(&SessionEvent::Start)?;
         self.apply(next);
-        self.spawn_child()?;
+        if self.pid.is_some() {
+            return Ok(());
+        }
+        if let Err(error) = self.spawn_child() {
+            self.fail(error.clone())?;
+            return Err(error);
+        }
         Ok(())
     }
 
