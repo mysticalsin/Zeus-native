@@ -10,9 +10,9 @@ public struct BoostSchedule: Equatable, Sendable {
 
     public mutating func boost(now: Double, seconds: Double) -> Double {
         let proposed = now + max(0, seconds)
-        // Red: the latest call wins, even when it is shorter than the one already running.
-        deadline = proposed
-        return proposed
+        let kept = max(deadline ?? proposed, proposed)
+        deadline = kept
+        return kept
     }
 
     public func stillBoosted(at now: Double) -> Bool {

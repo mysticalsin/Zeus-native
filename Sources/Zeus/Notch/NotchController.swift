@@ -36,8 +36,8 @@ final class NotchController {
     private var stallTimer: Timer?
     private var launch = StartGate()
     private var lifecycleObservers: [(NotificationCenter, NSObjectProtocol)] = []
-    private var launch = StartGate()
-    private var lifecycleObservers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var captureBoost = BoostSchedule()
+    private var boostTask: Task<Void, Never>?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
     /// Where the pointer is; tests replace it.
@@ -143,9 +143,17 @@ final class NotchController {
         for entry in panels {
             entry.panel.sharingType = .readOnly
         }
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
-            guard let self else { return }
+        let now = Date().timeIntervalSinceReferenceDate
+        let previous = captureBoost.deadline
+        let until = captureBoost.boost(now: now, seconds: seconds)
+        // A shorter boost must not replace the task that is already waiting for a later deadline.
+        guard until != previous else { return }
+        boostTask?.cancel()
+        boostTask = Task { [weak self] in
+            let delay = until - Date().timeIntervalSinceReferenceDate
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard !Task.isCancelled, let self, self.captureBoost.deadline == until else { return }
+            guard !self.captureBoost.stillBoosted(at: Date().timeIntervalSinceReferenceDate) else { return }
             let visible = ZeusWindowSharing.policy(
                 showInScreenSharing: SettingsStore.shared.bool(ZeusScreenSharePolicy.showInSharingKey),
                 meetingActive: MeetingState.active,
