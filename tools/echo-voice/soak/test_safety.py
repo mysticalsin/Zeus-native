@@ -33,6 +33,30 @@ class ShortRunTests(unittest.TestCase):
             self.assertTrue((out / "replies.jsonl").is_file())
 
 
+class EmptyStatsTests(unittest.TestCase):
+    def test_python_reference_stats_empty_is_finite(self):
+        import types
+        audio = types.ModuleType("haru_mlx.audio")
+        native = types.ModuleType("haru_mlx.native")
+        audio.load_audio = lambda *a, **k: None
+        audio.save_audio = lambda *a, **k: None
+        native.upsample_2x = lambda x: x
+        native.downsample_2x = lambda x: x
+        sys.modules["haru_mlx"] = types.ModuleType("haru_mlx")
+        sys.modules["haru_mlx.audio"] = audio
+        sys.modules["haru_mlx.native"] = native
+        import importlib.util
+        path = SOAK.parent / "pipeline-bench" / "python" / "pipe.py"
+        spec = importlib.util.spec_from_file_location("echo_pipe_under_test", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        got = mod.stats([])
+        self.assertEqual(got["n"], 0)
+        for key in ("p50_ms", "p95_ms", "p99_ms", "max_ms", "mean_ms"):
+            self.assertEqual(got[key], got[key])  # not NaN
+            self.assertNotEqual(abs(got[key]), float("inf"))
+
+
 class SignalTests(unittest.TestCase):
     def test_sigterm_flushes_frames_and_exits_143(self):
         """SIGTERM mid-run must be caught: frames.jsonl is flushed, events.jsonl

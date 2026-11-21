@@ -1,0 +1,11 @@
+//! Sweep regressions. These are not the original red-first invariants.
+use haru_pipe::stats::summary_json;
+
+#[test]
+fn empty_summary_is_finite_json() {
+    let s = summary_json(&[]);
+    assert!(s.contains("\"n\": 0"), "{s}");
+    let lower = s.to_ascii_lowercase();
+    assert!(!lower.contains("nan"), "{s}");
+    assert!(!lower.contains("inf"), "{s}");
+}
