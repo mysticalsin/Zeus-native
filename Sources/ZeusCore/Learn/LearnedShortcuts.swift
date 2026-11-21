@@ -93,7 +93,7 @@ public struct LearnedShortcutStore: Equatable, Sendable {
     public func write(to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(book)
-        try data.write(to: url)
+        try data.write(to: url, options: .atomic)
     }
 
     private mutating func push() {
@@ -196,11 +196,15 @@ public final class LearnedShortcutDisk: @unchecked Sendable {
     public func save(phrase: String, steps: [String], verified: Bool) -> LearnSave {
         lock.lock(); defer { lock.unlock() }
         let result = store.save(phrase: phrase, steps: steps, verified: verified)
-        if case .saved = result {
-            try? writeFault?()
-            try? store.write(to: url)
+        guard case .saved = result else { return result }
+        do {
+            try writeFault?()
+            try store.write(to: url)
+            return result
+        } catch {
+            _ = store.undo()
+            return .rejected("Couldn't save that shortcut. It is not stored.")
         }
-        return result
     }
 
     @discardableResult
