@@ -186,16 +186,41 @@ import Testing
         #expect(result.enabled == true)
         #expect(result.volume == 0.5)
         #expect(result.close == nil)
-        #expect(result.open == ChimeFileReference(path: owned.path, bookmark: Data([4])))
+        #expect(result.open == nil)
         #expect(FileManager.default.fileExists(atPath: missing) == false)
         #expect(try Data(contentsOf: owned) == original)
-        #expect(result.open?.path == owned.path)
 
         let refused = ChimeSettingsImport.applying(imported: imported) { _ in false }
         #expect(refused.close == nil)
         #expect(refused.open == nil)
         #expect(ChimeSettingsImport.storedPath(path: missing, readable: false) == "")
         #expect(ChimeSettingsImport.storedPath(path: "  ", readable: true) == "")
+    }
+
+    /// An imported settings file must not choose a chime file, even when the path exists and can be read.
+    @Test func importRejectsAReadableChimePath() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("zeus-chime-reject-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let close = root.appendingPathComponent("close.wav")
+        let open = root.appendingPathComponent("open.wav")
+        try Data([1, 1, 1, 1]).write(to: close)
+        try Data([2, 2, 2, 2]).write(to: open)
+        let imported = ChimeSettingsSnapshot(
+            enabled: false,
+            volume: 0.2,
+            close: ChimeFileReference(path: close.path, bookmark: Data([3])),
+            open: ChimeFileReference(path: open.path, bookmark: Data([4])))
+        let result = ChimeSettingsImport.applying(imported: imported) { path in
+            FileManager.default.isReadableFile(atPath: path)
+        }
+        #expect(result.enabled == false)
+        #expect(result.volume == 0.2)
+        #expect(result.close == nil)
+        #expect(result.open == nil)
+        #expect(try Data(contentsOf: close) == Data([1, 1, 1, 1]))
+        #expect(try Data(contentsOf: open) == Data([2, 2, 2, 2]))
     }
 
     @Test func playbackStaysOffWhenDisabledOrFocusIsActive() {
