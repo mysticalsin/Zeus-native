@@ -281,6 +281,83 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(calls == 2)
     }
 
+    @Test func speakKokoroSchedulesTheFirstClauseInsideTheOneSecondBudget() {
+        let text = longAnswer
+        var clock = SpeechManualClock()
+        let fullCost = 5.31
+        var scheduledAt: [Double] = []
+        let receipt = KokoroClausePlayback.speak(
+            text: text,
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            synthesize: { chunk, clock in
+                clock.advance(by: fullCost * Double(chunk.count) / Double(text.count))
+                return kokoroCrestReply(sampleRate: 24_000)
+            },
+            schedule: { _, at in scheduledAt.append(at) })
+        #expect(receipt.accepted)
+        #expect(receipt.chunks.count >= 2)
+        #expect((40...90).contains(receipt.chunks[0].count))
+        let first = try #require(receipt.firstAudioAt)
+        #expect(first < receipt.fullRenderCompletedAt)
+        #expect(first < KokoroClausePlayback.firstAudioBudgetSeconds)
+        #expect(first <= 1.0)
+        #expect(scheduledAt.first == first)
+        #expect(scheduledAt.count == receipt.chunks.count)
+    }
+
+    @Test func eachClauseAndTheJoinedStreamStayAtOrBelowMinusOneDBTP() {
+        var clock = SpeechManualClock()
+        let receipt = KokoroClausePlayback.speak(
+            text: longAnswer,
+            personaVoiceID: OriginalSyntheticVoice.id,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            synthesize: { _, _ in kokoroCrestReply(sampleRate: 24_000) },
+            schedule: { _, _ in })
+        #expect(receipt.scheduled.count >= 2)
+        for clause in receipt.scheduled {
+            #expect(TruePeakLimiter.truePeakDBTP(clause, sampleRate: 24_000) <= -1.0)
+        }
+        #expect(TruePeakLimiter.truePeakDBTP(receipt.joined, sampleRate: 24_000) <= -1.0)
+    }
+
+    @Test func theNormalizedFullReplyLandsNearMinusSeventeenPointEightLUFS() {
+        let reply = kokoroCrestReply(sampleRate: 24_000)
+        let shaped = KokoroClausePlayback.normalizedFullReply(reply, sampleRate: 24_000, output: VoiceStreamPolish())
+        let lufs = LoudnessNormalizer.measureIntegratedLUFS(shaped, sampleRate: 24_000)
+        #expect(abs(lufs - (-17.8)) <= 0.5)
+        #expect(TruePeakLimiter.truePeakDBTP(shaped, sampleRate: 24_000) <= -1.0)
+    }
+
+    @Test func onlyTheOriginalSyntheticVoiceIsSpoken() {
+        let refused = ["am_michael", "bm_george", "JARVIS (MCU)", "JARVIS MCU", "Paul Bettany", "Bettany", "preset-not-used", ""]
+        for voiceID in refused {
+            var clock = SpeechManualClock()
+            var scheduled = 0
+            let receipt = KokoroClausePlayback.speak(
+                text: "The reply is spoken one sentence at a time. The next sentence waits.",
+                personaVoiceID: voiceID,
+                sampleRate: 24_000,
+                clock: &clock,
+                output: VoiceStreamPolish(),
+                synthesize: { _, clock in
+                    clock.advance(by: 2)
+                    return [Float](repeating: 0.2, count: 800)
+                },
+                schedule: { _, _ in scheduled += 1 })
+            #expect(!receipt.accepted, voiceID)
+            #expect(receipt.scheduled.isEmpty, voiceID)
+            #expect(scheduled == 0, voiceID)
+            #expect(clock.seconds == 0, voiceID)
+        }
+        #expect(OriginalSyntheticVoice.accepts("zeus.synthetic"))
+        #expect(!OriginalSyntheticVoice.accepts("am_michael"))
+    }
+
     @Test func pipelineNamesEveryStageWithoutADefault() {
         #expect(VoiceStreamPolish.pipeline == [.clauseChunk, .loudness, .crossfade, .primer, .limiter])
         var seen: [String] = []
@@ -309,6 +386,31 @@ private func stageName(_ stage: SpeechPolishStage) -> String {
     case .primer: "primer"
     case .limiter: "limiter"
     }
+}
+
+/// Body 0.08 and a peak of 0.55 every 250 samples. pyloudnorm 0.1.1 on this shape,
+/// after a gain to -16 LUFS and a -1 dBTP limit, is about -17.69 LUFS.
+private func kokoroCrestReply(sampleRate: Double) -> [Float] {
+    let count = Int(sampleRate) * 2
+    var state: UInt32 = 0xC0FFEE
+    var raw = [Double]()
+    raw.reserveCapacity(count)
+    var peak = 0.0
+    for _ in 0..<count {
+        state = 1664525 &* state &+ 1013904223
+        let unit = (Double(state) / 4294967295.0) * 2 - 1
+        raw.append(unit)
+        peak = max(peak, abs(unit))
+    }
+    var samples = raw.map { Float($0 / peak * 0.08) }
+    var index = 0
+    var spike = 0
+    while index < samples.count {
+        samples[index] = spike % 2 == 0 ? 0.55 : -0.55
+        spike += 1
+        index += 250
+    }
+    return samples
 }
 
 private func tone(count: Int, frequency: Double, amplitude: Float, sampleRate: Double, phase: Double) -> [Float] {
