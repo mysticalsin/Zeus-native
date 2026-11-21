@@ -1,173 +1,513 @@
-import SwiftUI
+import Foundation
+#if canImport(ZeusCore)
 import ZeusCore
+#endif
 
-/// Chat tab as the agent hub. Running Claude Code, Codex, Gemini and Cursor sessions on the left,
-/// the selected one on the right with a reply field that types into its terminal (after an approval
-/// card); "New chat" picks an agent, a project folder and an instruction and starts it in a terminal.
-/// ZEUS's own chat keeps its transcript, History and floating window.
+struct ChatBarState: Equatable {
+    var transcript: HubTranscript
+    var selectedID: UUID?
+    var showsNewChatForm: Bool
+    var draft: String
+    var composerFocused: Bool
+}
+
+struct ChatBarLog: Equatable {
+    var source: String
+    var stage: String
+    var detail: String
+}
+
+enum ChatBarEvent: Equatable {
+    case send(String)
+    case delta(String)
+    case finish(String)
+    case finishEmpty
+    case stop
+    case failure(String)
+    case transcriptTap
+    case selectHistory(UUID)
+    case newChat
+    case copy(String)
+}
+
+struct ChatBarEffect: Equatable {
+    var state: ChatBarState
+    var opensWindow: Bool
+    var writes: Bool
+    var log: ChatBarLog?
+    var sendToModel: Bool
+    var stopModel: Bool
+}
+
+struct ChatBarPresentedLine: Equatable {
+    var id: String
+    var role: HubLineRole
+    var text: String
+    var parsesAsMarkdown: Bool { role == .agent && !text.isEmpty }
+}
+
+struct ChatBarPresentation: Equatable {
+    var status: HubTranscriptStatus
+    var lines: [ChatBarPresentedLine]
+}
+
+struct ChatBarComposerChrome: Equatable {
+    var placeholder: String
+    var showsStop: Bool
+    var sendEnabled: Bool
+    var sendQuiet: Bool
+}
+
+struct ChatBarHistorySection: Equatable {
+    var title: String
+    var ids: [UUID]
+}
+
+struct ChatBarMotion: Equatable {
+    var offset: Double
+    var scale: Double
+}
+
+enum ChatBarPage {
+    static let listWidth = 270.0
+    static let emptyTitle = "New conversation"
+    static let emptyDetail = "Chats stay in History on this Mac."
+    static let newChatTitle = "New chat"
+    static let composerPlaceholder = "Message Zeus"
+    static let selectionOpacity = 0.12
+    static let idleRowOpacity = 0.0
+    static let sectionOrder = ["Pinned", "Today", "Yesterday", "Previous 7 days", "Older"]
+    static let historyRowsUseStatusColor = false
+    static let newChatAccentFill = false
+
+    static func reduce(_ state: ChatBarState, _ event: ChatBarEvent, lineID: UUID = UUID()) -> ChatBarEffect {
+        var state = state
+        var writes = false
+        var log: ChatBarLog?
+        var sendToModel = false
+        var stopModel = false
+
+        switch event {
+        case .send(let text):
+            let spoken = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if spoken.isEmpty {
+                log = ChatBarLog(source: "chat", stage: "idle", detail: "current")
+            } else if state.transcript.status != .streaming {
+                let effect = HubTranscriptMachine.reduce(state.transcript, .send, text: spoken, lineID: lineID)
+                state.transcript = effect.transcript
+                writes = effect.writes
+                sendToModel = true
+                state.draft = ""
+            }
+        case .delta(let text):
+            let effect = HubTranscriptMachine.reduce(state.transcript, .delta, text: text, lineID: lineID)
+            state.transcript = effect.transcript
+            writes = effect.writes
+        case .finish(let text):
+            let effect = HubTranscriptMachine.reduce(state.transcript, .finish, text: text, lineID: lineID)
+            writes = effect.writes
+            state.transcript = effect.transcript
+            if writes { log = ChatBarLog(source: "chat", stage: "settled", detail: "current") }
+        case .finishEmpty:
+            let effect = HubTranscriptMachine.reduce(state.transcript, .finishEmpty, text: "", lineID: lineID)
+            writes = effect.writes
+            state.transcript = effect.transcript
+            if writes { log = ChatBarLog(source: "chat", stage: "failed", detail: "current") }
+        case .stop:
+            let kept = openAgentText(state.transcript.lines)
+            let effect = HubTranscriptMachine.reduce(state.transcript, .stop, text: "", lineID: lineID)
+            writes = effect.writes
+            state.transcript = effect.transcript
+            if writes {
+                stopModel = true
+                log = ChatBarLog(source: "chat", stage: kept ? "settled" : "stopped", detail: "current")
+            }
+        case .failure(let text):
+            let effect = HubTranscriptMachine.reduce(state.transcript, .failure, text: text, lineID: lineID)
+            writes = effect.writes
+            state.transcript = effect.transcript
+            if writes { log = ChatBarLog(source: "chat", stage: "failed", detail: "current") }
+        case .transcriptTap:
+            state.composerFocused = true
+            log = ChatBarLog(source: "chat", stage: "tab", detail: "chat")
+        case .selectHistory(let id):
+            state.selectedID = id
+            state.showsNewChatForm = false
+            log = ChatBarLog(source: "chat", stage: "select", detail: "current")
+        case .newChat:
+            state.showsNewChatForm.toggle()
+        case .copy:
+            log = ChatBarLog(source: "chat", stage: "copy", detail: "current")
+        }
+
+        return ChatBarEffect(
+            state: state,
+            opensWindow: false,
+            writes: writes,
+            log: log,
+            sendToModel: sendToModel,
+            stopModel: stopModel
+        )
+    }
+
+    static func present(messages: [ChatMessage], sending: Bool) -> ChatBarPresentation {
+        let lines = messages.map { message -> ChatBarPresentedLine in
+            let role: HubLineRole
+            switch message.role {
+            case .user:
+                role = .person
+            case .assistant:
+                if message.failed {
+                    role = .failed
+                } else if isStopped(message.text) {
+                    role = .stopped
+                } else {
+                    role = .agent
+                }
+            }
+            return ChatBarPresentedLine(id: message.id.uuidString, role: role, text: message.text)
+        }
+        let status: HubTranscriptStatus
+        if sending {
+            status = .streaming
+        } else if lines.last?.role == .failed {
+            status = .failed
+        } else if lines.isEmpty {
+            status = .idle
+        } else {
+            status = .settled
+        }
+        return ChatBarPresentation(status: status, lines: lines)
+    }
+
+    /// The stored transcript the page table reads. Message ids round-trip, so a later delta keeps the line.
+    static func transcript(messages: [ChatMessage], sending: Bool) -> HubTranscript {
+        let presentation = present(messages: messages, sending: sending)
+        let lines = presentation.lines.map { line in
+            StoredTranscriptLine(
+                id: UUID(uuidString: line.id) ?? UUID(),
+                role: line.role,
+                text: line.text,
+                failed: line.role == .failed
+            )
+        }
+        return HubTranscript(status: presentation.status, lines: lines)
+    }
+
+    static func composer(draft: String, sendingHere: Bool, busyElsewhere: Bool) -> ChatBarComposerChrome {
+        let cleaned = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sendEnabled = !sendingHere && !busyElsewhere && !cleaned.isEmpty
+        return ChatBarComposerChrome(
+            placeholder: busyElsewhere ? "Zeus is answering in another chat" : composerPlaceholder,
+            showsStop: sendingHere,
+            sendEnabled: sendEnabled,
+            sendQuiet: !sendEnabled
+        )
+    }
+
+    static func history(_ conversations: [ChatConversation], now: Date = Date(), calendar: Calendar = .current) -> [ChatBarHistorySection] {
+        ChatSection.group(conversations, now: now, calendar: calendar).map { group in
+            ChatBarHistorySection(title: group.section.title, ids: group.conversations.map(\.id))
+        }
+    }
+
+    static func motion(reduceMotion: Bool) -> ChatBarMotion {
+        reduceMotion ? ChatBarMotion(offset: 0, scale: 1) : ChatBarMotion(offset: 8, scale: 0.985)
+    }
+
+    /// A non-empty chat, and a visual-only link, still go through the existing conversation JSON.
+    static func save(_ conversation: ChatConversation, to store: ChatStore) throws {
+        try store.save(conversation)
+    }
+
+    private static func isStopped(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed == "Stopped." || trimmed == HubTranscriptNotice.stopped.storedLabel
+    }
+
+    private static func openAgentText(_ lines: [StoredTranscriptLine]) -> Bool {
+        guard let open = lines.last, open.role == .agent, !open.failed else { return false }
+        return !open.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+#if canImport(ZeusCore)
+typealias StoredTranscriptLine = ZeusCore.HubTranscriptLine
+#else
+typealias StoredTranscriptLine = HubTranscriptLine
+#endif
+
+#if canImport(SwiftUI)
+import SwiftUI
+
+/// Zeus's own conversation, inside the glass page. The composer sends, Stop shows while a reply
+/// streams, and history is grouped. A tap on the transcript stays in the bar.
 struct ChatPage: View {
     let chat: ChatModel
     @Bindable var hub: AgentHub = .shared
-    @AppStorage("chat.page.showHistory") private var showHistory = false
-
-    private var sessions: [NotchModel.Session] { hub.sessions }
-    private var selected: NotchModel.Session? { sessions.first { $0.id == hub.selectedSession } }
-    private var zeusChatHasContent: Bool { !chat.current.messages.isEmpty || chat.isSendingHere }
-    private var isEmpty: Bool { !showHistory && !hub.creating && sessions.isEmpty && !zeusChatHasContent }
+    @FocusState private var composerFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                capsule("New chat", symbol: "plus", active: hub.creating) {
-                    showHistory = false
-                    if hub.creating { hub.creating = false } else { hub.beginNewChat() }
-                }
-                capsule("History", count: chat.conversations.count, symbol: "clock", active: showHistory) {
-                    hub.creating = false
-                    withAnimation(TopBarStyle.pageSpring) { showHistory.toggle() }
-                }
-                Spacer(minLength: 0)
-                if chat.isSending {
-                    Text("Writing…").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudQuiet).transition(.opacity)
-                }
-            }
-            if hub.creating {
-                NewChatForm(hub: hub)
-            } else if showHistory {
+        if hub.creating {
+            NewChatForm(hub: hub)
+        } else {
+            HStack(alignment: .top, spacing: 10) {
+                historyColumn.frame(width: CGFloat(ChatBarPage.listWidth))
                 Tile(padding: 14) {
-                    history.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
-            } else if isEmpty {
-                GlanceSplitEmpty(
-                    leftTitle: "Chat",
-                    left: AnyView(AvatarView(state: .idle, size: 96).frame(maxWidth: .infinity, maxHeight: .infinity)),
-                    title: "Nothing running",
-                    detail: "Start a chat with your favorite agent",
-                    primary: "New chat",
-                    primaryAction: { hub.beginNewChat() }
-                )
-            } else {
-                HStack(alignment: .top, spacing: 10) {
-                    Tile(padding: 8) { agentList }.frame(width: 270)
-                    Tile(padding: 14) {
-                        detail.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: Agents
-
-    private var agentList: some View {
-        PageScroll(.vertical) {
-            VStack(spacing: 3) {
-                if zeusChatHasContent {
-                    listRow(title: "Zeus", subtitle: chat.current.displayTitle, color: Theme.accent, picked: selected == nil) { hub.selectedSession = nil }
-                }
-                ForEach(sessions) { session in
-                    listRow(agent: session.agent, subtitle: MeetingState.hideDetails ? session.status.label : "\(session.project) · \(session.status.label)",
-                            color: session.status.color, picked: selected?.id == session.id) { hub.selectedSession = session.id }
-                }
-            }
-        }
-    }
-
-    private func listRow(title: String? = nil, agent: String? = nil, subtitle: String, color: Color, picked: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Circle().fill(color).frame(width: 7, height: 7).shadow(color: color, radius: 3)
-                VStack(alignment: .leading, spacing: 1) {
-                    if let agent {
-                        HStack(spacing: 6) {
-                            EngineBrandLogo(agentLabel: agent, size: 14).accessibilityHidden(true)
-                            Text(agent).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                    if let session = selectedAgent {
+                        AgentReplyPane(hub: hub, session: session)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            transcript
+                            composer
                         }
-                    } else if let title {
-                        Text(title).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
-                    Text(subtitle).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 9)
-            .frame(height: 38)
-            .background(Color.white.opacity(picked ? 0.12 : 0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .contentShape(Rectangle())
+        }
+    }
+
+    private var selectedAgent: NotchModel.Session? {
+        hub.sessions.first { $0.id == hub.selectedSession }
+    }
+
+    private func snapshot() -> ChatBarState {
+        ChatBarState(
+            transcript: ChatBarPage.transcript(messages: chat.current.messages, sending: chat.isSendingHere),
+            selectedID: chat.currentID,
+            showsNewChatForm: hub.creating,
+            draft: chat.draft,
+            composerFocused: composerFocused
+        )
+    }
+
+    private func note(_ log: ChatBarLog?) {
+        guard let log else { return }
+        FlightRecorder.shared.record(log.source, log.stage, log.detail)
+    }
+
+    private var historyColumn: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                let effect = ChatBarPage.reduce(snapshot(), .newChat)
+                note(effect.log)
+                if effect.state.showsNewChatForm {
+                    hub.selectedSession = nil
+                    hub.beginNewChat()
+                } else { hub.creating = false }
+            } label: {
+                Text(ChatBarPage.newChatTitle)
+                    .font(TopBarStyle.label(12, .semibold))
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
+                    .background(Color.white.opacity(0.07), in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel(ChatBarPage.newChatTitle)
+
+            if !hub.sessions.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agents")
+                        .font(TopBarStyle.label(10, .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.cloudQuiet)
+                        .padding(.top, 4)
+                        .padding(.horizontal, 8)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(hub.sessions) { session in
+                        agentRow(session)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Agents")
+            }
+
+            Group {
+                if chat.conversations.isEmpty {
+                    Text("No chats yet.")
+                        .font(TopBarStyle.label(12))
+                        .foregroundStyle(Theme.cloudQuiet)
+                        .padding(.horizontal, 8)
+                } else {
+                    PageScroll(.vertical) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            let sections = ChatBarPage.history(chat.conversations)
+                            ForEach(sections, id: \.title) { section in
+                                Text(section.title)
+                                    .font(TopBarStyle.label(10, .semibold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(Theme.cloudQuiet)
+                                    .padding(.top, 8)
+                                    .padding(.horizontal, 8)
+                                    .accessibilityAddTraits(.isHeader)
+                                ForEach(section.ids, id: \.self) { id in
+                                    if let conversation = chat.conversations.first(where: { $0.id == id }) {
+                                        historyRow(conversation)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("History")
+        }
+    }
+
+    private func historyRow(_ conversation: ChatConversation) -> some View {
+        let picked = selectedAgent == nil && conversation.id == chat.currentID
+        return Button {
+            let effect = ChatBarPage.reduce(snapshot(), .selectHistory(conversation.id))
+            note(effect.log)
+            chat.select(conversation.id)
+            hub.selectedSession = nil
+            hub.creating = effect.state.showsNewChatForm
+        } label: {
+            Text(conversation.displayTitle)
+                .font(TopBarStyle.label(12.5, picked ? .semibold : .regular))
+                .foregroundStyle(picked ? Theme.cloudPrimary : Theme.cloudSecondary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    Color.white.opacity(picked ? ChatBarPage.selectionOpacity : ChatBarPage.idleRowOpacity),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityLabel(conversation.displayTitle)
         .accessibilityAddTraits(picked ? .isSelected : [])
     }
 
-    @ViewBuilder
-    private var detail: some View {
-        if let session = selected {
-            AgentReplyPane(hub: hub, session: session)
-        } else if zeusChatHasContent {
-            ChatTranscriptView(chat: chat, compact: true)
-                .contentShape(Rectangle())
-                .onTapGesture { chat.openWindow() }
-        } else {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Pick an agent").font(TopBarStyle.label(13, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                Text("Reply to a running session from here, or start a new chat.").font(TopBarStyle.label(11.5)).foregroundStyle(Theme.cloudQuiet)
-            }
-        }
-    }
-
-    private func capsule(_ title: String, count: Int? = nil, symbol: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: symbol).font(.system(size: 10.5, weight: .semibold))
-                Text(title).font(TopBarStyle.label(12, .semibold))
-                if let count, count > 0 {
-                    Text("\(count)").font(TopBarStyle.label(11, .semibold).monospacedDigit()).foregroundStyle(Theme.cloudQuiet)
-                }
-            }
-            .foregroundStyle(active ? Theme.cloudPrimary : Theme.cloudSecondary)
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .background(Color.white.opacity(active ? 0.14 : 0.07), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(PressableStyle())
-    }
-
-    private var history: some View {
-        Group {
-            if chat.conversations.isEmpty {
-                Text("No chats yet.").font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudQuiet)
-            } else {
-                PageScroll(.vertical) {
-                    LazyVStack(spacing: 4) {
-                        ForEach(chat.conversations) { conversation in row(conversation) }
-                    }
-                }
-            }
-        }
-    }
-
-    private func row(_ conversation: ChatConversation) -> some View {
-        let selected = conversation.id == chat.currentID
+    private func agentRow(_ session: NotchModel.Session) -> some View {
+        let picked = session.id == hub.selectedSession
+        let subtitle = MeetingState.hideDetails ? session.status.label : "\(session.project) · \(session.status.label)"
         return Button {
-            chat.select(conversation.id)
-            hub.selectedSession = nil
-            withAnimation(TopBarStyle.pageSpring) { showHistory = false }
+            hub.selectedSession = session.id
         } label: {
             HStack(spacing: 8) {
-                Text(conversation.displayTitle).font(TopBarStyle.label(12, selected ? .semibold : .medium))
-                    .foregroundStyle(selected ? Theme.cloudPrimary : Theme.cloudSecondary).lineLimit(1)
+                Text(session.agent)
+                    .font(TopBarStyle.label(12.5, picked ? .semibold : .regular))
+                    .foregroundStyle(picked ? Theme.cloudPrimary : Theme.cloudSecondary)
+                    .lineLimit(1)
                 Spacer(minLength: 4)
-                Text(conversation.updatedAt, format: .relative(presentation: .named, unitsStyle: .narrow))
-                    .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
+                Text(subtitle)
+                    .font(TopBarStyle.label(10.5))
+                    .foregroundStyle(Theme.cloudQuiet)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 30)
-            .background(Color.white.opacity(selected ? 0.10 : 0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                Color.white.opacity(picked ? ChatBarPage.selectionOpacity : ChatBarPage.idleRowOpacity),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityLabel("\(session.agent), \(subtitle)")
+        .accessibilityHint("Reply from this page")
+        .accessibilityAddTraits(picked ? .isSelected : [])
+    }
+
+    private var transcript: some View {
+        let presentation = ChatBarPage.present(messages: chat.current.messages, sending: chat.isSendingHere)
+        return VStack(alignment: .leading, spacing: 0) {
+            if presentation.lines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ChatBarPage.emptyTitle)
+                        .font(TopBarStyle.label(13, .semibold))
+                        .foregroundStyle(Theme.cloudPrimary)
+                    Text(ChatBarPage.emptyDetail)
+                        .font(TopBarStyle.label(11.5))
+                        .foregroundStyle(Theme.cloudQuiet)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                HubTranscriptView(
+                    lines: presentation.lines.map { HubTranscriptLine(id: $0.id, role: $0.role, text: $0.text) },
+                    status: presentation.status
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .contentShape(Rectangle())
+        .simultaneousGesture(TapGesture().onEnded {
+            let effect = ChatBarPage.reduce(snapshot(), .transcriptTap)
+            note(effect.log)
+            composerFocused = effect.state.composerFocused
+        })
+        .onChange(of: chat.isSendingHere) {
+            guard !chat.isSendingHere else { return }
+            let shown = ChatBarPage.present(messages: chat.current.messages, sending: false)
+            let stage: String
+            switch shown.lines.last?.role {
+            case .failed: stage = "failed"
+            case .stopped: stage = "stopped"
+            default: stage = "settled"
+            }
+            FlightRecorder.shared.record("chat", stage, "current")
+        }
+    }
+
+    private var composer: some View {
+        let chrome = ChatBarPage.composer(draft: chat.draft, sendingHere: chat.isSendingHere, busyElsewhere: chat.busyElsewhere)
+        return HStack(spacing: 8) {
+            TextField(
+                chrome.placeholder,
+                text: Binding(get: { chat.draft }, set: { chat.draft = $0 }),
+                axis: .vertical
+            )
+            .textFieldStyle(.plain)
+            .font(TopBarStyle.label(12.5))
+            .foregroundStyle(Theme.cloudPrimary)
+            .lineLimit(1...4)
+            .focused($composerFocused)
+            .accessibilityIdentifier("chat.message")
+            .onSubmit { submit() }
+            if chrome.showsStop {
+                mark(symbol: "stop.fill", label: "Stop", filled: true, action: stop)
+            } else {
+                mark(symbol: "arrow.up", label: "Send", filled: chrome.sendEnabled, action: submit)
+                    .opacity(chrome.sendQuiet ? 0.4 : 1)
+                    .disabled(!chrome.sendEnabled)
+            }
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 4)
+        .frame(minHeight: 30)
+        .background(Color.white.opacity(0.06), in: Capsule())
+    }
+
+    private func mark(symbol: String, label: String, filled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(filled ? Color.black : Theme.cloudQuiet)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(filled ? Color.white : Color.white.opacity(0.10)))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(label)
+    }
+
+    private func submit() {
+        let effect = ChatBarPage.reduce(snapshot(), .send(chat.draft))
+        note(effect.log)
+        if effect.sendToModel { chat.send() }
+    }
+
+    private func stop() {
+        let effect = ChatBarPage.reduce(snapshot(), .stop)
+        note(effect.log)
+        if effect.stopModel { chat.stop() }
     }
 }
 
@@ -183,47 +523,6 @@ extension NotchModel.Status {
         case .stalled: "Stalled"
         }
     }
-}
-
-/// The selected session: what it is doing, a reply field and the way to its terminal.
-private struct AgentReplyPane: View {
-    @Bindable var hub: AgentHub
-    let session: NotchModel.Session
-
-    var body: some View {
-        let canType = hub.canReply(to: session.id)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                EngineBrandLogo(agentLabel: session.agent, size: 16).accessibilityHidden(true)
-                Text(session.agent).font(TopBarStyle.label(13, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                if !MeetingState.hideDetails {
-                    Text(session.project).font(TopBarStyle.label(11.5)).foregroundStyle(Theme.cloudQuiet)
-                }
-                Spacer(minLength: 0)
-                Text(session.status.label).font(TopBarStyle.label(11, .semibold)).foregroundStyle(session.status.color)
-            }
-            Text(MeetingState.hideDetails ? "Details hidden" : (session.reason ?? session.task))
-                .font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
-            Spacer(minLength: 0)
-            HStack(spacing: 8) {
-                NotchTextField(text: $hub.replyDraft, placeholder: canType ? "Reply to \(session.agent)" : "Reply in the terminal", onSubmit: send)
-                    .padding(.horizontal, 10).frame(height: 30)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .disabled(!canType)
-                    .opacity(canType ? 1 : 0.5)
-                if AgentTerminals.shared.canJump(to: session.id) {
-                    CardButton(title: "Open", tint: Theme.cloudSecondary, filled: false) { hub.openTerminal(session.id) }
-                }
-                CardButton(title: hub.sending ? "Sending…" : "Send", tint: Theme.accent, filled: true, action: send)
-                    .opacity(canType && !hub.replyDraft.trimmingCharacters(in: .whitespaces).isEmpty ? 1 : 0.4)
-                    .disabled(!canType || hub.sending)
-            }
-            Text(hub.receipt ?? (canType ? "A card asks before anything is typed into the terminal." : "Replies can be typed into Terminal and iTerm2 sessions."))
-                .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
-        }
-    }
-
-    private func send() { Task { await hub.sendReply(session: session) } }
 }
 
 /// New chat: agent, project folder, instruction, Start.
@@ -291,3 +590,4 @@ private struct NewChatForm: View {
 
     private func start() { Task { await hub.launch() } }
 }
+#endif
