@@ -214,6 +214,17 @@ public final class UnixSocketServer: @unchecked Sendable {
     /// dev/inode of the socket created by a successful bind. A later file at the same path is left alone.
     private var boundDevice: UInt64?
     private var boundInode: UInt64?
+    /// What `lstat` reports for one directory entry. A symlink keeps its own inode.
+    struct DirectoryEntry: Equatable, Sendable {
+        var device: UInt64
+        var inode: UInt64
+        enum Kind: Equatable, Sendable { case socket, symlink, regular, other }
+        var kind: Kind
+    }
+    /// Test hook. When set, unlink reads this instead of `lstat`. Nil in production.
+    static let unlinkProbeLock = NSLock()
+    nonisolated(unsafe) static var unlinkProbe: (@Sendable (String) -> DirectoryEntry?)?
+    nonisolated(unsafe) static var lastUnlinkProbe: DirectoryEntry?
     /// Test hook. Called after bind and before chmod/listen. Return false to take the failure path.
     nonisolated(unsafe) static let rejectListenLock = NSLock()
     nonisolated(unsafe) static var rejectListenAfterBind: (@Sendable (String) -> Bool)?

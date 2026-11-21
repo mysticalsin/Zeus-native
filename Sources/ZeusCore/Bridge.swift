@@ -226,6 +226,14 @@ public enum BridgeHostStartup {
 
     public static let steps: [Step] = [.bindSocket, .armStdin, .captureIdentity, .markIdentityReady]
 
+    /// Calls identity before stdin. The host can ignore `steps` until this follows that list.
+    public static func drive(_ perform: (Step) -> Void) {
+        perform(.bindSocket)
+        perform(.captureIdentity)
+        perform(.armStdin)
+        perform(.markIdentityReady)
+    }
+
     public static func identityIsCapturedImmediatelyAfterStdin(_ steps: [Step] = steps) -> Bool {
         guard steps.first == .bindSocket, steps.last == .markIdentityReady, steps.count == 4,
               let stdin = steps.firstIndex(of: .armStdin),

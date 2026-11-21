@@ -280,6 +280,92 @@ struct BridgePendingRepliesTests {
         #expect(BridgeHostStartup.identityIsCapturedImmediatelyAfterStdin())
     }
 
+    @Test func driveRunsTheSharedStartupListInOrder() {
+        var seen: [BridgeHostStartup.Step] = []
+        BridgeHostStartup.drive { seen.append($0) }
+        #expect(seen == [.bindSocket, .armStdin, .captureIdentity, .markIdentityReady])
+        #expect(seen == BridgeHostStartup.steps)
+    }
+
+    @Test func theHostDrivesThatListAndNoOtherOrder() throws {
+        let source = try String(contentsOf: repositoryRoot().appendingPathComponent("Sources/zeus-bridge/main.swift"), encoding: .utf8)
+        let drive = try #require(source.range(of: "BridgeHostStartup.drive {"))
+        #expect(source.range(of: "for step in") == nil)
+        let bind = try #require(source.range(of: "server.start()"))
+        let arm = try #require(source.range(of: "input.start("))
+        let capture = try #require(source.range(of: "PeerSigning.captureOwnIdentity()"))
+        let ready = try #require(source.range(of: "noteIdentityReady()"))
+        #expect(drive.lowerBound < bind.lowerBound)
+        #expect(drive.lowerBound < arm.lowerBound)
+        #expect(drive.lowerBound < capture.lowerBound)
+        #expect(drive.lowerBound < ready.lowerBound)
+        #expect(source.components(separatedBy: "PeerSigning.captureOwnIdentity()").count == 2)
+        #expect(source.components(separatedBy: "input.start(").count == 2)
+        #expect(source.components(separatedBy: "server.start()").count == 2)
+        #expect(source.components(separatedBy: "noteIdentityReady()").count == 2)
+    }
+
+    @Test func finishLeavesASocketWithTheSameInodeOnAnotherDevice() throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("chrome.sock").path
+        let server = UnixSocketServer(path: path) { _, _ in }
+        try server.start()
+        defer { server.stop(); clearUnlinkProbe() }
+        var info = stat()
+        #expect(lstat(path, &info) == 0)
+        let inode = UInt64(info.st_ino)
+        let device = UInt64(info.st_dev)
+        UnixSocketServer.unlinkProbeLock.lock()
+        UnixSocketServer.unlinkProbe = { _ in
+            UnixSocketServer.DirectoryEntry(device: device &+ 1, inode: inode, kind: .socket)
+        }
+        UnixSocketServer.unlinkProbeLock.unlock()
+        server.stop()
+        var after = stat()
+        #expect(lstat(path, &after) == 0)
+        #expect((after.st_mode & S_IFMT) == S_IFSOCK)
+        #expect(UInt64(after.st_ino) == inode && UInt64(after.st_dev) == device)
+    }
+
+    @Test func finishKeepsASymlinkToARegularFileByLstat() throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("chrome.sock")
+        let file = root.appendingPathComponent("notes.txt")
+        let text = Data("keep-the-file".utf8)
+        try text.write(to: file)
+        let server = UnixSocketServer(path: url.path) { _, _ in }
+        try server.start()
+        defer { server.stop(); clearUnlinkProbe() }
+        clearUnlinkProbe()
+        #expect(unlink(url.path) == 0)
+        #expect(symlink(file.path, url.path) == 0)
+        server.stop()
+        var link = stat()
+        #expect(lstat(url.path, &link) == 0)
+        #expect((link.st_mode & S_IFMT) == S_IFLNK)
+        #expect(try Data(contentsOf: file) == text)
+        var target = stat()
+        #expect(stat(file.path, &target) == 0)
+        let probe = try #require(UnixSocketServer.unlinkProbeLock.withLock { UnixSocketServer.lastUnlinkProbe })
+        #expect(probe.kind == .symlink)
+        #expect(probe.inode == UInt64(link.st_ino))
+        #expect(probe.inode != UInt64(target.st_ino))
+    }
+
+    private func repositoryRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    }
+
+    private func clearUnlinkProbe() {
+        UnixSocketServer.unlinkProbeLock.lock()
+        UnixSocketServer.unlinkProbe = nil
+        UnixSocketServer.lastUnlinkProbe = nil
+        UnixSocketServer.unlinkProbeLock.unlock()
+    }
+
     @Test func socketIsBoundBeforeStdinAndIdentityFollowsTheReader() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
