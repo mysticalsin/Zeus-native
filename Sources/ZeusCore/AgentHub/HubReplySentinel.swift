@@ -149,9 +149,10 @@ public enum HubReplyForeground {
                 repeat with w in windows
                     repeat with t in tabs of w
                         if tty of t is "\(tty)" then
+                            -- `processes` is an unordered list. It does not mark the foreground process,
+                            -- so the last item is not that process. Fail closed.
                             set names to processes of t
-                            if (count of names) is 0 then return ""
-                            return last item of names
+                            return ""
                         end if
                     end repeat
                 end repeat

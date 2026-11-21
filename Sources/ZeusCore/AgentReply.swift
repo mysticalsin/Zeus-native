@@ -56,9 +56,9 @@ public enum AgentReply {
                             activate
                             if frontmost is false then return false
                             if (tty of selected tab of front window) is not "\(tty)" then return false
+                            -- `processes` does not mark the foreground process. The last item is not that process.
                             set fgNames to processes of selected tab of front window
-                            if (count of fgNames) is 0 then return false
-                            set fg to last item of fgNames as text
+                            set fg to ""
                             \(guardLines)
                             tell application "System Events"
                                 if (name of first application process whose frontmost is true) is not "Terminal" then return false
