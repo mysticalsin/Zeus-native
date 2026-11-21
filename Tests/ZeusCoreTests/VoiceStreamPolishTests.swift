@@ -167,6 +167,37 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(TruePeakLimiter.truePeakDBTP(limitedNoise, sampleRate: rate) <= -1)
     }
 
+    @Test func numberedListMarkerStaysWithTheSentence() {
+        let english = SpeechClauseChunker.chunks(of: "1. The build is ready to ship this morning. The notes are in the log.")
+        #expect(english.first?.hasPrefix("1. The build") == true)
+        #expect(english.contains("1.") == false)
+        let french = SpeechClauseChunker.chunks(of: "1. Le fichier est prêt pour la revue de ce matin. La suite reste une phrase.")
+        #expect(french.first?.hasPrefix("1. Le fichier") == true)
+        #expect(french.contains("1.") == false)
+    }
+
+    @Test func aTrailingPeriodAfterAURLEndsTheSentence() {
+        let pieces = SpeechClauseChunker.chunks(of: "Read https://example.com/guide. The rest of this answer is its own sentence.")
+        #expect(pieces.count == 2)
+        #expect(pieces[0] == "Read https://example.com/guide.")
+        #expect(pieces[1] == "The rest of this answer is its own sentence.")
+    }
+
+    @Test func frenchNarrowNoBreakSpaceBeforeAQuestionStillSplits() {
+        let pieces = SpeechClauseChunker.chunks(of: "Est-ce que le correctif est prêt\u{00A0}? La suite arrive dans la phrase suivante.")
+        #expect(pieces.count == 2)
+        #expect(pieces[0].hasSuffix("?"))
+        #expect(pieces[1].hasPrefix("La suite"))
+    }
+
+    @Test func shortBuffersDoNotClickAtTheJoin() {
+        let left = [Float](repeating: 0.8, count: 20)
+        let right = [Float](repeating: -0.8, count: 20)
+        #expect(maxAdjacentStep(left + right) > 1)
+        let joined = EqualPowerCrossfade.join(left, right, sampleRate: 24_000)
+        #expect(maxAdjacentStep(joined) < 0.25)
+    }
+
     @Test func cancelMidChunkStopsWithinOneBufferAndEmitsNoTail() {
         let polish = VoiceStreamPolish()
         let token = SpeechCancelToken()
