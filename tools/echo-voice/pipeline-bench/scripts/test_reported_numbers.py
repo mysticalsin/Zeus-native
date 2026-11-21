@@ -68,5 +68,12 @@ class SummaryStageTests(unittest.TestCase):
         self.assertIn("not in this tree", text)
 
 
+class ReproduceCommandTests(unittest.TestCase):
+    def test_report_commands_use_this_tree(self):
+        text = REPORT.read_text()
+        self.assertNotIn("/workspace/echo", text)
+        self.assertNotIn("package/haru-pipe", text)
+
+
 if __name__ == "__main__":
     unittest.main()
