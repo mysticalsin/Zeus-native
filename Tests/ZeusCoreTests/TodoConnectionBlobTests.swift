@@ -29,6 +29,7 @@ struct TodoConnectionBlobTests {
         let connection = BrainConnection(source: BrainSource(kind: .markdown, name: "Notes", path: "/tmp/zeus-notes"))
         let stored = try TodoConnectionBlob.persisted(existing: existing, connection: connection)
         #expect(stored != nil)
-        #expect(TodoConnectionBlob.persisted(existing: existing, connection: nil) == nil)
+        let removed = try TodoConnectionBlob.persisted(existing: existing, connection: nil)
+        #expect(removed == nil)
     }
 }
