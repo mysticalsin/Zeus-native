@@ -50,6 +50,7 @@ fn serve_command(config: &ServeConfig) -> i32 {
             private_socket,
             quantize,
         } => {
+            let _watchdog = config.watchdog;
             eprintln!(
                 "haru-companion: kv_window={:?} reanchor_minutes={:?} (held, not passed to haru-speech-mlx 0.1.0)",
                 config.kv_window, config.reanchor_minutes
@@ -91,6 +92,7 @@ struct ServeConfig {
     quantize: u8,
     kv_window: Option<u32>,
     reanchor_minutes: Option<u32>,
+    watchdog: bool,
 }
 
 impl ServeConfig {
@@ -131,6 +133,7 @@ fn parse(args: &[String]) -> Result<Command, String> {
                 quantize: 8,
                 kv_window: None,
                 reanchor_minutes: None,
+                watchdog: false,
             };
             let mut index = 1;
             while index < args.len() {
@@ -166,6 +169,26 @@ fn parse(args: &[String]) -> Result<Command, String> {
         }
         Some(other) => Err(usage(&format!("unknown command {other}"))),
         None => Err(usage("no command")),
+    }
+}
+
+#[cfg(test)]
+mod flag_tests {
+    use super::{parse, Command};
+
+    #[test]
+    fn watchdog_flag_is_recorded() {
+        let command = parse(&[
+            "serve".into(),
+            "--socket".into(),
+            "s".into(),
+            "--watchdog".into(),
+        ])
+        .unwrap();
+        match command {
+            Command::Serve(config) => assert!(config.watchdog),
+            Command::SelfTest { .. } => panic!("expected serve"),
+        }
     }
 }
 
