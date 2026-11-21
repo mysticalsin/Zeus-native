@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public enum FlingNameError: Error, Equatable, Sendable {
@@ -80,10 +81,42 @@ public enum FlingNames {
         }
     }
 
-    /// True when `url` is strictly inside `root` after resolving `.` and `..`.
+    /// True when `url` is strictly inside `root` after resolving `.`, `..` and symlinks.
+    /// A path that does not exist yet is checked from the deepest existing ancestor, so a
+    /// symlink in that chain cannot point outside the real root.
     public static func isContained(_ url: URL, in root: URL) -> Bool {
+        if let rootReal = realPath(root) {
+            guard let resolved = realPath(url) ?? resolvedNewPath(url) else { return false }
+            let prefix = rootReal.hasSuffix("/") ? rootReal : rootReal + "/"
+            return resolved.hasPrefix(prefix)
+        }
         let base = root.standardizedFileURL.path
         let path = url.standardizedFileURL.path
         return path.hasPrefix(base.hasSuffix("/") ? base : base + "/") && path != base
+    }
+
+    /// The canonical path, or nil when the path does not exist.
+    public static func realPath(_ url: URL) -> String? {
+        url.path.withCString { pointer in
+            guard let resolved = realpath(pointer, nil) else { return nil }
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+    }
+
+    /// Resolves the longest existing prefix, then appends the missing tail. `..` in the tail is refused.
+    private static func resolvedNewPath(_ url: URL) -> String? {
+        var current = url
+        var tail: [String] = []
+        while realPath(current) == nil {
+            let name = current.lastPathComponent
+            if name.isEmpty || name == "/" || name == "." || name == ".." { return nil }
+            tail.append(name)
+            let parent = current.deletingLastPathComponent()
+            if parent.path == current.path { return nil }
+            current = parent
+        }
+        guard let base = realPath(current) else { return nil }
+        return tail.reversed().reduce(base) { $0 + "/" + $1 }
     }
 }

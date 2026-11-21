@@ -70,12 +70,20 @@ public final class FlingFileSink {
         if let folder { return folder }
         let fm = FileManager.default
         let parent = destination.deletingLastPathComponent()
+        // O_NOFOLLOW: a symlink standing in for the parent is not a place to write.
+        let parentFD = open(parent.path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC)
+        guard parentFD >= 0 else { throw FlingSinkError.unsafePath }
+        defer { close(parentFD) }
         try fm.createDirectory(at: parent, withIntermediateDirectories: true)
         var name = destination.lastPathComponent
         let existing = Set((try? fm.contentsOfDirectory(atPath: parent.path)) ?? [])
         name = FlingNames.freeName(name, taken: existing)
         let url = parent.appendingPathComponent(name, isDirectory: true)
         try fm.createDirectory(at: url, withIntermediateDirectories: false)
+        let dirFD = open(url.path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC)
+        guard dirFD >= 0 else { throw FlingSinkError.unsafePath }
+        close(dirFD)
+        guard FlingNames.isContained(url, in: parent) else { throw FlingSinkError.unsafePath }
         folder = url
         return url
     }
@@ -83,6 +91,9 @@ public final class FlingFileSink {
     private func target(for name: String) throws -> URL {
         guard case .success(let safe) = FlingNames.validate(name) else { throw FlingSinkError.unsafePath }
         let dir = try stackFolder()
+        let dirFD = open(dir.path, O_RDONLY | O_NOFOLLOW | O_DIRECTORY | O_CLOEXEC)
+        guard dirFD >= 0 else { throw FlingSinkError.unsafePath }
+        defer { close(dirFD) }
         let taken = Set((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
         let url = dir.appendingPathComponent(FlingNames.freeName(safe, taken: taken))
         guard FlingNames.isContained(url, in: dir) else { throw FlingSinkError.unsafePath }

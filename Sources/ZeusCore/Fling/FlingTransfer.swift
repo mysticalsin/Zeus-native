@@ -303,12 +303,13 @@ public struct FlingReceiveMachine: Sendable {
                 default: return fail(.malformed, decline: .malformed)
                 }
             }
-            if context.paired && context.autoAccept {
+            let total = FlingOfferRules.totalFileBytes(incoming)
+            // Auto-accept never skips the large-offer warning. The person still has to say yes.
+            if context.paired && context.autoAccept && !FlingLimits.shouldWarn(totalBytes: total) {
                 state = .receiving(index: 0, got: 0)
                 return [.makeTemp(stackID: incoming.stackID), .send(.accept(FlingStackRef(stackID: incoming.stackID)))] + advance()
             }
             state = .prompting(deadline: now.addingTimeInterval(FlingLimits.promptTimeout))
-            let total = FlingOfferRules.totalFileBytes(incoming)
             return [.prompt(peerName: context.peerName, itemCount: incoming.items.count, totalBytes: total, stackID: incoming.stackID)]
 
         case (.receiving(let index, let got), .chunk(let chunk)):

@@ -346,6 +346,19 @@ struct SettingsCatalogTests {
         #expect(!store.bool("face.presence"))
     }
 
+    @MainActor @Test func perAppSoundIsNeverTurnedOnByImport() throws {
+        let (store, defaults, suiteName) = try Self.isolatedStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        #expect(!store.bool("audio.equaliser"))
+        let file = try JSONSerialization.data(withJSONObject: [
+            "format": "zeus.settings", "version": 1,
+            "options": ["audio.equaliser": "true"], "app": [String: String](),
+        ])
+        _ = try store.importJSON(file)
+        #expect(!store.bool("audio.equaliser"))
+        #expect(defaults.string(forKey: SettingsStore.key("audio.equaliser")) == nil)
+    }
+
     /// REG-684: Fling is an explicit opt-in. It starts off, and an import can leave it alone or turn it off, never on.
     @MainActor @Test func flingStartsOffAndAnImportNeverTurnsItOn() throws {
         let (store, defaults, suiteName) = try Self.isolatedStore()

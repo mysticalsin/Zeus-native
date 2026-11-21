@@ -16,6 +16,7 @@ public struct FacePresenceStatus: Equatable, Sendable {
     public static func hint(for state: FacePresenceMachine.State) -> String? {
         switch state {
         case .needsCameraConsent: "Allow the camera for Zeus in System Settings, Privacy & Security, Camera."
+        case .needsEnrollmentConfirm: "Press Enroll to teach Zeus your face. Nothing is saved until you do."
         case .enrolling: "Look at the camera until Zeus has learned your face."
         case .unavailable(.camera): "Zeus can't use the camera right now. Close other apps that use it, then switch Face presence off and on."
         case .unavailable(.lock): "This Mac can't be locked by Zeus right now. Switch Face presence off and on to try again."
@@ -33,6 +34,7 @@ public struct FacePresenceStatus: Equatable, Sendable {
                                       accessibilityText: "Face presence status: Away, \(spokenDuration(seconds: remaining)) left", hint: nil)
         case .off: return plain("Off", "person.crop.circle", state)
         case .needsCameraConsent: return plain("Needs camera", "video.slash", state)
+        case .needsEnrollmentConfirm: return plain("Confirm", "person.crop.circle.badge.plus", state)
         case .enrolling: return plain("Enrolling", "person.crop.circle.badge.plus", state)
         case .watching: return plain("Watching", "eye", state)
         case .present: return plain("Present", "person.crop.circle.badge.checkmark", state)

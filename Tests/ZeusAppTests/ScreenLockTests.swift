@@ -14,4 +14,14 @@ import Testing
     @Test func aLockFunctionThatFailsReportsFailure() {
         #expect(ScreenLock.lockWithoutEvents(using: { 1 }) == false)
     }
+
+    @Test func aFailedImmediateLockDoesNotPretendTheShortcutSucceeded() {
+        var posted = false
+        let ok = ScreenLock.lock(using: { 1 }) {
+            posted = true
+            return true
+        }
+        #expect(ok == false)
+        #expect(posted == false)
+    }
 }
