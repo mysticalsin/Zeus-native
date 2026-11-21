@@ -325,7 +325,8 @@ pub fn decode_client_frame(frame: &RawFrame) -> Result<ClientMessage, ProtocolEr
         HELLO => decode_hello(&frame.payload),
         START => decode_start(&frame.payload),
         PUSH => decode_push(&frame.payload),
-        CLOSE => Ok(ClientMessage::Close),
+        CLOSE if frame.payload.is_empty() => Ok(ClientMessage::Close),
+        CLOSE => Err(ProtocolError::BadJson),
         other => Err(ProtocolError::UnknownType(other)),
     }
 }
@@ -333,9 +334,15 @@ pub fn decode_client_frame(frame: &RawFrame) -> Result<ClientMessage, ProtocolEr
 pub fn decode_server(bytes: &[u8]) -> Result<ServerMessage, ProtocolError> {
     let mut buf = FrameBuf::default();
     let mut frames = buf.push(bytes)?;
+    if buf.take_error().is_some() {
+        return Err(ProtocolError::Oversized);
+    }
     let Some(frame) = frames.pop() else {
         return Err(ProtocolError::Truncated);
     };
+    if !frames.is_empty() || !buf.buf.is_empty() {
+        return Err(ProtocolError::BadJson);
+    }
     decode_server_frame(&frame)
 }
 
@@ -546,7 +553,10 @@ impl Json {
     fn as_u32(&self) -> Option<u32> {
         match self {
             Json::Number(value)
-                if value.is_finite() && *value >= 0.0 && *value <= f64::from(u32::MAX) =>
+                if value.is_finite()
+                    && *value >= 0.0
+                    && *value <= f64::from(u32::MAX)
+                    && value.fract() == 0.0 =>
             {
                 Some(*value as u32)
             }
@@ -557,10 +567,12 @@ impl Json {
     }
 }
 
+const MAX_JSON_DEPTH: usize = 16;
+
 fn parse_json(bytes: &[u8]) -> Result<Json, ProtocolError> {
     let text = std::str::from_utf8(bytes).map_err(|_| ProtocolError::BadJson)?;
     let mut parser = Parser { s: text, i: 0 };
-    let value = parser.parse().map_err(|_| ProtocolError::BadJson)?;
+    let value = parser.parse(0).map_err(|_| ProtocolError::BadJson)?;
     parser.skip();
     if parser.i != parser.s.len() {
         return Err(ProtocolError::BadJson);
@@ -573,15 +585,18 @@ struct Parser<'a> {
     i: usize,
 }
 
-impl<'a> Parser<'a> {
-    fn parse(&mut self) -> Result<Json, ()> {
+impl Parser<'_> {
+    fn parse(&mut self, depth: usize) -> Result<Json, ()> {
+        if depth > MAX_JSON_DEPTH {
+            return Err(());
+        }
         self.skip();
         let bytes = self.s.as_bytes();
         if self.i >= bytes.len() {
             return Err(());
         }
         match bytes[self.i] {
-            b'{' => self.object(),
+            b'{' => self.object(depth),
             b'"' => Ok(Json::String(self.string()?)),
             b't' => self.eat("true").map(|()| Json::Bool(true)),
             b'f' => self.eat("false").map(|()| Json::Bool(false)),
@@ -591,7 +606,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn object(&mut self) -> Result<Json, ()> {
+    fn object(&mut self, depth: usize) -> Result<Json, ()> {
         self.bump(b'{')?;
         let mut pairs = Vec::new();
         self.skip();
@@ -604,7 +619,7 @@ impl<'a> Parser<'a> {
             let key = self.string()?;
             self.skip();
             self.bump(b':')?;
-            let value = self.parse()?;
+            let value = self.parse(depth + 1)?;
             pairs.push((key, value));
             self.skip();
             match self.peek() {
@@ -621,25 +636,29 @@ impl<'a> Parser<'a> {
 
     fn string(&mut self) -> Result<String, ()> {
         self.bump(b'"')?;
-        let bytes = self.s.as_bytes();
         let mut out = String::new();
-        while self.i < bytes.len() {
-            let ch = bytes[self.i];
-            self.i += 1;
+        loop {
+            let rest = self.s.get(self.i..).ok_or(())?;
+            let ch = rest.chars().next().ok_or(())?;
+            self.i += ch.len_utf8();
             match ch {
-                b'"' => return Ok(out),
-                b'\\' => {
-                    let esc = *bytes.get(self.i).ok_or(())?;
-                    self.i += 1;
+                '"' => return Ok(out),
+                '\\' => {
+                    let rest = self.s.get(self.i..).ok_or(())?;
+                    let esc = rest.chars().next().ok_or(())?;
+                    self.i += esc.len_utf8();
                     match esc {
-                        b'"' => out.push('"'),
-                        b'\\' => out.push('\\'),
-                        b'/' => out.push('/'),
-                        b'n' => out.push('\n'),
-                        b'r' => out.push('\r'),
-                        b't' => out.push('\t'),
-                        b'u' => {
+                        '"' => out.push('"'),
+                        '\\' => out.push('\\'),
+                        '/' => out.push('/'),
+                        'n' => out.push('\n'),
+                        'r' => out.push('\r'),
+                        't' => out.push('\t'),
+                        'u' => {
                             let hex = self.s.get(self.i..self.i + 4).ok_or(())?;
+                            if !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                                return Err(());
+                            }
                             let code = u32::from_str_radix(hex, 16).map_err(|_| ())?;
                             out.push(char::from_u32(code).ok_or(())?);
                             self.i += 4;
@@ -647,10 +666,10 @@ impl<'a> Parser<'a> {
                         _ => return Err(()),
                     }
                 }
-                other => out.push(other as char),
+                other if (other as u32) < 0x20 => return Err(()),
+                other => out.push(other),
             }
         }
-        Err(())
     }
 
     fn number(&mut self) -> Result<Json, ()> {
