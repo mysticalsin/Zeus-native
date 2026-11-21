@@ -193,8 +193,16 @@ final class AgentHub {
         guard let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return false }
         guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
         guard sessionID == selectedSession else { return false }
+        // iTerm's write text submits, so the second process-group read is immediately before that script.
+        // Terminal types the chunks first, then reads again before Return. Neither bundle skips the second read.
+        if info.targetBundleID != "com.apple.Terminal" {
+            let after = foregroundSnapshot(info, frontmost: NSWorkspace.shared.frontmostApplication?.localizedName)
+            guard HubReplyJobGuard.maySubmit(
+                before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
+            guard sessionID == selectedSession else { return false }
+            return await Self.runGuardedScript(script)
+        }
         guard await Self.runGuardedScript(script) else { return false }
-        guard info.targetBundleID == "com.apple.Terminal" else { return true }
         let after = foregroundSnapshot(info, frontmost: NSWorkspace.shared.frontmostApplication?.localizedName)
         guard HubReplyJobGuard.maySubmit(
             before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
@@ -235,7 +243,7 @@ final class AgentHub {
         }
     }
 
-    /// `frontmost` is nil before the typing script activates Terminal. The Return check passes the live app.
+    /// `frontmost` is nil before the typing script activates the terminal. The second read passes the live app.
     private func foregroundSnapshot(_ info: TerminalInfo, frontmost: String?) -> HubReplyTTYSnapshot {
         guard let tty = info.tty else {
             return HubReplyTTYSnapshot(frontmostApp: frontmost, foregroundPgid: nil, processes: [])

@@ -226,7 +226,9 @@ public enum HubReplyJobGuard {
         }
     }
 
-    /// Return is safe only when the front app and the foreground process group are unchanged, and both reads still allow typing.
+    /// Return is safe when typing was allowed and the app is the target afterwards.
+    /// The pre-typing snapshot may have no frontmost app: the typing script activates the terminal.
+    /// A later snapshot whose front app is missing or different withholds Return. The process group must be unchanged.
     public static func maySubmit(
         before: HubReplyTTYSnapshot,
         after: HubReplyTTYSnapshot,
@@ -234,8 +236,8 @@ public enum HubReplyJobGuard {
         expectedCLI: Set<String>,
         allowedPaths: Set<String>
     ) -> Bool {
+        guard after.frontmostApp == expectedApp else { return false }
         guard let beforeGroup = before.foregroundPgid, beforeGroup == after.foregroundPgid else { return false }
-        guard before.frontmostApp == expectedApp, after.frontmostApp == expectedApp else { return false }
         return mayType(snapshot: before, expectedApp: expectedApp, expectedCLI: expectedCLI, allowedPaths: allowedPaths)
             && mayType(snapshot: after, expectedApp: expectedApp, expectedCLI: expectedCLI, allowedPaths: allowedPaths)
     }
