@@ -400,6 +400,30 @@ struct AgentsPageTests {
         #expect(queued.queuedRequests.first?.tier == .high)
     }
 
+    @Test func aClosedCardDoesNotHandAllowToTheNextCard() {
+        var ready = page(.groups)
+        let cardA = AgentsPageLive.request(approvalID: "card-a", sessionID: "s1", tool: "Bash", highRisk: false, command: "list files")
+        #expect(cardA.id == "card-a")
+        #expect(cardA.boundID == "card-a")
+        ready = ready.applying(.approvalRequested(cardA))
+        #expect(ready.revision.showing?.id == "card-a")
+        let tapped = AgentsPageHook.tapAllow(ready)
+        var gate = AgentsPageCardGate()
+        let opened = gate.step(before: ready, after: tapped.page, currentCard: "card-a")
+        gate = opened.0
+        #expect(gate.boundID == "card-a")
+        #expect(opened.1.isEmpty)
+        let finished = AgentsPageHook.advance(tapped.page, ticks: 2)
+        let toB = gate.step(before: tapped.page, after: finished.page, currentCard: "card-b")
+        #expect(toB.1.isEmpty)
+        #expect(finished.page.revision.executed.last?.action == .allowOnce)
+        var stillA = AgentsPageCardGate()
+        let openedA = stillA.step(before: ready, after: tapped.page, currentCard: "card-a")
+        stillA = openedA.0
+        let kept = stillA.step(before: tapped.page, after: finished.page, currentCard: "card-a")
+        #expect(kept.1 == [.allow])
+    }
+
     @Test func exhaustiveTransitionTable() {
         let failures = AgentsPageOracle.failures()
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")

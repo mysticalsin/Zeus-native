@@ -1970,12 +1970,36 @@ enum AgentsPageHook {
     }
 
     /// Verdicts whose undo window closed between the two pages. Undo drops the pending action, so nothing here is sent.
-    private static func appeared(from: AgentsPage, to: AgentsPage) -> [AgentsPageHookVerdict] {
+    static func appeared(from: AgentsPage, to: AgentsPage) -> [AgentsPageHookVerdict] {
         let start = from.revision.executed.count
         guard to.revision.executed.count > start else { return [] }
         return to.revision.executed.dropFirst(start).map { execution in
             execution.action.isApproval ? .allow : .deny
         }
+    }
+}
+
+/// Remembers which card opened the undo window. The stub still releases Allow to whoever is current.
+struct AgentsPageCardGate: Equatable, Sendable {
+    var boundID: String?
+
+    func step(before: AgentsPage, after: AgentsPage, currentCard: String?) -> (AgentsPageCardGate, [AgentsPageHookVerdict]) {
+        _ = currentCard
+        return (self, AgentsPageHook.appeared(from: before, to: after))
+    }
+}
+
+/// The live card. The stub drops the card id and keeps the session id.
+enum AgentsPageLive {
+    static func request(approvalID: String, sessionID: String?, tool: String, highRisk: Bool, command: String?) -> AgentsPageRequest {
+        _ = approvalID
+        return AgentsPageRequest(
+            sessionID: sessionID ?? approvalID,
+            tool: tool,
+            highRisk: highRisk,
+            command: command,
+            tier: highRisk ? .high : .low
+        )
     }
 }
 
