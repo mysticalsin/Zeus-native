@@ -4,7 +4,6 @@ import ZeusCore
 /// Privacy card for face verification. The camera prompt runs only after the switch is turned on.
 /// A capture session is not opened here.
 struct FaceVerificationSettingsPage: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var machine = FaceVerificationMachine()
     @State private var confirmingDelete = false
     @State private var checkResult = ""
@@ -12,6 +11,7 @@ struct FaceVerificationSettingsPage: View {
     private var store: SettingsStore { SettingsStore.shared }
 
     var body: some View {
+        let reduceMotion = Motion.reduced
         let model = FaceVerificationSectionModel.make(
             machine: machine,
             presenceEnabled: store.bool(FacePresenceLink.enabledKey),
