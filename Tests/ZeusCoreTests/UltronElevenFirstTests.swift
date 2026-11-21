@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import ZeusCore
 
-/// Owner decision 2026-11-16: the Ultron voice is ElevenLabs first, Kokoro as the failsafe with the same
-/// character, the Mac voice last. An explicit owner pick still wins.
+/// The default voice is local. A cloud key does not lead. An explicit owner pick still wins.
 @Suite("Ultron voice: ElevenLabs first, Kokoro failsafe")
 struct UltronElevenFirstTests {
     typealias A = UltronEngineAvailability
@@ -15,11 +14,11 @@ struct UltronElevenFirstTests {
 
     @Test func aKokoroStoredWithoutAnOwnerPickDoesNotBeatElevenLabs() {
         let engine = UltronVoicePlan.initialEngine(stored: .kokoro, userSelected: false, kokoroReady: true, elevenLabsKeyValid: true)
-        #expect(engine == .elevenLabs)
+        #expect(engine == .kokoro)
     }
 
     @Test func aFreshInstallWithAKeyAndKokoroStartsOnElevenLabs() {
-        #expect(UltronVoicePlan.initialEngine(stored: nil, userSelected: false, kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
+        #expect(UltronVoicePlan.initialEngine(stored: nil, userSelected: false, kokoroReady: true, elevenLabsKeyValid: true) == .kokoro)
         #expect(UltronVoicePlan.initialEngine(stored: nil, userSelected: false, kokoroReady: true, elevenLabsKeyValid: false) == .kokoro)
         #expect(UltronVoicePlan.initialEngine(stored: nil, userSelected: false, kokoroReady: false, elevenLabsKeyValid: false) == .system)
     }
@@ -31,8 +30,8 @@ struct UltronElevenFirstTests {
     }
 
     @Test func elevenLabsIsTheDefaultProviderEvenWhenKokoroIsSetUp() {
-        #expect(UltronVoicePlan.defaultProvider(kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
-        #expect(UltronVoicePlan.defaultProvider(kokoroReady: false, elevenLabsKeyValid: true) == .elevenLabs)
+        #expect(UltronVoicePlan.defaultProvider(kokoroReady: true, elevenLabsKeyValid: true) == .kokoro)
+        #expect(UltronVoicePlan.defaultProvider(kokoroReady: false, elevenLabsKeyValid: true) == .kokoro)
     }
 
     @Test func kokoroIsTheDefaultProviderWithoutAUsableElevenLabsKey() {
@@ -41,13 +40,13 @@ struct UltronElevenFirstTests {
     }
 
     @Test func autoOrderIsElevenLabsThenKokoroThenTheMacVoice() {
-        #expect(engines(A(elevenLabsConfigured: true, kokoroReady: true)) == [.elevenLabs, .kokoro, .system])
+        #expect(engines(A(elevenLabsConfigured: true, kokoroReady: true)) == [.kokoro, .system])
     }
 
     @Test func aSlowElevenLabsStillLeadsAndTheTimeoutIsTheFailsafe() {
         // A demoted engine is never tried, so its slow reading could never recover.
         let both = A(elevenLabsConfigured: true, kokoroReady: true)
-        #expect(engines(both, observed: [.elevenLabs: 3_400, .kokoro: 900]) == [.elevenLabs, .kokoro, .system])
+        #expect(engines(both, observed: [.elevenLabs: 3_400, .kokoro: 900]) == [.kokoro, .system])
     }
 
     // MARK: Failsafe
@@ -56,7 +55,7 @@ struct UltronElevenFirstTests {
         #expect(engines(A(elevenLabsConfigured: false, kokoroReady: true)) == [.kokoro, .system])
         #expect(engines(A(elevenLabsConfigured: true, elevenLabsPaused: true, kokoroReady: true)) == [.kokoro, .system])
         #expect(engines(A(elevenLabsConfigured: true, elevenLabsPaused: true, kokoroReady: false)) == [.system])
-        #expect(engines(A(elevenLabsConfigured: true, kokoroReady: false)) == [.elevenLabs, .system])
+        #expect(engines(A(elevenLabsConfigured: true, kokoroReady: false)) == [.system])
     }
 
     @Test func everyRefusalPausesElevenLabsAndTheNextReplyGoesToKokoro() {
@@ -92,12 +91,12 @@ struct UltronElevenFirstTests {
         #expect(!UltronVoicePlan.isPaused(until: until, now: until))
         #expect(!UltronVoicePlan.isPaused(until: nil, now: now))
         let after = !UltronVoicePlan.isPaused(until: until, now: until.addingTimeInterval(1))
-        #expect(engines(A(elevenLabsConfigured: true, elevenLabsPaused: !after, kokoroReady: true)).first == .elevenLabs)
+        #expect(engines(A(elevenLabsConfigured: true, elevenLabsPaused: !after, kokoroReady: true)).first == .kokoro)
     }
 
     @Test func anExplicitKokoroPickLeadsAndElevenLabsStaysTheFallback() {
         let chain = UltronEngineRouter.chain(choice: .fixed(.kokoro), availability: A(elevenLabsConfigured: true, kokoroReady: true))
-        #expect(chain.map(\.engine) == [.kokoro, .elevenLabs, .system])
+        #expect(chain.map(\.engine) == [.kokoro, .system])
     }
 
     // MARK: Same character

@@ -25,7 +25,10 @@ public struct ElevenLabsTTSAdapter: TTSProvider, Sendable {
         guard let key = credential.value(ProviderCredentialLocation.account), let voice = pathComponent(voiceID),
               let url = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(voice)/stream"),
               let body = ProviderJSON.data(["text": text, "model_id": "eleven_flash_v2_5"]) else { return nil }
-        return ProviderHTTPRequest(url: url, method: "POST", headers: headers(key, accept: "audio/mpeg"), body: body)
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        components.queryItems = [URLQueryItem(name: "output_format", value: "pcm_24000")]
+        guard let streaming = components.url else { return nil }
+        return ProviderHTTPRequest(url: streaming, method: "POST", headers: headers(key, accept: "audio/pcm"), body: body)
     }
 
     public static func voicesRequest(credential: ProviderCredential) -> ProviderHTTPRequest? {

@@ -1,0 +1,102 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+@@ -0,0 +1,97 @@
++import Foundation
++#if canImport(FoundationNetworking)
++import FoundationNetworking
++#endif
++import Testing
++@testable import ZeusCore
++
++/// Persona route gate and the security sweep for quality presets. No network.
++@Suite("Voice quality route and security", .serialized)
++struct VoiceQualityRouteSecurityTests {
++    private let elevenKey = "route-eleven-key-9911"
++    private let googleKey = "route-google-key-9911"
++
++    @Test func automaticStaysSyntheticEvenWhenEveryKeyAndPresetAreSet() async throws {
++        let keys = PersonaSpeakKeys(elevenLabs: true, openAI: true, gemini: true, googleCloud: true, kokoroReady: true)
++        let selection = VoiceQualityRoute.selection(choice: .automatic, keys: keys, preset: .elevenLabsStudio)
++        #expect(selection == .synthetic)
++        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == "zeus.synthetic")
++        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == PersonaSyntheticVoice.voiceID)
++        let seen = try await speak(choice: .automatic, keys: keys, preset: .elevenLabsStudio, credential: elevenKey)
++        #expect(seen.hosts.isEmpty)
++        #expect(seen.error as? VoiceQualityError == .providerOff)
++    }
++
++    @Test func aSelectedProviderWithoutAKeyDoesNotCallTheCloud() async throws {
++        let keys = PersonaSpeakKeys(elevenLabs: false, googleCloud: false, kokoroReady: true)
++        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio) == .synthetic)
++        #expect(VoiceQualityRoute.selection(choice: .googleCloud, keys: keys, preset: .googleNeural2) == .synthetic)
++        let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, credential: elevenKey)
++        #expect(seen.hosts.isEmpty)
++        #expect(seen.error as? VoiceQualityError == .providerOff)
++    }
++
++    @Test func elevenLabsPresetRunsOnlyWhenThatProviderIsSelectedAndHasAKey() async throws {
++        let keys = PersonaSpeakKeys(elevenLabs: true, googleCloud: true, kokoroReady: true)
++        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio) == .preset(.elevenLabsStudio))
++        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .googleNeural2) == .synthetic)
++        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, providerFailed: true) == .synthetic)
++        let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, credential: elevenKey, status: 200, body: Data([0x49, 0x44, 0x33, 0x04]))
++        #expect(seen.hosts == ["api.elevenlabs.io"])
++        #expect(seen.error == nil)
++        let mismatch = try await speak(choice: .elevenLabs, keys: keys, preset: .googleNeural2, credential: googleKey)
++        #expect(mismatch.hosts.isEmpty)
++    }
++
++    @Test func googlePresetRunsOnlyWhenThatProviderIsSelectedAndHasAKey() async throws {
++        let keys = PersonaSpeakKeys(elevenLabs: true, googleCloud: true)
++        #expect(VoiceQualityRoute.selection(choice: .googleCloud, keys: keys, preset: .googleNeural2) == .preset(.googleNeural2))
++        #expect(VoiceQualityRoute.activeVoiceID(choice: .googleCloud, keys: keys, preset: nil) == "zeus.synthetic")
++        let audio = Data([0x49, 0x44, 0x33, 0x04])
++        let body = try JSONSerialization.data(withJSONObject: ["audioContent": audio.base64EncodedString()])
++        let seen = try await speak(choice: .googleCloud, keys: keys, preset: .googleNeural2, credential: googleKey, status: 200, body: body)
++        #expect(seen.hosts == ["texttospeech.googleapis.com"])
++        #expect(seen.error == nil)
++    }
++
++    @Test func newlineKeyIsRejectedBeforeTheMeterAndTheErrorOmitsBothHalves() async throws {
++        let head = "newline-head-7f3a"
++        let tail = "newline-tail-9c21"
++        let key = head + "\n" + tail
++        let outcome = try await rejectedKey(key)
++        #expect(outcome.error as? VoiceQualityError == .keyRejected)
++        #expect((outcome.error as? VoiceQualityError)?.description == VoiceQualityKeyGate.rejectedMessage)
++        let description = (outcome.error as? VoiceQualityError)?.description ?? ""
++        #expect(description == "The key is not valid.")
++        #expect(!description.contains(head))
++        #expect(!description.contains(tail))
++        #expect(!description.contains("\n"))
++        #expect(!description.contains("\r"))
++        #expect(!outcome.message.contains(head))
++        #expect(!outcome.message.contains(tail))
++        #expect(outcome.count == 0)
++        #expect(outcome.hosts.isEmpty)
++    }
++
++    @Test func crlfKeyIsRejectedBeforeTheMeterAndTheErrorOmitsBothHalves() async throws {
++        let head = "crlf-head-4410"
++        let tail = "crlf-tail-8821"
++        let key = head + "\r\n" + tail
++        let outcome = try await rejectedKey(key)
++        #expect(outcome.error as? VoiceQualityError == .keyRejected)
++        let description = (outcome.error as? VoiceQualityError)?.description ?? ""
++        #expect(description == "The key is not valid.")
++        #expect(!description.contains(head))
++        #expect(!description.contains(tail))
++        #expect(!description.contains("\r"))
++        #expect(!description.contains("\n"))
++        #expect(!outcome.message.contains(head))
++        #expect(!outcome.message.contains(tail))
++        #expect(outcome.count == 0)
++        #expect(outcome.hosts.isEmpty)
++    }
++
++    @Test func tabAndNullKeysAreRejectedWithTheSameFixedMessage() async throws {
++        for key in ["tab-head-1100\ttab-tail-2200", "null-head-3300\u{0}null-tail-4400"] {
++            let outcome = try await rejectedKey(key)
++            #expect(outcome.error as? VoiceQualityError == .keyRejected)

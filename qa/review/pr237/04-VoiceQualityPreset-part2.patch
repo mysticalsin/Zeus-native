@@ -1,0 +1,144 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +138,139 @@
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++    ]
++
++    /// Google Cloud stock voices: Neural2, WaveNet, or Chirp HD only.
++    /// Letter labels and star catalog names are generic. Myth and character names (Puck, Fenrir) are not listed.
++    public static let google: [StockVoice] = [
++        StockVoice(
++            id: "en-US-Neural2-C",
++            name: "Neural2 C",
++            reason: "Google Neural2 stock voice. The id is a letter label, not a person or character."
++        ),
++        StockVoice(
++            id: "en-US-Neural2-D",
++            name: "Neural2 D",
++            reason: "Google Neural2 stock voice. The id is a letter label, not a person or character."
++        ),
++        StockVoice(
++            id: "en-US-Wavenet-D",
++            name: "Wavenet D",
++            reason: "Google WaveNet stock voice, official id en-US-Wavenet-D. Letter label, not a person or character."
++        ),
++        StockVoice(
++            id: "en-US-Wavenet-F",
++            name: "Wavenet F",
++            reason: "Google WaveNet stock voice, official id en-US-Wavenet-F. Letter label, not a person or character."
++        ),
++        StockVoice(
++            id: "en-US-Chirp-HD-D",
++            name: "Chirp HD D",
++            reason: "Google Chirp HD stock voice. Letter label, not a person, actor, or film character."
++        ),
++        StockVoice(
++            id: "en-US-Chirp3-HD-Achernar",
++            name: "Chirp3 HD Achernar",
++            reason: "Google Chirp 3 HD stock voice named for the star Achernar. Not a person, actor, or film character."
++        ),
++        StockVoice(
++            id: "en-US-Chirp3-HD-Alnilam",
++            name: "Chirp3 HD Alnilam",
++            reason: "Google Chirp 3 HD stock voice named for the star Alnilam. Not a person, actor, or film character."
++        ),
++    ]
++
++    public static func accepts(_ voiceID: String, providerID: String) -> Bool {
++        let trimmed = voiceID.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard !trimmed.isEmpty else { return false }
++        if trimmed.range(of: "mcu", options: .caseInsensitive) != nil { return false }
++        let list: [StockVoice]
++        switch providerID {
++        case ElevenLabsTTSAdapter.id: list = elevenLabs
++        case GoogleCloudTTSAdapter.id: list = google
++        default: return false
++        }
++        return list.contains { $0.id == trimmed }
++    }
++}
++
++/// ElevenLabs model, stability, and style for one quality preset.
++public struct ElevenLabsQualityDelivery: Equatable, Sendable {
++    public var modelID: String
++    public var stability: Double
++    public var style: Double
++
++    public init(modelID: String, stability: Double, style: Double) {
++        self.modelID = modelID
++        self.stability = stability
++        self.style = style
++    }
++}
++
++/// Google voice, speaking rate, pitch, and 24 kHz encoding for one quality preset.
++public struct GoogleQualityDelivery: Equatable, Sendable {
++    public var voiceID: String
++    public var speakingRate: Double
++    public var pitch: Double
++    public var audioEncoding: String
++    public var sampleRateHertz: Int
++    /// Chirp 3 HD rejects speaking rate and pitch. The preset still records the chosen values.
++    /// The request omits those two fields when this is false.
++    public var sendsRateAndPitch: Bool
++
++    public init(voiceID: String, speakingRate: Double, pitch: Double, audioEncoding: String, sampleRateHertz: Int, sendsRateAndPitch: Bool) {
++        self.voiceID = voiceID
++        self.speakingRate = speakingRate
++        self.pitch = pitch
++        self.audioEncoding = audioEncoding
++        self.sampleRateHertz = sampleRateHertz
++        self.sendsRateAndPitch = sendsRateAndPitch
++    }
++}
++
++/// Opt-in quality presets. They are off until the user picks both the provider and a preset.
++/// The speak-path default stays `zeus.synthetic`.
++public enum VoiceQualityPreset: String, Sendable, CaseIterable, Equatable {
++    case elevenLabsFast
++    case elevenLabsStudio
++    case googleNeural2
++    case googleWavenet
++    case googleChirpHD
++
++    public var providerID: String {
++        switch self {
++        case .elevenLabsFast, .elevenLabsStudio: ElevenLabsTTSAdapter.id
++        case .googleNeural2, .googleWavenet, .googleChirpHD: GoogleCloudTTSAdapter.id
++        }
++    }
++
++    public var defaultVoiceID: String {
++        switch self {
++        case .elevenLabsFast: "EXAVITQu4vr4xnSDxMaL"
++        case .elevenLabsStudio: "JBFqnCBsd6RMkjVDRZzb"
++        case .googleNeural2: "en-US-Neural2-D"
++        case .googleWavenet: "en-US-Wavenet-D"
++        case .googleChirpHD: "en-US-Chirp3-HD-Achernar"
++        }
++    }
++
++    /// Fast uses `eleven_flash_v2_5`. Stability 0.45 and style 0 match the existing plain delivery:
++    /// a steady read, with pauses carried by punctuation rather than extra style.
++    /// Studio uses `eleven_multilingual_v2`. Stability 0.6 and style 0.3 are take C
++    /// (`UltronCloudVoice.elevenLabsSettings`): fewer breaths, still no SSML.
++    public var elevenLabs: ElevenLabsQualityDelivery? {
++        switch self {
++        case .elevenLabsFast:
++            return ElevenLabsQualityDelivery(modelID: "eleven_flash_v2_5", stability: 0.45, style: 0)
++        case .elevenLabsStudio:
++            let settings = UltronCloudVoice.elevenLabsSettings
++            return ElevenLabsQualityDelivery(
++                modelID: "eleven_multilingual_v2",
++                stability: settings["stability"] ?? 0.6,
++                style: settings["style"] ?? 0.3
++            )
++        case .googleNeural2, .googleWavenet, .googleChirpHD:
++            return nil
++        }
++    }
++
++    /// Neural2 uses speaking rate 0.92, the measured pace already used for the Mac voice, and pitch 0.

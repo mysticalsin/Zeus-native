@@ -57,11 +57,11 @@ struct UltronEngineRouterTests {
     }
 
     @Test func availabilityMatrixInAutoMode() {
-        #expect(engines(.auto, A(elevenLabsConfigured: true)) == [.elevenLabs, .system])
-        #expect(engines(.auto, A(openAIConfigured: true)) == [.openAI, .system])
+        #expect(engines(.auto, A(elevenLabsConfigured: true)) == [.system])
+        #expect(engines(.auto, A(openAIConfigured: true)) == [.system])
         #expect(engines(.auto, A(kokoroReady: true)) == [.kokoro, .system])
-        #expect(engines(.auto, A(elevenLabsConfigured: true, openAIConfigured: true, kokoroReady: true)) == [.elevenLabs, .openAI, .kokoro, .system])
-        #expect(engines(.auto, A(elevenLabsConfigured: true, elevenLabsPaused: true, openAIConfigured: true)) == [.openAI, .system])
+        #expect(engines(.auto, A(elevenLabsConfigured: true, openAIConfigured: true, kokoroReady: true)) == [.kokoro, .system])
+        #expect(engines(.auto, A(elevenLabsConfigured: true, elevenLabsPaused: true, openAIConfigured: true)) == [.system])
         #expect(engines(.auto, A(elevenLabsConfigured: true, elevenLabsPaused: true, openAIConfigured: true, openAIPaused: true, kokoroReady: true)) == [.kokoro, .system])
     }
 
@@ -88,14 +88,14 @@ struct UltronEngineRouterTests {
         #expect(chosen.first?.engine == .kokoro)
         #expect(chosen.first?.reason == "chosen in Settings")
         let missing = UltronEngineRouter.chain(choice: .fixed(.openAI), availability: ready)
-        #expect(missing.first?.engine == .elevenLabs)
+        #expect(missing.first?.engine == .kokoro)
         #expect(missing.first?.reason.contains("OpenAI voice chosen but no OpenAI key") == true)
     }
 
     @Test func aSlowEngineDropsBehindAFasterOne() {
         let both = A(openAIConfigured: true, kokoroReady: true)
-        #expect(engines(.auto, both, observed: [.openAI: 3_400, .kokoro: 900]) == [.kokoro, .openAI, .system])
-        #expect(engines(.auto, both, observed: [.openAI: 400]) == [.openAI, .kokoro, .system])
+        #expect(engines(.auto, both, observed: [.openAI: 3_400, .kokoro: 900]) == [.kokoro, .system])
+        #expect(engines(.auto, both, observed: [.openAI: 400]) == [.kokoro, .system])
     }
 
     @Test func everyDecisionHasAReasonAndNoKeyMaterial() {
@@ -107,7 +107,7 @@ struct UltronEngineRouterTests {
     }
 
     @Test func legacyPlanDelegatesToTheRouter() {
-        #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
+        #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: true) == .kokoro)
         #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: false) == .kokoro)
         #expect(UltronVoicePlan.preferred(kokoroReady: false, elevenLabsKeyValid: false) == .system)
     }

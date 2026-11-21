@@ -1,0 +1,140 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+@@ -0,0 +203,135 @@
++        let meter = try VoiceQualityMeter(directory: directory)
++        #expect(throws: VoiceQualityError.meterCorrupt) {
++            try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
++        }
++        #expect(try Data(contentsOf: target) == Data("{\"elevenlabs\":10}".utf8))
++    }
++
++    @Test func oneRequestCannotExceedFiveThousandCharacters() async throws {
++        let keys = PersonaSpeakKeys(elevenLabs: true)
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
++        let speaker = VoiceQualitySpeaker(
++            meter: meter,
++            transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2)
++        )
++        let synthesis = speaker.synthesize(
++            text: String(repeating: "a", count: 5_001),
++            choice: .elevenLabs,
++            keys: keys,
++            preset: .elevenLabsFast,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        )
++        let error = await firstError(synthesis)
++        #expect(error as? VoiceQualityError == .requestTooLarge)
++        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 0)
++        #expect(RouteHostStub.hosts.isEmpty)
++    }
++
++    @Test func concurrentReservesCannotPassTheCapTogether() throws {
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        let group = DispatchGroup()
++        let box = ResultBox()
++        for _ in 0..<2 {
++            group.enter()
++            DispatchQueue.global().async {
++                do {
++                    try meter.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 30_000)
++                    box.add(true)
++                } catch {
++                    box.add(false)
++                }
++                group.leave()
++            }
++        }
++        group.wait()
++        #expect(box.successes == 1)
++        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 30_000)
++    }
++
++    private func speak(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, credential: String, status: Int = 401, body: Data? = nil, location: String? = nil) async throws -> RouteOutcome {
++        RouteHostStub.reset(reply: .init(status: status, body: body, location: location))
++        let directory = try temporaryDirectory()
++        let lines = RouteLog()
++        let speaker = VoiceQualitySpeaker(
++            meter: try VoiceQualityMeter(directory: directory),
++            transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2),
++            log: ProviderLog { lines.add($0) }
++        )
++        let synthesis = speaker.synthesize(
++            text: "Hello",
++            choice: choice,
++            keys: keys,
++            preset: preset,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: credential])
++        )
++        let error = await firstError(synthesis)
++        return RouteOutcome(hosts: RouteHostStub.hosts, error: error, log: lines.text)
++    }
++
++    private func rejectedKey(_ key: String) async throws -> RejectedKey {
++        RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        let lines = RouteLog()
++        let speaker = VoiceQualitySpeaker(
++            meter: meter,
++            transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2),
++            log: ProviderLog { lines.add($0) }
++        )
++        let keys = PersonaSpeakKeys(elevenLabs: true)
++        let synthesis = speaker.synthesize(
++            text: "Hello",
++            choice: .elevenLabs,
++            keys: keys,
++            preset: .elevenLabsFast,
++            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: key])
++        )
++        let error = await firstError(synthesis)
++        let surfaced = error ?? VoiceQualityError.keyRejected
++        let message = [String(describing: surfaced), String(reflecting: surfaced), VoiceQualityError.publicName(surfaced), lines.text].joined(separator: "\n")
++        return RejectedKey(error: error, message: message, count: try meter.count(providerID: ElevenLabsTTSAdapter.id), hosts: RouteHostStub.hosts)
++    }
++
++    private func firstError(_ synthesis: Synthesis) async -> Error? {
++        do {
++            for try await _ in synthesis.chunks {}
++            return nil
++        } catch {
++            return error
++        }
++    }
++
++    private func temporaryDirectory() throws -> URL {
++        let url = FileManager.default.temporaryDirectory.appendingPathComponent("voice-quality-route-\(UUID().uuidString)", isDirectory: true)
++        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
++        return url
++    }
++}
++
++private final class RedirectDecision: @unchecked Sendable {
++    private let lock = NSLock()
++    private var stored: URLRequest?
++    private var didCall = false
++    var called: Bool { lock.lock(); defer { lock.unlock() }; return didCall }
++    var request: URLRequest? { lock.lock(); defer { lock.unlock() }; return stored }
++    func record(_ request: URLRequest?) { lock.lock(); didCall = true; stored = request; lock.unlock() }
++}
++
++private struct RouteOutcome {
++    var hosts: [String]
++    var error: Error?
++    var log: String
++}
++
++private struct RejectedKey {
++    var error: Error?
++    var message: String
++    var count: Int
++    var hosts: [String]
++}
++
++private final class ResultBox: @unchecked Sendable {
++    private let lock = NSLock()
