@@ -391,6 +391,25 @@ import Testing
         #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
     }
 
+    /// The legacy item is deleted, then the write that would put it back fails. The cache must not
+    /// keep a value the backend no longer holds.
+    @Test func failedWriteBackDoesNotCacheASecretTheBackendNoLongerHolds() {
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        backend.failDelete = [AssistantKeyAccount.aliasOpenAI]
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+        backend.failDelete = []
+        backend.storeThenFailAfter = 1
+        #expect(store.remove(AssistantKeyAccount.canonicalOpenAI) == false)
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == nil)
+        #expect(store.get(AssistantKeyAccount.aliasOpenAI) == nil)
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
+    }
+
     /// The write is echoed by the other fakes, so this one stores a different value. Verify must fail.
     @Test func migrationFailsWhenTheStoredCanonicalValueDoesNotMatchTheWrite() {
         let backend = DivergentWriteKeychain(["com.zeus.app|assistant.key.openai": "sk-legacy"])
@@ -439,6 +458,9 @@ final class DeleteInjectionKeychain: KeychainBackend, @unchecked Sendable {
     var failWrite: Set<String> = []
     /// The next N writes fail, then writes store the value. Used when a retry must be able to succeed.
     var failNextWrites = 0
+    /// This many writes store the value. Every write after that returns false and leaves the bytes unchanged.
+    var storeThenFailAfter: Int?
+    private var storedWrites = 0
     /// When set, deleting an account that is not stored returns false. That is `errSecItemNotFound` reported as failure.
     var absentDeleteReturnsFalse = false
     private(set) var deleteLog: [String] = []
@@ -462,7 +484,9 @@ final class DeleteInjectionKeychain: KeychainBackend, @unchecked Sendable {
             failNextWrites -= 1
             return false
         }
+        if let limit = storeThenFailAfter, storedWrites >= limit { return false }
         items["\(service)|\(account)"] = value
+        if storeThenFailAfter != nil { storedWrites += 1 }
         return true
     }
 
