@@ -2,7 +2,7 @@
 
 2026-11-21. Branch `zeus-bot/voice-stream-polish-v2`. Lens: clicks at joins, primer length, pause at clause boundaries, French chunking, cancellation tails.
 
-This branch does not carry a jarvis2.0 file. `speakKokoro` is the clause writer: it accepts only `zeus.synthetic`, renders one clause at a time through `ClauseSpeechScheduler`, and schedules the first clause before the rest of the reply. `OrbPersona` is not included, because its addendum calls `JarvisPersona`.
+This branch does not carry the parked non-commercial companion stack. `speakKokoro` is the clause writer: it accepts only `zeus.synthetic`, renders one clause at a time through `ClauseSpeechScheduler`, and schedules the first clause before the rest of the reply.
 
 ## Findings
 
