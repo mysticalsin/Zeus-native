@@ -53,12 +53,12 @@ public struct SystemKeychain: KeychainBackend {
     /// "zeus-dev" or "login", for reports.
     public var location: String { dev == nil ? "login" : "zeus-dev" }
 
-    private func quietly<T>(_ body: () -> T) -> T {
+    private func quietly<T>(_ body: () throws -> T) rethrows -> T {
         var allowed: DarwinBoolean = true
         SecKeychainGetUserInteractionAllowed(&allowed)
         SecKeychainSetUserInteractionAllowed(false)
         defer { SecKeychainSetUserInteractionAllowed(allowed.boolValue) }
-        return body()
+        return try body()
     }
 
     private func scoped(_ service: String) -> SecKeychain? { service == KeychainStore.service ? dev : nil }
@@ -70,14 +70,18 @@ public struct SystemKeychain: KeychainBackend {
         return query
     }
 
-    public func accounts(service: String) -> [String] {
-        quietly {
+    public func accounts(service: String) throws -> [String] {
+        try quietly {
             var query = base(service)
             query[kSecReturnAttributes as String] = true
             query[kSecMatchLimit as String] = kSecMatchLimitAll
             var result: CFTypeRef?
-            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-                  let items = result as? [[String: Any]] else { return [] }
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            // Not-found is an empty list. Every other status, including a locked keychain, is an error.
+            if status == errSecItemNotFound { return [] }
+            guard status == errSecSuccess, let items = result as? [[String: Any]] else {
+                throw KeychainBackendError.listingFailed
+            }
             return items.compactMap { $0[kSecAttrAccount as String] as? String }
         }
     }
@@ -113,6 +117,7 @@ public struct SystemKeychain: KeychainBackend {
     @discardableResult
     public func delete(service: String, account: String) -> Bool {
         let status = quietly { SecItemDelete(base(service, account) as CFDictionary) }
+        // errSecSuccess and errSecItemNotFound are the only successes. A locked keychain is failure.
         return status == errSecSuccess || status == errSecItemNotFound
     }
 }

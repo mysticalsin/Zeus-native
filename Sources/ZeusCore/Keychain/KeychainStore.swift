@@ -1,9 +1,16 @@
 import Foundation
 
+/// A Keychain operation failed for a reason other than a missing item.
+public enum KeychainBackendError: Error, Equatable, Sendable {
+    /// The account list could not be read. An empty list means there are no items, not that the read failed.
+    case listingFailed
+}
+
 /// Where secrets physically live. The real one is the macOS Keychain; tests use memory.
 public protocol KeychainBackend: Sendable {
     /// Every account under `service` (attributes only, no secrets).
-    func accounts(service: String) -> [String]
+    /// Throws when the list cannot be read. A missing item is an empty list, not an error.
+    func accounts(service: String) throws -> [String]
     /// The value, or nil when missing or when reading would need the person to click a dialog.
     func read(service: String, account: String) -> String?
     @discardableResult func write(_ value: String, service: String, account: String) -> Bool
@@ -71,8 +78,11 @@ public final class KeychainStore: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         defer { if !keepAliasSnapshot { aliasRemovedAtLoad = nil } }
         guard !loaded else { return }
+        let names: [String]
+        do { names = try backend.accounts(service: Self.service) }
+        catch { return }
         loaded = true
-        for account in backend.accounts(service: Self.service) {
+        for account in names {
             if let value = backend.read(service: Self.service, account: account) { cache[account] = value }
         }
         // Read the legacy spelling from the cache just filled, write the canonical account, read that
@@ -109,7 +119,13 @@ public final class KeychainStore: @unchecked Sendable {
             return
         }
         for item in Self.legacy where cache[item.to] == nil {
-            guard backend.accounts(service: item.service).contains(item.account) else { continue }
+            let listed: [String]
+            do { listed = try backend.accounts(service: item.service) }
+            catch {
+                unreadableLegacy.append("\(item.service)/\(item.account)")
+                continue
+            }
+            guard listed.contains(item.account) else { continue }
             if let value = backend.read(service: item.service, account: item.account), !value.isEmpty {
                 if backend.write(value, service: Self.service, account: item.to) { cache[item.to] = value }
             } else {
@@ -143,7 +159,7 @@ public final class KeychainStore: @unchecked Sendable {
         lastRefresh[account] = stamp
         if let value = backend.read(service: Self.service, account: account) {
             cache[account] = value
-        } else if !backend.accounts(service: Self.service).contains(account) {
+        } else if let listed = try? backend.accounts(service: Self.service), !listed.contains(account) {
             cache[account] = nil
         }
         return cache[account]
@@ -184,8 +200,11 @@ public final class KeychainStore: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         if openAI { keepAliasSnapshot = false }
         let removed = deleteAccounts(Self.removalAccounts(for: account))
-        if openAI, !removed { restoreAliasRemovedAtLoad() }
-        else { aliasRemovedAtLoad = nil }
+        if openAI, !removed {
+            _ = restoreAliasRemovedAtLoad()
+            return false
+        }
+        aliasRemovedAtLoad = nil
         return removed
     }
 
@@ -207,10 +226,31 @@ public final class KeychainStore: @unchecked Sendable {
         return [AssistantKeyAccount.aliasOpenAI, AssistantKeyAccount.canonicalOpenAI]
     }
 
+    /// Writes `value` and reads it back. A write that does not return the same bytes is not stored.
+    private func verifiedWrite(_ value: String, account: String) -> Bool {
+        guard backend.write(value, service: Self.service, account: account) else { return false }
+        return backend.read(service: Self.service, account: account) == value
+    }
+
+    private func restoreRemoved(_ removed: [(account: String, value: String)]) {
+        for prior in removed.reversed() {
+            if verifiedWrite(prior.value, account: prior.account) || verifiedWrite(prior.value, account: prior.account) {
+                cache[prior.account] = prior.value
+            } else {
+                cache[prior.account] = prior.value
+            }
+        }
+    }
+
     private func deleteAccounts(_ targets: [String]) -> Bool {
         var removed: [(account: String, value: String)] = []
         for item in targets {
             let saved = cache[item] ?? backend.read(service: Self.service, account: item)
+            // Do not delete a secret until a write of that same value has been read back.
+            if let saved, !verifiedWrite(saved, account: item) {
+                restoreRemoved(removed)
+                return false
+            }
             switch Self.deleteOutcome(item, backend: backend) {
             case .removed:
                 cache[item] = nil
@@ -218,11 +258,7 @@ public final class KeychainStore: @unchecked Sendable {
             case .absent:
                 cache[item] = nil
             case .failed:
-                for prior in removed.reversed() {
-                    if backend.write(prior.value, service: Self.service, account: prior.account) {
-                        cache[prior.account] = prior.value
-                    }
-                }
+                restoreRemoved(removed)
                 return false
             }
         }
@@ -230,22 +266,44 @@ public final class KeychainStore: @unchecked Sendable {
     }
 
     /// `remove` of an OpenAI spelling that fails puts back an alias this load already deleted.
-    private func restoreAliasRemovedAtLoad() {
-        guard let value = aliasRemovedAtLoad else { return }
-        aliasRemovedAtLoad = nil
-        guard backend.accounts(service: Self.service).contains(AssistantKeyAccount.canonicalOpenAI) else { return }
-        guard !backend.accounts(service: Self.service).contains(AssistantKeyAccount.aliasOpenAI) else { return }
-        if backend.write(value, service: Self.service, account: AssistantKeyAccount.aliasOpenAI) {
-            cache[AssistantKeyAccount.aliasOpenAI] = value
+    /// A failed write leaves the snapshot in place and does not claim the alias was restored.
+    @discardableResult
+    private func restoreAliasRemovedAtLoad() -> Bool {
+        guard let value = aliasRemovedAtLoad else { return true }
+        guard let listed = try? backend.accounts(service: Self.service) else { return false }
+        guard listed.contains(AssistantKeyAccount.canonicalOpenAI) else { return false }
+        let account = AssistantKeyAccount.aliasOpenAI
+        guard !listed.contains(account) else {
+            aliasRemovedAtLoad = nil
+            return true
         }
+        guard verifiedWrite(value, account: account) || verifiedWrite(value, account: account) else { return false }
+        aliasRemovedAtLoad = nil
+        cache[account] = value
+        return true
     }
 
-    /// `errSecItemNotFound` is success: an account that is gone after the call was absent or deleted.
-    /// An account that is still present is a real failure, whatever status the backend reported.
+    /// `errSecSuccess` and `errSecItemNotFound` are the only successful delete results.
+    /// Any other status is failure. A list that throws is failure too: a locked keychain must not
+    /// look like an empty one, or `remove` would report success while the item stays.
+    /// A false delete of an item that can still be read is failure. A false delete of an item that
+    /// a successful list and read both show is gone is not-found, which is success.
     private static func deleteOutcome(_ account: String, backend: KeychainBackend) -> AccountDelete {
-        let present = backend.accounts(service: service).contains(account)
-        _ = backend.delete(service: service, account: account)
-        if backend.accounts(service: service).contains(account) { return .failed }
+        let present: Bool
+        do { present = try backend.accounts(service: service).contains(account) }
+        catch { return .failed }
+        let deleted = backend.delete(service: service, account: account)
+        if !deleted {
+            if backend.read(service: service, account: account) != nil { return .failed }
+            do {
+                if try backend.accounts(service: service).contains(account) { return .failed }
+            } catch { return .failed }
+            return .absent
+        }
+        do {
+            if try backend.accounts(service: service).contains(account) { return .failed }
+        } catch { return .failed }
+        if backend.read(service: service, account: account) != nil { return .failed }
         return present ? .removed : .absent
     }
 
@@ -261,7 +319,7 @@ public final class MemoryKeychain: KeychainBackend, @unchecked Sendable {
     public init(_ items: [String: String] = [:]) { self.items = items }
     static func key(_ s: String, _ a: String) -> String { "\(s)|\(a)" }
 
-    public func accounts(service: String) -> [String] {
+    public func accounts(service: String) throws -> [String] {
         lock.lock(); defer { lock.unlock() }
         return items.keys.filter { $0.hasPrefix(service + "|") }.map { String($0.dropFirst(service.count + 1)) }
     }
@@ -313,8 +371,9 @@ public enum AssistantKeyAccount {
     /// Copies the alias into the canonical account when the canonical account is empty.
     /// Reads the legacy value, writes the canonical account, reads that account back, and only then
     /// deletes `assistant.key.openai`. When the canonical value is already present, that value stays
-    /// and a stale alias is deleted. A failed delete is tried once more. Nil means the alias is still
-    /// present, so the migration is not done. The canonical value is returned only after the alias is gone.
+    /// and a stale alias is deleted. A failed delete is tried once more. Nil means the migration is
+    /// not done: the canonical write failed, the stored bytes did not match, or the alias is still
+    /// present. A non-nil result is the canonical value, and only after the alias is gone.
     public static func migrateOpenAI(
         get: (String) -> String?,
         writeCanonical: (String) -> Bool,
@@ -328,7 +387,7 @@ public enum AssistantKeyAccount {
         guard let alias = nonempty(get(aliasOpenAI)) else { return nil }
         guard writeCanonical(alias),
               let stored = nonempty(get(canonicalOpenAI)),
-              stored == alias else { return alias }
+              stored == alias else { return nil }
         guard deleteAliasConfirmed(deleteAlias) else { return nil }
         return stored
     }

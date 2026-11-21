@@ -146,7 +146,7 @@ struct CredentialOriginTests {
         let inner: MemoryKeychain
         var refusedWrites: Set<String> = []
         init(_ items: [String: String]) { inner = MemoryKeychain(items) }
-        func accounts(service: String) -> [String] { inner.accounts(service: service) }
+        func accounts(service: String) throws -> [String] { try inner.accounts(service: service) }
         func read(service: String, account: String) -> String? { inner.read(service: service, account: account) }
         func write(_ value: String, service: String, account: String) -> Bool {
             refusedWrites.contains(account) ? false : inner.write(value, service: service, account: account)

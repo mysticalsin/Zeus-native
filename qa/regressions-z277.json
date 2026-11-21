@@ -1,0 +1,56 @@
+{
+  "block": "z277-delta",
+  "note": "Separate from qa/regressions.json. That file and PR #274 both append at the same closing bracket of the regressions array, so one combined list does not merge cleanly.",
+  "regressions": [
+    {
+      "id": "REG-Z277-1",
+      "failure": "migrateOpenAI returned the legacy alias when the canonical write failed or the stored bytes did not match the written value.",
+      "features": ["F13"],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "migrateOpenAIReturnsNilWhenTheCanonicalWriteFails"
+      }
+    },
+    {
+      "id": "REG-Z277-2",
+      "failure": "A locked keychain listed no accounts and a refused delete still reported the secret removed.",
+      "features": ["F13"],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "lockedKeychainDeleteDoesNotReportSuccessWhileTheItemStays"
+      }
+    },
+    {
+      "id": "REG-Z277-3",
+      "failure": "A failed write-back dropped a legacy OpenAI secret that removal had already deleted.",
+      "features": ["F13"],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "failedWriteBackDoesNotDropTheDeletedSecret"
+      }
+    },
+    {
+      "id": "REG-Z277-4",
+      "failure": "Restoring the alias removed at load ignored a failed write, so the secret stayed deleted.",
+      "features": ["F13"],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "restoreOfTheAliasRemovedAtLoadDoesNotIgnoreAFailedWrite"
+      }
+    },
+    {
+      "id": "REG-Z277-5",
+      "failure": "A canonical write that stored different bytes was still treated as a completed migration.",
+      "features": ["F13"],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/KeychainStoreTests.swift",
+        "function": "migrationFailsWhenTheStoredCanonicalValueDoesNotMatchTheWrite"
+      }
+    }
+  ]
+}
