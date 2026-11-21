@@ -31,18 +31,21 @@ struct SpeechEngineSection: View {
                     Text(kind.title).tag(kind)
                 }
             }
+                .accessibilityIdentifier("dictation.speech-engine-settings.engine")
             Text(settings.engine.detail).font(.callout).foregroundStyle(.secondary)
             if settings.engine == .parakeet {
                 if let progress = status.progress {
                     ProgressView(value: progress) { Text(status.downloaded ? "Loading Parakeet…" : "Downloading Parakeet…") }
-                    if let dictation { Button("Cancel") { dictation.cancelModelPreparation() } }
+                    if let dictation { Button("Cancel") { dictation.cancelModelPreparation() }
+                        .accessibilityIdentifier("dictation.speech-engine-settings.cancel") }
                 } else if status.downloaded {
                     Label("On this Mac. Audio never leaves it.", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 } else {
                     HStack {
                         Text("Apple speech is used until Parakeet is downloaded.").foregroundStyle(.secondary)
                         Spacer()
-                        if let dictation { Button("Download") { dictation.prepareModel() } }
+                        if let dictation { Button("Download") { dictation.prepareModel() }
+                            .accessibilityIdentifier("dictation.speech-engine-settings.download") }
                     }
                 }
                 if let problem = status.problem {

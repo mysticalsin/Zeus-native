@@ -127,12 +127,15 @@ private struct DictationRecordDetail: View {
                     Button("Save Correction") { saveCorrection() }
                         .disabled(state.draft == record.result)
                         .keyboardShortcut("s", modifiers: .command)
+                        .accessibilityIdentifier("dictation.dictation-history-window.save-correction")
                     Button("Copy") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(state.draft, forType: .string)
                     }
+                        .accessibilityIdentifier("dictation.dictation-history-window.copy")
                     Spacer()
                     Button("Delete", role: .destructive) { controller?.deleteRecord(record.id) }
+                        .accessibilityIdentifier("dictation.dictation-history-window.delete")
                 }
                 if record.rawResult != record.result {
                     LabeledContent("Heard") { Text(record.rawResult).textSelection(.enabled).foregroundStyle(.secondary) }
@@ -156,7 +159,9 @@ private struct DictationRecordDetail: View {
                             state.note = "Added. Future dictations will use it."
                         }
                         .buttonStyle(GSButtonStyle(prominent: true))
+                        .accessibilityIdentifier("dictation.dictation-history-window.add-to-vocabulary")
                         Button("Not Now") { state.suggestion = nil }
+                            .accessibilityIdentifier("dictation.dictation-history-window.not-now")
                     }
                 }
             }
@@ -165,6 +170,7 @@ private struct DictationRecordDetail: View {
                 Picker("Mode", selection: Binding(get: { state.modeKey }, set: { state.modeKey = $0 })) {
                     ForEach(topBar.dictationModes) { mode in Label(mode.name, systemImage: mode.symbol).tag(mode.key) }
                 }
+                    .accessibilityIdentifier("dictation.dictation-history-window.mode")
                 Picker("Listen again with", selection: Binding(get: { state.engine }, set: { state.engine = $0 })) {
                     Text("Keep the words heard").tag(TranscriptionEngineKind?.none)
                     if controller?.hasAudio(record.id) == true {
@@ -174,12 +180,15 @@ private struct DictationRecordDetail: View {
                     }
                 }
                 .disabled(controller?.hasAudio(record.id) != true)
+                .accessibilityIdentifier("dictation.dictation-history-window.listen-again-with")
                 if controller?.hasAudio(record.id) != true {
                     Text("This dictation has no saved audio, so only the mode can change.").font(.callout).foregroundStyle(.secondary)
                 }
                 HStack {
                     Button(state.working ? "Working…" : "Reprocess") { reprocess() }
                         .disabled(state.working || controller == nil)
+                        .accessibilityLabel(state.working ? "Working…" : "Reprocess")
+                        .accessibilityIdentifier("dictation.dictation-history-window.working")
                     if state.working { ProgressView().controlSize(.small) }
                 }
             }
