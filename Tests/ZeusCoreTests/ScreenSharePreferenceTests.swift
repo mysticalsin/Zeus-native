@@ -72,4 +72,33 @@ struct ScreenSharePreferenceTests {
         _ = ZeusScreenSharePolicy.migrate(shownByBoolean)
         #expect(shownByBoolean.string(forKey: ZeusScreenSharePolicy.storedKey) != "true")
     }
+
+    /// The command line is an agent. It can hide Zeus and cannot turn sharing visibility on.
+    @Test func aCommandLineOnCannotEnableSharing() {
+        #expect(ScreenShareDebug.origin == .agent)
+        #expect(ScreenShareDebug.verb(" on ") == .on)
+        #expect(ScreenShareDebug.verb("OFF") == .off)
+        #expect(ScreenShareDebug.persistedShown(.on, currentlyShown: false) == nil)
+        #expect(ScreenShareDebug.persistedShown(.on, currentlyShown: true) == nil)
+        #expect(ScreenShareDebug.persistedShown(.off, currentlyShown: true) == false)
+        #expect(!ZeusScreenSharePolicy.persistsShow(requestedTrue: true, origin: ScreenShareDebug.origin))
+        #expect(ZeusScreenSharePolicy.persistsShow(requestedTrue: false, origin: .agent))
+    }
+
+    /// An imported interview.hide of false must not read as showing when the live string is absent.
+    @Test func anImportedHideFalseStaysHiddenWhenTheLiveStringIsAbsent() throws {
+        let defaults = try fresh()
+        #expect(ZeusScreenSharePolicy.importedLegacyHideWouldShow(false))
+        #expect(ZeusScreenSharePolicy.importedLegacyHideWouldShow("false"))
+        #expect(!ZeusScreenSharePolicy.importedLegacyHideWouldShow(true))
+        #expect(!ZeusScreenSharePolicy.applyImportedLegacyHide(false, defaults: defaults))
+        #expect(defaults.object(forKey: ZeusScreenSharePolicy.legacyHideKey) == nil)
+        #expect(defaults.string(forKey: ZeusScreenSharePolicy.storedKey) == nil)
+        #expect(!ZeusScreenSharePolicy.showInScreenSharing(from: defaults))
+
+        #expect(ZeusScreenSharePolicy.applyImportedLegacyHide(true, defaults: defaults))
+        #expect(defaults.object(forKey: ZeusScreenSharePolicy.legacyHideKey) as? Bool == true)
+        #expect(defaults.string(forKey: ZeusScreenSharePolicy.storedKey) == "false")
+        #expect(!ZeusScreenSharePolicy.showInScreenSharing(from: defaults))
+    }
 }
