@@ -173,7 +173,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dictation = DictationController(topBar: topBar, store: DictationStore(root: dictationRoot))
             topBar.toggleDictation = { [weak self] in
                 guard let self else { return }
-                if self.topBar.dictationPhase == .listening { self.dictation.finish() } else if !self.topBar.isDictating { self.dictation.begin() }
+                switch DictationPress.action(for: self.topBar.dictationPhase) {
+                case .begin: self.dictation.begin()
+                case .finish: self.dictation.finish()
+                case .cancel: self.dictation.cancel()
+                }
             }
             dictation.rewrite = { prompt in try await ClaudeRewriter.rewrite(prompt) }
             dictation.start()

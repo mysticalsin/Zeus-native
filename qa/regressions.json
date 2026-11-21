@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/ApprovalWaitTests.swift",
         "function": "answeringAnApprovalCancelsItsTimeout"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The top-bar Dictate control finished only while listening and began only while idle. During transcribing or rewriting it did nothing, and VoiceOver still said Start dictation while the button read Typing.",
+      "features": [
+        "F01"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DictationPressTests.swift",
+        "function": "aPressWhileTypingCancelsDictation"
+      }
     }
   ]
 }
