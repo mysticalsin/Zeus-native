@@ -239,6 +239,7 @@ final class WeatherSettingsModel {
         var editor = WeatherSettingsEditor.fresh(localeUsesUSCustomary: localeUsesUS)
         let stored = WeatherSettingsDisk.load(defaults: defaults, localeUsesUSCustomary: localeUsesUS)
         editor.restore(city: stored.city, unit: stored.unit, layout: stored.layout)
+        editor.restorePreciseLocation(stored.preciseLocation)
         self.editor = editor
         loader = WeatherForecastLoader { url in
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -297,6 +298,7 @@ final class WeatherSettingsModel {
         if editor.location.readsCoordinates, editor.committedCity.isEmpty {
             bridge.requestFix()
         }
+        persist()
     }
 
     func receive(_ sample: TopBarPointerSample) {
@@ -335,7 +337,8 @@ final class WeatherSettingsModel {
     }
 
     private func persist() {
-        WeatherSettingsDisk.save(city: editor.committedCity, unit: editor.unit, layout: editor.layout, defaults: defaults)
+        WeatherSettingsDisk.save(city: editor.committedCity, unit: editor.unit, layout: editor.layout,
+                                 preciseLocation: editor.location.wantsPreciseLocation, defaults: defaults)
         SettingsStore.shared.set(WeatherLayoutChoice.settingKey, editor.layout.title)
     }
 

@@ -57,6 +57,10 @@ public struct WeatherSettingsEditor: Equatable, Sendable {
         self.layout = layout
     }
 
+    public mutating func restorePreciseLocation(_ on: Bool) {
+        location.restoreStored(on)
+    }
+
     public static func fresh(localeUsesUSCustomary: Bool) -> WeatherSettingsEditor {
         WeatherSettingsEditor(
             cityDraft: "",

@@ -1,7 +1,7 @@
 import Foundation
 
 /// The weather keys Zeus already stores. City and units use the top bar defaults. Layout uses the catalog
-/// key with the settings store's `opt.` prefix. Precise location is not a stored switch.
+/// key with the settings store's `opt.` prefix. Precise location is the string "true" or "false" at `perm.location`.
 public enum WeatherSettingsDisk {
     public static let cityKey = "topBar.weatherCity"
     public static let celsiusKey = "topBar.celsius"
@@ -28,11 +28,12 @@ public enum WeatherSettingsDisk {
             city: defaults.string(forKey: cityKey) ?? "",
             unit: WeatherTemperatureUnit.resolve(stored: storedCelsius, localeUsesUSCustomary: localeUsesUSCustomary),
             layout: WeatherLayoutChoice.resolve(defaults.string(forKey: layoutKey)),
-            preciseLocation: false
+            preciseLocation: defaults.string(forKey: locationKey) == "true"
         )
     }
 
-    public static func save(city: String, unit: WeatherTemperatureUnit, layout: WeatherLayoutChoice, defaults: UserDefaults) {
+    /// `preciseLocation` nil leaves that key alone. A value writes "true" or "false" and never removes it.
+    public static func save(city: String, unit: WeatherTemperatureUnit, layout: WeatherLayoutChoice, preciseLocation: Bool? = nil, defaults: UserDefaults) {
         let storedCity: String
         switch WeatherCityPolicy.decide(city) {
         case .accepted(let name): storedCity = name
@@ -41,13 +42,16 @@ public enum WeatherSettingsDisk {
         defaults.set(storedCity, forKey: cityKey)
         defaults.set(unit.stored, forKey: celsiusKey)
         defaults.set(layout.title, forKey: layoutKey)
-        defaults.removeObject(forKey: locationKey)
+        if let preciseLocation {
+            defaults.set(preciseLocation ? "true" : "false", forKey: locationKey)
+        }
     }
 
     /// An imported file may change the city, the unit, and the layout. It cannot turn precise location on.
     public static func applyingImport(_ incoming: [String: Any], onto current: Values) -> Values {
         var next = current
-        next.preciseLocation = false
+        if let flag = incoming[locationKey] as? String, flag == "false" { next.preciseLocation = false }
+        if let flag = incoming[locationKey] as? Bool, flag == false { next.preciseLocation = false }
         if let city = incoming[cityKey] as? String {
             switch WeatherCityPolicy.decide(city) {
             case .accepted(let name): next.city = name
