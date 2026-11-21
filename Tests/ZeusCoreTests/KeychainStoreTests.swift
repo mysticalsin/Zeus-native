@@ -137,11 +137,16 @@ import Testing
 
     /// S04-01. The speech card writes `assistant.key.openAI`. An older reader used `assistant.key.openai`.
     @Test func openAIKeyReadsBothSpellingsWritesCanonicalAndMigrates() {
-        let aliasOnly = KeychainStore(backend: MemoryKeychain(["com.zeus.app|assistant.key.openai": "sk-alias"]), defaults: defaults())
+        let aliasBackend = MemoryKeychain(["com.zeus.app|assistant.key.openai": "sk-alias"])
+        let aliasOnly = KeychainStore(backend: aliasBackend, defaults: defaults())
         #expect(AssistantKeyAccount.readOpenAI(aliasOnly.get) == "sk-alias")
-        #expect(AssistantKeyAccount.migrateOpenAI(get: aliasOnly.get, writeCanonical: { aliasOnly.set($0, for: AssistantKeyAccount.canonicalOpenAI) }) == "sk-alias")
+        #expect(AssistantKeyAccount.migrateOpenAI(
+            get: aliasOnly.get,
+            writeCanonical: { aliasOnly.set($0, for: AssistantKeyAccount.canonicalOpenAI) },
+            deleteAlias: { aliasBackend.delete(service: KeychainStore.service, account: AssistantKeyAccount.aliasOpenAI) }
+        ) == "sk-alias")
         #expect(aliasOnly.get(AssistantKeyAccount.canonicalOpenAI) == "sk-alias")
-        #expect(aliasOnly.get(AssistantKeyAccount.aliasOpenAI) == "sk-alias")
+        #expect(aliasOnly.get(AssistantKeyAccount.aliasOpenAI) == nil)
 
         let canonical = KeychainStore(backend: MemoryKeychain(), defaults: defaults())
         #expect(AssistantKeyAccount.writeOpenAI("sk-new", write: { canonical.set($0, for: AssistantKeyAccount.canonicalOpenAI) }))
@@ -149,12 +154,17 @@ import Testing
         #expect(canonical.get(AssistantKeyAccount.aliasOpenAI) == nil)
         #expect(AssistantKeyAccount.readOpenAI(canonical.get) == "sk-new")
 
-        let both = KeychainStore(backend: MemoryKeychain([
+        let bothBackend = MemoryKeychain([
             "com.zeus.app|assistant.key.openAI": "sk-canonical",
             "com.zeus.app|assistant.key.openai": "sk-alias",
-        ]), defaults: defaults())
+        ])
+        let both = KeychainStore(backend: bothBackend, defaults: defaults())
         #expect(AssistantKeyAccount.readOpenAI(both.get) == "sk-canonical")
-        #expect(AssistantKeyAccount.migrateOpenAI(get: both.get, writeCanonical: { both.set($0, for: AssistantKeyAccount.canonicalOpenAI) }) == "sk-canonical")
+        #expect(AssistantKeyAccount.migrateOpenAI(
+            get: both.get,
+            writeCanonical: { both.set($0, for: AssistantKeyAccount.canonicalOpenAI) },
+            deleteAlias: { bothBackend.delete(service: KeychainStore.service, account: AssistantKeyAccount.aliasOpenAI) }
+        ) == "sk-canonical")
         #expect(both.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
     }
 

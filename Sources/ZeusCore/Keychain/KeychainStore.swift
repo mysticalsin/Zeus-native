@@ -70,11 +70,25 @@ public final class KeychainStore: @unchecked Sendable {
         for account in backend.accounts(service: Self.service) {
             if let value = backend.read(service: Self.service, account: account) { cache[account] = value }
         }
-        if AssistantKeyAccount.nonempty(cache[AssistantKeyAccount.canonicalOpenAI]) == nil,
-           let alias = AssistantKeyAccount.nonempty(cache[AssistantKeyAccount.aliasOpenAI]),
-           backend.write(alias, service: Self.service, account: AssistantKeyAccount.canonicalOpenAI) {
-            cache[AssistantKeyAccount.canonicalOpenAI] = alias
-        }
+        // Read the legacy spelling from the cache just filled, write the canonical account, read that
+        // account back, then delete the legacy spelling. A launch with no legacy spelling does not
+        // read the backend again. Leaving assistant.key.openai in place makes the next load copy it back.
+        let migrated = AssistantKeyAccount.migrateOpenAI(
+            get: { cache[$0] },
+            writeCanonical: { value in
+                guard backend.write(value, service: Self.service, account: AssistantKeyAccount.canonicalOpenAI) else { return false }
+                guard let stored = backend.read(service: Self.service, account: AssistantKeyAccount.canonicalOpenAI),
+                      stored == value else { return false }
+                cache[AssistantKeyAccount.canonicalOpenAI] = stored
+                return true
+            },
+            deleteAlias: {
+                guard backend.delete(service: Self.service, account: AssistantKeyAccount.aliasOpenAI) else { return false }
+                cache[AssistantKeyAccount.aliasOpenAI] = nil
+                return true
+            }
+        )
+        if let migrated { cache[AssistantKeyAccount.canonicalOpenAI] = migrated }
         guard !defaults.bool(forKey: Self.migratedFlag) else {
             unreadableLegacy = defaults.stringArray(forKey: Self.unreadableKey) ?? []
             return
@@ -140,13 +154,25 @@ public final class KeychainStore: @unchecked Sendable {
 
     /// Success means the backend confirmed deletion or the item was already absent.
     /// Keep cached state on failure so callers cannot falsely report a removed secret.
+    /// Removing either OpenAI spelling deletes both. Deleting only `assistant.key.openAI` left
+    /// `assistant.key.openai` for the next load to copy back.
     @discardableResult
     public func remove(_ account: String) -> Bool {
         load()
         lock.lock(); defer { lock.unlock() }
-        guard backend.delete(service: Self.service, account: account) else { return false }
-        cache[account] = nil
+        let targets = Self.removalAccounts(for: account)
+        for item in targets {
+            guard backend.delete(service: Self.service, account: item) else { return false }
+        }
+        for item in targets { cache[item] = nil }
         return true
+    }
+
+    /// The requested account is first, so a refusal leaves that item in place.
+    static func removalAccounts(for account: String) -> [String] {
+        let spellings = [AssistantKeyAccount.canonicalOpenAI, AssistantKeyAccount.aliasOpenAI]
+        guard spellings.contains(account) else { return [account] }
+        return [account] + spellings.filter { $0 != account }
     }
 }
 
@@ -209,11 +235,20 @@ public enum AssistantKeyAccount {
     }
 
     /// Copies the alias into the canonical account when the canonical account is empty.
-    /// A canonical value is left in place. Returns the canonical value after the attempt.
-    public static func migrateOpenAI(get: (String) -> String?, writeCanonical: (String) -> Bool) -> String? {
+    /// Reads the legacy value, writes the canonical account, reads that account back, and only then
+    /// deletes `assistant.key.openai`. A canonical value already present is left in place.
+    /// Returns the canonical value after the attempt.
+    public static func migrateOpenAI(
+        get: (String) -> String?,
+        writeCanonical: (String) -> Bool,
+        deleteAlias: () -> Bool
+    ) -> String? {
         if let canonical = nonempty(get(canonicalOpenAI)) { return canonical }
         guard let alias = nonempty(get(aliasOpenAI)) else { return nil }
-        if writeCanonical(alias), let stored = nonempty(get(canonicalOpenAI)) { return stored }
-        return alias
+        guard writeCanonical(alias),
+              let stored = nonempty(get(canonicalOpenAI)),
+              stored == alias else { return alias }
+        _ = deleteAlias()
+        return stored
     }
 }
