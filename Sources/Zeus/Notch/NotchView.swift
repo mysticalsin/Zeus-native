@@ -803,6 +803,7 @@ private struct TopBarPanelBody: View {
     @State private var agentsPage = AgentsPage.fresh()
     @State private var agentsReply = ""
     @State private var agentsNote = ""
+    @State private var cardGate = AgentsPageCardGate()
     @FocusState private var agentsApprovalFocused: Bool
 
     /// Glance's layout (TOPBAR-SPEC §2-4): the notch row stays empty, the tab capsule sits at
@@ -1138,15 +1139,22 @@ private struct TopBarPanelBody: View {
         }
     }
 
-    /// Hands a verdict to the hook only when the undo window has closed without an undo.
+    /// Hands a verdict to the hook only when the undo window has closed without an undo,
+    /// and only while the card that opened that window is still the one on screen.
     private func adopt(_ step: AgentsPageHook.Step) {
+        let (gate, sends) = cardGate.step(before: agentsPage, after: step.page, currentCard: model.approval?.id)
+        cardGate = gate
         agentsPage = step.page
-        for verdict in step.sends {
-            switch verdict {
-            case .allow: model.approval?.resolve(HookDecision.Verdict.allow)
-            case .deny: model.approval?.resolve(HookDecision.Verdict.deny)
-            case .ask: model.approval?.resolve(HookDecision.Verdict.ask)
-            }
+        for verdict in sends {
+            deliver(verdict)
+        }
+    }
+
+    private func deliver(_ verdict: AgentsPageHookVerdict) {
+        switch verdict {
+        case .allow: model.approval?.resolve(HookDecision.Verdict.allow)
+        case .deny: model.approval?.resolve(HookDecision.Verdict.deny)
+        case .ask: model.approval?.resolve(HookDecision.Verdict.ask)
         }
     }
 
@@ -1173,23 +1181,20 @@ private struct TopBarPanelBody: View {
         }
         page = page.applying(.sessionsReplaced(roster))
         if let approval = model.approval {
-            let id = approval.sessionID ?? roster.first?.id ?? approval.id
-            let req = AgentsPageRequest(
-                sessionID: id,
+            let req = AgentsPageLive.request(
+                approvalID: approval.id,
+                sessionID: approval.sessionID,
                 tool: approval.tool,
                 highRisk: approval.risk == .high,
                 command: approval.command.isEmpty ? nil : approval.command
             )
-            if page.showingRequest?.sessionID != id {
+            let known = page.revision.showing?.id == req.boundID
+                || page.revision.pending?.requestIDs.contains(req.boundID) == true
+                || page.revision.waiting.contains { $0.id == req.boundID }
+            if !known {
                 page = page.applying(.approvalRequested(req))
             }
-            if page.showingRequest == nil {
-                page.showingRequest = req
-                page.approvalGrown = true
-                page.cardAbovePage = false
-                page.secondsLeft = AgentsPage.countdownStart
-            }
-            if let deadline = approval.deadline {
+            if let deadline = approval.deadline, page.revision.pending == nil, page.revision.showing?.id == req.boundID {
                 page.secondsLeft = max(0, Int(deadline.timeIntervalSinceNow.rounded(.down)))
             }
         }
@@ -1979,21 +1984,33 @@ enum AgentsPageHook {
     }
 }
 
-/// Remembers which card opened the undo window. The stub still releases Allow to whoever is current.
+/// Remembers the card id that opened the undo window. Allow is released only while that card is still current.
 struct AgentsPageCardGate: Equatable, Sendable {
     var boundID: String?
 
     func step(before: AgentsPage, after: AgentsPage, currentCard: String?) -> (AgentsPageCardGate, [AgentsPageHookVerdict]) {
-        _ = currentCard
-        return (self, AgentsPageHook.appeared(from: before, to: after))
+        var gate = self
+        if before.revision.pending == nil, after.revision.pending != nil {
+            gate.boundID = after.revision.pending?.requestIDs.first
+        }
+        let fresh = AgentsPageHook.appeared(from: before, to: after)
+        if !fresh.isEmpty {
+            let sends = gate.boundID != nil && gate.boundID == currentCard ? fresh : []
+            gate.boundID = nil
+            return (gate, sends)
+        }
+        if before.revision.pending != nil, after.revision.pending == nil {
+            gate.boundID = nil
+        }
+        return (gate, [])
     }
 }
 
-/// The live card. The stub drops the card id and keeps the session id.
+/// The card on screen. Its id is the approval id, not the session id.
 enum AgentsPageLive {
     static func request(approvalID: String, sessionID: String?, tool: String, highRisk: Bool, command: String?) -> AgentsPageRequest {
-        _ = approvalID
-        return AgentsPageRequest(
+        AgentsPageRequest(
+            id: approvalID,
             sessionID: sessionID ?? approvalID,
             tool: tool,
             highRisk: highRisk,
