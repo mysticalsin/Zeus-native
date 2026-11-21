@@ -446,6 +446,23 @@ import Testing
         #expect(!branch.contains(".terminate("))
         #expect(!branch.contains("forceTerminate"))
     }
+
+    @Test func pauseDoesNotStartPlaybackAndPlayCanReachSpotify() {
+        #expect(MediaTransport.post(for: .pause, isPlaying: false) == nil)
+        #expect(MediaTransport.post(for: .pause, isPlaying: true) == .playPause)
+        #expect(MediaTransport.post(for: .play, isPlaying: true) == nil)
+        #expect(MediaTransport.post(for: .play, isPlaying: false) == .playPause)
+        let play = LocalCommandMachine().receive("play", finalAt: Self.origin, clock: Self.clock(after: 4), apps: [])
+        #expect(!LocalCommandHook.shouldPerform(play, hasSession: false, spotifyInstalled: true))
+        #expect(LocalCommandHook.shouldPerform(play, hasSession: true, spotifyInstalled: true))
+    }
+
+    @Test func aNegativeVolumeIsNotACommand() {
+        #expect(LocalCommandParser.parse("volume -1") == nil)
+        #expect(LocalCommandParser.parse("set the volume to -5") == nil)
+        #expect(LocalCommandParser.parse("volume 0") == .volume(.set(0)))
+        #expect(LocalCommandParser.parse("volume 1") == .volume(.set(1)))
+    }
 }
 
 extension LocalApp {
