@@ -8748,6 +8748,42 @@
         "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
         "function": "failedListenAfterBindLeavesAReplacementSocket"
       }
+    },
+    {
+      "id": "REG-981",
+      "failure": "The host could ignore BridgeHostStartup.steps and capture identity before stdin while the startup-order tests still passed. main now runs only BridgeHostStartup.drive, and that function walks the shared list.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "theHostDrivesThatListAndNoOtherOrder"
+      }
+    },
+    {
+      "id": "REG-982",
+      "failure": "Deleting the st_dev compare still passed the replacement, failed-listen and symlink tests, because those paths differ by inode or by file type. Unlink now refuses a socket that has the same inode on another device.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "finishLeavesASocketWithTheSameInodeOnAnotherDevice"
+      }
+    },
+    {
+      "id": "REG-983",
+      "failure": "stat() in place of lstat still passed the symlink-to-file test, because a followed regular file is not a socket. finish now records the lstat node, so a symlink to a regular file must stay a symlink.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "finishKeepsASymlinkToARegularFileByLstat"
+      }
     }
   ]
 }

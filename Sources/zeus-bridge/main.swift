@@ -121,9 +121,9 @@ do {
         relay.forward(line, reply: reply)
     }
     // Attach before the reader starts, so EOF or a bad frame can stop the socket instead of
-    // exiting with the file still on disk. The step list is the order the tests lock.
+    // exiting with the file still on disk. drive is the only startup order.
     lifetime.attach(input: input, server: server)
-    for step in BridgeHostStartup.steps {
+    BridgeHostStartup.drive { step in
         switch step {
         case .bindSocket:
             try? server.start()

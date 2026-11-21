@@ -294,7 +294,7 @@ struct BridgePendingRepliesTests {
         let bind = try #require(source.range(of: "server.start()"))
         let arm = try #require(source.range(of: "input.start("))
         let capture = try #require(source.range(of: "PeerSigning.captureOwnIdentity()"))
-        let ready = try #require(source.range(of: "noteIdentityReady()"))
+        let ready = try #require(source.range(of: "relay.noteIdentityReady()"))
         #expect(drive.lowerBound < bind.lowerBound)
         #expect(drive.lowerBound < arm.lowerBound)
         #expect(drive.lowerBound < capture.lowerBound)
@@ -302,7 +302,7 @@ struct BridgePendingRepliesTests {
         #expect(source.components(separatedBy: "PeerSigning.captureOwnIdentity()").count == 2)
         #expect(source.components(separatedBy: "input.start(").count == 2)
         #expect(source.components(separatedBy: "server.start()").count == 2)
-        #expect(source.components(separatedBy: "noteIdentityReady()").count == 2)
+        #expect(source.components(separatedBy: "relay.noteIdentityReady()").count == 2)
     }
 
     @Test func finishLeavesASocketWithTheSameInodeOnAnotherDevice() throws {

@@ -7118,6 +7118,22 @@
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "driveRunsTheSharedStartupListInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "theHostDrivesThatListAndNoOtherOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesASocketWithTheSameInodeOnAnotherDevice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishKeepsASymlinkToARegularFileByLstat"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
               "function": "finishLeavesAReplacementSocket"
             },
             {
@@ -7274,6 +7290,22 @@
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
               "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "driveRunsTheSharedStartupListInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "theHostDrivesThatListAndNoOtherOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesASocketWithTheSameInodeOnAnotherDevice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishKeepsASymlinkToARegularFileByLstat"
             },
             {
               "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",

@@ -285,26 +285,39 @@ public final class UnixSocketServer: @unchecked Sendable {
         }
     }
 
+    /// `lstat` of one path. A symlink is reported as a symlink, not as the file it names.
+    private static func directoryEntry(_ path: String) -> DirectoryEntry? {
+        var info = stat()
+        guard lstat(path, &info) == 0 else { return nil }
+        let type = info.st_mode & mode_t(S_IFMT)
+        let kind: DirectoryEntry.Kind
+        if type == mode_t(S_IFSOCK) { kind = .socket }
+        else if type == mode_t(S_IFLNK) { kind = .symlink }
+        else if type == mode_t(S_IFREG) { kind = .regular }
+        else { kind = .other }
+        return DirectoryEntry(device: UInt64(info.st_dev), inode: UInt64(info.st_ino), kind: kind)
+    }
+
     /// `lstat` of the socket we just bound. A symlink is not recorded, so finish cannot follow it.
     private func rememberBoundNode() {
-        var info = stat()
-        guard lstat(path, &info) == 0, (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK) else {
+        guard let node = Self.directoryEntry(path), node.kind == .socket else {
             boundDevice = nil
             boundInode = nil
             return
         }
-        boundDevice = UInt64(info.st_dev)
-        boundInode = UInt64(info.st_ino)
+        boundDevice = node.device
+        boundInode = node.inode
     }
 
-    /// Unlink only the inode from a successful bind. A replacement or a symlink stays.
+    /// Unlink only the socket inode from a successful bind. Device and inode must both match.
+    /// `lstat` does not follow a symlink. The check and `unlink` are still two calls, so a path
+    /// swapped in that window can be removed.
     private func unlinkIfStillBound() {
         guard let boundDevice, let boundInode else { return }
-        var info = stat()
-        guard lstat(path, &info) == 0,
-              (info.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK),
-              UInt64(info.st_dev) == boundDevice,
-              UInt64(info.st_ino) == boundInode else { return }
+        let probe = Self.unlinkProbeLock.withLock { Self.unlinkProbe }
+        let node = probe?(path) ?? Self.directoryEntry(path)
+        Self.unlinkProbeLock.withLock { Self.lastUnlinkProbe = node }
+        guard let node, node.kind == .socket, node.device == boundDevice, node.inode == boundInode else { return }
         unlink(path)
         self.boundDevice = nil
         self.boundInode = nil
