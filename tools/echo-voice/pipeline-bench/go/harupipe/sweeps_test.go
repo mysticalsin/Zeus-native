@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func TestZeroCapacityRingAcceptsEmptyPush(t *testing.T) {
+	r := NewRing(0)
+	if err := r.Push(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Push([]float32{}); err != nil {
+		t.Fatal(err)
+	}
+	if r.Len() != 0 {
+		t.Fatalf("len %d", r.Len())
+	}
+}
+
 func TestEmptySummaryIsFinite(t *testing.T) {
 	s := Summary(nil)
 	if s["n"] != 0 {
