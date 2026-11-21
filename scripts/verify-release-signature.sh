@@ -18,7 +18,13 @@ if [ "$EXPECTED_TEAM_ID" = "ZEUSTEAMID" ]; then
   echo "Release signature rejected: EXPECTED_TEAM_ID is the placeholder ZEUSTEAMID. MERGE-BLOCKED: needs Tony's Apple Team ID." >&2
   exit 1
 fi
-codesign --verify --deep --strict "$APP"
+# An empty, short, long, lowercase, or symbolic team is not a team id. The compare is never skipped.
+if ! [[ "$EXPECTED_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+  echo "Release signature rejected: EXPECTED_TEAM_ID must be 10 characters from A-Z and 0-9." >&2
+  exit 1
+fi
+requirement="certificate leaf[subject.OU] = ${EXPECTED_TEAM_ID}"
+codesign --verify --deep --strict -R "$requirement" "$APP"
 for binary in "$APP" "$APP"/Contents/Helpers/* "$APP"/Contents/Resources/zeus-now-playing; do
   if [ ! -e "$binary" ]; then
     case "$binary" in
@@ -30,10 +36,10 @@ for binary in "$APP" "$APP"/Contents/Helpers/* "$APP"/Contents/Resources/zeus-no
     echo "Release signature rejected: expected binary is missing: $binary" >&2
     exit 1
   fi
-  codesign --verify --strict "$binary"
+  codesign --verify --strict -R "$requirement" "$binary"
   details="$(codesign --display --verbose=4 "$binary" 2>&1)"
   team="$(awk -F= '/^TeamIdentifier=/{print $2; exit}' <<<"$details")"
-  if [ "$team" != "$EXPECTED_TEAM_ID" ] \
+  if ! [[ "$team" =~ ^[A-Z0-9]{10}$ ]] || [ "$team" != "$EXPECTED_TEAM_ID" ] \
     || ! grep -q '^Authority=Developer ID Application:' <<<"$details" \
     || ! grep -q '^Timestamp=' <<<"$details" \
     || grep -Eq '^Timestamp=(none|invalid)$' <<<"$details" \
