@@ -190,7 +190,18 @@ type Polyphase struct {
 	phases            [][]float32
 }
 
-func NewPolyphase(up, down int) *Polyphase {
+// BadRatio is returned when up or down is below 1. Those ratios used to
+// return an empty buffer (up = 0) or panic (down = 0, or both 0).
+type BadRatio struct{ Up, Down int }
+
+func (e BadRatio) Error() string {
+	return fmt.Sprintf("resample ratio %d/%d is not positive", e.Up, e.Down)
+}
+
+func NewPolyphase(up, down int) (*Polyphase, error) {
+	if up < 1 || down < 1 {
+		return nil, BadRatio{up, down}
+	}
 	g := gcd(up, down)
 	up, down = up/g, down/g
 	maxRate := max(up, down)
@@ -211,7 +222,7 @@ func NewPolyphase(up, down int) *Polyphase {
 		}
 		phases[p] = t
 	}
-	return &Polyphase{up, down, halfLen, phases}
+	return &Polyphase{up, down, halfLen, phases}, nil
 }
 
 func dot(a, b []float32) float32 {
@@ -257,12 +268,19 @@ func (pp *Polyphase) Process(x []float32) []float32 {
 	return y
 }
 
-func To24k(x []float32, rate int) []float32 {
+func To24k(x []float32, rate int) ([]float32, error) {
 	if rate == SampleRate {
-		return append([]float32(nil), x...)
+		return append([]float32(nil), x...), nil
+	}
+	if rate < 1 {
+		return nil, BadRatio{SampleRate, rate}
 	}
 	g := gcd(SampleRate, rate)
-	return NewPolyphase(SampleRate/g, rate/g).Process(x)
+	pp, err := NewPolyphase(SampleRate/g, rate/g)
+	if err != nil {
+		return nil, err
+	}
+	return pp.Process(x), nil
 }
 
 // ---------------------------------------------------------------- wav
@@ -346,7 +364,7 @@ func LoadAudio(path string) ([]float32, error) {
 	if err != nil {
 		return nil, err
 	}
-	return To24k(ToMono(w.Samples, w.Channels), w.Rate), nil
+	return To24k(ToMono(w.Samples, w.Channels), w.Rate)
 }
 
 // ---------------------------------------------------------------- native socket path

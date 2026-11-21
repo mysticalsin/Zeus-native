@@ -75,5 +75,5 @@ pub fn write_pcm16(path: impl AsRef<Path>, rate: u32, channels: usize, interleav
 pub fn load_audio(path: impl AsRef<Path>) -> io::Result<Vec<f32>> {
     let w = read(path)?;
     let mono = crate::convert::to_mono(&w.samples, w.channels);
-    Ok(crate::resample::to_24k(&mono, w.rate))
+    crate::resample::to_24k(&mono, w.rate).map_err(|e| bad(&e.to_string()))
 }

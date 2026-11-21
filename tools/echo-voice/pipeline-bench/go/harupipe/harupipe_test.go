@@ -26,7 +26,10 @@ func TestInt16RoundTrip(t *testing.T) {
 
 func TestResampleLength(t *testing.T) {
 	for _, c := range [][2]int{{16000, 16001}, {44100, 44101}, {48000, 48001}} {
-		y := To24k(make([]float32, c[1]), c[0])
+		y, err := To24k(make([]float32, c[1]), c[0])
+		if err != nil {
+			t.Fatal(err)
+		}
 		g := gcd(24000, c[0])
 		up, down := 24000/g, c[0]/g
 		if len(y) != (c[1]*up+down-1)/down {

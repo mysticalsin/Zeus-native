@@ -5,6 +5,17 @@
 
 fn gcd(a: u64, b: u64) -> u64 { if b == 0 { a } else { gcd(b, a % b) } }
 
+/// `up` or `down` was below 1. A zero ratio used to return an empty buffer or panic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BadRatio { pub up: u64, pub down: u64 }
+
+impl std::fmt::Display for BadRatio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "resample ratio {}/{} is not positive", self.up, self.down)
+    }
+}
+impl std::error::Error for BadRatio {}
+
 /// Modified Bessel function of the first kind, order 0 (power series).
 fn i0(x: f64) -> f64 {
     let (mut sum, mut term, q) = (1.0f64, 1.0f64, x * x / 4.0);
@@ -92,11 +103,15 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
     s
 }
 
-pub fn resample_poly(x: &[f32], up: u64, down: u64) -> Vec<f32> { Polyphase::new(up, down).process(x) }
+pub fn resample_poly(x: &[f32], up: u64, down: u64) -> Result<Vec<f32>, BadRatio> {
+    if up < 1 || down < 1 { return Err(BadRatio { up, down }); }
+    Ok(Polyphase::new(up, down).process(x))
+}
 
 /// Any rate -> 24 kHz, as `haru_mlx.audio.decode_audio` does.
-pub fn to_24k(x: &[f32], rate: u32) -> Vec<f32> {
-    if rate == crate::SAMPLE_RATE { return x.to_vec(); }
+pub fn to_24k(x: &[f32], rate: u32) -> Result<Vec<f32>, BadRatio> {
+    if rate == crate::SAMPLE_RATE { return Ok(x.to_vec()); }
+    if rate < 1 { return Err(BadRatio { up: crate::SAMPLE_RATE as u64, down: rate as u64 }); }
     let g = gcd(crate::SAMPLE_RATE as u64, rate as u64);
     resample_poly(x, crate::SAMPLE_RATE as u64 / g, rate as u64 / g)
 }
