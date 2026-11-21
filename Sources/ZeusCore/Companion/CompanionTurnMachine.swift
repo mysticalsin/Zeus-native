@@ -1,28 +1,38 @@
 import Foundation
 
-/// Clock for one companion turn. Tests pass a manual clock; the app can pass the system clock.
+/// Monotonic seconds for one companion turn. The machine compares these timestamps and never
+/// reads the wall clock, the same rule as face presence (`ProcessInfo.systemUptime`): a wall-clock
+/// change cannot make the deep spoken ceiling look exceeded.
 public protocol CompanionClock: Sendable {
     func now() -> TimeInterval
 }
 
 public struct CompanionSystemClock: CompanionClock {
     public init() {}
-    public func now() -> TimeInterval { Date().timeIntervalSinceReferenceDate }
+    public func now() -> TimeInterval { ProcessInfo.processInfo.systemUptime }
 }
 
-/// A clock the caller moves. The machine reads it and never advances it.
+/// A clock the caller moves. `now()` is monotonic. `jumpWall` is a discontinuity and does not move it.
 public final class CompanionManualClock: CompanionClock, @unchecked Sendable {
     private let lock = NSLock()
     private var instant: TimeInterval
+    private var wall: TimeInterval
 
     public init(now: TimeInterval) {
         instant = now
+        wall = now
     }
 
     public func now() -> TimeInterval { lock.withLock { instant } }
+    public func wallNow() -> TimeInterval { lock.withLock { wall } }
 
     public func advance(to time: TimeInterval) {
         lock.withLock { instant = time }
+    }
+
+    /// Moves the wall reading only. Monotonic `now()` stays put.
+    public func jumpWall(by delta: TimeInterval) {
+        lock.withLock { wall += delta }
     }
 }
 
