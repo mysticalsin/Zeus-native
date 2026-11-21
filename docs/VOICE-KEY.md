@@ -163,9 +163,9 @@ and Polyglot give it no second key, and then it passes every effect through (`aP
 - **I8p.** From rest, pressing exactly either key's own set acts. When a hands-free turn is open, only the key that opened
   it ends it. The other key is swallowed: it neither continues nor ends the turn.
 
-Right Option is a typing key, so its second key waits `VoiceKey.secondKeyConfirm` (0.25 s, or the tiling confirm when that
-is longer) before it starts. A letter inside that time reads as typing and starts nothing (accents). Left Option never
-starts it, and joining a Right Option turn cancels it. A tap shorter than the confirm does nothing; a double tap latches.
+Right Option in the talk monitor is strict push-to-talk (`RightOptionPushToTalk`). Key-down starts listening and key-up stops it. A tap never latches, a repeated key-down does not toggle, and another key does not cancel. Left Option does nothing. A missed key-up, including when focus is in another app, is the global modifier flags (`CGEventSource.flagsState`), read on any later event and every 3 s while the hold is up. The hold also ends at the 45 s talk limit, when the screen locks, and when secure input is on. The yields in `VoiceKey.secondTalkKey` still apply: Chat, pointing, dictation, Polyglot, and VoiceOver keep the key quiet.
+
+A second talk key the owner recorded that is not Right Option still uses `TalkKeyPair` and the hold machine, including its confirm and its latch. The pair's proofs are unchanged.
 
 **The mouse cancels it** (owner decision). While the second key's turn is armed or held, any mouse button going down (left, right,
 other; a drag starts with one) is a foreign key for the second key only: a press still inside its confirm is dropped, a held turn is
@@ -185,6 +185,7 @@ pair does none of this and is the machine.
 **A Space the system says is down** at the release of a second-key turn means a launcher on Option-Space that Carbon cannot see
 took the press: the turn is cancelled, not sent. A Space tapped and let go between two looks at the keyboard is caught too: the
 monitor asks the system on every key event and tick while the second key's turn is open, and a Space seen once cancels the turn.
+Right Option does not use that cancel. A click, or Space beside it, does not stop the hold. Key-up does, and so does a key-up lost when focus changes.
 
 **The default is written nowhere.** `ShortcutStore.loadSecondTalk` returns Right Option when `talk.secondShortcut` is
 absent or does not parse, and never writes. Only the recorder writes (`off`, or a key); Reset removes the key.

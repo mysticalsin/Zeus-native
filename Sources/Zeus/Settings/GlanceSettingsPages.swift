@@ -824,7 +824,7 @@ private struct ShortcutsPage: View {
             }
             GSDivider()
             ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
-                                text: "Hold to talk, let go to send, double-tap to keep listening, like the talk key. Left Option and Right Option with a letter type as usual.",
+                                text: "Hold Right Option to talk and release it to stop. It does not toggle, and another key does not cancel it. Left Option does nothing.",
                                 shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk,
                                 notes: state.secondTalkNotes, quietNotes: state.secondTalkQuietNotes) { new in

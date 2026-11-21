@@ -8676,6 +8676,150 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Holding Right Option did not start listening, or a repeated key-down toggled it off.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "holdingRightOptionStartsListeningAndARepeatDoesNotToggle"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "Releasing Right Option left listening on.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "releasingRightOptionStopsListening"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A quick Right Option tap latched listening instead of stopping when the key came up.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "aQuickTapStartsAndStopsAndNeverLatches"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "Pressing Option together with another key cancelled or toggled Right Option push-to-talk.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "optionWithAnotherKeyDoesNotCancelOrToggle"
+      }
+    },
+    {
+      "id": "REG-995",
+      "failure": "Left Option started or stopped Right Option push-to-talk.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "leftOptionDoesNothing"
+      }
+    },
+    {
+      "id": "REG-996",
+      "failure": "Right Option push-to-talk started while Chat, pointing, dictation, Polyglot, or VoiceOver already held the key.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "eachYieldKeepsRightOptionQuiet"
+      }
+    },
+    {
+      "id": "REG-997",
+      "failure": "A Right Option key-up lost on a focus change left listening on.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "aLostKeyUpOnFocusChangeStopsListening"
+      }
+    },
+    {
+      "id": "REG-998",
+      "failure": "A missed Right Option key-up left listening on because a later event did not read the global modifier flags.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "aLostKeyUpOnTheLiveFlagsStopsListening"
+      }
+    },
+    {
+      "id": "REG-999",
+      "failure": "The 3 s look left Right Option listening after the key was already up.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "theThreeSecondLookStopsWhenRightOptionIsUp"
+      }
+    },
+    {
+      "id": "REG-1000",
+      "failure": "A Right Option hold longer than the 45 s talk limit stayed listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "theHoldStopsAtTheTalkLimit"
+      }
+    },
+    {
+      "id": "REG-1001",
+      "failure": "Secure input, or an unknown secure-input answer, left the Right Option hold listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "secureInputStopsAndFailsClosed"
+      }
+    },
+    {
+      "id": "REG-1002",
+      "failure": "A screen lock without sleep left the Right Option hold listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "aScreenLockStopsTheHold"
+      }
     }
-]
+  ]
 }
