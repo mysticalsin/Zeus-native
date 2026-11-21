@@ -80,58 +80,48 @@ public struct UltronRouteDecision: Equatable, Sendable {
 
 /// Pure engine choice: no Keychain, no network. `Speaker` walks the chain until one speaks.
 public enum UltronEngineRouter {
-    /// Automatic order is the local voice, then the Mac voice. A saved cloud key does not join this list.
-    /// Chatterbox is used only when the owner picks it.
-    public static let autoOrder: [UltronEngine] = [.kokoro, .system]
+    /// Auto order: the designed ElevenLabs voice first, Kokoro as the failsafe. Another cloud engine whose
+    /// recent first-audio time is over `slowMs` drops behind the others. ElevenLabs is never demoted: a
+    /// demoted engine is never tried, so its reading could not recover; its first-audio timeout and a short
+    /// pause after a failure send a slow reply to Kokoro instead.
+    /// Chatterbox clones from a reference clip the owner supplies, so it is used only when chosen explicitly.
+    public static let autoOrder: [UltronEngine] = [.elevenLabs, .openAI, .gemini, .kokoro, .system]
     public static let slowMs = 2_500
 
     public static func chain(choice: UltronEngineChoice, availability: UltronEngineAvailability,
                              observedFirstAudioMs: [UltronEngine: Int] = [:]) -> [UltronRouteDecision] {
-        _ = observedFirstAudioMs
-        switch choice {
-        case .auto:
-            return local(availability, note: availability.skipReason(.kokoro) == nil
-                ? "auto: zeus.synthetic local voice"
-                : "auto: zeus.synthetic; no cloud or local voice is ready; the deepest Mac voice with the Ultron effect")
-        case .fixed(let engine):
-            if engine == .system {
-                return [UltronRouteDecision(engine: .system, reason: "chosen in Settings")]
-            }
-            if isCloud(engine) {
-                if let why = availability.skipReason(engine) {
-                    return local(availability, note: "\(engine.label) chosen but \(why); zeus.synthetic")
-                }
-                return [UltronRouteDecision(engine: engine, reason: "chosen in Settings")]
-                    + local(availability, note: "local fallback after \(engine.label)")
-            }
-            if engine == .chatterbox {
-                if let why = availability.skipReason(.chatterbox) {
-                    return local(availability, note: "Chatterbox chosen but \(why); zeus.synthetic")
-                }
-                return [UltronRouteDecision(engine: .chatterbox, reason: "chosen in Settings")]
-                    + local(availability, note: "local fallback")
-            }
-            if availability.skipReason(.kokoro) == nil {
-                return [UltronRouteDecision(engine: .kokoro, reason: "chosen in Settings"),
-                        UltronRouteDecision(engine: .system, reason: "Mac voice offline fallback")]
-            }
-            return local(availability, note: "Kokoro chosen but \(availability.skipReason(.kokoro) ?? "not set up"); zeus.synthetic")
+        var decisions: [UltronRouteDecision] = []
+        var seen = Set<UltronEngine>()
+        func add(_ engine: UltronEngine, _ reason: String) {
+            guard seen.insert(engine).inserted else { return }
+            decisions.append(UltronRouteDecision(engine: engine, reason: reason))
         }
-    }
-
-    private static func isCloud(_ engine: UltronEngine) -> Bool {
-        switch engine {
-        case .elevenLabs, .openAI, .gemini: true
-        case .kokoro, .chatterbox, .system: false
+        // The Mac voice chosen on purpose is the whole chain: no cloud voice speaks ahead of it.
+        if case .fixed(.system) = choice {
+            return [UltronRouteDecision(engine: .system, reason: "chosen in Settings")]
         }
-    }
-
-    /// Kokoro when it is ready, then the Mac voice. No second cloud.
-    private static func local(_ availability: UltronEngineAvailability, note: String) -> [UltronRouteDecision] {
-        if availability.skipReason(.kokoro) == nil {
-            return [UltronRouteDecision(engine: .kokoro, reason: note),
-                    UltronRouteDecision(engine: .system, reason: "Mac voice offline fallback")]
+        var skipped: [String] = []
+        if case .fixed(let chosen) = choice {
+            if let why = availability.skipReason(chosen) {
+                skipped.append("\(chosen.label) chosen but \(why)")
+            } else {
+                add(chosen, "chosen in Settings")
+            }
         }
-        return [UltronRouteDecision(engine: .system, reason: note)]
+        let usable = autoOrder.filter { availability.skipReason($0) == nil }
+        func isSlow(_ engine: UltronEngine) -> Bool { engine != .elevenLabs && (observedFirstAudioMs[engine] ?? 0) > slowMs }
+        let fast = usable.filter { !isSlow($0) }
+        let slow = usable.filter { isSlow($0) }
+        for engine in fast + slow {
+            if engine == .system { continue }
+            let tail = slow.contains(engine) ? "usable but slow lately" : "best available, lowest latency"
+            add(engine, (skipped.first.map { "\($0); " } ?? "auto: ") + tail)
+        }
+        let first = decisions.isEmpty
+        let why = first
+            ? "no cloud or local voice is ready (" + (skipped + autoOrder.compactMap { $0 == .system ? nil : availability.skipReason($0) }).prefix(2).joined(separator: ", ") + "); the deepest Mac voice with the Ultron effect"
+            : "last resort"
+        add(.system, why)
+        return decisions
     }
 }

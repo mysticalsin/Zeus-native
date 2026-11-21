@@ -12,18 +12,18 @@ struct VoiceQualityRouteSecurityTests {
     private let googleKey = "route-google-key-9911"
 
     @Test func automaticStaysSyntheticEvenWhenEveryKeyAndPresetAreSet() async throws {
-        let keys = PersonaSpeakKeys(elevenLabs: true, openAI: true, gemini: true, googleCloud: true, kokoroReady: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: true, openAI: true, gemini: true, googleCloud: true, kokoroReady: true)
         let selection = VoiceQualityRoute.selection(choice: .automatic, keys: keys, preset: .elevenLabsStudio)
         #expect(selection == .synthetic)
         #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == "zeus.synthetic")
-        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == PersonaSyntheticVoice.voiceID)
+        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == VoiceSpeakAllowlist.syntheticID)
         let seen = try await speak(choice: .automatic, keys: keys, preset: .elevenLabsStudio, credential: elevenKey)
         #expect(seen.hosts.isEmpty)
         #expect(seen.error as? VoiceQualityError == .providerOff)
     }
 
     @Test func aSelectedProviderWithoutAKeyDoesNotCallTheCloud() async throws {
-        let keys = PersonaSpeakKeys(elevenLabs: false, googleCloud: false, kokoroReady: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: false, googleCloud: false, kokoroReady: true)
         #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio) == .synthetic)
         #expect(VoiceQualityRoute.selection(choice: .googleCloud, keys: keys, preset: .googleNeural2) == .synthetic)
         let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, credential: elevenKey)
@@ -32,7 +32,7 @@ struct VoiceQualityRouteSecurityTests {
     }
 
     @Test func elevenLabsPresetRunsOnlyWhenThatProviderIsSelectedAndHasAKey() async throws {
-        let keys = PersonaSpeakKeys(elevenLabs: true, googleCloud: true, kokoroReady: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: true, googleCloud: true, kokoroReady: true)
         #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio) == .preset(.elevenLabsStudio))
         #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .googleNeural2) == .synthetic)
         #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, providerFailed: true) == .synthetic)
@@ -44,7 +44,7 @@ struct VoiceQualityRouteSecurityTests {
     }
 
     @Test func googlePresetRunsOnlyWhenThatProviderIsSelectedAndHasAKey() async throws {
-        let keys = PersonaSpeakKeys(elevenLabs: true, googleCloud: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: true, googleCloud: true)
         #expect(VoiceQualityRoute.selection(choice: .googleCloud, keys: keys, preset: .googleNeural2) == .preset(.googleNeural2))
         #expect(VoiceQualityRoute.activeVoiceID(choice: .googleCloud, keys: keys, preset: nil) == "zeus.synthetic")
         let audio = Data([0x49, 0x44, 0x33, 0x04])
@@ -234,7 +234,7 @@ struct VoiceQualityRouteSecurityTests {
         #expect(!carried)
         #expect(RouteRedirectStub.forwarded == nil)
 
-        let keys = PersonaSpeakKeys(elevenLabs: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: true)
         let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsFast, credential: sentinel, status: 302, location: "https://collector.example/collect")
         #expect(!seen.hosts.contains("collector.example"))
         #expect(!seen.log.contains(sentinel))
@@ -254,7 +254,7 @@ struct VoiceQualityRouteSecurityTests {
     }
 
     @Test func oneRequestCannotExceedFiveThousandCharacters() async throws {
-        let keys = PersonaSpeakKeys(elevenLabs: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: true)
         let directory = try temporaryDirectory()
         let meter = try VoiceQualityMeter(directory: directory)
         RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
@@ -297,7 +297,7 @@ struct VoiceQualityRouteSecurityTests {
         #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 30_000)
     }
 
-    private func speak(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, credential: String, status: Int = 401, body: Data? = nil, location: String? = nil) async throws -> RouteOutcome {
+    private func speak(choice: VoiceQualitySpeakChoice, keys: VoiceQualitySpeakKeys, preset: VoiceQualityPreset?, credential: String, status: Int = 401, body: Data? = nil, location: String? = nil) async throws -> RouteOutcome {
         RouteHostStub.reset(reply: .init(status: status, body: body, location: location))
         let directory = try temporaryDirectory()
         let lines = RouteLog()
@@ -327,7 +327,7 @@ struct VoiceQualityRouteSecurityTests {
             transport: URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2),
             log: ProviderLog { lines.add($0) }
         )
-        let keys = PersonaSpeakKeys(elevenLabs: true)
+        let keys = VoiceQualitySpeakKeys(elevenLabs: true)
         let synthesis = speaker.synthesize(
             text: "Hello",
             choice: .elevenLabs,

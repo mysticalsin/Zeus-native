@@ -346,7 +346,7 @@ struct VoiceQualityPresetTests {
 
     private func routed(_ speaker: VoiceQualitySpeaker, text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
         let google = preset.providerID == GoogleCloudTTSAdapter.id
-        var keys = PersonaSpeakKeys()
+        var keys = VoiceQualitySpeakKeys()
         if google { keys.googleCloud = true } else { keys.elevenLabs = true }
         return speaker.synthesize(text: text, choice: google ? .googleCloud : .elevenLabs, keys: keys, preset: preset, credential: credential, voiceID: voiceID)
     }

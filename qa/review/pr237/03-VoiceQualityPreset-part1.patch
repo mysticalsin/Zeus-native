@@ -2,7 +2,7 @@ diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusC
 new file mode 100644
 --- /dev/null
 +++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,129 @@
 +import Foundation
 +#if canImport(FoundationNetworking)
 +import FoundationNetworking
@@ -59,10 +59,7 @@ new file mode 100644
 +
 +    public static func accepted(_ raw: String) -> String? {
 +        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-+        guard trimmed.count >= 8, trimmed.count <= maxLength else { return nil }
-+        guard trimmed.unicodeScalars.allSatisfy({ scalar in
-+            scalar.value >= 0x20 && scalar.value != 0x7F && !scalar.properties.isWhitespace
-+        }) else { return nil }
++        guard VoiceProviderKeyPolicy.accepts(trimmed) else { return nil }
 +        return trimmed
 +    }
 +}
@@ -102,41 +99,36 @@ new file mode 100644
 +    }
 +}
 +
-+/// One stock voice that is allowed on a cloud request. `reason` says why the id is generic.
-+public struct StockVoice: Equatable, Sendable {
-+    public var id: String
-+    public var name: String
-+    public var reason: String
++/// The session the quality speaker uses when the caller does not inject a test transport.
++/// Redirects are refused by `VoiceQualityRedirectDelegate`.
++final class VoiceQualityURLSessionTransport: ProviderHTTPTransport, @unchecked Sendable {
++    let delegate = VoiceQualityRedirectDelegate()
++    let timeout: TimeInterval
++    let log: ProviderLog
 +
-+    public init(id: String, name: String, reason: String) {
-+        self.id = id
-+        self.name = name
-+        self.reason = reason
++    init(timeout: TimeInterval = ProviderHTTPBudget.requestTimeout, log: ProviderLog = ProviderLog()) {
++        self.timeout = timeout
++        self.log = log
 +    }
-+}
 +
-+/// Explicit stock voices. Anything else is refused, including Voice Library ids, clones,
-+/// character names, and any id that contains "MCU".
-+public enum VoiceQualityAllowList {
-+    /// ElevenLabs premade default voices (the account default list, not the Voice Library).
-+    /// Each name is a generic stock label. Legacy character voices (Glinda) and celebrity-coded
-+    /// names (Arnold) are left out, as are library replacements such as "Eldrin".
-+    public static let elevenLabs: [StockVoice] = [
-+        StockVoice(
-+            id: "EXAVITQu4vr4xnSDxMaL",
-+            name: "Sarah",
-+            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
-+        ),
-+        StockVoice(
-+            id: "JBFqnCBsd6RMkjVDRZzb",
-+            name: "George",
-+            reason: "ElevenLabs default premade voice. Generic first name. This is the stock id already used when no designed voice is saved."
-+        ),
-+        StockVoice(
-+            id: "IKne3meq5aSn9XLyUdCD",
-+            name: "Charlie",
-+            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
-+        ),
-+        StockVoice(
-+            id: "pNInz6obpgDQGcFmaJgB",
-+            name: "Adam",
++    func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse {
++        let urlRequest = try request.urlRequest(timeout: timeout)
++        let session = URLSession(configuration: configuration(), delegate: delegate, delegateQueue: nil)
++        defer { session.finishTasksAndInvalidate() }
++        let (data, response) = try await session.data(for: urlRequest)
++        guard let http = response as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
++        log.record("voice-quality \(request.method) \(request.url.host ?? "-") status=\(http.statusCode)")
++        return ProviderHTTPResponse(status: http.statusCode, body: data)
++    }
++
++    func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error> {
++        let interval = self.timeout
++        let response = Result { try request.urlRequest(timeout: interval) }
++        let delegate = self.delegate
++        return AsyncThrowingStream { continuation in
++            let task = Task {
++                do {
++                    let urlRequest = try response.get()
++                    let session = URLSession(configuration: self.configuration(), delegate: delegate, delegateQueue: nil)
++                    defer { session.finishTasksAndInvalidate() }
++                    let (data, httpResponse) = try await session.data(for: urlRequest)

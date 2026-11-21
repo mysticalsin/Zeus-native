@@ -17,18 +17,18 @@ new file mode 100644
 +    private let googleKey = "route-google-key-9911"
 +
 +    @Test func automaticStaysSyntheticEvenWhenEveryKeyAndPresetAreSet() async throws {
-+        let keys = PersonaSpeakKeys(elevenLabs: true, openAI: true, gemini: true, googleCloud: true, kokoroReady: true)
++        let keys = VoiceQualitySpeakKeys(elevenLabs: true, openAI: true, gemini: true, googleCloud: true, kokoroReady: true)
 +        let selection = VoiceQualityRoute.selection(choice: .automatic, keys: keys, preset: .elevenLabsStudio)
 +        #expect(selection == .synthetic)
 +        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == "zeus.synthetic")
-+        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == PersonaSyntheticVoice.voiceID)
++        #expect(VoiceQualityRoute.activeVoiceID(choice: .automatic, keys: keys, preset: .elevenLabsStudio) == VoiceSpeakAllowlist.syntheticID)
 +        let seen = try await speak(choice: .automatic, keys: keys, preset: .elevenLabsStudio, credential: elevenKey)
 +        #expect(seen.hosts.isEmpty)
 +        #expect(seen.error as? VoiceQualityError == .providerOff)
 +    }
 +
 +    @Test func aSelectedProviderWithoutAKeyDoesNotCallTheCloud() async throws {
-+        let keys = PersonaSpeakKeys(elevenLabs: false, googleCloud: false, kokoroReady: true)
++        let keys = VoiceQualitySpeakKeys(elevenLabs: false, googleCloud: false, kokoroReady: true)
 +        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio) == .synthetic)
 +        #expect(VoiceQualityRoute.selection(choice: .googleCloud, keys: keys, preset: .googleNeural2) == .synthetic)
 +        let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, credential: elevenKey)
@@ -37,7 +37,7 @@ new file mode 100644
 +    }
 +
 +    @Test func elevenLabsPresetRunsOnlyWhenThatProviderIsSelectedAndHasAKey() async throws {
-+        let keys = PersonaSpeakKeys(elevenLabs: true, googleCloud: true, kokoroReady: true)
++        let keys = VoiceQualitySpeakKeys(elevenLabs: true, googleCloud: true, kokoroReady: true)
 +        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio) == .preset(.elevenLabsStudio))
 +        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .googleNeural2) == .synthetic)
 +        #expect(VoiceQualityRoute.selection(choice: .elevenLabs, keys: keys, preset: .elevenLabsStudio, providerFailed: true) == .synthetic)
@@ -49,7 +49,7 @@ new file mode 100644
 +    }
 +
 +    @Test func googlePresetRunsOnlyWhenThatProviderIsSelectedAndHasAKey() async throws {
-+        let keys = PersonaSpeakKeys(elevenLabs: true, googleCloud: true)
++        let keys = VoiceQualitySpeakKeys(elevenLabs: true, googleCloud: true)
 +        #expect(VoiceQualityRoute.selection(choice: .googleCloud, keys: keys, preset: .googleNeural2) == .preset(.googleNeural2))
 +        #expect(VoiceQualityRoute.activeVoiceID(choice: .googleCloud, keys: keys, preset: nil) == "zeus.synthetic")
 +        let audio = Data([0x49, 0x44, 0x33, 0x04])

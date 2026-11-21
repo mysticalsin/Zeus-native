@@ -2,14 +2,7 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreT
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
-@@ -0,0 +347,138 @@
-+            #expect(error as? ProviderFailure == failure)
-+
-+            let defaults = freshDefaults("voice-quality-fallback-\(status)")
-+            let session = VoiceProviderSession(
-+                store: MemoryCredentialStore(),
-+                transport: URLSessionProviderTransport(timeout: 2),
-+                local: ScriptedLocal(),
+@@ -0,0 +329,132 @@
 +                preferences: VoiceProviderPreferences(defaults: defaults),
 +                adapters: [ScriptedFailureAdapter(failure: failure)]
 +            )
@@ -26,6 +19,13 @@ new file mode 100644
 +            }
 +        }
 +        #expect(ProviderHTTPBudget.requestTimeout == 8)
++    }
++
++    private func routed(_ speaker: VoiceQualitySpeaker, text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
++        let google = preset.providerID == GoogleCloudTTSAdapter.id
++        var keys = VoiceQualitySpeakKeys()
++        if google { keys.googleCloud = true } else { keys.elevenLabs = true }
++        return speaker.synthesize(text: text, choice: google ? .googleCloud : .elevenLabs, keys: keys, preset: preset, credential: credential, voiceID: voiceID)
 +    }
 +
 +    private func elevenRequest(_ preset: VoiceQualityPreset) throws -> ProviderHTTPRequest {
@@ -135,9 +135,3 @@ new file mode 100644
 +    nonisolated(unsafe) private static var reply = Reply(status: 200)
 +    nonisolated(unsafe) private static var seen: [URLRequest] = []
 +
-+    static var requests: [URLRequest] {
-+        lock.lock(); defer { lock.unlock() }
-+        return seen
-+    }
-+
-+    static func reset(reply: Reply) {

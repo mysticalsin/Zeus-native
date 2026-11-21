@@ -2,7 +2,7 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreT
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,114 @@
 +import Foundation
 +#if canImport(FoundationNetworking)
 +import FoundationNetworking
@@ -116,6 +116,4 @@ new file mode 100644
 +            log: ProviderLog { lines.add($0) }
 +        )
 +        let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: sentinel])
-+        let synthesis = speaker.synthesize(
-+            text: "Hello",
-+            preset: .elevenLabsFast,
++        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: "EXAVITQu4vr4xnSDxMaL", credential: credential)

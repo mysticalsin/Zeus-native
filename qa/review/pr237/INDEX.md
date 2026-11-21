@@ -1,27 +1,29 @@
-# PR 237 review patches
+# Presets v2 review patches
 
-Review slices of the PR-authored Swift files. Each patch is under 6 KB. The Swift sources are not changed by the commit that adds this index.
-
-Code head: `f00007895b6091afc7cfa33dee3ceede290ef7d0`
+Each patch is under 6 KB. `git blob` is `git hash-object` of the source, which matches the blob in the freeze commit.
 
 | Patch | Source | Lines | Bytes | sha256 | git blob |
 | --- | --- | --- | --- | --- | --- |
-| `01-VoiceQualityMeter-part1.patch` | `Sources/ZeusCore/Providers/VoiceQualityMeter.swift` | 1-140 | 6124 | `80a00babcc0a33f64832a51d00253908566efc3cfb85ba27a3c8fcfaf515f30c` | `f25819a9a25fef016dffce4763e9146a81065f6d` |
-| `02-VoiceQualityMeter-part2.patch` | `Sources/ZeusCore/Providers/VoiceQualityMeter.swift` | 141-147 | 527 | `63159b7c36c9fe1c4ddb806c79cfbe65b572c6e042fba19da27027d37e1b5862` | `f25819a9a25fef016dffce4763e9146a81065f6d` |
-| `03-VoiceQualityPreset-part1.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 1-137 | 6059 | `b5ea9aaf5f1d0986fdf2cba99f98afaa8898347d05b0c1d4e0dae4bb45d1494c` | `9be05f78241a1e88d6eda949f5a5dfe8bdf36f1a` |
-| `04-VoiceQualityPreset-part2.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 138-276 | 6100 | `d9e92aac34e349174d35deae1e4c62c67154a90444e6317154f9f62b6b264a49` | `9be05f78241a1e88d6eda949f5a5dfe8bdf36f1a` |
-| `05-VoiceQualityPreset-part3.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 277-391 | 6114 | `cc3e0b6c9ad3e02ec0f326b1fdc36597847445c2518e0053d10720e77d1920cf` | `9be05f78241a1e88d6eda949f5a5dfe8bdf36f1a` |
-| `06-VoiceQualityPreset-part4.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 392-517 | 6113 | `69b578bf97b57f72c5da8d0cd5c1dc3eacac5eca6d75c5f8cdc7bf20aa7e9997` | `9be05f78241a1e88d6eda949f5a5dfe8bdf36f1a` |
-| `07-VoiceQualityPreset-part5.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 518-629 | 5885 | `ba71945334daed023755e840bed8660e7430fba872d9efe37d7e5141a9193106` | `9be05f78241a1e88d6eda949f5a5dfe8bdf36f1a` |
-| `08-VoiceQualityPresetTests-part1.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 1-116 | 6116 | `d9f098288cd04eeb7507654d5dfdd90ee479651e9f9bfaba810ea437321f7b6a` | `b97919f8f3f5c2530c21ce221d322b27dd3a9641` |
-| `09-VoiceQualityPresetTests-part2.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 117-232 | 6141 | `0e7c7df6f8bdb1879d294ea994fec6bf01cdc6df903f539a19f7b1ed8783c1c9` | `b97919f8f3f5c2530c21ce221d322b27dd3a9641` |
-| `10-VoiceQualityPresetTests-part3.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 233-346 | 6115 | `30e30af5ff3d948628a9f4d2d2349f203d77c65b4b4afa96d498d0c49c7ae363` | `b97919f8f3f5c2530c21ce221d322b27dd3a9641` |
-| `11-VoiceQualityPresetTests-part4.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 347-484 | 6115 | `50046df23e32adeed88835d90b96f1fc5dbf2ed208ed981a829ac236d43c7d9b` | `b97919f8f3f5c2530c21ce221d322b27dd3a9641` |
-| `12-VoiceQualityPresetTests-part5.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 485-580 | 3891 | `d4419f9ffa96165dfdd8ee1df40ecf279b7221268831bf4d588eef1a18cfbefc` | `b97919f8f3f5c2530c21ce221d322b27dd3a9641` |
-| `13-VoiceQualityRouteSecurityTests-part1.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 1-97 | 6105 | `f286fc739c3d81c0051a1a2104863fdc439b40b5e40ff29e3e683d57fb0c04e8` | `5431ff7c7f1aedcba802cd2c095200c92c29f2f6` |
-| `14-VoiceQualityRouteSecurityTests-part2.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 98-202 | 6122 | `96834f6347935148132fd4818a3f2ac1ff5c4eec1db69b2547f69e672a12e778` | `5431ff7c7f1aedcba802cd2c095200c92c29f2f6` |
-| `15-VoiceQualityRouteSecurityTests-part3.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 203-337 | 6132 | `ce62b2ae423b6e4b79bc512f501510a8826c9041cc3ad636e809e9a8f554bc4c` | `5431ff7c7f1aedcba802cd2c095200c92c29f2f6` |
-| `16-VoiceQualityRouteSecurityTests-part4.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 338-430 | 4172 | `5931bc2a48b0d55005e0092eee22c0847c1378f924590b4c9e0802e7f956be3b` | `5431ff7c7f1aedcba802cd2c095200c92c29f2f6` |
-
-`git blob` is `git rev-parse HEAD:path` for that source at the code head.
+| `01-VoiceQualityMeter-part1.patch` | `Sources/ZeusCore/Providers/VoiceQualityMeter.swift` | 1-133 | 6095 | `8bdaf2033848290659388a94d436df3c679f10868c10d9c132731e17cc8a714d` | `4087c8037f000928cec28a7f7031bbdcc587d395` |
+| `02-VoiceQualityMeter-part2.patch` | `Sources/ZeusCore/Providers/VoiceQualityMeter.swift` | 134-148 | 833 | `4263e1e7f42f4bcfa033ba6113add5748f6a3d23984c89d9296c1d92ad673d86` | `4087c8037f000928cec28a7f7031bbdcc587d395` |
+| `03-VoiceQualityPreset-part1.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 1-129 | 6093 | `e21e3b83db574dd10454ec2e5ce6358cd765500ee9f9216c5e925908b6c46eae` | `52f3b6a725d981a1eb945464b993554c01c7c2c8` |
+| `04-VoiceQualityPreset-part2.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 130-267 | 6061 | `fb6a30f30a15a63ff7c760aaf97bf0f36b664dd93a547e0abb4f70fb94a39e7a` | `52f3b6a725d981a1eb945464b993554c01c7c2c8` |
+| `05-VoiceQualityPreset-part3.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 268-398 | 6074 | `2b6be919925141fac533838d906c784d9b6bc33cde69a13b14755361a097bd3d` | `52f3b6a725d981a1eb945464b993554c01c7c2c8` |
+| `06-VoiceQualityPreset-part4.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 399-526 | 6129 | `4232a091c77aa2cd323d5bd48c2a7aadda9df12b897e370ab1e73f5619de131e` | `52f3b6a725d981a1eb945464b993554c01c7c2c8` |
+| `07-VoiceQualityPreset-part5.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 527-634 | 6063 | `0b8b967e4198332e9e5d1ab5b79d0da23c8999400239ccfc77daabd7b3797537` | `52f3b6a725d981a1eb945464b993554c01c7c2c8` |
+| `08-VoiceQualityPreset-part6.patch` | `Sources/ZeusCore/Providers/VoiceQualityPreset.swift` | 635-713 | 3894 | `d4f2a5b074b62431dd272719fa1004718aa61e8e491ef9964dcff6763c95c088` | `52f3b6a725d981a1eb945464b993554c01c7c2c8` |
+| `09-ProviderTypes-part1.patch` | `Sources/ZeusCore/Providers/ProviderTypes.swift` | 1-158 | 6123 | `97a64f7712e1a0b86b66c7eb78d0a354b03f40ee999b9a72d212ac6612af3564` | `c03e46c7a22f607a3df10067f208f5642a024b25` |
+| `10-ProviderTypes-part2.patch` | `Sources/ZeusCore/Providers/ProviderTypes.swift` | 159-234 | 3838 | `e200bf007b5fcb6ecbcf97874debf534e00ec45125ee0d8e5dc3662743a40120` | `c03e46c7a22f607a3df10067f208f5642a024b25` |
+| `11-CredentialStore-part1.patch` | `Sources/ZeusCore/Providers/CredentialStore.swift` | 1-109 | 4674 | `93c56c8805eca10d6445c5260b7c7f9e92b4e95320685fb4edccd7b8722e3c68` | `f0793dfc982cdd60b72ca5de593dc926e2c14455` |
+| `12-VoiceQualityPresetTests-part1.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 1-114 | 6143 | `894cdf1c256fd6aeeb15db1761545a273a3ae9938aa9f1c4d41224ae41d5a14d` | `6198b12f920b0a27f5f32e9b549d5bd3ac159004` |
+| `13-VoiceQualityPresetTests-part2.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 115-224 | 6100 | `0454169b2180e2da408d60c0495559f5f3b99ffa50c59180dc46753a6d230df0` | `6198b12f920b0a27f5f32e9b549d5bd3ac159004` |
+| `14-VoiceQualityPresetTests-part3.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 225-328 | 6126 | `c112bd57d3048ee6600e66ff0c71d3e0601f1ad0e810bdac4d647c5e00fce2d8` | `6198b12f920b0a27f5f32e9b549d5bd3ac159004` |
+| `15-VoiceQualityPresetTests-part4.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 329-460 | 6138 | `76bf6e104b1d0857bd7f755c96297673d6b386c29134cb4c95117c0cf667ce09` | `6198b12f920b0a27f5f32e9b549d5bd3ac159004` |
+| `16-VoiceQualityPresetTests-part5.patch` | `Tests/ZeusCoreTests/VoiceQualityPresetTests.swift` | 461-562 | 4048 | `fdcaaef87bcdcf2030d3c9f6d8dfb81a276af029673dee629eea984cf268850b` | `6198b12f920b0a27f5f32e9b549d5bd3ac159004` |
+| `17-VoiceQualityRouteSecurityTests-part1.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 1-97 | 6127 | `83f8dd914fc5c95290c171d064cfb9316d76f94d5efcd0ff96db4b450ad59a3e` | `42701ce54d290aa6f9d68cfe25dc3e80aaa40437` |
+| `18-VoiceQualityRouteSecurityTests-part2.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 98-208 | 6073 | `058e48618d4beae2a5d4f2db8d467ce4c607091063dc6d60039c73c996913e3e` | `42701ce54d290aa6f9d68cfe25dc3e80aaa40437` |
+| `19-VoiceQualityRouteSecurityTests-part3.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 209-319 | 6075 | `4ae864733e95ac79cc6585c523913651ba11170d7796ab72a9eea5b292b1d176` | `42701ce54d290aa6f9d68cfe25dc3e80aaa40437` |
+| `20-VoiceQualityRouteSecurityTests-part4.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 320-463 | 6056 | `70fa45dcb108803e459204abbb189abf68739097ef09a588653103bac309d34e` | `42701ce54d290aa6f9d68cfe25dc3e80aaa40437` |
+| `21-VoiceQualityRouteSecurityTests-part5.patch` | `Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift` | 464-476 | 989 | `7f798945cb2be2640f8dff8fe83939a82816df1b1e3b5a7e21b62f0b42788a11` | `42701ce54d290aa6f9d68cfe25dc3e80aaa40437` |
+| `22-VoiceQualityNoUpstreamRouteTests-part1.patch` | `Tests/ZeusCoreTests/VoiceQualityNoUpstreamRouteTests.swift` | 1-11 | 938 | `fc9c41deda2cc794591ab8f8124eba715ea54ea0089a51e1b16332cee06f03af` | `65dd09efaedf66f646d3593538f239bfef8385cf` |
 

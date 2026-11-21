@@ -2,10 +2,7 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreT
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
-@@ -0,0 +117,116 @@
-+            voiceID: "EXAVITQu4vr4xnSDxMaL",
-+            credential: credential
-+        )
+@@ -0,0 +115,110 @@
 +        var captured = ""
 +        do {
 +            for try await chunk in synthesis.chunks {
@@ -71,12 +68,7 @@ new file mode 100644
 +            meter: meter,
 +            transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
 +        )
-+        let synthesis = speaker.synthesize(
-+            text: "Hello",
-+            preset: .elevenLabsFast,
-+            voiceID: "MCU-Tony",
-+            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
-+        )
++        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: "MCU-Tony", credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey]))
 +        let error = await firstError(synthesis)
 +        #expect(error as? VoiceQualityError == .voiceRefused)
 +        #expect(QualityURLStub.requests.isEmpty)
@@ -119,3 +111,5 @@ new file mode 100644
 +    @Test func meterFailsClosedOnCorruptState() async throws {
 +        let directory = try temporaryDirectory()
 +        let file = directory.appendingPathComponent("voice-quality-meter.json")
++        try Data("not-json".utf8).write(to: file)
++        let garbage = try VoiceQualityMeter(directory: directory)

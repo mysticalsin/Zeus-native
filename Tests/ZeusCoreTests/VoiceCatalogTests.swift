@@ -147,18 +147,18 @@ struct VoiceCatalogTests {
             kokoroReady: true, chatterboxReady: false, elevenLabsConfigured: true, openAIConfigured: true)
         #expect(VoiceProviderFallback.chain(chosen: .elevenLabs, availability: without) == [.elevenLabs, .kokoro, .openAICompatible])
         let a = UltronEngineAvailability(elevenLabsConfigured: true, openAIConfigured: true, kokoroReady: true)
-        #expect(UltronEngineRouter.chain(choice: .auto, availability: a).map(\.engine) == [.kokoro, .system])
+        #expect(UltronEngineRouter.chain(choice: .auto, availability: a).map(\.engine) == [.elevenLabs, .openAI, .kokoro, .system])
         #expect(UltronEngineRouter.chain(choice: .auto, availability: UltronEngineAvailability()).map(\.engine) == [.system])
         #expect(UltronEngineAvailability().skipReason(.gemini) == "no Gemini key")
     }
 
     @Test func elevenLabsStaysFirstWhenAGeminiKeyIsSaved() {
         let a = UltronEngineAvailability(elevenLabsConfigured: true, openAIConfigured: true, geminiConfigured: true, kokoroReady: true)
-        #expect(UltronEngineRouter.chain(choice: .auto, availability: a).map(\.engine) == [.kokoro, .system])
+        #expect(UltronEngineRouter.chain(choice: .auto, availability: a).map(\.engine) == [.elevenLabs, .openAI, .gemini, .kokoro, .system])
         let only = UltronEngineAvailability(geminiConfigured: true)
-        #expect(UltronEngineRouter.chain(choice: .auto, availability: only).map(\.engine) == [.system])
+        #expect(UltronEngineRouter.chain(choice: .auto, availability: only).map(\.engine) == [.gemini, .system])
         let chosen = UltronEngineAvailability(elevenLabsConfigured: true, geminiConfigured: true)
-        #expect(UltronEngineRouter.chain(choice: .fixed(.gemini), availability: chosen).map(\.engine) == [.gemini, .system])
+        #expect(UltronEngineRouter.chain(choice: .fixed(.gemini), availability: chosen).map(\.engine) == [.gemini, .elevenLabs, .system])
         let paused = UltronEngineAvailability(geminiConfigured: true, geminiPaused: true)
         #expect(UltronEngineRouter.chain(choice: .auto, availability: paused).map(\.engine) == [.system])
     }

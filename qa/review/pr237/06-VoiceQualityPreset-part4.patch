@@ -2,7 +2,74 @@ diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusC
 new file mode 100644
 --- /dev/null
 +++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
-@@ -0,0 +392,126 @@
+@@ -0,0 +399,128 @@
++/// Providers stay off unless `voice.ttsProvider` names ElevenLabs or Google Cloud and
++/// `voice.quality.preset` names a preset for that same provider. Otherwise the voice is `zeus.synthetic`.
++public enum VoiceQualityOptIn {
++    public static let presetKey = "voice.quality.preset"
++
++    public static func selection(defaults: UserDefaults) -> VoiceQualitySelection {
++        let choice = VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: VoiceProviderPreferences.selectionKey))
++        guard case .provider(let id) = choice,
++              let raw = defaults.string(forKey: presetKey),
++              let preset = VoiceQualityPreset(rawValue: raw),
++              preset.providerID == id else { return .synthetic }
++        return .preset(preset)
++    }
++
++    public static func activeVoiceID(defaults: UserDefaults) -> String {
++        switch selection(defaults: defaults) {
++        case .synthetic: VoiceSpeakAllowlist.syntheticID
++        case .preset(let preset): preset.defaultVoiceID
++        }
++    }
++}
++
++/// Pause marks stay the existing ellipsis sanitizer. Untrusted text is not wrapped in SSML.
++public enum VoiceQualityMarkup {
++    public static func spoken(_ text: String) -> String {
++        UltronSpeechText.sanitize(text)
++    }
++}
++
++/// A request with a description that names the method and host only. Headers, including the key, are omitted.
++public struct VoiceQualityCall: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
++    public var request: ProviderHTTPRequest
++
++    public init(request: ProviderHTTPRequest) { self.request = request }
++
++    public var description: String {
++        "\(request.method) \(request.url.host ?? "-")\(request.url.path)"
++    }
++
++    public var debugDescription: String { description }
++}
++
++public enum VoiceQualityRequestBuilder {
++    public static func make(text: String, preset: VoiceQualityPreset, voiceID: String, credential: ProviderCredential) throws -> ProviderHTTPRequest {
++        guard VoiceQualityAllowList.accepts(voiceID, providerID: preset.providerID) else {
++            throw VoiceQualityError.voiceRefused
++        }
++        guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
++            throw VoiceQualityError.keyRejected
++        }
++        guard VoiceQualityRequestSize.allows(VoiceQualityMarkup.spoken(text).count) else {
++            throw VoiceQualityError.requestTooLarge
++        }
++        let spoken = VoiceQualityMarkup.spoken(text)
++        switch preset {
++        case .elevenLabsFast, .elevenLabsStudio:
++            guard let delivery = preset.elevenLabs else { throw VoiceQualityError.voiceRefused }
++            return try elevenLabs(spoken, voiceID: voiceID, delivery: delivery, key: key)
++        case .googleNeural2, .googleWavenet, .googleChirpHD:
++            guard let delivery = preset.google else { throw VoiceQualityError.voiceRefused }
++            return try google(spoken, voiceID: voiceID, delivery: delivery, key: key)
++        }
++    }
++
++    private static func elevenLabs(_ text: String, voiceID: String, delivery: ElevenLabsQualityDelivery, key: String) throws -> ProviderHTTPRequest {
++        guard let voice = ElevenLabsTTSAdapter.pathComponent(voiceID),
++              let url = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(voice)/stream"),
 +              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
 +            throw VoiceQualityError.voiceRefused
 +        }
@@ -64,68 +131,3 @@ new file mode 100644
 +/// Reads a provider key from the seam's credential store. On macOS that store is
 +/// `KeychainCredentialStore` (generic password, this device only) under `com.zeus.app`.
 +/// The key is not written to UserDefaults, the meter file, logs, or error text.
-+public enum VoiceQualityKeychain {
-+    public static func credential(providerID: String, store: any CredentialStore) -> ProviderCredential? {
-+        guard let key = store.read(service: VoiceProviderAccounts.service, account: VoiceProviderAccounts.keyAccount(for: providerID)),
-+              VoiceProviderKeyPolicy.accepts(key) else { return nil }
-+        return ProviderCredential(fields: [ProviderCredentialLocation.account: key])
-+    }
-+}
-+
-+/// How `VoiceProviderSession.fallback` already treats these failures.
-+/// Kokoro, then the Mac voice. A 401 or 429 leaves the provider in error. A 5xx leaves it ready.
-+public struct VoiceQualityFallbackPlan: Equatable, Sendable {
-+    public var engines: [String]
-+    public var leavesProviderReady: Bool
-+
-+    public init(engines: [String], leavesProviderReady: Bool) {
-+        self.engines = engines
-+        self.leavesProviderReady = leavesProviderReady
-+    }
-+}
-+
-+public enum VoiceQualityFallback {
-+    public static func plan(for failure: ProviderFailure) -> VoiceQualityFallbackPlan {
-+        switch failure {
-+        case .cancelled:
-+            return VoiceQualityFallbackPlan(engines: [], leavesProviderReady: true)
-+        case .unauthorized, .rateLimited, .creditsUsedUp, .badVoice:
-+            return VoiceQualityFallbackPlan(engines: SyntheticFallbackOrder.engines, leavesProviderReady: false)
-+        default:
-+            return VoiceQualityFallbackPlan(engines: SyntheticFallbackOrder.engines, leavesProviderReady: true)
-+        }
-+    }
-+}
-+
-+/// Speaks with one quality preset through the provider HTTP seam. URLSession only, via `ProviderHTTPTransport`.
-+public struct VoiceQualitySpeaker: Sendable {
-+    public var meter: VoiceQualityMeter
-+    public var transport: any ProviderHTTPTransport
-+    public var log: ProviderLog
-+
-+    public init(meter: VoiceQualityMeter, transport: any ProviderHTTPTransport, log: ProviderLog = ProviderLog()) {
-+        self.meter = meter
-+        self.transport = transport
-+        self.log = log
-+    }
-+
-+    public func synthesize(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
-+        let meter = self.meter
-+        let transport = self.transport
-+        let log = self.log
-+        let voice = voiceID ?? preset.defaultVoiceID
-+        return Self.stream {
-+            guard let key = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") else {
-+                throw VoiceQualityError.keyRejected
-+            }
-+            let spoken = VoiceQualityMarkup.spoken(text)
-+            guard VoiceQualityRequestSize.allows(spoken.count) else { throw VoiceQualityError.requestTooLarge }
-+            let clean = ProviderCredential(fields: [ProviderCredentialLocation.account: key])
-+            let request = try VoiceQualityRequestBuilder.make(text: text, preset: preset, voiceID: voice, credential: clean)
-+            guard VoiceQualityEndpoint.allows(request.url) else { throw VoiceQualityError.endpointRefused }
-+            try meter.reserve(providerID: preset.providerID, characters: spoken.count)
-+            let response = try await transport.send(request)
-+            log.record(
-+                "voice-quality \(VoiceQualityCall(request: request).description) status=\(response.status)",
-+                secrets: [key]
-+            )

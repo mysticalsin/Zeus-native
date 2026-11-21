@@ -15,7 +15,7 @@ Green: `9e5a0798d7fea43d3b1115d669bc20350c18e381`. Isolated `swift test --filter
 3. One speak request could be as large as the whole 50,000 character budget. There was no per-request cap.
 4. Built URLs were the two provider hosts, but nothing checked the host again before send.
 5. `URLSession` on Linux crashes if a `URLProtocol` asks it to follow a redirect (`swift-corelibs-foundation` does not handle redirects). The quality path must refuse the redirect in the task delegate instead of following it. A 302 to another host would otherwise be a place a key header could be replayed.
-6. Cloud presets could be applied from the stored preset alone. #229's `PersonaSpeakRoute` stays on `zeus.synthetic` unless that provider is selected and a key exists.
+6. Cloud presets could be applied from the stored preset alone. The default stays `zeus.synthetic` unless that provider is selected and a key exists.
 
 ### Fixes
 
@@ -24,7 +24,7 @@ Green: `9e5a0798d7fea43d3b1115d669bc20350c18e381`. Isolated `swift test --filter
 - A single request is capped at 5,000 characters, before the meter. The 50,000 cumulative ceiling is unchanged.
 - `VoiceQualityEndpoint` allows only `https://api.elevenlabs.io` and `https://texttospeech.googleapis.com`, with no userinfo.
 - `VoiceQualityRedirectDelegate.willPerformHTTPRedirection` returns nil. The test stub answers 302 with a `Location` on `collector.example` and does not ask Linux URLSession to follow it. The delegate is invoked with that redirected request and returns nil. The second host is not contacted and the key is not on a request to it.
-- `VoiceQualityRoute` reads `PersonaSpeakRoute.chain`. A preset is used only when that chain starts with the same cloud step. Automatic, a missing key, a mismatched preset, and a failed provider stay on `zeus.synthetic` and do not open a request.
+- `VoiceQualityRoute` allows a preset only when the user selected that provider and a key exists. Automatic, a missing key, a mismatched preset, and a failed provider stay on `zeus.synthetic` and do not open a request.
 - The in-process meter lock still makes two concurrent 30,000 reserves succeed once.
 
 No file from #229 was edited.

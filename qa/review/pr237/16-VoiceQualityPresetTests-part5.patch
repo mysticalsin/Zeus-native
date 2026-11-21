@@ -2,7 +2,13 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreT
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
-@@ -0,0 +485,96 @@
+@@ -0,0 +461,102 @@
++    static var requests: [URLRequest] {
++        lock.lock(); defer { lock.unlock() }
++        return seen
++    }
++
++    static func reset(reply: Reply) {
 +        lock.lock(); defer { lock.unlock() }
 +        self.reply = reply
 +        seen = []

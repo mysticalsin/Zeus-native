@@ -1,0 +1,84 @@
+diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
+@@ -0,0 +635,79 @@
++        return synthesize(text: text, choice: choice, keys: keys, preset: preset, credential: credential)
++    }
++
++    private static func stream(_ work: @escaping @Sendable () async throws -> Data) -> Synthesis {
++        let task = SynthesisTask()
++        let chunks = AsyncThrowingStream<AudioChunk, Error> { continuation in
++            let job = Task {
++                do {
++                    try Task.checkCancellation()
++                    let audio = try await work()
++                    try Task.checkCancellation()
++                    continuation.yield(AudioChunk(data: audio, index: 0, isLast: true))
++                    continuation.finish()
++                } catch {
++                    continuation.finish(throwing: VoiceQualityError.publicError(error))
++                }
++            }
++            task.cancel = {
++                job.cancel()
++                continuation.finish(throwing: ProviderFailure.cancelled)
++            }
++            continuation.onTermination = { reason in
++                if case .cancelled = reason { job.cancel() }
++            }
++        }
++        return Synthesis(chunks: chunks, cancel: { task.cancel() })
++    }
++
++    private static func audio(from body: Data, preset: VoiceQualityPreset) throws -> Data {
++        switch preset {
++        case .elevenLabsFast, .elevenLabsStudio:
++            return body
++        case .googleNeural2, .googleWavenet, .googleChirpHD:
++            guard let json = ProviderJSON.object(body),
++                  let encoded = json["audioContent"] as? String,
++                  let audio = Data(base64Encoded: encoded) else { throw ProviderFailure.invalidResponse }
++            return audio
++        }
++    }
++}
++
++/// A `TTSProvider` for one preset. It is not registered, so the card and the default stay on the local voice.
++public struct VoiceQualityTTSAdapter: TTSProvider {
++    public var preset: VoiceQualityPreset
++    public var meter: VoiceQualityMeter
++    public var log: ProviderLog
++
++    public init(preset: VoiceQualityPreset, meter: VoiceQualityMeter, log: ProviderLog = ProviderLog()) {
++        self.preset = preset
++        self.meter = meter
++        self.log = log
++    }
++
++    public var descriptor: ProviderDescriptor {
++        preset.providerID == GoogleCloudTTSAdapter.id ? GoogleCloudTTSAdapter.descriptor : ElevenLabsTTSAdapter.descriptor
++    }
++
++    public func listVoices(credential: ProviderCredential, using transport: any ProviderHTTPTransport) async throws -> [ProviderVoice] {
++        _ = transport
++        guard credential.value(ProviderCredentialLocation.account) != nil else {
++            throw ProviderFailure.missingCredential
++        }
++        let list = preset.providerID == GoogleCloudTTSAdapter.id ? VoiceQualityAllowList.google : VoiceQualityAllowList.elevenLabs
++        return list.map { ProviderVoice(id: $0.id, name: $0.name, language: preset.providerID == GoogleCloudTTSAdapter.id ? "en-US" : nil) }
++    }
++
++    public func synthesize(text: String, voice: ProviderVoice, credential: ProviderCredential, using transport: any ProviderHTTPTransport) -> Synthesis? {
++        _ = (text, voice, credential, transport, meter, preset, log)
++        return VoiceQualitySpeaker.refused()
++    }
++
++    public func validate(credential: ProviderCredential, using transport: any ProviderHTTPTransport) async throws {
++        if preset.providerID == GoogleCloudTTSAdapter.id {
++            try await GoogleCloudTTSAdapter().validate(credential: credential, using: transport)
++        } else {
++            try await ElevenLabsTTSAdapter().validate(credential: credential, using: transport)
++        }
++    }
++}

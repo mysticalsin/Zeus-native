@@ -60,12 +60,7 @@ enum ZeusPersona {
 enum ZeusPrompt {
     static var system: String { system(personality: .current()) }
 
-    static func system(personality: ZeusPersonality) -> String {
-        CompanionPromptOverlay.applying(persona: PersonaCatalog.current(), to: base(personality: personality))
-    }
-
-    /// Spoken system prompt before an optional persona addendum. Classic appends nothing.
-    static func base(personality: ZeusPersonality) -> String { """
+    static func system(personality: ZeusPersonality) -> String { """
     You are ZEUS, a voice assistant that lives on Tony's Mac. Tony is talking to you out loud,
     and your reply will be spoken by a text-to-speech voice.
 

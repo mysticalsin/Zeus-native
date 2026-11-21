@@ -145,9 +145,9 @@ struct QA20ScreenshotTests {
 struct QA20VoiceTests {
     @Test func defaultPresetIsTheLocalEngineFirst() {
         #expect(UltronVoicePlan.presetTitle == "Ultron voice (default)")
-        #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: true) == .kokoro)
+        #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: true) == .elevenLabs)
         #expect(UltronVoicePlan.preferred(kokoroReady: true, elevenLabsKeyValid: false) == .kokoro)
-        #expect(UltronVoicePlan.preferred(kokoroReady: false, elevenLabsKeyValid: true) == .system)
+        #expect(UltronVoicePlan.preferred(kokoroReady: false, elevenLabsKeyValid: true) == .elevenLabs)
         #expect(UltronVoicePlan.preferred(kokoroReady: false, elevenLabsKeyValid: false) == .system)
         #expect(UltronVoicePlan.engineLabel(.kokoro, kokoroVoice: "am_michael") == "Kokoro am_michael")
     }

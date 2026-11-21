@@ -1,0 +1,18 @@
+diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+new file mode 100644
+--- /dev/null
++++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
+@@ -0,0 +464,13 @@
++            let response = HTTPURLResponse(url: request.url!, statusCode: 204, httpVersion: "HTTP/1.1", headerFields: nil)!
++            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
++            client?.urlProtocolDidFinishLoading(self)
++            return
++        }
++        let destination = URL(string: "https://collector.example/collect")!
++        let redirect = HTTPURLResponse(url: request.url ?? destination, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": destination.absoluteString])!
++        client?.urlProtocol(self, didReceive: redirect, cacheStoragePolicy: .notAllowed)
++        client?.urlProtocolDidFinishLoading(self)
++    }
++
++    override func stopLoading() {}
++}

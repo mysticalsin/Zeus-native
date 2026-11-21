@@ -2,9 +2,7 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift b/Tests/ZeusCoreT
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityPresetTests.swift
-@@ -0,0 +233,114 @@
-+        try Data("not-json".utf8).write(to: file)
-+        let garbage = try VoiceQualityMeter(directory: directory)
+@@ -0,0 +225,104 @@
 +        #expect(throws: VoiceQualityError.meterCorrupt) {
 +            try garbage.reserve(providerID: ElevenLabsTTSAdapter.id, characters: 1)
 +        }
@@ -24,12 +22,7 @@ new file mode 100644
 +            meter: garbage,
 +            transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
 +        )
-+        let synthesis = speaker.synthesize(
-+            text: "Hello",
-+            preset: .elevenLabsFast,
-+            voiceID: nil,
-+            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
-+        )
++        let synthesis = routed(speaker, text: "Hello", preset: .elevenLabsFast, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey]))
 +        let error = await firstError(synthesis)
 +        #expect(error as? VoiceQualityError == .meterCorrupt)
 +        #expect(QualityURLStub.requests.isEmpty)
@@ -72,12 +65,7 @@ new file mode 100644
 +            meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
 +            transport: URLSessionProviderTransport(protocolClasses: [HangURLStub.self], timeout: 2)
 +        )
-+        let synthesis = speaker.synthesize(
-+            text: "Hello",
-+            preset: .googleNeural2,
-+            voiceID: nil,
-+            credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey])
-+        )
++        let synthesis = routed(speaker, text: "Hello", preset: .googleNeural2, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey]))
 +        let finished = Task { () -> String in
 +            do {
 +                for try await _ in synthesis.chunks {}
@@ -110,10 +98,12 @@ new file mode 100644
 +                meter: try VoiceQualityMeter(directory: try temporaryDirectory()),
 +                transport: URLSessionProviderTransport(protocolClasses: [QualityURLStub.self], timeout: 2)
 +            )
-+            let synthesis = speaker.synthesize(
-+                text: "Hello",
-+                preset: .googleNeural2,
-+                voiceID: nil,
-+                credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey])
-+            )
++            let synthesis = routed(speaker, text: "Hello", preset: .googleNeural2, voiceID: nil, credential: ProviderCredential(fields: [ProviderCredentialLocation.account: googleKey]))
 +            let error = await firstError(synthesis)
++            #expect(error as? ProviderFailure == failure)
++
++            let defaults = freshDefaults("voice-quality-fallback-\(status)")
++            let session = VoiceProviderSession(
++                store: MemoryCredentialStore(),
++                transport: URLSessionProviderTransport(timeout: 2),
++                local: ScriptedLocal(),

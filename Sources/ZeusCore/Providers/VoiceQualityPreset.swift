@@ -342,26 +342,48 @@ public enum VoiceQualityPreset: String, Sendable, CaseIterable, Equatable {
         }
     }
 
-    /// The cloud step this preset may occupy on `PersonaSpeakRoute`.
-    public var routeStep: PersonaSpeakStep {
-        switch self {
-        case .elevenLabsFast, .elevenLabsStudio: .elevenLabs
-        case .googleNeural2, .googleWavenet, .googleChirpHD: .googleCloud
-        }
+}
+
+/// The provider the user picked. Automatic never selects a cloud preset.
+public enum VoiceQualitySpeakChoice: String, Sendable, Equatable {
+    case automatic
+    case elevenLabs
+    case googleCloud
+}
+
+/// Which cloud keys exist. A key alone does not select a provider.
+public struct VoiceQualitySpeakKeys: Equatable, Sendable {
+    public var elevenLabs: Bool
+    public var openAI: Bool
+    public var gemini: Bool
+    public var googleCloud: Bool
+    public var kokoroReady: Bool
+
+    public init(elevenLabs: Bool = false, openAI: Bool = false, gemini: Bool = false, googleCloud: Bool = false, kokoroReady: Bool = false) {
+        self.elevenLabs = elevenLabs
+        self.openAI = openAI
+        self.gemini = gemini
+        self.googleCloud = googleCloud
+        self.kokoroReady = kokoroReady
     }
 }
 
-/// Cloud presets run only when `PersonaSpeakRoute` puts that provider first.
-/// That happens when the user selected it and a key exists. Automatic stays `zeus.synthetic`.
+/// Cloud presets run only when this gate says the user selected that provider and a key exists.
+/// Automatic stays `zeus.synthetic`.
 public enum VoiceQualityRoute {
-    public static func selection(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> VoiceQualitySelection {
-        guard let preset else { return .synthetic }
-        let steps = PersonaSpeakRoute.chain(choice: choice, keys: keys, providerFailed: providerFailed)
-        guard steps.first == preset.routeStep else { return .synthetic }
-        return .preset(preset)
+    public static func selection(choice: VoiceQualitySpeakChoice, keys: VoiceQualitySpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> VoiceQualitySelection {
+        guard let preset, !providerFailed else { return .synthetic }
+        switch choice {
+        case .elevenLabs where preset.providerID == ElevenLabsTTSAdapter.id && keys.elevenLabs:
+            return .preset(preset)
+        case .googleCloud where preset.providerID == GoogleCloudTTSAdapter.id && keys.googleCloud:
+            return .preset(preset)
+        case .automatic, .elevenLabs, .googleCloud:
+            return .synthetic
+        }
     }
 
-    public static func activeVoiceID(choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> String {
+    public static func activeVoiceID(choice: VoiceQualitySpeakChoice, keys: VoiceQualitySpeakKeys, preset: VoiceQualityPreset?, providerFailed: Bool = false) -> String {
         switch selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
         case .synthetic: VoiceSpeakAllowlist.syntheticID
         case .preset(let chosen): chosen.defaultVoiceID
@@ -547,13 +569,13 @@ public struct VoiceQualitySpeaker: Sendable {
         self.log = log
     }
 
-    /// A call that did not come through `PersonaSpeakRoute`. It does not read the key or open a request.
+    /// A call that did not come through `VoiceQualityRoute`. It does not read the key or open a request.
     public func synthesize(text: String, preset: VoiceQualityPreset, voiceID: String?, credential: ProviderCredential) -> Synthesis {
         _ = (text, preset, voiceID, credential)
         return Self.refused()
     }
 
-    public func synthesize(text: String, choice: PersonaSpeakChoice, keys: PersonaSpeakKeys, preset: VoiceQualityPreset?, credential: ProviderCredential, providerFailed: Bool = false, voiceID: String? = nil) -> Synthesis {
+    public func synthesize(text: String, choice: VoiceQualitySpeakChoice, keys: VoiceQualitySpeakKeys, preset: VoiceQualityPreset?, credential: ProviderCredential, providerFailed: Bool = false, voiceID: String? = nil) -> Synthesis {
         switch VoiceQualityRoute.selection(choice: choice, keys: keys, preset: preset, providerFailed: providerFailed) {
         case .synthetic:
             return Self.refused()
@@ -597,7 +619,7 @@ public struct VoiceQualitySpeaker: Sendable {
 
     public func synthesizeIfEnabled(text: String, defaults: UserDefaults, credential: ProviderCredential) -> Synthesis {
         let stored = VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: VoiceProviderPreferences.selectionKey))
-        let choice: PersonaSpeakChoice
+        let choice: VoiceQualitySpeakChoice
         switch stored {
         case .provider(let id) where id == ElevenLabsTTSAdapter.id: choice = .elevenLabs
         case .provider(let id) where id == GoogleCloudTTSAdapter.id: choice = .googleCloud
@@ -605,7 +627,7 @@ public struct VoiceQualitySpeaker: Sendable {
         }
         let preset = defaults.string(forKey: VoiceQualityOptIn.presetKey).flatMap(VoiceQualityPreset.init(rawValue:))
         let hasKey = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") != nil
-        var keys = PersonaSpeakKeys()
+        var keys = VoiceQualitySpeakKeys()
         if hasKey {
             if choice == .elevenLabs { keys.elevenLabs = true }
             if choice == .googleCloud { keys.googleCloud = true }

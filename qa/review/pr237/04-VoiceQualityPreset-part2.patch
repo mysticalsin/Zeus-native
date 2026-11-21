@@ -2,7 +2,67 @@ diff --git a/Sources/ZeusCore/Providers/VoiceQualityPreset.swift b/Sources/ZeusC
 new file mode 100644
 --- /dev/null
 +++ b/Sources/ZeusCore/Providers/VoiceQualityPreset.swift
-@@ -0,0 +138,139 @@
+@@ -0,0 +130,138 @@
++                    guard let http = httpResponse as? HTTPURLResponse else { throw ProviderFailure.invalidResponse }
++                    continuation.yield(.status(http.statusCode))
++                    if !data.isEmpty { continuation.yield(.chunk(data)) }
++                    continuation.finish()
++                } catch {
++                    continuation.finish(throwing: ProviderFailure.wrap(error))
++                }
++            }
++            continuation.onTermination = { _ in task.cancel() }
++        }
++    }
++
++    private func configuration() -> URLSessionConfiguration {
++        let configuration = URLSessionConfiguration.ephemeral
++        configuration.timeoutIntervalForRequest = timeout
++        configuration.timeoutIntervalForResource = timeout
++        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
++        configuration.urlCache = nil
++        return configuration
++    }
++}
++
++/// One stock voice that is allowed on a cloud request. `reason` says why the id is generic.
++public struct StockVoice: Equatable, Sendable {
++    public var id: String
++    public var name: String
++    public var reason: String
++
++    public init(id: String, name: String, reason: String) {
++        self.id = id
++        self.name = name
++        self.reason = reason
++    }
++}
++
++/// Explicit stock voices. Anything else is refused, including Voice Library ids, clones,
++/// character names, and any id that contains "MCU".
++public enum VoiceQualityAllowList {
++    /// ElevenLabs premade default voices (the account default list, not the Voice Library).
++    /// Each name is a generic stock label. Legacy character voices (Glinda) and celebrity-coded
++    /// names (Arnold) are left out, as are library replacements such as "Eldrin".
++    public static let elevenLabs: [StockVoice] = [
++        StockVoice(
++            id: "EXAVITQu4vr4xnSDxMaL",
++            name: "Sarah",
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++        StockVoice(
++            id: "JBFqnCBsd6RMkjVDRZzb",
++            name: "George",
++            reason: "ElevenLabs default premade voice. Generic first name. This is the stock id already used when no designed voice is saved."
++        ),
++        StockVoice(
++            id: "IKne3meq5aSn9XLyUdCD",
++            name: "Charlie",
++            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
++        ),
++        StockVoice(
++            id: "pNInz6obpgDQGcFmaJgB",
++            name: "Adam",
 +            reason: "ElevenLabs default premade voice. Generic first name, not a named person, actor, or character."
 +        ),
 +    ]
@@ -81,64 +141,3 @@ new file mode 100644
 +    public var pitch: Double
 +    public var audioEncoding: String
 +    public var sampleRateHertz: Int
-+    /// Chirp 3 HD rejects speaking rate and pitch. The preset still records the chosen values.
-+    /// The request omits those two fields when this is false.
-+    public var sendsRateAndPitch: Bool
-+
-+    public init(voiceID: String, speakingRate: Double, pitch: Double, audioEncoding: String, sampleRateHertz: Int, sendsRateAndPitch: Bool) {
-+        self.voiceID = voiceID
-+        self.speakingRate = speakingRate
-+        self.pitch = pitch
-+        self.audioEncoding = audioEncoding
-+        self.sampleRateHertz = sampleRateHertz
-+        self.sendsRateAndPitch = sendsRateAndPitch
-+    }
-+}
-+
-+/// Opt-in quality presets. They are off until the user picks both the provider and a preset.
-+/// The speak-path default stays `zeus.synthetic`.
-+public enum VoiceQualityPreset: String, Sendable, CaseIterable, Equatable {
-+    case elevenLabsFast
-+    case elevenLabsStudio
-+    case googleNeural2
-+    case googleWavenet
-+    case googleChirpHD
-+
-+    public var providerID: String {
-+        switch self {
-+        case .elevenLabsFast, .elevenLabsStudio: ElevenLabsTTSAdapter.id
-+        case .googleNeural2, .googleWavenet, .googleChirpHD: GoogleCloudTTSAdapter.id
-+        }
-+    }
-+
-+    public var defaultVoiceID: String {
-+        switch self {
-+        case .elevenLabsFast: "EXAVITQu4vr4xnSDxMaL"
-+        case .elevenLabsStudio: "JBFqnCBsd6RMkjVDRZzb"
-+        case .googleNeural2: "en-US-Neural2-D"
-+        case .googleWavenet: "en-US-Wavenet-D"
-+        case .googleChirpHD: "en-US-Chirp3-HD-Achernar"
-+        }
-+    }
-+
-+    /// Fast uses `eleven_flash_v2_5`. Stability 0.45 and style 0 match the existing plain delivery:
-+    /// a steady read, with pauses carried by punctuation rather than extra style.
-+    /// Studio uses `eleven_multilingual_v2`. Stability 0.6 and style 0.3 are take C
-+    /// (`UltronCloudVoice.elevenLabsSettings`): fewer breaths, still no SSML.
-+    public var elevenLabs: ElevenLabsQualityDelivery? {
-+        switch self {
-+        case .elevenLabsFast:
-+            return ElevenLabsQualityDelivery(modelID: "eleven_flash_v2_5", stability: 0.45, style: 0)
-+        case .elevenLabsStudio:
-+            let settings = UltronCloudVoice.elevenLabsSettings
-+            return ElevenLabsQualityDelivery(
-+                modelID: "eleven_multilingual_v2",
-+                stability: settings["stability"] ?? 0.6,
-+                style: settings["style"] ?? 0.3
-+            )
-+        case .googleNeural2, .googleWavenet, .googleChirpHD:
-+            return nil
-+        }
-+    }
-+
-+    /// Neural2 uses speaking rate 0.92, the measured pace already used for the Mac voice, and pitch 0.

@@ -2,7 +2,7 @@ diff --git a/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift b/Tests/Ze
 new file mode 100644
 --- /dev/null
 +++ b/Tests/ZeusCoreTests/VoiceQualityRouteSecurityTests.swift
-@@ -0,0 +98,105 @@
+@@ -0,0 +98,111 @@
 +            #expect((outcome.error as? VoiceQualityError)?.description == "The key is not valid.")
 +            #expect(!outcome.message.contains("tab-head-1100"))
 +            #expect(!outcome.message.contains("tab-tail-2200"))
@@ -38,6 +38,52 @@ new file mode 100644
 +        #expect(outcome.hosts.isEmpty)
 +    }
 +
++    @Test func aNonRouteSynthesizeIsRefused() async throws {
++        RouteHostStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))
++        let directory = try temporaryDirectory()
++        let meter = try VoiceQualityMeter(directory: directory)
++        let transport = URLSessionProviderTransport(protocolClasses: [RouteHostStub.self], timeout: 2)
++        let speaker = VoiceQualitySpeaker(meter: meter, transport: transport)
++        let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
++        let synthesis = speaker.synthesize(text: "Hello", preset: .elevenLabsFast, voiceID: "EXAVITQu4vr4xnSDxMaL", credential: credential)
++        let error = await firstError(synthesis)
++        #expect(error as? VoiceQualityError == .providerOff)
++        #expect(RouteHostStub.hosts.isEmpty)
++        let adapter = VoiceQualityTTSAdapter(preset: .elevenLabsFast, meter: meter)
++        let adapted = adapter.synthesize(
++            text: "Hello",
++            voice: ProviderVoice(id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", language: nil),
++            credential: credential,
++            using: transport
++        )
++        if let adapted {
++            let adaptedError = await firstError(adapted)
++            #expect(adaptedError as? VoiceQualityError == .providerOff)
++        }
++        #expect(RouteHostStub.hosts.isEmpty)
++        #expect(try meter.count(providerID: ElevenLabsTTSAdapter.id) == 0)
++    }
++
++    @Test func voiceProviderKeyPolicyRejectsEmptyWhitespaceControlsAndKeysPast256() {
++        #expect(!VoiceProviderKeyPolicy.accepts(""))
++        #expect(!VoiceProviderKeyPolicy.accepts("   "))
++        #expect(!VoiceProviderKeyPolicy.accepts("short"))
++        #expect(!VoiceProviderKeyPolicy.accepts("abcd efgh"))
++        let marker = "POLICY-TAIL-7c"
++        let exact = String(repeating: "p", count: 256 - marker.count) + marker
++        #expect(exact.count == 256)
++        #expect(VoiceProviderKeyPolicy.accepts(exact))
++        let tooLong = exact + "Q"
++        let refused = !VoiceProviderKeyPolicy.accepts(tooLong)
++        #expect(refused)
++        let withNull = "abcdefgh\u{0}ijklmnop"
++        let nullRefused = !VoiceProviderKeyPolicy.accepts(withNull)
++        #expect(nullRefused)
++        #expect(!VoiceProviderKeyPolicy.accepts("line\nbreak-key"))
++        #expect(!VoiceProviderKeyPolicy.accepts("tab\tbreak-key"))
++        #expect(VoiceProviderKeyPolicy.accepts("  \(exact)  "))
++    }
++
 +    @Test func urlSessionAndHeaderErrorsDoNotEchoTheKey() {
 +        let sentinel = "header-sentinel-key-55aa"
 +        let underlying = NSError(
@@ -68,43 +114,3 @@ new file mode 100644
 +        let delegate = VoiceQualityRedirectDelegate()
 +        let configuration = URLSessionConfiguration.ephemeral
 +        configuration.protocolClasses = [RouteRedirectStub.self]
-+        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
-+        defer { session.invalidateAndCancel() }
-+        var request = URLRequest(url: URL(string: "https://api.elevenlabs.io/v1/user")!)
-+        request.setValue(sentinel, forHTTPHeaderField: "xi-api-key")
-+        request.setValue(sentinel, forHTTPHeaderField: "X-Goog-Api-Key")
-+        _ = try? await session.data(for: request)
-+        let task = session.dataTask(with: request)
-+        defer { task.cancel() }
-+        let redirect = HTTPURLResponse(url: request.url!, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": "https://collector.example/collect"])!
-+        var followed = URLRequest(url: URL(string: "https://collector.example/collect")!)
-+        followed.setValue(sentinel, forHTTPHeaderField: "xi-api-key")
-+        followed.setValue(sentinel, forHTTPHeaderField: "X-Goog-Api-Key")
-+        let decision = RedirectDecision()
-+        delegate.urlSession(session, task: task, willPerformHTTPRedirection: redirect, newRequest: followed) { decision.record($0) }
-+        #expect(decision.called)
-+        #expect(decision.request == nil)
-+        let hosts = RouteRedirectStub.hosts
-+        #expect(hosts.contains("api.elevenlabs.io"))
-+        #expect(!hosts.contains("collector.example"))
-+        let carried = RouteRedirectStub.requests.contains { request in
-+            let host = request.url?.host ?? ""
-+            let xi = request.value(forHTTPHeaderField: "xi-api-key")
-+            let goog = request.value(forHTTPHeaderField: "X-Goog-Api-Key")
-+            return host != "api.elevenlabs.io" && (xi == sentinel || goog == sentinel)
-+        }
-+        #expect(!carried)
-+        #expect(RouteRedirectStub.forwarded == nil)
-+
-+        let keys = PersonaSpeakKeys(elevenLabs: true)
-+        let seen = try await speak(choice: .elevenLabs, keys: keys, preset: .elevenLabsFast, credential: sentinel, status: 302, location: "https://collector.example/collect")
-+        #expect(!seen.hosts.contains("collector.example"))
-+        #expect(!seen.log.contains(sentinel))
-+    }
-+
-+    @Test func theMeterDoesNotFollowASymlink() throws {
-+        let directory = try temporaryDirectory()
-+        let target = directory.appendingPathComponent("real-meter.json")
-+        let link = directory.appendingPathComponent("voice-quality-meter.json")
-+        try Data("{\"elevenlabs\":10}".utf8).write(to: target)
-+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)

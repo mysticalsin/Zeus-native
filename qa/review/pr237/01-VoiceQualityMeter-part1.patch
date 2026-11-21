@@ -2,7 +2,7 @@ diff --git a/Sources/ZeusCore/Providers/VoiceQualityMeter.swift b/Sources/ZeusCo
 new file mode 100644
 --- /dev/null
 +++ b/Sources/ZeusCore/Providers/VoiceQualityMeter.swift
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,133 @@
 +import Foundation
 +#if canImport(Darwin)
 +import Darwin
@@ -79,15 +79,43 @@ new file mode 100644
 +        do { data = try JSONSerialization.data(withJSONObject: counts, options: [.sortedKeys]) }
 +        catch { throw VoiceQualityError.meterCorrupt }
 +        guard data.count <= Self.maxFileBytes else { throw VoiceQualityError.meterCorrupt }
-+        try Self.refuseSymlink(fileURL)
 +        let temporary = fileURL.deletingLastPathComponent().appendingPathComponent(".voice-quality-meter-\(UUID().uuidString).tmp")
-+        do { try Self.writeNoFollow(data, to: temporary) }
-+        catch {
++        let fd = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode_t(0o600))
++        if fd < 0 { throw VoiceQualityError.meterCorrupt }
++        var failed = false
++        data.withUnsafeBytes { raw in
++            var offset = 0
++            while offset < raw.count {
++                let count = raw.baseAddress.map { base in
++                    write(fd, base.advanced(by: offset), raw.count - offset)
++                } ?? -1
++                if count <= 0 { failed = true; break }
++                offset += count
++            }
++        }
++        if failed || fsync(fd) != 0 {
++            close(fd)
++            unlink(temporary.path)
++            throw VoiceQualityError.meterCorrupt
++        }
++        var written = stat()
++        let writtenOK = withUnsafeMutablePointer(to: &written) { fstat(fd, $0) } == 0
++        close(fd)
++        guard writtenOK else {
 +            unlink(temporary.path)
 +            throw VoiceQualityError.meterCorrupt
 +        }
 +        if rename(temporary.path, fileURL.path) != 0 {
 +            unlink(temporary.path)
++            throw VoiceQualityError.meterCorrupt
++        }
++        let check = open(fileURL.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
++        if check < 0 { throw VoiceQualityError.meterCorrupt }
++        var landed = stat()
++        let landedOK = withUnsafeMutablePointer(to: &landed) { fstat(check, $0) } == 0
++        close(check)
++        let regular = (landed.st_mode & S_IFMT) == S_IFREG
++        guard landedOK, regular, landed.st_dev == written.st_dev, landed.st_ino == written.st_ino else {
 +            throw VoiceQualityError.meterCorrupt
 +        }
 +    }
@@ -108,38 +136,3 @@ new file mode 100644
 +                return read(fd, base, raw.count)
 +            }
 +            if count == 0 { break }
-+            if count < 0 { throw VoiceQualityError.meterCorrupt }
-+            data.append(contentsOf: buffer.prefix(count))
-+            if data.count > maxFileBytes { throw VoiceQualityError.meterCorrupt }
-+        }
-+        return data
-+    }
-+
-+    private static func refuseSymlink(_ url: URL) throws {
-+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-+        if fd < 0 {
-+            if errno == ENOENT { return }
-+            throw VoiceQualityError.meterCorrupt
-+        }
-+        close(fd)
-+    }
-+
-+    private static func writeNoFollow(_ data: Data, to url: URL) throws {
-+        let fd = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode_t(0o600))
-+        if fd < 0 { throw VoiceQualityError.meterCorrupt }
-+        var failed = false
-+        data.withUnsafeBytes { raw in
-+            var offset = 0
-+            while offset < raw.count {
-+                let count = raw.baseAddress.map { base in
-+                    write(fd, base.advanced(by: offset), raw.count - offset)
-+                } ?? -1
-+                if count < 0 { failed = true; break }
-+                offset += count
-+            }
-+        }
-+        close(fd)
-+        if failed { throw VoiceQualityError.meterCorrupt }
-+    }
-+
-+    private static func whole(_ value: Any) -> Int? {
