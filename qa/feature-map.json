@@ -7727,6 +7727,49 @@
           ]
         },
         {
+          "id": "F13.idle-top-bar-black",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "The quiet top bar is an explicit idle state whose fill is sRGB 0, 0, 0, 1 with no glass, blur, material, vibrancy, gradient, tint, translucency or shadow, and whose content is only the selected character. Hover, peek, calibration and live attention keep the existing body. This does not sample a Mac framebuffer.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "idleBlackIsExactlyZero"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "idleShowsOnlyTheZeusCharacter"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "idleShowsOnlyTheJarvisCharacter"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "orbPersonaIsJarvisAndClassicIsZeus"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "hoverRestoresTheExistingVisuals"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "approvalRecordingAndMusicStayVisible"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "expandedPeekAndCalibrationKeepTheExistingBody"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "reduceMotionUsesTheSameTransition"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+              "function": "eachLiveAttentionMarkStays"
+            }
+          ]
+        },
+        {
           "id": "F13.closed-wings-notch",
           "check": "native-ClosedWingsNotchTests",
           "acceptance": "At a 220 x 38 notch the laid-out left and right wing frames and their content never intersect the centred notch rectangle for long hint, copied, track, permission, volume, mascot, music and Scribe ticker cues. Layout evidence in an owned window; not device proof.",

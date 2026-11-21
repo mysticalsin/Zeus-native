@@ -1447,6 +1447,33 @@ struct NotchActionButton: View {
 
 // MARK: Closed-notch wings
 
+/// The quiet bar's only mark: Zeus, or Jarvis when that character is chosen.
+struct IdleCharacterMark: View {
+    let character: TopBarCharacterChoice
+
+    var body: some View {
+        switch character {
+        case .zeus:
+            MiniMascotView(state: .idle, size: NotchClosedBodyLayout.miniMascotSize)
+        case .jarvis:
+            OrbMascotView(visualState: .idle, reduceMotion: Motion.reduced, paused: false)
+                .frame(width: NotchClosedBodyLayout.miniMascotSize, height: NotchClosedBodyLayout.miniMascotSize)
+                .accessibilityLabel("Jarvis")
+        }
+    }
+}
+
+/// The quiet character in the resting mascot's wing. The other wing stays empty.
+struct IdleCharacterWing: View {
+    let character: TopBarCharacterChoice
+    var notchGap: CGFloat
+
+    var body: some View {
+        ClosedWingsRow(notchGap: notchGap, extra: NotchClosedBodyLayout.idleMascotExtra,
+                       left: IdleCharacterMark(character: character), right: EmptyView())
+    }
+}
+
 /// What sits either side of the camera housing while the notch is closed: a cue, a live
 /// dictation, a focus countdown or the track that's playing (in that order of importance).
 struct ClosedWings: View {
