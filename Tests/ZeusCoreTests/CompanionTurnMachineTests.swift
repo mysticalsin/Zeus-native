@@ -138,11 +138,27 @@ struct CompanionTurnMachineTests {
         #expect(machine.phase != .speaking)
     }
 
+    @Test func bargeInFromSpeakingStartsTheMicrophone() {
+        var machine = arrive(.speaking)
+        let response = machine.send(.bargeIn)
+        #expect(machine.phase == .listening)
+        guard case .accepted(let outcome) = response else {
+            Issue.record("barge-in from speaking was rejected")
+            return
+        }
+        #expect(outcome.commands.contains(.startMic))
+        #expect(outcome.commands.contains(.startCapture))
+        let speech = outcome.commands.firstIndex(of: .stopSpeech)
+        let mic = outcome.commands.firstIndex(of: .startMic)
+        #expect(speech != nil && mic != nil && speech! < mic!)
+    }
+
     @Test func bargeInFromSpeakingStopsSpeechFlightAndCaptureInOneStep() {
         for phase in [CompanionTurnPhase.thinking, .speaking, .transcribing, .listening, .error("That failed. Nothing was changed.")] {
             var machine = arrive(phase)
             let response = machine.send(.bargeIn)
-            #expect(machine.phase == .interrupted, "\(phase) did not interrupt")
+            let listened = phase == .thinking || phase == .speaking
+            #expect(machine.phase == (listened ? .listening : .interrupted), "\(phase) did not interrupt")
             guard case .accepted(let outcome) = response else {
                 Issue.record("barge-in from \(phase) was rejected")
                 continue
@@ -152,6 +168,7 @@ struct CompanionTurnMachineTests {
             let flight = outcome.commands.firstIndex(of: .cancelFlight)
             let model = outcome.commands.firstIndex(of: .cancelLLM)
             #expect(speech != nil && flight != nil && model != nil)
+            if listened { #expect(outcome.commands.contains(.startMic)) }
             #expect(speech! < flight! && flight! < model!)
             #expect(outcome.commands.filter { $0 == .stopSpeech }.count == 1)
             #expect(outcome.commands.filter { $0 == .cancelFlight }.count == 1)
@@ -166,24 +183,19 @@ struct CompanionTurnMachineTests {
     @Test func secondHoldListensAgainAfterTheInterrupt() {
         var machine = arrive(.speaking)
         let interrupted = machine.send(.bargeIn)
-        guard case .accepted = interrupted else {
+        guard case .accepted(let first) = interrupted else {
             Issue.record("barge-in from speaking was rejected")
             return
         }
-        #expect(machine.phase == .interrupted)
-        let again = machine.send(.keyDown)
         #expect(machine.phase == .listening)
-        guard case .accepted(let outcome) = again else {
-            Issue.record("key down after the interrupt was rejected")
-            return
-        }
-        #expect(outcome.commands == [.showListeningLamp, .startMic, .startCapture])
+        #expect(first.commands.contains(.startMic))
+        #expect(first.commands.contains(.startCapture))
         #expect(machine.phase != .speaking)
     }
 
     @Test func noSpeechAfterInterrupted() {
         var machine = arrive(.speaking)
-        machine.send(.bargeIn)
+        machine.send(.cancel)
         #expect(machine.phase == .interrupted)
         let blocked: [CompanionTurnEvent] = [
             .firstToken, .firstAudio, .audioFinished,
@@ -574,7 +586,8 @@ struct CompanionTurnMachineTests {
                 return .accept(.error(line), [.cancelLLM, .speakError(line)])
             case .timeout:
                 return .accept(.error(timeoutLine), [.cancelLLM, .speakError(timeoutLine)])
-            case .bargeIn, .cancel: return .accept(.interrupted, cancels)
+            case .bargeIn: return .accept(.listening, cancels + listen)
+            case .cancel: return .accept(.interrupted, cancels)
             case .reset: return .accept(.idle, cancels)
             default: return .reject
             }
@@ -583,7 +596,8 @@ struct CompanionTurnMachineTests {
             case .firstAudio: return .accept(.speaking, [])
             case .audioFinished: return .accept(.idle, [])
             case .timeout: return .accept(.idle, [.stopSpeech])
-            case .bargeIn, .cancel: return .accept(.interrupted, cancels)
+            case .bargeIn: return .accept(.listening, cancels + listen)
+            case .cancel: return .accept(.interrupted, cancels)
             case .reset: return .accept(.idle, cancels)
             default: return .reject
             }
@@ -633,7 +647,7 @@ struct CompanionTurnMachineTests {
             machine.send(.partialTranscript("partial"))
             machine.send(.keyUp)
             machine.send(.finalTranscript("what time is it", instant: true))
-            machine.send(.bargeIn)
+            machine.send(.cancel)
         case .error(let reason):
             machine.send(.keyDown)
             machine.send(.partialTranscript("partial"))
