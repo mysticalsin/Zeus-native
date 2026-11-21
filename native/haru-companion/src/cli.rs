@@ -6,7 +6,8 @@ use crate::engine::{selftest_report, Engine};
 use crate::serve::{accept_authorized, bind_socket, serve_one, OsPeer};
 use crate::session::ChildControl;
 use crate::supervisor::{
-    apply, child_argv, decide, LaunchDecision, LaunchRequest, NetGate, SocketBind, SpyBinder,
+    apply, decide, LaunchDecision, LaunchRequest, NetGate, serve_child_argv, SocketBind,
+    SpyBinder,
     SpyLauncher, SpyNet, StdLauncher,
 };
 use std::path::PathBuf;
@@ -55,7 +56,7 @@ fn serve_command(config: &ServeConfig) -> i32 {
                 "haru-companion: watchdog={} kv_window={:?} reanchor_minutes={:?} (held, not passed to haru-speech-mlx 0.1.0)",
                 config.watchdog, config.kv_window, config.reanchor_minutes
             );
-            let argv = child_argv(&python, &model, &private_socket, quantize);
+            let argv = serve_child_argv(&python, &model, &private_socket, quantize);
             match run_serve(&socket, &private_socket, &argv, config.watchdog) {
                 Ok(()) => 0,
                 Err(error) => {

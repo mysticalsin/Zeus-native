@@ -120,6 +120,12 @@ pub fn private_socket(public: &Path) -> PathBuf {
     public.with_file_name(name)
 }
 
+/// Argv `serve` passes to the model process. The red test locks the current
+/// behaviour: this still forwards the parent gate path.
+pub fn serve_child_argv(python: &Path, model: &Path, gate: &Path, quantize: u8) -> Vec<String> {
+    child_argv(python, model, gate, quantize)
+}
+
 pub fn child_argv(python: &Path, model: &Path, socket: &Path, quantize: u8) -> Vec<String> {
     vec![
         python.display().to_string(),

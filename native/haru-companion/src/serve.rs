@@ -13,6 +13,23 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::time::Duration;
 
+/// Compares the listening inode with the directory entry. The stub accepts
+/// every path; the bind sweep replaces it.
+pub fn listener_matches(listener: &UnixListener, path: &Path) -> std::io::Result<()> {
+    let _ = (listener, path);
+    Ok(())
+}
+
+/// Removes `path`. The stub ignores the recorded inode.
+pub fn unlink_if_ours(path: &Path, dev: u64, ino: u64) -> std::io::Result<()> {
+    let _ = (dev, ino);
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     if let Ok(meta) = std::fs::symlink_metadata(path) {
         let kind = meta.file_type();
