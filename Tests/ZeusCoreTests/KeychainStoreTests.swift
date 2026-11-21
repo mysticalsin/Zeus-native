@@ -188,4 +188,191 @@ import Testing
         let relaunch = KeychainStore(backend: both, defaults: defaults())
         #expect(AssistantKeyAccount.readOpenAI(relaunch.get) == nil)
     }
+
+    /// The legacy spelling is deleted first. A refused legacy delete must leave the canonical secret.
+    @Test func legacyDeleteFailureKeepsTheCanonicalSecret() {
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        backend.failDelete = [AssistantKeyAccount.aliasOpenAI]
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(!store.remove(AssistantKeyAccount.canonicalOpenAI))
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(store.get(AssistantKeyAccount.aliasOpenAI) == "sk-legacy")
+    }
+
+    /// Removal order is legacy, then canonical, for either requested spelling.
+    @Test func openAIRemovalDeletesTheLegacySpellingBeforeTheCanonicalAccount() {
+        let legacyFirst = [AssistantKeyAccount.aliasOpenAI, AssistantKeyAccount.canonicalOpenAI]
+        #expect(KeychainStore.removalAccounts(for: AssistantKeyAccount.canonicalOpenAI) == legacyFirst)
+        #expect(KeychainStore.removalAccounts(for: AssistantKeyAccount.aliasOpenAI) == legacyFirst)
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.remove(AssistantKeyAccount.canonicalOpenAI))
+        #expect(backend.deleteLog.first == AssistantKeyAccount.aliasOpenAI)
+        #expect(backend.deleteLog.last == AssistantKeyAccount.canonicalOpenAI)
+        #expect(backend.items.isEmpty)
+    }
+
+    /// `errSecItemNotFound` is success. A missing legacy item must not block, or undo, the canonical delete.
+    @Test func absentLegacyDeleteIsSuccessAndTheCanonicalSecretIsRemoved() {
+        let backend = DeleteInjectionKeychain(["com.zeus.app|assistant.key.openAI": "sk-canonical"])
+        backend.absentDeleteReturnsFalse = true
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.remove(AssistantKeyAccount.canonicalOpenAI))
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] == nil)
+        #expect(!store.has(AssistantKeyAccount.canonicalOpenAI))
+    }
+
+    /// A canonical delete that fails after the legacy item was removed is rolled back. The secret stays.
+    @Test func canonicalDeleteFailureRestoresTheLegacyAccount() {
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        backend.failDelete = [AssistantKeyAccount.canonicalOpenAI]
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(!store.remove(AssistantKeyAccount.aliasOpenAI))
+        #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(store.get(AssistantKeyAccount.aliasOpenAI) == "sk-legacy")
+    }
+
+    /// Both spellings at launch: the alias is stale and has to go. The canonical value stays.
+    @Test func loadDropsAStaleAliasWhenBothOpenAIAccountsExist() {
+        let backend = MemoryKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == nil)
+        #expect(store.get(AssistantKeyAccount.aliasOpenAI) == nil)
+    }
+
+    /// A refused alias delete is not "migrated". The alias is still there for the next attempt.
+    @Test func failedAliasDeleteDuringLoadLeavesTheStaleAlias() {
+        let backend = DeleteInjectionKeychain([
+            "com.zeus.app|assistant.key.openAI": "sk-canonical",
+            "com.zeus.app|assistant.key.openai": "sk-legacy",
+        ])
+        backend.failDelete = [AssistantKeyAccount.aliasOpenAI]
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
+        #expect(store.get(AssistantKeyAccount.aliasOpenAI) == "sk-legacy")
+    }
+
+    @Test func migrateOpenAIDoesNotReportDoneWhenAliasDeleteKeepsFailing() {
+        var stored = [AssistantKeyAccount.aliasOpenAI: "sk-legacy"]
+        var attempts = 0
+        let result = AssistantKeyAccount.migrateOpenAI(
+            get: { stored[$0] },
+            writeCanonical: { value in
+                stored[AssistantKeyAccount.canonicalOpenAI] = value
+                return true
+            },
+            deleteAlias: {
+                attempts += 1
+                return false
+            })
+        #expect(result == nil)
+        #expect(attempts == 2)
+        #expect(stored[AssistantKeyAccount.aliasOpenAI] == "sk-legacy")
+        #expect(stored[AssistantKeyAccount.canonicalOpenAI] == "sk-legacy")
+    }
+
+    @Test func migrateOpenAIRetriesAFailedAliasDeleteBeforeReportingDone() {
+        var stored = [AssistantKeyAccount.aliasOpenAI: "sk-legacy"]
+        var attempts = 0
+        let result = AssistantKeyAccount.migrateOpenAI(
+            get: { stored[$0] },
+            writeCanonical: { value in
+                stored[AssistantKeyAccount.canonicalOpenAI] = value
+                return true
+            },
+            deleteAlias: {
+                attempts += 1
+                guard attempts > 1 else { return false }
+                stored[AssistantKeyAccount.aliasOpenAI] = nil
+                return true
+            })
+        #expect(result == "sk-legacy")
+        #expect(attempts == 2)
+        #expect(stored[AssistantKeyAccount.aliasOpenAI] == nil)
+    }
+
+    @Test func migrateOpenAIDoesNotReportDoneWhenAStaleAliasSurvives() {
+        var stored = [
+            AssistantKeyAccount.canonicalOpenAI: "sk-canonical",
+            AssistantKeyAccount.aliasOpenAI: "sk-legacy",
+        ]
+        var attempts = 0
+        let failed = AssistantKeyAccount.migrateOpenAI(
+            get: { stored[$0] },
+            writeCanonical: { _ in Issue.record("canonical value was already present"); return false },
+            deleteAlias: {
+                attempts += 1
+                return false
+            })
+        #expect(failed == nil)
+        #expect(attempts == 2)
+        #expect(stored[AssistantKeyAccount.aliasOpenAI] == "sk-legacy")
+
+        let dropped = AssistantKeyAccount.migrateOpenAI(
+            get: { stored[$0] },
+            writeCanonical: { _ in Issue.record("canonical value was already present"); return false },
+            deleteAlias: {
+                stored[AssistantKeyAccount.aliasOpenAI] = nil
+                return true
+            })
+        #expect(dropped == "sk-canonical")
+        #expect(stored[AssistantKeyAccount.aliasOpenAI] == nil)
+    }
+}
+
+/// A keychain whose deletes can fail while the item stays, and whose missing items can report failure.
+final class DeleteInjectionKeychain: KeychainBackend, @unchecked Sendable {
+    private let lock = NSLock()
+    var items: [String: String]
+    var failDelete: Set<String> = []
+    /// When set, deleting an account that is not stored returns false. That is `errSecItemNotFound` reported as failure.
+    var absentDeleteReturnsFalse = false
+    private(set) var deleteLog: [String] = []
+
+    init(_ items: [String: String] = [:]) { self.items = items }
+
+    func accounts(service: String) -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        return items.keys.filter { $0.hasPrefix(service + "|") }.map { String($0.dropFirst(service.count + 1)) }
+    }
+
+    func read(service: String, account: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return items["\(service)|\(account)"]
+    }
+
+    func write(_ value: String, service: String, account: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        items["\(service)|\(account)"] = value
+        return true
+    }
+
+    @discardableResult
+    func delete(service: String, account: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        deleteLog.append(account)
+        let key = "\(service)|\(account)"
+        guard items[key] != nil else { return !absentDeleteReturnsFalse }
+        if failDelete.contains(account) { return false }
+        items[key] = nil
+        return true
+    }
 }
