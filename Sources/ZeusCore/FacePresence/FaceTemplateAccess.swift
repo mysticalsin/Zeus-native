@@ -231,6 +231,69 @@ public final class MemoryFaceTemplateKeychain: FaceTemplateKeychain, @unchecked 
     }
 }
 
+/// Result of asking the system who is present. A nil or empty domain state is not a success.
+public enum FaceTemplateEvaluation: Equatable, Sendable {
+    case failed
+    case succeeded(Data?)
+}
+
+/// What to do with the stored face after that answer. Unavailable keeps the template.
+public enum FaceTemplateDomainEffect: Equatable, Sendable {
+    case allow(Data)
+    case denyKeep
+    case changedDelete
+}
+
+/// Empty and nil domain states are unavailable. They are not compared and they do not delete.
+public enum FaceTemplateDomainGate {
+    public static func effect(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false) -> FaceTemplateDomainEffect {
+        switch evaluation {
+        case .failed, .succeeded(nil):
+            return .denyKeep
+        case .succeeded(let current?):
+            if current.isEmpty { return .denyKeep }
+            if let stored, !stored.isEmpty {
+                return stored == current ? .allow(current) : .changedDelete
+            }
+            return enrolled ? .changedDelete : .allow(current)
+        }
+    }
+
+    public static func denies(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false) -> Bool {
+        if case .allow = effect(stored: stored, evaluation: evaluation, enrolled: enrolled) { return false }
+        return true
+    }
+}
+
+/// Replace an epoch in place. A failed write leaves the previous bytes, and an empty value is never stored.
+public enum FaceTemplateEpochPlan: Equatable, Sendable {
+    case update
+    case add
+}
+
+public enum FaceTemplateEpochWrite {
+    public static func plan(existing: Data?) -> FaceTemplateEpochPlan {
+        if let existing, !existing.isEmpty { return .update }
+        return .add
+    }
+
+    public static func kept(existing: Data?, next: Data, succeeded: Bool) -> Data? {
+        let prior = existing.flatMap { $0.isEmpty ? nil : Optional($0) }
+        guard succeeded, !next.isEmpty else { return prior }
+        return next
+    }
+}
+
+/// Query fields for the face-template item. The group is `CredentialKeychainPolicy.accessGroup`.
+public enum FaceTemplateKeychainAttributes {
+    public static let service = "com.zeus.app"
+
+    public static func query(account: String, teamIdentifier: String) -> [String: String]? {
+        guard let group = CredentialKeychainPolicy.accessGroup(teamIdentifier: teamIdentifier) else { return nil }
+        return ["service": service, "account": account, "accessGroup": group]
+    }
+}
+
 /// What a read or save must present so the item's `SecAccessControl` is evaluated.
 /// `presentsAccessControl` is true only for an `LAContext` (`kSecUseAuthenticationContext`) or
 /// `kSecUseOperationPrompt` path. An empty prompt does not count.

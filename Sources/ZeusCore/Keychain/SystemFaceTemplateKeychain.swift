@@ -18,31 +18,33 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     public init() {}
 
     public func write(_ record: FaceTemplateRecord) -> Result<Void, FaceTemplateFailure> {
-        switch epochCheck() {
-        case .changed:
+        let evaluation = Self.evaluate()
+        switch Self.decision(evaluation: evaluation, account: record.account) {
+        case .denyKeep:
+            return .failure(.unavailable)
+        case .changedDelete:
             _ = remove(account: record.account)
             return .failure(.biometryChanged)
-        case .unavailable:
-            return .failure(.unavailable)
-        case .same, .first:
-            break
+        case .allow(let state):
+            guard let context = evaluation.context else { return .failure(.unavailable) }
+            let saved = FaceTemplateSecureSession.write(record, items: Items(context: context))
+            if case .success = saved { _ = Self.rememberEpoch(state) }
+            return saved
         }
-        let saved = FaceTemplateSecureSession.write(record, items: Items())
-        if case .success = saved { _ = rememberEpoch() }
-        return saved
     }
 
     public func read(account: String, requiring protection: FaceTemplateProtection) -> Result<Data, FaceTemplateFailure> {
-        switch epochCheck() {
-        case .changed:
+        let evaluation = Self.evaluate()
+        switch Self.decision(evaluation: evaluation, account: account) {
+        case .denyKeep:
+            return .failure(.unavailable)
+        case .changedDelete:
             _ = remove(account: account)
             return .failure(.biometryChanged)
-        case .unavailable:
-            return .failure(.unavailable)
-        case .same, .first:
-            break
+        case .allow:
+            guard let context = evaluation.context else { return .failure(.unavailable) }
+            return FaceTemplateSecureSession.read(account: account, requiring: protection, items: Items(context: context))
         }
-        return FaceTemplateSecureSession.read(account: account, requiring: protection, items: Items())
     }
 
     @discardableResult
@@ -53,7 +55,7 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     }
 
     public func protection(of account: String) -> FaceTemplateProtection? {
-        var query = base(account: account)
+        guard var query = base(account: account) else { return nil }
         query[kSecReturnAttributes as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         // Existence only. Fail the prompt instead of showing it, so a name lookup does not ask
@@ -69,8 +71,10 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
 
     /// SecItem adapter. Update replaces the payload of an existing item. Add runs only when the item is missing.
     private struct Items: FaceTemplateSecureItems {
+        var context: LAContext
+
         func probe(account: String) -> FaceTemplateProbe {
-            var query = SystemFaceTemplateKeychain.base(account: account)
+            guard var query = SystemFaceTemplateKeychain.base(account: account) else { return .missing }
             query[kSecReturnData as String] = true
             query[kSecMatchLimit as String] = kSecMatchLimitOne
             query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
@@ -85,10 +89,10 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
 
         func add(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure> {
             guard authentication.presentsAccessControl else { return .failure(.unavailable) }
-            guard let control = SystemFaceTemplateKeychain.accessControl(authentication.protection) else {
+            guard let control = SystemFaceTemplateKeychain.accessControl(authentication.protection),
+                  var query = prompted(account: record.account, authentication: authentication) else {
                 return .failure(.unavailable)
             }
-            var query = prompted(account: record.account, authentication: authentication)
             query[kSecValueData as String] = record.payload
             query[kSecAttrAccessControl as String] = control
             let status = SecItemAdd(query as CFDictionary, nil)
@@ -97,8 +101,10 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         }
 
         func replace(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure> {
-            guard authentication.presentsAccessControl else { return .failure(.unavailable) }
-            let query = prompted(account: record.account, authentication: authentication)
+            guard authentication.presentsAccessControl,
+                  let query = prompted(account: record.account, authentication: authentication) else {
+                return .failure(.unavailable)
+            }
             let attributes = [kSecValueData as String: record.payload]
             let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
             if status == errSecItemNotFound { return .failure(.missing) }
@@ -107,10 +113,10 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         }
 
         func read(account: String, authentication: FaceTemplateAuthentication) -> Result<Data, FaceTemplateFailure> {
-            guard authentication.presentsAccessControl, !authentication.operationPrompt.isEmpty else {
+            guard authentication.presentsAccessControl, !authentication.operationPrompt.isEmpty,
+                  var query = prompted(account: account, authentication: authentication) else {
                 return .failure(.unavailable)
             }
-            var query = prompted(account: account, authentication: authentication)
             query[kSecReturnData as String] = true
             query[kSecMatchLimit as String] = kSecMatchLimitOne
             var result: CFTypeRef?
@@ -127,19 +133,25 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
             return .success(())
         }
 
-        private func prompted(account: String, authentication: FaceTemplateAuthentication) -> [String: Any] {
-            var query = SystemFaceTemplateKeychain.base(account: account)
-            query[kSecUseAuthenticationContext as String] = LAContext()
+        private func prompted(account: String, authentication: FaceTemplateAuthentication) -> [String: Any]? {
+            guard var query = SystemFaceTemplateKeychain.base(account: account) else { return nil }
+            query[kSecUseAuthenticationContext as String] = context
             query[kSecUseOperationPrompt as String] = authentication.operationPrompt
             return query
         }
     }
 
-    private static func base(account: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: Self.service,
-         kSecAttrAccount as String: account,
-         kSecUseDataProtectionKeychain as String: true]
+    /// The access group is `CredentialKeychainPolicy.accessGroup` from the shared keychain change.
+    /// A missing Team ID fails closed and does not omit the group.
+    private static func base(account: String) -> [String: Any]? {
+        guard let team = DevKeychain.teamIdentifier,
+              let fields = FaceTemplateKeychainAttributes.query(account: account, teamIdentifier: team),
+              let group = fields["accessGroup"], let service = fields["service"] else { return nil }
+        return [kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account,
+                kSecAttrAccessGroup as String: group,
+                kSecUseDataProtectionKeychain as String: true]
     }
 
     private static func accessControl(_ protection: FaceTemplateProtection) -> SecAccessControl? {
@@ -156,42 +168,53 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
 
     @discardableResult
     private static func deleteItem(account: String) -> OSStatus {
-        SecItemDelete(base(account: account) as CFDictionary)
+        guard let query = base(account: account) else { return errSecParam }
+        return SecItemDelete(query as CFDictionary)
     }
 
-    private enum Epoch { case first, same, changed, unavailable }
+    private struct Evaluation {
+        var value: FaceTemplateEvaluation
+        var context: LAContext?
+    }
 
-    /// Compares the current fingerprint set with the set stored when the template was saved.
-    /// This does not evaluate a policy and does not return the template.
-    private func epochCheck() -> Epoch {
+    /// `evaluatePolicy` must succeed. A nil or empty domain state is unavailable and is not stored.
+    private static func evaluate() -> Evaluation {
         let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else { return .unavailable }
-        let current = context.evaluatedPolicyDomainState ?? Data()
-        switch epochData() {
-        case .none: return .first
-        case .some(let stored) where stored == current: return .same
-        case .some: return .changed
+        do {
+            try context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Confirm it is you before Zeus uses the saved face.")
+            return Evaluation(value: .succeeded(context.evaluatedPolicyDomainState), context: context)
+        } catch {
+            return Evaluation(value: .failed, context: nil)
         }
     }
 
-    private func epochData() -> Data? {
-        var query = base(account: Self.epochAccount)
+    private static func decision(evaluation: Evaluation, account: String) -> FaceTemplateDomainEffect {
+        let stored = usable(epochData())
+        let enrolled = Items(context: evaluation.context ?? LAContext()).probe(account: account) != .missing
+        return FaceTemplateDomainGate.effect(stored: stored, evaluation: evaluation.value, enrolled: enrolled)
+    }
+
+    private static func usable(_ data: Data?) -> Data? {
+        guard let data, !data.isEmpty else { return nil }
+        return data
+    }
+
+    private static func epochData() -> Data? {
+        guard var query = base(account: epochAccount) else { return nil }
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
-        return result as? Data
+        return usable(result as? Data)
     }
 
-    private func rememberEpoch() -> Bool {
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else { return false }
-        let current = context.evaluatedPolicyDomainState ?? Data()
-        _ = deleteItem(account: Self.epochAccount)
-        var query = base(account: Self.epochAccount)
-        query[kSecValueData as String] = current
+    /// Update the existing epoch. Add only when it is missing. A failed call does not delete it.
+    private static func rememberEpoch(_ state: Data) -> Bool {
+        guard !state.isEmpty, var query = base(account: epochAccount) else { return false }
+        let updated = SecItemUpdate(query as CFDictionary, [kSecValueData as String: state] as CFDictionary)
+        if updated == errSecSuccess { return true }
+        if updated != errSecItemNotFound { return false }
+        query[kSecValueData as String] = state
         query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
     }

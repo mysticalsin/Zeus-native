@@ -8882,6 +8882,34 @@
             {
               "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
               "function": "promptsMatchUserPresenceOrBiometryCurrentSetAndDevicePasscode"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "evaluationFailureDeniesTheFaceTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "nilDomainStateDeniesTheFaceTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "changedDomainStateDeniesTheFaceTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "emptyDomainStateIsUnavailableAndIsNeverStored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "unavailableCurrentStateDeniesWithoutDeleting"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "failedEpochAddKeepsThePreviousRecord"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "faceTemplateQueryUsesTheSharedAccessGroup"
             }
           ]
         }

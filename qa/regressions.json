@@ -5064,6 +5064,90 @@
       }
     },
     {
+      "id": "REG-991",
+      "failure": "A face template could be saved or read without the keychain access control, or a cancelled prompt still stored or returned the print.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "cancelledOrFailedSaveStoresNothing"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "An older face template was deleted before the new protected copy had been read back and matched, or a failed check still removed it.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "migrationKeepsTheOldCopyWhenVerificationFails"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A log line included face-template bytes, or a byte count next to whose face it was.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "logsNeverIncludeTemplateBytesOrASizeTiedToAnIdentity"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "Saving a face template deleted the stored item before the new copy was added, so a failed add lost the template. The real read also ignored the requested access control.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedReplaceKeepsTheStoredTemplate"
+      }
+    },
+    {
+      "id": "REG-998",
+      "failure": "An empty face-template domain state was stored and later matched another empty state, so a missing evaluation counted as the same fingerprints.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "emptyDomainStateIsUnavailableAndIsNeverStored"
+      }
+    },
+    {
+      "id": "REG-999",
+      "failure": "An unavailable current domain state deleted the stored face template instead of denying and leaving it in place.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "unavailableCurrentStateDeniesWithoutDeleting"
+      }
+    },
+    {
+      "id": "REG-1000",
+      "failure": "Replacing the face-template epoch deleted the old record before the new one was stored, so a failed add looked like a first enrollment.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedEpochAddKeepsThePreviousRecord"
+      }
+    },
+    {
       "id": "REG-603",
       "failure": "With the switch stored on, launching Zeus opened the camera before the owner did anything.",
       "features": [
@@ -8676,54 +8760,6 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
-    },
-    {
-      "id": "REG-991",
-      "failure": "A face template could be saved or read without the keychain access control, or a cancelled prompt still stored or returned the print.",
-      "features": [
-        "F14"
-      ],
-      "check": "portable-keychain",
-      "guard": {
-        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
-        "function": "cancelledOrFailedSaveStoresNothing"
-      }
-    },
-    {
-      "id": "REG-992",
-      "failure": "An older face template was deleted before the new protected copy had been read back and matched, or a failed check still removed it.",
-      "features": [
-        "F14"
-      ],
-      "check": "portable-keychain",
-      "guard": {
-        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
-        "function": "migrationKeepsTheOldCopyWhenVerificationFails"
-      }
-    },
-    {
-      "id": "REG-993",
-      "failure": "A log line included face-template bytes, or a byte count next to whose face it was.",
-      "features": [
-        "F14"
-      ],
-      "check": "portable-keychain",
-      "guard": {
-        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
-        "function": "logsNeverIncludeTemplateBytesOrASizeTiedToAnIdentity"
-      }
-    },
-    {
-      "id": "REG-994",
-      "failure": "Saving a face template deleted the stored item before the new copy was added, so a failed add lost the template. The real read also ignored the requested access control.",
-      "features": [
-        "F14"
-      ],
-      "check": "portable-keychain",
-      "guard": {
-        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
-        "function": "failedReplaceKeepsTheStoredTemplate"
-      }
     }
-  ]
+]
 }
