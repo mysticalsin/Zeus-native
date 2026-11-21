@@ -1,149 +1,146 @@
 # haru-companion
 
-One local process Zeus can talk to. It supervises a Haru child, speaks a
-24 kHz socket protocol, and does not start a process, bind a socket, or open
-a network connection unless `serve` is asked for with a Python interpreter
-and a model directory.
+A local supervisor for one Haru conversation. Zeus talks to it over a
+Unix socket at 24 kHz. The companion owns the session, the watchdog, and
+the child process. It does not download weights and it does not open a
+TCP connection.
 
-This crate does not download weights. Tests use `FakeBackend` and synthetic
-frames only. The model pin, when a real child is launched, is
-`haru-speech-mlx` 0.1.0 (`python -m haru_mlx.native`), 8-bit, 24 kHz mono,
-3200-sample frames. There is no `reference_path` in protocol v1.
-
-`haru-pipe` is the path dependency (`../haru-pipe`). It is Apache-2.0, has
-no crates.io dependencies, and does the 48 kHz ↔ 24 kHz conversion
-(`downsample_2x` / `upsample_2x`).
-
-## Commands
-
-```
-haru-companion serve --socket PATH --python PATH --model DIR [--quantize 8] [--watchdog] [--kv-window N] [--reanchor-minutes M]
-haru-companion selftest [--frames 10000]
-```
-
-`serve` without `--python` or `--model` exits 2 and spawns nothing.
-`--kv-window` and `--reanchor-minutes` are accepted and held. They are not
-forwarded to `haru-speech-mlx` 0.1.0, whose CLI does not know them.
-`selftest` runs an in-process fake session and prints overhead percentiles
-and RSS. It does not spawn, bind, or use the network.
-
-With the conversation flag off (`LaunchRequest::default`), `decide` returns
-`NoLaunch { FlagOff }` and `apply` does not call the process, socket, or
-network ports.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  Zeus["Zeus client<br/>24 kHz socket"] --> Protocol["protocol.rs<br/>v1 frames"]
-  Protocol --> Engine["engine.rs<br/>lockstep 133 ms"]
-  Engine --> Session["session.rs<br/>VoiceSessionState"]
-  Engine --> Watch["watchdog.rs"]
-  Engine --> Super["supervisor.rs<br/>child + budget"]
-  Super --> Child["python -m haru_mlx.native<br/>or FakeBackend"]
-  Engine --> Pipe["haru-pipe<br/>48 kHz up/down"]
-  Pipe --> Child
-```
-
-Zeus sends 24 kHz frames. The real child speaks 48 kHz. The companion
-upsamples each push toward the child and downsamples each model frame back
-to 3200 samples. A push that is not ready within 133 ms becomes one silence
-frame and increments `underruns`. Each push still returns exactly one frame.
-
-## Wire protocol v1
-
-Unix socket, mode `0600`, one client, peer uid must match the process.
-Frame: `u8 type | u32 LE length | payload`.
-
-| Dir | Type | Name | Payload |
-| --- | --- | --- | --- |
-| client → companion | `0x21` | HELLO | `{"v":1}` |
-| client → companion | `0x22` | START | `{"language":"en"\|"fr","system_prompt":"...","speak_first":bool}` |
-| client → companion | `0x23` | PUSH | `u32 seq` then `3200 × f32 LE` (12804 bytes) |
-| client → companion | `0x24` | CLOSE | empty |
-| companion → client | `0x31` | HELLO_ACK | `{"v":1,"sample_rate":24000,"frame_samples":3200}` |
-| companion → client | `0x32` | STATE | `{"session","child","watchdog"}` |
-| companion → client | `0x33` | FRAME | `u32 seq`, `f32 step_ms`, `3200 × f32 LE` |
-| companion → client | `0x34` | TEXT | utf-8 |
-| companion → client | `0x35` | ERROR | `{"code","message"}` and, for size, `expected` and `got` |
-
-A START object that contains `reference_path` is `reference_not_allowed`
-and does not change the session. A PUSH whose sample count is not 3200 is
-`bad_frame_size` with `expected: 3200` and does not change the session.
-`bad_frame_size` is a different error from `illegal_transition`.
-
-The child command, only after a launch is allowed, is:
+The model, when a launch is allowed, is `haru-speech-mlx` 0.1.0:
 
 ```
 python -m haru_mlx.native --socket <private> --model <dir> --quantize 8
 ```
 
-Upstream message types are `0x01` AUDIO, `0x02` START, `0x03` PREPARE,
-`0x10` HELLO, `0x11` FRAME, `0x12` TEXT, `0x13` ASSETS, `0x14` ERROR,
-`0x15` READY.
+`--kv-window` and `--reanchor-minutes` are accepted and held. They are
+not forwarded. Protocol v1 has no `reference_path`.
 
-## Session table
+`haru-pipe` (`../haru-pipe`) is the Apache-2.0 path dependency. It has
+no crates.io dependencies of its own and does the 48 kHz ↔ 24 kHz
+conversion (`downsample_2x` / `upsample_2x`).
 
-The machine mirrors the amended `VoiceSessionState` (PR #30 review, B1–B3):
-an exhaustive nested match with no `_` arm. `failed` and `closed` are
-terminal. Recovery is a new session, not a transition out of `failed`.
+## Architecture
 
-| State | start | started | push | close | closed | fail(e) |
-| --- | --- | --- | --- | --- | --- | --- |
-| idle | starting | illegal | illegal | **closed** | illegal | failed(e) |
-| starting | illegal | streaming | illegal | **closing** | illegal | failed(e) |
-| streaming | illegal | illegal | streaming | closing | illegal | failed(e) |
-| closing | illegal | illegal | illegal | illegal | closed | failed(e) |
-| closed | illegal | illegal | illegal | illegal | illegal | illegal |
-| failed | illegal | illegal | illegal | illegal | illegal | illegal |
+```mermaid
+flowchart LR
+  Zeus["Zeus client, 24 kHz"] --> Socket["Unix socket, mode 0600"]
+  Socket --> Protocol["protocol.rs, v1 frames"]
+  Protocol --> Engine["engine.rs, 133 ms lockstep"]
+  Engine --> Session["session.rs"]
+  Engine --> Watch["watchdog.rs"]
+  Engine --> Super["supervisor.rs"]
+  Super --> Child["python -m haru_mlx.native"]
+  Engine --> Pipe["haru-pipe, 48 kHz up and down"]
+  Pipe --> Child
+```
 
-`illegal` is `illegal_transition`. A close that wins the race against start
-lands in `closed`, so a later start is refused and no child is spawned.
-Close during `starting` (the model-load await) goes `closing` then `closed`,
-kills the child, and a late `started` is refused. The session never reaches
-`streaming`.
+Zeus sends 24 kHz frames. A real child speaks 48 kHz. The companion
+upsamples each push toward the child and downsamples each model frame
+back to 3200 samples. A push that is not ready within 133 ms becomes
+one silence frame and increments `underruns`. Each push still returns
+exactly one frame.
 
-`SessionError` also carries `process_exited`, `socket_closed`,
-`start_timeout`, and `watchdog_restart`. The table test builds every state
-and every event from exhaustive matches over those enums, then checks one
-outcome per pair.
+`serve` binds the socket, checks that the interpreter can be spawned,
+then accepts one client whose uid matches this process. When that
+client disconnects, the session closes, the child is signalled, and
+the socket file is removed. A missing interpreter exits 2 and leaves
+no socket behind.
 
-## Watchdog and restarts
+## Session state machine
 
-`Ok → Pending → Restart → Cooldown → Ok`. Soft faults wait for idle: a
-repeated token block in TEXT, 3 unanswered turns, or 23 garbage frames
-(~3 s). Hard faults restart immediately: p95 step over 120 ms across 225
-frames (30 s), child RSS over 14 GB, or no frame for 2 s while streaming.
-After a restart the watchdog is in cooldown (450 frames, 60 s) and further
-faults do not storm.
+The table is an exhaustive nested match with no wildcard arm. `failed`
+and `closed` are terminal. Recovery is a new session, not a transition
+out of `failed`.
 
-A restart records `failed(watchdog_restart)`, kills the child, and, inside
-a budget of 3 restarts per 10 minutes, opens a fresh idle session. The old
-pid is not left in the alive set. The same budget applies to
-`process_exited` and `socket_closed`. Past the budget the child stays
-`stopped_failed`.
+```mermaid
+stateDiagram-v2
+  [*] --> idle
+  idle --> starting: start
+  idle --> closed: close
+  idle --> failed: fail
+  starting --> streaming: started
+  starting --> closing: close
+  starting --> failed: fail
+  streaming --> streaming: push
+  streaming --> closing: close
+  streaming --> failed: fail
+  closing --> closed: closed
+  closing --> failed: fail
+```
 
-## Check
+Anything else is `illegal_transition` and does not move the session. A
+push of the wrong length is `bad_frame_size` and also does not move it.
+
+The drawing in [`docs/state-machine.svg`](docs/state-machine.svg) is
+generated from `SessionState::next`. The moving dot walks the legal
+path idle → starting → streaming → closing → closed.
+
+Close from `idle` lands in `closed`, so a later start is refused and
+no child is spawned. Close during `starting` goes `closing` then
+`closed`, kills the child, and a late `started` is refused. A client
+that drops without `CLOSE` ends the session the same way. A restart
+kills the previous pid before it opens a fresh idle session.
+
+## How to run
+
+```
+haru-companion serve --socket PATH --python PATH --model DIR [--quantize 8] [--watchdog] [--kv-window N] [--reanchor-minutes M]
+haru-companion selftest [--frames N]
+```
+
+`selftest` runs an in-process fake session and prints overhead
+percentiles and RSS. It does not spawn, bind, or use the network.
+`--frames` is capped at 20000. `--watchdog` turns the watchdog on for
+that process. With the conversation flag off (`LaunchRequest::default`),
+`decide` returns `NoLaunch { FlagOff }` and nothing is spawned or bound.
 
 ```
 cd native/haru-companion && cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked -- --test-threads=1
+cargo test --locked
 ```
 
 Repeat the three commands in `native/haru-pipe`. Both crates commit a
-`Cargo.lock`. CI for this lives in `.github/workflows/haru-companion.yml`
-(ubuntu-latest, path filter `native/**`, `contents: read`, no cache and no
-secrets). It was added only after Tony's card `t1983s8178`.
+`Cargo.lock`. CI is `.github/workflows/haru-companion.yml` (ubuntu-latest,
+path filter `native/**`, `contents: read`, no cache and no secrets).
 
-## Revert
+## Wire protocol v1
 
-This slice is new files only:
+Frame: `u8 type | u32 LE length | payload`. The socket is mode `0600`.
+One client at a time. The peer uid must match the process. A length
+above 8 MiB is rejected and the framer resynchronises. Strings are
+Unicode. `en` and `fr` are the only languages.
 
-- `native/haru-companion/`
-- `native/haru-pipe/`
-- `.github/workflows/haru-companion.yml`
+| Dir | Type | Name | Payload |
+| --- | --- | --- | --- |
+| client → companion | `0x21` | HELLO | `{"v":1}` |
+| client → companion | `0x22` | START | `language` `en` or `fr`, `system_prompt`, `speak_first` |
+| client → companion | `0x23` | PUSH | `u32 seq` then `3200 × f32 LE` |
+| client → companion | `0x24` | CLOSE | empty |
+| companion → client | `0x31` | HELLO_ACK | `v`, `sample_rate` 24000, `frame_samples` 3200 |
+| companion → client | `0x32` | STATE | `session`, `child`, `watchdog` |
+| companion → client | `0x33` | FRAME | `u32 seq`, `f32 step_ms`, `3200 × f32 LE` |
+| companion → client | `0x34` | TEXT | utf-8 |
+| companion → client | `0x35` | ERROR | `code`, `message`, and for size `expected` and `got` |
 
-Revert the companion commits in reverse order, or delete those three paths.
-Nothing under `Package.swift`, `Sources/`, `Tests/`, or the existing
-workflows is modified.
+A START object that contains `reference_path` is `reference_not_allowed`.
+Upstream message types stay `0x01` AUDIO through `0x15` READY.
+
+## Watchdog and restarts
+
+`Ok → Pending → Restart → Cooldown → Ok`. Soft faults wait for idle: a
+repeated token block, 3 unanswered turns, or 23 garbage frames. Hard
+faults restart immediately: p95 step over 120 ms across 225 frames,
+child RSS over 14 GB, no frame for 2 s while streaming, or a non-finite
+step time. A memory report does not invent a latency sample. Garbage is
+scored on the model frame, including one that was replaced by silence
+because it missed the 133 ms lockstep.
+
+After a restart the watchdog is in cooldown for 450 frames. The restart
+budget is 3 per 10 minutes, then the child stays `stopped_failed`.
+`process_exited`, `socket_closed`, and `start_timeout` are distinct
+errors. An exit reported before launch, or after the supervisor has
+stopped, does not spawn another child.
+
+The child is reaped when it exits. Shutdown is SIGTERM, then SIGKILL
+after a short grace. On Linux the child is armed with `PR_SET_PDEATHSIG`
+so a crashed supervisor does not leave the interpreter running.
