@@ -318,8 +318,14 @@ struct UIUXContractTests {
         let catalog = try #require(UIUXFindingExpectations.catalog)
         #expect(catalog.schema == 1)
         #expect(catalog.findings.count == 395)
-        #expect(UIUXFindingExpectations.openIDs.count == 34)
-        #expect(UIUXFindingExpectations.closedIDs.count == 361)
+        #expect(UIUXFindingExpectations.openIDs.count == 395)
+        #expect(UIUXFindingExpectations.closedIDs.isEmpty)
+        let root = try #require(UIUXRepo.root())
+        let scanned = UIUXScanCache.shared.findings(root: root)
+        let closedStillInScan = catalog.findings.filter { finding in
+            finding.expect == "closed" && scanned.contains { UIUXAudit.sameSite($0, finding) }
+        }
+        #expect(closedStillInScan.isEmpty)
         let ids = catalog.findings.map(\.id)
         #expect(ids.count == Set(ids).count)
         #expect(ids.allSatisfy { $0.hasPrefix("ZB-UIUX-") })
@@ -338,13 +344,16 @@ struct UIUXContractTests {
 
     /// A closed catalog row is a site the current scan does not report. The case runs. It is not skipped.
     /// Matching is file plus snippet, so a moved line is still the same site.
-    @Test(arguments: UIUXFindingExpectations.closedIDs)
-    func closedFindingsStayClosedInTheCatalog(id: String) throws {
+    @Test func closedFindingsStayClosedInTheCatalog() throws {
         let root = try #require(UIUXRepo.root())
-        let finding = try #require(UIUXFindingExpectations.catalog?.findings.first { $0.id == id })
-        #expect(finding.expect == "closed")
-        let stillPresent = UIUXScanCache.shared.findings(root: root).contains { UIUXAudit.sameSite($0, finding) }
-        #expect(stillPresent == false)
+        let catalog = try #require(UIUXFindingExpectations.catalog)
+        let scanned = UIUXScanCache.shared.findings(root: root)
+        let closed = catalog.findings.filter { $0.expect == "closed" }
+        for finding in closed {
+            let stillPresent = scanned.contains { UIUXAudit.sameSite($0, finding) }
+            #expect(stillPresent == false, "\(finding.id) is closed while its site is still in the scan")
+        }
+        #expect(closed.count == UIUXFindingExpectations.closedIDs.count)
     }
 }
 

@@ -2,7 +2,7 @@
   "findings" : [
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-001",
       "kind" : "accessibility",
@@ -11,7 +11,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-002",
       "kind" : "accessibility",
@@ -20,7 +20,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-003",
       "kind" : "accessibility",
@@ -29,7 +29,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-004",
       "kind" : "accessibility",
@@ -38,7 +38,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-005",
       "kind" : "accessibility",
@@ -47,7 +47,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-006",
       "kind" : "accessibility",
@@ -56,7 +56,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/AgentCardsUI.swift",
       "id" : "ZB-UIUX-A11Y-007",
       "kind" : "accessibility",
@@ -65,7 +65,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/OtherAgents.swift",
       "id" : "ZB-UIUX-A11Y-008",
       "kind" : "accessibility",
@@ -74,7 +74,7 @@
     },
     {
       "detail" : "Picker missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-009",
       "kind" : "accessibility",
@@ -83,7 +83,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-010",
       "kind" : "accessibility",
@@ -92,7 +92,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-011",
       "kind" : "accessibility",
@@ -101,7 +101,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-012",
       "kind" : "accessibility",
@@ -110,7 +110,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-013",
       "kind" : "accessibility",
@@ -119,7 +119,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-014",
       "kind" : "accessibility",
@@ -128,7 +128,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-A11Y-015",
       "kind" : "accessibility",
@@ -137,7 +137,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-016",
       "kind" : "accessibility",
@@ -146,7 +146,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-017",
       "kind" : "accessibility",
@@ -155,7 +155,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-018",
       "kind" : "accessibility",
@@ -164,7 +164,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-019",
       "kind" : "accessibility",
@@ -173,7 +173,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-020",
       "kind" : "accessibility",
@@ -182,7 +182,7 @@
     },
     {
       "detail" : "Picker missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-021",
       "kind" : "accessibility",
@@ -191,7 +191,7 @@
     },
     {
       "detail" : "Picker missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-022",
       "kind" : "accessibility",
@@ -200,7 +200,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationHistoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-023",
       "kind" : "accessibility",
@@ -209,7 +209,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationPreviewCard.swift",
       "id" : "ZB-UIUX-A11Y-024",
       "kind" : "accessibility",
@@ -218,7 +218,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationPreviewCard.swift",
       "id" : "ZB-UIUX-A11Y-025",
       "kind" : "accessibility",
@@ -227,7 +227,7 @@
     },
     {
       "detail" : "Picker missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/SpeechEngineSettings.swift",
       "id" : "ZB-UIUX-A11Y-026",
       "kind" : "accessibility",
@@ -236,7 +236,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/SpeechEngineSettings.swift",
       "id" : "ZB-UIUX-A11Y-027",
       "kind" : "accessibility",
@@ -245,7 +245,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/SpeechEngineSettings.swift",
       "id" : "ZB-UIUX-A11Y-028",
       "kind" : "accessibility",
@@ -326,7 +326,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-A11Y-037",
       "kind" : "accessibility",
@@ -335,7 +335,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-A11Y-038",
       "kind" : "accessibility",
@@ -344,7 +344,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-A11Y-039",
       "kind" : "accessibility",
@@ -353,7 +353,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-A11Y-040",
       "kind" : "accessibility",
@@ -362,7 +362,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-A11Y-041",
       "kind" : "accessibility",
@@ -371,7 +371,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-A11Y-042",
       "kind" : "accessibility",
@@ -380,7 +380,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
       "id" : "ZB-UIUX-A11Y-043",
       "kind" : "accessibility",
@@ -389,7 +389,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
       "id" : "ZB-UIUX-A11Y-044",
       "kind" : "accessibility",
@@ -398,7 +398,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
       "id" : "ZB-UIUX-A11Y-045",
       "kind" : "accessibility",
@@ -407,7 +407,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
       "id" : "ZB-UIUX-A11Y-046",
       "kind" : "accessibility",
@@ -416,7 +416,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
       "id" : "ZB-UIUX-A11Y-047",
       "kind" : "accessibility",
@@ -425,7 +425,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeIdleView.swift",
       "id" : "ZB-UIUX-A11Y-048",
       "kind" : "accessibility",
@@ -434,7 +434,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
       "id" : "ZB-UIUX-A11Y-049",
       "kind" : "accessibility",
@@ -443,7 +443,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
       "id" : "ZB-UIUX-A11Y-050",
       "kind" : "accessibility",
@@ -452,7 +452,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
       "id" : "ZB-UIUX-A11Y-051",
       "kind" : "accessibility",
@@ -461,7 +461,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
       "id" : "ZB-UIUX-A11Y-052",
       "kind" : "accessibility",
@@ -470,7 +470,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
       "id" : "ZB-UIUX-A11Y-053",
       "kind" : "accessibility",
@@ -479,7 +479,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMeetingCardView.swift",
       "id" : "ZB-UIUX-A11Y-054",
       "kind" : "accessibility",
@@ -488,7 +488,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-055",
       "kind" : "accessibility",
@@ -497,7 +497,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-056",
       "kind" : "accessibility",
@@ -506,7 +506,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-057",
       "kind" : "accessibility",
@@ -515,7 +515,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-058",
       "kind" : "accessibility",
@@ -524,7 +524,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-059",
       "kind" : "accessibility",
@@ -533,7 +533,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-060",
       "kind" : "accessibility",
@@ -542,7 +542,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-061",
       "kind" : "accessibility",
@@ -551,7 +551,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-A11Y-062",
       "kind" : "accessibility",
@@ -560,7 +560,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-063",
       "kind" : "accessibility",
@@ -569,7 +569,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-064",
       "kind" : "accessibility",
@@ -578,7 +578,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-065",
       "kind" : "accessibility",
@@ -587,7 +587,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-066",
       "kind" : "accessibility",
@@ -596,7 +596,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-067",
       "kind" : "accessibility",
@@ -605,7 +605,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-068",
       "kind" : "accessibility",
@@ -614,7 +614,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-069",
       "kind" : "accessibility",
@@ -623,7 +623,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-070",
       "kind" : "accessibility",
@@ -632,7 +632,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-071",
       "kind" : "accessibility",
@@ -641,7 +641,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-072",
       "kind" : "accessibility",
@@ -650,7 +650,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-073",
       "kind" : "accessibility",
@@ -659,7 +659,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-074",
       "kind" : "accessibility",
@@ -668,7 +668,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-075",
       "kind" : "accessibility",
@@ -677,7 +677,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-076",
       "kind" : "accessibility",
@@ -686,7 +686,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-077",
       "kind" : "accessibility",
@@ -695,7 +695,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-078",
       "kind" : "accessibility",
@@ -704,7 +704,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-079",
       "kind" : "accessibility",
@@ -713,7 +713,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-080",
       "kind" : "accessibility",
@@ -722,7 +722,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-081",
       "kind" : "accessibility",
@@ -731,7 +731,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-082",
       "kind" : "accessibility",
@@ -740,7 +740,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-083",
       "kind" : "accessibility",
@@ -749,7 +749,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-084",
       "kind" : "accessibility",
@@ -758,7 +758,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-085",
       "kind" : "accessibility",
@@ -767,7 +767,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-086",
       "kind" : "accessibility",
@@ -776,7 +776,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-087",
       "kind" : "accessibility",
@@ -785,7 +785,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-088",
       "kind" : "accessibility",
@@ -794,7 +794,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-089",
       "kind" : "accessibility",
@@ -803,7 +803,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-090",
       "kind" : "accessibility",
@@ -812,7 +812,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-091",
       "kind" : "accessibility",
@@ -821,7 +821,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-092",
       "kind" : "accessibility",
@@ -830,7 +830,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-A11Y-093",
       "kind" : "accessibility",
@@ -893,7 +893,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-100",
       "kind" : "accessibility",
@@ -902,7 +902,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-101",
       "kind" : "accessibility",
@@ -911,7 +911,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-102",
       "kind" : "accessibility",
@@ -920,7 +920,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-103",
       "kind" : "accessibility",
@@ -929,7 +929,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-104",
       "kind" : "accessibility",
@@ -938,7 +938,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-105",
       "kind" : "accessibility",
@@ -947,7 +947,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-106",
       "kind" : "accessibility",
@@ -956,7 +956,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-107",
       "kind" : "accessibility",
@@ -965,7 +965,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-108",
       "kind" : "accessibility",
@@ -974,7 +974,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-109",
       "kind" : "accessibility",
@@ -983,7 +983,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-110",
       "kind" : "accessibility",
@@ -992,7 +992,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-111",
       "kind" : "accessibility",
@@ -1001,7 +1001,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAIConnectionsPage.swift",
       "id" : "ZB-UIUX-A11Y-112",
       "kind" : "accessibility",
@@ -1010,7 +1010,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAboutPage.swift",
       "id" : "ZB-UIUX-A11Y-113",
       "kind" : "accessibility",
@@ -1019,7 +1019,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAboutPage.swift",
       "id" : "ZB-UIUX-A11Y-114",
       "kind" : "accessibility",
@@ -1028,7 +1028,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAboutPage.swift",
       "id" : "ZB-UIUX-A11Y-115",
       "kind" : "accessibility",
@@ -1037,7 +1037,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAboutPage.swift",
       "id" : "ZB-UIUX-A11Y-116",
       "kind" : "accessibility",
@@ -1046,7 +1046,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAboutPage.swift",
       "id" : "ZB-UIUX-A11Y-117",
       "kind" : "accessibility",
@@ -1055,7 +1055,7 @@
     },
     {
       "detail" : "Toggle missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAgentHubCards.swift",
       "id" : "ZB-UIUX-A11Y-118",
       "kind" : "accessibility",
@@ -1064,7 +1064,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAgentHubCards.swift",
       "id" : "ZB-UIUX-A11Y-119",
       "kind" : "accessibility",
@@ -1073,7 +1073,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAgentHubCards.swift",
       "id" : "ZB-UIUX-A11Y-120",
       "kind" : "accessibility",
@@ -1082,7 +1082,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAgentHubCards.swift",
       "id" : "ZB-UIUX-A11Y-121",
       "kind" : "accessibility",
@@ -1091,7 +1091,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAgentHubCards.swift",
       "id" : "ZB-UIUX-A11Y-122",
       "kind" : "accessibility",
@@ -1100,7 +1100,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-123",
       "kind" : "accessibility",
@@ -1109,7 +1109,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-124",
       "kind" : "accessibility",
@@ -1118,7 +1118,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-125",
       "kind" : "accessibility",
@@ -1127,7 +1127,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-126",
       "kind" : "accessibility",
@@ -1136,7 +1136,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-127",
       "kind" : "accessibility",
@@ -1145,7 +1145,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-128",
       "kind" : "accessibility",
@@ -1154,7 +1154,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-129",
       "kind" : "accessibility",
@@ -1163,7 +1163,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBeamerPage.swift",
       "id" : "ZB-UIUX-A11Y-130",
       "kind" : "accessibility",
@@ -1172,7 +1172,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSBrowserUseRows.swift",
       "id" : "ZB-UIUX-A11Y-131",
       "kind" : "accessibility",
@@ -1181,7 +1181,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDiagnosticsLogs.swift",
       "id" : "ZB-UIUX-A11Y-132",
       "kind" : "accessibility",
@@ -1190,7 +1190,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDiagnosticsLogs.swift",
       "id" : "ZB-UIUX-A11Y-133",
       "kind" : "accessibility",
@@ -1199,7 +1199,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDiagnosticsLogs.swift",
       "id" : "ZB-UIUX-A11Y-134",
       "kind" : "accessibility",
@@ -1208,7 +1208,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDiagnosticsLogs.swift",
       "id" : "ZB-UIUX-A11Y-135",
       "kind" : "accessibility",
@@ -1217,7 +1217,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-136",
       "kind" : "accessibility",
@@ -1226,7 +1226,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-137",
       "kind" : "accessibility",
@@ -1235,7 +1235,7 @@
     },
     {
       "detail" : "Slider missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-138",
       "kind" : "accessibility",
@@ -1244,7 +1244,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-139",
       "kind" : "accessibility",
@@ -1253,7 +1253,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-140",
       "kind" : "accessibility",
@@ -1262,7 +1262,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-141",
       "kind" : "accessibility",
@@ -1271,7 +1271,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-142",
       "kind" : "accessibility",
@@ -1280,7 +1280,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-143",
       "kind" : "accessibility",
@@ -1289,7 +1289,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-144",
       "kind" : "accessibility",
@@ -1298,7 +1298,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-145",
       "kind" : "accessibility",
@@ -1307,7 +1307,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-146",
       "kind" : "accessibility",
@@ -1316,7 +1316,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-147",
       "kind" : "accessibility",
@@ -1325,7 +1325,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDictationPage.swift",
       "id" : "ZB-UIUX-A11Y-148",
       "kind" : "accessibility",
@@ -1334,7 +1334,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDrawnNotchCard.swift",
       "id" : "ZB-UIUX-A11Y-149",
       "kind" : "accessibility",
@@ -1343,7 +1343,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDrawnNotchCard.swift",
       "id" : "ZB-UIUX-A11Y-150",
       "kind" : "accessibility",
@@ -1352,7 +1352,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDrawnNotchCard.swift",
       "id" : "ZB-UIUX-A11Y-151",
       "kind" : "accessibility",
@@ -1361,7 +1361,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSDrawnNotchCard.swift",
       "id" : "ZB-UIUX-A11Y-152",
       "kind" : "accessibility",
@@ -1370,7 +1370,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-153",
       "kind" : "accessibility",
@@ -1379,7 +1379,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-154",
       "kind" : "accessibility",
@@ -1388,7 +1388,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-155",
       "kind" : "accessibility",
@@ -1397,7 +1397,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-156",
       "kind" : "accessibility",
@@ -1406,7 +1406,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-157",
       "kind" : "accessibility",
@@ -1415,7 +1415,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-158",
       "kind" : "accessibility",
@@ -1424,7 +1424,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-159",
       "kind" : "accessibility",
@@ -1433,7 +1433,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-160",
       "kind" : "accessibility",
@@ -1442,7 +1442,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-161",
       "kind" : "accessibility",
@@ -1451,7 +1451,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-162",
       "kind" : "accessibility",
@@ -1460,7 +1460,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEnginePage.swift",
       "id" : "ZB-UIUX-A11Y-163",
       "kind" : "accessibility",
@@ -1469,7 +1469,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-A11Y-164",
       "kind" : "accessibility",
@@ -1478,7 +1478,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-A11Y-165",
       "kind" : "accessibility",
@@ -1487,7 +1487,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-A11Y-166",
       "kind" : "accessibility",
@@ -1496,7 +1496,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-A11Y-167",
       "kind" : "accessibility",
@@ -1505,7 +1505,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-A11Y-168",
       "kind" : "accessibility",
@@ -1514,7 +1514,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-A11Y-169",
       "kind" : "accessibility",
@@ -1523,7 +1523,7 @@
     },
     {
       "detail" : "Toggle missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFacePresenceCard.swift",
       "id" : "ZB-UIUX-A11Y-170",
       "kind" : "accessibility",
@@ -1532,7 +1532,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFacePresenceCard.swift",
       "id" : "ZB-UIUX-A11Y-171",
       "kind" : "accessibility",
@@ -1541,7 +1541,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFacePresenceCard.swift",
       "id" : "ZB-UIUX-A11Y-172",
       "kind" : "accessibility",
@@ -1550,7 +1550,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFeaturesPage.swift",
       "id" : "ZB-UIUX-A11Y-173",
       "kind" : "accessibility",
@@ -1559,7 +1559,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFeaturesPage.swift",
       "id" : "ZB-UIUX-A11Y-174",
       "kind" : "accessibility",
@@ -1568,7 +1568,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFeaturesPage.swift",
       "id" : "ZB-UIUX-A11Y-175",
       "kind" : "accessibility",
@@ -1577,7 +1577,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSFeaturesPage.swift",
       "id" : "ZB-UIUX-A11Y-176",
       "kind" : "accessibility",
@@ -1586,7 +1586,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-177",
       "kind" : "accessibility",
@@ -1595,7 +1595,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-178",
       "kind" : "accessibility",
@@ -1604,7 +1604,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-179",
       "kind" : "accessibility",
@@ -1613,7 +1613,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-180",
       "kind" : "accessibility",
@@ -1622,7 +1622,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-181",
       "kind" : "accessibility",
@@ -1631,7 +1631,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-182",
       "kind" : "accessibility",
@@ -1640,7 +1640,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-183",
       "kind" : "accessibility",
@@ -1649,7 +1649,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-184",
       "kind" : "accessibility",
@@ -1658,7 +1658,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSInsomniaPage.swift",
       "id" : "ZB-UIUX-A11Y-185",
       "kind" : "accessibility",
@@ -1667,7 +1667,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-186",
       "kind" : "accessibility",
@@ -1676,7 +1676,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-187",
       "kind" : "accessibility",
@@ -1685,7 +1685,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-188",
       "kind" : "accessibility",
@@ -1694,7 +1694,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-189",
       "kind" : "accessibility",
@@ -1703,7 +1703,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-190",
       "kind" : "accessibility",
@@ -1712,7 +1712,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-191",
       "kind" : "accessibility",
@@ -1721,7 +1721,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLanguagePacksCard.swift",
       "id" : "ZB-UIUX-A11Y-192",
       "kind" : "accessibility",
@@ -1730,7 +1730,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSLiveDiagnosticsCard.swift",
       "id" : "ZB-UIUX-A11Y-193",
       "kind" : "accessibility",
@@ -1739,7 +1739,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSPolyglotPage.swift",
       "id" : "ZB-UIUX-A11Y-194",
       "kind" : "accessibility",
@@ -1748,7 +1748,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSPolyglotPage.swift",
       "id" : "ZB-UIUX-A11Y-195",
       "kind" : "accessibility",
@@ -1757,7 +1757,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShelfPage.swift",
       "id" : "ZB-UIUX-A11Y-196",
       "kind" : "accessibility",
@@ -1766,7 +1766,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShelfPage.swift",
       "id" : "ZB-UIUX-A11Y-197",
       "kind" : "accessibility",
@@ -1775,7 +1775,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShortcutRecorder.swift",
       "id" : "ZB-UIUX-A11Y-198",
       "kind" : "accessibility",
@@ -1784,7 +1784,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShortcutRecorder.swift",
       "id" : "ZB-UIUX-A11Y-199",
       "kind" : "accessibility",
@@ -1793,7 +1793,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShortcutRecorder.swift",
       "id" : "ZB-UIUX-A11Y-200",
       "kind" : "accessibility",
@@ -1802,7 +1802,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShortcutRecorder.swift",
       "id" : "ZB-UIUX-A11Y-201",
       "kind" : "accessibility",
@@ -1811,7 +1811,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSShortcutRecorder.swift",
       "id" : "ZB-UIUX-A11Y-202",
       "kind" : "accessibility",
@@ -1910,7 +1910,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSSpeechEngineCard.swift",
       "id" : "ZB-UIUX-A11Y-213",
       "kind" : "accessibility",
@@ -1919,7 +1919,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSSpeechEngineCard.swift",
       "id" : "ZB-UIUX-A11Y-214",
       "kind" : "accessibility",
@@ -1928,7 +1928,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSSpeechEngineCard.swift",
       "id" : "ZB-UIUX-A11Y-215",
       "kind" : "accessibility",
@@ -1937,7 +1937,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSSpeechEngineCard.swift",
       "id" : "ZB-UIUX-A11Y-216",
       "kind" : "accessibility",
@@ -1946,7 +1946,7 @@
     },
     {
       "detail" : "Slider missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSTilingPage.swift",
       "id" : "ZB-UIUX-A11Y-217",
       "kind" : "accessibility",
@@ -1955,7 +1955,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-218",
       "kind" : "accessibility",
@@ -1964,7 +1964,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-219",
       "kind" : "accessibility",
@@ -1973,7 +1973,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-220",
       "kind" : "accessibility",
@@ -1982,7 +1982,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-221",
       "kind" : "accessibility",
@@ -1991,7 +1991,7 @@
     },
     {
       "detail" : "Slider missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-222",
       "kind" : "accessibility",
@@ -2000,7 +2000,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-223",
       "kind" : "accessibility",
@@ -2009,7 +2009,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-224",
       "kind" : "accessibility",
@@ -2018,7 +2018,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-225",
       "kind" : "accessibility",
@@ -2027,7 +2027,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-226",
       "kind" : "accessibility",
@@ -2036,7 +2036,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-227",
       "kind" : "accessibility",
@@ -2045,7 +2045,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-228",
       "kind" : "accessibility",
@@ -2054,7 +2054,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-229",
       "kind" : "accessibility",
@@ -2063,7 +2063,7 @@
     },
     {
       "detail" : "SecureField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-230",
       "kind" : "accessibility",
@@ -2072,7 +2072,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-231",
       "kind" : "accessibility",
@@ -2081,7 +2081,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-232",
       "kind" : "accessibility",
@@ -2090,7 +2090,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-233",
       "kind" : "accessibility",
@@ -2099,7 +2099,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-234",
       "kind" : "accessibility",
@@ -2108,7 +2108,7 @@
     },
     {
       "detail" : "Slider missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-235",
       "kind" : "accessibility",
@@ -2117,7 +2117,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-236",
       "kind" : "accessibility",
@@ -2126,7 +2126,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-237",
       "kind" : "accessibility",
@@ -2135,7 +2135,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-238",
       "kind" : "accessibility",
@@ -2144,7 +2144,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSVoiceCards.swift",
       "id" : "ZB-UIUX-A11Y-239",
       "kind" : "accessibility",
@@ -2153,7 +2153,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-240",
       "kind" : "accessibility",
@@ -2162,7 +2162,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-241",
       "kind" : "accessibility",
@@ -2171,7 +2171,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-242",
       "kind" : "accessibility",
@@ -2180,7 +2180,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-243",
       "kind" : "accessibility",
@@ -2189,7 +2189,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-244",
       "kind" : "accessibility",
@@ -2198,7 +2198,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-245",
       "kind" : "accessibility",
@@ -2207,7 +2207,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-246",
       "kind" : "accessibility",
@@ -2216,7 +2216,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-247",
       "kind" : "accessibility",
@@ -2225,7 +2225,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-248",
       "kind" : "accessibility",
@@ -2234,7 +2234,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-249",
       "kind" : "accessibility",
@@ -2243,7 +2243,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-250",
       "kind" : "accessibility",
@@ -2252,7 +2252,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-251",
       "kind" : "accessibility",
@@ -2261,7 +2261,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-252",
       "kind" : "accessibility",
@@ -2270,7 +2270,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-253",
       "kind" : "accessibility",
@@ -2279,7 +2279,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-254",
       "kind" : "accessibility",
@@ -2288,7 +2288,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-255",
       "kind" : "accessibility",
@@ -2297,7 +2297,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-256",
       "kind" : "accessibility",
@@ -2306,7 +2306,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-257",
       "kind" : "accessibility",
@@ -2315,7 +2315,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-258",
       "kind" : "accessibility",
@@ -2324,7 +2324,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-259",
       "kind" : "accessibility",
@@ -2333,7 +2333,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-260",
       "kind" : "accessibility",
@@ -2342,7 +2342,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-261",
       "kind" : "accessibility",
@@ -2351,7 +2351,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-262",
       "kind" : "accessibility",
@@ -2360,7 +2360,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-263",
       "kind" : "accessibility",
@@ -2369,7 +2369,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-264",
       "kind" : "accessibility",
@@ -2378,7 +2378,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-265",
       "kind" : "accessibility",
@@ -2387,7 +2387,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-266",
       "kind" : "accessibility",
@@ -2396,7 +2396,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-267",
       "kind" : "accessibility",
@@ -2405,7 +2405,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-268",
       "kind" : "accessibility",
@@ -2414,7 +2414,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-269",
       "kind" : "accessibility",
@@ -2423,7 +2423,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-270",
       "kind" : "accessibility",
@@ -2432,7 +2432,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-271",
       "kind" : "accessibility",
@@ -2441,7 +2441,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-272",
       "kind" : "accessibility",
@@ -2450,7 +2450,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-273",
       "kind" : "accessibility",
@@ -2459,7 +2459,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-274",
       "kind" : "accessibility",
@@ -2468,7 +2468,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-275",
       "kind" : "accessibility",
@@ -2477,7 +2477,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-276",
       "kind" : "accessibility",
@@ -2486,7 +2486,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-277",
       "kind" : "accessibility",
@@ -2495,7 +2495,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-278",
       "kind" : "accessibility",
@@ -2504,7 +2504,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-279",
       "kind" : "accessibility",
@@ -2513,7 +2513,7 @@
     },
     {
       "detail" : "Toggle missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-280",
       "kind" : "accessibility",
@@ -2522,7 +2522,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-281",
       "kind" : "accessibility",
@@ -2531,7 +2531,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsPages.swift",
       "id" : "ZB-UIUX-A11Y-282",
       "kind" : "accessibility",
@@ -2540,7 +2540,7 @@
     },
     {
       "detail" : "Toggle missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-A11Y-283",
       "kind" : "accessibility",
@@ -2549,7 +2549,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-A11Y-284",
       "kind" : "accessibility",
@@ -2558,7 +2558,7 @@
     },
     {
       "detail" : "DisclosureGroup missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-A11Y-285",
       "kind" : "accessibility",
@@ -2567,7 +2567,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-A11Y-286",
       "kind" : "accessibility",
@@ -2576,7 +2576,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-A11Y-287",
       "kind" : "accessibility",
@@ -2585,7 +2585,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-A11Y-288",
       "kind" : "accessibility",
@@ -2639,7 +2639,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceEmptyStates.swift",
       "id" : "ZB-UIUX-A11Y-294",
       "kind" : "accessibility",
@@ -2648,7 +2648,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceEmptyStates.swift",
       "id" : "ZB-UIUX-A11Y-295",
       "kind" : "accessibility",
@@ -2657,7 +2657,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
       "id" : "ZB-UIUX-A11Y-296",
       "kind" : "accessibility",
@@ -2666,7 +2666,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
       "id" : "ZB-UIUX-A11Y-297",
       "kind" : "accessibility",
@@ -2675,7 +2675,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
       "id" : "ZB-UIUX-A11Y-298",
       "kind" : "accessibility",
@@ -2684,7 +2684,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
       "id" : "ZB-UIUX-A11Y-299",
       "kind" : "accessibility",
@@ -2693,7 +2693,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
       "id" : "ZB-UIUX-A11Y-300",
       "kind" : "accessibility",
@@ -2702,7 +2702,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/GlanceHomeCards.swift",
       "id" : "ZB-UIUX-A11Y-301",
       "kind" : "accessibility",
@@ -2711,7 +2711,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/HomeStripView.swift",
       "id" : "ZB-UIUX-A11Y-302",
       "kind" : "accessibility",
@@ -2720,7 +2720,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/HomeWidgetViews.swift",
       "id" : "ZB-UIUX-A11Y-303",
       "kind" : "accessibility",
@@ -2729,7 +2729,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/RecordingActivityWings.swift",
       "id" : "ZB-UIUX-A11Y-304",
       "kind" : "accessibility",
@@ -2738,7 +2738,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
       "id" : "ZB-UIUX-A11Y-305",
       "kind" : "accessibility",
@@ -2747,7 +2747,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
       "id" : "ZB-UIUX-A11Y-306",
       "kind" : "accessibility",
@@ -2756,7 +2756,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
       "id" : "ZB-UIUX-A11Y-307",
       "kind" : "accessibility",
@@ -2765,7 +2765,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
       "id" : "ZB-UIUX-A11Y-308",
       "kind" : "accessibility",
@@ -2774,7 +2774,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
       "id" : "ZB-UIUX-A11Y-309",
       "kind" : "accessibility",
@@ -2783,7 +2783,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TeleprompterPage.swift",
       "id" : "ZB-UIUX-A11Y-310",
       "kind" : "accessibility",
@@ -2792,7 +2792,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TilingPage.swift",
       "id" : "ZB-UIUX-A11Y-311",
       "kind" : "accessibility",
@@ -2801,7 +2801,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TilingPage.swift",
       "id" : "ZB-UIUX-A11Y-312",
       "kind" : "accessibility",
@@ -2810,7 +2810,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TilingPage.swift",
       "id" : "ZB-UIUX-A11Y-313",
       "kind" : "accessibility",
@@ -2819,7 +2819,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-314",
       "kind" : "accessibility",
@@ -2828,7 +2828,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-315",
       "kind" : "accessibility",
@@ -2837,7 +2837,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-316",
       "kind" : "accessibility",
@@ -2846,7 +2846,7 @@
     },
     {
       "detail" : "TextField missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-317",
       "kind" : "accessibility",
@@ -2855,7 +2855,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-318",
       "kind" : "accessibility",
@@ -2864,7 +2864,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-319",
       "kind" : "accessibility",
@@ -2873,7 +2873,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-320",
       "kind" : "accessibility",
@@ -2882,7 +2882,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodayPages.swift",
       "id" : "ZB-UIUX-A11Y-321",
       "kind" : "accessibility",
@@ -2891,7 +2891,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-322",
       "kind" : "accessibility",
@@ -2900,7 +2900,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-323",
       "kind" : "accessibility",
@@ -2909,7 +2909,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-324",
       "kind" : "accessibility",
@@ -2918,7 +2918,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-325",
       "kind" : "accessibility",
@@ -2927,7 +2927,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-326",
       "kind" : "accessibility",
@@ -2936,7 +2936,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-327",
       "kind" : "accessibility",
@@ -2945,7 +2945,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-328",
       "kind" : "accessibility",
@@ -2954,7 +2954,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TodoPage.swift",
       "id" : "ZB-UIUX-A11Y-329",
       "kind" : "accessibility",
@@ -2963,7 +2963,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-330",
       "kind" : "accessibility",
@@ -2972,7 +2972,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-331",
       "kind" : "accessibility",
@@ -2981,7 +2981,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-332",
       "kind" : "accessibility",
@@ -2990,7 +2990,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-333",
       "kind" : "accessibility",
@@ -2999,7 +2999,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-334",
       "kind" : "accessibility",
@@ -3008,7 +3008,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-335",
       "kind" : "accessibility",
@@ -3017,7 +3017,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-336",
       "kind" : "accessibility",
@@ -3026,7 +3026,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-337",
       "kind" : "accessibility",
@@ -3035,7 +3035,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-338",
       "kind" : "accessibility",
@@ -3044,7 +3044,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-339",
       "kind" : "accessibility",
@@ -3053,7 +3053,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-340",
       "kind" : "accessibility",
@@ -3062,7 +3062,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-341",
       "kind" : "accessibility",
@@ -3071,7 +3071,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-342",
       "kind" : "accessibility",
@@ -3080,7 +3080,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-343",
       "kind" : "accessibility",
@@ -3089,7 +3089,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-344",
       "kind" : "accessibility",
@@ -3098,7 +3098,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-345",
       "kind" : "accessibility",
@@ -3107,7 +3107,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-346",
       "kind" : "accessibility",
@@ -3116,7 +3116,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-347",
       "kind" : "accessibility",
@@ -3125,7 +3125,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-348",
       "kind" : "accessibility",
@@ -3134,7 +3134,7 @@
     },
     {
       "detail" : "Button missing label, identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-349",
       "kind" : "accessibility",
@@ -3143,7 +3143,7 @@
     },
     {
       "detail" : "NotchActionButton missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-350",
       "kind" : "accessibility",
@@ -3152,7 +3152,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-351",
       "kind" : "accessibility",
@@ -3161,7 +3161,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-352",
       "kind" : "accessibility",
@@ -3170,7 +3170,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-353",
       "kind" : "accessibility",
@@ -3179,7 +3179,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-354",
       "kind" : "accessibility",
@@ -3188,7 +3188,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-A11Y-355",
       "kind" : "accessibility",
@@ -3197,7 +3197,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/WavesPage.swift",
       "id" : "ZB-UIUX-A11Y-356",
       "kind" : "accessibility",
@@ -3206,7 +3206,7 @@
     },
     {
       "detail" : "Button missing identifier",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/WavesPage.swift",
       "id" : "ZB-UIUX-A11Y-357",
       "kind" : "accessibility",
@@ -3224,7 +3224,7 @@
     },
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents",
       "id" : "ZB-UIUX-TYPE-001",
       "kind" : "dynamic-type",
@@ -3233,7 +3233,7 @@
     },
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Notch",
       "id" : "ZB-UIUX-TYPE-002",
       "kind" : "dynamic-type",
@@ -3242,7 +3242,7 @@
     },
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe",
       "id" : "ZB-UIUX-TYPE-003",
       "kind" : "dynamic-type",
@@ -3251,7 +3251,7 @@
     },
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings",
       "id" : "ZB-UIUX-TYPE-004",
       "kind" : "dynamic-type",
@@ -3260,7 +3260,7 @@
     },
     {
       "detail" : "Fixed type sizes and no dynamic type ramp",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar",
       "id" : "ZB-UIUX-TYPE-005",
       "kind" : "dynamic-type",
@@ -3278,7 +3278,7 @@
     },
     {
       "detail" : "0.08",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-MOTION-001",
       "kind" : "motion-literal",
@@ -3305,7 +3305,7 @@
     },
     {
       "detail" : "0.25",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-MOTION-004",
       "kind" : "motion-literal",
@@ -3314,7 +3314,7 @@
     },
     {
       "detail" : "0.15",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeLiveParts.swift",
       "id" : "ZB-UIUX-MOTION-005",
       "kind" : "motion-literal",
@@ -3323,7 +3323,7 @@
     },
     {
       "detail" : "0.06",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeLiveParts.swift",
       "id" : "ZB-UIUX-MOTION-006",
       "kind" : "motion-literal",
@@ -3332,7 +3332,7 @@
     },
     {
       "detail" : "0.25, 0.5",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeMemoryWindow.swift",
       "id" : "ZB-UIUX-MOTION-007",
       "kind" : "motion-literal",
@@ -3341,7 +3341,7 @@
     },
     {
       "detail" : "0.82",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeOpenAnimation.swift",
       "id" : "ZB-UIUX-MOTION-008",
       "kind" : "motion-literal",
@@ -3350,7 +3350,7 @@
     },
     {
       "detail" : "0.06",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-MOTION-009",
       "kind" : "motion-literal",
@@ -3359,7 +3359,7 @@
     },
     {
       "detail" : "0.15",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribePage.swift",
       "id" : "ZB-UIUX-MOTION-010",
       "kind" : "motion-literal",
@@ -3368,7 +3368,7 @@
     },
     {
       "detail" : "1.8, 0.35",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSAboutPage.swift",
       "id" : "ZB-UIUX-MOTION-011",
       "kind" : "motion-literal",
@@ -3377,7 +3377,7 @@
     },
     {
       "detail" : "0.15",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GSEqualiserCard.swift",
       "id" : "ZB-UIUX-MOTION-012",
       "kind" : "motion-literal",
@@ -3386,7 +3386,7 @@
     },
     {
       "detail" : "0.28, 0.85",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-MOTION-013",
       "kind" : "motion-literal",
@@ -3395,7 +3395,7 @@
     },
     {
       "detail" : "0.45",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/LyricsViews.swift",
       "id" : "ZB-UIUX-MOTION-014",
       "kind" : "motion-literal",
@@ -3404,7 +3404,7 @@
     },
     {
       "detail" : "0.18",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/LyricsViews.swift",
       "id" : "ZB-UIUX-MOTION-015",
       "kind" : "motion-literal",
@@ -3413,7 +3413,7 @@
     },
     {
       "detail" : "0.35",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-016",
       "kind" : "motion-literal",
@@ -3422,7 +3422,7 @@
     },
     {
       "detail" : "0.35",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-017",
       "kind" : "motion-literal",
@@ -3431,7 +3431,7 @@
     },
     {
       "detail" : "0.08",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-018",
       "kind" : "motion-literal",
@@ -3440,7 +3440,7 @@
     },
     {
       "detail" : "0.12",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-019",
       "kind" : "motion-literal",
@@ -3449,7 +3449,7 @@
     },
     {
       "detail" : "0.05",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-020",
       "kind" : "motion-literal",
@@ -3458,7 +3458,7 @@
     },
     {
       "detail" : "0.18",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-021",
       "kind" : "motion-literal",
@@ -3467,7 +3467,7 @@
     },
     {
       "detail" : "0.05",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-022",
       "kind" : "motion-literal",
@@ -3476,7 +3476,7 @@
     },
     {
       "detail" : "0.2",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-023",
       "kind" : "motion-literal",
@@ -3485,7 +3485,7 @@
     },
     {
       "detail" : "0.06",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-024",
       "kind" : "motion-literal",
@@ -3494,7 +3494,7 @@
     },
     {
       "detail" : "0.08",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-MOTION-025",
       "kind" : "motion-literal",
@@ -3503,7 +3503,7 @@
     },
     {
       "detail" : "0.08",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Dictation\/DictationExtrasSettings.swift",
       "id" : "ZB-UIUX-REDUCE-001",
       "kind" : "motion-reduce",
@@ -3521,7 +3521,7 @@
     },
     {
       "detail" : "0.28, 0.85",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Settings\/GlanceSettingsStyle.swift",
       "id" : "ZB-UIUX-REDUCE-003",
       "kind" : "motion-reduce",
@@ -3530,7 +3530,7 @@
     },
     {
       "detail" : "0.2",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/TopBar\/TopBarViews.swift",
       "id" : "ZB-UIUX-REDUCE-004",
       "kind" : "motion-reduce",
@@ -3539,7 +3539,7 @@
     },
     {
       "detail" : "Material without a Reduce Transparency branch",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Agents\/BackgroundAgentTracker.swift",
       "id" : "ZB-UIUX-GLASS-001",
       "kind" : "reduce-transparency",
@@ -3548,7 +3548,7 @@
     },
     {
       "detail" : "Material without a Reduce Transparency branch",
-      "expect" : "closed",
+      "expect" : "open",
       "file" : "Sources\/Zeus\/Scribe\/ScribeEndWindow.swift",
       "id" : "ZB-UIUX-GLASS-002",
       "kind" : "reduce-transparency",
