@@ -424,6 +424,17 @@ struct AgentsPageTests {
         #expect(kept.1 == [.allow])
     }
 
+    @Test func aSingleReturnOnADestructiveCardDoesNotApprove() {
+        var destructive = page(.approval)
+        if var showing = destructive.revision.showing {
+            showing.tier = .destructive
+            destructive.revision.showing = showing
+        }
+        let pressed = AgentsPageDestructive.keyboard(destructive, key: .return)
+        #expect(pressed.page.revision.pending?.action != .allowOnce)
+        #expect(pressed.page.revision.pending?.action.isApproval != true)
+    }
+
     @Test func aDestructiveActivateDeniesAndConfirmHolds() {
         var destructive = page(.approval)
         if var showing = destructive.revision.showing {
