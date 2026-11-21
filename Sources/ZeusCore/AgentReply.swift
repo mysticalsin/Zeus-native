@@ -74,7 +74,14 @@ public enum AgentReply {
             let test = [uuid.map { "unique id of s is \"\($0)\"" }, tty.map { "tty of s is \"\($0)\"" }]
                 .compactMap { $0 }.joined(separator: " or ")
             let ttyAgain = tty.map { "if tty of s is not \"\($0)\" then return false" } ?? ""
-            _ = expectedCLI
+            let names = expectedCLI.compactMap(TerminalTabScript.safe).sorted()
+            let jobCheck = names.isEmpty
+                ? "return false"
+                : """
+                set fg to variable named "jobName" of s as text
+                if fg is "" then return false
+                if not (\(names.map { "fg is \"\($0)\"" }.joined(separator: " or "))) then return false
+                """
             return """
             tell application "iTerm2"
                 repeat with w in windows
@@ -83,6 +90,7 @@ public enum AgentReply {
                             if \(test) then
                                 if frontmost is false then return false
                                 \(ttyAgain)
+                                \(jobCheck)
                                 tell s to write text "\(escaped)"
                                 return true
                             end if
@@ -100,7 +108,7 @@ public enum AgentReply {
     /// Return, after a fresh frontmost and tty check.
     /// `verified` is the process-group read taken immediately before this script. A false read produces no script.
     public static func submitScript(for info: TerminalInfo, verified: Bool = true) -> String? {
-        _ = verified
+        guard verified else { return nil }
         guard info.targetBundleID == "com.apple.Terminal", let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
         return """
         tell application "Terminal"

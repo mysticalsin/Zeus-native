@@ -206,7 +206,11 @@ final class AgentHub {
         let after = foregroundSnapshot(info, frontmost: NSWorkspace.shared.frontmostApplication?.localizedName)
         guard HubReplyJobGuard.maySubmit(
             before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
-        guard let submit = AgentReply.submitScript(for: info) else { return false }
+        guard let submit = AgentReply.submitScript(
+            for: info,
+            verified: HubReplyJobGuard.maySubmit(
+                before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed)
+        ) else { return false }
         guard HubReplyScriptGuard.maySubmit(script: submit, approved: true) else { return false }
         guard sessionID == selectedSession else { return false }
         return await Self.runGuardedScript(submit)

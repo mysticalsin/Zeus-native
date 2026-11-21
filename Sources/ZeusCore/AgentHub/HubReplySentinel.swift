@@ -217,13 +217,15 @@ public enum HubReplyJobGuard {
         guard let pgid = snapshot.foregroundPgid else { return false }
         let foreground = snapshot.processes.filter { $0.pgid == pgid && !$0.stopped }
         guard !foreground.isEmpty else { return false }
-        return foreground.contains { process in
-            guard let name = HubReplyForeground.normalizedToken(process.name), expectedCLI.contains(name) else { return false }
-            guard !HubReplyForeground.isShell(name) else { return false }
-            guard let path = process.executablePath, !path.isEmpty else { return false }
-            return HubReplyForeground.verdict(
-                name: name, expected: expectedCLI, executablePath: path, allowedPaths: allowedPaths) == .agent
+        let shellInGroup = foreground.contains { process in
+            HubReplyForeground.isShell(HubReplyForeground.normalizedToken(process.name) ?? "")
         }
+        guard !shellInGroup else { return false }
+        guard let leader = foreground.first(where: { $0.pid == pgid }) else { return false }
+        guard let name = HubReplyForeground.normalizedToken(leader.name), expectedCLI.contains(name) else { return false }
+        guard let path = leader.executablePath, !path.isEmpty else { return false }
+        return HubReplyForeground.verdict(
+            name: name, expected: expectedCLI, executablePath: path, allowedPaths: allowedPaths) == .agent
     }
 
     /// Return is safe when typing was allowed and the app is the target afterwards.
