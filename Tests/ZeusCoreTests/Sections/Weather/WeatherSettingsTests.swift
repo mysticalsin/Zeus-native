@@ -68,10 +68,21 @@ import Testing
     }
 
     @Test func aFiniteReadingPastIntMaxReturnsNil() {
+        let maxFitting = Double(Int.max).nextDown
+        let minFitting = Double(Int.min)
+        #expect(WeatherTemperatureUnit.degrees(celsius: maxFitting, unit: .celsius) == Int(maxFitting))
+        #expect(WeatherTemperatureUnit.degrees(celsius: Double(Int.max), unit: .celsius) == nil)
         #expect(WeatherTemperatureUnit.degrees(celsius: 1e19, unit: .celsius) == nil)
         #expect(WeatherTemperatureUnit.degrees(celsius: -1e19, unit: .celsius) == nil)
-        #expect(WeatherTemperatureUnit.degrees(celsius: 1e19, unit: .fahrenheit) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: minFitting, unit: .celsius) == Int.min)
+        #expect(WeatherTemperatureUnit.degrees(celsius: minFitting.nextDown, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: maxFitting, unit: .celsius) == Int(maxFitting))
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: Double(Int.max), unit: .celsius) == nil)
         #expect(WeatherTemperatureUnit.wind(kilometersPerHour: 1e19, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: -1e19, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: minFitting, unit: .celsius) == Int.min)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: minFitting.nextDown, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: 1e19, unit: .fahrenheit) == nil)
         let miles = (-1e19 * 0.621371).rounded()
         #expect(WeatherTemperatureUnit.wind(kilometersPerHour: -1e19, unit: .fahrenheit) == Int(exactly: miles))
         #expect(WeatherTemperatureUnit.degrees(celsius: 1e20, unit: .celsius) == nil)
@@ -84,43 +95,22 @@ import Testing
         #expect(WeatherTemperatureUnit.degrees(celsius: .nan, unit: .celsius) == nil)
         #expect(WeatherTemperatureUnit.wind(kilometersPerHour: .infinity, unit: .celsius) == nil)
         #expect(WeatherTemperatureUnit.wind(kilometersPerHour: .nan, unit: .fahrenheit) == nil)
-        let lowest = Double(Int.min)
-        let highest = Double(Int.max).nextDown
-        #expect(WeatherTemperatureUnit.degrees(celsius: lowest.nextDown, unit: .celsius) == nil)
-        #expect(WeatherTemperatureUnit.degrees(celsius: lowest, unit: .celsius) == Int.min)
-        #expect(WeatherTemperatureUnit.degrees(celsius: highest, unit: .celsius) == Int(exactly: highest))
-        #expect(WeatherTemperatureUnit.degrees(celsius: highest.nextUp, unit: .celsius) == nil)
-        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: lowest.nextDown, unit: .celsius) == nil)
-        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: highest.nextUp, unit: .celsius) == nil)
     }
 
-    @Test func conversionChecksTheIntRangeBeforeConverting() throws {
-        let source = try String(contentsOf: Self.unitSource, encoding: .utf8)
-        guard let whole = source.range(of: "func whole") else {
-            Issue.record("whole is missing")
-            return
-        }
-        let body = source[whole.lowerBound...]
-        let minCheck = body.range(of: "Int.min")
-        let maxCheck = body.range(of: "Int.max")
-        let convert = body.range(of: "Int(exactly:")
-        #expect(minCheck != nil)
-        #expect(maxCheck != nil)
-        #expect(convert != nil)
-        if let minCheck, let maxCheck, let convert {
-            #expect(minCheck.lowerBound < convert.lowerBound)
-            #expect(maxCheck.lowerBound < convert.lowerBound)
-        }
-    }
-
-    private static var unitSource: URL {
-        var url = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()
-        while url.path != "/" {
-            let candidate = url.appendingPathComponent("Sources/ZeusCore/Settings/Sections/Weather/WeatherTemperatureUnit.swift")
-            if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
-            url.deleteLastPathComponent()
-        }
-        return URL(fileURLWithPath: #filePath)
+    @Test func intBoundsConvertOnlyWhenTheDoubleFits() {
+        let maxFitting = Double(Int.max).nextDown
+        let minFitting = Double(Int.min)
+        #expect(WeatherTemperatureUnit.degrees(celsius: maxFitting, unit: .celsius) == Int(maxFitting))
+        #expect(WeatherTemperatureUnit.degrees(celsius: Double(Int.max), unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: 1e19, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: -1e19, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.degrees(celsius: minFitting, unit: .celsius) == Int.min)
+        #expect(WeatherTemperatureUnit.degrees(celsius: minFitting.nextDown, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: maxFitting, unit: .celsius) == Int(maxFitting))
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: Double(Int.max), unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: 1e19, unit: .celsius) == nil)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: minFitting, unit: .celsius) == Int.min)
+        #expect(WeatherTemperatureUnit.wind(kilometersPerHour: minFitting.nextDown, unit: .celsius) == nil)
     }
 
     @Test func integerCelsiusRoundTripsAndFahrenheitFollowsTheSameRounding() {

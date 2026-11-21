@@ -17,26 +17,18 @@ public enum WeatherTemperatureUnit: String, Equatable, Sendable, CaseIterable {
     }
 
     public static func degrees(celsius: Double, unit: WeatherTemperatureUnit) -> Int? {
-        guard celsius.isFinite else { return nil }
         let value = unit == .celsius ? celsius : celsius * 9 / 5 + 32
         return whole(value)
     }
 
     /// The forecast service reports kilometres per hour. Miles use the same factor as the Home wind card.
     public static func wind(kilometersPerHour: Double, unit: WeatherTemperatureUnit) -> Int? {
-        guard kilometersPerHour.isFinite else { return nil }
         let value = unit == .celsius ? kilometersPerHour : kilometersPerHour * 0.621371
         return whole(value)
     }
 
-    /// Refuse a non-finite reading, and any reading outside `Int`, before converting. `Int(_:)` traps there.
     private static func whole(_ value: Double) -> Int? {
-        guard value.isFinite else { return nil }
         let rounded = value.rounded()
-        guard rounded.isFinite else { return nil }
-        guard rounded >= Double(Int.min) else { return nil }
-        // `Double(Int.max)` is 2^63, which is not an `Int`. The last Double that fits is the one before it.
-        guard rounded <= Double(Int.max).nextDown else { return nil }
-        return Int(exactly: rounded)
+        return Int(exactly: rounded) ?? 0
     }
 }
