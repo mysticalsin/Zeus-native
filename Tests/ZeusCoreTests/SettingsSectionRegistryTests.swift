@@ -48,6 +48,20 @@ import ZeusCore
         #expect(last?.hidden == false)
     }
 
+    @Test func assistantIsAddedWithoutRemovingExistingSections() {
+        let titles = SettingsSectionRegistry.existing.map(\.title)
+        let required = ["General", "Appearance", "Sounds", "Notifications", "Shortcuts", "Insomnia", "Integrations", "Murmure", "Polyglot", "Dictation", "Voice", "Engine", "Features", "Beamer", "Tiling", "Shelf", "License", "Permissions", "Privacy", "Diagnostics", "About"]
+        for title in required {
+            #expect(titles.contains(title))
+        }
+        #expect(titles.contains("Assistant"))
+        #expect(titles.count == required.count + 1)
+        #expect(SettingsSectionRegistry.existing.contains { $0.id == SettingsSectionRegistry.id(for: "assistant") })
+        #expect(AssistantSectionPolicy.sensitiveOffByDefault.values.allSatisfy { $0 == false })
+        #expect(AssistantSectionPolicy.sensitiveOffByDefault["explanation.enabled"] == false)
+        #expect(AssistantSectionPolicy.sensitiveOffByDefault["pointing.sendScreenshot"] == false)
+    }
+
     @Test func searchStaysInRegistryOrder() {
         let found = SettingsSectionRegistry.search("u", in: SettingsSectionRegistry.existing)
         let indexes = found.compactMap { item in SettingsSectionRegistry.existing.firstIndex { $0.id == item.id } }
