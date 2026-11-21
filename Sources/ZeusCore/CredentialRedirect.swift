@@ -6,11 +6,37 @@ public enum CredentialRedirect {
         "authorization", "proxy-authorization", "cookie", "x-api-key", "xi-api-key", "api-key",
     ]
 
-    /// Red behavior: follow any http(s) redirect and keep every header. The fix refuses a different host
-    /// and strips credential headers on the same host.
     public static func forwarded(proposed: URL, from original: URL, headers: [String: String]) -> (url: URL, headers: [String: String])? {
-        let scheme = proposed.scheme?.lowercased()
-        guard scheme == "https" || scheme == "http" else { return nil }
-        return (proposed, headers)
+        guard let proposedHost = proposed.host?.lowercased(), !proposedHost.isEmpty,
+              let originalHost = original.host?.lowercased(),
+              proposedHost == originalHost,
+              proposed.user == nil, proposed.password == nil else { return nil }
+        let proposedScheme = proposed.scheme?.lowercased()
+        let originalScheme = original.scheme?.lowercased()
+        if originalScheme == "https" {
+            guard proposedScheme == "https" else { return nil }
+        } else {
+            guard proposedScheme == "http" || proposedScheme == "https" else { return nil }
+        }
+        let kept = headers.filter { !sensitiveHeaders.contains($0.key.lowercased()) }
+        return (proposed, kept)
+    }
+
+    public static func apply(to request: URLRequest, original: URL?) -> URLRequest? {
+        guard let original, let proposed = request.url,
+              let forwarded = forwarded(proposed: proposed, from: original, headers: request.allHTTPHeaderFields ?? [:]) else { return nil }
+        var cleaned = request
+        cleaned.url = forwarded.url
+        cleaned.allHTTPHeaderFields = forwarded.headers
+        return cleaned
+    }
+}
+
+public final class CredentialRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    public func urlSession(_ session: URLSession, task: URLSessionTask,
+                           willPerformHTTPRedirection response: HTTPURLResponse,
+                           newRequest request: URLRequest,
+                           completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(CredentialRedirect.apply(to: request, original: task.originalRequest?.url ?? response.url))
     }
 }
