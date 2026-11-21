@@ -49,6 +49,34 @@ import Testing
         }
     }
 
+    @Test func closeDuringStartEndsClosedAndNeverStreams() async throws {
+        let gate = StartGate()
+        let backend = try FakeDuplexVoiceBackend(frames: [tone(0.3)], beforeStarted: {
+            await gate.markEntered()
+            await gate.waitUntilReleased()
+        })
+        let task = Task { try await backend.start() }
+        await gate.waitUntilEntered()
+        #expect(await backend.state == .starting)
+        await backend.close()
+        #expect(await backend.state == .closing)
+        await gate.release()
+        await #expect(throws: VoiceSessionError.illegalTransition(from: .closed, event: .started)) {
+            try await task.value
+        }
+        #expect(await backend.state == .closed)
+        #expect(await backend.state != .streaming)
+    }
+
+    @Test func closeFromIdleRefusesALaterStart() async throws {
+        let backend = try FakeDuplexVoiceBackend(frames: [tone(0.1)])
+        await backend.close()
+        #expect(await backend.state == .closed)
+        await #expect(throws: VoiceSessionError.illegalTransition(from: .closed, event: .start)) {
+            try await backend.start()
+        }
+    }
+
     @Test func closeBeforeStartLeavesTheSessionIdle() async throws {
         let backend = try FakeDuplexVoiceBackend(frames: [tone(0.1)])
         await backend.close()
@@ -152,6 +180,37 @@ import Testing
         for token in ["XCT" + "Skip", "expected" + "Failure", "with" + "KnownIssue", ".dis" + "abled"] {
             #expect(source.contains(token) == false)
         }
+    }
+}
+
+private actor StartGate {
+    private var entered = false
+    private var released = false
+    private var enteredWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func markEntered() {
+        entered = true
+        let waiters = enteredWaiters
+        enteredWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { enteredWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        let waiters = releaseWaiters
+        releaseWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
+
+    func waitUntilReleased() async {
+        if released { return }
+        await withCheckedContinuation { releaseWaiters.append($0) }
     }
 }
 

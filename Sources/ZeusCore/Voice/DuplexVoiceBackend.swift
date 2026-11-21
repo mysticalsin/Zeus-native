@@ -27,22 +27,25 @@ public protocol DuplexVoiceBackend: Sendable {
 /// Canned frames for tests. Not a model and not a download.
 public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
     private let frames: [VoiceFrame]
+    private let beforeStarted: (@Sendable () async -> Void)?
     private var session = VoiceSessionState.idle
     private var nextReply = 1
 
     public var state: VoiceSessionState { session }
 
-    public init(frames: [[Float]]) throws {
+    public init(frames: [[Float]], beforeStarted: (@Sendable () async -> Void)? = nil) throws {
         let built = try frames.map { try VoiceFrame(samples: $0) }
         guard !built.isEmpty else {
             throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: 0)
         }
         self.frames = built
+        self.beforeStarted = beforeStarted
     }
 
     public func start() async throws -> VoiceFrame {
         session = try session.next(on: .start)
         session = try session.next(on: .started)
+        await beforeStarted?()
         nextReply = 1
         return frames[0]
     }
