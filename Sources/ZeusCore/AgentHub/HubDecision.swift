@@ -265,17 +265,21 @@ public struct HubReplyState: Equatable, Sendable {
     public var receipt: HubReplyReceipt?
     /// The cleaned line released by approval. Nil until then, and nil again after the script result.
     public var script: String?
+    /// The app and tty shown on the pending reply. Nil until the reply asks.
+    public var target: HubReplyTarget?
 
     public init(
         status: HubReplyStatus = .idle,
         draft: String = "",
         receipt: HubReplyReceipt? = nil,
-        script: String? = nil
+        script: String? = nil,
+        target: HubReplyTarget? = nil
     ) {
         self.status = status
         self.draft = draft
         self.receipt = receipt
         self.script = script
+        self.target = target
     }
 }
 
@@ -289,11 +293,21 @@ public struct HubReplyContext: Equatable, Sendable {
     public var text: String
     public var destinationCanTakeText: Bool
     public var trusted: Bool
+    public var target: HubReplyTarget?
+    public var foreground: HubReplyForeground.Verdict?
 
-    public init(text: String = "", destinationCanTakeText: Bool = false, trusted: Bool = false) {
+    public init(
+        text: String = "",
+        destinationCanTakeText: Bool = false,
+        trusted: Bool = false,
+        target: HubReplyTarget? = nil,
+        foreground: HubReplyForeground.Verdict? = nil
+    ) {
         self.text = text
         self.destinationCanTakeText = destinationCanTakeText
         self.trusted = trusted
+        self.target = target
+        self.foreground = foreground
     }
 }
 

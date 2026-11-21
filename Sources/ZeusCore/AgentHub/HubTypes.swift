@@ -285,6 +285,12 @@ public enum HubReplyReceipt: String, CaseIterable, Codable, Equatable, Hashable,
     case sent = "Sent."
     case openDestination = "This terminal can't take typed replies. Open it and reply there."
     case openSession = "I couldn't find that terminal tab. Open it and reply there."
+    /// The line contains a zero-width or bidirectional mark. It is kept, not stripped.
+    case hiddenCharacter = "That line has a hidden or bidirectional character, so it was not sent."
+    case tabChanged = "That terminal tab changed, so nothing was typed."
+    case tabVanished = "That terminal tab is gone, so nothing was typed."
+    case bareShell = "That tab is a shell prompt, so nothing was typed."
+    case foregroundUnknown = "Zeus could not see what is running in that tab, so nothing was typed."
 }
 
 public enum HubGroupStatus: String, CaseIterable, Codable, Equatable, Hashable, Sendable, HubStoredLabel {

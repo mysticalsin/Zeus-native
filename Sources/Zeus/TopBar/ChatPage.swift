@@ -218,9 +218,16 @@ private struct AgentReplyPane: View {
                     .opacity(canType && !hub.replyDraft.trimmingCharacters(in: .whitespaces).isEmpty ? 1 : 0.4)
                     .disabled(!canType || hub.sending)
             }
-            Text(hub.receipt ?? (canType ? "A card asks before anything is typed into the terminal." : "Replies can be typed into Terminal and iTerm2 sessions."))
-                .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
+            Text(caption(canType: canType))
+                .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(2)
         }
+    }
+
+    private func caption(canType: Bool) -> String {
+        if hub.replyNeedsApproval, let target = hub.replyTarget {
+            return HubReplyTargetGate.cardSentence(target)
+        }
+        return hub.receipt ?? (canType ? "A card asks before anything is typed into the terminal." : "Replies can be typed into Terminal and iTerm2 sessions.")
     }
 
     private func send() { Task { await hub.sendReply(session: session) } }

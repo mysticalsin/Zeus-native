@@ -97,6 +97,11 @@ struct HubTypesTests {
             "Sent.",
             "This terminal can't take typed replies. Open it and reply there.",
             "I couldn't find that terminal tab. Open it and reply there.",
+            "That line has a hidden or bidirectional character, so it was not sent.",
+            "That terminal tab changed, so nothing was typed.",
+            "That terminal tab is gone, so nothing was typed.",
+            "That tab is a shell prompt, so nothing was typed.",
+            "Zeus could not see what is running in that tab, so nothing was typed.",
         ])
         try roundTrip(HubGroupStatus.self, ["collapsed", "expanded"])
         try roundTrip(HubGroupEvent.self, ["activateHeader", "sessionsChanged", "lostLastSession", "firstLoad"])

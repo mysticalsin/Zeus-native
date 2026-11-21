@@ -60,10 +60,14 @@ public struct HubReplyDispatch: Equatable, Sendable {
         sessionID: String,
         field: String,
         destinationCanTakeText: Bool,
-        trusted: Bool
+        trusted: Bool,
+        target: HubReplyTarget? = nil,
+        foreground: HubReplyForeground.Verdict? = nil
     ) -> Step {
         guard sessionID == boundSessionID, !sessionID.isEmpty else { return .hold(state) }
-        let context = HubReplyContext(text: field, destinationCanTakeText: destinationCanTakeText, trusted: trusted)
+        let context = HubReplyContext(
+            text: field, destinationCanTakeText: destinationCanTakeText, trusted: trusted,
+            target: target, foreground: foreground)
         switch event {
         case .textChanged:
             return edit(field, context: context)
@@ -108,6 +112,7 @@ public struct HubReplyDispatch: Equatable, Sendable {
         }
         let drafted = HubDecision.reply(HubReplyState(), .textChanged, context: context)
         guard drafted.script == nil, drafted.state.script == nil else { return failClosed(keeping: field) }
+        if HubReplyHidden.containsMark(field) { return refuse(keeping: field, receipt: .hiddenCharacter) }
         guard let cleaned = HubDecision.cleanedLine(field) else {
             return absorb(HubDecision.reply(drafted.state, .send, context: context))
         }
@@ -116,12 +121,22 @@ public struct HubReplyDispatch: Equatable, Sendable {
         }
         // A line that cannot be embedded must not reach the approval, or approval would release it.
         guard HubReplyTyping.canType(cleaned) else { return failClosed(keeping: field) }
-        return absorb(HubDecision.reply(drafted.state, .send, context: context))
+        var outcome = HubDecision.reply(drafted.state, .send, context: context)
+        if outcome.asksApproval { outcome.state.target = context.target }
+        return absorb(outcome)
     }
 
     private mutating func approve(context: HubReplyContext) -> Step {
         guard state.status == .awaitingDecision else {
             return absorb(HubDecision.reply(state, .approved, context: context))
+        }
+        if HubReplyHidden.containsMark(state.draft) { return refuse(keeping: state.draft, receipt: .hiddenCharacter) }
+        if let shown = state.target, let reason = HubReplyTargetGate.refusal(shown: shown, current: context.target) {
+            return refuse(keeping: state.draft, receipt: reason)
+        }
+        if let foreground = context.foreground, foreground != .agent {
+            let receipt: HubReplyReceipt = foreground == .bareShell ? .bareShell : .foregroundUnknown
+            return refuse(keeping: state.draft, receipt: receipt)
         }
         guard let preview = HubDecision.cleanedLine(state.draft) else {
             return absorb(HubDecision.reply(state, .approved, context: context))
@@ -133,7 +148,12 @@ public struct HubReplyDispatch: Equatable, Sendable {
     }
 
     private mutating func failClosed(keeping field: String) -> Step {
-        state = HubReplyState(status: .idle, draft: field, receipt: .notSent, script: nil)
+        refuse(keeping: field, receipt: .notSent)
+    }
+
+    /// The draft stays, including any hidden character. Nothing is asked and nothing is typed.
+    private mutating func refuse(keeping field: String, receipt: HubReplyReceipt) -> Step {
+        state = HubReplyState(status: .idle, draft: field, receipt: receipt, script: nil)
         return .hold(state)
     }
 
@@ -169,7 +189,7 @@ public enum HubReplyTyping {
     public static let maxLength = 2_000
 
     public static func canType(_ line: String) -> Bool {
-        guard !line.isEmpty, line.count <= maxLength else { return false }
+        guard !line.isEmpty, line.count <= maxLength, !HubReplyHidden.containsMark(line) else { return false }
         return line.unicodeScalars.allSatisfy { !isBreak($0) }
     }
 
@@ -226,6 +246,7 @@ public enum HubReplyTyping {
 public enum HubReplyScriptGuard {
     public static func mayRun(script: String, line: String, approved: Bool) -> Bool {
         guard approved, let escaped = HubReplyTyping.escape(line) else { return false }
+        guard !HubReplyHidden.containsMark(line) else { return false }
         guard AgentReply.sanitize(line) == line else { return false }
         guard script.unicodeScalars.allSatisfy({ !isStructuralBreak($0) }) else { return false }
         if let expected = literalKeystrokes(line), expected == typingLines(script) { return true }

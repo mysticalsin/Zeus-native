@@ -48,10 +48,16 @@ final class AgentHub {
     /// Inline approval for the selected row. Trust does not set this by itself.
     var replyNeedsApproval: Bool { replyGate.state.status == .awaitingDecision }
     var replyPhase: HubReplyStatus { replyGate.state.status }
+    /// The app and tty the pending reply will type into. Nil until that reply asks.
+    var replyTarget: HubReplyTarget? { replyGate.state.target }
 
     /// The injected steps of the reply path. Tests and previews replace the runner.
     /// The bundled `send` is not called: its approval closure refuses, so it cannot type.
     @ObservationIgnored var sender: AgentReplySender?
+    /// Tests supply the foreground process name. Production reads it with AppleScript.
+    @ObservationIgnored var foregroundProbe: ((TerminalInfo) -> String?)?
+    /// The name read at Approve. Typing uses this read again instead of asking the terminal twice.
+    @ObservationIgnored private var approvedForeground: String?
     @ObservationIgnored private var syncingReply = false
     @ObservationIgnored private var replyGate = HubReplyDispatch()
     @ObservationIgnored private var replyTimeout: Task<Void, Never>?
@@ -66,12 +72,14 @@ final class AgentHub {
         guard session.id == selectedSession, !session.id.isEmpty else { return }
         guard replyGate.state.status != .sending else { return }
         let wasAwaiting = replyGate.state.status == .awaitingDecision
+        let target = HubReplyTarget.make(info: AgentTerminals.shared.info(for: session.id), agent: session.agent)
         let step = replyGate.perform(
             .send,
             sessionID: session.id,
             field: replyDraft,
             destinationCanTakeText: canReply(to: session.id),
-            trusted: replyIsTrusted(session.id))
+            trusted: replyIsTrusted(session.id),
+            target: target)
         publish(step, wasAwaiting: wasAwaiting)
     }
 
@@ -79,12 +87,21 @@ final class AgentHub {
     func approveReply() async {
         guard let session = selectedSession, !session.isEmpty else { return }
         guard replyGate.state.status == .awaitingDecision else { return }
+        let info = (sender ?? liveSender).terminal(session)
+        let fresh = HubReplyTarget.make(info: info, agent: "")
+        if let shown = replyTarget {
+            _ = HubReplyTargetGate.refusal(shown: shown, current: fresh)
+        }
+        let expected = replyTarget?.expectedCLI ?? []
+        let verdict = foregroundVerdict(info: info, expected: expected)
         let step = replyGate.perform(
             .approved,
             sessionID: session,
             field: replyDraft,
             destinationCanTakeText: canReply(to: session),
-            trusted: replyIsTrusted(session))
+            trusted: replyIsTrusted(session),
+            target: fresh,
+            foreground: verdict)
         publish(step, wasAwaiting: true)
         guard let line = step.typedLine, step.sessionID == session else { return }
         let typed = await typeApprovedLine(line, sessionID: session)
@@ -163,6 +180,12 @@ final class AgentHub {
         guard HubReplyTyping.canType(line) else { return false }
         let typer = sender ?? liveSender
         guard let info = typer.terminal(sessionID) else { return false }
+        if sender == nil {
+            let verdict = HubReplyForeground.verdict(
+                name: approvedForeground,
+                expected: replyGate.state.target?.expectedCLI ?? [])
+            guard verdict == .agent else { return false }
+        }
         guard let script = AgentReply.script(for: info, text: line) else { return false }
         guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
         guard sessionID == selectedSession else { return false }
@@ -178,6 +201,30 @@ final class AgentHub {
             terminal: { session in MainActor.assumeIsolated { AgentTerminals.shared.info(for: session) } },
             approve: { _, _ in false },
             run: { script in await Self.runGuardedScript(script) })
+    }
+
+    /// Production asks the terminal what is in the foreground. An injected sender does not.
+    private func foregroundVerdict(info: TerminalInfo?, expected: Set<String>) -> HubReplyForeground.Verdict? {
+        let name: String?
+        if sender != nil {
+            name = info.flatMap { foregroundProbe?($0) }
+        } else {
+            name = info.flatMap(foregroundName)
+        }
+        approvedForeground = name
+        guard sender == nil || foregroundProbe != nil else { return nil }
+        return HubReplyForeground.verdict(name: name, expected: expected)
+    }
+
+    /// Terminal's `processes` or iTerm's `jobName`. The automation permission is the one the app already has.
+    private func foregroundName(_ info: TerminalInfo) -> String? {
+        guard let bundle = info.targetBundleID, let tty = info.tty else { return nil }
+        let script = HubReplyForeground.queryScript(bundleID: bundle, tty: tty)
+        guard !script.isEmpty else { return nil }
+        var error: NSDictionary?
+        let result = NSAppleScript(source: script)?.executeAndReturnError(&error)
+        guard error == nil, let text = result?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return text
     }
 
     private static func runGuardedScript(_ script: String) async -> Bool {
