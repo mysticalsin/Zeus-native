@@ -17,10 +17,9 @@ public enum BundledHelperPublish {
         writeRegistration: () throws -> Void
     ) -> Result<Void, Failure> {
         let files = FileManager.default
+        guard staged.isFileURL, destination.isFileURL, registration.isFileURL else { return .failure(.unreadableStage) }
         guard files.fileExists(atPath: staged.path) else { return .failure(.unreadableStage) }
         guard accept(staged) else {
-            try? files.removeItem(at: destination)
-            try? files.removeItem(at: registration)
             try? files.removeItem(at: staged)
             return .failure(.rejected)
         }

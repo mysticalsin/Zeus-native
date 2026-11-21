@@ -26,31 +26,42 @@ enum ChromeInstaller {
         return object["path"] as? String == installedBridge.path
     }
 
-    /// Refuses to leave `zeus-bridge` installed unless its signature pins this app's team and the
-    /// bridge signing identifier. On failure the installed copy and the Chrome host registration
-    /// are removed, so Chrome is not left a path to launch.
-    static func authorizeInstalledBridge() -> Result<Void, InstallError> {
-        switch BundledHelperLaunch.decide(path: installedBridge.path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier) {
-        case .launch:
+    /// Copies the bundled bridge next to the installed one, without replacing it.
+    static func stageBundledBridge() throws -> URL {
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/zeus-bridge")
+        guard FileManager.default.isExecutableFile(atPath: bundled.path) else { throw HelperInstaller.HelperError.missing(bundled.path) }
+        try FileManager.default.createDirectory(at: ZeusPaths.binDirectory, withIntermediateDirectories: true)
+        let staging = ZeusPaths.binDirectory.appendingPathComponent("zeus-bridge.new")
+        try? FileManager.default.removeItem(at: staging)
+        try FileManager.default.copyItem(at: bundled, to: staging)
+        return staging
+    }
+
+    /// Replaces the installed bridge only when the staged copy's signature matches this app.
+    /// A refusal deletes the copy and leaves the previous bridge and the Chrome host registration untouched.
+    static func publishStagedBridge(_ staged: URL, writeRegistration: @escaping () throws -> Void = {}) -> Result<Void, InstallError> {
+        let outcome = BundledHelperPublish.replaceIfAccepted(
+            staged: staged,
+            destination: installedBridge,
+            registration: ZeusPaths.chromeNativeHostManifest,
+            accept: { url in
+                if case .launch = BundledHelperLaunch.decide(path: url.path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier) {
+                    return true
+                }
+                BundledHelperLaunchLog.refused(path: url.path)
+                return false
+            },
+            writeRegistration: writeRegistration)
+        switch outcome {
+        case .success:
             return .success(())
-        case .refuse(let sentence):
-            BundledHelperLaunchLog.refused(path: installedBridge.path)
-            try? FileManager.default.removeItem(at: installedBridge)
-            try? uninstall()
-            return .failure(.helperRefused(sentence))
+        case .failure:
+            return .failure(.helperRefused(BundledHelperLaunchPolicy.refusalSentence))
         }
     }
 
     static func install() throws {
-        try HelperInstaller.refresh("zeus-bridge")
-        switch authorizeInstalledBridge() {
-        case .success:
-            break
-        case .failure(let error):
-            throw error
-        }
-        try refreshExtension()
-
+        let staged = try stageBundledBridge()
         let manifest: [String: Any] = [
             "name": ZeusPaths.nativeHostName,
             "description": "Zeus browser bridge",
@@ -59,9 +70,17 @@ enum ChromeInstaller {
             "allowed_origins": ["chrome-extension://\(ZeusPaths.extensionID)/"],
         ]
         let url = ZeusPaths.chromeNativeHostManifest
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
-        try data.write(to: url, options: .atomic)
+        switch publishStagedBridge(staged, writeRegistration: {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+        }) {
+        case .success:
+            break
+        case .failure(let error):
+            throw error
+        }
+        try refreshExtension()
     }
 
     static func uninstall() throws {

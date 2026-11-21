@@ -52,7 +52,7 @@ public enum BundledHelperLaunchPolicy {
             return requirementText(teamIdentifier: team, signingIdentifier: signingIdentifier)
         case .localDev(let leaf):
             guard isLeafSHA1(leaf), isToken(signingIdentifier, allowing: "._-") else { return nil }
-            return "anchor apple generic and certificate leaf = H\"\(leaf.lowercased())\" and identifier \"\(signingIdentifier)\""
+            return "certificate leaf = H\"\(leaf.lowercased())\" and identifier \"\(signingIdentifier)\""
         }
     }
 
@@ -87,13 +87,13 @@ public enum BundledHelperLaunchPolicy {
         return .launch
     }
 
-    static func isLeafSHA1(_ text: String) -> Bool {
+    public static func isLeafSHA1(_ text: String) -> Bool {
         let leaf = text.lowercased()
         return leaf.count == 40 && leaf.allSatisfy(\.isHexDigit)
     }
 
     /// Letters, digits and the given extras only, so a value cannot add a requirement clause.
-    static func isToken(_ text: String, allowing extra: String) -> Bool {
+    public static func isToken(_ text: String, allowing extra: String) -> Bool {
         !text.isEmpty && text.unicodeScalars.allSatisfy { scalar in
             scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar) || extra.unicodeScalars.contains(scalar))
         }

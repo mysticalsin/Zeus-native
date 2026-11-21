@@ -241,9 +241,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.helperRefresh) {
             if ClaudeHookInstaller.isInstalled() { try? ClaudeHookInstaller.refreshHelper() }
             if ChromeInstaller.isInstalled() {
-                try? HelperInstaller.refresh("zeus-bridge")
-                // A failed check removes the host registration, so Chrome is not left a path to launch.
-                _ = ChromeInstaller.authorizeInstalledBridge()
+                // A refused copy is discarded. The bridge and host registration already on disk stay.
+                if let staged = try? ChromeInstaller.stageBundledBridge() {
+                    _ = ChromeInstaller.publishStagedBridge(staged)
+                }
                 try? ChromeInstaller.refreshExtension()
             }
         }
