@@ -4,10 +4,10 @@ import Foundation
 /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. The keychain item itself carries the access
 /// control, so a check that only runs in the app is not enough.
 public enum FaceTemplateProtection: Equatable, Sendable {
-    /// `SecAccessControlCreateWithFlags(.userPresence)`.
+    /// `SecAccessControlCreateFlags.userPresence` with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
     case userPresence
-    /// `SecAccessControlCreateWithFlags` with `.biometryCurrentSet`, or `.devicePasscode` when
-    /// that set cannot answer. A change of fingerprints still requires enrolling again.
+    /// Flags `.biometryCurrentSet`, `.or`, and `.devicePasscode`, with
+    /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. A change of fingerprints still requires enrolling again.
     case biometryCurrentSetOrDevicePasscode
 }
 
@@ -262,22 +262,51 @@ public protocol FaceTemplateSecureItems: Sendable {
     func delete(account: String) -> Result<Void, FaceTemplateFailure>
 }
 
-/// Save and read sequencing for a face template. This copy still matches the system keychain:
-/// delete, then add, and a read that does not present the access control.
+/// Save and read sequencing for a face template. An existing item is updated in place.
+/// A read presents that protection's access control. Bytes that arrive with the prompt refused are discarded.
 public enum FaceTemplateSecureSession {
+    public static let userPresencePrompt = "Authenticate to read the face template."
+    public static let biometryOrPasscodePrompt = "Authenticate with Touch ID or the device passcode to read the face template."
+
     public static func authentication(for protection: FaceTemplateProtection) -> FaceTemplateAuthentication {
-        FaceTemplateAuthentication(protection: protection, operationPrompt: "", presentsAccessControl: false)
+        switch protection {
+        case .userPresence:
+            FaceTemplateAuthentication(protection: protection, operationPrompt: userPresencePrompt, presentsAccessControl: true)
+        case .biometryCurrentSetOrDevicePasscode:
+            FaceTemplateAuthentication(protection: protection, operationPrompt: biometryOrPasscodePrompt, presentsAccessControl: true)
+        }
     }
 
     public static func write(_ record: FaceTemplateRecord, items: any FaceTemplateSecureItems) -> Result<Void, FaceTemplateFailure> {
         let authentication = authentication(for: record.protection)
-        _ = items.delete(account: record.account)
-        return items.add(record, authentication: authentication)
+        switch items.probe(account: record.account) {
+        case .missing:
+            return items.add(record, authentication: authentication)
+        case .protected, .unprotected:
+            switch items.replace(record, authentication: authentication) {
+            case .success:
+                return .success(())
+            case .failure(let error) where error == .missing:
+                return items.add(record, authentication: authentication)
+            case .failure(let error):
+                return .failure(error)
+            }
+        }
     }
 
     public static func read(account: String, requiring protection: FaceTemplateProtection, items: any FaceTemplateSecureItems) -> Result<Data, FaceTemplateFailure> {
-        _ = protection
-        let authentication = FaceTemplateAuthentication(protection: protection, operationPrompt: "", presentsAccessControl: false)
-        return items.read(account: account, authentication: authentication)
+        let authentication = authentication(for: protection)
+        guard authentication.presentsAccessControl, !authentication.operationPrompt.isEmpty else {
+            return .failure(.unavailable)
+        }
+        switch items.probe(account: account) {
+        case .missing:
+            return .failure(.missing)
+        case .unprotected(var data):
+            if !data.isEmpty { data.resetBytes(in: 0..<data.count) }
+            return .failure(.unavailable)
+        case .protected:
+            return items.read(account: account, authentication: authentication)
+        }
     }
 }

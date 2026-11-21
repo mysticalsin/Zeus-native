@@ -8712,6 +8712,18 @@
         "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
         "function": "logsNeverIncludeTemplateBytesOrASizeTiedToAnIdentity"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "Saving a face template deleted the stored item before the new copy was added, so a failed add lost the template. The real read also ignored the requested access control.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "failedReplaceKeepsTheStoredTemplate"
+      }
     }
   ]
 }

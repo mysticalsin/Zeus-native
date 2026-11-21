@@ -8,8 +8,9 @@ import Security
 ///
 /// A read and a save both go through `SecItem` with the access control on the item. Cancelling the
 /// system prompt, or any other error, returns no bytes. When the fingerprint set changes, the item
-/// is deleted and the caller enrolls again. `LAContext` only notices that change; it is not the
-/// gate that releases the template.
+/// is deleted and the caller enrolls again. The epoch `LAContext` only notices that change.
+/// The read gate is the item's `SecAccessControl`, evaluated with an `LAContext`
+/// (`kSecUseAuthenticationContext`) and `kSecUseOperationPrompt`.
 public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     private static let service = "com.zeus.app"
     private static let epochAccount = "face.presence.biometryEpoch"
@@ -26,19 +27,12 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         case .same, .first:
             break
         }
-        guard let control = accessControl(record.protection) else { return .failure(.unavailable) }
-        _ = deleteItem(account: record.account)
-        var query = base(account: record.account)
-        query[kSecValueData as String] = record.payload
-        query[kSecAttrAccessControl as String] = control
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else { return .failure(Self.failure(status)) }
-        _ = rememberEpoch()
-        return .success(())
+        let saved = FaceTemplateSecureSession.write(record, items: Items())
+        if case .success = saved { _ = rememberEpoch() }
+        return saved
     }
 
     public func read(account: String, requiring protection: FaceTemplateProtection) -> Result<Data, FaceTemplateFailure> {
-        _ = protection
         switch epochCheck() {
         case .changed:
             _ = remove(account: account)
@@ -48,13 +42,7 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         case .same, .first:
             break
         }
-        var query = base(account: account)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return .failure(Self.failure(status)) }
-        return .success(data)
+        return FaceTemplateSecureSession.read(account: account, requiring: protection, items: Items())
     }
 
     @discardableResult
@@ -69,7 +57,7 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         query[kSecReturnAttributes as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         // Existence only. Fail the prompt instead of showing it, so a name lookup does not ask
-        // for a fingerprint. A real read of the template does not set this flag.
+        // for a fingerprint. The template read uses kSecUseOperationPrompt and an LAContext instead.
         query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -79,14 +67,82 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
         return nil
     }
 
-    private func base(account: String) -> [String: Any] {
+    /// SecItem adapter. Update replaces the payload of an existing item. Add runs only when the item is missing.
+    private struct Items: FaceTemplateSecureItems {
+        func probe(account: String) -> FaceTemplateProbe {
+            var query = SystemFaceTemplateKeychain.base(account: account)
+            query[kSecReturnData as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitOne
+            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            if status == errSecItemNotFound { return .missing }
+            if status == errSecSuccess {
+                return .unprotected((result as? Data) ?? Data())
+            }
+            return .protected
+        }
+
+        func add(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure> {
+            guard authentication.presentsAccessControl else { return .failure(.unavailable) }
+            guard let control = SystemFaceTemplateKeychain.accessControl(authentication.protection) else {
+                return .failure(.unavailable)
+            }
+            var query = prompted(account: record.account, authentication: authentication)
+            query[kSecValueData as String] = record.payload
+            query[kSecAttrAccessControl as String] = control
+            let status = SecItemAdd(query as CFDictionary, nil)
+            guard status == errSecSuccess else { return .failure(SystemFaceTemplateKeychain.failure(status)) }
+            return .success(())
+        }
+
+        func replace(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure> {
+            guard authentication.presentsAccessControl else { return .failure(.unavailable) }
+            let query = prompted(account: record.account, authentication: authentication)
+            let attributes = [kSecValueData as String: record.payload]
+            let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+            if status == errSecItemNotFound { return .failure(.missing) }
+            guard status == errSecSuccess else { return .failure(SystemFaceTemplateKeychain.failure(status)) }
+            return .success(())
+        }
+
+        func read(account: String, authentication: FaceTemplateAuthentication) -> Result<Data, FaceTemplateFailure> {
+            guard authentication.presentsAccessControl, !authentication.operationPrompt.isEmpty else {
+                return .failure(.unavailable)
+            }
+            var query = prompted(account: account, authentication: authentication)
+            query[kSecReturnData as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitOne
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            guard status == errSecSuccess, let data = result as? Data else {
+                return .failure(SystemFaceTemplateKeychain.failure(status))
+            }
+            return .success(data)
+        }
+
+        func delete(account: String) -> Result<Void, FaceTemplateFailure> {
+            let status = SystemFaceTemplateKeychain.deleteItem(account: account)
+            guard status == errSecSuccess || status == errSecItemNotFound else { return .failure(.unavailable) }
+            return .success(())
+        }
+
+        private func prompted(account: String, authentication: FaceTemplateAuthentication) -> [String: Any] {
+            var query = SystemFaceTemplateKeychain.base(account: account)
+            query[kSecUseAuthenticationContext as String] = LAContext()
+            query[kSecUseOperationPrompt as String] = authentication.operationPrompt
+            return query
+        }
+    }
+
+    private static func base(account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: Self.service,
          kSecAttrAccount as String: account,
          kSecUseDataProtectionKeychain as String: true]
     }
 
-    private func accessControl(_ protection: FaceTemplateProtection) -> SecAccessControl? {
+    private static func accessControl(_ protection: FaceTemplateProtection) -> SecAccessControl? {
         let flags: SecAccessControlCreateFlags
         switch protection {
         case .userPresence:
@@ -99,7 +155,7 @@ public struct SystemFaceTemplateKeychain: FaceTemplateKeychain {
     }
 
     @discardableResult
-    private func deleteItem(account: String) -> OSStatus {
+    private static func deleteItem(account: String) -> OSStatus {
         SecItemDelete(base(account: account) as CFDictionary)
     }
 

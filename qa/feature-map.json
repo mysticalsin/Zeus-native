@@ -8817,7 +8817,7 @@
         {
           "id": "F14.template-presence",
           "check": "portable-keychain",
-          "acceptance": "A face template is written and read only with WhenUnlockedThisDeviceOnly and user presence, or biometryCurrentSet with a device-passcode fallback. Cancel and failure store nothing and return nothing. The decrypted bytes are not cached past a match. A fingerprint change drops the template. An older copy is deleted only after the new copy matches. Logs omit template bytes and any size tied to an identity.",
+          "acceptance": "A face template is written and read only with WhenUnlockedThisDeviceOnly. The default flags are biometryCurrentSet, or, and devicePasscode. The other accepted protection is userPresence. A read presents that access control through an LAContext or kSecUseOperationPrompt. An existing item is updated in place, so a failed save leaves the stored template. Cancel and failure store nothing and return nothing. The decrypted bytes are not cached past a match. A fingerprint change drops the template. An older copy is deleted only after the new copy matches. Logs omit template bytes and any size tied to an identity.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
@@ -8862,6 +8862,26 @@
             {
               "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
               "function": "wordingMatchesTouchIDPasscodeAndReenrol"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "saveAddsANewTemplateWithoutDeletingFirst"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "failedReplaceKeepsTheStoredTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "readPresentsTheItemsAccessControl"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "unprotectedTemplateIsNotReturned"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "promptsMatchUserPresenceOrBiometryCurrentSetAndDevicePasscode"
             }
           ]
         }
