@@ -8676,6 +8676,30 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Dock clearance treated a two-point inset the same as frame noise. The showing-dock comparison is one point, and a two-point inset is a Dock that is already outside the visible frame.",
+      "features": [
+        "F09"
+      ],
+      "check": "portable-explanation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DockClearanceTests.swift",
+        "function": "onePointOfFrameSlopIsNotADockAndTwoPointsIs"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The privacy manifest omitted a required-reason category that Sources call. File timestamps of the app's own logs need C617.1, and UserDefaults needs CA92.1. A used family with no declaration must fail the release-script check.",
+      "features": [
+        "S06"
+      ],
+      "check": "release-mocks",
+      "guard": {
+        "file": "qa/release-scripts/test_release_scripts.py",
+        "function": "test_disk_space_apis_require_the_privacy_manifest_category"
+      }
     }
-]
+  ]
 }

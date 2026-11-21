@@ -295,11 +295,8 @@ final class ExplanationDesktopCard {
             ?? pointer.flatMap { point in screens.first { $0.frame.contains(point) } } ?? NSScreen.main
         guard let screen else { return nil }
         let full = screen.frame, visible = screen.visibleFrame
-        let frame = DockClearanceRect(x: full.minX, y: full.minY, width: full.width, height: full.height)
-        let visibleRect = DockClearanceRect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height)
-        let reserved = DockClearance.reserved(frame: frame, visible: visibleRect).map {
-            ExplanationRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
-        }
-        return (ExplanationRect(x: visibleRect.x, y: visibleRect.y, width: visibleRect.width, height: visibleRect.height), reserved)
+        return DockClearance.geometry(
+            frame: DockClearanceRect(x: full.minX, y: full.minY, width: full.width, height: full.height),
+            visible: DockClearanceRect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height))
     }
 }

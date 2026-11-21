@@ -36,4 +36,13 @@ public enum DockClearance {
         }
         return reserved
     }
+
+    /// The mapping the desktop card uses: the visible frame is the usable area, and the reserved
+    /// bands come from `reserved`. NSScreen stays in the app target.
+    public static func geometry(frame: DockClearanceRect, visible: DockClearanceRect) -> (usable: ExplanationRect, reserved: [ExplanationRect]) {
+        let reserved = reserved(frame: frame, visible: visible).map {
+            ExplanationRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height)
+        }
+        return (ExplanationRect(x: visible.x, y: visible.y, width: visible.width, height: visible.height), reserved)
+    }
 }
