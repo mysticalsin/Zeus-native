@@ -74,6 +74,8 @@ final class PolyglotMicCapture: @unchecked Sendable {
         engine.stop()
     }
 
+    deinit { stop() }
+
     static func level(_ samples: [Float]) -> Double {
         guard !samples.isEmpty else { return 0 }
         let rms = (samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count)).squareRoot()
@@ -125,11 +127,17 @@ final class PolyglotSystemCapture: NSObject, SCStreamOutput, SCStreamDelegate, @
         self.stream = stream
     }
 
-    func stop() {
+    func stop() async {
         let stream = stream
         self.stream = nil
         onChunk = nil
         resampler = nil
+        if let stream { try? await stream.stopCapture() }
+    }
+
+    deinit {
+        let stream = stream
+        self.stream = nil
         if let stream { Task { try? await stream.stopCapture() } }
     }
 

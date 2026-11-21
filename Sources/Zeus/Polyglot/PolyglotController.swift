@@ -61,6 +61,8 @@ final class PolyglotController {
     /// Bumped by every start and stop; a start whose token no longer matches is abandoned and torn down.
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var startTask: Task<Void, Never>?
+    /// Finishes `stopCapture` before another system capture may start. `CaptureStopGate`.
+    @ObservationIgnored private var systemStop: Task<Void, Never>?
     /// Bumped when a run's pipeline is created; events from an older run's draining stream are dropped.
     @ObservationIgnored private var epoch = 0
     /// Clear drops what is still draining: events from runs older than this never land again.
@@ -143,7 +145,11 @@ final class PolyglotController {
         send(.startRequested(token: token))
         // Captions start on the deployment target. On-device translation is checked per language
         // pair and stays unavailable below macOS 26; the heard line is still shown.
-        startTask = Task { [weak self] in await self?.begin(chosen, generation: token) }
+        let release = systemStop
+        startTask = Task { [weak self] in
+            await release?.value
+            await self?.begin(chosen, generation: token)
+        }
     }
 
     func stop() {
@@ -156,9 +162,10 @@ final class PolyglotController {
         let wasLive = run.isListening || pipeline != nil
         send(.stopRequested(token: stopToken))
         mic?.stop()
-        system?.stop()
+        let stoppingSystem = system
         mic = nil
         system = nil
+        systemStop = Task { await stoppingSystem?.stop() }
         audioIn?.finish()
         audioIn = nil
         level = 0
@@ -268,7 +275,10 @@ final class PolyglotController {
                     Task { @MainActor in self?.updateLevel(chunk.level) }
                 }
                 let effects = send(.inputOpened(token: token, input: .system))
-                if effects.contains(.release(.system)) { capture.onStopped = nil; capture.stop() } else { system = capture }
+                if effects.contains(.release(.system)) {
+                    capture.onStopped = nil
+                    await capture.stop()
+                } else { system = capture }
                 guard isCurrent(token) else { audioContinuation.finish(); return }
             } catch {
                 guard isCurrent(token) else { audioContinuation.finish(); return }
@@ -326,9 +336,10 @@ final class PolyglotController {
                 mic?.stop()
                 mic = nil
             case .release(.system):
-                system?.onStopped = nil
-                system?.stop()
+                let stopping = system
+                stopping?.onStopped = nil
                 system = nil
+                systemStop = Task { await stopping?.stop() }
             case .endRun:
                 stop()
             default:
