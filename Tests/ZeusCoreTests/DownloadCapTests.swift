@@ -197,6 +197,96 @@ struct DownloadCapTests {
         #expect(!FileManager.default.fileExists(atPath: tree.path))
         try? FileManager.default.removeItem(at: root)
     }
+
+    @Test func byteCapsAreThePinnedSizesPlusTwentyFivePercent() {
+        #expect(PinnedModelBytes.whisperBaseEn == 147_964_211)
+        #expect(PinnedModelBytes.whisperSmall == 487_601_967)
+        #expect(PinnedModelBytes.whisperLargeTurboQ5 == 574_041_195)
+        #expect(PinnedModelBytes.kokoroOnnx == 325_532_387)
+        #expect(PinnedModelBytes.kokoroVoices == 28_214_398)
+        #expect(PinnedModelBytes.cap(147_964_211) == 184_955_263)
+        #expect(PinnedModelBytes.cap(487_601_967) == 609_502_458)
+        #expect(PinnedModelBytes.cap(574_041_195) == 717_551_493)
+        #expect(PinnedModelBytes.cap(325_532_387) == 406_915_483)
+        #expect(PinnedModelBytes.cap(28_214_398) == 35_267_997)
+    }
+
+    @Test func aFakeSessionCancelsWhenExpectedLengthOrBytesWrittenPassTheCap() {
+        let task = FakeDownloadTask()
+        let guardRail = DownloadTransferGuard(maximumBytes: 184_955_263, allowedHosts: PinnedDownloadHosts.whisper)
+        guardRail.evaluateWrite(written: 1, expected: 184_955_264, task: task)
+        #expect(task.cancelCount == 1)
+        #expect(guardRail.stopped)
+
+        let within = FakeDownloadTask()
+        let ok = DownloadTransferGuard(maximumBytes: 184_955_263, allowedHosts: PinnedDownloadHosts.whisper)
+        ok.evaluateWrite(written: 184_955_263, expected: -1, task: within)
+        #expect(within.cancelCount == 0)
+        ok.evaluateWrite(written: 184_955_264, expected: -1, task: within)
+        #expect(within.cancelCount == 1)
+    }
+
+    @Test func redirectsStopAtFiveAndStayOnHttpsAllowlistedHosts() {
+        let hosts = PinnedDownloadHosts.whisper
+        let guardRail = DownloadTransferGuard(maximumBytes: 100, allowedHosts: hosts)
+        let task = FakeDownloadTask()
+        var followed = 0
+        for _ in 1...5 {
+            var request: URLRequest?
+            guardRail.evaluateRedirect(URL(string: "https://us.aws.cdn.hf.co/model.bin")!, task: task) { request = $0 }
+            if request != nil { followed += 1 }
+        }
+        #expect(followed == 5)
+        #expect(task.cancelCount == 0)
+        var sixth: URLRequest?
+        guardRail.evaluateRedirect(URL(string: "https://us.aws.cdn.hf.co/model.bin")!, task: task) { sixth = $0 }
+        #expect(sixth == nil)
+        #expect(task.cancelCount == 1)
+
+        let plain = DownloadTransferGuard(maximumBytes: 100, allowedHosts: hosts)
+        let httpTask = FakeDownloadTask()
+        var http: URLRequest?
+        plain.evaluateRedirect(URL(string: "http://huggingface.co/model.bin")!, task: httpTask) { http = $0 }
+        #expect(http == nil)
+        #expect(httpTask.cancelCount == 1)
+
+        let other = DownloadTransferGuard(maximumBytes: 100, allowedHosts: hosts)
+        let otherTask = FakeDownloadTask()
+        var foreign: URLRequest?
+        other.evaluateRedirect(URL(string: "https://example.com/model.bin")!, task: otherTask) { foreign = $0 }
+        #expect(foreign == nil)
+
+        let kokoro = DownloadTransferGuard(maximumBytes: 100, allowedHosts: PinnedDownloadHosts.kokoro)
+        let kokoroTask = FakeDownloadTask()
+        var release: URLRequest?
+        kokoro.evaluateRedirect(URL(string: "https://release-assets.githubusercontent.com/kokoro-v1.0.onnx")!, task: kokoroTask) { release = $0 }
+        #expect(release != nil)
+        #expect(kokoroTask.cancelCount == 0)
+    }
+
+    @Test func anUnpackLargerThanTheCapIsRefused() {
+        let maximum = PinnedModelBytes.cap(PinnedModelBytes.whisperBaseEn)
+        #expect(ArchiveUnpackCap.exceeds(producedBytes: maximum, maximumBytes: maximum) == false)
+        #expect(ArchiveUnpackCap.exceeds(producedBytes: maximum + 1, maximumBytes: maximum))
+        #expect(ArchiveUnpackCap.isArchive("ggml-base.en.bin") == false)
+        #expect(ArchiveUnpackCap.isArchive("model.zip"))
+    }
+
+    @Test func aByteCapRemovesThePartialAndKeepsTheFinishedModel() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-cap-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let partial = directory.appendingPathComponent("model.partial")
+        let finished = directory.appendingPathComponent("ggml-base.en.bin")
+        try Data("finished".utf8).write(to: finished)
+        let result = await DownloadRunner.run(kind: .model, clock: { 0 }, partials: { [partial] }) {
+            try Data("partial".utf8).write(to: partial)
+            throw DownloadCapExceeded()
+        }
+        #expect(result == .capped)
+        #expect(!FileManager.default.fileExists(atPath: partial.path))
+        #expect(try Data(contentsOf: finished) == Data("finished".utf8))
+    }
 }
 
 private final class ManualClock: @unchecked Sendable {
