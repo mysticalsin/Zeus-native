@@ -389,6 +389,17 @@ final class TopBarServices {
 
     // MARK: Weather (Open-Meteo: free, no key; the city comes from Settings or the time zone)
 
+    private static let weatherSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration, delegate: WeatherRedirectGuard(), delegateQueue: nil)
+    }()
+
+    private static func weatherData(from url: URL) async throws -> (Data, URLResponse) {
+        try await weatherSession.data(from: url)
+    }
+
     private func fetchWeather(force: Bool) {
         guard force || Date().timeIntervalSince(lastWeatherFetch) > 20 * 60 else { return }
         lastWeatherFetch = Date()
@@ -397,7 +408,7 @@ final class TopBarServices {
         Task { @MainActor in
             do {
                 let place = try await Self.geocode(city)
-                let (data, _) = try await URLSession.shared.data(from: WeatherSnapshot.url(latitude: place.lat, longitude: place.lon))
+                let (data, _) = try await Self.weatherData(from: WeatherSnapshot.url(latitude: place.lat, longitude: place.lon))
                 let snapshot = try WeatherSnapshot.decode(data)
                 model.weather = snapshot
                 if let minutes = rainGate.minutesUntilRain(snapshot) { model.show(.rain(minutes: minutes)) }
@@ -428,7 +439,7 @@ final class TopBarServices {
         var parts = URLComponents(string: "https://geocoding-api.open-meteo.com/v1/search")!
         parts.queryItems = [.init(name: "name", value: city), .init(name: "count", value: "1")]
         struct Response: Decodable { let results: [Place]? }
-        let (data, _) = try await URLSession.shared.data(from: parts.url!)
+        let (data, _) = try await weatherData(from: parts.url!)
         guard let place = try JSONDecoder().decode(Response.self, from: data).results?.first else {
             throw URLError(.cannotFindHost)
         }
@@ -496,6 +507,21 @@ final class TopBarServices {
         } else {
             model.show(.focusFinished(finished == .focus ? "Focus done. Take a break." : "Break over. Back to it."))
         }
+    }
+}
+
+private final class WeatherRedirectGuard: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        guard let original = task.originalRequest?.url ?? response.url,
+              let proposed = request.url,
+              WeatherSnapshot.redirected(proposed, from: original) != nil else {
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
     }
 }
 
