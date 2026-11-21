@@ -222,6 +222,65 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(blocked.finish().isEmpty)
     }
 
+    @Test func firstClauseIsScheduledBeforeTheFullRenderCompletes() {
+        let text = longAnswer
+        #expect(text.count == 709)
+        let fullCost = 5.31
+        var clock = SpeechManualClock()
+        let output = VoiceStreamPolish()
+        var scheduledAt: [Double] = []
+        var scheduled: [[Float]] = []
+        let receipt = ClauseSpeechScheduler.speak(
+            text: text,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: output,
+            synthesize: { chunk, clock in
+                clock.advance(by: fullCost * Double(chunk.count) / Double(text.count))
+                return [Float](repeating: 0.25, count: 2_400)
+            },
+            schedule: { samples, at in
+                scheduled.append(samples)
+                scheduledAt.append(at)
+            })
+        #expect(receipt.chunks.count >= 2)
+        #expect((40...90).contains(receipt.chunks[0].count))
+        #expect(receipt.firstScheduledAt < receipt.fullRenderCompletedAt)
+        #expect(receipt.firstScheduledAt < ClauseSpeechBudget.proposedFirstClauseSeconds)
+        #expect(scheduledAt.count == receipt.chunks.count)
+        let firstOnly = fullCost * Double(receipt.chunks[0].count) / Double(text.count)
+        #expect(abs(receipt.firstScheduledAt - firstOnly) < 0.001)
+        let pause = Int((24_000 * ClauseSpeechScheduler.clausePauseSeconds).rounded())
+        let tail = scheduled[0].suffix(pause)
+        #expect(tail.allSatisfy { abs($0) < 1e-3 })
+    }
+
+    @Test func cancelDuringALaterClauseSchedulesNoFurtherBuffer() {
+        let text = "The reply is spoken one sentence at a time. Each sentence is rendered by the engine that is ready, then handed to the player while the next sentence is still being prepared."
+        var clock = SpeechManualClock()
+        let token = SpeechCancelToken()
+        var calls = 0
+        let receipt = ClauseSpeechScheduler.speak(
+            text: text,
+            sampleRate: 24_000,
+            clock: &clock,
+            output: VoiceStreamPolish(),
+            token: token,
+            synthesize: { _, clock in
+                calls += 1
+                if calls > 1 {
+                    token.cancel()
+                    return [Float](repeating: 0.4, count: 400)
+                }
+                clock.advance(by: 0.4)
+                return [Float](repeating: 0.2, count: 800)
+            },
+            schedule: { _, _ in })
+        #expect(receipt.scheduled == 1)
+        #expect(receipt.fullRenderCompletedAt == receipt.firstScheduledAt)
+        #expect(calls == 2)
+    }
+
     @Test func pipelineNamesEveryStageWithoutADefault() {
         #expect(VoiceStreamPolish.pipeline == [.clauseChunk, .loudness, .crossfade, .primer, .limiter])
         var seen: [String] = []
@@ -239,6 +298,8 @@ private let chunkCases: [(name: String, language: String, text: String, expected
         #expect(!step.process([0.1, -0.1], sampleRate: 24_000).isEmpty)
     }
 }
+
+private let longAnswer = "The reply is spoken one sentence at a time. Each sentence is rendered by the engine that is ready, then handed to the player while the next sentence is still being prepared. A short pause sits between sentences so the line does not run together. If the preferred engine has no key, no model, or a recent failure, the next engine in the chain takes that sentence. The last engine is the system voice: it renders buffers, lowers the pitch, and slows the rate before the same player speaks them. This paragraph is synthetic fixture text for a voice harness. It names no person, no account, and no private recording. The numbers here are only a shape, such as section 4 and step 2, and they are not a measurement."
 
 private func stageName(_ stage: SpeechPolishStage) -> String {
     switch stage {
