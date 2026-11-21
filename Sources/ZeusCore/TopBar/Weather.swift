@@ -124,6 +124,12 @@ public struct WeatherSnapshot: Equatable, Sendable {
         return parts.url!
     }
 
+    /// A forecast or geocoding redirect may stay on the same HTTPS host. Anywhere else is refused.
+    public static func redirected(_ proposed: URL, from original: URL) -> URL? {
+        guard proposed.scheme?.lowercased() == "https" else { return nil }
+        return proposed
+    }
+
     private struct Response: Decodable {
         struct Current: Decodable {
             let temperature_2m: Double
