@@ -44,8 +44,14 @@ public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
 
     public func start() async throws -> VoiceFrame {
         session = try session.next(on: .start)
-        session = try session.next(on: .started)
         await beforeStarted?()
+        guard session == .starting else {
+            if session == .closing {
+                session = try session.next(on: .closed)
+            }
+            throw VoiceSessionError.illegalTransition(from: session, event: .started)
+        }
+        session = try session.next(on: .started)
         nextReply = 1
         return frames[0]
     }
@@ -62,7 +68,12 @@ public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
     }
 
     public func close() async {
-        guard let closing = try? session.next(on: .close) else { return }
-        session = (try? closing.next(on: .closed)) ?? closing
+        let previous = session
+        guard let next = try? session.next(on: .close) else { return }
+        session = next
+        // Streaming has no load left to finish the close. Starting does: start applies `.closed`.
+        if previous == .streaming, let done = try? session.next(on: .closed) {
+            session = done
+        }
     }
 }

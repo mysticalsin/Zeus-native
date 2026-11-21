@@ -78,24 +78,31 @@ public indirect enum VoiceSessionState: Sendable, Equatable, Hashable {
         }
     }
 
+    /// `closed` and `failed` are terminal: every event from them is refused.
+    /// `fail` is legal from `idle`, and from every other state that is not terminal.
+    /// A close from `idle` goes straight to `closed`. A close from `starting` stops at `closing`.
     public func next(on event: VoiceSessionEvent) throws -> VoiceSessionState {
         switch self {
         case .idle:
             switch event {
             case .start:
                 return .starting
+            case .close:
+                return .closed
             case .fail(let error):
                 return .failed(error)
-            case .started, .push, .close, .closed:
+            case .started, .push, .closed:
                 throw VoiceSessionError.illegalTransition(from: self, event: event)
             }
         case .starting:
             switch event {
             case .started:
                 return .streaming
+            case .close:
+                return .closing
             case .fail(let error):
                 return .failed(error)
-            case .start, .push, .close, .closed:
+            case .start, .push, .closed:
                 throw VoiceSessionError.illegalTransition(from: self, event: event)
             }
         case .streaming:

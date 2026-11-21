@@ -14,8 +14,8 @@ import Testing
         #expect(states.map(\.shape) == VoiceSessionStateShape.allCases)
         #expect(events.map(\.shape) == VoiceSessionEventShape.allCases)
         let legal: [VoiceSessionState: [VoiceSessionEvent: VoiceSessionState]] = [
-            .idle: [.start: .starting, .fail(failure): .failed(failure)],
-            .starting: [.started: .streaming, .fail(failure): .failed(failure)],
+            .idle: [.start: .starting, .close: .closed, .fail(failure): .failed(failure)],
+            .starting: [.started: .streaming, .close: .closing, .fail(failure): .failed(failure)],
             .streaming: [.push: .streaming, .close: .closing, .fail(failure): .failed(failure)],
             .closing: [.closed: .closed, .fail(failure): .failed(failure)],
         ]
@@ -77,10 +77,13 @@ import Testing
         }
     }
 
-    @Test func closeBeforeStartLeavesTheSessionIdle() async throws {
-        let backend = try FakeDuplexVoiceBackend(frames: [tone(0.1)])
+    @Test func aSecondCloseStaysClosed() async throws {
+        let backend = try FakeDuplexVoiceBackend(frames: [tone(0.1), tone(0.2)])
+        _ = try await backend.start()
         await backend.close()
-        #expect(await backend.state == .idle)
+        #expect(await backend.state == .closed)
+        await backend.close()
+        #expect(await backend.state == .closed)
     }
 
     @Test func aPushBeforeStartThrows() async throws {
