@@ -310,6 +310,29 @@ struct RecordlyDeviceCaptureTests {
         #expect(!RecordlyPrimaryRecord.startsDeviceCapture(phase: machine.phase))
     }
 
+    /// A screen session that has started is the recorder. A ready chip must not open a second one.
+    @Test func anActiveScreenSessionDoesNotStartAnotherRecorder() throws {
+        #expect(RecordlyPrimaryRecord.blocksAnotherRecorder(screenSessionActive: true))
+        #expect(!RecordlyPrimaryRecord.blocksAnotherRecorder(screenSessionActive: false))
+        var machine = RecordlyDeviceCaptureMachine()
+        _ = machine.send(.select(.microphone))
+        _ = machine.send(.permission(.microphoneGranted))
+        #expect(machine.phase == .ready)
+        #expect(RecordlyPrimaryRecord.startsDeviceCapture(phase: machine.phase))
+        #expect(!RecordlyPrimaryRecord.mayStartDeviceRecorder(
+            phase: machine.phase,
+            screenSessionActive: true
+        ))
+        #expect(RecordlyPrimaryRecord.mayStartDeviceRecorder(
+            phase: machine.phase,
+            screenSessionActive: false
+        ))
+        let controller = try repoSource("Sources/Zeus/Recordly/RecordlyController.swift")
+        let started = controller.components(separatedBy: "case .started").dropFirst().first ?? ""
+        let branch = started.components(separatedBy: "case .failed").first ?? started
+        #expect(!branch.contains(".record()"))
+    }
+
     /// One Record control. The status view does not grow a second Record button, and the primary
     /// start reads the chip instead of forcing the microphone off.
     @Test func oneRecordControlHonorsTheChip() throws {
