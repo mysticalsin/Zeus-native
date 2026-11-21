@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "The quiet top bar, with the pointer away and nothing asking for attention, was not sRGB 0,0,0,1. Its fill was Color.black inside an opacity group and four shadows on a clear window, so the small closed shape did not match the hardware notch. Idle was also not a state: the closed bar could show the classic mascot only, never the selected character alone.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarIdleBlackTests.swift",
+        "function": "idleBlackIsExactlyZero"
+      }
     }
-]
+  ]
 }

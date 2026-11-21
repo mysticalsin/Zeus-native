@@ -169,6 +169,7 @@ final class NotchController {
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
         setIgnoresMouse(ignoresMouse(for: presentation))
+        notePointerOverBar()
         // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
         model.alerts.setSuspended(presentation != .closed, now: now())
         alertsChanged()
@@ -360,6 +361,7 @@ final class NotchController {
     /// always has something to show, so it opens after a short dwell (no accidental flashes).
     private func mouseMoved() {
         followPointer()
+        notePointerOverBar()
         // A peek takes the mouse over its card only; the rest of the window lets clicks through.
         if model.presentation == .peek { setIgnoresMouse(ignoresMouse(for: .peek)) }
         guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
@@ -506,6 +508,19 @@ final class NotchController {
     }
     static var closeDelayMilliseconds: Int {
         switch SettingsStore.shared.string("notch.closeDelay") { case "0.5 s": 500; case "1 s": 1000; case "2 s": 2000; default: 0 }
+    }
+
+    /// Records whether the pointer is on the bar. It does not open or close anything.
+    private func notePointerOverBar() {
+        guard let screen else { return }
+        let over: Bool
+        switch model.presentation {
+        case .panel:
+            over = true
+        case .closed, .peek:
+            over = inHotZone(screen)
+        }
+        if model.pointerOverBar != over { model.pointerOverBar = over }
     }
 
     /// Glance's trigger (TOPBAR-SPEC §6): the closed island plus the 27.5 pt ears either side, as

@@ -44,6 +44,13 @@ struct NotchShape: Shape {
     }
 }
 
+extension TopBarIdleBlack {
+    /// The idle bar fill. `sRGB` is 0, 0, 0, 1. This is not `Color.black`.
+    static var color: Color {
+        Color(.sRGB, red: sRGB.red, green: sRGB.green, blue: sRGB.blue, opacity: sRGB.alpha)
+    }
+}
+
 extension NotchModel.Status {
     var color: Color {
         switch self {
@@ -95,6 +102,36 @@ struct NotchView: View {
     private var layers: NotchBodyLayers {
         let background = backgroundOverride ?? NotchBackground.resolve(SettingsStore.shared.string(NotchBackground.settingID))
         return background.layers(closed: model.presentation == .closed)
+    }
+
+    /// Idle, hover or active. Nil keeps the agents-only notch on its existing paint.
+    private var chromeFrame: TopBarChromeFrame? {
+        guard let topBar else { return nil }
+        let avatar = AvatarStatus.shared
+        let musicPlaying = topBar.nowPlaying?.isPlaying == true
+        let focus = topBar.focus.phase != .idle && SettingsStore.shared.bool("lights.timer")
+        let agentGlowing = model.status != .idle && topBar.haloStyle != .off
+        let lights = !topBar.lights.isEmpty || agentGlowing || topBar.isDraggingFiles || topBar.micListening
+            || focus
+            || (musicPlaying && (topBar.liveMusicWings || SettingsStore.shared.bool("lights.musicProgress")))
+        return TopBarIdleChrome.resolve(TopBarChromeFacts(
+            pointerOverBar: model.pointerOverBar,
+            expanded: model.presentation == .panel,
+            peek: model.presentation == .peek,
+            reduceMotion: Motion.reduced,
+            calibrating: showsGuide,
+            character: TopBarCharacterChoice.resolved(mascotKind: PersonaCatalog.current().mascotKind),
+            approval: model.approval != nil,
+            recording: RecordlyController.shared.isRecording || ScribeController.shared.isRecording,
+            music: topBar.liveMusicWings && musicPlaying,
+            dictation: topBar.isDictating,
+            cue: topBar.cue != nil,
+            focusTimer: focus,
+            recordingFeedback: RecordlyController.shared.topBarFeedback() != nil || ScribeController.shared.topBarFeedback() != nil,
+            alerts: !model.alerts.isEmpty,
+            lights: lights,
+            avatarActivity: avatar.posePreview != nil || avatar.current != .idle
+        ))
     }
 
     /// The closed shape on this display.
@@ -349,6 +386,7 @@ struct NotchView: View {
         let breathing = !Motion.reduced && glowing
         let shape = NotchShape(shoulder: shoulder, earHeight: earHeight, bottomRadius: bottomRadius)
         let glanceOpen = topBar != nil && model.presentation == .panel
+        let pitchBlack = chromeFrame?.treatment == .pitchBlack
         return ZStack(alignment: .top) {
             DisplaySynchronizedView(paused: !breathing, preferredFramesPerSecond: Motion.ambientFPS) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
@@ -360,21 +398,24 @@ struct NotchView: View {
                     ? Color(hue: (t / 9).truncatingRemainder(dividingBy: 1), saturation: 0.55, brightness: 1)
                     : status.color
                 ZStack(alignment: .top) {
-                    shape
-                        // Pitch black, closed and open, so the body reads as part of the hardware notch and
-                        // only Zeus's own marks show on it. One fill type, so opening grows the body instead of
-                        // cross-fading a new layer in.
-                        .fill(Color.black)
-                        // Transparent: the closed island has no body, only its marks (the hardware notch is black).
-                        .opacity(drawn.fill ? 1 : 0)
-                        // Glance's soft drop shadow under the open body (parity/N4: alpha 0.19 at 2 pt
-                        // below, 0.10 at 15 pt, gone by 50 pt; weaker at the sides).
-                        .shadow(color: .black.opacity(glanceOpen ? Glass.notchShadow.opacity : 0),
-                                radius: Glass.notchShadow.radius, y: Glass.notchShadow.y)
-                        .shadow(color: glow.opacity(glowing ? 0.28 * breath : 0), radius: 9)
-                        .shadow(color: glow.opacity(glowing ? 0.2 * breath : 0), radius: 3)
-                        .shadow(color: Theme.bolt.opacity(glowing && halo == .storm ? 0.3 * breath : 0), radius: 26)
-                    shape.stroke(glow.opacity(glowing && drawn.outline ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
+                    if pitchBlack {
+                        // Quiet bar: sRGB 0,0,0,1 and no opacity group, shadow, blur or material.
+                        shape.fill(TopBarIdleBlack.color)
+                    } else {
+                        shape
+                            // Hover, peek and the open panel keep this fill, so their animation is unchanged.
+                            .fill(Color.black)
+                            // Transparent: the closed island has no body, only its marks (the hardware notch is black).
+                            .opacity(drawn.fill ? 1 : 0)
+                            // Glance's soft drop shadow under the open body (parity/N4: alpha 0.19 at 2 pt
+                            // below, 0.10 at 15 pt, gone by 50 pt; weaker at the sides).
+                            .shadow(color: .black.opacity(glanceOpen ? Glass.notchShadow.opacity : 0),
+                                    radius: Glass.notchShadow.radius, y: Glass.notchShadow.y)
+                            .shadow(color: glow.opacity(glowing ? 0.28 * breath : 0), radius: 9)
+                            .shadow(color: glow.opacity(glowing ? 0.2 * breath : 0), radius: 3)
+                            .shadow(color: Theme.bolt.opacity(glowing && halo == .storm ? 0.3 * breath : 0), radius: 26)
+                        shape.stroke(glow.opacity(glowing && drawn.outline ? 0.35 + 0.5 * breath : 0), lineWidth: 1.2)
+                    }
                 }
             }
 
@@ -438,7 +479,20 @@ struct NotchView: View {
     private var content: some View {
         switch model.presentation {
         case .closed:
-            if let topBar {
+            if case .characterOnly(let character) = chromeFrame?.content {
+                // Same wing slot as the resting mascot when that wing is already open. Otherwise the
+                // character sits in the notch, and the body keeps its current width.
+                Group {
+                    if let topBar, ClosedWings.kind(of: topBar) == .avatar(.idle) {
+                        IdleCharacterWing(character: character, notchGap: footprint.wingBase)
+                    } else {
+                        IdleCharacterMark(character: character)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+                .frame(height: barHeight)
+                .allowsHitTesting(false)
+            } else if let topBar {
                 // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
                 ClosedWings(topBar: topBar, notchGap: footprint.wingBase).frame(height: barHeight)
                     .allowsHitTesting(false)

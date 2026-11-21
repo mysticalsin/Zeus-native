@@ -82,6 +82,8 @@ final class NotchModel {
     @ObservationIgnored var onCardChange: () -> Void = {}
 
     var presentation: Presentation = .closed
+    /// True while the pointer is over the closed hot zone, or anywhere on the open panel.
+    var pointerOverBar = false
     /// The shape's height follows this, set in its own faster transaction (Glance's height leads its
     /// width on open). Nil follows `presentation` (snapshots, tests).
     var heightPresentation: Presentation?

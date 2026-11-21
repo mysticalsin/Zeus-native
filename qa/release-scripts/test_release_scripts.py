@@ -107,8 +107,10 @@ class ReleaseScripts(unittest.TestCase):
         # Only substitute the macOS-only absolute PlistBuddy path; all shell control flow is original.
         bundle = self.root / "scripts/bundle.sh"
         bundle.write_text(bundle.read_text().replace("/usr/libexec/PlistBuddy", "plistbuddy"))
-        for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements"):
+        for name in ("AppIcon.icns", "Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements"):
             (self.root / "Resources" / name).write_text("fixture")
+        (self.root / "LICENSES").mkdir()
+        (self.root / "LICENSES" / "jarvis2.0-LICENSE").write_text("license")
         for name in ("dist", "icons", "node_modules"):
             (self.root / "extension" / name).mkdir(parents=True)
         for name in ("manifest.json", "popup.html"):
@@ -164,6 +166,7 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         resources = self.root / "build/Zeus.app/Contents/Resources"
         self.assertTrue((resources / "Zeus_Zeus.bundle/resource.txt").is_file())
+        self.assertEqual((resources / "jarvis2.0-LICENSE").read_text(), "license")
         self.assertEqual(sorted(p.name for p in resources.glob("*Tests.bundle")), [])
 
     def test_release_requires_identity_and_profile_before_build(self):
