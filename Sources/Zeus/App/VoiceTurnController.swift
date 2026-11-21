@@ -186,6 +186,7 @@ final class VoiceTurnController {
         if let turn = currentTurn { Task { await brain.cancel(turn: turn) } }
         ahead.cancel()
         speaker.stop()
+        ZeusSpeechHold.active = false
         seams.duckEnd()
         wakeConversationActive = false
         buddy.model.captionVisible = false
@@ -254,6 +255,7 @@ final class VoiceTurnController {
             return false
         }
         listening = true
+        ZeusSpeechHold.active = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
         ZeusSound.play(.listenStart)
         seams.duckBegin()
@@ -295,6 +297,9 @@ final class VoiceTurnController {
             let live = turnRun.finish(run)
             if live, wakeConversationActive, result.error == nil, !result.cancelled {
                 handsFree()
+            } else {
+                while speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
+                if !listening { ZeusSpeechHold.active = false }
             }
             return result
         }
@@ -350,6 +355,7 @@ final class VoiceTurnController {
         tabTask?.cancel()
         tabTask = nil
         turnEngine = nil
+        ZeusSpeechHold.active = false
         seams.duckEnd()
         liveWords.clear()
         buddy.model.audioLevel = nil
