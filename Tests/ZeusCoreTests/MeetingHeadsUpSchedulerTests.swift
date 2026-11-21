@@ -132,6 +132,16 @@ import Testing
     @Test func duplicateOccasionIdsDoNotTrap() throws {
         let source = try schedulerSource()
         #expect(!source.contains("uniqueKeysWithValues"))
+        let first = occasion(.meeting, id: "same", minutesFromStart: 30)
+        let second = occasion(.reminder, id: "same", minutesFromStart: 5)
+        let plan = MeetingHeadsUpScheduler.plan(
+            settings: settings(enabled: true, lead: 15),
+            occasions: [first, second],
+            now: start
+        )
+        #expect(plan.cues.map(\.occasionID) == ["same"])
+        #expect(plan.cues.first?.kind == .meeting)
+        #expect(plan.createdEvents.isEmpty)
     }
 
     @Test func thePlanRefreshesAfterSleepWakeAndAMovedMeeting() throws {

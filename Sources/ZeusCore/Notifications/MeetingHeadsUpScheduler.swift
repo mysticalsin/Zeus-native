@@ -104,6 +104,7 @@ public enum MeetingHeadsUpScheduler {
         now: Date,
         scribeWatchedIDs: Set<String> = []
     ) -> MeetingHeadsUpPlan {
+        let occasions = firstOccasions(occasions)
         guard settings.enabled else {
             return MeetingHeadsUpPlan(phase: .off, cues: [], createdEvents: [])
         }
@@ -122,8 +123,22 @@ public enum MeetingHeadsUpScheduler {
     }
 
     /// The first cue whose fire time has arrived and whose occasion has not ended.
+    /// Keeps the first occasion for each id. A repeated id does not trap.
+    static func firstOccasions(_ occasions: [InAppOccasion]) -> [InAppOccasion] {
+        var seen = Set<String>()
+        return occasions.filter { seen.insert($0.id).inserted }
+    }
+
+    static func startsByID(_ occasions: [InAppOccasion]) -> [String: Date] {
+        var starts: [String: Date] = [:]
+        for occasion in firstOccasions(occasions) where starts[occasion.id] == nil {
+            starts[occasion.id] = occasion.start
+        }
+        return starts
+    }
+
     public static func firstDueTitle(cues: [HeadsUpCue], occasions: [InAppOccasion], now: Date) -> String? {
-        let starts = Dictionary(uniqueKeysWithValues: occasions.map { ($0.id, $0.start) })
+        let starts = startsByID(occasions)
         return cues.first { cue in
             guard let start = starts[cue.occasionID] else { return false }
             return cue.fireAt <= now && now <= start
@@ -158,7 +173,7 @@ public enum MeetingHeadsUpScheduler {
     }
 
     private static func phase(cues: [HeadsUpCue], occasions: [InAppOccasion], now: Date) -> MeetingHeadsUpPhase {
-        let starts = Dictionary(uniqueKeysWithValues: occasions.map { ($0.id, $0.start) })
+        let starts = startsByID(occasions)
         let showing = cues.contains { cue in
             guard let start = starts[cue.occasionID] else { return false }
             return cue.fireAt <= now && now <= start

@@ -110,8 +110,17 @@ final class NotchController {
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
             workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refreshDisplays(force: false) }
+                MainActor.assumeIsolated {
+                    self?.refreshDisplays(force: false)
+                    self?.refreshMeetingHeadsUp()
+                }
             }
+        }
+        workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshMeetingHeadsUp() }
+        }
+        ScribeCallWatcher.shared.onSlotsUpdated = { [weak self] in
+            self?.refreshMeetingHeadsUp()
         }
         for name in ["com.apple.screenIsUnlocked", "com.apple.screenIsLocked"] {
             DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
@@ -168,7 +177,7 @@ final class NotchController {
         model.presentation = presentation
         if presentation != .panel { model.picker = nil }
         if presentation != .peek { model.recap = nil }
-        if presentation == .peek { refreshMeetingHeadsUp() }
+        refreshMeetingHeadsUp()
         setIgnoresMouse(ignoresMouse(for: presentation))
         // The capsule shows only on the closed notch: while a peek or the panel covers it, alert timers pause.
         model.alerts.setSuspended(presentation != .closed, now: now())
