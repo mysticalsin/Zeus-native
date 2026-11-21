@@ -214,6 +214,27 @@ public enum BridgeChromeAdmission {
     }
 }
 
+/// The host runs these steps in order. Identity is captured immediately after stdin is armed,
+/// so a blocking signature read cannot sit in front of the reader, and it is not postponed past that.
+public enum BridgeHostStartup {
+    public enum Step: Equatable, Sendable {
+        case bindSocket
+        case armStdin
+        case captureIdentity
+        case markIdentityReady
+    }
+
+    /// Wrong on purpose until the host uses this list. Identity currently sits before stdin.
+    public static let steps: [Step] = [.bindSocket, .captureIdentity, .armStdin, .markIdentityReady]
+
+    public static func identityIsCapturedImmediatelyAfterStdin(_ steps: [Step] = steps) -> Bool {
+        guard steps.first == .bindSocket, steps.last == .markIdentityReady, steps.count == 4,
+              let stdin = steps.firstIndex(of: .armStdin),
+              let identity = steps.firstIndex(of: .captureIdentity) else { return false }
+        return stdin + 1 == identity
+    }
+}
+
 /// Owns the bridge stdin reader and the local socket so a terminal frame can stop both.
 /// `finish` does not exit the process. The host calls `exit` after it returns.
 public final class BridgeHostLifetime: @unchecked Sendable {

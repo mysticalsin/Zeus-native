@@ -214,6 +214,9 @@ public final class UnixSocketServer: @unchecked Sendable {
     /// dev/inode of the socket created by a successful bind. A later file at the same path is left alone.
     private var boundDevice: UInt64?
     private var boundInode: UInt64?
+    /// Test hook. Called after bind and before chmod/listen. Return false to take the failure path.
+    nonisolated(unsafe) static let rejectListenLock = NSLock()
+    nonisolated(unsafe) static var rejectListenAfterBind: (@Sendable (String) -> Bool)?
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
 
@@ -254,7 +257,8 @@ public final class UnixSocketServer: @unchecked Sendable {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
             }
             guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            guard chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
+            let listenAccepted = Self.rejectListenLock.withLock { Self.rejectListenAfterBind?(path) ?? true }
+            guard listenAccepted, chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
                 unlink(path)
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }

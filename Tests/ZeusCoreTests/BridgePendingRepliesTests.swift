@@ -204,6 +204,82 @@ struct BridgePendingRepliesTests {
         #expect((info.st_mode & S_IFMT) == S_IFLNK)
     }
 
+    @Test func finishLeavesAReplacementSocket() throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("chrome.sock")
+        let (pipe, input) = try reader()
+        defer { input.stop(); try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close() }
+        let server = UnixSocketServer(path: url.path) { _, _ in }
+        try server.start()
+        let lifetime = BridgeHostLifetime()
+        lifetime.attach(input: input, server: server)
+        #expect(unlink(url.path) == 0)
+        let replacement = try Self.bindSocket(at: url.path)
+        defer { close(replacement.fd) }
+        var before = stat()
+        #expect(lstat(url.path, &before) == 0)
+        lifetime.finish()
+        var after = stat()
+        #expect(lstat(url.path, &after) == 0)
+        #expect((after.st_mode & S_IFMT) == S_IFSOCK)
+        #expect(after.st_ino == before.st_ino && after.st_dev == before.st_dev)
+    }
+
+    @Test func failedListenAfterBindLeavesAReplacementSocket() throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("listen.sock")
+        let held = Box<Int32>(-1)
+        let keptInode = Box<UInt64>(0)
+        defer { let fd = held.read(); if fd >= 0 { close(fd) } }
+        UnixSocketServer.rejectListenLock.lock()
+        UnixSocketServer.rejectListenAfterBind = { path in
+            _ = unlink(path)
+            let bound = try? BridgePendingRepliesTests.bindSocket(at: path)
+            if let bound {
+                held.change { $0 = bound.fd }
+                var info = stat()
+                if lstat(path, &info) == 0 { keptInode.change { $0 = UInt64(info.st_ino) } }
+            }
+            return false
+        }
+        UnixSocketServer.rejectListenLock.unlock()
+        defer {
+            UnixSocketServer.rejectListenLock.lock()
+            UnixSocketServer.rejectListenAfterBind = nil
+            UnixSocketServer.rejectListenLock.unlock()
+        }
+        let server = UnixSocketServer(path: url.path) { _, _ in }
+        #expect(throws: POSIXError.self) { try server.start() }
+        var info = stat()
+        #expect(lstat(url.path, &info) == 0)
+        #expect((info.st_mode & S_IFMT) == S_IFSOCK)
+        #expect(UInt64(info.st_ino) == keptInode.read() && keptInode.read() != 0)
+    }
+
+    private struct BoundFD {
+        var fd: Int32
+        var inode: UInt64
+    }
+
+    private static func bindSocket(at path: String) throws -> BoundFD {
+        let fd = UnixSocket.makeSocket()
+        try #require(fd >= 0)
+        var address = try #require(UnixSocket.address(for: path))
+        let result = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        guard result == 0 else { close(fd); throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        var info = stat()
+        guard fstat(fd, &info) == 0 else { close(fd); throw POSIXError(.EIO) }
+        return BoundFD(fd: fd, inode: UInt64(info.st_ino))
+    }
+
+    @Test func identityIsCapturedImmediatelyAfterStdinIsArmed() {
+        #expect(BridgeHostStartup.identityIsCapturedImmediatelyAfterStdin())
+    }
+
     @Test func socketIsBoundBeforeStdinAndIdentityFollowsTheReader() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

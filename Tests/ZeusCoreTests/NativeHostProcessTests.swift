@@ -7,6 +7,14 @@ import Glibc
 #endif
 @testable import ZeusCore
 
+private final class PipeWriteFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Int?
+    func store(_ count: Int) { lock.withLock { stored = count } }
+    var isReady: Bool { lock.withLock { stored != nil } }
+    var value: Int { lock.withLock { stored ?? -1 } }
+}
+
 /// A pipe write that returns when the buffer is full. `FileHandle.write` waits until a reader
 /// drains it, which freezes the host fixture when `zeus-bridge` has not armed stdin yet.
 private enum BoundedFileWrite {
@@ -163,15 +171,30 @@ struct NativeHostProcessTests {
     }
 
     /// Chrome's framed stdin is larger than a pipe. The write has to return while the read end is
-    /// still open and idle, or a host that has not armed its reader freezes the suite.
-    @Test func unreadStdinPipeWriteReturnsBeforeTheReaderDrains() throws {
+    /// still open and idle. A blocking write is closed at 2 seconds so the suite fails instead of hanging.
+    @Test func unreadStdinPipeWriteReturnsBeforeTheReaderDrains() async throws {
         let pipe = Pipe()
-        defer { try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close() }
         let payload = Data(repeating: 0x61, count: 512 * 1024)
-        let began = ContinuousClock.now
-        let wrote = try BoundedFileWrite.write(pipe.fileHandleForWriting, payload, timeout: 0.4)
-        #expect(wrote < payload.count)
-        #expect(began.duration(to: .now) < .seconds(1.5))
+        let wrote = PipeWriteFlag()
+        let worker = Task.detached {
+            let count = try? BoundedFileWrite.write(pipe.fileHandleForWriting, payload, timeout: 0.4)
+            if let count { wrote.store(count) }
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while !wrote.isReady, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        if !wrote.isReady {
+            try? pipe.fileHandleForReading.close()
+            _ = await worker.value
+            Issue.record("stdin write did not return before the 2 second test deadline")
+            try? pipe.fileHandleForWriting.close()
+            return
+        }
+        try? pipe.fileHandleForReading.close()
+        try? pipe.fileHandleForWriting.close()
+        _ = await worker.value
+        #expect(wrote.value < payload.count)
     }
 
     @Test func oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled() async throws {
