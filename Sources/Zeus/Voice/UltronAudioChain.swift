@@ -278,6 +278,9 @@ final class UltronAudioChain {
 
     func stop() {
         player.stop()
+        // The player node is not the engine. `OutputEngineLifecycle.stop` stops the engine too,
+        // so a headset is not left in its playback profile for the next listen.
+        engine.stop()
         pending.reset()
         ledger.reset()
         carry = nil
