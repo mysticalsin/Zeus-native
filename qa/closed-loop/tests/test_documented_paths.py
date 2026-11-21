@@ -107,6 +107,15 @@ class DocumentedPaths(unittest.TestCase):
         caller = text.split("func importDefaultIfNeeded", 1)[1].split("static func", 1)[0]
         self.assertIn("defaultKeyPath()", caller)
 
+    def test_scripts_do_not_default_to_a_personal_worktree(self):
+        offenders = []
+        for path in (ROOT / "scripts").rglob("*.sh"):
+            if "dev/zeus-wt" in path.read_text():
+                offenders.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual(offenders, [])
+        script = (ROOT / "scripts/silent-eval.sh").read_text()
+        self.assertIn('LOG_DIR="${ZEUS_SILENT_EVAL_LOG_DIR:-${TMPDIR:-/tmp}/zeus-silent-eval}"', script)
+
     def test_runnable_commands_have_no_undefined_placeholders(self):
         problems = []
         for path in markdown_files():
