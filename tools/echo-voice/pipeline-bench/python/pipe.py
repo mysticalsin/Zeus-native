@@ -23,18 +23,39 @@ sys.path.insert(0, str(HERE.parent / "upstream" / "haru_speech_mlx-0.1.0"))
 import numpy as np  # noqa: E402
 
 
+def refuse(msg: str) -> None:
+    print(f"haru-pipe: {msg}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def load_manifest(wl: Path) -> dict:
+    path = Path(wl) / "manifest.json"
+    try:
+        text = path.read_text()
+    except OSError as err:
+        refuse(f"manifest: {err}")
+    try:
+        man = json.loads(text)
+    except json.JSONDecodeError as err:
+        refuse(f"manifest: {err}")
+    files = man.get("files") if isinstance(man, dict) else None
+    stream = man.get("stream") if isinstance(man, dict) else None
+    if not isinstance(files, list) or not isinstance(stream, dict) or not isinstance(stream.get("file"), str):
+        refuse("manifest: expected files and stream.file")
+    return man
+
+
 def manifest_path(base: Path, name: str) -> Path:
     """Reject absolute paths, empty names, and '..', then keep the resolved path inside base."""
     rel = Path(name)
     root = Path(base).resolve()
     if name == "" or rel.is_absolute() or ".." in rel.parts:
-        print(f"haru-pipe: refusing manifest path {name!r}", file=sys.stderr)
-        raise SystemExit(2)
+        refuse(f"refusing manifest path {name!r}")
     full = (root / rel).resolve()
     if not full.is_relative_to(root):
-        print(f"haru-pipe: refusing manifest path {name!r}", file=sys.stderr)
-        raise SystemExit(2)
+        refuse(f"refusing manifest path {name!r}")
     return full
+
 
 SR, FRAME = 24_000, 3200
 FRAME_MSG, CLIENT_BLOCK = 0x11, 480  # 10 ms speaker callback at 48 kHz
@@ -171,10 +192,14 @@ def stream_run(raw: bytes, max_frames=0, model_ns=0, first_cb=None):
 
 def cmd_bench(a):
     wl, out = Path(a.workload), Path(a.out); out.mkdir(parents=True, exist_ok=True)
-    man = json.loads((wl / "manifest.json").read_text()); res = {"impl": "python"}
+    man = load_manifest(wl); res = {"impl": "python"}
     file_jobs = []
     if a.mode in ("all", "file"):
+        if not man["files"]:
+            refuse("no audio in workload")
         for f in man["files"]:
+            if not isinstance(f, dict) or not isinstance(f.get("file"), str):
+                refuse("manifest: expected files and stream.file")
             file_jobs.append((manifest_path(wl, f["file"]), manifest_path(out, "reply_" + f["file"])))
     stream_src = manifest_path(wl, man["stream"]["file"]) if a.mode in ("all", "stream") else None
     t = now(); import scipy.signal, soundfile  # noqa: F401  first-use imports, timed separately
@@ -184,6 +209,8 @@ def cmd_bench(a):
         for src, dst in file_jobs:
             r, per = file_one(src, dst); files.append(r); per_all += per
         wall = (now() - t0) / 1e9; audio = sum(r["audio_s"] for r in files)
+        if audio == 0:
+            refuse("no audio in workload")
         res["file"] = {"files": files, "wall_s": wall, "audio_s": audio, "rtf": wall / audio, "per_frame": stats(per_all)}
     if a.mode in ("all", "stream"):
         raw = stream_src.read_bytes()
@@ -196,7 +223,7 @@ def cmd_bench(a):
 
 
 def cmd_e2e(a):
-    wl = Path(a.workload); man = json.loads((wl / "manifest.json").read_text())
+    wl = Path(a.workload); man = load_manifest(wl)
     with open(manifest_path(wl, man["stream"]["file"]), "rb") as fh: raw = fh.read(a.frames * 2 * FRAME * 4 + 1_000_000)
     def first(): sys.stdout.write("FIRST_AUDIO\n"); sys.stdout.flush()
     _, per = stream_run(raw, a.frames, int(a.model_ms * 1e6), first)
