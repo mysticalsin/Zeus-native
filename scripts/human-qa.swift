@@ -1282,7 +1282,7 @@ func journeyVoiceProviders(expectFailure: Bool) {
         }
         _ = remove.press()
         let gone = waitFor(c, 4.0) { () -> Bool? in
-            let pill = first([w]) { $0.ident == "settings.voiceProviders.status.elevenlabs" }
+            let pill = first([w]) { $0.ident == "settings.voiceProviders.status" }
             let value = (pill?.value ?? "") + (pill?.desc ?? "")
             return value.localizedCaseInsensitiveContains("Not added") ? true : nil
         }

@@ -260,6 +260,8 @@ struct VoiceQualityPresetTests {
         defaults.set(VoiceQualityPreset.googleNeural2.rawValue, forKey: VoiceQualityOptIn.presetKey)
         #expect(VoiceQualityOptIn.selection(defaults: defaults) == .synthetic)
         defaults.set(VoiceQualityPreset.elevenLabsStudio.rawValue, forKey: VoiceQualityOptIn.presetKey)
+        #expect(VoiceQualityOptIn.selection(defaults: defaults) == .synthetic)
+        VoiceQualityOptIn.set(.elevenLabsStudio, defaults: defaults)
         #expect(VoiceQualityOptIn.selection(defaults: defaults) == .preset(.elevenLabsStudio))
 
         QualityURLStub.reset(reply: .init(status: 200, body: Data([0x49, 0x44, 0x33, 0x04])))

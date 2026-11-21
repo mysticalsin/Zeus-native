@@ -45,6 +45,33 @@ struct VoiceProviderPicker: View {
                 .accessibilityLabel("Provider")
             }
             .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)
+            if selected == ElevenLabsTTSAdapter.id || selected == GoogleCloudTTSAdapter.id {
+                let presets = VoiceQualityPreset.allCases.filter { $0.providerID == selected }
+                HStack(spacing: 12) {
+                    Text("Quality preset").font(GS.rowTitle).foregroundStyle(GS.text)
+                    Spacer(minLength: 12)
+                    Picker("Quality preset", selection: Binding(
+                        get: {
+                            if case .preset(let preset) = VoiceQualityOptIn.selection(defaults: .standard), preset.providerID == selected {
+                                return preset.rawValue
+                            }
+                            return ""
+                        },
+                        set: { raw in
+                            controller.choosePreset(VoiceQualityPreset(rawValue: raw), providerID: selected)
+                        }
+                    )) {
+                        Text("Off").tag("")
+                        ForEach(presets, id: \.rawValue) { preset in
+                            Text(preset.title).tag(preset.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("settings.voiceProviders.preset")
+                    .accessibilityLabel("Quality preset")
+                }
+                .frame(minHeight: VoiceProviderMetrics.standard.rowHeight)
+            }
             if selected != VoiceProviderChoice.localID {
                 Toggle("Use for replies", isOn: Binding(
                     get: { controller.model.rows.first { $0.id == selected }?.isSelected ?? false },
@@ -166,8 +193,26 @@ final class VoiceProvidersController {
 
     func use(_ id: String) {
         configuringID = id == VoiceProviderChoice.localID ? nil : id
-        if id == VoiceProviderChoice.localID { sessionSelect(.local) }
-        else { sessionSelect(.provider(id)) }
+        if id == VoiceProviderChoice.localID {
+            VoiceQualityOptIn.set(nil, defaults: .standard)
+            sessionSelect(.local)
+        } else {
+            if case .preset(let preset) = VoiceQualityOptIn.selection(defaults: .standard), preset.providerID != id {
+                VoiceQualityOptIn.set(nil, defaults: .standard)
+            }
+            sessionSelect(.provider(id))
+        }
+    }
+
+    func choosePreset(_ preset: VoiceQualityPreset?, providerID: String) {
+        VoiceQualityOptIn.applyPicker(providerID: providerID, preset: preset, defaults: .standard)
+        if let preset {
+            configuringID = providerID
+            sessionSelect(.provider(preset.providerID))
+        } else {
+            configuringID = nil
+            sessionSelect(.local)
+        }
     }
 
     func validate() {

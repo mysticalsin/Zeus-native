@@ -13,12 +13,26 @@ public struct IdentitySpeechOutput: SpeechOutputProcessing {
     }
 }
 
-/// The only voice id the speak path may send to a provider.
+/// Where a turn speaks. `synthetic` is the default. A quality preset is used only after an explicit opt-in.
+public enum VoiceSpeakDestination: Equatable, Sendable {
+    case synthetic
+    case quality(VoiceQualityPreset)
+}
+
+/// The generic provider adapter may send only `zeus.synthetic`.
+/// An explicit quality opt-in is routed to `VoiceQualitySpeaker` instead.
 public enum VoiceSpeakAllowlist {
     public static let syntheticID = "zeus.synthetic"
 
     public static func accepts(_ voiceID: String) -> Bool {
         voiceID == syntheticID
+    }
+
+    public static func destination(defaults: UserDefaults) -> VoiceSpeakDestination {
+        switch VoiceQualityOptIn.selection(defaults: defaults) {
+        case .synthetic: .synthetic
+        case .preset(let preset): .quality(preset)
+        }
     }
 }
 

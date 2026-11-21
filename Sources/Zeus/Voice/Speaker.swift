@@ -195,13 +195,23 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
 
     // MARK: Choosing and playing
 
+    /// Explicit quality opt-in speaks through VoiceQualitySpeaker. A migrated provider stays on zeus.synthetic.
+    private func providerSpeech(_ text: String) async -> PluginVoiceBridge.Result {
+        switch VoiceSpeakAllowlist.destination(defaults: .standard) {
+        case .synthetic:
+            return .passthrough
+        case .quality:
+            return await PluginVoiceBridge.speakQuality(text)
+        }
+    }
+
     /// Tries each engine in router order until one produces audio. Returns nil only when nothing could speak.
     private func speakLine(_ text: String, began: Date = Date(), onStart: (@MainActor () -> Void)? = nil) async -> Played? {
         let settings = VoiceSettings.shared
         lineOnStart = onStart
         lineBase = chain.ledger.scheduled
         defer { lineOnStart = nil }
-        switch await PluginVoiceBridge.speak(text) {
+        switch await providerSpeech(text) {
         case .passthrough:
             break
         case .spoken(let engine, let voice, let reason, let firstAudioMs):

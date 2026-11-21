@@ -19,6 +19,10 @@ public struct VoiceProviderPreferences: @unchecked Sendable {
         else { defaults.removeObject(forKey: key) }
     }
 
+    public func clearQualityOptIn() {
+        VoiceQualityOptIn.set(nil, defaults: defaults)
+    }
+
     /// The existing Settings key `voice.ttsProvider`. Local stays `kokoro`.
     public static let selectionKey = "voice.ttsProvider"
     public static func voiceKey(_ providerID: String) -> String { VoiceProviderAccounts.voiceDefaultsKey(for: providerID) }
@@ -259,6 +263,8 @@ public actor VoiceProviderSession {
         catalog[providerID] = nil
         selection.reduce(.remove(providerID))
         preferences.choice = selection.choice
+        preferences.clearQualityOptIn()
+        statusLine = "Not added"
         log.record("provider=\(providerID) removed")
     }
 
@@ -270,7 +276,7 @@ public actor VoiceProviderSession {
         }
         guard VoiceProviderKeyPolicy.accepts(trimmed) else {
             log.record("provider=\(providerID) rejected key")
-            statusLine = "\(descriptor.displayName): the key is not valid."
+            statusLine = VoiceProviderKeyCopy.rejected
             return
         }
         let service = serviceName(providerID)

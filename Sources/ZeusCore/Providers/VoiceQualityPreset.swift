@@ -301,6 +301,16 @@ public enum VoiceQualityPreset: String, Sendable, CaseIterable, Equatable {
         }
     }
 
+    public var title: String {
+        switch self {
+        case .elevenLabsFast: "ElevenLabs Fast"
+        case .elevenLabsStudio: "ElevenLabs Studio"
+        case .googleNeural2: "Google Neural2"
+        case .googleWavenet: "Google WaveNet"
+        case .googleChirpHD: "Google Chirp HD"
+        }
+    }
+
     public var defaultVoiceID: String {
         switch self {
         case .elevenLabsFast: "EXAVITQu4vr4xnSDxMaL"
@@ -402,18 +412,55 @@ public enum VoiceQualitySelection: Equatable, Sendable {
     case preset(VoiceQualityPreset)
 }
 
-/// Providers stay off unless `voice.ttsProvider` names ElevenLabs or Google Cloud and
-/// `voice.quality.preset` names a preset for that same provider. Otherwise the voice is `zeus.synthetic`.
+/// Providers stay off unless the user explicitly chose a preset.
+/// A migrated or legacy `voice.ttsProvider` value is not consent. The default is `zeus.synthetic`.
 public enum VoiceQualityOptIn {
     public static let presetKey = "voice.quality.preset"
+    public static let consentKey = "voice.quality.consent"
+
+    /// Writes the explicit choice. `nil` clears it and leaves the voice on `zeus.synthetic`.
+    public static func set(_ preset: VoiceQualityPreset?, defaults: UserDefaults) {
+        if let preset {
+            defaults.set(true, forKey: consentKey)
+            defaults.set(preset.rawValue, forKey: presetKey)
+            defaults.set(providerRaw(for: preset.providerID), forKey: VoiceProviderPreferences.selectionKey)
+        } else {
+            defaults.set(false, forKey: consentKey)
+            defaults.removeObject(forKey: presetKey)
+        }
+    }
+
+    /// The one settings picker. Local, a mismatched preset, or a missing preset clears the opt-in.
+    public static func applyPicker(providerID: String, preset: VoiceQualityPreset?, defaults: UserDefaults) {
+        guard providerID != VoiceProviderChoice.localID,
+              let preset,
+              preset.providerID == providerID else {
+            set(nil, defaults: defaults)
+            return
+        }
+        set(preset, defaults: defaults)
+    }
 
     public static func selection(defaults: UserDefaults) -> VoiceQualitySelection {
-        let choice = VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: VoiceProviderPreferences.selectionKey))
-        guard case .provider(let id) = choice,
-              let raw = defaults.string(forKey: presetKey),
-              let preset = VoiceQualityPreset(rawValue: raw),
+        guard defaults.bool(forKey: consentKey),
+              let raw = defaults.string(forKey: VoiceProviderPreferences.selectionKey),
+              let id = explicitProviderID(raw),
+              let presetRaw = defaults.string(forKey: presetKey),
+              let preset = VoiceQualityPreset(rawValue: presetRaw),
               preset.providerID == id else { return .synthetic }
         return .preset(preset)
+    }
+
+    private static func explicitProviderID(_ raw: String) -> String? {
+        switch raw {
+        case VoiceTTSProvider.elevenLabs.rawValue: ElevenLabsTTSAdapter.id
+        case VoiceTTSProvider.googleCloud.rawValue: GoogleCloudTTSAdapter.id
+        default: nil
+        }
+    }
+
+    private static func providerRaw(for providerID: String) -> String {
+        providerID == GoogleCloudTTSAdapter.id ? VoiceTTSProvider.googleCloud.rawValue : VoiceTTSProvider.elevenLabs.rawValue
     }
 
     public static func activeVoiceID(defaults: UserDefaults) -> String {
@@ -625,20 +672,16 @@ public struct VoiceQualitySpeaker: Sendable {
     }
 
     public func synthesizeIfEnabled(text: String, defaults: UserDefaults, credential: ProviderCredential) -> Synthesis {
-        let stored = VoiceProviderAccounts.choice(fromTTSProvider: defaults.string(forKey: VoiceProviderPreferences.selectionKey))
-        let choice: VoiceQualitySpeakChoice
-        switch stored {
-        case .provider(let id) where id == ElevenLabsTTSAdapter.id: choice = .elevenLabs
-        case .provider(let id) where id == GoogleCloudTTSAdapter.id: choice = .googleCloud
-        default: choice = .automatic
+        guard case .preset(let preset) = VoiceQualityOptIn.selection(defaults: defaults) else {
+            return Self.refused()
         }
-        let preset = defaults.string(forKey: VoiceQualityOptIn.presetKey).flatMap(VoiceQualityPreset.init(rawValue:))
-        let hasKey = VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") != nil
+        let choice: VoiceQualitySpeakChoice = preset.providerID == GoogleCloudTTSAdapter.id ? .googleCloud : .elevenLabs
+        guard VoiceQualityKeyGate.accepted(credential.fields[ProviderCredentialLocation.account] ?? "") != nil else {
+            return Self.refused()
+        }
         var keys = VoiceQualitySpeakKeys()
-        if hasKey {
-            if choice == .elevenLabs { keys.elevenLabs = true }
-            if choice == .googleCloud { keys.googleCloud = true }
-        }
+        if choice == .elevenLabs { keys.elevenLabs = true }
+        if choice == .googleCloud { keys.googleCloud = true }
         return synthesize(text: text, choice: choice, keys: keys, preset: preset, credential: credential)
     }
 

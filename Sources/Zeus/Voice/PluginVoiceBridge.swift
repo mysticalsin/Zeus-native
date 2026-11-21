@@ -156,6 +156,30 @@ enum PluginVoiceBridge {
         return created
     }
 
+    static func speakQuality(_ text: String) async -> Result {
+        guard case .quality(let preset) = VoiceSpeakAllowlist.destination(defaults: .standard) else {
+            return .passthrough
+        }
+        guard let credential = VoiceQualityKeychain.credential(providerID: preset.providerID, store: KeychainCredentialStore()) else {
+            return .localFallback(reason: "provider is off")
+        }
+        let meter: VoiceQualityMeter
+        do { meter = try VoiceQualityMeter.applicationSupport() }
+        catch { return .localFallback(reason: "character meter unreadable") }
+        let log = ProviderLog { line in NSLog("[ZEUS] voice-provider %@", line) }
+        let speaker = VoiceQualitySpeaker(meter: meter, log: log)
+        let synthesis = speaker.synthesizeIfEnabled(text: text, defaults: .standard, credential: credential)
+        var audio = Data()
+        do {
+            for try await chunk in synthesis.chunks { audio.append(chunk.data) }
+        } catch {
+            return .localFallback(reason: VoiceQualityError.publicName(error))
+        }
+        guard !audio.isEmpty, PluginAudioPlay.play(audio) else { return .localFallback(reason: "no audio") }
+        let engine: UltronEngine = preset.providerID == ElevenLabsTTSAdapter.id ? .elevenLabs : .system
+        return .spoken(engine: engine, voice: preset.defaultVoiceID, reason: "quality preset", firstAudioMs: nil)
+    }
+
     static func speak(_ text: String) async -> Result {
         let choice = VoiceProviderPreferences(defaults: .standard).choice
         guard case .provider = choice else { return .passthrough }

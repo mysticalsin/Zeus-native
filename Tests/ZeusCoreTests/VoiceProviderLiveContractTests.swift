@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Testing
 @testable import ZeusCore
 
@@ -15,11 +18,11 @@ import Testing
 /// Run both by exporting either variable and filtering on `VoiceProviderLiveContractTests`.
 /// Native playback of the returned bytes is MAC-PENDING. This test only checks that the service
 /// accepted the key, listed voices, and returned audio bytes.
-@Suite("Live voice provider contracts")
+@Suite("Live voice provider contracts", .serialized)
 struct VoiceProviderLiveContractTests {
-    @Test(.enabled(if: VoiceProviderLiveGate.elevenLabs != nil))
+    @Test(.disabled(if: VoiceProviderLiveGate.shouldSkip("ZEUS_LIVE_ELEVENLABS_KEY"), "ZEUS_LIVE_ELEVENLABS_KEY is not set"))
     func elevenLabsListsVoicesAndReturnsAudio() async throws {
-        let key = try #require(VoiceProviderLiveGate.elevenLabs)
+        let key = try liveKey("ZEUS_LIVE_ELEVENLABS_KEY")
         let log = LiveLog()
         let transport = URLSessionProviderTransport(timeout: ProviderHTTPBudget.requestTimeout, log: ProviderLog { log.append($0) })
         let adapter = ElevenLabsTTSAdapter()
@@ -35,9 +38,9 @@ struct VoiceProviderLiveContractTests {
         #expect(!log.leaked(key))
     }
 
-    @Test(.enabled(if: VoiceProviderLiveGate.google != nil))
+    @Test(.disabled(if: VoiceProviderLiveGate.shouldSkip("ZEUS_LIVE_GOOGLE_TTS_KEY"), "ZEUS_LIVE_GOOGLE_TTS_KEY is not set"))
     func googleCloudListsVoicesAndReturnsAudio() async throws {
-        let key = try #require(VoiceProviderLiveGate.google)
+        let key = try liveKey("ZEUS_LIVE_GOOGLE_TTS_KEY")
         let log = LiveLog()
         let transport = URLSessionProviderTransport(timeout: ProviderHTTPBudget.requestTimeout, log: ProviderLog { log.append($0) })
         let adapter = GoogleCloudTTSAdapter()
@@ -52,16 +55,65 @@ struct VoiceProviderLiveContractTests {
         #expect(audio.count > 32)
         #expect(!log.leaked(key))
     }
+
+    @Test func aMissingLiveKeyIsCountedAsASkip() {
+        VoiceProviderLiveGate.resetSkips()
+        #expect(VoiceProviderLiveGate.decision(nil, name: "ZEUS_LIVE_ELEVENLABS_KEY") == .skip("ZEUS_LIVE_ELEVENLABS_KEY"))
+        #expect(VoiceProviderLiveGate.decision("  \n", name: "ZEUS_LIVE_GOOGLE_TTS_KEY") == .skip("ZEUS_LIVE_GOOGLE_TTS_KEY"))
+        #expect(VoiceProviderLiveGate.decision("present-key", name: "ZEUS_LIVE_ELEVENLABS_KEY") == .run("present-key"))
+        VoiceProviderLiveGate.noteSkip("ZEUS_LIVE_ELEVENLABS_KEY")
+        VoiceProviderLiveGate.noteSkip("ZEUS_LIVE_GOOGLE_TTS_KEY")
+        #expect(VoiceProviderLiveGate.skipCount == 2)
+        #expect(VoiceProviderLiveGate.skipped == ["ZEUS_LIVE_ELEVENLABS_KEY", "ZEUS_LIVE_GOOGLE_TTS_KEY"])
+    }
+
+    private func liveKey(_ name: String) throws -> String {
+        switch VoiceProviderLiveGate.decision(ProcessInfo.processInfo.environment[name], name: name) {
+        case .skip:
+            #expect(Bool(false), "\(name) is not set")
+            throw LiveKeyMissing(name: name)
+        case .run(let key):
+            return key
+        }
+    }
+}
+
+private struct LiveKeyMissing: Error {
+    var name: String
 }
 
 enum VoiceProviderLiveGate {
-    static var elevenLabs: String? { value("ZEUS_LIVE_ELEVENLABS_KEY") }
-    static var google: String? { value("ZEUS_LIVE_GOOGLE_TTS_KEY") }
+    enum Decision: Equatable {
+        case skip(String)
+        case run(String)
+    }
 
-    private static func value(_ name: String) -> String? {
-        guard let raw = ProcessInfo.processInfo.environment[name] else { return nil }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var names: [String] = []
+
+    static var skipCount: Int { lock.lock(); defer { lock.unlock() }; return names.count }
+    static var skipped: [String] { lock.lock(); defer { lock.unlock() }; return names }
+
+    static func resetSkips() {
+        lock.lock(); names = []; lock.unlock()
+    }
+
+    static func noteSkip(_ name: String) {
+        lock.lock(); names.append(name); lock.unlock()
+    }
+
+    static func shouldSkip(_ name: String) -> Bool {
+        if case .skip(let skipped) = decision(ProcessInfo.processInfo.environment[name], name: name) {
+            noteSkip(skipped)
+            return true
+        }
+        return false
+    }
+
+    static func decision(_ raw: String?, name: String) -> Decision {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmed.isEmpty { return .skip(name) }
+        return .run(trimmed)
     }
 }
 

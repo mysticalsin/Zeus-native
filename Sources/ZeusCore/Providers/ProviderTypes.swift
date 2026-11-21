@@ -225,6 +225,11 @@ public enum ProviderCredentialLocation {
     }
 }
 
+/// Shown when a key is refused. It names what to do next and never includes the key.
+public enum VoiceProviderKeyCopy {
+    public static let rejected = "Paste the key again. It needs 8 to 256 characters and no spaces or line breaks."
+}
+
 public enum VoiceProviderCopy {
     public static let onboarding = "Zeus speaks with the local voice on this Mac. Spoken words are sent to a provider only after you add it, validate it, and select it."
     public static let helper = "Spoken text leaves this Mac only while that provider is selected and ready. If it is not ready, Zeus speaks with the local voice for that turn."

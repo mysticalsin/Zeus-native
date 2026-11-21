@@ -37,3 +37,27 @@ Lowering the minimum from 8 to 7 failed `sevenCharactersAreRejectedAndEightAreAc
 ### Known limits
 
 Linux `swift-corelibs-foundation` aborts inside `URLProtocolClient.wasRedirectedTo`. The production-transport test on Linux delivers the 302 with `didReceive` and checks that `send` refuses it and does not contact the second host. macOS calls `wasRedirectedTo`, and the same delegate returns nil. This Linux run did not build the native macOS app.
+
+## App route: explicit preset opt-in
+
+Lens: a migrated provider must not count as consent, and an explicit preset must reach `VoiceQualitySpeaker`.
+
+Red: `4a700b280d03738d0ab36d0512205d4e2e65f21c`.
+
+### Findings
+
+1. `voice.ttsProvider` set to `elevenLabs` or `googleCloud` by migration, plus a preset key, selected the cloud voice. A legacy domain such as `com.zeus.elevenlabs` could be widened into the same choice.
+2. `VoiceSpeakAllowlist` accepted only `zeus.synthetic`, so the speak path never called `VoiceQualitySpeaker`.
+3. Settings had two pickers, and neither wrote `voice.quality.preset`.
+4. A rejected key said it was not valid, without saying what to do.
+5. Live contract tests used `.enabled(if:)`, so a missing key could look like a pass. The human QA step looked up `settings.voiceProviders.status.elevenlabs`, which is not the status identifier.
+
+### Fixes
+
+- `VoiceQualityOptIn.set` is the only write. It stores `voice.quality.consent`, the preset, and the exact provider raw value. `selection` requires that consent and the exact raw value `elevenLabs` or `googleCloud`.
+- `VoiceSpeakAllowlist.destination` sends an explicit preset to `VoiceQualitySpeaker` and everything else to `zeus.synthetic`.
+- Settings keeps one preset picker, `settings.voiceProviders.preset`, and it calls `applyPicker`.
+- A rejected key says: `Paste the key again. It needs 8 to 256 characters and no spaces or line breaks.`
+- Live tests are `.disabled(if:)` with the variable name, `shouldSkip` counts them, and a missing key inside the test body fails instead of returning. Human QA reads `settings.voiceProviders.status`.
+
+`Speaker.swift` changes are only `providerSpeech` and the `speakLine` switch. `speakKokoro` and `KokoroClausePlayback` are untouched. Timeouts are unchanged.
