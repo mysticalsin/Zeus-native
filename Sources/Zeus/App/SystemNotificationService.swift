@@ -173,6 +173,7 @@ private final class UserNotificationCenterClient: NSObject, SystemNotificationCl
     /// crashed with "bundleProxyForCurrentProcess is nil" the first time any code (not just the
     /// Notifications page) ran unbundled (snapshot rendering, `swift test`, a dev `swift run`).
     private lazy var center = UNUserNotificationCenter.current()
+    private var deliveryBudget = NotificationDeliveryBudget()
 
     /// `UNUserNotificationCenter` needs a real, installed `.app` bundle; every method below
     /// returns a safe no-op instead of calling it when that's not the case.
@@ -217,6 +218,10 @@ private final class UserNotificationCenterClient: NSObject, SystemNotificationCl
         }
         // A repeat of the same alert or cue replaces its banner instead of stacking another.
         if let replace = payload.replaceIdentifier { identifier = replace }
+        if let dropped = deliveryBudget.admit(identifier) {
+            center.removeDeliveredNotifications(withIdentifiers: [dropped])
+            center.removePendingNotificationRequests(withIdentifiers: [dropped])
+        }
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         try? await center.add(request)
     }

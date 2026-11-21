@@ -47,6 +47,8 @@ public struct AlertStack: Equatable, Sendable {
     /// Identical alerts inside this window become one card with a count.
     public static let coalesceWindow: TimeInterval = 5
     public static let maxVisible = 3
+    /// Distinct alerts kept behind the capsule. Older ones leave so a flood cannot grow without a bound.
+    public static let maxQueued = 40
     /// After the pointer leaves, a card keeps at least this long so a hover never ends in an instant dismissal.
     public static let minimumAfterHover: TimeInterval = 1.5
 
@@ -89,6 +91,11 @@ public struct AlertStack: Equatable, Sendable {
         var fresh = alert
         fresh.postedAt = now
         items.insert(fresh, at: 0)
+        if items.count > Self.maxQueued {
+            let dropped = items.removeLast()
+            deadlines[dropped.id] = nil
+            frozenRemaining[dropped.id] = nil
+        }
         refresh(now: now)
         return .added(fresh.id)
     }
