@@ -294,6 +294,19 @@ public enum UpdateClock {
     }
 }
 
+/// Whether opening the card may start a check. A download, verify, or install already running is left alone.
+public enum UpdateAppearance {
+    public static func startsCheckOnAppear(_ state: UpdateSessionState, automaticChecks: Bool, configured: Bool) -> Bool {
+        guard configured, automaticChecks else { return false }
+        switch state {
+        case .downloading, .verifying, .installing:
+            return false
+        default:
+            return true
+        }
+    }
+}
+
 /// Explicit update states. Download, verify, and install cannot be skipped, and each step is checked again.
 public enum UpdateSession {
     public static func initial(_ context: UpdateContext) -> UpdateSessionState {

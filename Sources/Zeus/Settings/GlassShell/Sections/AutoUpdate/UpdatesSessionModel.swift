@@ -48,8 +48,13 @@ final class UpdatesSessionModel {
 
     func appear() {
         reloadConfiguration()
+        let start = UpdateAppearance.startsCheckOnAppear(
+            state,
+            automaticChecks: context.configuration.automaticChecks,
+            configured: context.canAct
+        )
         SettingsStore.shared.actions[UpdateConfiguration.checkNowKey] = { [weak self] in self?.checkNow() }
-        guard context.canAct, context.configuration.automaticChecks else { return }
+        guard start else { return }
         checkNow()
         startSchedule()
     }
