@@ -16,7 +16,7 @@ public enum CLIGate {
 
     public static func isSensitive(op: ZeusCommand.Op, debugSubcommand: String, argument: String) -> Bool {
         switch op {
-        case .listen, .browse, .code, .term: return true
+        case .listen, .browse, .code, .term, .ask, .research: return true
         case .debug:
             if debugSubcommand == "screen-share" { return argument.lowercased() != "state" }
             return sensitiveDebug.contains(debugSubcommand)
@@ -96,4 +96,13 @@ public enum CLIGateStore {
     public static func noticePending(defaults: UserDefaults) -> Bool { defaults.bool(forKey: noticeKey) }
 
     public static func dismissNotice(defaults: UserDefaults) { defaults.removeObject(forKey: noticeKey) }
+}
+
+/// A command-line turn with the privacy switch off stays on this Mac.
+public enum RestrictedTurn {
+    public static func mayUseProvider(restricted: Bool) -> Bool { !restricted }
+
+    public static func memory(_ block: String, restricted: Bool) -> String { restricted ? "" : block }
+
+    public static func history<T>(_ turns: [T], restricted: Bool) -> [T] { restricted ? [] : turns }
 }

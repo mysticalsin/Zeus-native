@@ -427,6 +427,9 @@ final class VoiceTurnController {
 
     /// `zeus "..."`: a typed turn through the same fast path, brain, tags, actions and approvals as a spoken one.
     func textTurn(_ text: String, turn: UUID, deep: Bool, speak: Bool) async -> TurnResult {
+        if !RestrictedTurn.mayUseProvider(restricted: CLIAccess.turnRestricted) {
+            return refuseRestricted(speak: speak)
+        }
         var screenshots: [ScreenShot] = []
         if ScreenAwareness.isScreenQuestion(text) {
             screenshots = await ScreenCapture.captureAll()
@@ -801,6 +804,9 @@ final class VoiceTurnController {
                          // The speculative run behind `replay` was started before the screenshots and the draw prompt
                          // were in hand, so its answer never draws (its coordinates would mean nothing).
                          replaySawScreen: Bool = false) async -> TurnResult {
+        if !RestrictedTurn.mayUseProvider(restricted: CLIAccess.turnRestricted) {
+            return refuseRestricted(speak: speak)
+        }
         // Named agents: "ask Scout to ...", "Scribe, ...". Each has its own persona and memory.
         let agentStore = AgentStore()
         let route = AgentRouter.route(transcript, agents: agentStore.profiles())
@@ -831,7 +837,10 @@ final class VoiceTurnController {
             system += "\n\n" + awareness.promptPrefix
             NSLog("[ZEUS] screen awareness: axTokens=%d preferPixels=%@", awareness.axTokenEstimate, awareness.preferPixels ? "yes" : "no")
         }
-        let memoryBlock = UserMemoryPersistence.shared.load().promptBlock(for: transcript)
+        let memoryBlock = RestrictedTurn.memory(
+            UserMemoryPersistence.shared.load().promptBlock(for: transcript),
+            restricted: CLIAccess.turnRestricted)
+
         if !memoryBlock.isEmpty { system += "\n\n" + memoryBlock }
         var shots = restricted ? [] : screenshots
         if !restricted, !pageText, awareness.needsCapture, shots.isEmpty {
@@ -873,7 +882,7 @@ final class VoiceTurnController {
             screenshots: requestShots,
             axSummary: includeFront ? Self.context(controls: activeTab == nil && !restricted) : nil,
             activeTab: activeTab,
-            history: history,
+            history: RestrictedTurn.history(history, restricted: CLIAccess.turnRestricted),
             systemPrompt: system,
             deep: deep,
             carriesDrawImage: sight.sendsImages,
