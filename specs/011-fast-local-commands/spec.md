@@ -14,8 +14,9 @@ At 150 milliseconds or later it does not act.
 `VoiceTurnController.understand` is the single hook. That function already decides
 what a final transcript can answer without a model. The hook runs first:
 
-1. When Settings has instant commands off, the machine is reset and the transcript
-   is not consumed.
+1. When Settings has instant commands off, or the turn is a restricted command-line
+   turn, the machine is reset and the transcript is not consumed. The existing
+   refusal still applies.
 2. Otherwise the machine is given the transcript, the final-transcript instant, the
    clock, and the injected app list.
 3. A consumed decision is performed and spoken here, and `understand` returns.

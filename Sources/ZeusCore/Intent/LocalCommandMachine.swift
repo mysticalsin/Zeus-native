@@ -1,0 +1,279 @@
+import Foundation
+
+/// One installed app, supplied by the caller. The machine never looks a name up itself.
+public struct LocalApp: Equatable, Sendable {
+    public var name: String
+    public var bundleID: String
+    public var path: String
+    public var aliases: [String]
+    public var isRunning: Bool
+    /// `true` dirty, `false` known clean, `nil` unknown. Unknown asks before a quit.
+    public var hasUnsavedState: Bool?
+
+    public init(name: String, bundleID: String, path: String = "", aliases: [String] = [],
+                isRunning: Bool = false, hasUnsavedState: Bool? = nil) {
+        self.name = name
+        self.bundleID = bundleID
+        self.path = path
+        self.aliases = aliases
+        self.isRunning = isRunning
+        self.hasUnsavedState = hasUnsavedState
+    }
+}
+
+public enum LocalAppVerb: Equatable, Sendable {
+    case open, quit, switchTo
+}
+
+public enum LocalCommandAction: Equatable, Sendable {
+    case open(LocalApp)
+    case quit(LocalApp)
+    case switchTo(LocalApp)
+    case media(LocalMedia)
+    case volume(LocalVolume)
+}
+
+public enum LocalCommandEffect: Equatable, Sendable {
+    /// Start this action before speaking. The clock has already accepted it.
+    case perform(LocalCommandAction)
+    case speak(String)
+    /// The transcript was not taken. The caller continues with the existing route.
+    case fallThrough
+}
+
+public enum LocalCommandState: Equatable, Sendable {
+    case idle
+    case confirmingQuit(LocalApp)
+    case confirmingChoice(LocalAppVerb, [LocalApp])
+    case acted(LocalCommandAction)
+}
+
+public struct LocalCommandDecision: Equatable, Sendable {
+    public var state: LocalCommandState
+    public var effects: [LocalCommandEffect]
+    /// Milliseconds from the final transcript to the clock reading. Nil only when the clock was not read.
+    public var elapsedMilliseconds: Int?
+
+    public var consumed: Bool {
+        !effects.contains(.fallThrough)
+    }
+}
+
+/// A clock the machine reads once per transcript. Tests pass a frozen instant.
+public struct LocalCommandClock: Sendable {
+    public var now: @Sendable () -> ContinuousClock.Instant
+
+    public init(now: @escaping @Sendable () -> ContinuousClock.Instant) {
+        self.now = now
+    }
+
+    public static let system = LocalCommandClock { ContinuousClock.now }
+}
+
+/// Deterministic local commands. One state, one clock reading, no I/O.
+public struct LocalCommandMachine: Equatable, Sendable {
+    public static let latencyBudgetMilliseconds = 150
+
+    public private(set) var state: LocalCommandState
+
+    public init() {
+        state = .idle
+    }
+
+    public mutating func reset() {
+        state = .idle
+    }
+
+    public mutating func receive(_ transcript: String, finalAt: ContinuousClock.Instant,
+                                 clock: LocalCommandClock, apps: [LocalApp]) -> LocalCommandDecision {
+        let elapsed = Self.elapsedMilliseconds(from: finalAt, to: clock.now())
+        guard elapsed < Self.latencyBudgetMilliseconds else {
+            state = .idle
+            return decision(.idle, [.fallThrough], elapsed)
+        }
+        switch state {
+        case .confirmingQuit(let app):
+            return receiveQuitReply(transcript, app: app, elapsed: elapsed, apps: apps)
+        case .confirmingChoice(let verb, let candidates):
+            return receiveChoiceReply(transcript, verb: verb, candidates: candidates, elapsed: elapsed, apps: apps)
+        case .idle, .acted:
+            state = .idle
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps)
+        }
+    }
+
+    // MARK: Replies
+
+    private static let yesWords: Set<String> = [
+        "yes", "yeah", "yep", "yah", "confirm", "do it", "go ahead", "quit it", "please do", "sure", "ok", "okay", "quit",
+    ]
+
+    private static let noWords: Set<String> = [
+        "no", "nope", "nah", "cancel", "dont", "do not", "stop", "never mind", "leave it", "leave it open",
+    ]
+
+    private mutating func receiveQuitReply(_ transcript: String, app: LocalApp, elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+        let words = LocalCommandParser.normalize(transcript)
+        if Self.yesWords.contains(words) {
+            return act(.quit(app), line: "Quitting \(app.name).", elapsed: elapsed)
+        }
+        if Self.noWords.contains(words) {
+            state = .idle
+            return decision(.idle, [.speak("Leaving it open.")], elapsed)
+        }
+        if LocalCommandParser.parse(transcript) != nil {
+            state = .idle
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps)
+        }
+        state = .idle
+        return decision(.idle, [.fallThrough], elapsed)
+    }
+
+    private mutating func receiveChoiceReply(_ transcript: String, verb: LocalAppVerb, candidates: [LocalApp],
+                                             elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+        let words = LocalCommandParser.normalize(transcript)
+        if Self.noWords.contains(words) {
+            state = .idle
+            return decision(.idle, [.speak("Okay.")], elapsed)
+        }
+        if LocalCommandParser.parse(transcript) != nil {
+            state = .idle
+            return receiveFresh(transcript, elapsed: elapsed, apps: apps)
+        }
+        let hits = Self.match(words, in: candidates)
+        switch hits.count {
+        case 0:
+            state = .idle
+            return decision(.idle, [.fallThrough], elapsed)
+        case 1:
+            return resolve(hits[0], verb: verb, elapsed: elapsed)
+        default:
+            return askChoice(verb, hits, elapsed: elapsed)
+        }
+    }
+
+    // MARK: Fresh transcript
+
+    private mutating func receiveFresh(_ transcript: String, elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+        guard let command = LocalCommandParser.parse(transcript) else {
+            return decision(.idle, [.fallThrough], elapsed)
+        }
+        switch command {
+        case .media(let media):
+            let line = switch media {
+            case .play: "Playing."
+            case .pause: "Paused."
+            case .next: "Next."
+            }
+            return act(.media(media), line: line, elapsed: elapsed)
+        case .volume(let volume):
+            let line = switch volume {
+            case .up: "Louder."
+            case .down: "Quieter."
+            case .mute: "Muted."
+            case .unmute: "Unmuted."
+            case .set(let value): "Volume \(value)."
+            }
+            return act(.volume(volume), line: line, elapsed: elapsed)
+        case .open(let query):
+            return resolveQuery(query, verb: .open, elapsed: elapsed, apps: apps)
+        case .quit(let query):
+            return resolveQuery(query, verb: .quit, elapsed: elapsed, apps: apps)
+        case .switchTo(let query):
+            return resolveQuery(query, verb: .switchTo, elapsed: elapsed, apps: apps)
+        }
+    }
+
+    private mutating func resolveQuery(_ query: String, verb: LocalAppVerb, elapsed: Int, apps: [LocalApp]) -> LocalCommandDecision {
+        let hits = Self.match(query, in: apps)
+        switch hits.count {
+        case 0:
+            return decision(.idle, [.fallThrough], elapsed)
+        case 1:
+            return resolve(hits[0], verb: verb, elapsed: elapsed)
+        default:
+            return askChoice(verb, hits, elapsed: elapsed)
+        }
+    }
+
+    private mutating func resolve(_ app: LocalApp, verb: LocalAppVerb, elapsed: Int) -> LocalCommandDecision {
+        switch verb {
+        case .open:
+            return act(.open(app), line: "Opening \(app.name).", elapsed: elapsed)
+        case .switchTo:
+            return act(.switchTo(app), line: "Switching to \(app.name).", elapsed: elapsed)
+        case .quit:
+            guard app.isRunning else {
+                state = .idle
+                return decision(.idle, [.speak("\(app.name) isn't open.")], elapsed)
+            }
+            guard app.hasUnsavedState == false else {
+                state = .confirmingQuit(app)
+                return decision(state, [.speak("Quit \(app.name)? It may have unsaved changes.")], elapsed)
+            }
+            return act(.quit(app), line: "Quitting \(app.name).", elapsed: elapsed)
+        }
+    }
+
+    private mutating func askChoice(_ verb: LocalAppVerb, _ apps: [LocalApp], elapsed: Int) -> LocalCommandDecision {
+        state = .confirmingChoice(verb, apps)
+        return decision(state, [.speak(Self.choicePrompt(apps.map(\.name)))], elapsed)
+    }
+
+    private mutating func act(_ action: LocalCommandAction, line: String, elapsed: Int) -> LocalCommandDecision {
+        state = .acted(action)
+        return decision(state, [.perform(action), .speak(line)], elapsed)
+    }
+
+    private func decision(_ state: LocalCommandState, _ effects: [LocalCommandEffect], _ elapsed: Int) -> LocalCommandDecision {
+        LocalCommandDecision(state: state, effects: effects, elapsedMilliseconds: elapsed)
+    }
+
+    // MARK: Catalog
+
+    /// Exact name or alias, else a space-bounded prefix. Exact hits suppress prefixes.
+    public static func match(_ query: String, in apps: [LocalApp]) -> [LocalApp] {
+        let wanted = LocalCommandParser.normalize(query)
+        guard wanted.count >= 2 else { return [] }
+        var exact: [LocalApp] = []
+        var prefixed: [LocalApp] = []
+        var seen = Set<String>()
+        for app in apps {
+            let identity = app.bundleID.isEmpty ? app.path + app.name : app.bundleID
+            guard seen.insert(identity).inserted else { continue }
+            let keys = [app.name] + app.aliases
+            let normalised = keys.map(LocalCommandParser.normalize).filter { !$0.isEmpty }
+            if normalised.contains(wanted) {
+                exact.append(app)
+            } else if normalised.contains(where: { $0.hasPrefix(wanted + " ") }) {
+                prefixed.append(app)
+            }
+        }
+        return sort(exact.isEmpty ? prefixed : exact)
+    }
+
+    public static func choicePrompt(_ names: [String]) -> String {
+        switch names.count {
+        case 0: "Which one?"
+        case 1: "Did you mean \(names[0])?"
+        case 2: "Did you mean \(names[0]) or \(names[1])?"
+        default:
+            "Did you mean \(names.dropLast().joined(separator: ", ")), or \(names[names.count - 1])?"
+        }
+    }
+
+    private static func sort(_ apps: [LocalApp]) -> [LocalApp] {
+        apps.sorted { lhs, rhs in
+            let order = lhs.name.lowercased().compare(rhs.name.lowercased(), locale: Locale(identifier: "en"))
+            if order == .orderedSame { return lhs.bundleID < rhs.bundleID }
+            return order == .orderedAscending
+        }
+    }
+
+    /// Whole milliseconds, never negative. A clock behind `finalAt` counts as zero.
+    public static func elapsedMilliseconds(from finalAt: ContinuousClock.Instant, to now: ContinuousClock.Instant) -> Int {
+        let components = (now - finalAt).components
+        let milliseconds = components.seconds * 1000 + components.attoseconds / 1_000_000_000_000_000
+        return Int(max(0, milliseconds))
+    }
+}

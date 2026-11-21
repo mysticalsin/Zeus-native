@@ -29,6 +29,10 @@ final class AppIndex: @unchecked Sendable {
 
     var count: Int { lock.withLock { matcher.count } }
 
+    /// The last scan, for a caller that already holds its own copy of the names.
+    /// Reading this does not scan the disk.
+    func snapshot() -> [AppEntry] { lock.withLock { entries } }
+
     @MainActor
     func start() {
         refreshInBackground()

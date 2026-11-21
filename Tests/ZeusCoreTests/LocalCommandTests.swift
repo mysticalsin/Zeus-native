@@ -205,17 +205,17 @@ import Testing
             #expect(LocalCommandParser.parse(phrase) == nil, "parser kept \(phrase)")
             var machine = LocalCommandMachine()
             let decision = machine.receive(phrase, finalAt: Self.origin, clock: clock, apps: Self.catalog)
-            #expect(decision.effects == [.fallThrough], phrase)
-            #expect(decision.consumed == false, phrase)
-            #expect(machine.state == .idle, phrase)
+            #expect(decision.effects == [.fallThrough], "\(phrase)")
+            #expect(decision.consumed == false, "\(phrase)")
+            #expect(machine.state == .idle, "\(phrase)")
         }
 
         var machine = LocalCommandMachine()
-        for phrase in ["open zephyr", "quit zephyr", "switch to zephyr", "go to sleep", "open harbor repo"] {
+        for phrase in ["open meadow", "quit meadow", "switch to meadow", "go to sleep", "open harbor repo"] {
             let decision = machine.receive(phrase, finalAt: Self.origin, clock: clock, apps: Self.catalog)
-            #expect(decision.effects == [.fallThrough], phrase)
-            #expect(Self.performed(decision) == nil, phrase)
-            #expect(machine.state == .idle, phrase)
+            #expect(decision.effects == [.fallThrough], "\(phrase)")
+            #expect(Self.performed(decision) == nil, "\(phrase)")
+            #expect(machine.state == .idle, "\(phrase)")
         }
     }
 
@@ -290,6 +290,10 @@ import Testing
         var exact = LocalCommandMachine()
         let direct = exact.receive("open field notes", finalAt: Self.origin, clock: clock, apps: Self.catalog)
         #expect(Self.performed(direct) == .open(Self.fieldNotes))
+
+        var alias = LocalCommandMachine()
+        let harbour = alias.receive("open harbour", finalAt: Self.origin, clock: clock, apps: Self.catalog)
+        #expect(Self.performed(harbour) == .open(Self.harbor))
     }
 
     @Test func quitAsksUnlessUnsavedStateIsKnownClean() {
