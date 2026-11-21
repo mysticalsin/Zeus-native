@@ -61,7 +61,11 @@ import Testing
                     Issue.record("a remove left the tap installed")
                 }
             }
-            #expect(tap.installed == false)
+            if stops > 0 || installs == 0 {
+                #expect(tap.installed == false)
+            } else {
+                #expect(tap.installed)
+            }
         }
     }
 }

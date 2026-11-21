@@ -26,7 +26,7 @@ public struct WakeTapLifecycle: Equatable, Sendable {
 
     public mutating func remove() -> WakeTapRemoval {
         guard installed else { return .alreadyClear }
-        // Red: a stopped engine used to skip removal. The flag stays set.
-        return .leftInstalled
+        installed = false
+        return .removed
     }
 }

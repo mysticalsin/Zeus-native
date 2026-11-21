@@ -26,6 +26,9 @@ final class WakeWordListener: @unchecked Sendable {
     private var spotted: (at: Date, request: String, changedAt: Date)?
     private var generation = 0
     private var fired = false
+    /// The tap is tracked here so `stop` can remove it after the engine has already stopped,
+    /// and so a second stop does not call `removeTap` when nothing is installed.
+    private var tap = WakeTapLifecycle()
     private var unavailableLogged = false
     private var closingAt: Date?
     // Measurements for the log.
@@ -60,26 +63,38 @@ final class WakeWordListener: @unchecked Sendable {
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else { throw SpeechInput.InputError.recognizerUnavailable }
         lock.withLock { fired = false; vad = VoiceActivity(); preroll = []; prerollSeconds = 0 }
-        input.removeTap(onBus: 0)
+        removeInstalledTap()
         // ~85 ms per buffer at 48 kHz: few wake-ups, still quick to react.
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             self?.feed(buffer)
         }
+        tap.install()
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            removeInstalledTap()
+            throw error
+        }
     }
 
     func stop() {
-        if engine.isRunning {
-            engine.stop()
-            engine.inputNode.removeTap(onBus: 0)
-        }
+        if engine.isRunning { engine.stop() }
+        // The engine may already be stopped (a failed start, sleep, a route change). The tap
+        // still has to come off, and a second stop must not ask again.
+        removeInstalledTap()
         let (request, task) = lock.withLock { () -> (SFSpeechAudioBufferRecognitionRequest?, SFSpeechRecognitionTask?) in
             defer { endWindowLocked() }
             return (self.request, self.task)
         }
         request?.endAudio()
         task?.cancel()
+    }
+
+    /// Removes the tap only when this listener installed one. `WakeTapLifecycle.remove` is the decision.
+    private func removeInstalledTap() {
+        guard tap.remove() == .removed else { return }
+        engine.inputNode.removeTap(onBus: 0)
     }
 
     // MARK: Audio thread
