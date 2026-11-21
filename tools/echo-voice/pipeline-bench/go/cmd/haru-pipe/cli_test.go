@@ -152,4 +152,9 @@ func TestManifestEscapeRefused(t *testing.T) {
 	runCase("subdir/../../../../keep/SENTINEL")
 	runCase(absWav)
 	runCase("")
+	link := filepath.Join(wl, "subdir", "escape.wav")
+	if err := os.Symlink(sentinel, link); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("subdir", "escape.wav"))
 }
