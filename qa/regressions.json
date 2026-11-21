@@ -8686,8 +8686,44 @@
       "check": "portable-bridge-transport",
       "guard": {
         "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
-        "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+      "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+      }
+    },
+    {
+      "id": "REG-976",
+      "failure": "stdin EOF or a bad frame before the host lifetime was attached called exit without stopping the socket, so the socket file could stay behind.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "finishBeforeAttachRemovesTheSocketFile"
+      }
+    },
+    {
+      "id": "REG-977",
+      "failure": "A Chrome frame could settle a pending reply before the bridge had captured its own identity. Until that flag is set, only ping and unknown_type are answered.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered"
+      }
+    },
+    {
+      "id": "REG-978",
+      "failure": "captureOwnIdentity returns nil where no signature can be kept. PeerBinaryRule.decide must refuse that nil own signature instead of trusting the peer.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-socket-safety",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PeerBinaryRuleTests.swift",
+        "function": "nilOwnSignatureFromCaptureOwnIdentityRefusesThePeer"
       }
     }
-]
+  ]
 }

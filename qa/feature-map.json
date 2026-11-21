@@ -6926,6 +6926,10 @@
             {
               "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
               "function": "serverDoesNotRemoveRegularFilesOrSymlinks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PeerBinaryRuleTests.swift",
+              "function": "nilOwnSignatureFromCaptureOwnIdentityRefusesThePeer"
             }
           ]
         },
@@ -7093,6 +7097,14 @@
               "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
             },
             {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishBeforeAttachRemovesTheSocketFile"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered"
+            },
+            {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
               "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
             }
@@ -7214,6 +7226,14 @@
             {
               "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
               "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishBeforeAttachRemovesTheSocketFile"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered"
             },
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",

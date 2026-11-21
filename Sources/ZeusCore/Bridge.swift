@@ -195,9 +195,11 @@ public enum BridgeChromeAdmission {
     }
 
     public static func action(for message: Data, identityReady: Bool) -> Action {
-        _ = identityReady
         if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message) {
             guard response.id.utf8.count <= 256 else { return .close }
+            guard identityReady else {
+                return .reply(.failure(response.id, BridgeError(code: "unknown_type", message: "response")))
+            }
             return .completePending(response)
         }
         guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message),
@@ -207,6 +209,9 @@ public enum BridgeChromeAdmission {
                 "pong": .bool(true), "host": .string(ZeusPaths.nativeHostName),
                 "version": .string(ZeusCoreVersion.string),
             ])))
+        }
+        guard identityReady else {
+            return .reply(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
         }
         return .reply(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
     }
@@ -224,9 +229,15 @@ public final class BridgeHostLifetime: @unchecked Sendable {
     public init(socketPath: String) { self.socketPath = socketPath }
 
     public func attach(input: NativeMessageInput, server: UnixSocketServer) {
-        lock.withLock {
+        let alreadyStopped = lock.withLock { () -> Bool in
             self.input = input
             self.server = server
+            return stopped
+        }
+        if alreadyStopped {
+            input.stop()
+            server.stop()
+            unlink(socketPath)
         }
     }
 
@@ -238,5 +249,6 @@ public final class BridgeHostLifetime: @unchecked Sendable {
         }
         resources.0?.stop()
         resources.1?.stop()
+        unlink(socketPath)
     }
 }

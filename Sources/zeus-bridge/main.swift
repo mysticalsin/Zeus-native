@@ -5,44 +5,18 @@ import ZeusCore
 // surface is ZeusPaths.chromeSocket; no browser, provider or capture API is invoked here.
 let requestTimeout: TimeInterval = 60
 
-/// Coordinates a terminal stream failure with the cancelable stdin reader. Socket peers receive
-/// a failure reply or a transport EOF, never an indefinitely retained reservation.
-final class HostLifetime: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stopped = false
-    private var input: NativeMessageInput?
-    private var server: UnixSocketServer?
-
-    func attach(input: NativeMessageInput, server: UnixSocketServer) {
-        lock.withLock { self.input = input; self.server = server }
-    }
-
-    func finish(code: Int32) {
-        let resources = lock.withLock { () -> (NativeMessageInput?, UnixSocketServer?)? in
-            guard !stopped else { return nil }
-            stopped = true
-            return (input, server)
-        }
-        guard let resources else { return }
-        resources.0?.stop()
-        resources.1?.stop()
-        // A failed framed stream cannot be reused. Exit also closes original stdio descriptors;
-        // a stalled Chrome reader cannot keep this host's input loop alive after output failure.
-        exit(code)
-    }
-}
-
 final class Relay: @unchecked Sendable {
     private enum ProtocolFailure: Error { case invalidMessage }
     private let lock = NSLock()
     private var stopped = false
+    private var identityReady = false
     private let pending = BridgePendingReplies()
     private let output: NativeMessageOutput
-    private let lifetime: HostLifetime
+    private let lifetime: BridgeHostLifetime
     // Only the serial input consumer accesses this decoder.
     private var decoder = NativeMessagingFrame.Decoder()
 
-    init(lifetime: HostLifetime) throws {
+    init(lifetime: BridgeHostLifetime) throws {
         self.lifetime = lifetime
         output = try NativeMessageOutput(handle: .standardOutput)
     }
@@ -76,7 +50,13 @@ final class Relay: @unchecked Sendable {
         guard first else { return }
         output.stop()
         pending.failAll(BridgeError(code: BridgeError.notConnected, message: "Chrome's connection ended"))
-        lifetime.finish(code: code)
+        lifetime.finish()
+        // A failed framed stream cannot be reused. Exit also closes original stdio descriptors.
+        exit(code)
+    }
+
+    func noteIdentityReady() {
+        lock.withLock { identityReady = true }
     }
 
     private func enqueue(_ json: Data) -> NativeMessageOutput.Admission {
@@ -116,24 +96,15 @@ final class Relay: @unchecked Sendable {
     /// Valid late responses are ignored. Invalid framed JSON or oversized correlation IDs close
     /// the transport; stdout cannot be used for diagnostic text or a resynchronization guess.
     private func fromChrome(_ message: Data) throws {
-        if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message) {
-            guard response.id.utf8.count <= 256 else { throw ProtocolFailure.invalidMessage }
+        let ready = lock.withLock { identityReady }
+        switch BridgeChromeAdmission.action(for: message, identityReady: ready) {
+        case .reply(let response):
+            guard let json = Self.encode(response), enqueue(json) == .accepted else {
+                throw ProtocolFailure.invalidMessage
+            }
+        case .completePending(let response):
             pending.complete(response)
-            return
-        }
-        guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message),
-              request.id.utf8.count <= 256 else { throw ProtocolFailure.invalidMessage }
-        let response: BridgeResponse
-        switch request.type {
-        case "ping":
-            response = .success(request.id, .object([
-                "pong": .bool(true), "host": .string(ZeusPaths.nativeHostName),
-                "version": .string(ZeusCoreVersion.string),
-            ]))
-        default:
-            response = .failure(request.id, BridgeError(code: "unknown_type", message: request.type))
-        }
-        guard let json = Self.encode(response), enqueue(json) == .accepted else {
+        case .close:
             throw ProtocolFailure.invalidMessage
         }
     }
@@ -141,26 +112,27 @@ final class Relay: @unchecked Sendable {
     private static func encode(_ response: BridgeResponse) -> Data? { try? JSONEncoder().encode(response) }
 }
 
-let lifetime = HostLifetime()
+let lifetime = BridgeHostLifetime(socketPath: ZeusPaths.chromeSocket.path)
 do {
     let relay = try Relay(lifetime: lifetime)
     let input = try NativeMessageInput(handle: .standardInput)
-    // Arm stdin before asking Security.framework who this binary is. That call can block the main
-    // thread, and Chrome's frame is larger than the pipe: FileHandle.write in the parent then never
-    // returns, so the pending-reply tests sit in the stdin write until the job is killed.
-    input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
-    // Chrome keeps this process running while the app is rebuilt and replaces the installed file.
-    // Read the identity now, before that happens, so a later peer is still recognised. The stdin
-    // source is already running on its own queue.
-    PeerSigning.captureOwnIdentity()
     let server = UnixSocketServer(path: ZeusPaths.chromeSocket.path, peerPolicy: ChromeSocketPeers.policy(environment: ProcessInfo.processInfo.environment),
                                   peerVerifier: ChromeSocketPeers.verifier) { [relay] line, reply in
         relay.forward(line, reply: reply)
     }
+    // Attach before the reader starts, so EOF or a bad frame can stop the socket instead of
+    // exiting with the file still on disk.
     lifetime.attach(input: input, server: server)
-    // Without a socket the extension still connects; the app reports Chrome as unreachable.
     try? server.start()
+    // Arm stdin before asking Security.framework who this binary is. That call can block the main
+    // thread, and Chrome's frame is larger than the pipe.
+    input.start(consume: { [relay] in try relay.consume($0) }, ended: { [relay] in relay.inputEnded($0) })
+    // Chrome keeps this process running while the app is rebuilt and replaces the installed file.
+    // Read the identity now, before that happens, so a later peer is still recognised.
+    PeerSigning.captureOwnIdentity()
+    relay.noteIdentityReady()
     dispatchMain()
 } catch {
+    lifetime.finish()
     exit(2)
 }
