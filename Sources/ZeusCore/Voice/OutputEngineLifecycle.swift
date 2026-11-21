@@ -14,6 +14,6 @@ public struct OutputEngineLifecycle: Equatable, Sendable {
     }
 
     public mutating func stop() {
-        // Red: the player stops and the engine keeps running.
+        running = false
     }
 }
