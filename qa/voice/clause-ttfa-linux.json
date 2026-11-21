@@ -1,0 +1,40 @@
+{
+  "label": "Linux-harness numbers. Not an M-series Mac measurement.",
+  "voice": "bm_george",
+  "speed": 0.88,
+  "lang": "en-gb",
+  "model_load_s": 0.6932004410000445,
+  "full_chars": 709,
+  "first_clause": "The reply is spoken one sentence at a time.",
+  "first_clause_chars": 43,
+  "proposed_ttfa_budget_s": 1.0,
+  "proposed_ttfa_budget_note": "Warm Kokoro on an M-series Mac, first clause of 40-90 characters. Proposed, not measured on a Mac.",
+  "fixture_ttfa_s": 5.313161961999981,
+  "fixture": {
+    "integrated_lufs": -21.783810086079242,
+    "true_peak": 0.5717234764159802,
+    "true_peak_dbtp": -4.85627948373337
+  },
+  "host_full_render_s": 4.6454682900000535,
+  "host_full": {
+    "integrated_lufs": -21.84742313497984,
+    "true_peak": 0.5594883904721468,
+    "true_peak_dbtp": -5.044178415284373
+  },
+  "host_first_clause_s": 0.419026489000089,
+  "host_first_clause": {
+    "integrated_lufs": -21.62546396743606,
+    "true_peak": 0.5098413204845014,
+    "true_peak_dbtp": -5.851299394157498
+  },
+  "polished_full": {
+    "integrated_lufs": -17.803253405589444,
+    "true_peak": 0.8912500468828073,
+    "true_peak_dbtp": -1.000008685893982
+  },
+  "polished_first_clause": {
+    "integrated_lufs": -16.774173259172546,
+    "true_peak": 0.8912500468828073,
+    "true_peak_dbtp": -1.000008685893982
+  }
+}

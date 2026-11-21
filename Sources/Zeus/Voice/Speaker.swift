@@ -21,6 +21,8 @@ extension LineSpeaking {
 /// as its first audio arrives, so the next sentence is requested while the previous one plays.
 @MainActor
 final class Speaker: SentenceSpeaking, LineSpeaking {
+    /// Echo's polish replaces this. The identity default leaves samples unchanged.
+    var speechOutput: any SpeechOutputProcessing = VoiceStreamPolish()
     nonisolated(unsafe) static var urlSession: URLSession = .shared
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
@@ -32,6 +34,16 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         var voice: String
         var reason: String
         var firstAudioMs: Int?
+        /// A later clause failed after audio was scheduled. The line is held, and it is not a success.
+        var partialFailure: Bool
+    }
+
+    /// One engine's result for a line. A partial failure carries the log line the turn must write.
+    private struct LineSpeech {
+        var voice: String
+        var partialFailure: Bool
+        var logStage: String?
+        var logDetail: String?
     }
 
     private let synthesizer = AVSpeechSynthesizer()
@@ -48,6 +60,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     /// How many times the shared output engine has been started (the tests check a key press starts none).
     var outputEngineStarts: Int { chain.engineStarts }
     var attemptOverride: (@MainActor (String) async -> String?)?
+    /// Set when a queued line played some audio and then failed. The talk turn reads this before the done chime.
+    private(set) var turnPartialFailure = false
     private var pump: Task<Void, Never>?
     private var pumpToken: UUID?
     private var systemRendering = false
@@ -104,6 +118,11 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
 
     // MARK: Entry points
 
+    /// Clears the partial-failure flag for a new talk turn.
+    func prepareTurn() {
+        turnPartialFailure = false
+    }
+
     /// `onStart` runs once, on the main actor, when this line's audio starts, before the next line begins.
     func speak(_ text: String, onStart: (@MainActor () -> Void)? = nil) {
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -115,7 +134,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             while let self, !Task.isCancelled {
                 if !self.queue.isEmpty {
                     let line = self.queue.removeFirst()
-                    _ = await self.speakLine(line.text, onStart: line.onStart)
+                    let played = await self.speakLine(line.text, onStart: line.onStart)
+                    if played?.partialFailure == true { self.turnPartialFailure = true }
                 } else if self.chain.isPlaying || self.systemRendering {
                     try? await Task.sleep(for: .milliseconds(40))
                 } else {
@@ -137,17 +157,19 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         let began = Date()
         var first: Played?
         var count = 0
+        var partial = false
         for await sentence in sentenceStream {
             if Task.isCancelled { break }
             let text = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
             let played = await speakLine(text, began: count == 0 ? began : Date())
+            if played?.partialFailure == true { partial = true }
             if first == nil { first = played }
             count += 1
         }
         while (chain.isPlaying || systemRendering), !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
         return SpeakOutcome(engine: first?.engine.logName ?? "none", voice: first?.voice ?? "", reason: first?.reason ?? "nothing was spoken",
-                            firstAudioMs: first?.firstAudioMs, sentences: count)
+                            firstAudioMs: first?.firstAudioMs, sentences: count, partialFailure: partial)
     }
 
     /// Warms the engine the next reply will use. Called on every talk-key press, never at launch. Cloud voices
@@ -198,58 +220,71 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         for decision in settings.routeDecisions() {
             if Task.isCancelled { return nil }
             audioReadyAt = nil
-            guard let voiceName = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
+            guard let spoken = await attempt(decision.engine, text, settings: settings, began: began) else { continue }
             armLineStart() // Engines that never reported a first buffer have still queued their audio by now.
             let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
             if let ms { settings.recordFirstAudio(decision.engine, ms: ms) }
-            logSpoken(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
-            return Played(engine: decision.engine, voice: voiceName, reason: decision.reason, firstAudioMs: ms)
+            if spoken.partialFailure, let stage = spoken.logStage, let detail = spoken.logDetail {
+                VoiceLog.log(stage, detail)
+            } else {
+                logSpoken(engine: decision.engine, voice: spoken.voice, reason: decision.reason, firstAudioMs: ms)
+            }
+            return Played(engine: decision.engine, voice: spoken.voice, reason: decision.reason, firstAudioMs: ms, partialFailure: spoken.partialFailure)
         }
         return nil
     }
 
     /// One engine, one sentence. The voice name on success, nil when this engine could not speak it.
-    private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> String? {
-        if let attemptOverride { return await attemptOverride(text) }
+    private func attempt(_ engine: UltronEngine, _ text: String, settings: VoiceSettings, began: Date) async -> LineSpeech? {
+        if let attemptOverride {
+            guard let voice = await attemptOverride(text) else { return nil }
+            return LineSpeech(voice: voice, partialFailure: false, logStage: nil, logDetail: nil)
+        }
         VoiceLatency.shared.mark(.ttsRequest)
         switch engine {
         case .elevenLabs:
             if let id = await speakElevenLabs(text, began: began) {
                 settings.clearProviderPause(.elevenLabs)
-                return id
+                return LineSpeech(voice: id, partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure(), !settings.isProviderPaused(.elevenLabs) { settings.noteProviderFailure(.elevenLabs, reason: .other("no audio")) }
             return nil
         case .openAI:
             if let voice = await speakOpenAI(text, began: began) {
                 settings.clearProviderPause(.openAICompatible)
-                return voice
+                return LineSpeech(voice: voice, partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.openAICompatible, reason: .offline) }
             return nil
         case .gemini:
             if let voice = await speakGemini(text, began: began) {
                 settings.clearProviderPause(.gemini)
-                return voice
+                return LineSpeech(voice: voice, partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.gemini, reason: .offline) }
             return nil
         case .kokoro:
-            if await speakKokoro(text, voice: settings.kokoroVoice, speed: settings.kokoroSpeed, began: began) {
+            let turn = await speakKokoro(text, voice: OriginalSyntheticVoice.id, speed: settings.kokoroSpeed, began: began)
+            switch turn.disposition {
+            case .fallThrough:
+                if Self.countsAsFailure() { settings.noteProviderFailure(.kokoro, reason: .missingModel) }
+                return nil
+            case .spoken:
                 settings.clearProviderPause(.kokoro)
-                return settings.kokoroVoice
+                return LineSpeech(voice: turn.voice, partialFailure: false, logStage: nil, logDetail: nil)
+            case .partial:
+                return LineSpeech(voice: turn.voice, partialFailure: true, logStage: turn.logStage, logDetail: turn.logDetail)
             }
-            if Self.countsAsFailure() { settings.noteProviderFailure(.kokoro, reason: .missingModel) }
-            return nil
         case .chatterbox:
             if await speakChatterbox(text, began: began) {
                 settings.clearProviderPause(.chatterbox)
-                return "reference"
+                return LineSpeech(voice: "reference", partialFailure: false, logStage: nil, logDetail: nil)
             }
             if Self.countsAsFailure() { settings.noteProviderFailure(.chatterbox, reason: .missingModel) }
             return nil
         case .system:
-            return await speakSystem(text)
+            guard let name = await speakSystem(text) else { return nil }
+            return LineSpeech(voice: name, partialFailure: false, logStage: nil, logDetail: nil)
         }
     }
 
@@ -444,19 +479,65 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         }
     }
 
-    private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> Bool {
-        guard let url = await KokoroVoice.render(text, voice: voice, speed: speed) else { return false }
-        // Rendering takes seconds: if the owner interrupted meanwhile, the finished line is thrown away, never played.
-        guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return false }
-        if Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
-            try? FileManager.default.removeItem(at: url)
-            return false
+    /// `voice` is the persona voice id. Only `zeus.synthetic` is played. The Kokoro pack voice
+    /// stays the engine voice. Clauses go through `ClauseSpeechScheduler`: the first is scheduled
+    /// before the rest render, with a 90 ms gap and a fade-in on every later clause.
+    private func speakKokoro(_ text: String, voice: String, speed: Double, began: Date) async -> KokoroTurnReport {
+        guard OriginalSyntheticVoice.accepts(voice) else {
+            return KokoroTurn.report(
+                KokoroPlayReceipt(succeeded: false, scheduledCount: 0, fallThrough: true),
+                engine: "kokoro",
+                voice: voice)
         }
-        guard chain.scheduleFile(url) else { return false }
-        markAudioReady()
-        return true
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-kokoro-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let engineVoice = VoiceSettings.shared.kokoroVoice
+        let output = speechOutput
+        let token = SpeechCancelToken()
+        let deadline = VoiceTTSChain.firstAudioTimeout + 30
+        // Playback waits on Kokoro off the main actor. `waitForKokoro` posts its render back here,
+        // so waiting on this actor would deadlock the first clause.
+        nonisolated(unsafe) let speaker = self
+        let result = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<KokoroPlayReceipt, Never>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    var clock = SpeechManualClock()
+                    let played = KokoroClausePlayback.play(
+                        text: text,
+                        personaVoiceID: voice,
+                        sampleRate: 24_000,
+                        clock: &clock,
+                        output: output,
+                        token: token,
+                        directory: directory,
+                        deadline: deadline,
+                        render: { chunk, _ in
+                            if token.isCancelled { return nil }
+                            guard let url = KokoroClauseWait.render(chunk, voice: engineVoice, speed: speed, began: began, token: token) else { return nil }
+                            guard SpeechAttemptPolicy.mayPlay(cancelled: token.isCancelled) else {
+                                try? FileManager.default.removeItem(at: url)
+                                return nil
+                            }
+                            return url
+                        },
+                        play: { url in
+                            KokoroClauseWait.scheduleOnMain {
+                                let ok = speaker.chain.scheduleFile(url)
+                                if ok { speaker.markAudioReady() }
+                                return ok
+                            }
+                        })
+                    continuation.resume(returning: played)
+                }
+            }
+        } onCancel: {
+            token.cancel()
+        }
+        return KokoroTurn.report(result, engine: "kokoro", voice: voice)
     }
 
+    /// Renders one clause off the caller's wait. `scheduleFile` reads the shaped file and deletes it;
+    /// originals are removed when `KokoroClausePlayback.play` returns.
     private func speakChatterbox(_ text: String, began: Date) async -> Bool {
         guard let url = await ChatterboxVoice.render(text) else { return false }
         guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { try? FileManager.default.removeItem(at: url); return false }

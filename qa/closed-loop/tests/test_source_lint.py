@@ -306,6 +306,7 @@ AUDITED_BLOCKING_FILES = {
     "Zeus/Brain/SpotlightClient.swift": "mdfind runs only inside Task.detached (VoiceTurnController).",
     "Zeus/Insomnia/InsomniaController.swift": "Quit-time wait for the Insomnia queue, bounded to 3 s.",
     "Zeus/Voice/KokoroWorkerSession.swift": "Child reaping on the worker's own queue and awaited tasks.",
+    "Zeus/Voice/KokoroClauseWait.swift": "Clause render waits on a global queue for the main-actor worker, then schedules audio back on the main queue. speakKokoro does not call these waits on the main actor.",
     "Zeus/Watch/ZeusWatchRunner.swift": "Child wait inside a continuation on a global queue, killed after 3 s.",
     "Zeus/App/KeychainSelfTest.swift": "Command-line self test: no window exists.",
     "Zeus/Voice/VoiceSample.swift": "Command-line sample mode: no window exists.",

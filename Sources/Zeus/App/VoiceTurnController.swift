@@ -817,6 +817,7 @@ final class VoiceTurnController {
         // No network or process work before the engines start: the Ollama check runs at key press and the
         // launch warm-up never blocks a turn (both used to wait here, ahead of the first token).
         VoiceAnswerLatency.beginTurn()
+        speaker.prepareTurn()
         var system = ZeusPrompt.system
         let spokenTranscript = route?.request ?? transcript
         let includeFront = BrainTurnPrep.usesFrontContext(transcript: spokenTranscript)
@@ -1151,7 +1152,9 @@ final class VoiceTurnController {
                 let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
                 speaker.speak(Self.voiced(rest), onStart: reveal)
             }
-            buddy.showCaption(Self.captionTail(spoken))
+            while speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(40)) }
+            let close = VoiceTurnFinish.present(caption: Self.captionTail(spoken), partialFailure: speaker.turnPartialFailure)
+            buddy.showCaption(close.caption)
             buddy.hideCaption()
             // No Screen Recording: one log line and one plain notice per launch, never a permission prompt mid-turn.
             if owesSightNotice, let notice = sightNotice.take(permissionGranted: false) {
@@ -1166,7 +1169,7 @@ final class VoiceTurnController {
             let personality = ZeusPersonality.current()
             let answer = PersonaReplyClamp.clamp(ResponseSanitizer.sanitize(spoken), transcript: transcript, personality: personality)
             if answer.isEmpty { VoiceLog.log("spoken", "(nothing)") } else { VoiceLog.logContent("spoken", answer) }
-            ZeusSound.play(.voiceDone)
+            if close.playDoneChime { ZeusSound.play(.voiceDone) }
             lastAnswerAt = Date()
             if let route, !answer.isEmpty {
                 var memory = agentStore.memory(for: route.agent)
