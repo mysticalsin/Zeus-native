@@ -72,9 +72,11 @@ final class FacePresenceController {
     // MARK: State
 
     private(set) var machine = FacePresenceMachine()
-    /// The faces in the vault, enabled or not. Embeddings never leave this type except as `EnrolledFace` for matching.
+    /// The faces in the vault, enabled or not. Samples are not kept here; a match reads them and drops them.
     private(set) var faces: [FaceRecord] = []
     private(set) var vaultReadable = true
+    /// Fingerprints changed. The template is gone until the owner enrolls again.
+    private(set) var needsReenrol = false
 
     @ObservationIgnored var environment: Environment
     @ObservationIgnored private(set) var cameraRun = 0
@@ -157,7 +159,7 @@ final class FacePresenceController {
     func setFace(_ id: String, enabled: Bool) {
         guard let index = faces.firstIndex(where: { $0.id == id }), faces[index].isEnabled != enabled else { return }
         var updated = faces
-        updated[index] = faces[index].with(isEnabled: enabled)
+        updated[index] = faces[index].with(isEnabled: enabled).withoutSamples()
         commit(updated)
     }
 
@@ -293,9 +295,16 @@ final class FacePresenceController {
             case .enrolling(let token):
                 offerToEnrollment(token: token, analysis: analysis, spoofCues: latched, uptime: frame.uptime)
             case .watching, .present, .away:
-                let verdict = FacePresenceVerdict.decide(observation: analysis.observation, faces: faces.map(\.enrolledFace),
-                                                         spoofCues: latched)
-                send(.observed(verdict, uptime: frame.uptime))
+                let read = environment.vault.withTemplates { records in
+                    let verdict = FacePresenceVerdict.decide(observation: analysis.observation,
+                                                             faces: records.map(\.enrolledFace), spoofCues: latched)
+                    send(.observed(verdict, uptime: frame.uptime))
+                }
+                if case .failure(.biometryChanged) = read {
+                    needsReenrol = true
+                    faces = []
+                    send(.facesChanged(enabledFaces: 0, uptime: frame.uptime))
+                }
             default:
                 break
             }
@@ -326,7 +335,8 @@ final class FacePresenceController {
             let face = FaceRecord(id: UUID().uuidString, name: nextFaceName(), isEnabled: true, revision: result.revision,
                                   samples: result.samples, threshold: result.threshold)
             if environment.vault.save(faces + [face]) == .saved {
-                faces.append(face)
+                faces.append(face.withoutSamples())
+                needsReenrol = false
                 saved = true
             }
         }
@@ -370,9 +380,14 @@ final class FacePresenceController {
 
     private func loadVault() {
         switch environment.vault.load() {
-        case .empty: faces = []; vaultReadable = true
-        case .faces(let stored): faces = stored; vaultReadable = true
-        case .unreadable: faces = []; vaultReadable = false
+        case .empty:
+            faces = []; vaultReadable = true; needsReenrol = false
+        case .faces(let stored):
+            faces = stored.map { $0.withoutSamples() }; vaultReadable = true; needsReenrol = false
+        case .unreadable:
+            faces = []; vaultReadable = false; needsReenrol = false
+        case .reenrol:
+            faces = []; vaultReadable = true; needsReenrol = true
         }
     }
 

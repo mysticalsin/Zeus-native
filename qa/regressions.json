@@ -8676,6 +8676,42 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "A face template could be saved or read without the keychain access control, or a cancelled prompt still stored or returned the print.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "cancelledOrFailedSaveStoresNothing"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "An older face template was deleted before the new protected copy had been read back and matched, or a failed check still removed it.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "migrationKeepsTheOldCopyWhenVerificationFails"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A log line included face-template bytes, or a byte count next to whose face it was.",
+      "features": [
+        "F14"
+      ],
+      "check": "portable-keychain",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+        "function": "logsNeverIncludeTemplateBytesOrASizeTiedToAnIdentity"
+      }
     }
-]
+  ]
 }

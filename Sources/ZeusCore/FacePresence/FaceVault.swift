@@ -41,6 +41,11 @@ public struct FaceRecord: Codable, Equatable, Sendable {
     public func with(isEnabled: Bool) -> FaceRecord {
         FaceRecord(id: id, name: name, isEnabled: isEnabled, revision: revision, samples: samples, threshold: threshold)
     }
+
+    /// The row the card keeps. The samples stay in the protected keychain item, not on this copy.
+    public func withoutSamples() -> FaceRecord {
+        FaceRecord(id: id, name: name, isEnabled: isEnabled, revision: revision, samples: [], threshold: threshold)
+    }
 }
 
 /// Everything the vault file holds.

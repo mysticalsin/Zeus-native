@@ -113,7 +113,7 @@ struct FaceTemplateAccessTests {
         var deletedOld = false
         var deletedNew = false
         let result = FaceTemplateMigration.run(
-            readOld: { .success(old.value) },
+            readOld: { .success(old.value ?? Data()) },
             writeNew: { written.value = $0; return .success(()) },
             readNew: { .success(written.value ?? Data()) },
             deleteNew: { deletedNew = true; written.value = nil; return .success(()) },
@@ -129,7 +129,7 @@ struct FaceTemplateAccessTests {
         var deletedOld = false
         var deletedNew = false
         let result = FaceTemplateMigration.run(
-            readOld: { .success(old.value) },
+            readOld: { .success(old.value ?? Data()) },
             writeNew: { _ in .success(()) },
             readNew: { .success(Data("other-template".utf8)) },
             deleteNew: { deletedNew = true; return .success(()) },
@@ -202,9 +202,9 @@ private final class LockedLines: @unchecked Sendable {
 
 private final class LockedData: @unchecked Sendable {
     private let lock = NSLock()
-    private var stored: Data
-    init(_ value: Data) { stored = value }
-    var value: Data {
+    private var stored: Data?
+    init(_ value: Data?) { stored = value }
+    var value: Data? {
         get { lock.lock(); defer { lock.unlock() }; return stored }
         set { lock.lock(); stored = newValue; lock.unlock() }
     }

@@ -18,25 +18,32 @@ struct FacePresenceCardModel: Equatable {
     let lockAfterLabel: String
     /// The lock time only matters while Face presence is on; while it is Off the row is dimmed and inert.
     let lockAfterEnabled: Bool
+    /// Fingerprints changed, so the saved face print can no longer be read.
+    let needsReenrol: Bool
 
     static let lockAfterChoices = FaceLockAfter.choices.map(\.label)
+    static let enrollNote = FaceTemplateCopy.enroll
+    static let reenrolNote = FaceTemplateCopy.reenrol
 
     /// What VoiceOver reads for the status row, "Face presence status: Away, 1 minute 42 seconds left".
     var statusAccessibilityLabel: String { status.accessibilityText }
 
-    static func make(machine: FacePresenceMachine, faces: [FaceRecord], lockAfterLabel: String, uptime: Double) -> FacePresenceCardModel {
+    static func make(machine: FacePresenceMachine, faces: [FaceRecord], lockAfterLabel: String, uptime: Double,
+                     needsReenrol: Bool = false) -> FacePresenceCardModel {
         FacePresenceCardModel(
             status: machine.status(at: uptime),
             faces: faces.map { FaceRow(id: $0.id, name: $0.name, isEnabled: $0.isEnabled) },
             enrollEnabled: machine.canEnroll,
             // A stored label that is not one of the five reads as the default, as the lock rule does.
             lockAfterLabel: lockAfterChoices.contains(lockAfterLabel) ? lockAfterLabel : FaceLockAfter.defaultLabel,
-            lockAfterEnabled: machine.state != .off)
+            lockAfterEnabled: machine.state != .off,
+            needsReenrol: needsReenrol)
     }
 }
 
-/// The card: a switch, the status, one row per face, Enroll and the lock time. Nothing else: no tagline, no helper
-/// text, no preview of the camera. It holds no rules; every tap goes to the closure it was given.
+/// The card: a switch, the status, one row per face, Enroll and the lock time. Enroll says that saving asks for
+/// Touch ID or the device passcode, and that the face print is not kept after a match. A fingerprint change
+/// says to enroll again. No preview of the camera. It holds no rules; every tap goes to the closure it was given.
 struct GSFacePresenceCard: View {
     let model: FacePresenceCardModel
     @Binding var isOn: Bool
@@ -82,6 +89,22 @@ struct GSFacePresenceCard: View {
                     .buttonStyle(GSButtonStyle())
                     .disabled(!model.enrollEnabled)
             }
+            Text(FacePresenceCardModel.enrollNote)
+                .font(OB.font(12.5))
+                .foregroundStyle(GS.text.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, GS.rowIconColumn).padding(.trailing, 16).padding(.vertical, 8)
+                .accessibilityLabel(FacePresenceCardModel.enrollNote)
+            if model.needsReenrol {
+                Text(FacePresenceCardModel.reenrolNote)
+                    .font(OB.font(12.5))
+                    .foregroundStyle(GS.text.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, GS.rowIconColumn).padding(.trailing, 16).padding(.bottom, 8)
+                    .accessibilityLabel(FacePresenceCardModel.reenrolNote)
+            }
             GSDivider()
             GSRow(symbol: "timer", title: "Lock after absent for") {
                 GSPopup(selection: $lockAfter, options: FacePresenceCardModel.lockAfterChoices, label: "Lock after absent for")
@@ -110,7 +133,8 @@ struct GSFacePresenceCardHost: View {
         GSFacePresenceCard(
             model: FacePresenceCardModel.make(machine: controller.machine, faces: controller.faces,
                                               lockAfterLabel: store.string(FacePresenceController.lockAfterID),
-                                              uptime: ProcessInfo.processInfo.systemUptime),
+                                              uptime: ProcessInfo.processInfo.systemUptime,
+                                              needsReenrol: controller.needsReenrol),
             isOn: store.boolBinding(FacePresenceController.switchID),
             lockAfter: store.stringBinding(FacePresenceController.lockAfterID),
             setFace: { controller.setFace($0, enabled: $1) },

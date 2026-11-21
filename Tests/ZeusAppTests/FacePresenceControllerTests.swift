@@ -48,7 +48,8 @@ struct FacePresenceControllerTests {
         let script = Script()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-controller-\(UUID().uuidString)", isDirectory: true)
         let keychain = KeychainStore(backend: MemoryKeychain(), defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.facecontroller.\(UUID().uuidString)")!)
-        var vault: FaceVaultStore { FaceVaultStore(directory: directory, keychain: keychain) }
+        let templates = MemoryFaceTemplateKeychain()
+        var vault: FaceVaultStore { FaceVaultStore(directory: directory, keychain: keychain, templates: templates) }
         var clock: Double = 1000
         var lockCalls = 0
         var lockResult = true
@@ -488,8 +489,11 @@ struct FacePresenceControllerTests {
         #expect(face.name == "Face 1")
         #expect(face.isEnabled)
         #expect(face.revision == Rig.revision)
-        #expect(face.samples.count == 10)
+        #expect(face.samples.isEmpty)
         #expect(rig.vault.load() == .faces([face]))
+        var storedSamples = 0
+        #expect(rig.vault.withTemplates { storedSamples = $0.first?.samples.count ?? 0 } == .success(()))
+        #expect(storedSamples == 10)
         #expect(rig.controller.machine.state == .watching(since: rig.clock))
         #expect(rig.source.running)
     }
@@ -613,6 +617,8 @@ struct FacePresenceControllerTests {
         // The last face gone: file and key are gone with it.
         #expect(rig.vault.load() == .empty)
         #expect(!FileManager.default.fileExists(atPath: rig.vault.url.path))
+        #expect(!FileManager.default.fileExists(atPath: rig.vault.metaURL.path))
+        #expect(rig.templates.item(account: FaceVaultStore.templateAccount) == nil)
         #expect(rig.keychain.get(FaceVaultStore.keyAccount) == nil)
     }
 
@@ -620,7 +626,7 @@ struct FacePresenceControllerTests {
         let rig = Rig(); defer { rig.cleanUp() }
         rig.enroll("1")
         rig.turnOn()
-        try Data("damaged".utf8).write(to: rig.vault.url)
+        rig.templates.failReads = .cancelled
         rig.controller.setFace("1", enabled: false)
         #expect(rig.controller.faces[0].isEnabled)
         rig.controller.deleteFace("1")
