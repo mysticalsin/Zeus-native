@@ -444,13 +444,33 @@ struct AgentsPageTests {
         let tapped = AgentsPageDestructive.activate(destructive)
         #expect(tapped.page.revision.pending?.action == .deny)
         #expect(tapped.page.revision.pending?.action.isApproval == false)
-        let keys = AgentsPageDestructive.keyboard(destructive, key: .return)
-        #expect(keys.page.revision.pending?.action == .allowOnce)
-        #expect(keys.page.revision.pending?.holdMilliseconds == HubRevision3Timing.destructiveHoldMilliseconds)
+        let down = AgentsPageDestructive.keyDown(destructive, key: .return)
+        #expect(down.page.revision.pending == nil)
+        let short = AgentsPageDestructive.keyUp(down.page, key: .return, elapsedMilliseconds: HubRevision3Timing.destructiveHoldMilliseconds - 1)
+        #expect(short.page.revision.pending?.action.isApproval != true)
+        let again = AgentsPageDestructive.keyDown(destructive, key: .return)
+        let held = AgentsPageDestructive.keyUp(again.page, key: .return, elapsedMilliseconds: 1_500)
+        #expect(held.page.revision.pending?.action == .allowOnce)
+        #expect(held.page.revision.pending?.holdMilliseconds == 1_500)
+        let two = AgentsPageDestructive.keyUp(
+            AgentsPageDestructive.keyDown(destructive, key: .two).page,
+            key: .two,
+            elapsedMilliseconds: 1_400)
+        #expect(two.page.revision.pending?.action == .allowForThisSession)
+        #expect(two.page.revision.pending?.holdMilliseconds == 1_400)
+        let stray = AgentsPageDestructive.keyUp(destructive, key: .return, elapsedMilliseconds: 1_500)
+        #expect(stray.page.revision.pending == nil)
         let spoken = AgentsPageDestructive.confirm(destructive, action: .allowOnce)
         #expect(AgentsPageDestructive.voiceOverConfirmLabel(.allowOnce) == "Confirm Allow once")
-        #expect(spoken.page.revision.pending?.action == .allowOnce)
-        #expect(spoken.page.revision.pending?.holdMilliseconds == HubRevision3Timing.destructiveHoldMilliseconds)
+        #expect(AgentsPageDestructive.voiceOverConfirmLabel(.allowOnce, armed: true) == "Confirm Allow once again")
+        #expect(spoken.page.voiceOverArmed == .allowOnce)
+        #expect(spoken.page.revision.pending?.action.isApproval != true)
+        let switched = AgentsPageDestructive.confirm(spoken.page, action: .allowForThisSession)
+        #expect(switched.page.revision.pending == nil)
+        #expect(switched.page.voiceOverArmed == .allowForThisSession)
+        let second = AgentsPageDestructive.confirm(spoken.page, action: .allowOnce)
+        #expect(second.page.revision.pending?.action == .allowOnce)
+        #expect(second.page.revision.pending?.holdMilliseconds == nil)
     }
 
     @Test func theHoldFillStepsUnderReduceMotionAndUndoShowsItsCountdown() {

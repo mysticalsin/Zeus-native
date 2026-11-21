@@ -805,6 +805,7 @@ private struct TopBarPanelBody: View {
     @State private var agentsNote = ""
     @State private var cardGate = AgentsPageCardGate()
     @State private var destructiveHold: AgentsPageHoldClock?
+    @State private var destructiveKeyClock: AgentsPageKeyClock?
     @FocusState private var agentsApprovalFocused: Bool
 
     /// Glance's layout (TOPBAR-SPEC §2-4): the notch row stays empty, the tab capsule sits at
@@ -1003,15 +1004,8 @@ private struct TopBarPanelBody: View {
             }
         }
         .focusable(destructive)
-        .onKeyPress(.return) {
-            guard destructive else { return .ignored }
-            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .return))
-            return .handled
-        }
-        .onKeyPress(KeyEquivalent("2")) {
-            guard destructive else { return .ignored }
-            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .two))
-            return .handled
+        .onKeyPress(phases: [.down, .up]) { press in
+            destructiveKey(press, destructive: destructive)
         }
     }
 
@@ -1037,9 +1031,10 @@ private struct TopBarPanelBody: View {
         }
         .animation(fill.animates ? .linear(duration: 0.08) : nil, value: fill.fraction)
         .onLongPressGesture(minimumDuration: Double(HubRevision3Timing.destructiveHoldMilliseconds) / 1_000) {
+            let milliseconds = holdMilliseconds(for: action, now: Date())
             destructiveHold = nil
-            adopt(AgentsPageHook.hold(
-                agentsPage, action: action, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds))
+            guard milliseconds >= HubRevision3Timing.destructiveHoldMilliseconds else { return }
+            adopt(AgentsPageHook.hold(agentsPage, action: action, milliseconds: milliseconds))
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
@@ -1052,19 +1047,44 @@ private struct TopBarPanelBody: View {
                     destructiveHold = nil
                 }
         )
-        .onKeyPress(.return) {
-            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .return))
-            return .handled
-        }
-        .onKeyPress(KeyEquivalent("2")) {
-            adopt(AgentsPageDestructive.keyboard(agentsPage, key: .two))
-            return .handled
+        .onKeyPress(phases: [.down, .up]) { press in
+            destructiveKey(press, destructive: true)
         }
         .accessibilityLabel(action.title)
-        .accessibilityHint("Press and hold. \(AgentsPageDestructive.voiceOverConfirmLabel(action)) approves.")
-        .accessibilityAction(named: AgentsPageDestructive.voiceOverConfirmLabel(action)) {
-            destructiveHold = nil
+        .accessibilityHint("Press and hold for 1.2 seconds. \(AgentsPageDestructive.voiceOverConfirmLabel(action, armed: agentsPage.voiceOverArmed == action)) is a separate confirm.")
+        .accessibilityAction(named: AgentsPageDestructive.voiceOverConfirmLabel(action, armed: agentsPage.voiceOverArmed == action)) {
             adopt(AgentsPageDestructive.confirm(agentsPage, action: action))
+        }
+    }
+
+    private func destructiveKey(_ press: KeyPress, destructive: Bool) -> KeyPress.Result {
+        guard destructive else { return .ignored }
+        let key: HubDecisionKey?
+        switch press.key {
+        case .return: key = .return
+        case KeyEquivalent("2"): key = .two
+        default: key = nil
+        }
+        guard let key, let action = key.action, action.isApproval else { return .ignored }
+        switch press.phase {
+        case .down:
+            if destructiveKeyClock?.key != key {
+                let started = Date()
+                destructiveKeyClock = AgentsPageKeyClock(key: key, started: started)
+                destructiveHold = AgentsPageHoldClock(action: action, started: started)
+            }
+            adopt(AgentsPageDestructive.keyDown(agentsPage, key: key))
+            return .handled
+        case .up:
+            let elapsed = destructiveKeyClock?.key == key
+                ? max(0, Int(Date().timeIntervalSince(destructiveKeyClock?.started ?? Date()) * 1_000))
+                : 0
+            destructiveKeyClock = nil
+            destructiveHold = nil
+            adopt(AgentsPageDestructive.keyUp(agentsPage, key: key, elapsedMilliseconds: elapsed))
+            return .handled
+        default:
+            return .ignored
         }
     }
 
@@ -1535,6 +1555,10 @@ struct AgentsPage: Equatable, Sendable {
     var requestSessionIDs: [String: String]
     /// Spoken by the revision machine. Nil until a step keeps it.
     var announcement: String?
+    /// The destructive approval key that is down. A release shorter than the hold does not approve.
+    var destructiveKeyDown: HubDecisionKey?
+    /// The VoiceOver confirm that is waiting for a second, explicit confirm.
+    var voiceOverArmed: HubDecisionAction?
 
     static let countdownStart = 12
     static let undoSeconds = 2
@@ -1576,7 +1600,9 @@ struct AgentsPage: Equatable, Sendable {
             revision: HubRevision3State(),
             requestDetails: [:],
             requestSessionIDs: [:],
-            announcement: nil
+            announcement: nil,
+            destructiveKeyDown: nil,
+            voiceOverArmed: nil
         )
     }
 
@@ -1788,6 +1814,34 @@ struct AgentsPage: Equatable, Sendable {
         next.applyExecutions(since: before)
         next.mirrorRevision()
         next.restoreDetails()
+        next.openedWindow = false
+        next.cardAbovePage = false
+        return next
+    }
+
+    /// The second VoiceOver confirm. It starts the undo window and does not invent a hold duration.
+    func applyingVoiceOverConfirm(_ action: HubDecisionAction) -> AgentsPage {
+        guard voiceOverArmed == action, action.isApproval, let showing = revision.showing, showing.tier == .destructive else {
+            return self
+        }
+        var next = self
+        let at = revision.clock
+        next.revision.pending = HubRevision3Pending(
+            action: action,
+            note: nil,
+            requestIDs: [showing.id],
+            deniesAllQueued: false,
+            undoUntil: at + HubRevision3Timing.undoMilliseconds,
+            holdMilliseconds: nil,
+            fromCountdown: false,
+            tier: showing.tier)
+        next.revision.holdAction = nil
+        next.revision.holdBeganAt = nil
+        next.revision.clock = at
+        next.destructiveKeyDown = nil
+        next.voiceOverArmed = nil
+        next.announcement = HubRevision3Speech.pending(action, deniesAllQueued: false)
+        next.mirrorRevision()
         next.openedWindow = false
         next.cardAbovePage = false
         return next
@@ -2084,25 +2138,62 @@ struct AgentsPageCardGate: Equatable, Sendable {
 }
 
 /// The card on screen. Its id is the approval id, not the session id.
-/// Destructive controls. A click denies. Return, 2, and the VoiceOver confirm action hold for the spec duration.
+/// Destructive controls. A click denies. Return and 2 approve only after a measured hold. VoiceOver confirms twice.
 enum AgentsPageDestructive {
     static func activate(_ page: AgentsPage) -> AgentsPageHook.Step {
         AgentsPageHook.tapDeny(page)
     }
 
+    /// One VoiceOver action arms the confirm. The same action a second time approves, with no invented hold.
     static func confirm(_ page: AgentsPage, action: HubDecisionAction) -> AgentsPageHook.Step {
-        AgentsPageHook.hold(page, action: action, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds)
+        guard page.revision.showing?.tier == .destructive, action.isApproval else {
+            return AgentsPageHook.Step(page: page, sends: [])
+        }
+        guard page.voiceOverArmed == action else {
+            var armed = page
+            armed.voiceOverArmed = action
+            armed.announcement = "Confirm \(action.title) again."
+            return AgentsPageHook.Step(page: armed, sends: [])
+        }
+        return AgentsPageHook.Step(page: page.applyingVoiceOverConfirm(action), sends: [])
     }
 
+    /// A single press has no measured duration, so a destructive approval key does not approve.
     static func keyboard(_ page: AgentsPage, key: HubDecisionKey) -> AgentsPageHook.Step {
         if page.revision.showing?.tier == .destructive, let action = key.action, action.isApproval {
-            return confirm(page, action: action)
+            _ = action
+            return AgentsPageHook.Step(page: page, sends: [])
         }
         return AgentsPageHook.press(page, key)
     }
 
-    static func voiceOverConfirmLabel(_ action: HubDecisionAction) -> String {
-        "Confirm \(action.title)"
+    static func keyDown(_ page: AgentsPage, key: HubDecisionKey) -> AgentsPageHook.Step {
+        guard page.revision.showing?.tier == .destructive, let action = key.action, action.isApproval else {
+            return AgentsPageHook.press(page, key)
+        }
+        var next = page
+        next.destructiveKeyDown = key
+        _ = action
+        return AgentsPageHook.Step(page: next, sends: [])
+    }
+
+    /// `elapsedMilliseconds` is the time from key-down to key-up. Shorter than the spec hold does not approve.
+    static func keyUp(_ page: AgentsPage, key: HubDecisionKey, elapsedMilliseconds: Int) -> AgentsPageHook.Step {
+        guard page.revision.showing?.tier == .destructive,
+              let action = key.action, action.isApproval,
+              page.destructiveKeyDown == key else {
+            return AgentsPageHook.Step(page: page, sends: [])
+        }
+        var released = page
+        released.destructiveKeyDown = nil
+        guard elapsedMilliseconds >= HubRevision3Timing.destructiveHoldMilliseconds else {
+            return AgentsPageHook.Step(page: released, sends: [])
+        }
+        return AgentsPageHook.hold(released, action: action, milliseconds: elapsedMilliseconds)
+    }
+
+    static func voiceOverConfirmLabel(_ action: HubDecisionAction, armed: Bool = false) -> String {
+        armed ? "Confirm \(action.title) again" : "Confirm \(action.title)"
     }
 }
 
@@ -2132,6 +2223,11 @@ enum AgentsPageUndoChip {
 
 private struct AgentsPageHoldClock: Equatable {
     var action: HubDecisionAction
+    var started: Date
+}
+
+private struct AgentsPageKeyClock: Equatable {
+    var key: HubDecisionKey
     var started: Date
 }
 
