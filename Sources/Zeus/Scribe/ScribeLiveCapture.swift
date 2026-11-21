@@ -83,7 +83,8 @@ final class ScribeLiveCaptureProvider: ScribeIssueReportingCaptureProvider, @unc
             current = run
             return old
         }
-        previous?.abandon()
+        // CaptureHandoff: release the previous microphone before the next one begins.
+        previous?.releaseBeforeReplacement()
         run.begin()
     }
 
@@ -137,6 +138,7 @@ private final class ScribeCaptureRun: @unchecked Sendable {
     private let events: @Sendable (ScribeCaptureEvent) -> Void
     private let issues: @Sendable (ScribeCaptureIssue) -> Void
     private let queue = DispatchQueue(label: "zeus.scribe.capture", qos: .userInitiated)
+    private let queueKey = DispatchSpecificKey<UInt8>()
     private let worker = DispatchQueue(label: "zeus.scribe.drain", qos: .userInitiated)
 
     /// Guards the flags below (never taken on an audio thread).
@@ -181,6 +183,7 @@ private final class ScribeCaptureRun: @unchecked Sendable {
         self.frames = frames
         self.events = events
         self.issues = issues
+        queue.setSpecific(key: queueKey, value: 1)
     }
 
     // MARK: Lifecycle
@@ -252,6 +255,29 @@ private final class ScribeCaptureRun: @unchecked Sendable {
                     events(.captureEnded(session))
                 }
             }
+        }
+    }
+
+    /// Blocks until this run has dropped the microphone. The caller is not this run's queue.
+    /// `CaptureHandoff.start` returns `.release` and only then `.begin` for the replacement.
+    func releaseBeforeReplacement() {
+        monitor.ingress.revoke(session: session)
+        lock.withLock {
+            stopRequested = true
+            delivering = false
+        }
+        let work = { [self] in
+            lock.withLock {
+                stopRequested = true
+                finished = true
+                delivering = false
+            }
+            teardown()
+        }
+        if DispatchQueue.getSpecific(key: queueKey) != nil {
+            work()
+        } else {
+            queue.sync(execute: work)
         }
     }
 
