@@ -93,11 +93,13 @@ func main() {
 		if *mode == "all" || *mode == "stream" {
 			raw, err := os.ReadFile(filepath.Join(*wl, man.Stream.File))
 			must(err)
+			framesOut, err := os.Create(filepath.Join(*out, "stream_frames.bin"))
+			must(err)
 			t0 := time.Now()
-			st, per := hp.StreamRun(raw, 0, 0, nil)
+			st, per := hp.StreamRunTo(raw, 0, 0, nil, framesOut)
 			wall := time.Since(t0).Seconds()
+			must(framesOut.Close())
 			audio := float64(len(raw)) / 4 / 48000
-			must(os.WriteFile(filepath.Join(*out, "stream_frames.bin"), st.Msgs, 0o644))
 			res["stream"] = map[string]any{"frames": len(per), "wall_s": wall, "audio_s": audio, "rtf": wall / audio, "per_frame": hp.Summary(per), "drained_samples": st.Drained}
 		}
 	case "e2e":

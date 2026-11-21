@@ -63,19 +63,30 @@ pub fn file_one(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result
 /// NativeServer._serve's audio path plus a client playback jitter buffer.
 pub struct Stream {
     ingest: Ingest, out: Ring, frame: Frame, reply: Frame, pcm48: Vec<f32>, block: Vec<f32>,
-    pub index: u32, pub model: Duration, pub msgs: Vec<u8>, pub drained: usize,
+    pub index: u32, pub model: Duration,
+    /// The most recent FRAME message only. Older payloads are not retained.
+    pub msgs: Vec<u8>,
+    pub emitted_bytes: u64,
+    on_msg: Box<dyn FnMut(&[u8])>,
+    pub drained: usize,
 }
 
 impl Stream {
     pub fn new(model: Duration, expected_bytes: usize) -> Self {
+        let _ = expected_bytes; // callers still pass a hint; messages are not retained
         Stream { ingest: Ingest::new(), out: Ring::new(8 * FRAME_SAMPLES_48K), frame: Frame::silence(), reply: Frame::silence(),
-            pcm48: vec![0.0; FRAME_SAMPLES_48K], block: vec![0.0; CLIENT_BLOCK], index: 1, model, msgs: Vec::with_capacity(expected_bytes), drained: 0 }
+            pcm48: vec![0.0; FRAME_SAMPLES_48K], block: vec![0.0; CLIENT_BLOCK], index: 1, model,
+            msgs: Vec::new(), emitted_bytes: 0, on_msg: Box::new(|_| {}), drained: 0 }
     }
     fn emit(&mut self) {
         sim_model(self.frame.as_slice(), self.reply.as_mut_slice());
         if !self.model.is_zero() { spin_until(Instant::now() + self.model); }
         upsample_2x_into(self.reply.as_slice(), &mut self.pcm48);
-        encode_frame_msg(self.index, 0.0, &self.pcm48, &mut self.msgs);
+        let mut msg = Vec::with_capacity(5 + 8 + 4 * self.pcm48.len());
+        encode_frame_msg(self.index, 0.0, &self.pcm48, &mut msg);
+        self.emitted_bytes += msg.len() as u64;
+        (self.on_msg)(&msg);
+        self.msgs = msg;
         self.index += 1;
         self.out.push(&self.pcm48).expect("jitter buffer overflow");
         while self.out.len() >= CLIENT_BLOCK { self.out.pop_into(&mut self.block).unwrap(); self.drained += CLIENT_BLOCK; }
@@ -86,8 +97,15 @@ impl Stream {
     }
 }
 
-pub fn stream_run(raw: &[u8], max_frames: usize, model: Duration, mut first: impl FnMut()) -> (Stream, Vec<u64>) {
+pub fn stream_run(raw: &[u8], max_frames: usize, model: Duration, first: impl FnMut()) -> (Stream, Vec<u64>) {
+    stream_run_to(raw, max_frames, model, |_| {}, first)
+}
+
+/// Like [`stream_run`], and calls `sink` with each FRAME message so the caller
+/// can write it out without this struct retaining every payload.
+pub fn stream_run_to(raw: &[u8], max_frames: usize, model: Duration, sink: impl FnMut(&[u8]) + 'static, mut first: impl FnMut()) -> (Stream, Vec<u64>) {
     let mut st = Stream::new(model, raw.len() * 2 + 4096);
+    st.on_msg = Box::new(sink);
     let mut rng = XorShift32::new();
     let mut per: Vec<u64> = Vec::with_capacity(raw.len() / (4 * 2 * FRAME_SAMPLES) + 8);
     let (mut acc, mut pos) = (0u64, 0usize);

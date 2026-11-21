@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"sort"
@@ -441,15 +442,18 @@ type Stream struct {
 	reply       Frame
 	pcm48       []float32
 	block       []float32
-	Index       uint32
-	Model       time.Duration
-	Msgs        []byte
-	Drained     int
+	Index         uint32
+	Model         time.Duration
+	Msgs          []byte // most recent FRAME message only
+	BytesEmitted  int
+	sink          io.Writer
+	Drained       int
 }
 
 func NewStream(model time.Duration, expected int) *Stream {
+	_ = expected // retained so callers can still pass a size hint; messages are not buffered
 	return &Stream{in: NewRing(8 * FrameSamples), out: NewRing(8 * FrameSamples48k), pcm48: make([]float32, FrameSamples48k),
-		block: make([]float32, ClientBlock), Index: 1, Model: model, Msgs: make([]byte, 0, expected)}
+		block: make([]float32, ClientBlock), Index: 1, Model: model}
 }
 
 func (s *Stream) emit() {
@@ -458,7 +462,12 @@ func (s *Stream) emit() {
 		SpinUntil(time.Now().Add(s.Model))
 	}
 	Upsample2xInto(s.reply[:], s.pcm48)
-	s.Msgs = EncodeFrameMsg(s.Index, 0, s.pcm48, s.Msgs)
+	msg := EncodeFrameMsg(s.Index, 0, s.pcm48, nil)
+	s.BytesEmitted += len(msg)
+	if s.sink != nil {
+		_, _ = s.sink.Write(msg)
+	}
+	s.Msgs = msg
 	s.Index++
 	if err := s.out.Push(s.pcm48); err != nil {
 		panic(err)
@@ -504,7 +513,14 @@ func (s *Stream) Feed(payload []byte, onFrame func()) {
 }
 
 func StreamRun(raw []byte, maxFrames int, model time.Duration, first func()) (*Stream, []int64) {
+	return StreamRunTo(raw, maxFrames, model, first, nil)
+}
+
+// StreamRunTo is StreamRun with a sink that receives each FRAME message.
+// The in-memory Msgs field keeps only the latest one.
+func StreamRunTo(raw []byte, maxFrames int, model time.Duration, first func(), sink io.Writer) (*Stream, []int64) {
 	st := NewStream(model, 2*len(raw)+4096)
+	st.sink = sink
 	rng := NewXorShift32()
 	per := make([]int64, 0, len(raw)/(4*FrameSamples48k)+8)
 	var acc int64

@@ -47,10 +47,12 @@ fn main() {
             if mode == "all" || mode == "stream" {
                 let raw = std::fs::read(wl.join(&stream)).unwrap();
                 let t0 = Instant::now();
-                let (st, per) = bench::stream_run(&raw, 0, Duration::ZERO, || {});
+                let mut frames_out = std::fs::File::create(out.join("stream_frames.bin")).unwrap();
+                let (st, per) = bench::stream_run_to(&raw, 0, Duration::ZERO, move |msg| {
+                    std::io::Write::write_all(&mut frames_out, msg).unwrap();
+                }, || {});
                 let wall = t0.elapsed().as_secs_f64();
                 let audio = raw.len() as f64 / 4.0 / 48_000.0;
-                std::fs::write(out.join("stream_frames.bin"), &st.msgs).unwrap();
                 parts.push(format!("\"stream\": {{\"frames\": {}, \"wall_s\": {wall}, \"audio_s\": {audio}, \"rtf\": {}, \"per_frame\": {}, \"drained_samples\": {}}}",
                     per.len(), wall / audio, stats::summary_json(&per), st.drained));
             }
