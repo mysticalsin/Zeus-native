@@ -62,6 +62,29 @@ struct VoiceProviderPreferencePreservationTests {
         #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == VoiceTTSProvider.kokoro.rawValue)
     }
 
+    @Test func aStoredCloudEngineDoesNotReadAsLocal() {
+        for provider in [VoiceTTSProvider.gemini, .openAICompatible] {
+            let choice = VoiceProviderAccounts.choice(fromTTSProvider: provider.rawValue)
+            #expect(choice != .local)
+            #expect(VoiceProviderAccounts.ttsProviderRaw(for: choice) == provider.rawValue)
+        }
+    }
+
+    @Test func assigningLocalKeepsAnotherOnDeviceEngine() throws {
+        let defaults = try fresh()
+        let other = try #require(VoiceTTSProvider.allCases.first { !$0.needsKey && $0 != .kokoro })
+        defaults.set(other.rawValue, forKey: VoiceProviderPreferences.selectionKey)
+        VoiceProviderPreferences(defaults: defaults).choice = .local
+        #expect(defaults.string(forKey: VoiceProviderPreferences.selectionKey) == other.rawValue)
+    }
+
+    @Test func theSettingsPickerUsesThePreferenceStore() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Voice/VoiceSettings.swift"), encoding: .utf8)
+        #expect(source.contains("VoiceProviderPreferences"))
+    }
+
     @Test func choosingAnAdapterReplacesThePreservedValue() throws {
         let defaults = try fresh()
         defaults.set(try unsupportedRaw(), forKey: VoiceProviderPreferences.selectionKey)
