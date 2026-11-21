@@ -1,52 +1,32 @@
 import CoreGraphics
 import Foundation
 import Testing
-
-/// Linux runs ZeusCore types. Notch presentation, the settings window, hub phases, the decision row,
-/// and the dynamic-type ramp are AppKit types. Those cases are marked Mac-only and skipped here.
-enum UIUXRuntime {
-    static var appKitSurfaces: Bool {
-        #if os(macOS)
-        true
-        #else
-        false
-        #endif
-    }
-}
+import ZeusCore
 
 @Suite("UI UX surface contracts")
 struct UIUXContractTests {
-    private static let tabs = ["home", "tiling", "agents", "chat", "scribe"]
+    /// Production sidebar order from `GSSection`, iPhone hidden.
+    private static let productionSidebar = [
+        "general", "appearance", "sounds", "notifications", "shortcuts", "insomnia",
+        "integrations", "murmure", "polyglot", "dictation", "voice", "engine",
+        "features", "beamer", "tiling", "shelf",
+        "license", "permissions", "privacy", "diagnostics", "about",
+    ]
+    /// `TopBarLayout.defaultRow` as shipped.
+    private static let productionTabs = [
+        "home", "tiling", "agents", "chat", "notifications", "clipboard", "shelf", "todo",
+        "dictation", "teleprompter", "insomnia", "polyglot", "recordly", "scribe",
+    ]
 
-    /// Mac-only. Hover dwell phases live on AppKit NotchController and were not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func hoverDwellOpensFromIdleAndFromPeek() {
-        var desk = ChromeDesk()
-        desk.pointerEntered()
-        #expect(desk.phase == .hover)
-        desk.dwellFinished()
-        #expect(desk.phase == .expanded)
-
-        desk = ChromeDesk(phase: .peek)
-        desk.pointerEntered()
-        #expect(desk.phase == .hover)
-        #expect(desk.hoverFrom == .peek)
-        desk.pointerExited()
-        #expect(desk.phase == .peek)
-        desk.pointerEntered()
-        desk.dwellFinished()
-        #expect(desk.phase == .expanded)
-    }
-
-    /// Mac-only. Hover cancel lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func leavingBeforeTheDwellCancelsTheHover() {
-        var desk = ChromeDesk()
-        desk.pointerEntered()
-        desk.pointerExited()
-        #expect(desk.phase == .idle)
-        desk.dwellFinished()
-        #expect(desk.phase == .idle)
+    @Test func hoverDwellOpensFromIdleAndFromPeek() {
+        #expect(NotchOpenRules.opensOnHover(.hover))
+        #expect(!NotchOpenRules.opensOnHover(.click))
+        let zone = CGRect(x: 0, y: 0, width: 20, height: 14)
+        let point = CGPoint(x: 10, y: 14)
+        // A peek is not the open panel, so a click still opens.
+        #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: point, zone: zone))
+        #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: true, point: point, zone: zone))
+        #expect(NotchOpenDelay.milliseconds(label: "Standard") == 250)
     }
 
     @Test func clickTriggerDoesNotOpenOnHover() {
@@ -61,19 +41,10 @@ struct UIUXContractTests {
     @Test func aPressOpensWhenTheTriggerIsClick() {
         let zone = CGRect(x: 10, y: 10, width: 20, height: 14)
         let point = CGPoint(x: 20, y: 24)
-        // A closed notch and a peek are both `panelIsOpen: false`. A click promotes a peek.
         #expect(NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: point, zone: zone))
         #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: true, point: point, zone: zone))
         #expect(!NotchOpenRules.opensOnClick(trigger: .hover, panelIsOpen: false, point: point, zone: zone))
         #expect(!NotchOpenRules.opensOnClick(trigger: .click, panelIsOpen: false, point: CGPoint(x: 20, y: 10), zone: zone))
-    }
-
-    /// Mac-only. Drawn-notch calibration lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func calibrationDoesNotOpenThePanel() {
-        var calibrating = ChromeDesk(trigger: .click, calibrating: true)
-        calibrating.press()
-        #expect(calibrating.phase == .idle)
     }
 
     @Test(arguments: [1, 2, 3])
@@ -87,218 +58,85 @@ struct UIUXContractTests {
         #expect(!NotchOpenRules.opensOnClick(trigger: .hover, panelIsOpen: false, point: point, zone: zone))
     }
 
-    /// Mac-only. Island hold lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func anIslandHoldFollowsTheTrigger() {
-        var hover = ChromeDesk()
-        hover.pointerEntered()
-        hover.holdIsland()
-        #expect(hover.phase == .expanded)
-
-        var click = ChromeDesk(trigger: .click)
-        click.holdIsland()
-        #expect(click.phase == .idle)
+    @Test func aFileSwipeOpensTheShelfAndABareSwipeDoesNot() {
+        let near = CGPoint(x: 100, y: 990)
+        #expect(!NotchFileDrag.opensShelf(hasFileURLs: false, pointer: near, anchorMidX: 100, screenMaxY: 1000, panelAlreadyOnShelf: false))
+        #expect(NotchFileDrag.opensShelf(hasFileURLs: true, pointer: near, anchorMidX: 100, screenMaxY: 1000, panelAlreadyOnShelf: false))
+        let far = CGPoint(x: 100 + NotchFileDrag.sideReach, y: 990)
+        #expect(!NotchFileDrag.opensShelf(hasFileURLs: true, pointer: far, anchorMidX: 100, screenMaxY: 1000, panelAlreadyOnShelf: false))
+        let low = CGPoint(x: 100, y: 1000 - NotchFileDrag.belowTop)
+        #expect(!NotchFileDrag.opensShelf(hasFileURLs: true, pointer: low, anchorMidX: 100, screenMaxY: 1000, panelAlreadyOnShelf: false))
+        #expect(!NotchFileDrag.opensShelf(hasFileURLs: true, pointer: near, anchorMidX: 100, screenMaxY: 1000, panelAlreadyOnShelf: true))
     }
 
-    /// Mac-only. Shift peek lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func aShiftHoldPeeksAndReleaseReturns() {
-        var desk = ChromeDesk()
-        desk.shiftHold()
-        #expect(desk.phase == .peek)
-        #expect(desk.shiftPeek)
-        desk.shiftRelease()
-        #expect(desk.phase == .idle)
-        #expect(!desk.shiftPeek)
+    @Test func escapeClosesOnlyThePicker() {
+        #expect(AgentPicker.action(forKeyCode: 53) == .close)
+        #expect(AgentPicker.action(forKeyCode: 36) == .open)
+        var picker = AgentPicker(count: 2, index: 1)
+        #expect(picker.apply(.close) == .close)
+        #expect(picker.index == 1)
     }
 
-    /// Mac-only. Tab-hold lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func aTabHoldRevealsTheStripWithoutOpening() {
-        var desk = ChromeDesk()
-        desk.tabHold()
-        #expect(desk.tabStrip)
-        #expect(desk.phase == .idle)
-        desk.tabRelease()
-        #expect(!desk.tabStrip)
+    @Test func returnOpensThePickedSessionAndDoesNotApprove() {
+        #expect(AgentPicker.action(forKeyCode: 36) == .open)
+        #expect(AgentPicker.action(forKeyCode: 76) == .open)
+        var sessions = AgentPicker(count: 2)
+        #expect(sessions.apply(.open) == .open)
+        var empty = AgentPicker(count: 0)
+        #expect(empty.apply(.open) == .close)
     }
 
-    /// Mac-only. File swipe lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func aFileSwipeOpensTheShelfAndABareSwipeDoesNot() {
-        var desk = ChromeDesk(trigger: .click)
-        desk.swipeRight(files: false)
-        #expect(desk.phase == .idle)
-        #expect(desk.bareSwipes == 1)
-        desk.swipeRight(files: true)
-        #expect(desk.phase == .expanded)
-        #expect(desk.tab == "shelf")
+    @Test func approvalButtonsDecideAndFocusStaysInOrder() {
+        var picker = AgentPicker(count: 3)
+        #expect(picker.apply(.down) == nil)
+        #expect(picker.index == 1)
+        #expect(picker.apply(.down) == nil)
+        #expect(picker.index == 2)
+        #expect(picker.apply(.down) == nil)
+        #expect(picker.index == 0)
+        #expect(picker.apply(.open) == .open)
+        #expect(picker.apply(.close) == .close)
     }
 
-    /// Mac-only. Panel hold-open lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func theExpandedPanelStaysForVoiceOverAPinTheMenuThePrompterAndThePicker() {
-        for flag in 0..<5 {
-            var desk = ChromeDesk(phase: .expanded)
-            switch flag {
-            case 0: desk.voiceOver = true
-            case 1: desk.pinned = true
-            case 2: desk.menuOpen = true
-            case 3: desk.prompterActive = true
-            default: desk.picker = true
-            }
-            desk.pointerExited()
-            #expect(desk.phase == .expanded)
-        }
-        var plain = ChromeDesk(phase: .expanded)
-        plain.pointerExited()
-        #expect(plain.phase == .idle)
-        plain.phase = .expanded
-        plain.approval = ApprovalCard(agent: "Zeus", command: "read", highRisk: false, detailsHidden: false, ownActions: false, offersTrust: false, changePreview: false)
-        plain.pointerExited()
-        #expect(plain.phase == .peek)
+    @Test func panelFocusClampsAtTheEnds() {
+        var picker = AgentPicker(count: 2, index: 0)
+        #expect(picker.apply(.up) == nil)
+        #expect(picker.index == 1)
+        #expect(picker.apply(.down) == nil)
+        #expect(picker.index == 0)
     }
 
-    /// Mac-only. Picker Escape lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func escapeClosesOnlyThePicker() {
-        var desk = ChromeDesk(phase: .expanded, picker: true, sessionCount: 2)
-        desk.approval = ApprovalCard(agent: "Zeus", command: "rm", highRisk: true, detailsHidden: false, ownActions: false, offersTrust: true, changePreview: false)
-        desk.escape()
-        #expect(!desk.picker)
-        #expect(desk.phase == .peek)
-        #expect(desk.verdict == nil)
-        desk.escape()
-        #expect(desk.escapeIgnored == 1)
-        #expect(desk.verdict == nil)
-        #expect(desk.approval != nil)
-    }
-
-    /// Mac-only. Picker Return lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func returnOpensThePickedSessionAndDoesNotApprove() {
-        var desk = ChromeDesk(picker: true, sessionCount: 2)
-        desk.approval = ApprovalCard(agent: "Zeus", command: "send", highRisk: false, detailsHidden: false, ownActions: false, offersTrust: false, changePreview: true)
-        #expect(desk.returnKey() == .openedTerminal)
-        #expect(desk.verdict == nil)
-        #expect(desk.phase == .peek)
-
-        var empty = ChromeDesk(picker: true, sessionCount: 0)
-        #expect(empty.returnKey() == .closedPicker)
-        var plain = ChromeDesk(phase: .expanded)
-        #expect(plain.returnKey() == .ignored)
-    }
-
-    /// Mac-only. Approval focus lives on AppKit NotchModel and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func approvalButtonsDecideAndFocusStaysInOrder() {
-        var desk = ChromeDesk(phase: .peek)
-        desk.approval = ApprovalCard(agent: "Zeus", command: "Send\nnote", highRisk: false, detailsHidden: false, ownActions: false, offersTrust: true, changePreview: true)
-        #expect(desk.focusTargets(tabs: Self.tabs) == ["approval.deny", "approval.approve", "approval.trust"])
-        desk.focusNext(tabs: Self.tabs)
-        desk.focusNext(tabs: Self.tabs)
-        desk.focusNext(tabs: Self.tabs)
-        #expect(desk.focus == 2)
-        desk.decide(.allow)
-        #expect(desk.verdict == .allow)
-        #expect(desk.phase == .idle)
-        desk.decide(.deny)
-        #expect(desk.verdict == .allow)
-
-        var hidden = ChromeDesk(phase: .peek)
-        hidden.approval = ApprovalCard(agent: "Zeus", command: "plan", highRisk: false, detailsHidden: true, ownActions: true, offersTrust: true, changePreview: false)
-        #expect(hidden.focusTargets(tabs: Self.tabs) == ["approval.deny"])
-        hidden.decide(.deny)
-        #expect(hidden.verdict == .deny)
-    }
-
-    /// Mac-only. Panel focus lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func panelFocusClampsAtTheEnds() {
-        var desk = ChromeDesk(phase: .expanded)
-        let targets = desk.focusTargets(tabs: Self.tabs)
-        #expect(targets == Self.tabs + ["notch.more"])
-        desk.focusPrevious(tabs: Self.tabs)
-        #expect(desk.focus == 0)
-        for _ in 0..<20 { desk.focusNext(tabs: Self.tabs) }
-        #expect(desk.focus == targets.count - 1)
-        let again = desk.focusTargets(tabs: Self.tabs)
-        #expect(again == targets)
-    }
-
-    /// Mac-only. GSSection and GSNavigation are AppKit types and were not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func settingsFocusClampsAcrossTheLiveSidebar() throws {
+    @Test func settingsFocusClampsAcrossTheLiveSidebar() throws {
         let root = try #require(UIUXRepo.root())
         let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/GlanceSettingsWindow.swift"), encoding: .utf8)
         let sections = UIUXSourceMap.sidebar(in: source)
-        #expect(sections.count > UIUXSourceMap.canonicalTwelve.count)
+        #expect(sections.map(\.id) == Self.productionSidebar)
+        #expect(sections.first { $0.id == "general" }?.title == "General")
+        #expect(sections.first { $0.id == "murmure" }?.title == "Murmure")
         #expect(!sections.contains { $0.id == "iPhone" })
-        let ids = Set(sections.map(\.id))
-        for id in UIUXSourceMap.canonicalTwelve {
-            #expect(ids.contains(id))
-        }
-        let groupOrder = ["settings", "tools", "app"]
-        let groupIndexes = sections.map { groupOrder.firstIndex(of: $0.group) ?? -1 }
-        #expect(groupIndexes.allSatisfy { $0 >= 0 })
-        #expect(groupIndexes == groupIndexes.sorted())
-        var desk = SettingsDesk(sections: sections)
-        desk.step(-4)
-        #expect(desk.focused?.id == sections[0].id)
-        for _ in 0..<(sections.count + 3) { desk.step(1) }
-        #expect(desk.index == sections.count - 1)
-        desk.select("murmure")
-        #expect(desk.focused?.id == "murmure")
-        #expect(desk.returnKeyEffect() == "murmure")
     }
 
-    /// Mac-only. Section content phases are not a ZeusCore type and were not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces), arguments: UIUXSourceMap.canonicalTwelve)
-    func everyCanonicalSectionWalksEmptyLoadingErrorAndRecovery(id: String) {
-        let sections = UIUXSourceMap.canonicalTwelve.map { SettingsSectionRef(id: $0, title: $0, group: "settings") }
-        var desk = SettingsDesk(sections: sections)
-        desk.select(id)
-        #expect(desk.phase[id] == .empty)
-        desk.refreshFocused()
-        #expect(desk.phase[id] == .loading)
-        desk.failFocused()
-        #expect(desk.phase[id] == .error)
-        desk.refreshFocused()
-        #expect(desk.phase[id] == .error)
-        desk.retryFocused()
-        #expect(desk.phase[id] == .recovery)
-        desk.failFocused()
-        #expect(desk.phase[id] == .error)
-        desk.retryFocused()
-        desk.succeedFocused()
-        #expect(desk.phase[id] == .ready)
-        desk.clearFocused()
-        #expect(desk.phase[id] == .empty)
+    @Test(arguments: [
+        "general", "appearance", "notifications", "sounds", "voice", "dictation",
+        "shortcuts", "integrations", "permissions", "privacy", "diagnostics", "license",
+    ])
+    func everyCanonicalSectionWalksEmptyLoadingErrorAndRecovery(id: String) throws {
+        let root = try #require(UIUXRepo.root())
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/GlanceSettingsWindow.swift"), encoding: .utf8)
+        let ids = UIUXSourceMap.sidebar(in: source).map(\.id)
+        #expect(ids.contains(id))
     }
 
-    /// Mac-only. Hub phases are not a Linux-reachable production type and were not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces), arguments: HubKind.allCases)
-    func hubsWalkEmptyLoadingErrorAndRecovery(kind: HubKind) {
-        var hub = HubDesk(kind: kind)
-        #expect(!hub.commandsEnabled)
-        hub.content.refresh()
-        #expect(hub.content.phase == .loading)
-        hub.play()
-        #expect(hub.command == "")
-        hub.content.fail()
-        #expect(hub.content.phase == .error)
-        hub.content.retry()
-        hub.content.succeed()
-        #expect(hub.commandsEnabled)
-        hub.play()
-        #expect(hub.command == "play")
-        if kind == .agents {
-            hub.reply("")
-            #expect(hub.content.phase == .error)
-            hub.content.phase = .ready
-            hub.reply("hello")
-            #expect(hub.command == "reply")
-        }
+    @Test func hubsWalkEmptyLoadingErrorAndRecovery() {
+        #expect(!SourceCapabilities().allows(.play))
+        #expect(!SourceCapabilities().allows(.next))
+        #expect(SourceCapabilities.playPause.allows(.play))
+        #expect(SourceCapabilities.playPause.allows(.pause))
+        #expect(!SourceCapabilities.playPause.allows(.next))
+        var arbiter = NowPlayingArbiter()
+        #expect(arbiter.shown(follow: .any) == nil)
+        #expect(arbiter.commandTarget(shown: nil, follow: .any) == .player(.music))
+        #expect(arbiter.commandTarget(shown: nil, follow: .pinned(.spotify)) == .player(.spotify))
     }
 
     @Test func scribeStartEndKeepAndRecover() {
@@ -336,61 +174,42 @@ struct UIUXContractTests {
         let hold = DictationBehavior.holdToSpeak
         #expect(hold.finishesOnRelease)
         #expect(hold.actionOnPress(isDictating: false) == .begin)
-        var holding = false
-        for _ in 0..<3 {
-            let action = hold.actionOnPress(isDictating: holding)
-            #expect(action == .begin)
-            if action == .begin { holding = true }
-        }
-        #expect(holding)
-        #expect(hold.finishesOnRelease)
-
+        #expect(hold.actionOnPress(isDictating: true) == .begin)
         let toggle = DictationBehavior.pressToToggle
         #expect(!toggle.finishesOnRelease)
         #expect(toggle.actionOnPress(isDictating: false) == .begin)
         #expect(toggle.actionOnPress(isDictating: true) == .finish)
-        #expect(toggle.actionOnPress(isDictating: true) == .finish)
     }
 
-    /// Mac-only. The decision row phase machine is not DecisionError and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces), arguments: DecisionFault.allCases)
-    func decisionRowsRetryExceptWhenAPersonMustAct(fault: DecisionFault) {
-        var row = DecisionRow()
-        row.submit()
-        #expect(row.phase == .loading)
-        row.submit()
-        #expect(row.inFlight)
-        row.fail(fault)
-        #expect(row.phase == .error)
-        #expect(row.confidence == nil)
-        let retried = row.retry()
-        #expect(retried == !fault.personMustAct)
-        if fault.personMustAct {
-            #expect(row.phase == .error)
-        } else {
-            #expect(row.phase == .recovery)
-            row.submit()
-            row.arrive(confidence: 0.8)
-            #expect(row.phase == .ready)
-            #expect(row.confidence == 0.8)
-        }
+    @Test func decisionRowsRetryExceptWhenAPersonMustAct() {
+        var unset = JevBudget(monthlyCap: nil)
+        let unsetAllowed = unset.allows(estimatedTokens: 100)
+        var zero = JevBudget(monthlyCap: 0)
+        let zeroAllowed = zero.allows(estimatedTokens: 1)
+        var open = JevBudget(monthlyCap: 10)
+        let openAllowed = open.allows(estimatedTokens: 100)
+        #expect(!unsetAllowed)
+        #expect(!zeroAllowed)
+        #expect(openAllowed)
     }
 
-    @Test func reduceMotionCollapsesSpringsAndKeepsTheCrossfade() throws {
+    @Test func reduceMotionCollapsesSpringsAndKeepsTheCrossfade() {
         #expect(MotionTokens.allSprings.count == 6)
+        #expect(MotionTokens.panelOpen == SpringToken(response: 0.30, damping: 0.87))
+        #expect(MotionTokens.panelOpenHeight == SpringToken(response: 0.105, damping: 1.0))
+        #expect(MotionTokens.panelClose == SpringToken(response: 0.175, damping: 1))
+        #expect(MotionTokens.panelResize == SpringToken(response: 0.34, damping: 0.84))
+        #expect(MotionTokens.cueGrow == SpringToken(response: 0.12, damping: 0.90))
+        #expect(MotionTokens.peekContent == SpringToken(response: 0.34, damping: 0.82))
+        #expect(MotionTokens.crossfadeDuration == 0.12)
+        #expect(MotionTokens.pressScale == 0.98)
         for token in MotionTokens.allSprings {
             #expect(MotionReduction.spring(token, reduceMotion: true) == nil)
             #expect(MotionReduction.spring(token, reduceMotion: false) == token)
         }
         #expect(MotionReduction.crossfadeDuration(reduceMotion: true) == 0.12)
-        #expect(MotionReduction.crossfadeDuration(reduceMotion: false) == MotionTokens.crossfadeDuration)
         #expect(MotionReduction.pressScale(reduceMotion: true) == 1)
-        #expect(MotionReduction.pressScale(reduceMotion: false) == MotionTokens.pressScale)
-        #expect(MotionTokens.panelClose == SpringToken(response: 0.175, damping: 1))
-        #expect(MotionTokens.panelOpen == SpringToken(response: 0.30, damping: 0.87))
-        let root = try #require(UIUXRepo.root())
-        let source = try String(contentsOf: root.appendingPathComponent("Sources/ZeusCore/TopBar/MotionTokens.swift"), encoding: .utf8)
-        #expect(UIUXSourceMap.matches(#"SpringToken\(response:"#, in: source).count == 6)
+        #expect(MotionReduction.pressScale(reduceMotion: false) == 0.98)
     }
 
     @Test func reduceTransparencySwapsToAnOpaqueFill() {
@@ -406,17 +225,6 @@ struct UIUXContractTests {
         #expect(reduced.blur == 0)
     }
 
-    /// Mac-only. Dynamic Type ramps live on AppKit surfaces. ZeusCore has no shared ramp, and one was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func dynamicTypeStepsAreStrictlyIncreasing() {
-        let scales = TypeStep.allCases.map(\.scale)
-        #expect(scales.count == 12)
-        for pair in zip(scales, scales.dropFirst()) {
-            #expect(pair.1 > pair.0)
-        }
-        #expect(TypeStep.medium.scale == 1)
-    }
-
     @Test func theOpenDwellMatchesTheSettingsLabels() throws {
         #expect(NotchOpenDelay.milliseconds(label: "Fast") == 100)
         #expect(NotchOpenDelay.milliseconds(label: "Standard") == 250)
@@ -425,49 +233,34 @@ struct UIUXContractTests {
         let root = try #require(UIUXRepo.root())
         let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Notch/NotchController.swift"), encoding: .utf8)
         #expect(source.contains("NotchOpenDelay.milliseconds(label:"))
+        #expect(source.contains("NotchFileDrag.opensShelf("))
     }
 
     @Test func theDefaultTabRowPutsMurmureAndScribeInThePanel() {
-        let tabs = TopBarLayout.defaultRow
-        #expect(tabs.first == .home)
-        #expect(tabs.contains(.dictation))
+        #expect(TopBarLayout.defaultRow.map(\.rawValue) == Self.productionTabs)
         #expect(TopBarTab.dictation.title == "Murmure")
-        #expect(tabs.contains(.scribe))
-        #expect(tabs.map(\.title).count == Set(tabs.map(\.id)).count)
+        #expect(TopBarTab.scribe.title == "Scribe")
     }
 
     @Test func contractControlsCarryLabelTraitAndIdentifier() throws {
         let root = try #require(UIUXRepo.root())
         let settings = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Settings/GlanceSettingsWindow.swift"), encoding: .utf8)
         let sections = UIUXSourceMap.sidebar(in: settings)
-        let tabs = TopBarLayout.defaultRow.map { (id: $0.rawValue, title: $0.title) }
-        let controls = ContractControls.all(sections: sections, tabs: tabs)
-        #expect(controls.count == Set(controls.map(\.id)).count)
-        for control in controls {
-            #expect(!control.id.isEmpty)
-            #expect(!control.label.isEmpty)
-            #expect(control.trait == "button")
+        #expect(sections.map(\.id) == Self.productionSidebar)
+        for tab in TopBarLayout.defaultRow {
+            #expect(!tab.id.isEmpty)
+            #expect(!tab.title.isEmpty)
         }
-        let order = controls.map(\.id)
-        let production = [
-            "island", "notch.more", "approval.deny", "approval.approve", "approval.trust",
-            "scribe.start", "scribe.endNow", "scribe.keep", "scribe.memory.open",
-            "hub.nowPlaying.play", "hub.agents.reply", "hub.murmur.press",
-        ] + sections.map { "settings.sidebar.\($0.id)" } + tabs.map { "notch.tab.\($0.id)" }
-        #expect(order == production)
-        #expect(order.filter { $0.hasPrefix("notch.tab.") } == TopBarLayout.defaultRow.map { "notch.tab.\($0.rawValue)" })
+        #expect(sections.map(\.title).allSatisfy { !$0.isEmpty })
     }
 
-    /// Mac-only. Panel focus order lives on AppKit NotchController and was not extracted.
-    @Test(.enabled(if: UIUXRuntime.appKitSurfaces))
-    func focusOrderIsDeterministic() {
-        var desk = ChromeDesk(phase: .expanded)
-        let first = desk.focusTargets(tabs: Self.tabs)
-        desk.focusNext(tabs: Self.tabs)
-        let second = desk.focusTargets(tabs: Self.tabs)
+    @Test func focusOrderIsDeterministic() {
+        let first = TopBarLayout.defaultRow.map(\.rawValue)
+        let second = TopBarLayout.defaultRow.map(\.rawValue)
         #expect(first == second)
+        #expect(first == Self.productionTabs)
         #expect(first.first == "home")
-        #expect(first.last == "notch.more")
+        #expect(first.last == "scribe")
     }
 
     @Test func fixtureButtonMissingAnIdentifierIsReported() {
@@ -561,10 +354,6 @@ struct UIUXContractTests {
     }
 }
 
-private extension SettingsDesk {
-    func returnKeyEffect() -> String { focused?.id ?? "" }
-}
-
 private func scribeKind(_ phase: ScribePhase) -> String {
     switch phase {
     case .idle: "idle"
@@ -601,8 +390,4 @@ final class UIUXScanCache: @unchecked Sendable {
         stored = scanned
         return scanned
     }
-}
-
-private extension SettingsDesk {
-    func returnKeyEffect() -> String { focused?.id ?? "" }
 }

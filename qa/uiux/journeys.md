@@ -19,11 +19,11 @@ tests. Those tests never write the system settings.
 | Island and notch | idle, hover, peek, expanded |
 | Pointer and clicks | press, hold, double click, triple click, right swipe |
 | Keys | focus order, Escape, Return |
-| Settings | the twelve sections below, plus the rest of the live sidebar |
-| Approval row | deny, approve, trust, hidden details, change preview |
-| Decision row | empty, loading, ready, error, recovery |
-| Scribe and Murmure | start, hold, toggle, end, keep, notes, permission failure |
-| Hubs | now playing, agents, Murmure |
+| Settings | the production sidebar order, including the twelve sections below |
+| Keys | AgentPicker focus, Escape, Return |
+| Decision | JevBudget.allows when the cap is unset, zero, or positive |
+| Scribe and Murmure | ScribeSessionMachine and DictationBehavior |
+| Hubs | SourceCapabilities and NowPlayingArbiter |
 
 The twelve settings sections are General, Appearance, Notifications, Sounds, Voice, Dictation,
 Shortcuts, Integrations, Permissions, Privacy, Diagnostics and License. The live sidebar also
@@ -74,8 +74,7 @@ and the sampled colour. The run folder matches `scripts/human-qa.sh`: a private 
    full panel. Screenshot `shot-j4-peek.png`.
 2. Pixel `pixel-j4-card`: the card fill is inside the peek, and a point 40 pt beside the card is
    not the card (the rest of the menu bar stays usable).
-3. Shift held alone peeks and releases back to idle when no approval is waiting.
-4. Tab held alone shows the tab strip and does not open the panel. Release hides the strip.
+3. The current app does not peek when Shift is held alone, and it does not reveal a tab strip when Tab is held alone. Those two gestures are not part of this contract.
 
 ## J5. Right swipe
 
@@ -111,21 +110,16 @@ and the sampled colour. The run folder matches `scripts/human-qa.sh`: a private 
 
 ## J8. Decision row
 
-1. Submit an empty decision row. It shows loading and ignores a second submit while one is in flight.
-2. A successful result shows ready and a confidence value. Screenshot `shot-j8-ready.png`.
-3. Failures `unavailable`, `http`, `badResponse` and a finished `inFlight` offer recovery, then a
-   retry can succeed.
-4. `noKey`, `capReached` and `reconciliation` stay on the error and do not offer a silent retry.
-   Screenshot `shot-j8-person.png` shows the person-action copy.
-5. The row's contract identifier is `hub.decision`. The Mac pass records whether that identifier
+The app does not have a decision-row phase machine (empty, loading, ready, error, recovery). The executable contract is `JevBudget.allows`: an unset cap and a zero cap refuse the call, and a positive cap allows a small estimate. Screenshot names below are not produced by that contract.
+
+1. The row's contract identifier is `hub.decision`. The Mac pass records whether that identifier
    is present. The current source gap is `ZB-UIUX-DECISION-001` in `qa/uiux/findings.json`.
 
 ## J9. The twelve settings sections
 
-Walk focus from the top of the sidebar. It clamps on the first and last rows. Return selects the
-focused section and does not change its content phase.
+The settings pages do not share an empty, loading, error, and recovery phase machine. The executable contract is the sidebar order parsed from `GSSection` in `GlanceSettingsWindow.swift`, with iPhone hidden. Focus clamp and per-section content phases are not part of this contract.
 
-For each of the twelve, in this order:
+The twelve ids, in the order the contract pins, are general, appearance, sounds, notifications, shortcuts, and insomnia, then the tools group, then license, permissions, privacy, diagnostics, and about. The twelve names below are the ones the contract requires to be present:
 
 | Section | Identifier | Empty shot | Loading shot | Error shot | Recovery shot |
 |---|---|---|---|---|---|
@@ -142,13 +136,8 @@ For each of the twelve, in this order:
 | Diagnostics | `settings.sidebar.diagnostics` | `shot-set-diagnostics-empty.png` | `shot-set-diagnostics-loading.png` | `shot-set-diagnostics-error.png` | `shot-set-diagnostics-ready.png` |
 | License | `settings.sidebar.license` | `shot-set-license-empty.png` | `shot-set-license-loading.png` | `shot-set-license-error.png` | `shot-set-license-ready.png` |
 
-On each section: refresh moves empty to loading; failure moves loading to error; refresh while
-errored stays on the error; retry moves error to recovery; success moves recovery to ready; clear
-moves ready back to empty. Pixel `pixel-set-selected`: the selected sidebar row is filled and the
-row above it is not.
-
-Then visit Insomnia, Murmure, Polyglot, Engine, Features, Beamer, Tiling, Shelf and About the same
-way, one screenshot each at ready: `shot-set-<id>-ready.png`. Confirm the iPhone row is absent.
+Pixel `pixel-set-selected`: the selected sidebar row is filled and the row above it is not.
+Confirm the iPhone row is absent. Insomnia, Murmure, Polyglot, Engine, Features, Beamer, Tiling, Shelf, and About are in the pinned order. There is no per-section empty, loading, error, or recovery shot in this contract.
 
 ## J10. Scribe
 
@@ -171,12 +160,10 @@ way, one screenshot each at ready: `shot-set-<id>-ready.png`. Confirm the iPhone
 
 ## J12. Hubs
 
-Now playing, agents and Murmure each walk empty, loading, error, recovery and ready.
+Now playing, agents, and Murmure do not share an empty, loading, error, and recovery desk. The executable contract is `SourceCapabilities.allows` and `NowPlayingArbiter`: a source with no capabilities ignores play and next, play is allowed once the source has play/pause, an empty arbiter shows nothing, and a command with nothing shown goes to Music unless a player is pinned.
 
-1. While empty, loading or errored, play and reply do nothing. Screenshot `shot-hub-empty.png`.
-2. After recovery succeeds, play is enabled. Screenshot `shot-hub-ready.png`.
-3. An empty agent reply shows the error. A non-empty reply records `reply`.
-4. Identifiers: `hub.nowPlaying.play`, `hub.agents.reply`.
+1. Screenshot `shot-hub-empty.png` is the Mac pass for an empty now-playing hub. It is not an executable phase walk.
+2. Identifiers the Mac pass looks for: `hub.nowPlaying.play`, `hub.agents.reply`.
 
 ## J13. Motion, glass, type
 
@@ -188,9 +175,8 @@ Now playing, agents and Murmure each walk empty, loading, error, recovery and re
 2. Reduce Motion: springs and the press scale collapse to instant (press scale becomes 1). The
    crossfade stays 0.12 s. Screenshot `shot-motion-reduced.png` beside `shot-motion-full.png`.
 3. Reduce Transparency: a blurred surface becomes opaque. Screenshot `shot-glass-opaque.png`.
-4. Dynamic type: the twelve steps from extra small through the largest accessibility size are
-   strictly increasing, with medium at 1. Screenshot the settings sidebar at medium and at the
-   largest size: `shot-type-medium.png`, `shot-type-accessibility.png`.
+4. Dynamic type: ZeusCore has no shared type-scale table on this head. Screenshot the settings sidebar at medium and at the
+   largest size when a Mac pass is run: `shot-type-medium.png`, `shot-type-accessibility.png`. Those shots are not an executable scale contract.
 
 ## What this pass does not prove
 

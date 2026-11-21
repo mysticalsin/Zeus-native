@@ -6660,7 +6660,7 @@
         {
           "id": "F12.uiux-chrome",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Click and hover rules call NotchOpenRules. Hover dwell, shift peek, file swipe, Escape, Return, and approval focus are Mac-only because those phases live on AppKit NotchController and were not extracted. No window and no system setting write.",
+          "acceptance": "Hover and click call NotchOpenRules and NotchOpenDelay. A file drag calls NotchFileDrag. Escape, Return, and picker focus call AgentPicker. The person pass in qa/uiux/journeys.md uses the running window. No system setting write.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -6702,7 +6702,7 @@
         {
           "id": "F12.uiux-decisions",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Mac-only decision-row sketch. DecisionError is the production error. The row phase machine is not a ZeusCore type and was not extracted. No provider call.",
+          "acceptance": "JevBudget.allows refuses a call when the monthly cap is unset or zero, and allows a small estimate when the cap is positive. No provider call.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -8236,7 +8236,7 @@
         {
           "id": "F13.uiux-settings",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Sidebar focus and the twelve section phases are Mac-only because GSSection is AppKit and was not extracted. Contract control order is compared with TopBarLayout.defaultRow and the sidebar parsed from GlanceSettingsWindow. No settings window.",
+          "acceptance": "The sidebar parsed from GlanceSettingsWindow matches the pinned production order, including the twelve canonical sections, and the default tab row matches TopBarLayout. The person pass in qa/uiux/journeys.md uses the settings window. No system setting write.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -8288,7 +8288,7 @@
         {
           "id": "S01.uiux-scribe-murmur",
           "check": "native-ZeusCoreTests",
-          "acceptance": "ScribeSessionMachine covers start, acknowledge, end, keep, capture end, and notes. DictationBehavior covers hold and toggle. Hub phases are Mac-only because there is no Linux-reachable hub type. No microphone and no system setting write.",
+          "acceptance": "ScribeSessionMachine covers start, acknowledge, end, keep, capture end, and notes. DictationBehavior covers hold and toggle. SourceCapabilities and NowPlayingArbiter cover the now-playing command gate. No microphone and no system setting write.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",

@@ -530,8 +530,14 @@ final class NotchController {
             }
         }
         let mouse = NSEvent.mouseLocation
-        let near = abs(mouse.x - anchorFrame(screen).midX) < 330 && mouse.y > screen.frame.maxY - 110
-        if near, !(model.presentation == .panel && topBar.selectedTab == .shelf) {
+        let frame = anchorFrame(screen)
+        if NotchFileDrag.opensShelf(
+            hasFileURLs: true,
+            pointer: mouse,
+            anchorMidX: frame.midX,
+            screenMaxY: screen.frame.maxY,
+            panelAlreadyOnShelf: model.presentation == .panel && topBar.selectedTab == .shelf
+        ) {
             topBar.selectedTab = .shelf
             show(.panel)
         }
