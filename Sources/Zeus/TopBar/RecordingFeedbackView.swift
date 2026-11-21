@@ -137,6 +137,7 @@ struct RecordingFeedbackFrameView: View {
         case .completed: "checkmark.circle.fill"
         case .failed: "exclamationmark.triangle.fill"
         case .starting: "record.circle"
+        case .recording: "record.circle.fill"
         case .finishing, .writing: "text.badge.checkmark"
         case .exporting: "square.and.arrow.up"
         }
@@ -173,7 +174,13 @@ extension ScribeController {
             return .init(producer: .meetings, phase: .completed, sessionKey: key, beganAt: began, label: "Meeting notes saved")
         case .failed:
             return .init(producer: .meetings, phase: .failed, sessionKey: key, beganAt: began, label: "Meeting needs attention")
-        case .idle, .recording, .ending: return nil
+        case .recording:
+            guard let shown = ScribeRecordingIndicator.feedback(for: "recording") else { return nil }
+            return .init(producer: .meetings, phase: .recording, sessionKey: key, beganAt: began, label: shown.label)
+        case .ending:
+            guard let shown = ScribeRecordingIndicator.feedback(for: "ending") else { return nil }
+            return .init(producer: .meetings, phase: .recording, sessionKey: key, beganAt: began, label: shown.label)
+        case .idle: return nil
         }
     }
 }
