@@ -30,7 +30,17 @@ public enum PinnedDownloadHosts {
     public static let kokoro: Set<String> = ["github.com", "release-assets.githubusercontent.com"]
 }
 
-/// An extracted archive must stay within the same byte cap. These pinned downloads are single files.
+/// Bytes `pip install faster-whisper` may leave on disk.
+/// The known total is the unpacked size of the six large macOS wheels measured from PyPI
+/// (ctranslate2 62318280, onnxruntime 83215359, av 68390463, numpy 50124502, tokenizers 10106273,
+/// hf-xet 8426554) plus 11986242 bytes for the small pure-Python wheels in that install.
+/// The cap adds 25 percent.
+public enum FasterWhisperUnpack {
+    public static let knownBytes: Int64 = 294_567_673
+    public static var maximumBytes: Int64 { PinnedModelBytes.cap(knownBytes) }
+}
+
+/// An extracted archive must stay within the byte cap. The pinned Whisper and Kokoro files are not archives.
 public enum ArchiveUnpackCap {
     public static func exceeds(producedBytes: Int64, maximumBytes: Int64) -> Bool {
         producedBytes > maximumBytes

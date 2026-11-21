@@ -126,6 +126,27 @@ public enum InstallFootprint {
         }
         return tops.sorted().map { tree.appendingPathComponent($0) }
     }
+
+    /// Bytes of regular files this setup added. Symlinks are not followed, so a venv alias is not counted twice.
+    public static func producedBytes(tree: URL, treeExisted: Bool, before: Set<String>) -> Int64 {
+        let rootPath = tree.path
+        guard !rootPath.isEmpty else { return 0 }
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard let walker = FileManager.default.enumerator(at: tree, includingPropertiesForKeys: [.isSymbolicLinkKey, .isDirectoryKey, .fileSizeKey], options: []) else {
+            return 0
+        }
+        var total: Int64 = 0
+        for case let url as URL in walker {
+            let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .fileSizeKey])
+            if values?.isSymbolicLink == true || values?.isDirectory == true { continue }
+            let path = url.path
+            guard path.hasPrefix(prefix) else { continue }
+            let relative = String(path.dropFirst(prefix.count))
+            if treeExisted && before.contains(relative) { continue }
+            total += Int64(values?.fileSize ?? 0)
+        }
+        return total
+    }
 }
 
 public enum PartialFiles {
@@ -188,7 +209,12 @@ public enum DownloadRunner {
             while await group.next() != nil {}
             return first
         }
-        if outcome == .tookTooLong || outcome == .cancelled || outcome == .capped { _ = PartialFiles.remove(partials()) }
+        if outcome == .tookTooLong || outcome == .cancelled || outcome == .capped {
+            let left = PartialFiles.remove(partials())
+            if !left.isEmpty {
+                return .failed("Partial files remained after the download stopped.")
+            }
+        }
         return outcome
     }
 }

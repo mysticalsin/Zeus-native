@@ -199,6 +199,10 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
         }) {
             let failure = await worker.value
             if let failure { throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: failure]) }
+            let produced = InstallFootprint.producedBytes(tree: tree, treeExisted: treeExisted, before: before)
+            if ArchiveUnpackCap.exceeds(producedBytes: produced, maximumBytes: FasterWhisperUnpack.maximumBytes) {
+                throw DownloadCapExceeded()
+            }
         }
         switch outcome {
         case .finished: progress?(1)
