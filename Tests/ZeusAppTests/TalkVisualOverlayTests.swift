@@ -44,8 +44,11 @@ struct TalkVisualOverlayTests {
         let layout = ExplanationCanvasLayout(scene: f.scene, size: size, captureContext: f.capture, reduceMotion: true,
                                              captureTransform: mapping)
         #expect(layout.isValid)
-        #expect(Set(layout.items.map(\.object.geometry.kind)) == [.ring, .arrow, .label])
-        #expect(layout.hiddenLabelIDs.isEmpty, "the label found room beside its anchor")
+        #expect(Set(layout.items.map(\.object.geometry.kind)) == [.ring, .arrow, .card])
+        #expect(layout.items.first { $0.object.geometry.kind == .ring }?.object.style.stroke == .ink)
+        let ringBox = layout.items.first { $0.object.geometry.kind == .ring }?.path.boundingRect
+        #expect(ringBox.map { abs($0.width - $0.height) > 0.5 } == true)
+        #expect(layout.hiddenLabelIDs.isEmpty, "the diagram card draws its text inside the rect")
 
         let overlay = ExplanationOverlay()
         defer { overlay.hide() }

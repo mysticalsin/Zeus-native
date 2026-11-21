@@ -399,7 +399,12 @@ struct ExplanationCanvasLayout {
     }
     static func shape(_ geometry: ExplanationGeometry) -> Path {
         if let points = geometry.points { return polyline(points.map { .init(x: $0.x, y: $0.y) }) }
-        if let radius = geometry.radius, [.point, .ring, .badge].contains(geometry.kind) {
+        if geometry.kind == .ring, let radius = geometry.radius {
+            let ellipse = TalkDrawScene.ringEllipse(radius: radius)
+            return Path(ellipseIn: .init(x: -ellipse.width / 2, y: -ellipse.height / 2,
+                                         width: ellipse.width, height: ellipse.height))
+        }
+        if let radius = geometry.radius, [.point, .badge].contains(geometry.kind) {
             return Path(ellipseIn: .init(x: -radius, y: -radius, width: radius * 2, height: radius * 2))
         }
         if let size = geometry.size {

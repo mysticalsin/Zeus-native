@@ -85,6 +85,17 @@ class MatrixContractTests(unittest.TestCase):
         with self.assertRaises(c.Invalid):
             c.validate_map(data, self.portable)
 
+    def test_sidecar_registries_validate_and_are_read(self):
+        checks = c.validate_map(self.data, self.portable)
+        rows = runner.load_registries(checks)
+        loaded = {row["id"] for row in rows}
+        sidecars = sorted((c.ROOT / "qa").glob("regressions-*.json"))
+        self.assertTrue(sidecars, "a PR sidecar must sit beside qa/regressions.json")
+        for path in sidecars:
+            data = c.load(path)
+            c.validate_registry(data, checks)
+            self.assertIn(data["regressions"][0]["id"], loaded)
+
     def test_removed_regression_guard_is_a_schema_failure(self):
         checks = c.validate_map(self.data, self.portable)
         ledger = c.load(c.ROOT / "qa/regressions.json")

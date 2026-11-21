@@ -5653,6 +5653,46 @@
             {
               "file": "Tests/ZeusCoreTests/TalkDrawPolicyTests.swift",
               "function": "aRequestKeepsItsDrawImageFlagThroughWith"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aFixtureMarkListHasOneOfEachStyle"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "outOfRangePointsDrop"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aCardClampsInsideTheShot"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "underReducedMotionRevealIsOneAndDurationIsZero"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aMarkForSentenceTwoIsNotInTheFrameForSentenceZero"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "anUnknownStyleDrops"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "atMostSixMarks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "figureThreeIsAnInkEllipseAndADiagramCard"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aMovingFrameKeepsTheStrokeDuration"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aZeroLengthUnderlineIsDropped"
             }
           ]
         },

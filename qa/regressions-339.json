@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "policy": "PR 339 guards live in this sidecar so they do not share the closing bracket of qa/regressions.json. The runner reads every qa/regressions-*.json file.",
+  "regressions": [
+    {
+      "id": "REG-339-1",
+      "failure": "A talk drawing could not ask the existing overlay for an underline, a label or a path. A point outside the shot could still be drawn, an unknown style or an image address could be kept, a seventh mark could be kept, a card could sit outside the shot, a sentence 2 mark could appear in the sentence 0 frame, or reduced motion could still take time to reveal the mark.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+        "function": "underReducedMotionRevealIsOneAndDurationIsZero"
+      }
+    },
+    {
+      "id": "REG-339-2",
+      "failure": "Mock-up figure 3 was drawn as an orange circle and a text chip. The ring is an ink ellipse and the card is a diagram card.",
+      "features": ["F11"],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+        "function": "figureThreeIsAnInkEllipseAndADiagramCard"
+      }
+    }
+  ]
+}

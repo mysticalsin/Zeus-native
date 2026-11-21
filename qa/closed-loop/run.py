@@ -380,6 +380,23 @@ def run_check(definition, args, output, portable, native_build=None, discovery_r
     return row
 
 
+def registry_paths(root=ROOT):
+    folder = root / "qa"
+    sidecars = sorted(path for path in folder.glob("regressions-*.json") if path.is_file())
+    return [folder / "regressions.json", *sidecars]
+
+
+def load_registries(definitions, root=ROOT):
+    """The main ledger plus each PR sidecar. Every file must pass validate_registry."""
+    rows, seen = [], set()
+    for path in registry_paths(root):
+        for row in validate_registry(load(path), definitions, root):
+            require(row["id"] not in seen, f"duplicate regression id {row['id']}")
+            seen.add(row["id"])
+            rows.append(row)
+    return rows
+
+
 def evaluate_registry(registry, checks, output):
     rows = []
     for entry in registry:
@@ -456,7 +473,7 @@ def main(argv=None):
         portable = portable_module()
         feature_map = load(ROOT / "qa/feature-map.json")
         definitions = validate_map(feature_map, portable)
-        registry = validate_registry(load(ROOT / "qa/regressions.json"), definitions)
+        registry = load_registries(definitions)
         result["map_sha256"] = digest((ROOT / "qa/feature-map.json").read_bytes())
         result["registry_sha256"] = digest((ROOT / "qa/regressions.json").read_bytes())
         selftest = {"id": "closed-loop-selftests", "kind": "selftests", "scope": "Runner/schema/receipt/aggregate rejection regressions."}
