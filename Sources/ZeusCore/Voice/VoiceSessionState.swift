@@ -43,6 +43,7 @@ enum VoiceSessionEventShape: CaseIterable, Equatable, Sendable {
 public indirect enum VoiceSessionError: Error, Equatable, Hashable, Sendable {
     case illegalTransition(from: VoiceSessionState, event: VoiceSessionEvent)
     case badFrameSize(expected: Int, got: Int)
+    case emptyFrameList
 }
 
 public indirect enum VoiceSessionState: Sendable, Equatable, Hashable {

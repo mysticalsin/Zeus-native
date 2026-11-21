@@ -44,6 +44,12 @@ import Testing
         #expect(await backend.state == .streaming)
     }
 
+    @Test func anEmptyFrameListIsNotAFrameSizeError() {
+        #expect(throws: VoiceSessionError.emptyFrameList) {
+            try FakeDuplexVoiceBackend(frames: [])
+        }
+    }
+
     @Test func aWrongSizeFrameThrows() async throws {
         let backend = try FakeDuplexVoiceBackend(frames: [tone(0.25), tone(0.5)])
         _ = try await backend.start()
