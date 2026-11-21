@@ -251,3 +251,21 @@ Checked against `ee9de8e`. Soak files were not edited. Red commit `71fdbc0`. Fix
   - `pipe.py` exited 1 and printed a traceback for those four manifests. Go and Rust already exited 2 with a `haru-pipe:` line for the non-JSON file (`haru-pipe: invalid character...` and `haru-pipe: manifest has no stream`).
 - Fixes: chart red `c1aa744`, green `f098f5f`. Manifest text red `50ef82e`, green `92e401b`. The chart's resting widths are those p50 lengths, CSS grows them, and `@media (prefers-reduced-motion: reduce)` sets `animation: none`. `pipe.py` prints one `haru-pipe:` line and exits 2.
 - Tests, all exit 0: `test_stream_chart.py` 1, `test_pipe_messages.py` 1, `test_security.py` 3, `test_reported_numbers.py` 4, `test_notice.py` 1. Ten tests.
+
+## 26. Accessibility
+
+- Time: 2026-11-21T05:57:10Z.
+- Lens: Accessibility.
+- Checked: CLI and report colour, `docs/stream-latency.svg` (`role="img"`), `pipeline-bench/results/table.md`, `bench/results/summary.md`, `pipeline-bench/REPORT.md`, `README.md`, and `scripts/gen_workload.py`. No review comments on PR #84. E-01, E-03, and E-05 still pass in `test_security.py` (3 tests, exit 0). CI on `77a2283` was still queued (`app`, `feature-map`, `extension`, `release-scripts`), with no failed check.
+- Findings:
+  - The chart's accessible description named Python, Rust, and Go p50 only. `role="img"` hides the visible p95 labels. The missing values are Python p95 0.160699 ms, Rust p95 0.02150425 ms, Go p95 0.044256149999999994 ms.
+  - `pipeline-bench/results/table.md` opened on the table row. It had column headers and no heading.
+  - `bench/results/summary.md` pointed at `/workspace/echo/pipeline-bench/REPORT.md`, which is not in this tree.
+- Skipped, and why:
+  - `NO_COLOR` and colour-only pass/fail: the non-soak CLI and reports emit no ANSI colour. Soak prints the words `PASS` and `FAIL`. Nothing changes when colour is removed.
+  - HTML reports: there are none.
+  - Audio transcripts: `gen_workload.py` writes seeded formant PCM, not words, and no wav is tracked. Soak sample wavs are described in `soak/results/SCHEMA.md` as synthetic stereo. That directory was not edited.
+  - Bold Rust cells in `REPORT.md`: section 1 already says "Rust wins on the pipeline" in plain text.
+  - Soak `SCHEMA.md` and `MAC_RUN_PLAN.md` still cite `/workspace/echo/soak/results`. Left as they are; this branch does not edit `soak/`.
+- Fixes: red `b2cf4bf`, green `8e67721`. The description now includes those three p95 values. `table.md` starts with `# Pipeline medians`. The M5 summary links to `../../pipeline-bench/REPORT.md`.
+- Tests, all exit 0: `test_accessibility.py` 3, then the same file 20 times in a row (20/20). Also `test_stream_chart.py` 1, `test_security.py` 3, `test_pipe_messages.py` 1, `test_reported_numbers.py` 4, `test_notice.py` 1. Thirteen tests in the combined run.
