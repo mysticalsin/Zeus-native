@@ -273,6 +273,45 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log.isEmpty, "only the talk monitor has a second key: \(calls.log)")
     }
 
+    /// Sentinel L-1 #112. A stale hardware read must not hold Right Option past the key-up,
+    /// and a flags repeat of that key must not ask the hardware at all.
+    @Test func aRightOptionReleaseStopsAtTheKeyUpAndNeverTakesTheRepeatDropPath() {
+        let (monitor, calls) = make(second: .rightOption)
+        let clock = FakeClock()
+        monitor.now = { clock.seconds }
+        var releaseAt: TimeInterval?
+        monitor.onRelease = {
+            calls.releases += 1
+            calls.log.append("release")
+            releaseAt = clock.seconds
+        }
+        monitor.modifierIsDown = { $0 == 61 || $0 == 58 }
+        rightOptionDown(monitor)
+        clock.seconds = VoiceKey.secondKeyConfirm
+        monitor.configChanged()
+        #expect(calls.log == ["press"], "the hold starts at the confirm: \(calls.log)")
+        let keyUp = VoiceKey.secondKeyConfirm + 0.20
+        clock.seconds = keyUp
+        rightOptionUp(monitor)
+        #expect(releaseAt == keyUp, "the release stops the turn at the key-up")
+        clock.seconds = keyUp + 0.30
+        monitor.configChanged()
+        #expect(releaseAt == keyUp, "a later tick is not what stops Right Option: \(calls.log)")
+
+        var asked: [UInt16] = []
+        monitor.modifierIsDown = { code in
+            asked.append(code)
+            return true
+        }
+        monitor.feed(.flags(keyCode: 58, modifiers: [.option]), at: clock.seconds)
+        clock.seconds += 0.01
+        monitor.feed(.flags(keyCode: 61, modifiers: [.option]), at: clock.seconds)
+        asked.removeAll()
+        clock.seconds += 0.01
+        monitor.feed(.flags(keyCode: 61, modifiers: [.option]), at: clock.seconds)
+        #expect(asked.isEmpty, "Right Option never takes the repeat-drop path")
+    }
+
     // MARK: The talk chord (docs/ULTRON-CHORD-PLAN.md)
 
     private let space: UInt16 = 49

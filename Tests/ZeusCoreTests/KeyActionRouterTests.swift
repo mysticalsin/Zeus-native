@@ -114,4 +114,57 @@ struct ModifierFlagsRepeatTests {
             deviceKeys: [63], flagModifiers: .function, hardwareDown: { _ in false })
         #expect(events == [.flags(keyCode: 63, modifiers: [])])
     }
+
+    /// Sentinel L-1 #112. The repeat-drop path reads the hardware and, when that read is still
+    /// "down", the monitor keeps the key until a later tick. Right Option must not enter it.
+    @Test func anUnrelatedModifierNeverTakesTheRepeatDropPathAndRightOptionStopsAtTheKeyUp() {
+        var reads: [UInt16] = []
+        func hardware(_ code: UInt16) -> Bool {
+            reads.append(code)
+            return true
+        }
+
+        let rightOption = ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: 61, modifiers: .option, deviceKeys: [58, 61], hardwareDown: hardware)
+        #expect(reads.isEmpty, "Right Option never takes the repeat-drop path")
+        #expect(!rightOption)
+        reads.removeAll()
+        let shift = ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: 60, modifiers: .shift, deviceKeys: [56, 60], hardwareDown: hardware)
+        #expect(reads.isEmpty, "Shift is not a key this path owns")
+        #expect(!shift)
+
+        reads.removeAll()
+        #expect(ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: 54, modifiers: .command, deviceKeys: [54, 55], hardwareDown: hardware))
+        #expect(reads == [54], "Right Command still asks the hardware")
+        reads.removeAll()
+        #expect(ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: 55, modifiers: .command, deviceKeys: [54, 55], hardwareDown: hardware))
+        #expect(reads == [55], "Left Command still asks the hardware")
+
+        var state = ShortcutState()
+        state.apply(.flags(keyCode: 58, modifiers: [.option]))
+        state.apply(.flags(keyCode: 61, modifiers: [.option]))
+        let releaseAt = 0.40
+        let laterTick = 0.70
+        let release = ShortcutEvent.flags(keyCode: 61, modifiers: [.option])
+        reads.removeAll()
+        let dropped = ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: 61, modifiers: .option, deviceKeys: state.deviceKeys, hardwareDown: hardware)
+        var stoppedAt: TimeInterval?
+        if !dropped {
+            state.apply(release)
+            stoppedAt = releaseAt
+        } else {
+            let caughtUp = ModifierFlagsRepeat.missedReleases(
+                deviceKeys: state.deviceKeys, flagModifiers: state.flagModifiers, hardwareDown: { $0 != 61 })
+            for event in caughtUp { state.apply(event) }
+            if !state.deviceKeys.contains(61) { stoppedAt = laterTick }
+        }
+        #expect(reads.isEmpty, "the key-up does not wait on a hardware read")
+        #expect(stoppedAt == releaseAt, "Right Option stops at the key-up, not on a later tick")
+        #expect(!state.deviceKeys.contains(61))
+        #expect(state.deviceKeys.contains(58), "Left Option still holds the flag")
+    }
 }
