@@ -5685,6 +5685,14 @@
             {
               "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
               "function": "figureThreeIsAnInkEllipseAndADiagramCard"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aMovingFrameKeepsTheStrokeDuration"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/TalkDrawStyleTests.swift",
+              "function": "aZeroLengthUnderlineIsDropped"
             }
           ]
         },

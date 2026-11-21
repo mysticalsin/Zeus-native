@@ -72,6 +72,27 @@ import Testing
         #expect(frame.objects.allSatisfy { $0.reveal == 1 })
     }
 
+    /// Forcing the stroke length to 0 would still pass the reduced-motion check.
+    @Test func aMovingFrameKeepsTheStrokeDuration() {
+        let frame = TalkDrawScene.frame(Self.fixture(), shot: Self.shot(), captureID: UUID(), sentence: 0, reduceMotion: false)
+        #expect(TalkDrawScene.strokeDuration > 0)
+        #expect(frame.duration == TalkDrawScene.strokeDuration)
+        #expect(frame.reveal == 1)
+    }
+
+    /// Dropping `from != to` would keep a zero-length underline.
+    @Test func aZeroLengthUnderlineIsDropped() {
+        let draw = TalkDrawParser.parse(#"""
+        {"s":1,"m":[
+        {"k":"underline","from":[40,40],"to":[40,40],"at":0},
+        {"k":"underline","from":[40,40],"to":[90,40],"at":0}
+        ]}
+        """#)!
+        let kept = TalkDrawScene.objects(draw, shot: Self.shot(), captureID: UUID()).values.flatMap { $0 }
+        #expect(kept.count == 1)
+        #expect(kept[0].geometry.kind == .underline)
+    }
+
     @Test func aMarkForSentenceTwoIsNotInTheFrameForSentenceZero() {
         let shot = Self.shot()
         let draw = Self.fixture()
