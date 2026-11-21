@@ -8679,7 +8679,7 @@
     },
     {
       "id": "REG-991",
-      "failure": "Scribe opt-in tests built a UserDefaults suite from a temporary path. Parallel runs shared that domain, so aStaleStampWithAskMeIsRemovedAtLaunch still saw the stamp it had removed. Each test now uses its own app.zeus.tests suite and removes only its own keys.",
+      "failure": "Scribe opt-in tests shared a file-backed UserDefaults domain under parallel runs, so aStaleStampWithAskMeIsRemovedAtLaunch still saw the stamp it had removed. Each test now uses an in-memory UserDefaults, which also stays out of the owner's preferences.",
       "features": [
         "F03"
       ],

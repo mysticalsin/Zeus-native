@@ -5,19 +5,37 @@ import Testing
 private let optIn1 = Date(timeIntervalSince1970: 1_000)
 private let optIn2 = Date(timeIntervalSince1970: 2_000)
 
+/// Values stay in this object. A file-backed suite is shared by parallel tests on Linux, and a
+/// bundle-id suite is written into the owner's preferences.
+final class IsolatedDefaults: UserDefaults, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: Any] = [:]
+
+    override func object(forKey defaultName: String) -> Any? {
+        lock.lock(); defer { lock.unlock() }
+        return storage[defaultName]
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        lock.lock(); defer { lock.unlock() }
+        if let value { storage[defaultName] = value } else { storage.removeValue(forKey: defaultName) }
+    }
+
+    override func set(_ value: Double, forKey defaultName: String) {
+        lock.lock(); defer { lock.unlock() }
+        storage[defaultName] = value
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        lock.lock(); defer { lock.unlock() }
+        storage.removeValue(forKey: defaultName)
+    }
+}
+
 @Suite("Scribe automatic start opt-in")
 struct ScribeAutoStartOptInTests {
     private func fresh() throws -> (UserDefaults, () -> Void) {
-        // A suite name that contains a slash is not private when these tests run together, and
-        // removePersistentDomain synchronizes every domain in the process. A bundle id keeps
-        // this test's keys to itself; cleanup removes those keys and does not synchronize.
-        let name = "app.zeus.tests.ScribeAutoStartOptIn.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        let keys = [
-            ScribeAutoStartOptIn.key, ScribeAutoStartOptIn.legacyKey, ScribeAutoStartOptIn.firstRecordingKey,
-            FeatureSettings.key(ScribeAutoStartMode.settingID),
-        ]
-        return (defaults, { for key in keys { defaults.removeObject(forKey: key) } })
+        (IsolatedDefaults(), {})
     }
 
     // MARK: The stamp follows the choice
