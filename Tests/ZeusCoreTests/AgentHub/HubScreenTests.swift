@@ -213,14 +213,12 @@ struct HubScreenTests {
         let east = session("e", "East", "docs", .done)
         var state = HubGroupMachine.next(HubGroupState(), .firstLoad, sessions: [north, south, east])
         state = HubGroupMachine.next(state, .activateHeader, header: "North")
-        #expect(state.groups.map { ($0.agent, $0.status) } == [
-            ("South", .expanded), ("North", .expanded), ("East", .collapsed),
-        ])
+        #expect(state.groups.map(\.agent) == ["South", "North", "East"])
+        #expect(state.groups.map(\.status) == [.expanded, .expanded, .collapsed])
 
         state = HubGroupMachine.next(state, .lostLastSession, sessions: [north, east], header: "South")
-        #expect(state.groups.map { ($0.agent, $0.status) } == [
-            ("North", .expanded), ("East", .collapsed),
-        ])
+        #expect(state.groups.map(\.agent) == ["North", "East"])
+        #expect(state.groups.map(\.status) == [.expanded, .collapsed])
         #expect(state.groups.contains { $0.agent == "South" } == false)
 
         let kept = HubGroupMachine.next(state, .lostLastSession, sessions: [
@@ -251,14 +249,14 @@ struct HubScreenTests {
         let ada = session("a", "Ada", "api", .running)
         let bee = session("b", "Bee", "web", .done)
         var state = HubGroupMachine.next(HubGroupState(), .firstLoad, sessions: [ada, bee])
-        #expect(state.groups.map { ($0.agent, $0.status) } == [("Ada", .expanded), ("Bee", .collapsed)])
+        #expect(state.groups.map(\.agent) == ["Ada", "Bee"])
+        #expect(state.groups.map(\.status) == [.expanded, .collapsed])
         state = HubGroupMachine.next(state, .activateHeader, header: "Bee")
         let added = session("c", "Ada", "docs", .needsApproval)
         let cy = session("d", "Cy", "api", .loading)
         state = HubGroupMachine.next(state, .sessionsChanged, sessions: [ada, added, bee, cy])
-        #expect(state.groups.map { ($0.agent, $0.status) } == [
-            ("Ada", .expanded), ("Bee", .expanded), ("Cy", .collapsed),
-        ])
+        #expect(state.groups.map(\.agent) == ["Ada", "Bee", "Cy"])
+        #expect(state.groups.map(\.status) == [.expanded, .expanded, .collapsed])
         #expect(state.groups[0].count == 2)
         #expect(state.groups[0].mostUrgent.status == .needsApproval)
     }
@@ -289,7 +287,8 @@ struct HubScreenTests {
         let dropped = HubGroupMachine.next(state, .sessionsChanged, sessions: [
             session("b", "Ada", "api", .absent), bee,
         ])
-        #expect(dropped.groups.map { ($0.agent, $0.status) } == [("Bee", .expanded)])
+        #expect(dropped.groups.map(\.agent) == ["Bee"])
+        #expect(dropped.groups.map(\.status) == [.expanded])
     }
 
     @Test func removingOneProjectKeepsTheAgentHeader() {
