@@ -313,6 +313,32 @@ struct FaceTemplateAccessTests {
         #expect(FaceTemplatePolicyWait.evaluation(replied: false, waited: 0, state: state) == .failed)
     }
 
+    @Test func policyTimeoutInvalidatesAndIgnoresALateReply() {
+        let reply = FaceTemplatePolicyReply()
+        let state = Data("epoch-a".utf8)
+        #expect(reply.claimTimeout() == .timedOut)
+        #expect(reply.shouldInvalidate)
+        #expect(!reply.finish(.succeeded(state)))
+        #expect(reply.evaluation == .failed)
+    }
+
+    @Test func policyReplySettlesOnceWithoutInvalidating() {
+        let reply = FaceTemplatePolicyReply()
+        let state = Data("epoch-a".utf8)
+        #expect(reply.finish(.succeeded(state)))
+        #expect(!reply.finish(.succeeded(Data("epoch-b".utf8))))
+        #expect(reply.claimTimeout() == .reply(.succeeded(state)))
+        #expect(!reply.shouldInvalidate)
+        #expect(reply.evaluation == .succeeded(state))
+    }
+
+    @Test func policyWaitDeadlineIsDispatchTime() {
+        let before = DispatchTime.now()
+        let deadline = FaceTemplatePolicyWait.dispatchDeadline(after: FaceTemplatePolicyWait.limit)
+        #expect(deadline > before)
+        #expect(deadline <= before + (FaceTemplatePolicyWait.limit + 1))
+    }
+
     @Test func failedEpochAddKeepsThePreviousRecord() {
         let existing = Data("epoch-a".utf8)
         let next = Data("epoch-b".utf8)
