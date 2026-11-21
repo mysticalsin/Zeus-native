@@ -19,7 +19,7 @@ final class PrompterWindowModel {
     var sessionMode: PrompterFollowMode?
     /// What the session actually does: the fallback if one happened, otherwise your saved choice.
     var effectiveMode: PrompterFollowMode { sessionMode ?? mode }
-    var fontSize: Double { didSet { defaults.set(fontSize, forKey: "prompterWindow.font") } }
+    var fontSize: Double { didSet { PrompterMetricsPreference.setSize(fontSize, defaults: defaults) } }
     var mirrored: Bool { didSet { defaults.set(mirrored, forKey: "prompterWindow.mirror") } }
     var countdown: Bool { didSet { defaults.set(countdown, forKey: "prompterWindow.countdown") } }
     var hiddenFromCapture: Bool { didSet { defaults.set(hiddenFromCapture, forKey: "prompterWindow.private"); onPrivacyChange(hiddenFromCapture) } }
@@ -78,10 +78,11 @@ final class PrompterWindowModel {
 
     init(topBar: TopBarModel) {
         self.topBar = topBar
-        roll = PrompterRoll(speed: defaults.object(forKey: "prompterWindow.speed") as? Double ?? 40, voiceFollow: true)
+        PrompterMetricsPreference.migrate(defaults)
+        roll = PrompterRoll(speed: PrompterMetricsPreference.speed(defaults), voiceFollow: true)
         follower = ScriptFollower(script: PrompterScript(topBar.script))
         mode = defaults.string(forKey: "prompterWindow.mode").flatMap(PrompterFollowMode.init(rawValue:)) ?? .words
-        fontSize = defaults.object(forKey: "prompterWindow.font") as? Double ?? 32
+        fontSize = PrompterMetricsPreference.size(defaults)
         mirrored = defaults.bool(forKey: "prompterWindow.mirror")
         countdown = defaults.object(forKey: "prompterWindow.countdown") as? Bool ?? true
         hiddenFromCapture = defaults.object(forKey: "prompterWindow.private") as? Bool ?? true
@@ -680,7 +681,7 @@ final class PrompterWindowController {
         return true
     }
 
-    private func persistSpeed() { UserDefaults.standard.set(model.roll.speed, forKey: "prompterWindow.speed") }
+    private func persistSpeed() { PrompterMetricsPreference.setSpeed(model.roll.speed, defaults: UserDefaults.standard) }
 
     func importScript() {
         stopFollowingSlides()
