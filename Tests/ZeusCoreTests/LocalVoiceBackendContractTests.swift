@@ -218,7 +218,8 @@ import Testing
         let chain = UltronEngineRouter.chain(
             choice: .auto,
             availability: UltronEngineAvailability(elevenLabsConfigured: true, kokoroReady: true))
-        #expect(chain.map(\.engine) == [.elevenLabs, .system])
+        // Auto, with ElevenLabs configured and Kokoro ready, is still ElevenLabs, Kokoro, then the Mac voice.
+        #expect(chain.map(\.engine) == [.elevenLabs, .kokoro, .system])
     }
 
     @Test func theTransitionSwitchHasNoDefault() throws {
