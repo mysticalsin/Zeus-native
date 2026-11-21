@@ -70,12 +70,10 @@ fn serve_accepts_one_client_then_removes_the_socket() {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
     let connected = std::os::unix::net::UnixStream::connect(&socket);
-    let code = server.join().unwrap();
-    assert!(
-        connected.is_ok(),
-        "serve returned before a client could connect"
-    );
+    let connected_ok = connected.is_ok();
     drop(connected);
+    let code = server.join().unwrap();
+    assert!(connected_ok, "serve returned before a client could connect");
     assert_eq!(code, 0);
     assert!(!socket.exists(), "socket left behind after serve returned");
     let _ = std::fs::remove_dir_all(&root);
@@ -96,10 +94,6 @@ fn failed_spawn_removes_the_socket_it_created() {
         root.join("model").display().to_string(),
     ]);
     assert_ne!(code, 0);
-    assert!(
-        !socket.exists(),
-        "failed serve left {}",
-        socket.display()
-    );
+    assert!(!socket.exists(), "failed serve left {}", socket.display());
     let _ = std::fs::remove_dir_all(&root);
 }

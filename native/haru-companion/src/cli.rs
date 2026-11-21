@@ -1,8 +1,9 @@
 //! `haru-companion serve ...` and `haru-companion selftest`.
 //! Missing python, model, or the conversation flag never spawns or binds.
 
-use crate::engine::selftest_report;
-use crate::serve::bind_socket;
+use crate::backend::FakeBackend;
+use crate::engine::{selftest_report, Engine};
+use crate::serve::{bind_socket, serve_one};
 use crate::session::ChildControl;
 use crate::supervisor::{
     apply, child_argv, decide, LaunchDecision, LaunchRequest, NetGate, SocketBind, SpyBinder,
@@ -59,7 +60,7 @@ fn serve_command(config: &ServeConfig) -> i32 {
                 eprintln!("haru-companion: reference_path is not allowed");
                 return 2;
             }
-            match run_serve(&socket, &argv) {
+            match run_serve(&socket, &argv, config.watchdog) {
                 Ok(()) => 0,
                 Err(error) => {
                     eprintln!("haru-companion: {error}");
@@ -70,13 +71,24 @@ fn serve_command(config: &ServeConfig) -> i32 {
     }
 }
 
-fn run_serve(socket: &std::path::Path, argv: &[String]) -> std::io::Result<()> {
+fn run_serve(socket: &std::path::Path, argv: &[String], watchdog: bool) -> std::io::Result<()> {
     let listener = bind_socket(socket)?;
-    let mut launcher = StdLauncher::new();
-    let spawned = launcher.spawn(argv);
-    drop(listener);
+    let mut probe = StdLauncher::new();
+    if let Err(error) = probe.spawn(argv) {
+        drop(listener);
+        let _ = std::fs::remove_file(socket);
+        return Err(error);
+    }
+    drop(probe);
+    let mut engine = Engine::new(
+        FakeBackend::quiet(),
+        StdLauncher::new(),
+        argv.to_vec(),
+        watchdog,
+    );
+    let served = serve_one(listener, &mut engine);
     let _ = std::fs::remove_file(socket);
-    spawned.map(|_| ())
+    served
 }
 
 enum Command {
@@ -175,6 +187,12 @@ fn parse(args: &[String]) -> Result<Command, String> {
     }
 }
 
+fn usage(detail: &str) -> String {
+    format!(
+        "haru-companion: {detail}\nusage: haru-companion serve --socket PATH --python PATH --model DIR [--quantize 8] [--watchdog] [--kv-window N] [--reanchor-minutes M]\n       haru-companion selftest [--frames N]"
+    )
+}
+
 #[cfg(test)]
 mod flag_tests {
     use super::{parse, Command};
@@ -193,10 +211,4 @@ mod flag_tests {
             Command::SelfTest { .. } => panic!("expected serve"),
         }
     }
-}
-
-fn usage(detail: &str) -> String {
-    format!(
-        "haru-companion: {detail}\nusage: haru-companion serve --socket PATH --python PATH --model DIR [--quantize 8] [--watchdog] [--kv-window N] [--reanchor-minutes M]\n       haru-companion selftest [--frames N]"
-    )
 }
