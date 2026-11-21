@@ -74,9 +74,21 @@ func main() {
 	b, err := os.ReadFile(filepath.Join(*wl, "manifest.json"))
 	must(err)
 	must(json.Unmarshal(b, &man))
+	if *nframes < 1 {
+		must(fmt.Errorf("--frames must be at least 1"))
+	}
 	res := map[string]any{"impl": "go"}
+	rtf := func(wall, audio float64) float64 {
+		if audio == 0 {
+			must(fmt.Errorf("no audio in workload"))
+		}
+		return wall / audio
+	}
 	switch os.Args[1] {
 	case "bench":
+		if *mode != "all" && *mode != "file" && *mode != "stream" {
+			must(fmt.Errorf("bad --mode"))
+		}
 		must(os.MkdirAll(*out, 0o755))
 		if *mode == "all" || *mode == "file" {
 			t0 := time.Now()
@@ -88,7 +100,7 @@ func main() {
 				files, per, audio = append(files, r), append(per, p...), audio+a
 			}
 			wall := time.Since(t0).Seconds()
-			res["file"] = map[string]any{"files": files, "wall_s": wall, "audio_s": audio, "rtf": wall / audio, "per_frame": hp.Summary(per)}
+			res["file"] = map[string]any{"files": files, "wall_s": wall, "audio_s": audio, "rtf": rtf(wall, audio), "per_frame": hp.Summary(per)}
 		}
 		if *mode == "all" || *mode == "stream" {
 			raw, err := os.ReadFile(filepath.Join(*wl, man.Stream.File))
@@ -100,7 +112,7 @@ func main() {
 			wall := time.Since(t0).Seconds()
 			must(framesOut.Close())
 			audio := float64(len(raw)) / 4 / 48000
-			res["stream"] = map[string]any{"frames": len(per), "wall_s": wall, "audio_s": audio, "rtf": wall / audio, "per_frame": hp.Summary(per), "drained_samples": st.Drained}
+			res["stream"] = map[string]any{"frames": len(per), "wall_s": wall, "audio_s": audio, "rtf": rtf(wall, audio), "per_frame": hp.Summary(per), "drained_samples": st.Drained}
 		}
 	case "e2e":
 		f, err := os.Open(filepath.Join(*wl, man.Stream.File))
@@ -112,7 +124,10 @@ func main() {
 		s := hp.Summary(per)
 		s["overhead_p50_ms"] = s["p50_ms"] - *modelMs
 		res["simulated_model_ms"], res["first_audio"] = *modelMs, s
+	default:
+		must(fmt.Errorf("usage: haru-pipe bench|e2e"))
 	}
-	enc, _ := json.Marshal(res)
+	enc, err := json.Marshal(res)
+	must(err)
 	fmt.Println(string(enc))
 }

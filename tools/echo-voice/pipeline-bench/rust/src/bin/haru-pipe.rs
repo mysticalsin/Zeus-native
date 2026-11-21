@@ -13,12 +13,49 @@ fn arg(args: &[String], name: &str, default: Option<&str>) -> String {
         .or(default.map(String::from)).unwrap_or_else(|| die(&format!("missing {name}")))
 }
 fn die(msg: &str) -> ! { eprintln!("haru-pipe: {msg}"); std::process::exit(2) }
+fn parse_f64(s: &str, name: &str) -> f64 { s.parse().unwrap_or_else(|_| die(&format!("bad {name}"))) }
+fn parse_usize(s: &str, name: &str) -> usize {
+    let n: usize = s.parse().unwrap_or_else(|_| die(&format!("bad {name}")));
+    if n == 0 { die(&format!("{name} must be at least 1")); }
+    n
+}
+fn rtf(wall: f64, audio: f64) -> f64 {
+    if audio == 0.0 { die("no audio in workload"); }
+    wall / audio
+}
+
+/// File names for every `"file"` string, with or without whitespace around the colon.
+fn file_names(text: &str) -> Vec<String> {
+    let b = text.as_bytes();
+    let key = b"\"file\"";
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + key.len() <= b.len() {
+        if &b[i..i + key.len()] == key {
+            let mut j = i + key.len();
+            while j < b.len() && b[j].is_ascii_whitespace() { j += 1; }
+            if j < b.len() && b[j] == b':' {
+                j += 1;
+                while j < b.len() && b[j].is_ascii_whitespace() { j += 1; }
+                if j < b.len() && b[j] == b'"' {
+                    j += 1;
+                    let start = j;
+                    while j < b.len() && b[j] != b'"' { j += 1; }
+                    if let Ok(s) = std::str::from_utf8(&b[start..j]) { out.push(s.to_string()); }
+                    i = j;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    out
+}
 
 /// Tiny manifest reader: the workload manifest's "file" entries, in order.
 fn manifest(dir: &Path) -> (Vec<String>, String) {
     let text = std::fs::read_to_string(dir.join("manifest.json")).unwrap_or_else(|e| die(&format!("manifest: {e}")));
-    let mut files = Vec::new();
-    for part in text.split("\"file\": \"").skip(1) { files.push(part.split('"').next().unwrap().to_string()); }
+    let mut files = file_names(&text);
     let stream = files.pop().unwrap_or_else(|| die("manifest has no stream"));
     (files, stream)
 }
@@ -30,7 +67,8 @@ fn main() {
             let wl = PathBuf::from(arg(&args, "--workload", None));
             let out = PathBuf::from(arg(&args, "--out", None));
             let mode = arg(&args, "--mode", Some("all"));
-            std::fs::create_dir_all(&out).unwrap();
+            if !matches!(mode.as_str(), "all" | "file" | "stream") { die("bad --mode"); }
+            std::fs::create_dir_all(&out).unwrap_or_else(|e| die(&e.to_string()));
             let (files, stream) = manifest(&wl);
             let mut parts = vec!["\"impl\": \"rust\"".to_string()];
             if mode == "all" || mode == "file" {
@@ -42,7 +80,7 @@ fn main() {
                 }
                 let wall = t0.elapsed().as_secs_f64();
                 parts.push(format!("\"file\": {{\"files\": [{}], \"wall_s\": {wall}, \"audio_s\": {audio}, \"rtf\": {}, \"per_frame\": {}}}",
-                    jsons.join(", "), wall / audio, stats::summary_json(&per)));
+                    jsons.join(", "), rtf(wall, audio), stats::summary_json(&per)));
             }
             if mode == "all" || mode == "stream" {
                 let raw = std::fs::read(wl.join(&stream)).unwrap();
@@ -54,14 +92,14 @@ fn main() {
                 let wall = t0.elapsed().as_secs_f64();
                 let audio = raw.len() as f64 / 4.0 / 48_000.0;
                 parts.push(format!("\"stream\": {{\"frames\": {}, \"wall_s\": {wall}, \"audio_s\": {audio}, \"rtf\": {}, \"per_frame\": {}, \"drained_samples\": {}}}",
-                    per.len(), wall / audio, stats::summary_json(&per), st.drained));
+                    per.len(), rtf(wall, audio), stats::summary_json(&per), st.drained));
             }
             println!("{{{}}}", parts.join(", "));
         }
         Some("e2e") => {
             let wl = PathBuf::from(arg(&args, "--workload", None));
-            let model_ms: f64 = arg(&args, "--model-ms", Some("86.55")).parse().unwrap();
-            let frames: usize = arg(&args, "--frames", Some("40")).parse().unwrap();
+            let model_ms = parse_f64(&arg(&args, "--model-ms", Some("86.55")), "--model-ms");
+            let frames = parse_usize(&arg(&args, "--frames", Some("40")), "--frames");
             let (_, stream) = manifest(&wl);
             use std::io::Read;
             let mut raw = vec![0u8; frames * 2 * frame::FRAME_SAMPLES * 4 + 1_000_000];
