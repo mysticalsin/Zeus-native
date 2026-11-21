@@ -13,3 +13,12 @@ public enum LockScreenSymbolGate {
         return resolved
     }
 }
+
+/// Turns a symbol table into the answer the player card reads. A resolved table that is not called
+/// can show the card. A missing table hides it. Calling an unverified symbol is a failed call.
+public enum LockScreenSpaceProbe {
+    public static func answer(resolved: Bool, invokesUnverifiedSymbols: Bool) -> LockScreenSpaceAnswer {
+        guard resolved else { return .symbolMissing }
+        return invokesUnverifiedSymbols ? .callFailed : .shown
+    }
+}

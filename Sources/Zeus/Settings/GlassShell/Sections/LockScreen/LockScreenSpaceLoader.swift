@@ -19,10 +19,10 @@ enum LockScreenSpaceLoader {
     private static let framework = "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight"
 
     /// Asks whether the symbols are present. It never creates a space.
+    /// A resolved table shows the card. A missing table hides it.
     static func probe() -> LockScreenSpaceAnswer {
-        guard invokesUnverifiedSymbols == false else { return .callFailed }
         let resolved = LockScreenSymbolGate.table(names: names, lookup: lookup)
-        return resolved == nil ? .symbolMissing : .callFailed
+        return LockScreenSpaceProbe.answer(resolved: resolved != nil, invokesUnverifiedSymbols: invokesUnverifiedSymbols)
     }
 
     private static func lookup(_ name: String) -> UInt? {
