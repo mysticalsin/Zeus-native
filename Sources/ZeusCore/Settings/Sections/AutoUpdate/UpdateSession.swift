@@ -299,7 +299,7 @@ public enum UpdateAppearance {
     public static func startsCheckOnAppear(_ state: UpdateSessionState, automaticChecks: Bool, configured: Bool) -> Bool {
         guard configured, automaticChecks else { return false }
         switch state {
-        case .downloading, .verifying, .installing:
+        case .downloading, .verifying, .installing, .readyToInstall:
             return false
         default:
             return true
