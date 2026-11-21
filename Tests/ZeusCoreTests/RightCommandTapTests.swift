@@ -15,6 +15,21 @@ struct RightCommandTapTests {
         #expect(stopped == [.toggle(listening: false, cue: endCue)])
     }
 
+    @Test func leftCommandHeldAcrossARightCommandTapDoesNotStartListening() {
+        var tap = RightCommandTap()
+        #expect(tap.leftDown(at: 0).isEmpty)
+        #expect(tap.rightDown(at: 0.01, otherKeyDown: false).isEmpty)
+        #expect(tap.rightUp(at: 0.12).isEmpty)
+        #expect(!tap.listening)
+    }
+
+    @Test func aSoloRightCommandTapDoesNotArmTalk() {
+        var tap = RightCommandTap()
+        #expect(tap.rightDown(at: 0, otherKeyDown: false).isEmpty)
+        _ = tap.rightUp(at: 0.12)
+        #expect(!tap.listening)
+    }
+
     @Test func chordedOrLongHeldOrLeftCommandDoesNothing() {
         var chord = RightCommandTap()
         _ = chord.rightDown(at: 0, otherKeyDown: false)
