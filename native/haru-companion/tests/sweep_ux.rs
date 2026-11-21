@@ -25,7 +25,11 @@ fn texts(svg: &str) -> Vec<(f64, f64, String)> {
         let tag_end = rest.find('>').unwrap();
         let close = rest.find("</text>").unwrap();
         let body = rest[tag_end + 1..close].to_string();
-        out.push((attr(&rest[..tag_end], "x"), attr(&rest[..tag_end], "y"), body));
+        out.push((
+            attr(&rest[..tag_end], "x"),
+            attr(&rest[..tag_end], "y"),
+            body,
+        ));
         rest = &rest[close..];
     }
     out
@@ -76,7 +80,14 @@ fn diagram_labels_stay_readable_while_the_dot_moves() {
         );
     }
     let path = motion_points(&svg);
-    let states = ["idle", "starting", "streaming", "closing", "closed", "failed"];
+    let states = [
+        "idle",
+        "starting",
+        "streaming",
+        "closing",
+        "closed",
+        "failed",
+    ];
     for (x, y, text) in &labels {
         if states.contains(&text.as_str()) {
             continue;

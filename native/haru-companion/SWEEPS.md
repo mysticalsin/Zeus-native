@@ -151,7 +151,7 @@ Each real defect was committed as a failing test, then the fix.
 - Findings: `state_machine_svg` placed `close` and `fail(socket_closed)` on the same point `(185, 142)`. The streaming-to-closing `close` label sat on the `animateMotion` path. A foreign peer was dropped with no bytes; the client `read_exact` returned `UnexpectedEof`.
 - Stress: 20 foreign-uid connections in a row. Each must read one `peer_uid` error frame, and the server must return `PermissionDenied`.
 - Test: `a822b99` `tests/sweep_ux.rs`. Both tests failed before the fix.
-- Fix: this commit. Edge labels are offset off the nodes, off each other, and at least 16 px from the motion path. `serve_one_with` writes an error frame with code `peer_uid` before it returns `PermissionDenied`. `docs/state-machine.svg` matches the generator.
+- Fix: `6ffb0aa`. Edge labels are offset off the nodes, off each other, and at least 16 px from the motion path. `serve_one_with` writes an error frame with code `peer_uid` before it returns `PermissionDenied`. `docs/state-machine.svg` matches the generator.
 - Counts after the fix, `cargo +stable test --locked` (default threads): haru-companion 87 passed, 0 failed. haru-pipe 16 passed, 0 failed. `cargo +stable fmt --check` and `cargo +stable clippy --locked --all-targets -- -D warnings` passed for both crates.
 
 ## Checked, not a new defect
