@@ -556,7 +556,7 @@ enum SettingStatus {
             return status == .authorizedAlways ? (true, "Allowed") : (false, status == .denied ? "Denied" : "Optional")
         case "perm.calendar": return eventKit(.event)
         case "perm.reminders": return eventKit(.reminder)
-        case "perm.notifications": return (false, "Not used yet")
+        case "perm.notifications": return (false, "Asked when you turn notifications on")
         case "perm.fullDisk":
             let probe = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Safari/Bookmarks.plist")
             return FileHandle(forReadingAtPath: probe.path) != nil ? (true, "Allowed") : (false, "Not needed yet")
@@ -594,7 +594,7 @@ enum SettingStatus {
         switch id {
         case "perm.location": (false, "Optional")
         case "perm.calendar", "perm.reminders": (true, "Allowed")
-        case "perm.notifications": (false, "Not used yet")
+        case "perm.notifications": (false, "Asked when you turn notifications on")
         case "perm.fullDisk": (false, "Not needed yet")
         case "perm.automation": (true, "Asked per app")
         case "dictation.model": (true, "Apple on-device · no download")
