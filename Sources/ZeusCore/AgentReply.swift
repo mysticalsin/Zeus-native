@@ -7,14 +7,21 @@ import Foundation
 public enum AgentReply {
     public static let maxLength = 2000
 
-    /// One line, no control characters. Nil when nothing is left to send.
+    /// One line, no control characters and no newlines. Nil when nothing is left to send.
     public static func sanitize(_ text: String) -> String? {
         let flat = text.unicodeScalars.map { scalar -> Character in
-            scalar.value < 0x20 || scalar.value == 0x7F ? " " : Character(scalar)
+            isStripped(scalar) ? " " : Character(scalar)
         }
         let line = String(flat).split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
         guard !line.isEmpty else { return nil }
         return String(line.prefix(maxLength))
+    }
+
+    /// C0 and C1 controls, DEL, and Unicode newlines. They are not typed.
+    private static func isStripped(_ scalar: Unicode.Scalar) -> Bool {
+        if scalar.value < 0x20 || scalar.value == 0x7F { return true }
+        if (0x80...0x9F).contains(scalar.value) { return true }
+        return CharacterSet.newlines.contains(scalar)
     }
 
     /// Whether ZEUS can type into this terminal.
@@ -24,18 +31,27 @@ public enum AgentReply {
     }
 
     /// The AppleScript that types `text` and Return into the session's exact tab.
+    /// Terminal receives literal keystrokes in the tab that is already open. The text is not a new shell command.
     public static func script(for info: TerminalInfo, text: String) -> String? {
         guard let line = sanitize(text) else { return nil }
-        let escaped = line.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let escaped = appleScriptString(line)
         switch info.targetBundleID {
         case "com.apple.Terminal":
             guard let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
+            let strokes = literalKeystrokes(line)
+            guard !strokes.isEmpty else { return nil }
             return """
             tell application "Terminal"
                 repeat with w in windows
                     repeat with t in tabs of w
                         if tty of t is "\(tty)" then
-                            do script "\(escaped)" in t
+                            set selected of t to true
+                            set index of w to 1
+                            activate
+                            tell application "System Events" to tell process "Terminal"
+                                \(strokes)
+                                keystroke return
+                            end tell
                             return true
                         end if
                     end repeat
@@ -67,6 +83,19 @@ public enum AgentReply {
         default:
             return nil
         }
+    }
+
+    /// Escapes a line for a double-quoted AppleScript string.
+    private static func appleScriptString(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    /// Literal keystrokes, each at most 20 UTF-16 units. Controls and newlines are already gone.
+    private static func literalKeystrokes(_ line: String) -> String {
+        KeystrokeTyping.pieces(line, limit: 20).compactMap { piece -> String? in
+            guard case .text(let chunk) = piece, !chunk.isEmpty else { return nil }
+            return "keystroke \"\(appleScriptString(chunk))\""
+        }.joined(separator: "\n")
     }
 }
 

@@ -68,7 +68,8 @@ struct AgentReplyTests {
 
     @Test func terminalAndITermScriptsEscapeTheText() throws {
         let script = try #require(AgentReply.script(for: terminal, text: #"say "hi" \o/"#))
-        #expect(script.contains(#"do script "say \"hi\" \\o/" in t"#))
+        #expect(script.contains(#"keystroke "say \"hi\" \\o/""#))
+        #expect(!script.contains("do script"))
         #expect(script.contains(#"tty of t is "/dev/ttys004""#))
         let iterm = TerminalInfo(bundleID: "com.googlecode.iterm2", program: nil, sessionID: "w0t1p0:ABCD-1234", tty: nil)
         let itermScript = try #require(AgentReply.script(for: iterm, text: "go"))
@@ -102,7 +103,8 @@ struct AgentReplyTests {
         let outcome = await sender(fake, terminal: terminal).send("  keep going\n", to: "s1", agent: "Claude Code")
         #expect(outcome == .sent)
         #expect(fake.asked == ["Claude Code: keep going"])
-        #expect(fake.ran.count == 1 && fake.ran[0].contains("do script \"keep going\""))
+        #expect(fake.ran.count == 1 && fake.ran[0].contains("keystroke \"keep going\""))
+        #expect(!fake.ran[0].contains("do script"))
     }
 
     @Test func declinedFailedUnsupportedAndEmptyTypeNothingWrong() async {
