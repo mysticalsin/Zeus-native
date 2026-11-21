@@ -233,6 +233,37 @@ struct FaceTemplateAccessTests {
         #expect(items.payload(account: "face.presence.templates") == secret)
     }
 
+    @Test func evaluationFailureDeniesTheFaceTemplate() {
+        let stored = Data("epoch-a".utf8)
+        #expect(FaceTemplateDomainGate.denies(stored: stored, evaluation: .failed))
+        #expect(FaceTemplateDomainGate.denies(stored: nil, evaluation: .failed))
+    }
+
+    @Test func nilDomainStateDeniesTheFaceTemplate() {
+        #expect(FaceTemplateDomainGate.denies(stored: Data("epoch-a".utf8), evaluation: .succeeded(nil)))
+        #expect(FaceTemplateDomainGate.denies(stored: nil, evaluation: .succeeded(nil)))
+        #expect(FaceTemplateDomainGate.denies(stored: Data(), evaluation: .succeeded(nil)))
+    }
+
+    @Test func changedDomainStateDeniesTheFaceTemplate() {
+        let stored = Data("epoch-a".utf8)
+        let changed = Data("epoch-b".utf8)
+        #expect(FaceTemplateDomainGate.denies(stored: stored, evaluation: .succeeded(changed)))
+        #expect(!FaceTemplateDomainGate.denies(stored: stored, evaluation: .succeeded(stored)))
+        #expect(!FaceTemplateDomainGate.denies(stored: nil, evaluation: .succeeded(stored)))
+    }
+
+    @Test func faceTemplateQueryUsesTheSharedAccessGroup() {
+        let team = "TEAMID1234"
+        let group = CredentialKeychainPolicy.accessGroup(teamIdentifier: team)
+        #expect(group == team + "." + CredentialKeychainPolicy.accessGroupSuffix)
+        let query = FaceTemplateKeychainAttributes.query(account: "face.presence.templates", teamIdentifier: team)
+        #expect(query?["accessGroup"] == group)
+        #expect(query?["service"] == "com.zeus.app")
+        #expect(FaceTemplateKeychainAttributes.query(account: "face.presence.templates", teamIdentifier: "") == nil)
+        #expect(FaceTemplateKeychainAttributes.query(account: "face.presence.templates", teamIdentifier: "team") == nil)
+    }
+
     @Test func promptsMatchUserPresenceOrBiometryCurrentSetAndDevicePasscode() {
         let user = FaceTemplateSecureSession.authentication(for: .userPresence)
         let biometry = FaceTemplateSecureSession.authentication(for: .biometryCurrentSetOrDevicePasscode)
