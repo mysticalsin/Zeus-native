@@ -1030,6 +1030,14 @@ private struct VoicePage: View {
             GSDivider()
             TalkMicrophoneRow()
             GSDivider()
+            GSToggleRow(symbol: "rectangle.dashed.badge.record", title: "Let Zeus see my screen when I talk",
+                        text: "On: each question can include a screenshot of the displays. Off: Zeus answers without looking. The screenshot is not saved.",
+                        isOn: bool("talk.seeScreen"))
+            GSDivider()
+            GSToggleRow(symbol: "scribble.variable", title: "Draw on the screen while Zeus answers",
+                        text: "Off until you turn it on. Marks can appear while the answer is spoken, and one screenshot of the display under the pointer may be sent.",
+                        isOn: bool("talk.drawOnScreen"))
+            GSDivider()
             KeyAccessLinkRow(navigation: navigation)
         }
         WakeWordCard()
