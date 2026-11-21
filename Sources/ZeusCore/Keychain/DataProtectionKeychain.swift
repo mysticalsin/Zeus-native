@@ -58,8 +58,14 @@ public protocol CredentialKeychain: Sendable {
     func readProtected(service: String, account: String) -> KeychainRead
     /// Label, creator and whether the access list admits every program. Never the secret.
     func legacyFacts(service: String, account: String) -> LegacyItemFacts
+    /// Every legacy match, each with its own persistent reference. Not limited to one.
+    func legacyCandidates(service: String, account: String) -> [LegacyCandidate]
     func writeProtected(_ data: Data, request: KeychainWriteRequest) -> Bool
+    func writeLegacy(_ data: Data, service: String, account: String) -> Bool
     func deleteLegacy(service: String, account: String) -> Bool
+    /// Deletes one legacy item. Other matches for the same account stay.
+    func deleteLegacyItem(persistentRef: Data) -> Bool
+    func deleteProtected(service: String, account: String) -> Bool
 }
 
 /// Words the app can show. `needsReentry` is the state "This key needs re-entry".
@@ -132,13 +138,44 @@ public enum CredentialKeychainPolicy {
     public static let zeusCreator = "ZEUS"
     /// Present means on. Never copy a legacy item into this account.
     public static let cliSwitchAccount = "cli.control.enabled"
+    public static let bundleIdentifier = "app.zeus.mac"
     /// Accounts a scheduled or background job must read while the screen is locked. None.
     public static let whileLockedAccounts: Set<String> = []
+    /// Account names Zeus itself creates. A credential origin (suffix `.origin`) is never in this set.
+    public static let importableAccounts: Set<String> = [
+        "elevenlabs.api-key", "elevenlabs.voice-id", "license.key", "license.activation", "trial.start",
+        "assistant.key.openAI", "assistant.key.anthropic", "assistant.key.elevenLabs", "assistant.key.openai",
+        "worker.url", "worker.token", "cloud.key.openai", "cloud.key.anthropic", "cloud.key.elevenlabs",
+        "cloudflare.api-token", "jev-api-key", "anyllm-api-key", "openai-tts.api-key", "gemini-tts.api-key",
+        "chatterbox.api-key", "face.presence.vaultKey", "insomnia.hotspotPassword",
+    ]
 
-    /// True only when the access list is not open to every program and the creator or the label is Zeus's.
+    /// Label and creator are not provenance. An open list, or any list other than Zeus alone, is not Zeus.
     public static func zeusWrote(_ facts: LegacyItemFacts) -> Bool {
         if facts.anyProgram { return false }
         return facts.creator == zeusCreator || facts.label == zeusLabel
+    }
+
+    /// Team id plus bundle id, the designated requirement an imported item's access list must name.
+    public static func designatedRequirement(teamIdentifier: String) -> String? {
+        guard isTeamIdentifier(teamIdentifier) else { return nil }
+        return "identifier \"\(bundleIdentifier)\" and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
+    }
+
+    /// True when the trusted-app list is exactly Zeus's designated requirement and nobody else.
+    public static func aclIsOnlyZeus(_ facts: LegacyItemFacts, teamIdentifier: String) -> Bool {
+        guard !facts.anyProgram, let expected = designatedRequirement(teamIdentifier: teamIdentifier) else { return false }
+        return facts.trustedRequirements == [expected]
+    }
+
+    /// True for an account Zeus creates. The command-line switch and every `*.origin` account are refused.
+    public static func mayImport(account: String) -> Bool {
+        if account == cliSwitchAccount || account.hasSuffix(".origin") { return false }
+        if importableAccounts.contains(account) { return true }
+        let prefix = "fling.peer."
+        guard account.hasPrefix(prefix) else { return false }
+        let rest = account.dropFirst(prefix.count)
+        return !rest.isEmpty && rest.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
     }
 
     public static func isTeamIdentifier(_ team: String) -> Bool {
@@ -200,9 +237,24 @@ public struct LegacyItemFacts: Equatable, Sendable {
     public var label: String
     public var creator: String
     public var anyProgram: Bool
+    /// Code requirements of the trusted applications. One entry, equal to Zeus's designated requirement, is required to import.
+    public var trustedRequirements: [String]
+    public init(label: String, creator: String, anyProgram: Bool, trustedRequirements: [String] = []) {
+        self.label = label
+        self.creator = creator
+        self.anyProgram = anyProgram
+        self.trustedRequirements = trustedRequirements
+    }
     public static let zeus = LegacyItemFacts(label: CredentialKeychainPolicy.zeusLabel,
                                               creator: CredentialKeychainPolicy.zeusCreator,
                                               anyProgram: false)
+}
+
+/// One legacy match. `persistentRef` identifies that item alone. It is not the secret.
+public struct LegacyCandidate: Equatable, Sendable {
+    public var persistentRef: Data
+    public var data: Data
+    public var facts: LegacyItemFacts
 }
 
 /// One pass over a legacy item. `markMigrated` is what the caller persists so the pass does not run again.
@@ -255,17 +307,30 @@ public enum CredentialKeychainMigration {
         if alreadyMigrated || account == CredentialKeychainPolicy.cliSwitchAccount {
             return MigrationAttempt(outcome: protectedOnly(service: service, account: account, keychain: keychain), markMigrated: true)
         }
-        let facts = keychain.legacyFacts(service: service, account: account)
-        switch keychain.readLegacy(service: service, account: account) {
+        guard CredentialKeychainPolicy.mayImport(account: account) else {
+            return MigrationAttempt(outcome: .needsReentry, markMigrated: true)
+        }
+        return importEligible(service: service, account: account, teamIdentifier: teamIdentifier, keychain: keychain)
+    }
+
+    /// Puts the protected value back into the legacy store, then drops only the protected item.
+    /// A second legacy item is left as it is. Nothing is removed when the copy cannot be read back.
+    public static func removeKeepingLegacy(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
+        guard CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier) != nil else {
+            return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+        }
+        switch keychain.readProtected(service: service, account: account) {
         case .unreadable:
             return MigrationAttempt(outcome: .locked, markMigrated: false)
         case .absent:
-            return MigrationAttempt(outcome: protectedOnly(service: service, account: account, keychain: keychain), markMigrated: true)
+            return MigrationAttempt(outcome: .absent, markMigrated: true)
         case .value(let data):
-            guard CredentialKeychainPolicy.zeusWrote(facts) else {
-                return MigrationAttempt(outcome: .needsReentry, markMigrated: true)
+            guard keychain.writeLegacy(data, service: service, account: account),
+                  case .value(let back) = keychain.readLegacy(service: service, account: account), back == data,
+                  keychain.deleteProtected(service: service, account: account) else {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
             }
-            return importOwned(data, service: service, account: account, teamIdentifier: teamIdentifier, keychain: keychain)
+            return MigrationAttempt(outcome: .migrated, markMigrated: true)
         }
     }
 
@@ -298,6 +363,32 @@ public enum CredentialKeychainMigration {
         guard let request = CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier),
               keychain.writeProtected(data, request: request) else { return .needsReentry }
         return verify(data, service: service, account: account, keychain: keychain, success: .migrated)
+    }
+
+    /// Copies the first legacy item whose access list is only Zeus. Every other match is kept.
+    /// Running again does not overwrite a different protected value and does not delete a non-matching item.
+    private static func importEligible(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
+        let candidates = keychain.legacyCandidates(service: service, account: account)
+        switch keychain.readProtected(service: service, account: account) {
+        case .unreadable:
+            return MigrationAttempt(outcome: .locked, markMigrated: false)
+        case .value(let existing):
+            for candidate in candidates where candidate.data == existing && CredentialKeychainPolicy.aclIsOnlyZeus(candidate.facts, teamIdentifier: teamIdentifier) {
+                _ = keychain.deleteLegacyItem(persistentRef: candidate.persistentRef)
+            }
+            return MigrationAttempt(outcome: .alreadyProtected, markMigrated: true)
+        case .absent:
+            guard let chosen = candidates.first(where: { CredentialKeychainPolicy.aclIsOnlyZeus($0.facts, teamIdentifier: teamIdentifier) }) else {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: true)
+            }
+            guard let request = CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier),
+                  keychain.writeProtected(chosen.data, request: request),
+                  case .value(let back) = keychain.readProtected(service: service, account: account), back == chosen.data,
+                  keychain.deleteLegacyItem(persistentRef: chosen.persistentRef) else {
+                return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
+            }
+            return MigrationAttempt(outcome: .migrated, markMigrated: true)
+        }
     }
 
     private static func protectedOnly(service: String, account: String, keychain: any CredentialKeychain) -> CredentialMigrationOutcome {

@@ -1,5 +1,10 @@
 import Foundation
 import Testing
+#if canImport(Darwin)
+@preconcurrency import Darwin
+#elseif canImport(Glibc)
+@preconcurrency import Glibc
+#endif
 @testable import ZeusCore
 
 /// Records Keychain attributes and the order of calls. Holds no file and calls no Keychain API.
@@ -10,6 +15,10 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
     var failDelete = false
     var corruptReadBack = false
     var facts: LegacyItemFacts = .zeus
+    /// A second legacy item with different bytes. `deleteLegacy(service:account:)` drops every match.
+    var sibling: Data?
+    let primaryRef = Data("primary-ref".utf8)
+    let siblingRef = Data("sibling-ref".utf8)
     private(set) var kinds: [String] = []
     private(set) var writes: [KeychainWriteRequest] = []
     private(set) var log = ""
@@ -25,6 +34,30 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
     }
 
     func legacyFacts(service: String, account: String) -> LegacyItemFacts { facts }
+
+    func legacyCandidates(service: String, account: String) -> [LegacyCandidate] {
+        var list: [LegacyCandidate] = []
+        if case .value(let data) = legacy {
+            list.append(LegacyCandidate(persistentRef: primaryRef, data: data, facts: facts))
+        }
+        if let sibling {
+            list.append(LegacyCandidate(persistentRef: siblingRef, data: sibling, facts: facts))
+        }
+        return list
+    }
+
+    func deleteLegacyItem(persistentRef: Data) -> Bool {
+        note("deleteLegacy")
+        if persistentRef == primaryRef, case .value = legacy {
+            legacy = .absent
+            return true
+        }
+        if persistentRef == siblingRef, sibling != nil {
+            sibling = nil
+            return true
+        }
+        return false
+    }
 
     func readProtected(service: String, account: String) -> KeychainRead {
         note("readProtected")
@@ -44,6 +77,19 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         note("deleteLegacy")
         guard !failDelete else { return false }
         legacy = .absent
+        sibling = nil
+        return true
+    }
+
+    func writeLegacy(_ data: Data, service: String, account: String) -> Bool {
+        note("writeLegacy")
+        legacy = .value(data)
+        return true
+    }
+
+    func deleteProtected(service: String, account: String) -> Bool {
+        note("deleteProtected")
+        protected = .absent
         return true
     }
 
@@ -269,21 +315,23 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         let defaults = UserDefaults(suiteName: name)!
         let flags = MigrationFlagStore(defaults: defaults)
         let store = RecordingCredentialKeychain(legacy: .value(secret))
-        store.facts = .zeus
-        #expect(!flags.contains(service: service, account: account))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        let saved = "elevenlabs.api-key"
+        #expect(!flags.contains(service: service, account: saved))
         let first = CredentialKeychainMigration.migrateOnce(
-            service: service, account: account, teamIdentifier: team, keychain: store,
-            alreadyMigrated: flags.contains(service: service, account: account))
+            service: service, account: saved, teamIdentifier: team, keychain: store,
+            alreadyMigrated: flags.contains(service: service, account: saved))
         #expect(first.outcome == .migrated)
         #expect(first.markMigrated)
-        if first.markMigrated { flags.mark(service: service, account: account) }
+        if first.markMigrated { flags.mark(service: service, account: saved) }
         store.legacy = .value(Data("planted-later".utf8))
         let reloaded = MigrationFlagStore(defaults: defaults)
-        #expect(reloaded.contains(service: service, account: account))
+        #expect(reloaded.contains(service: service, account: saved))
         let mark = store.kinds.count
         _ = CredentialKeychainMigration.migrateOnce(
-            service: service, account: account, teamIdentifier: team, keychain: store,
-            alreadyMigrated: reloaded.contains(service: service, account: account))
+            service: service, account: saved, teamIdentifier: team, keychain: store,
+            alreadyMigrated: reloaded.contains(service: service, account: saved))
         let added = Array(store.kinds.dropFirst(mark))
         #expect(!added.contains("readLegacy"))
         #expect(!added.contains("writeProtected"))
@@ -301,5 +349,126 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         #expect(store.kinds.isEmpty)
         #expect(store.legacy == .value(secret))
         #expect(store.protected == .absent)
+    }
+
+    @Test func anAttackerOnlyAclIsNotImported() {
+        let store = RecordingCredentialKeychain(legacy: .value(secret))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [Self.attackerRequirement])
+        let result = CredentialKeychainMigration.migrateOnce(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
+        #expect(!CredentialKeychainPolicy.aclIsOnlyZeus(store.facts, teamIdentifier: team))
+        #expect(result.outcome != .migrated)
+        #expect(store.writes.isEmpty)
+        #expect(!store.kinds.contains("deleteLegacy"))
+        #expect(store.legacy == .value(secret))
+        #expect(store.protected == .absent)
+    }
+
+    @Test func aPlantedProviderKeyAndAnOriginAccountAreNotImported() {
+        let zeusOnly = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                        trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        for name in ["planted.provider.key", "anyllm-api-key.origin", "license.server.origin"] {
+            let store = RecordingCredentialKeychain(legacy: .value(secret))
+            store.facts = zeusOnly
+            let result = CredentialKeychainMigration.migrateOnce(
+                service: service, account: name, teamIdentifier: team, keychain: store, alreadyMigrated: false)
+            #expect(result.outcome != .migrated)
+            #expect(store.writes.isEmpty)
+            #expect(!store.kinds.contains("deleteLegacy"))
+            #expect(store.legacy == .value(secret))
+        }
+    }
+
+    @Test func aSecondLegacyItemWithDifferentBytesIsKept() {
+        let other = Data("other-legacy-value".utf8)
+        let store = RecordingCredentialKeychain(legacy: .value(secret))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        store.sibling = other
+        _ = CredentialKeychainMigration.migrateOnce(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
+        #expect(store.sibling == other)
+        #expect(store.protected == .value(secret))
+    }
+
+    @Test func aRerunAfterTheFlagIsClearedDoesNotImportAnAttackerOrDropTheOtherItem() {
+        let store = RecordingCredentialKeychain(legacy: .value(secret))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        let other = Data("other-legacy-value".utf8)
+        store.sibling = other
+        let first = CredentialKeychainMigration.migrateOnce(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
+        #expect(first.outcome == .migrated)
+        store.legacy = .value(Data("planted-later".utf8))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [Self.attackerRequirement])
+        let second = CredentialKeychainMigration.migrateOnce(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
+        #expect(second.outcome != .migrated)
+        #expect(store.protected == .value(secret))
+        #expect(store.legacy == .value(Data("planted-later".utf8)))
+        #expect(store.sibling == other)
+    }
+
+    @Test func migrationDoesNotPrintTheSecret() {
+        let unique = Data("synthetic-key-value".utf8)
+        let store = RecordingCredentialKeychain(legacy: .value(unique))
+        store.facts = LegacyItemFacts(label: "ZEUS", creator: "ZEUS", anyProgram: false,
+                                       trustedRequirements: [CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team)!])
+        let output = capturedOutput {
+            _ = CredentialKeychainMigration.migrate(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+            _ = CredentialKeychainMigration.migrateOnce(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store, alreadyMigrated: false)
+            _ = CredentialKeychainMigration.write(data: unique, service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+            _ = CredentialKeychainMigration.removeKeepingLegacy(service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+        }
+        #expect(!output.contains(unique))
+        #expect(!store.log.contains("synthetic-key-value"))
+        #expect(!CredentialKeychainMigration.logLine(account: "elevenlabs.api-key", outcome: .migrated).contains("synthetic-key-value"))
+    }
+
+    @Test func turningOffCopiesTheKeyBackBeforeDroppingTheProtectedItem() {
+        let store = RecordingCredentialKeychain(protected: .value(secret))
+        let other = Data("other-legacy-value".utf8)
+        store.sibling = other
+        let result = CredentialKeychainMigration.removeKeepingLegacy(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+        #expect(result.outcome == .migrated || result.outcome == .alreadyProtected)
+        #expect(store.protected == .absent)
+        #expect(store.legacy == .value(secret))
+        #expect(store.sibling == other)
+    }
+
+    private static let attackerRequirement = "identifier \"com.attacker.tool\" and certificate leaf[subject.OU] = \"ATKTEAM01\""
+
+    private func capturedOutput(_ body: () -> Void) -> Data {
+        flushStandardStreams()
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        let savedOut = dup(STDOUT_FILENO)
+        let savedErr = dup(STDERR_FILENO)
+        dup2(outPipe.fileHandleForWriting.fileDescriptor, STDOUT_FILENO)
+        dup2(errPipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO)
+        body()
+        flushStandardStreams()
+        dup2(savedOut, STDOUT_FILENO)
+        dup2(savedErr, STDERR_FILENO)
+        close(savedOut)
+        close(savedErr)
+        try? outPipe.fileHandleForWriting.close()
+        try? errPipe.fileHandleForWriting.close()
+        return outPipe.fileHandleForReading.readDataToEndOfFile() + errPipe.fileHandleForReading.readDataToEndOfFile()
+    }
+
+    /// Flushes C stdio without naming the imported `stdout` or `stderr` variables.
+    private func flushStandardStreams() {
+        guard let handle = dlopen(nil, RTLD_NOW) else { return }
+        defer { dlclose(handle) }
+        for name in ["_IO_2_1_stdout_", "_IO_2_1_stderr_", "__stdoutp", "__stderrp"] {
+            guard let symbol = dlsym(handle, name) else { continue }
+            let file = UnsafeMutablePointer<FILE>(OpaquePointer(symbol))
+            fflush(file)
+        }
     }
 }

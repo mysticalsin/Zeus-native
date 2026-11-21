@@ -128,9 +128,11 @@ public struct SystemKeychain: KeychainBackend {
     @discardableResult
     public func delete(service: String, account: String) -> Bool {
         quietly {
-            let adapter = SecCredentialKeychain(teamIdentifier: DevKeychain.teamIdentifier ?? "", legacyQuery: { self.legacyQuery($0, $1) })
-            if DevKeychain.teamIdentifier != nil, !adapter.deleteProtected(service: service, account: account) { return false }
-            return adapter.deleteLegacy(service: service, account: account)
+            guard let team = DevKeychain.teamIdentifier else { return false }
+            let adapter = SecCredentialKeychain(teamIdentifier: team, legacyQuery: { self.legacyQuery($0, $1) })
+            let outcome = CredentialKeychainMigration.removeKeepingLegacy(
+                service: service, account: account, teamIdentifier: team, keychain: adapter)
+            return outcome == .migrated || outcome == .absent
         }
     }
 }
@@ -154,8 +156,60 @@ private struct SecCredentialKeychain: CredentialKeychain {
             return LegacyItemFacts(label: "", creator: "", anyProgram: true)
         }
         let label = attrs[kSecAttrLabel as String] as? String ?? ""
+        let access = Self.trustedApps(attrs[kSecAttrAccess as String])
         return LegacyItemFacts(label: label, creator: Self.creatorString(attrs[kSecAttrCreator as String]),
-                                anyProgram: Self.accessAllowsAnyProgram(attrs[kSecAttrAccess as String]))
+                                anyProgram: access.anyProgram, trustedRequirements: access.requirements)
+    }
+
+    func legacyCandidates(service: String, account: String) -> [LegacyCandidate] {
+        var query = legacyQuery(service, account)
+        query[kSecReturnData as String] = true
+        query[kSecReturnPersistentRef as String] = true
+        query[kSecReturnAttributes as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitAll
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return [] }
+        guard status == errSecSuccess else { return [] }
+        let rows: [[String: Any]]
+        if let many = result as? [[String: Any]] { rows = many }
+        else if let one = result as? [String: Any] { rows = [one] }
+        else { return [] }
+        return rows.compactMap { attrs in
+            guard let data = attrs[kSecValueData as String] as? Data,
+                  let ref = attrs[kSecValuePersistentRef as String] as? Data else { return nil }
+            let access = Self.trustedApps(attrs[kSecAttrAccess as String])
+            let facts = LegacyItemFacts(label: attrs[kSecAttrLabel as String] as? String ?? "",
+                                         creator: Self.creatorString(attrs[kSecAttrCreator as String]),
+                                         anyProgram: access.anyProgram, trustedRequirements: access.requirements)
+            return LegacyCandidate(persistentRef: ref, data: data, facts: facts)
+        }
+    }
+
+    func writeLegacy(_ data: Data, service: String, account: String) -> Bool {
+        let existing = legacyCandidates(service: service, account: account)
+        if let first = existing.first {
+            let query: [String: Any] = [kSecValuePersistentRef as String: first.persistentRef]
+            let update: [String: Any] = [kSecValueData as String: data]
+            return SecItemUpdate(query as CFDictionary, update as CFDictionary) == errSecSuccess
+        }
+        var add = legacyQuery(service, account)
+        add[kSecValueData as String] = data
+        add[kSecAttrLabel as String] = CredentialKeychainPolicy.zeusLabel
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+    }
+
+    func deleteLegacyItem(persistentRef: Data) -> Bool {
+        let query: [String: Any] = [kSecValuePersistentRef as String: persistentRef]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+
+    func deleteProtected(service: String, account: String) -> Bool {
+        guard let query = protectedQuery(service, account) else { return false }
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 
     func readProtected(service: String, account: String) -> KeychainRead {
@@ -185,12 +239,6 @@ private struct SecCredentialKeychain: CredentialKeychain {
 
     func deleteLegacy(service: String, account: String) -> Bool {
         let status = SecItemDelete(legacyQuery(service, account) as CFDictionary)
-        return status == errSecSuccess || status == errSecItemNotFound
-    }
-
-    func deleteProtected(service: String, account: String) -> Bool {
-        guard let query = protectedQuery(service, account) else { return false }
-        let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
@@ -243,23 +291,32 @@ private struct SecCredentialKeychain: CredentialKeychain {
         return String(bytes: bytes, encoding: .utf8) ?? ""
     }
 
-    /// An access list with no application list admits every program. A missing list is treated the same way,
-    /// so an item we cannot attribute is not copied.
-    private static func accessAllowsAnyProgram(_ value: Any?) -> Bool {
-        guard let value else { return true }
+    /// Trusted applications on the access list. A missing list, or a list that is not exactly this app, is not imported.
+    private static func trustedApps(_ value: Any?) -> (anyProgram: Bool, requirements: [String]) {
+        guard let value else { return (true, []) }
         let object = value as AnyObject
-        guard CFGetTypeID(object) == SecAccessGetTypeID() else { return true }
+        guard CFGetTypeID(object) == SecAccessGetTypeID() else { return (true, []) }
         let access = object as! SecAccess
         var list: CFArray?
-        guard SecAccessCopyACLList(access, &list) == errSecSuccess, let acls = list as? [SecACL], !acls.isEmpty else { return true }
+        guard SecAccessCopyACLList(access, &list) == errSecSuccess, let acls = list as? [SecACL], !acls.isEmpty else { return (true, []) }
+        guard let team = DevKeychain.teamIdentifier,
+              let expected = CredentialKeychainPolicy.designatedRequirement(teamIdentifier: team) else { return (true, []) }
+        var selfApp: SecTrustedApplication?
+        guard SecTrustedApplicationCreateFromPath(nil, &selfApp) == errSecSuccess, let selfApp else { return (true, []) }
+        var requirements: [String] = []
         for acl in acls {
             var apps: CFArray?
             var description: CFString?
             var prompt = CSSM_ACL_KEYCHAIN_PROMPT_SELECTOR()
-            guard SecACLCopyContents(acl, &apps, &description, &prompt) == errSecSuccess else { return true }
-            if apps == nil { return true }
+            guard SecACLCopyContents(acl, &apps, &description, &prompt) == errSecSuccess else { return (true, []) }
+            guard let apps else { return (true, []) }
+            let array = apps as NSArray
+            for index in 0..<array.count {
+                guard let app = array[index] as? SecTrustedApplication else { return (true, []) }
+                requirements.append(CFEqual(app, selfApp) ? expected : "other")
+            }
         }
-        return false
+        return (false, requirements)
     }
 
     private static func constant(_ access: KeychainAccessibility) -> CFString {
