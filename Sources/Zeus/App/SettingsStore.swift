@@ -296,7 +296,7 @@ final class SettingsStore {
     /// loosen what Zeus may do. A person turns these on, on the Mac they are using.
     static let neverEnabledByImport: Set<String> = [
         "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
-        "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
+        "notify.system", "notify.replaceBanners", "notify.mirror", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
         "face.presence",
         // It reads other apps' window frames and moves their windows.
         "tiling.enabled",
@@ -306,7 +306,7 @@ final class SettingsStore {
     /// Choices an imported file may never make, whatever it says, by option id. A person picks these on this Mac.
     static let neverChosenByImport: [String: Set<String>] = [ScribeAutoStartMode.settingID: [ScribeAutoStartMode.automatic.title]]
     private static var neverEnabledAppKeys: Set<String> {
-        [WakeWordController.defaultsKey, "dictation.engineForVoice"]
+        [WakeWordController.defaultsKey, "dictation.engineForVoice", NotificationMirrorPreference.key]
     }
     /// A cloud transcription engine or a non-local voice provider is only ever chosen on this Mac, by hand.
     static func importWouldSelectCloud(key: String, value: Any) -> Bool {
@@ -382,6 +382,9 @@ final class SettingsStore {
             let rule = Self.appRules[key] ?? (key == HaloMigration.legacyKey ? AppRule.text(64) : nil)
             guard let rule, rule.accepts(value), !Self.neverImportedAppKeys.contains(key) else { continue }
             if Self.neverEnabledAppKeys.contains(key), (value as? NSNumber)?.boolValue == true { continue }
+            // An import cannot enable the notch mirror, whether the file says true or "true".
+            if (key == NotificationMirrorPreference.key || key == NotificationMirrorPreference.legacyKey),
+               NotificationMirrorPreference.importWouldEnable(value) { continue }
             // An import never moves speech to a cloud service: this Mac may already hold that service's key.
             if Self.importWouldSelectCloud(key: key, value: value) { continue }
             appChanges.append((key, value))

@@ -6,26 +6,43 @@ public enum NotificationMirrorPreference {
     public static let key = "notifications.mirror"
     public static let legacyKey = "opt.notify.mirror"
 
-    /// The Boolean when one was stored, otherwise a legacy "true". A read does not write.
+    /// The Boolean when one was stored. A legacy string never turns the mirror on. A read does not write.
     public static func isOn(_ defaults: UserDefaults) -> Bool {
         if let stored = defaults.object(forKey: key) as? Bool { return stored }
-        return defaults.string(forKey: legacyKey) == "true"
+        return false
     }
 
-    /// Copies a legacy string into the Boolean when the Boolean is absent. The string stays.
+    /// Copies a legacy `"false"` into the Boolean when the Boolean is absent. The string stays.
+    /// A legacy `"true"` is left untouched, so an upgrade cannot turn mirroring on.
     @discardableResult
     public static func migrate(_ defaults: UserDefaults) -> Bool {
         guard defaults.object(forKey: key) == nil else { return false }
-        switch defaults.string(forKey: legacyKey) {
-        case "true":
-            defaults.set(true, forKey: key)
+        guard defaults.string(forKey: legacyKey) == "false" else { return false }
+        defaults.set(false, forKey: key)
+        return true
+    }
+
+    /// An imported value enables the mirror when it is boolean true or the string `"true"`.
+    public static func importWouldEnable(_ value: Any) -> Bool {
+        if let flag = value as? Bool { return flag }
+        if let text = value as? String { return text == "true" }
+        return false
+    }
+
+    /// Applies an imported value. True is refused and nothing is written. False is stored.
+    /// Anything else is ignored. An import cannot enable the mirror.
+    @discardableResult
+    public static func applyImport(_ value: Any, defaults: UserDefaults) -> Bool {
+        if importWouldEnable(value) { return false }
+        if let flag = value as? Bool, flag == false {
+            set(false, defaults: defaults)
             return true
-        case "false":
-            defaults.set(false, forKey: key)
-            return true
-        default:
-            return false
         }
+        if let text = value as? String, text == "false" {
+            set(false, defaults: defaults)
+            return true
+        }
+        return false
     }
 
     /// Writes the Boolean and the same choice as the legacy string.
