@@ -72,6 +72,12 @@ public struct PreciseLocationMachine: Equatable, Sendable {
         }
     }
 
+    /// Restores a choice the person already stored. It does not raise the system prompt.
+    public mutating func restoreStored(_ on: Bool) {
+        wantsPreciseLocation = on
+        promptOutstanding = false
+    }
+
     public mutating func send(_ event: PreciseLocationEvent) -> PreciseLocationEffect? {
         switch event {
         case .userEnabled:
