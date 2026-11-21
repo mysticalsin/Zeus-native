@@ -17,6 +17,11 @@ struct FeaturesSettingsPage: View {
     var body: some View {
         GSPageHeading(section: .features, subtitle: "What Zeus does on its own, and how far it may go.")
             .padding(.bottom, -GS.cardGap)
+        GSCard("Drive") {
+            GSToggleRow(symbol: "cursorarrow.click", title: "Move the system pointer",
+                        text: "Drive mode may glide and click when Accessibility cannot. Off until you turn it on.",
+                        isOn: store.boolBinding("present.physicalPointer"))
+        }
         GSCard("Instant commands") {
             GSToggleRow(symbol: "bolt", title: "Fast path", text: "Simple commands (open an app, volume, timers, to-dos, Beamer) run the moment you finish speaking. Off sends every command to the AI.",
                         isOn: store.boolBinding("fastPath.enabled"))
