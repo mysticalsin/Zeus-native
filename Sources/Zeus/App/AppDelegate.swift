@@ -634,7 +634,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DeepLinks.openSettings = { [weak self] section in
             self?.showSettings(GSSection.allCases.first { $0.rawValue.lowercased() == section && $0.isShown })
         }
-        DeepLinks.handle(urls)
+        DeepLinks.confirm = { [weak self] prompt in
+            guard let self else { return false }
+            let verdict = await self.notch.requestApproval(agent: "Zeus", project: "Link", tool: "Confirm",
+                                                           command: prompt.summary, risk: .high)
+            return verdict == .allow
+        }
+        Task { await DeepLinks.handle(urls) }
     }
 
     /// Opening ZEUS again (Finder, Spotlight) shows the panel, or Settings when the menu bar

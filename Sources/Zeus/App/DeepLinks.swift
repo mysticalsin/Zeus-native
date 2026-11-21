@@ -4,10 +4,10 @@ import ZeusCore
 /// Carries out `zeus://` links (see `ZeusDeepLink`).
 @MainActor
 enum DeepLinks {
-    static func handle(_ urls: [URL]) {
+    static func handle(_ urls: [URL]) async {
         for url in urls {
             guard let link = ZeusDeepLink.parse(url) else { continue }
-            perform(link)
+            await perform(link, presentedNonce: ZeusDeepLink.presentedNonce(in: url))
         }
     }
 
@@ -18,8 +18,20 @@ enum DeepLinks {
     static var requestDictationStart: (() -> Void)?
     /// Wired by the app: opens the Settings window on a page (`GSSection` raw value, any case) or the last one.
     static var openSettings: ((String?) -> Void)?
+    /// Secret for this launch. A link that presents it may change state. It is not written to disk.
+    static let launchNonce = DeepLinkGate.makeNonce()
+    /// Inline confirmation in the top bar. Unset means a state change or a text write does not run.
+    static var confirm: (@MainActor (DeepLinkPrompt) async -> Bool)?
 
-    static func perform(_ link: ZeusDeepLink) {
+    static func perform(_ link: ZeusDeepLink, presentedNonce: String? = nil) async {
+        await DeepLinkPerformer.run(link, presentedNonce: presentedNonce, launchNonce: launchNonce, isDictating: isDictating(),
+                                    confirm: { prompt in
+            guard let confirm else { return false }
+            return await confirm(prompt)
+        }, apply: apply)
+    }
+
+    private static func apply(_ link: ZeusDeepLink) {
         let dictation = DictationHub.shared.controller
         switch link {
         // An external link must never start the microphone itself; it only brings Zeus forward.
