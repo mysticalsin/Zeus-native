@@ -9,8 +9,10 @@ import Testing
 
     @Test func everyStateAndEventHasOneOutcome() throws {
         let failure = VoiceSessionError.badFrameSize(expected: 3_200, got: 1)
-        let states: [VoiceSessionState] = [.idle, .starting, .streaming, .closing, .closed, .failed(failure)]
-        let events: [VoiceSessionEvent] = [.start, .started, .push, .close, .closed, .fail(failure)]
+        let states = VoiceSessionState.everyCase(failure: failure)
+        let events = VoiceSessionEvent.everyCase(failure: failure)
+        #expect(states.map(\.shape) == VoiceSessionStateShape.allCases)
+        #expect(events.map(\.shape) == VoiceSessionEventShape.allCases)
         let legal: [VoiceSessionState: [VoiceSessionEvent: VoiceSessionState]] = [
             .idle: [.start: .starting, .fail(failure): .failed(failure)],
             .starting: [.started: .streaming, .fail(failure): .failed(failure)],
