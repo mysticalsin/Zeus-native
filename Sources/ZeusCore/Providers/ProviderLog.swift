@@ -44,6 +44,8 @@ public struct ProviderSignpostSample: Equatable, Sendable {
 /// Records `voice.first-audio`. Metadata keeps only a provider id and a route.
 /// On macOS the same interval is an `OSSignposter` interval. Linux records the sample only.
 public final class ProviderSignposter: @unchecked Sendable {
+    /// A long session keeps the latest marks, not every mark since launch.
+    public static let sampleCap = 64
     private let lock = NSLock()
     public private(set) var samples: [ProviderSignpostSample] = []
 
@@ -68,6 +70,9 @@ public final class ProviderSignposter: @unchecked Sendable {
         let sample = ProviderSignpostSample(name: ProviderSignpostName.firstAudio, milliseconds: milliseconds, metadata: Self.sanitize(metadata))
         lock.lock()
         samples.append(sample)
+        if samples.count > Self.sampleCap {
+            samples.removeFirst(samples.count - Self.sampleCap)
+        }
         lock.unlock()
         return milliseconds
     }
