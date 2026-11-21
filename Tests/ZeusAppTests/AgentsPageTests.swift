@@ -335,6 +335,71 @@ struct AgentsPageTests {
         #expect(denied.revision.pending?.requestIDs == ["s1", "s2"])
     }
 
+    @Test func undoBeforeSendCancelsTheAllow() {
+        let tapped = AgentsPageHook.tapAllow(page(.approval))
+        #expect(tapped.sends.isEmpty)
+        let undone = AgentsPageHook.undo(tapped.page)
+        #expect(undone.sends.isEmpty)
+        let later = AgentsPageHook.advance(undone.page, ticks: 2)
+        #expect(later.sends.isEmpty)
+        #expect(later.page.revision.executed.allSatisfy { !$0.action.isApproval })
+    }
+
+    @Test func allowIsSentOnlyAfterTheUndoWindow() {
+        let tapped = AgentsPageHook.tapAllow(page(.approval))
+        #expect(tapped.sends.isEmpty)
+        let midway = AgentsPageHook.advance(tapped.page, ticks: 1)
+        #expect(midway.sends.isEmpty)
+        let sent = AgentsPageHook.advance(midway.page, ticks: 1)
+        #expect(sent.sends == [.allow])
+    }
+
+    @Test func destructiveRequiresTheHoldBeforeAnySend() {
+        var destructive = page(.approval)
+        if var showing = destructive.revision.showing {
+            showing.tier = .destructive
+            destructive.revision.showing = showing
+        }
+        let tapped = AgentsPageHook.tapAllow(destructive)
+        #expect(tapped.sends.isEmpty)
+        #expect(tapped.page.revision.pending == nil)
+        let early = AgentsPageHook.hold(destructive, action: .allowOnce, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds - 1)
+        #expect(early.sends.isEmpty)
+        #expect(early.page.revision.pending == nil)
+        let held = AgentsPageHook.hold(destructive, action: .allowOnce, milliseconds: HubRevision3Timing.destructiveHoldMilliseconds)
+        #expect(held.sends.isEmpty)
+        #expect(held.page.revision.pending?.action == .allowOnce)
+        let sent = AgentsPageHook.advance(held.page, ticks: 2)
+        #expect(sent.sends == [.allow])
+    }
+
+    @Test func aDuplicateRequestKeepsTheShowingCommandAndTier() {
+        let start = page(.approval)
+        let duplicate = AgentsPageRequest(
+            id: "s1", sessionID: "s1", tool: "Bash", highRisk: true, command: "show the diff", tier: .high)
+        let next = start.applying(.approvalRequested(duplicate)).applying(.tick)
+        #expect(next.showingRequest?.command == "list files")
+        #expect(next.showingRequest?.tier == .low)
+        #expect(next.revision.showing?.tier == .low)
+        #expect(next.revision.waiting.isEmpty)
+    }
+
+    @Test func eachRequestKeepsItsOwnIdAndCommand() {
+        var start = page(.approval)
+        start.roster.append(HubGroupSession(id: "s2", agent: "Agent A", project: "Fixture", status: .running, elapsedSeconds: 1))
+        start.sessions["s2"] = HubSessionState(status: .running, clockGeneration: 1)
+        let other = AgentsPageRequest(
+            id: "req-b", sessionID: "s2", tool: "Bash", highRisk: true, command: "show the diff", tier: .high)
+        let queued = start.applying(.approvalRequested(other)).applying(.tick)
+        #expect(queued.revision.showing?.id == "s1")
+        #expect(queued.revision.showing?.tier == .low)
+        #expect(queued.showingRequest?.command == "list files")
+        #expect(queued.showingRequest?.tier == .low)
+        #expect(queued.revision.waiting.map(\.id) == ["req-b"])
+        #expect(queued.queuedRequests.first?.command == "show the diff")
+        #expect(queued.queuedRequests.first?.tier == .high)
+    }
+
     @Test func exhaustiveTransitionTable() {
         let failures = AgentsPageOracle.failures()
         #expect(failures.isEmpty, "\(failures.joined(separator: "\n"))")

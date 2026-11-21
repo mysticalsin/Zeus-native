@@ -1367,12 +1367,16 @@ enum AgentsPagePhase: String, Equatable, Sendable {
 
 /// One approval the page can show or queue. Tiers beyond the existing high-risk flag are not invented here.
 struct AgentsPageRequest: Equatable, Sendable {
+    /// Empty means the session id. A real request supplies its own id.
+    var id: String = ""
     var sessionID: String
     var tool: String
     var highRisk: Bool
     var command: String?
     /// The revision 3 tier. High-risk maps to `.high`. Destructive is named only by that type.
     var tier: HubRiskTier = .low
+
+    var boundID: String { id.isEmpty ? sessionID : id }
 }
 
 /// What the Agents page is told. A pair that is not handled leaves the page as it was.
@@ -1881,6 +1885,39 @@ private extension HubSessionStatus {
     var isError: Bool {
         if case .error = self { return true }
         return false
+    }
+}
+
+/// What the page tells the hook. The stub still sends Allow on the tap. The window is not consulted.
+enum AgentsPageHookVerdict: String, Equatable, Sendable {
+    case allow, deny, ask
+}
+
+enum AgentsPageHook {
+    struct Step: Equatable, Sendable {
+        var page: AgentsPage
+        var sends: [AgentsPageHookVerdict]
+    }
+
+    static func tapAllow(_ page: AgentsPage) -> Step {
+        Step(page: page.applying(.approve), sends: [.allow])
+    }
+
+    static func undo(_ page: AgentsPage) -> Step {
+        Step(page: page.applying(.undo), sends: [])
+    }
+
+    static func hold(_ page: AgentsPage, action: HubDecisionAction, milliseconds: Int) -> Step {
+        let began = page.applying(.holdBegan(action))
+        let released = began.applying(.holdReleased(after: milliseconds))
+        let sends: [AgentsPageHookVerdict] = milliseconds >= HubRevision3Timing.destructiveHoldMilliseconds ? [.allow] : []
+        return Step(page: released, sends: sends)
+    }
+
+    static func advance(_ page: AgentsPage, ticks: Int) -> Step {
+        var current = page
+        for _ in 0..<ticks { current = current.applying(.tick) }
+        return Step(page: current, sends: [])
     }
 }
 
