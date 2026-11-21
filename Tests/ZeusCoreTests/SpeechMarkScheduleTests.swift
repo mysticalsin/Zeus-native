@@ -93,4 +93,32 @@ import Testing
         #expect(real?.estimated == false && real?.timingDisclosure.isEmpty == true)
         #expect(atOne.first { $0.id == "guessed" }?.estimated == true)
     }
+
+    /// Deleting `audioStartSeconds >= 0` or `time <= audioTime` must fail these cases.
+    @Test func dueTimesCoverEmptySingleBetweenAndOutOfOrder() {
+        var empty = SpeechMarkSchedule(marks: [])
+        #expect(empty.due(at: 1).isEmpty)
+        #expect(empty.apply(sentenceIndex: 0, audioStartSeconds: 0).isEmpty)
+
+        var single = SpeechMarkSchedule(marks: [.init(id: "only", sentenceIndex: 0)])
+        #expect(single.apply(sentenceIndex: 0, audioStartSeconds: -1).isEmpty)
+        #expect(single.due(at: 0).isEmpty)
+        #expect(single.apply(sentenceIndex: 0, audioStartSeconds: 1).map(\.id) == ["only"])
+        #expect(single.due(at: 0).isEmpty)
+        #expect(single.due(at: 1).map(\.id) == ["only"])
+
+        let between = SpeechMarkSchedule(marks: [
+            .init(id: "a", sentenceIndex: 0, dueSeconds: 1),
+            .init(id: "b", sentenceIndex: 0, dueSeconds: 3),
+        ])
+        #expect(between.due(at: 2).map(\.id) == ["a"])
+        #expect(between.due(at: 3).map(\.id) == ["a", "b"])
+
+        let reversed = SpeechMarkSchedule(marks: [
+            .init(id: "late", sentenceIndex: 0, dueSeconds: 5),
+            .init(id: "early", sentenceIndex: 0, dueSeconds: 1),
+        ])
+        #expect(reversed.due(at: 2).map(\.id) == ["early"])
+        #expect(reversed.due(at: 5).map(\.id) == ["late", "early"])
+    }
 }

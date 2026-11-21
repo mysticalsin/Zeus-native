@@ -6585,6 +6585,10 @@
             {
               "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
               "function": "theWordEstimateIsOnlyAFallbackWhenRealTimingIsMissing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/SpeechMarkScheduleTests.swift",
+              "function": "dueTimesCoverEmptySingleBetweenAndOutOfOrder"
             }
           ]
         }
