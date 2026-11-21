@@ -114,12 +114,19 @@ Start from A4. Music is playing Track A. Click pause and wait until A1's log lin
 - Player state: do not run the player-state tell. `application id "com.apple.Music" is running` is `false`.
 - Log: none for the quit itself.
 
-### C2. Play with nothing open
+### C2. Next and previous do not launch
 
-- Action: click the white disc (accessibility label Play).
-- Visible: the title stays Nothing playing. The guidance line stays. The disc stays a triangle. It does not become two bars.
-- Player state: `application id "com.apple.Music" is running` is still `false`.
-- Log: `command play nosource`. No `accepted` line and no `permissionDenied` line.
+- Action: click the dark circle on the right of the disc (accessibility label Next track), then the dark circle on the left (accessibility label Previous track).
+- Visible: the title stays Nothing playing. The guidance line stays. The disc stays a triangle. Music does not open.
+- Player state: do not run the player-state tell. `application id "com.apple.Music" is running` is still `false`.
+- Log: `command next nosource`, then `command previous nosource`. No `launched` line and no `accepted` line.
+
+### C3. Play launches Music and starts playback
+
+- Action: click the white disc (accessibility label Play). Wait for the accepted log line. The wait is `MediaCommandRouter.launchTimeout` (8 seconds). One second past that, with no accepted line, is a failure.
+- Visible: the dimmer line may read "Starting playback." while the player opens. Zeus's panel stays open. The disc ends on the black two-bar pause glyph. The title becomes the track name returned by `osascript -e 'tell application "Music" to name of current track'`, one white line.
+- Player state: `playing`.
+- Log, in this order, one of each: `command play launched bundle=com.apple.Music`, then `command play accepted bundle=com.apple.Music`. No `nosource` line and no `permissionDenied` line.
 
 ## D. Automation permission denied
 

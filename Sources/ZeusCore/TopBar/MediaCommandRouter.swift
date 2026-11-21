@@ -50,6 +50,8 @@ public enum MediaCommandState: Equatable, Sendable {
     case playing
     case paused
     case noSource
+    /// A user tap on Play is opening the last player. Nothing else launches a player.
+    case launchingSource
     case commandPending(MediaControlCommand)
     case failed(MediaCommandFailure)
 }
@@ -59,6 +61,8 @@ public enum MediaCommandFailure: Equatable, Sendable {
     case permissionDenied
     /// The command was attempted and the source did not take it.
     case unavailable
+    /// A user tap asked for a player and it did not become ready in time.
+    case launchFailed
 }
 
 public enum MediaCommandDelivery: Equatable, Sendable {
@@ -73,6 +77,10 @@ public enum MediaCommandEvent: Equatable, Sendable {
     case press(MediaControlCommand)
     case result(MediaCommandDelivery)
     case recover
+    /// The launched player is ready to take play. Ignored once `launchTimeout` has passed.
+    case sourceReady
+    /// Asks whether a launch has run out of time. At `launchTimeout` it is still open. One second later it fails.
+    case launchClock
 }
 
 public enum MediaCommandEffect: Equatable, Sendable {
@@ -80,6 +88,8 @@ public enum MediaCommandEffect: Equatable, Sendable {
     /// Read the real now-playing sample again, `after` seconds from the press. Always under 0.15.
     case resync(MediaCommandRoute, after: Double)
     case openRecovery
+    /// Open this player. `activates` is false so the open does not steal focus.
+    case launch(bundleID: String, activates: Bool)
 }
 
 public struct MediaCommandRejection: Error, Equatable, Sendable {
@@ -97,7 +107,8 @@ public struct MediaCommandRejection: Error, Equatable, Sendable {
 }
 
 /// One router for play, pause, next, previous and seek. Illegal transitions throw and change nothing.
-/// A press with no source sends nothing. A second press inside the debounce window sends nothing.
+/// Pause, next and previous with no source send nothing. A user tap on Play with no source launches
+/// the last player. Nothing else launches a player.
 public struct MediaCommandRouter: Equatable, Sendable {
     /// A second press inside this window is a double-tap, not a new command.
     public static let debounceWindow: Double = 0.25
@@ -105,6 +116,17 @@ public struct MediaCommandRouter: Equatable, Sendable {
     public static let resyncDelay: Double = 0.12
     /// How often to look again while a permission check is still in flight.
     public static let permissionRecheck: Double = 0.04
+    /// How long a Play tap waits for the player it just opened. Ready at this bound still counts.
+    /// One second later the launch has failed.
+    public static let launchTimeout: Double = 8
+    /// Used when no scripted player has been seen yet.
+    public static let defaultLaunchBundleID = "com.apple.Music"
+
+    /// A ready signal at `now` is still in time. `now == startedAt + launchTimeout` is in time.
+    /// `now == startedAt + launchTimeout + 1` is not.
+    public static func launchAccepted(startedAt: Double, now: Double) -> Bool {
+        now - startedAt <= launchTimeout
+    }
 
     public private(set) var state: MediaCommandState
     public private(set) var route: MediaCommandRoute?
@@ -117,6 +139,8 @@ public struct MediaCommandRouter: Equatable, Sendable {
     private var lastCommandAt: Double?
     /// Contradicting samples before this time are the old state, still in flight.
     private var holdContradictionsUntil: Double?
+    private var lastLaunchBundleID = MediaCommandRouter.defaultLaunchBundleID
+    private var launchStartedAt: Double?
 
     public init() {
         state = .unknown
@@ -135,12 +159,17 @@ public struct MediaCommandRouter: Equatable, Sendable {
             return try finish(delivery, now: now)
         case .recover:
             return try recover()
+        case .sourceReady:
+            return ready(now: now)
+        case .launchClock:
+            return launchClock(now: now)
         }
     }
 
     // MARK: Samples
 
     private mutating func apply(_ sample: MediaNowPlayingSample?, now: Double) -> [MediaCommandEffect] {
+        if case .launchingSource = state { return [] }
         guard let sample else {
             state = .noSource
             route = nil
@@ -150,6 +179,9 @@ public struct MediaCommandRouter: Equatable, Sendable {
             pendingSince = nil
             holdContradictionsUntil = nil
             return []
+        }
+        if case .scriptedPlayer(let bundleID) = sample.route.endpoint {
+            lastLaunchBundleID = bundleID
         }
         if case .failed(.permissionDenied) = state {
             route = sample.route
@@ -180,6 +212,7 @@ public struct MediaCommandRouter: Equatable, Sendable {
 
     private mutating func press(_ command: MediaControlCommand, now: Double) throws -> [MediaCommandEffect] {
         if case .commandPending = state { throw MediaCommandRejection(.inFlight) }
+        if case .launchingSource = state { throw MediaCommandRejection(.inFlight) }
         if let last = lastCommandAt, now - last < Self.debounceWindow {
             throw MediaCommandRejection(.duplicate)
         }
@@ -187,9 +220,13 @@ public struct MediaCommandRouter: Equatable, Sendable {
         case .unknown:
             throw MediaCommandRejection(.illegalTransition)
         case .noSource:
-            return []
+            guard command == .play else { return [] }
+            return beginLaunch(now: now)
         case .failed(.permissionDenied):
             throw MediaCommandRejection(.blocked)
+        case .failed(.launchFailed):
+            guard command == .play else { return [] }
+            return beginLaunch(now: now)
         case .failed(.unavailable):
             guard route != nil else { return [] }
             return try begin(command, playing: reportedPlaying, now: now)
@@ -197,9 +234,51 @@ public struct MediaCommandRouter: Equatable, Sendable {
             return try begin(command, playing: true, now: now)
         case .paused:
             return try begin(command, playing: false, now: now)
-        case .commandPending:
+        case .commandPending, .launchingSource:
             throw MediaCommandRejection(.inFlight)
         }
+    }
+
+    /// Only a Play tap reaches this. The open does not activate the player.
+    private mutating func beginLaunch(now: Double) -> [MediaCommandEffect] {
+        let bundleID = lastLaunchBundleID
+        launchStartedAt = now
+        state = .launchingSource
+        lastCommandAt = now
+        return [.launch(bundleID: bundleID, activates: false)]
+    }
+
+    private mutating func ready(now: Double) -> [MediaCommandEffect] {
+        guard case .launchingSource = state, let started = launchStartedAt else { return [] }
+        guard Self.launchAccepted(startedAt: started, now: now) else {
+            failLaunch()
+            return []
+        }
+        return startPlay(now: now)
+    }
+
+    private mutating func launchClock(now: Double) -> [MediaCommandEffect] {
+        guard case .launchingSource = state, let started = launchStartedAt else { return [] }
+        guard !Self.launchAccepted(startedAt: started, now: now) else { return [] }
+        failLaunch()
+        return []
+    }
+
+    private mutating func failLaunch() {
+        state = .failed(.launchFailed)
+        launchStartedAt = nil
+        reportedPlaying = false
+    }
+
+    private mutating func startPlay(now: Double) -> [MediaCommandEffect] {
+        let route = MediaCommandRoute(endpoint: .scriptedPlayer(bundleID: lastLaunchBundleID), canSkip: true, canSeek: false)
+        self.route = route
+        state = .commandPending(.play)
+        pendingSince = now
+        pendingWasPlaying = false
+        launchStartedAt = nil
+        holdContradictionsUntil = now + Self.resyncDelay
+        return [.send(.play, route), .resync(route, after: Self.resyncDelay)]
     }
 
     private mutating func begin(_ command: MediaControlCommand, playing: Bool, now: Double) throws -> [MediaCommandEffect] {
@@ -327,8 +406,8 @@ public enum MediaControlPresentation {
         switch state {
         case .unknown: fallbackPlaying
         case .playing: true
-        case .paused, .noSource: false
-        case .failed(.permissionDenied): false
+        case .paused, .noSource, .launchingSource: false
+        case .failed(.permissionDenied), .failed(.launchFailed): false
         case .failed(.unavailable): fallbackPlaying
         case .commandPending(let command):
             switch command {
@@ -342,6 +421,7 @@ public enum MediaControlPresentation {
     public static func activation(_ state: MediaCommandState, fallbackPlaying: Bool) -> MediaControlActivation {
         if showsRecovery(state) { return .recover }
         if case .failed(.unavailable) = state { return .press(fallbackPlaying ? .pause : .play) }
+        if case .failed(.launchFailed) = state { return .press(.play) }
         return .press(showsPause(state, fallbackPlaying: fallbackPlaying) ? .pause : .play)
     }
 
@@ -350,10 +430,14 @@ public enum MediaControlPresentation {
         switch state {
         case .noSource:
             "Nothing is playing. Start playback, then these controls follow it."
+        case .launchingSource:
+            "Starting playback."
         case .failed(.permissionDenied):
             "Playback controls need permission."
         case .failed(.unavailable):
             "The player did not answer. Try again."
+        case .failed(.launchFailed):
+            "The player did not start. Try again."
         case .unknown, .playing, .paused, .commandPending:
             nil
         }
@@ -390,9 +474,11 @@ public enum MediaControlPresentation {
         case .playing: "Playing"
         case .paused: "Paused"
         case .noSource: "Nothing playing"
+        case .launchingSource: "Starting playback"
         case .commandPending: "Sending"
         case .failed(.permissionDenied): "Needs permission"
         case .failed(.unavailable): "Not available"
+        case .failed(.launchFailed): "The player did not start"
         }
     }
 }

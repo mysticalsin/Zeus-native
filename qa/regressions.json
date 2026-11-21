@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/MediaCommandRouterTests.swift",
         "function": "playOnAPausedPlayerReachesTheSink"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A Play tap with no player running logged nosource and left the player quit.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MediaCommandRouterTests.swift",
+        "function": "playWithNothingRunningLaunchesTheLastPlayerAndSendsPlay"
+      }
     }
 ]
 }

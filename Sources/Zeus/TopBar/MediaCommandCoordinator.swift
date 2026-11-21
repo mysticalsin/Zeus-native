@@ -1,6 +1,26 @@
+import AppKit
 import Foundation
 import os
 import ZeusCore
+
+/// Resumes a launch wait once: either the open finished, or the bound plus one second elapsed.
+private final class LaunchOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var resumed = false
+    private let continuation: CheckedContinuation<Bool, Never>
+
+    init(_ continuation: CheckedContinuation<Bool, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ value: Bool) {
+        lock.lock()
+        let first = !resumed
+        resumed = true
+        lock.unlock()
+        if first { continuation.resume(returning: value) }
+    }
+}
 
 private enum MediaCommandLog {
     static let logger = Logger(subsystem: "app.zeus.mac", category: "media-playback")
@@ -84,6 +104,7 @@ final class MediaCommandCoordinator {
 
     private func perform(_ effects: [MediaCommandEffect]) {
         var send: (MediaControlCommand, MediaCommandRoute)?
+        var launch: (bundleID: String, activates: Bool)?
         var after = MediaCommandRouter.resyncDelay
         for effect in effects {
             switch effect {
@@ -94,7 +115,13 @@ final class MediaCommandCoordinator {
             case .openRecovery:
                 MediaCommandLog.write("recovery opened")
                 model.openPermissions()
+            case .launch(let bundleID, let activates):
+                launch = (bundleID, activates)
             }
+        }
+        if let launch {
+            launchPlayer(bundleID: launch.bundleID, activates: launch.activates)
+            return
         }
         guard let (command, route) = send else { return }
         generation += 1
@@ -109,6 +136,65 @@ final class MediaCommandCoordinator {
             guard token == self.generation else { return }
             await self.readBack(route)
         }
+    }
+
+    /// Opens the player behind Zeus, then sends play if it is ready inside `launchTimeout`.
+    private func launchPlayer(bundleID: String, activates: Bool) {
+        generation += 1
+        let token = generation
+        let started = clock()
+        MediaCommandLog.write("command play launched bundle=\(bundleID)")
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let ready = await Self.openAndWait(bundleID: bundleID, activates: activates, budget: MediaCommandRouter.launchTimeout)
+            guard token == self.generation else { return }
+            let now = self.clock()
+            let event: MediaCommandEvent
+            let when: Double
+            if ready, MediaCommandRouter.launchAccepted(startedAt: started, now: now) {
+                event = .sourceReady
+                when = now
+            } else {
+                event = .launchClock
+                when = started + MediaCommandRouter.launchTimeout + 1
+            }
+            let effects = (try? self.router.reduce(event, now: when)) ?? []
+            if case .failed(.launchFailed) = self.router.state {
+                MediaCommandLog.write("command play launchFailed")
+            }
+            self.publish()
+            self.perform(effects)
+        }
+    }
+
+    /// True when the player is running and finished launching before `budget` seconds.
+    /// The open itself gives up one second past the bound, so a callback that never arrives cannot wait forever.
+    private static func openAndWait(bundleID: String, activates: Bool, budget: Double) async -> Bool {
+        guard NowPlaying.Player(bundleID: bundleID) != nil,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return false }
+        let started = Date()
+        let opened: Bool = await withCheckedContinuation { continuation in
+            let once = LaunchOnce(continuation)
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = activates
+            configuration.addsToRecentItems = false
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration) { app, error in
+                once.resume(app != nil && error == nil)
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(budget + 1))
+                once.resume(false)
+            }
+        }
+        guard opened, Date().timeIntervalSince(started) <= budget else { return false }
+        while Date().timeIntervalSince(started) <= budget {
+            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
+               app.isFinishedLaunching {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return false
     }
 
     private func apply(_ event: MediaCommandEvent) {

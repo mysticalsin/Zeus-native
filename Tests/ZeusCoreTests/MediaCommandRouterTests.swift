@@ -20,6 +20,26 @@ private struct MediaCommandSink: Equatable {
                 resyncAfter.append(after)
             case .openRecovery:
                 recoveries += 1
+            case .launch:
+                break
+            }
+        }
+    }
+}
+
+/// Records launch requests. `activates` is false when the open must not steal focus.
+private struct LaunchRecord: Equatable {
+    var bundleID: String
+    var activates: Bool
+}
+
+private struct FakeWorkspace {
+    var launches: [LaunchRecord] = []
+
+    mutating func take(_ effects: [MediaCommandEffect]) {
+        for effect in effects {
+            if case .launch(let bundleID, let activates) = effect {
+                launches.append(LaunchRecord(bundleID: bundleID, activates: activates))
             }
         }
     }
@@ -101,11 +121,89 @@ private struct MediaCommandSink: Equatable {
         var router = MediaCommandRouter()
         _ = try router.reduce(.info(nil), now: 0)
         var sink = MediaCommandSink()
-        sink.take(try router.reduce(.press(.play), now: 1))
-        sink.take(try router.reduce(.press(.next), now: 2))
+        var workspace = FakeWorkspace()
+        for command in [MediaControlCommand.pause, .next, .previous, .seek(4)] {
+            let effects = try router.reduce(.press(command), now: 1)
+            sink.take(effects)
+            workspace.take(effects)
+        }
         #expect(sink.commands.isEmpty)
+        #expect(workspace.launches.isEmpty)
         #expect(router.state == .noSource)
         #expect(MediaControlPresentation.guidance(for: .noSource) == "Nothing is playing. Start playback, then these controls follow it.")
+    }
+
+    @Test func playWithNothingRunningLaunchesTheLastPlayerAndSendsPlay() throws {
+        var router = MediaCommandRouter()
+        let quiet = try router.reduce(.info(nil), now: 0)
+        #expect(quiet.isEmpty)
+        var workspace = FakeWorkspace()
+        var sink = MediaCommandSink()
+        let pressed = try router.reduce(.press(.play), now: 0)
+        workspace.take(pressed)
+        sink.take(pressed)
+        #expect(workspace.launches == [LaunchRecord(bundleID: MediaCommandRouter.defaultLaunchBundleID, activates: false)])
+        #expect(workspace.launches.first?.bundleID == "com.apple.Music")
+        #expect(sink.commands.isEmpty)
+        #expect(router.state == .launchingSource)
+        let bound = MediaCommandRouter.launchTimeout
+        _ = try router.reduce(.launchClock, now: bound)
+        #expect(router.state == .launchingSource)
+        let ready = try router.reduce(.sourceReady, now: bound)
+        sink.take(ready)
+        #expect(sink.commands == [.play])
+        #expect(router.state == .commandPending(.play))
+    }
+
+    @Test func aLaunchThatMissesTheBoundByOneSecondFailsAndCanBeRetried() throws {
+        var router = MediaCommandRouter()
+        _ = try router.reduce(.info(nil), now: 0)
+        var workspace = FakeWorkspace()
+        var sink = MediaCommandSink()
+        workspace.take(try router.reduce(.press(.play), now: 0))
+        let bound = MediaCommandRouter.launchTimeout
+        let missed = try router.reduce(.sourceReady, now: bound + 1)
+        sink.take(missed)
+        #expect(sink.commands.isEmpty)
+        #expect(router.state == .failed(.launchFailed))
+        #expect(MediaControlPresentation.guidance(for: router.state) == "The player did not start. Try again.")
+        workspace.take(try router.reduce(.press(.play), now: bound + 2))
+        #expect(workspace.launches.count == 2)
+        #expect(router.state == .launchingSource)
+    }
+
+    @Test func theLaunchClockFailsOnlyPastTheBound() throws {
+        var router = MediaCommandRouter()
+        _ = try router.reduce(.info(nil), now: 0)
+        _ = try router.reduce(.press(.play), now: 10)
+        let bound = MediaCommandRouter.launchTimeout
+        _ = try router.reduce(.launchClock, now: 10 + bound)
+        #expect(router.state == .launchingSource)
+        _ = try router.reduce(.launchClock, now: 10 + bound + 1)
+        #expect(router.state == .failed(.launchFailed))
+        #expect(MediaCommandRouter.launchAccepted(startedAt: 0, now: bound))
+        #expect(!MediaCommandRouter.launchAccepted(startedAt: 0, now: bound + 1))
+        var sink = MediaCommandSink()
+        sink.take(try router.reduce(.press(.pause), now: 30))
+        #expect(sink.commands.isEmpty)
+        #expect(router.state == .failed(.launchFailed))
+    }
+
+    @Test func playLaunchesTheLastScriptedPlayerAndASecondTapDoesNotLaunchAgain() throws {
+        var router = MediaCommandRouter()
+        let previous = MediaCommandRoute(endpoint: .scriptedPlayer(bundleID: "com.spotify.client"), canSkip: true, canSeek: true)
+        _ = try router.reduce(.info(sample(playing: false, route: previous)), now: 0)
+        let cleared = try router.reduce(.info(nil), now: 1)
+        #expect(cleared.isEmpty)
+        var workspace = FakeWorkspace()
+        workspace.take(try router.reduce(.press(.play), now: 2))
+        #expect(workspace.launches == [LaunchRecord(bundleID: "com.spotify.client", activates: false)])
+        let during = router
+        #expect(throws: MediaCommandRejection(.inFlight)) {
+            try router.reduce(.press(.play), now: 2.05)
+        }
+        #expect(router == during)
+        #expect(workspace.launches.count == 1)
     }
 
     @Test func permissionDeniedShowsAnErrorAndRecoveryOpensSettings() throws {
