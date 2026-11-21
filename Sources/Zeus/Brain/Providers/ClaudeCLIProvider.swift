@@ -138,7 +138,9 @@ final class ClaudeCLIProvider: BrainProvider, @unchecked Sendable {
             lock.unlock()
 
             let message = Self.userMessage(for: request, context: split.context)
-            StdinFeeder.feed(message + Data([0x0A]), to: stdin.fileHandleForWriting)
+            StdinFeeder.feed(message + Data([0x0A]), to: stdin.fileHandleForWriting) { problem in
+                parser.fail("The prompt could not be sent: \(problem)")
+            }
         }
     }
 
@@ -298,11 +300,14 @@ final class StreamJSONParser: @unchecked Sendable {
 enum StdinFeeder {
     static let ignoreSIGPIPE: Void = { signal(SIGPIPE, SIG_IGN) }()
 
-    static func feed(_ data: Data, to handle: FileHandle) {
+    static func feed(_ data: Data, to handle: FileHandle, onError: @escaping @Sendable (String) -> Void = { _ in }) {
         _ = ignoreSIGPIPE
         DispatchQueue.global(qos: .userInitiated).async {
-            do { try handle.write(contentsOf: data) } catch {}
-            try? handle.close()
+            let problem = StdinWrite.attempt {
+                try handle.write(contentsOf: data)
+                try handle.close()
+            }
+            if let problem { onError(problem) }
         }
     }
 }
