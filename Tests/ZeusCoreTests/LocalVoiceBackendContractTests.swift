@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Testing
 @testable import ZeusCore
 
@@ -173,6 +176,51 @@ import Testing
         #expect(tries.value == 2)
     }
 
+    @Test func flagsOffDoNotUseTheNetworkOrAProcess() async throws {
+        let flags = LocalVoiceFlags()
+        #expect(flags.conversationMode == false)
+        #expect(flags.pocketTTS == false)
+        let banned = ["URL" + "Session", "posix_" + "spawn", "NW" + "Connection", "Process"]
+        let files = [
+            "Sources/ZeusCore/Voice/DuplexVoiceBackend.swift",
+            "Sources/ZeusCore/Voice/VoiceSessionState.swift",
+            "Sources/ZeusCore/Voice/LocalVoiceFlags.swift",
+            "Sources/ZeusCore/Voice/PersistedVoiceSettings.swift",
+        ]
+        for file in files {
+            let source = try voiceSource(file)
+            for token in banned where source.contains(token) {
+                #expect(Bool(false), "\(file) contains \(token)")
+            }
+        }
+        let trap = LaunchSeen.shared
+        trap.reset()
+        #if canImport(FoundationNetworking)
+        URLProtocol.registerClass(LaunchTrap.self)
+        defer { URLProtocol.unregisterClass(LaunchTrap.self) }
+        #endif
+        let backend = try FakeDuplexVoiceBackend(frames: [tone(0.2), tone(0.4)])
+        _ = try await backend.start()
+        _ = try await backend.push(userFrame: tone(0.2))
+        await backend.close()
+        #expect(trap.value == false)
+        #expect(await backend.state == .closed)
+    }
+
+    @Test func theEngineRouterIsUnchangedWhenLocalFlagsAreOff() throws {
+        let flags = LocalVoiceFlags()
+        #expect(flags.conversationMode == false)
+        #expect(flags.pocketTTS == false)
+        let router = try voiceSource("Sources/ZeusCore/Voice/UltronEngineRouter.swift")
+        for token in ["Local" + "VoiceFlags", "conversation" + "Mode", "pocket" + "TTS"] where router.contains(token) {
+            #expect(Bool(false), "router mentions \(token)")
+        }
+        let chain = UltronEngineRouter.chain(
+            choice: .auto,
+            availability: UltronEngineAvailability(elevenLabsConfigured: true, kokoroReady: true))
+        #expect(chain.map(\.engine) == [.elevenLabs, .system])
+    }
+
     @Test func theTransitionSwitchHasNoDefault() throws {
         let source = try voiceSource("Sources/ZeusCore/Voice/VoiceSessionState.swift")
         #expect(source.contains("default:") == false)
@@ -185,6 +233,27 @@ import Testing
         }
     }
 }
+
+private final class LaunchSeen: @unchecked Sendable {
+    static let shared = LaunchSeen()
+    private let lock = NSLock()
+    private var stored = false
+    var value: Bool { lock.withLock { stored } }
+    func mark() { lock.withLock { stored = true } }
+    func reset() { lock.withLock { stored = false } }
+}
+
+#if canImport(FoundationNetworking)
+private final class LaunchTrap: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool {
+        LaunchSeen.shared.mark()
+        return false
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {}
+    override func stopLoading() {}
+}
+#endif
 
 private actor StartGate {
     private var entered = false
