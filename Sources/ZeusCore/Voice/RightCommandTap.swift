@@ -101,7 +101,7 @@ public struct RightCommandTap: Equatable, Sendable {
             switch action {
             case .murmur:
                 signals.append(.murmur)
-            case .talk:
+            case .talk, .send:
                 break
             }
         }
