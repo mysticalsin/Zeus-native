@@ -181,6 +181,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
 
     func stop() {
         queue.removeAll()
+        // Cancel the in-flight provider utterance before the pump task resumes and plays it.
+        PluginVoiceBridge.cancelSpeaking()
         pump?.cancel()
         pump = nil
         pumpToken = nil

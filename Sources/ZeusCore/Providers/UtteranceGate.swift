@@ -12,8 +12,6 @@ public final class UtteranceGate: @unchecked Sendable {
     public func begin() -> UInt64 {
         lock.lock()
         defer { lock.unlock() }
-        // Red: a new utterance wipes every cancel, so stop() loses the line that was in flight.
-        cancelled.removeAll()
         next += 1
         active = next
         return next
@@ -29,7 +27,6 @@ public final class UtteranceGate: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         cancelled.insert(id)
-        if active == id { active = nil }
     }
 
     public func isCancelled(_ id: UInt64) -> Bool {
