@@ -6,6 +6,10 @@ pub fn percentile(sorted: &[f64], q: f64) -> f64 {
     sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo as f64)
 }
 pub fn summary_json(ns: &[u64]) -> String {
+    if ns.is_empty() {
+        // null percentiles: an empty sample has no quantile. mean 0 (not -0, not NaN).
+        return "{\"n\": 0, \"p50_ms\": null, \"p95_ms\": null, \"p99_ms\": null, \"max_ms\": null, \"mean_ms\": 0}".to_string();
+    }
     let mut ms: Vec<f64> = ns.iter().map(|&v| v as f64 / 1e6).collect();
     ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let mean = ms.iter().sum::<f64>() / ms.len().max(1) as f64;
