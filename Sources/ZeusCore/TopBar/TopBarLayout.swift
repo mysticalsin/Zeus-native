@@ -23,7 +23,7 @@ public enum TopBarTab: String, Codable, CaseIterable, Identifiable, Sendable {
         case .clipboard: "Clipboard"
         case .shelf: "Shelf"
         case .focus: "Focus"
-        case .dictation: "Murmure"
+        case .dictation: "Murmur"
         case .teleprompter: "Prompter"
         case .chat: "Chat"
         case .today: "Today"

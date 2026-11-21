@@ -34,7 +34,7 @@ public enum SettingsSectionRegistry {
             ("shortcuts", "Shortcuts"),
             ("insomnia", "Insomnia"),
             ("integrations", "Integrations"),
-            ("murmure", "Murmure"),
+            ("murmure", "Murmur"),
             ("polyglot", "Polyglot"),
             ("dictation", "Dictation"),
             ("voice", "Voice"),

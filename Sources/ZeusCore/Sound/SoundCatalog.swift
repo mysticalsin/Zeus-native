@@ -92,6 +92,20 @@ public enum SoundCatalog {
 
     public static func styleNames(for slot: SoundSlot) -> [String] { styles(for: slot).map(\.style) }
 
+    /// Stored style ids keep their old names. The picker shows these words.
+    private static let displayName = [
+        "Spaceship Futuristic": "Long rise",
+        "Mystery Game": "Short motif",
+        "Weard Permission": "Soft pulse",
+        "Weard 2 Permission": "Second pulse",
+    ]
+
+    public static func label(_ stored: String) -> String { displayName[stored] ?? stored }
+
+    public static func stored(_ label: String) -> String {
+        displayName.first { $0.value == label }?.key ?? label
+    }
+
     public static var everySpec: [SoundSpec] { SoundSlot.allCases.flatMap(styles(for:)) }
 }
 

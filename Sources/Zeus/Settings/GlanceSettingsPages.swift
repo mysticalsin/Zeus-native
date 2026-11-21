@@ -130,7 +130,7 @@ private struct GeneralPage: View {
             GSDivider()
             GSToggleRow(symbol: "person.2.wave.2", title: "Meeting mode", text: "Quiet sounds and private previews during calls and screen sharing.", isOn: bool("general.meetingMode"))
             GSDivider()
-            GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus windows out of screen shares and recordings.", isOn: bool("general.showInScreenSharing"))
+            GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus out of screen shares, recordings and screenshots. A meeting does not change this switch.", isOn: bool("general.showInScreenSharing"))
             GSDivider()
             GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", text: "After 10 minutes or more away, the notch shows what your agents finished or are waiting on.", isOn: bool("general.welcomeBack"))
         }
@@ -242,7 +242,7 @@ private struct AppearancePage: View {
             HStack(spacing: 12) {
                 style("Classic", "")
                 style("Dashboard", "")
-                style("Dashboard B", "")
+                style("Dashboard B", "", label: "Solid panel")
             }
             .padding(.bottom, 10)
             GSInfo(text: "Changes apply instantly.")
@@ -257,7 +257,7 @@ private struct AppearancePage: View {
         }
         GSCard("Top bar") {
             GSRow(symbol: "arrow.up.and.down", title: "Top bar position",
-                  text: "Lowers the closed notch with its light, ticker and wings. The open panel and the screen edge light stay at the top. Applies to every display.") {
+                  text: "Lowers the closed top bar with its light, ticker and wings. The open panel and the screen edge light stay at the top. Applies to every display.") {
                 HStack(spacing: 10) {
                     Text("Higher").font(GS.rowText).foregroundStyle(GS.secondary)
                     OBTickSlider(value: Binding(get: { TopBarPositionModel.shared.offset }, set: { TopBarPositionModel.shared.choose($0) }),
@@ -275,11 +275,6 @@ private struct AppearancePage: View {
                     .buttonStyle(GSButtonStyle())
                     .ownedJourneyControl("settings.appearance.topBarPositionReset")
             }
-            GSDivider()
-            GSToggleRow(symbol: store.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash",
-                        title: "Show Zeus in screen shares",
-                        text: "On: people you share your screen with, and screenshots, can see Zeus. Off keeps it out of them. Your choice applies during meetings too.",
-                        isOn: bool(ZeusScreenSharePolicy.showInSharingKey))
         }
         if let drawnNotchCard = DrawnNotchCardModel(context: context, navigation: navigation) { DrawnNotchCard(model: drawnNotchCard) }
         GSCard("Running card") {
@@ -288,8 +283,8 @@ private struct AppearancePage: View {
                 runningTheme("Essentials", "")
             }
             GSDivider()
-            GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens it after the delay. Click opens it only when you click the notch.") {
-                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
+            GSRow(symbol: "cursorarrow.click", title: "Open the top bar on", text: "Hover opens it after the delay. Click opens it only when you click the top bar.") {
+                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the top bar on")
             }
             GSDivider()
             // The delay only applies to hover, so it is subdued while the trigger is Click.
@@ -302,7 +297,7 @@ private struct AppearancePage: View {
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
-            GSToggleRow(symbol: "rectangle.topthird.inset.filled", title: "Hide the notch automatically", text: "Closes when you move the pointer away.", isOn: bool("notch.autoHide"))
+            GSToggleRow(symbol: "rectangle.topthird.inset.filled", title: "Hide the top bar automatically", text: "Closes when you move the pointer away.", isOn: bool("notch.autoHide"))
             GSDivider()
             GSRow(symbol: "timer", title: "Delay before closing") {
                 GSPopup(selection: SettingsStore.binding("notch.closeDelay"), options: SettingsCatalog.option("notch.closeDelay")?.choices ?? []).popupLabel("Delay before closing")
@@ -310,7 +305,7 @@ private struct AppearancePage: View {
         }
         GSCard("Zeus beside the pointer") {
             GSRow(symbol: "cursorarrow.rays", title: "Show Zeus beside the pointer",
-                  text: "\"When I call him\" keeps your pointer clear: he appears for the talk shortcut, Hey Zeus, a voice turn or when he points, and fades out about 2 seconds after.") {
+                  text: "Always stays beside the pointer. Only when called, Zeus appears for a talk key or a voice turn and fades about 2 seconds later. Never hides Zeus.") {
                 GSPopup(selection: Binding(get: { BuddyPreference.shared.show.title },
                                            set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
                         options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
@@ -352,9 +347,9 @@ private struct AppearancePage: View {
                 GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
             }
             GSDivider()
-            GSRow(symbol: "rectangle.dashed", title: "Island background",
-                  text: "Transparent draws only the mascot and the text beside the notch, with no body, outline or glow. The notch itself stays black. The open panel is always black.") {
-                GSPopup(selection: SettingsStore.binding(NotchBackground.settingID), options: NotchBackground.allCases.map(\.rawValue)).popupLabel("Island background")
+            GSRow(symbol: "rectangle.dashed", title: "Top bar background",
+                  text: "Transparent draws only the mascot and the text, with no body, outline or glow. The hardware notch stays black. The open panel is always black.") {
+                GSPopup(selection: SettingsStore.binding(NotchBackground.settingID), options: NotchBackground.allCases.map(\.rawValue)).popupLabel("Top bar background")
             }
             GSDivider()
             GSRow(symbol: "line.3.horizontal", title: "Light thickness") {
@@ -440,8 +435,8 @@ private struct AppearancePage: View {
         }
     }
 
-    private func style(_ name: String, _ caption: String) -> some View {
-        GSPictureChoice(title: name, caption: caption, selected: SettingsStore.binding("appearance.cardStyle").wrappedValue == name,
+    private func style(_ name: String, _ caption: String, label: String? = nil) -> some View {
+        GSPictureChoice(title: label ?? name, caption: caption, selected: SettingsStore.binding("appearance.cardStyle").wrappedValue == name,
                         action: { store.set("appearance.cardStyle", name) }) {
             ThemePreview(style: name).frame(width: 400, height: 240).scaleEffect(0.38).frame(width: 152, height: 91)
         }
@@ -608,9 +603,9 @@ private struct SoundsPage: View {
             .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         }
         GSCard("Your cues") {
-            cue("play.circle", "Run start", "When an agent starts a new task.", "sound.startStyle", SoundStyles.runStart, .start)
+            cue("play.circle", "Run start", store.bool("sound.agentStart") ? "When an agent starts a new task." : "Turn on the chime below to hear a start.", "sound.startStyle", SoundStyles.runStart, .start, enabled: store.bool("sound.agentStart"))
             GSDivider()
-            cue("hand.raised", "Requests", "When an agent needs a permission or an answer.", "sound.approvalStyle", SoundStyles.requests, .approval)
+            cue("hand.raised", "Requests", "When an agent needs a permission or an answer. Styles include Soft pulse and Second pulse.", "sound.approvalStyle", SoundStyles.requests, .approval)
             GSDivider()
             cue("checkmark.bubble", "Your answer", "When you approve or deny a request.", "sound.answerStyle", SoundStyles.answer, .answer)
             GSDivider()
@@ -651,13 +646,17 @@ private struct SoundsPage: View {
         GSEqualiserCard(controller: context.equaliser(), isOn: bool("audio.equaliser"))
     }
 
-    private func cue(_ symbol: String, _ title: String, _ text: String, _ id: String, _ options: [String], _ event: ZeusSound.Event) -> some View {
+    private func cue(_ symbol: String, _ title: String, _ text: String, _ id: String, _ options: [String], _ event: ZeusSound.Event, enabled: Bool = true) -> some View {
         GSRow(symbol: symbol, title: title, text: text) {
             HStack(spacing: 8) {
-                GSPopup(selection: SettingsStore.binding(id), options: options).popupLabel("\(title) sound")
+                GSPopup(selection: Binding(get: { SoundCatalog.label(store.string(id)) },
+                                           set: { store.set(id, SoundCatalog.stored($0)) }),
+                        options: options.map(SoundCatalog.label)).popupLabel("\(title) sound")
                 preview(event, title)
             }
         }
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.5)
     }
 
     private func voiceCue(_ symbol: String, _ title: String, _ text: String, _ key: ReferenceWritableKeyPath<ExtraPreferences, Bool>, _ event: ZeusSound.Event) -> some View {
@@ -828,7 +827,7 @@ private struct ShortcutsPage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
             ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus",
-                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean."
+                                text: "Hold Control and Option to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean."
                                     + (state.chord != nil ? " Control + Option + Space does the same." : ""),
                                 shortcut: Preferences.shared.pushToTalk, defaultValue: ShortcutStore.talkDefault,
                                 otherName: "Dictation", other: DictationSettings.shared.key,
@@ -840,7 +839,7 @@ private struct ShortcutsPage: View {
             }
             GSDivider()
             ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
-                                text: "Hold to talk, let go to send, double-tap to keep listening, like the talk key. Left Option and Right Option with a letter type as usual.",
+                                text: "Hold Right Option to talk to Zeus. Let go to send, and double-tap to keep listening. Left Option and Right Option with a letter type as usual.",
                                 shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk,
                                 notes: state.secondTalkNotes, quietNotes: state.secondTalkQuietNotes) { new in
@@ -888,23 +887,56 @@ private struct ShortcutsPage: View {
                 .padding(.vertical, 6)
             }
             GSDivider()
-            ShortcutRecorderRow(symbol: "keyboard", title: "Dictation", text: "Hold to speak, let go to write it where your cursor is.",
+            ShortcutRecorderRow(symbol: "keyboard", title: "Murmur", text: "Right Command. A tap or a hold dictates with Murmur. Let go to write it where your cursor is.",
                                 shortcut: DictationSettings.shared.key, defaultValue: .rightCommand, allowsOff: true,
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) {
                 DictationSettings.shared.key = $0
             }
         }
         GSCard("Keyboard shortcut") {
-            GSRow(symbol: "rectangle.and.hand.point.up.left", title: "Open the agent picker") {
+            GSRow(symbol: "rectangle.and.hand.point.up.left", title: "Open the agent picker", text: "Arrows move, Return opens, Esc closes.") {
                 GSPopup(selection: Binding(get: { ExtraPreferences.shared.openNotch.title },
                                            set: { value in ExtraPreferences.shared.openNotch = ShortcutPreset.allCases.first { $0.title == value } ?? .optionCommandZ }),
                         options: ShortcutPreset.allCases.map(\.title))
             }
+            GSDivider()
+            GSRow(symbol: "checklist", title: "Quick to-do", text: "Opens the To-do tab ready to type. Default is Control-Command-Z, so it does not share a chord with another Zeus shortcut.") {
+                GSPopup(selection: Binding(get: { ExtraPreferences.shared.quickTodo.title },
+                                           set: { value in ExtraPreferences.shared.quickTodo = ShortcutPreset.allCases.first { $0.title == value } ?? .controlCommandZ }),
+                        options: ShortcutPreset.allCases.map(\.title))
+            }
         }
+        PointingShortcutCard()
         GSCard("Answer from the keyboard") {
-            GSToggleRow(symbol: "keyboard", title: "Answer permissions from the keyboard", text: "Approve, deny or open a request with a key while its card is waiting.", isOn: bool("shortcut.answerKeys"))
+            GSToggleRow(symbol: "keyboard", title: "Answer permissions from the keyboard", text: "While a card is waiting, Control-Option Y approves, Control-Option N denies, and Control-Option O opens it.", isOn: bool("shortcut.answerKeys"))
         }
         LearnedShortcutsCard()
+    }
+}
+
+/// Pointing lives with the keys it shares. Right Option is already hold-to-talk, so the note says that choice turns the second talk key off.
+private struct PointingShortcutCard: View {
+    private let choices = ["Control-Option", "Right Option", "Fn (Globe)"]
+
+    var body: some View {
+        GSCard("Pointing") {
+            GSToggleRow(symbol: "cursorarrow.rays", title: "Enable desktop pointing",
+                        text: "Hold the pointing keys and Zeus can mark what is under the pointer. Nothing is captured until you hold them.",
+                        isOn: store.boolBinding("pointing.enabled"))
+            GSDivider()
+            GSRow(symbol: "keyboard", title: "Pointing keys",
+                  text: "Control and Option is also a talk hold, so that choice is one talk turn. Right Option is hold-to-talk, and choosing it turns the second talk key off. Fn leaves both talk keys alone.") {
+                GSPopup(selection: store.stringBinding("pointing.shortcut"), options: choices, label: "Pointing keys")
+            }
+            GSDivider()
+            GSToggleRow(symbol: "pencil.tip", title: "Draw while held",
+                        text: "The pointer leaves a trail while the pointing keys are held. Clicks still reach your apps.",
+                        isOn: store.boolBinding("pointing.drawWhileHeld"))
+            GSDivider()
+            GSToggleRow(symbol: "rectangle.dashed.badge.record", title: "Send a screenshot with each question",
+                        text: "Off until you turn it on. On, the display under the pointer is sent once per question and is not saved.",
+                        isOn: store.boolBinding("pointing.sendScreenshot"))
+        }
     }
 }
 
@@ -991,16 +1023,13 @@ private struct MurmurePage: View {
             }
         }
         SpeechEngineCard(compact: true, navigation: navigation)
-        GSCard("Murmure") {
-            ShortcutLinkRow(symbol: "keyboard", title: "Dictation shortcut", current: settings.key, navigation: navigation)
+        GSCard("Murmur") {
+            ShortcutLinkRow(symbol: "keyboard", title: "Murmur shortcut", current: settings.key, navigation: navigation)
             GSDivider()
             KeyAccessLinkRow(navigation: navigation)
         }
         GSCard("Language and feedback") {
-            GSToggleRow(symbol: "speaker.wave.1", title: "Play dictation sounds", text: "A short cue when recording starts and ends.",
-                        isOn: Binding(get: { settings.sounds }, set: { settings.sounds = $0 }))
-            GSDivider()
-            GSRow(symbol: "globe", title: "Dictation language", text: "Automatic follows macOS for Apple Speech and lets Whisper detect. Selected languages go to Whisper; Parakeet applies a script hint where supported.") {
+            GSRow(symbol: "globe", title: "Dictation language", text: "Automatic follows macOS. The sound for this cue is on the Dictation page, and Sound feedback mutes it too.") {
                 GSPopup(selection: Binding(get: { settings.language.title },
                                            set: { value in settings.language = DictationLanguage(persistedValue: value) }),
                         options: DictationLanguage.allCases.map(\.title)).popupLabel("Dictation language")
@@ -1027,6 +1056,10 @@ private struct VoicePage: View {
         ZeusVoiceCards(navigation: navigation)
         GSCard("Talk to Zeus") {
             ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
+            GSDivider()
+            GSToggleRow(symbol: "rectangle.dashed.badge.record", title: "Let Zeus see my screen when I talk",
+                        text: "Off until you turn it on. On, each question can include a screenshot of every display. The screenshot is not saved.",
+                        isOn: store.boolBinding("talk.seeScreen"))
             GSDivider()
             TalkMicrophoneRow()
             GSDivider()
@@ -1431,7 +1464,7 @@ private struct RunningCardMini: View {
                     Circle().fill(Theme.glow).frame(width: 7, height: 7)
                     Text("Claude Code").font(.system(size: 8, weight: .semibold)).foregroundStyle(.white)
                     Spacer()
-                    Text("Working").font(.system(size: 7)).foregroundStyle(.white.opacity(0.5))
+                    Text("Running").font(.system(size: 7)).foregroundStyle(.white.opacity(0.5))
                 }
                 if !essentials {
                     HStack(alignment: .bottom, spacing: 2.5) {

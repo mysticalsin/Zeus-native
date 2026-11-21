@@ -54,7 +54,7 @@ struct PolyglotSettingsPage: View {
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk) { settings.hotkey = $0 }
             GSDivider()
             KeyAccessLinkRow(navigation: navigation)
-            GSInfo(text: "You can also say \u{201C}Hey Zeus, translate\u{201D} or \u{201C}start Polyglot\u{201D}.")
+            GSInfo(text: "The shortcut above starts and stops live captions. A wake phrase stays off until you turn it on from the Voice page.")
         }
         GSCard("Engine") {
             GSRow(symbol: "cpu", title: "Speech to text",

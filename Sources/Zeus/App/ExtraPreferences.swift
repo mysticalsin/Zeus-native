@@ -75,7 +75,7 @@ final class ExtraPreferences {
     var openNotch = ShortcutPreset(rawValue: UserDefaults.standard.string(forKey: "shortcut.openNotch") ?? "") ?? .optionCommandZ {
         didSet { store(openNotch.rawValue, "shortcut.openNotch"); onShortcutsChange?() }
     }
-    var quickTodo = ShortcutPreset(rawValue: UserDefaults.standard.string(forKey: "shortcut.quickTodo") ?? "") ?? .controlOptionT {
+    var quickTodo = ShortcutPreset(rawValue: UserDefaults.standard.string(forKey: "shortcut.quickTodo") ?? "") ?? .controlCommandZ {
         didSet { store(quickTodo.rawValue, "shortcut.quickTodo"); onShortcutsChange?() }
     }
 
@@ -107,7 +107,7 @@ final class ExtraPreferences {
         soundVoiceDone = Self.bool("sound.voiceDone", true)
         soundVoiceError = Self.bool("sound.voiceError", true)
         openNotch = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.openNotch") ?? "") ?? .optionCommandZ
-        quickTodo = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.quickTodo") ?? "") ?? .controlOptionT
+        quickTodo = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.quickTodo") ?? "") ?? .controlCommandZ
         hideFromScreenShare = Self.bool("interview.hide", false)
     }
 }

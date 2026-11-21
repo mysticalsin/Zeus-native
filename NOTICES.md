@@ -12,9 +12,9 @@ never in the product UI.
   TypeSafe code or weights are included. Not used: openjev, typesafe-inc/JEV-27B-Desktop,
   TypeSafeAI/Open-Jev.
 
-## Speech to text (Murmure dictation and voice turns)
+## Speech to text (Murmur dictation and voice turns)
 Every engine below is optional. Local models are downloaded only when the person clicks Download
-in Settings › Murmure; cloud engines run only when chosen and only with the person's own key.
+in Settings › Murmur; cloud engines run only when chosen and only with the person's own key.
 
 ### FluidAudio (Parakeet engines on the Neural Engine)
 - Code: https://github.com/FluidInference/FluidAudio, Apache License 2.0 (Swift package, 0.18.x).

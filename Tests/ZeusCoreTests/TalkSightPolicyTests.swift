@@ -72,11 +72,11 @@ import Testing
         #expect(!TalkDrawPolicy.accepts(winner: "anthropic-api"))
     }
 
-    @Test func seeScreenDefaultsOnAndIsSeparateFromDrawOnScreen() {
+    @Test func seeScreenDefaultsOffAndIsSeparateFromDrawOnScreen() {
         let name = NSTemporaryDirectory() + "talk.seeScreen.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
-        #expect(FeatureSettings.talkSeeScreen(defaults: defaults))
+        #expect(!FeatureSettings.talkSeeScreen(defaults: defaults))
         #expect(!FeatureSettings.talkDrawOnScreen(defaults: defaults))
         defaults.set("false", forKey: FeatureSettings.key("talk.seeScreen"))
         #expect(!FeatureSettings.talkSeeScreen(defaults: defaults))

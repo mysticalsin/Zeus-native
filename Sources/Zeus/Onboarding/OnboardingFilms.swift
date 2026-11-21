@@ -279,7 +279,7 @@ struct MurmureScene: View {
         ZStack(alignment: .top) {
             Desk(t: t, lidY: 300)
             ChatWindow(t: t, phase: .empty).scaleEffect(0.8).offset(y: 380)
-            Text("Murmure").font(Glass.font(78, .heavy)).tracking(-2)
+            Text("Murmur").font(Glass.font(78, .heavy)).tracking(-2)
                 .foregroundStyle(LinearGradient(colors: [Color(rgb: 236, 72, 153), Color(rgb: 139, 92, 246), Color(rgb: 59, 130, 246)], startPoint: .leading, endPoint: .trailing))
                 .shadow(color: Color(rgb: 139, 92, 246).opacity(0.8), radius: 18)
                 .offset(y: 150)

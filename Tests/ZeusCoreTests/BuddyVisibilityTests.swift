@@ -9,7 +9,7 @@ import Testing
         #expect(BuddyShow.stored(nil) == .onCall)
         #expect(BuddyShow.stored("garbage") == .onCall)
         #expect(BuddyShow.stored("always") == .always)
-        #expect(BuddyShow.onCall.title == "When I call him")
+        #expect(BuddyShow.onCall.title == "Only when called")
         #expect(BuddyVisibility().policy == .onCall)
     }
 
