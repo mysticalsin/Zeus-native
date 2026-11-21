@@ -251,6 +251,48 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log == ["press", "release", "press", "release", "press", "release"], "turning the key off stops the hold: \(calls.log)")
     }
 
+    @Test func aMissedRightOptionKeyUpStopsWhenAnotherEventSeesItUp() async throws {
+        let (monitor, calls) = make(second: .rightOption, live: .option)
+        rightOptionDown(monitor)
+        #expect(calls.log == ["press"], "\(calls.log)")
+        monitor.liveModifiers = { [] }
+        monitor.feed(.keyDown(keyCode: letterT, modifiers: []))
+        #expect(calls.log == ["press", "release"], "a later event reads the live flags and stops: \(calls.log)")
+    }
+
+    @Test func aMissedRightOptionKeyUpStopsOnTheThreeSecondTick() async throws {
+        let (monitor, calls) = make(second: .rightOption, live: .option)
+        rightOptionDown(monitor)
+        #expect(calls.log == ["press"], "\(calls.log)")
+        monitor.liveModifiers = { [] }
+        try await wait(3.3)
+        #expect(calls.log == ["press", "release"], "the 3 s look sees the key up: \(calls.log)")
+    }
+
+    @Test func aScreenLockWithoutSleepStopsTheHold() async throws {
+        let (monitor, calls) = make(second: .rightOption, live: .option)
+        let center = NotificationCenter()
+        monitor.observeSleep(center: center)
+        rightOptionDown(monitor)
+        center.post(name: Notification.Name("com.apple.screenIsLocked"), object: nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        #expect(calls.log == ["press", "release"], "lock without sleep stops: \(calls.log)")
+    }
+
+    @Test func aSessionResignAndScreensSleepStopTheHold() async throws {
+        let (monitor, calls) = make(second: .rightOption, live: .option)
+        let center = NotificationCenter()
+        monitor.observeSleep(center: center)
+        rightOptionDown(monitor)
+        center.post(name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        #expect(calls.log == ["press", "release"], "session resign stops: \(calls.log)")
+        rightOptionDown(monitor)
+        center.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        #expect(calls.log == ["press", "release", "press", "release"], "screens sleep stops: \(calls.log)")
+    }
+
     @Test func theDictationMonitorNeverHearsTheSecondKey() async throws {
         let (monitor, calls) = make(key: .rightCommand, role: .dictation, second: .rightOption)
         rightOptionDown(monitor)
