@@ -14,7 +14,17 @@ public struct CaptureHandoff: Equatable, Sendable {
     public init() {}
 
     public mutating func start(_ session: Int) -> [Effect] {
-        // Red: the new capture begins while the previous microphone is still open.
+        if releasing {
+            queued = session
+            return []
+        }
+        if let live {
+            queued = session
+            let old = live
+            self.live = nil
+            releasing = true
+            return [.release(old)]
+        }
         live = session
         return [.begin(session)]
     }
