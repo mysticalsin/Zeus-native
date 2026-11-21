@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Observation
+import os
 import Speech
 import ZeusCore
 
@@ -265,6 +266,8 @@ private final class ReviewAnswerGate: @unchecked Sendable {
 /// recognition); an AI mode then rewrites the text with your existing Claude plan.
 @MainActor
 final class DictationController {
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Zeus", category: "dictation")
+
     private let topBar: TopBarModel
     private let settings = DictationSettings.shared
     private let speech = SpeechInput()
@@ -958,9 +961,10 @@ final class DictationController {
             if let stream { text = try await stream.finish() } else { text = try await engine.transcribe(samples: samples, hints: hints, language: language) }
             outcome = .text(text)
         } catch {
-            outcome = .failed(ShownFailure.engine(engine.kind.title))
-            NSLog("[ZEUS] dictation engine %@: %@", engine.kind.title, error.localizedDescription)
-            if isCurrent() { SpeechEngineBoard.shared.message = ShownFailure.engine(engine.kind.title) }
+            let message = ShownFailure.sentence(for: error, otherwise: ShownFailure.engine(engine.kind.title))
+            outcome = .failed(message)
+            Self.log.error("dictation engine \(engine.kind.rawValue, privacy: .public) \(ShownFailure.logDetail(error), privacy: .private)")
+            if isCurrent() { SpeechEngineBoard.shared.message = message }
         }
         switch DictationFallback.decide(chosen: engine.kind, outcome: outcome, live: live) {
         case .keep(let text):
@@ -1253,8 +1257,8 @@ final class DictationController {
             case .success(let read): samples = read
             case .failure(let error):
                 // Apple reads the file itself below; say why our reader could not.
-                NSLog("[ZEUS] dictation file: %@", error.localizedDescription)
-                topBar.show(.dictation(ShownFailure.dictationFile))
+                Self.log.error("dictation file \(ShownFailure.logDetail(error), privacy: .private)")
+                topBar.show(.dictation(ShownFailure.sentence(for: error, otherwise: ShownFailure.dictationFile)))
                 samples = []
             }
             let heard = try? await engine.transcribe(samples: samples, hints: hints, language: settings.language.localeIdentifier)

@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Observation
+import os
 import SwiftUI
 import ZeusCore
 
@@ -235,6 +236,8 @@ enum ScribeCancelTombstones {
 @MainActor
 @Observable
 final class ScribeController {
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Zeus", category: "scribe")
+
     /// The app's controller: live capture, live mute reading, real transcription, meetings kept on disk.
     /// Creating it (first access) starts the call watcher; nothing is captured until `start()`.
     static let shared = ScribeController.makeProduction()
@@ -1049,8 +1052,9 @@ final class ScribeController {
             notes = ScribeNotes.merge(generated: generated, into: notes ?? ScribeMeetingNotes())
         } catch {
             // The transcript is already in hand: keep and save it rather than failing and losing it.
-            notesIssue = ShownFailure.meetingNotes
-            NSLog("[ZEUS] scribe notes: %@", error.localizedDescription)
+            notesIssue = ShownFailure.sentence(for: error, otherwise: ShownFailure.meetingNotes)
+            // Log the meeting id. The detail is private, and key-shaped text is already redacted.
+            Self.log.error("scribe notes meeting=\(id.rawValue.uuidString, privacy: .public) \(ShownFailure.logDetail(error), privacy: .private)")
             notes = ScribeMeetingNotes(privateNotes: notes?.privateNotes ?? "")
         }
         completeNotes(id)
@@ -1711,8 +1715,9 @@ final class ScribeController {
             if saveFailures.recordSuccess(id: recap.id.rawValue) { refreshUnsavedMeetings() }
             return true
         } catch {
-            let message = ShownFailure.meetingSave
-            NSLog("[ZEUS] scribe save %@: %@", recap.title, error.localizedDescription)
+            let message = ShownFailure.sentence(for: error, otherwise: ShownFailure.meetingSave)
+            // Log the meeting id. The detail is private, and key-shaped text is already redacted.
+            Self.log.error("scribe save meeting=\(recap.id.rawValue.uuidString, privacy: .public) \(ShownFailure.logDetail(error), privacy: .private)")
             saveFailures.recordFailure(
                 id: recap.id.rawValue, message: message,
                 payload: ScribeFailedSave(recap: recap, dismissedAt: dismissedAt)

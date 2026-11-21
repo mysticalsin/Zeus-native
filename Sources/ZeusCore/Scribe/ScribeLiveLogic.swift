@@ -1442,6 +1442,11 @@ public struct ScribeMeetingStore: Sendable {
         } catch let error as ScribeMeetingStoreError {
             throw error
         } catch {
+            // Keep a permission error's code so the screen can name the denial.
+            // The path stays in the private log. The sentence is the fixed permission line.
+            if ShownFailure.notice(for: error) != nil {
+                throw error
+            }
             throw ScribeMeetingStoreError.write("Couldn't save the meeting: \(error.localizedDescription)")
         }
     }
