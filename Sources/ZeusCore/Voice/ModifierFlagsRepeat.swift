@@ -1,19 +1,22 @@
 import Foundation
 
-/// A repeated flags event while both sides of a modifier are down.
+/// A repeated flags event while both Command keys are down.
 ///
 /// The event stream cannot tell that repeat from "the right key went up and the left key
-/// is still holding the flag". The hardware key state can. When it says the key is still
-/// down, the event must not clear the hold.
+/// is still holding the flag". The hardware key state can. When it says the Command key is
+/// still down, the event must not clear the hold. Other modifiers keep the event.
 public enum ModifierFlagsRepeat {
-    /// True when `keyCode` is a modifier that is still physically down, its flag is set,
+    /// True when Left or Right Command (55 or 54) is still physically down, its flag is set,
     /// and the other side is tracked down. A lone key is never this case.
+    /// Any other modifier returns false without reading the hardware. A late read would hold
+    /// the key until a later tick, and Right Option push-to-talk must stop at the key-up.
     public static func isHardwareStillDown(
         keyCode: UInt16,
         modifiers: ShortcutModifiers,
         deviceKeys: Set<UInt16>,
         hardwareDown: (UInt16) -> Bool
     ) -> Bool {
+        guard keyCode == RightCommandTap.leftKeyCode || keyCode == RightCommandTap.rightKeyCode else { return false }
         guard let entry = entry(for: keyCode), modifiers.contains(entry.flag) else { return false }
         guard deviceKeys.contains(keyCode) else { return false }
         let sibling = entry.left == keyCode ? entry.right : entry.left

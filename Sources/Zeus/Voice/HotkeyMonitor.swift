@@ -123,7 +123,8 @@ final class HotkeyMonitor {
     /// test that feeds keys with no key-up is not undone by the real keyboard.
     var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
     /// Whether a modifier key code is physically down. Nil in tests, so a flags event is taken as the picture.
-    /// `start()` reads the hardware. A repeat while both sides are down is dropped only when this says the key is still down.
+    /// `start()` reads the hardware. A repeat while both Command keys are down is dropped only when this says that
+    /// key is still down. Right Option is not asked, so its release stops at the key-up.
     var modifierIsDown: ((UInt16) -> Bool)?
 
     private var keyMonitors: [Any] = []
@@ -280,8 +281,8 @@ final class HotkeyMonitor {
         send(.tick(at: now(), live: liveModifiers()))
     }
 
-    /// A flags repeat while both sides are down and the hardware still holds this side. Dropping it
-    /// keeps the right-hand key from looking released.
+    /// A flags repeat while both Command keys are down and the hardware still holds this side.
+    /// Only key codes 54 and 55. Dropping any other modifier would hold its release for a late hardware read.
     private func dropStillHeldRepeat(_ event: ShortcutEvent) -> Bool {
         guard let modifierIsDown, case .flags(let code, let mods) = event else { return false }
         return ModifierFlagsRepeat.isHardwareStillDown(
