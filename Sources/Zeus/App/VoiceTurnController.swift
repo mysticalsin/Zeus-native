@@ -59,7 +59,7 @@ final class VoiceTurnController {
         var warmsOnPress = true
         var duckBegin: @MainActor () -> Void = { SystemAudioDucker.begin() }
         var duckEnd: @MainActor () -> Void = { SystemAudioDucker.end() }
-        var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureAll() }
+        var captureScreens: @MainActor () async -> [ScreenShot] = { await ScreenCapture.captureForTalk() }
         var speechStart: @MainActor (SpeechInput) throws -> Int = { try $0.start() }
         var speechStop: @MainActor (SpeechInput) async -> String = { await $0.stop() }
         static func silent() -> Seams { Seams(warmsOnPress: false, duckBegin: {}, duckEnd: {}, captureScreens: { [] }) }
@@ -70,6 +70,7 @@ final class VoiceTurnController {
     /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
     private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
+    private var capture = TalkCaptureSession()
     private var tabTask: Task<TabContext?, Never>?
     private var turnTask: Task<TurnResult, Never>?
     private var currentTurn: UUID?
@@ -202,6 +203,46 @@ final class VoiceTurnController {
         speech.deviceUID = choice == .automatic ? nil : choice.resolvedUID(devices: devices(), builtInUID: builtInUID())
     }
 
+    private func talkDisplays() -> [TalkCapturePolicy.Display] {
+        NSScreen.screens.compactMap { screen in
+            guard let id = screen.displayID else { return nil }
+            return TalkCapturePolicy.Display(id: id, frame: screen.frame)
+        }
+    }
+
+    /// Seeing off, or no display under the pointer, starts nothing. The seam captures only the policy's display.
+    private func startScreenshotCapture() {
+        capture.begin(turnID: UUID(), seeing: seeScreenConsent(), pointer: NSEvent.mouseLocation, displays: talkDisplays())
+        guard !capture.displayIDs().isEmpty else {
+            screenshotsTask = nil
+            return
+        }
+        screenshotsTask = Task { await seams.captureScreens() }
+    }
+
+    /// Re-reads seeing and the plugged-in displays, then waits only until the speech bound.
+    private func loadScreenshots() async -> [ScreenShot] {
+        capture.setSeeing(seeScreenConsent())
+        capture.sync(displays: talkDisplays(), pointer: NSEvent.mouseLocation)
+        guard let task = screenshotsTask, !capture.dropped, capture.frameID != nil else {
+            screenshotsTask?.cancel()
+            screenshotsTask = nil
+            return []
+        }
+        let armedTurn = capture.turnID
+        let armedFrame = capture.frameID
+        let ready = await TalkCapturePolicy.collect(boundMs: TalkCapturePolicy.speechWaitBoundMs) {
+            await task.value
+        }
+        guard capture.turnID == armedTurn, capture.frameID == armedFrame, !capture.dropped else { return [] }
+        guard let ready else {
+            capture.dropFrame()
+            task.cancel()
+            return []
+        }
+        return ready
+    }
+
     @discardableResult
     func press() -> Bool {
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
@@ -263,8 +304,8 @@ final class VoiceTurnController {
         liveWords.clear()
         buddy.model.audioLevel = 0
         buddy.listen()
-        // Screens are captured while you talk, so the answer isn't waiting on them.
-        screenshotsTask = Task { await seams.captureScreens() }
+        // Seeing off starts no capture. A later shot is kept only for this turn's frame.
+        startScreenshotCapture()
         // With Chrome in front, the extension reads the page you're looking at.
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
@@ -378,7 +419,7 @@ final class VoiceTurnController {
         let heardAt = ContinuousClock.now
         VoiceLatency.shared.begin(at: heardAt)
         // Only the LLM path uses these; the fast path never waits for them.
-        screenshotsTask = Task { await seams.captureScreens() }
+        startScreenshotCapture()
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
@@ -545,7 +586,7 @@ final class VoiceTurnController {
         let shots: [ScreenShot]
         let tab: TabContext?
         if loadCaptures {
-            let captured = await screenshotsTask?.value ?? []
+            let captured = await loadScreenshots()
             shots = InstantTable.allowsScreenshots(route) ? captured : []
             tab = chrome.prepare(await tabTask?.value)
         } else {

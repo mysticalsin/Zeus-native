@@ -2,12 +2,31 @@ import AppKit
 import ScreenCaptureKit
 import ZeusCore
 
-/// Captures every display (ZEUS's own windows excluded), longest side 1280 px, JPEG 0.8,
-/// the cursor's screen first. Returns [] without Screen Recording permission.
+/// Captures the display under the pointer when seeing is on, longest side 1280 px, JPEG 0.8.
+/// Seeing off returns [] and does not open a capture. Returns [] without Screen Recording permission.
 @MainActor
 enum ScreenCapture {
+    /// The talk seam. Only the display `TalkCapturePolicy` names is captured.
+    static func captureForTalk() async -> [ScreenShot] {
+        let displays = NSScreen.screens.compactMap { screen -> TalkCapturePolicy.Display? in
+            guard let id = screen.displayID else { return nil }
+            return TalkCapturePolicy.Display(id: id, frame: screen.frame)
+        }
+        let allowed = TalkCapturePolicy.displayIDs(
+            seeing: FeatureSettings.talkSeeScreen(),
+            pointer: NSEvent.mouseLocation,
+            displays: displays)
+        return await capture(displayIDs: allowed)
+    }
+
     static func captureAll() async -> [ScreenShot] {
+        await captureForTalk()
+    }
+
+    private static func capture(displayIDs: [UInt32]) async -> [ScreenShot] {
+        guard !displayIDs.isEmpty else { return [] }
         guard CGPreflightScreenCaptureAccess() else { return [] }
+        let allowed = Set(displayIDs)
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
             let ownPID = ProcessInfo.processInfo.processIdentifier
@@ -15,7 +34,7 @@ enum ScreenCapture {
             let mouse = NSEvent.mouseLocation
 
             var captured: [(shot: (Data, Int, Int, CGRect), cursor: CGPoint?)] = []
-            for display in content.displays {
+            for display in content.displays where allowed.contains(display.displayID) {
                 guard let screen = NSScreen.screens.first(where: { $0.displayID == display.displayID }) else { continue }
                 let frame = screen.frame
                 let scale = 1280 / max(frame.width, frame.height)
