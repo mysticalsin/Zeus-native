@@ -260,15 +260,17 @@ public struct HandsCommandLog: Equatable, Sendable {
 
     public func write(to url: URL) throws {
         let directory = url.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         let data = (text + (lines.isEmpty ? "" : "\n")).data(using: .utf8) ?? Data()
         if FileManager.default.fileExists(atPath: url.path), let handle = FileHandle(forWritingAtPath: url.path) {
             defer { try? handle.close() }
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
-        } else {
-            try data.write(to: url)
+        } else if !FileManager.default.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600]) {
+            throw CocoaError(.fileWriteUnknown)
         }
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }
 
@@ -284,14 +286,16 @@ public enum HandsCommandLogger {
         let body = raw.hasSuffix("\n") ? raw : raw + "\n"
         guard let data = body.data(using: .utf8) else { return }
         let directory = url.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
         if FileManager.default.fileExists(atPath: url.path), let handle = FileHandle(forWritingAtPath: url.path) {
             defer { try? handle.close() }
             _ = try? handle.seekToEnd()
             try? handle.write(contentsOf: data)
         } else {
-            try? data.write(to: url)
+            FileManager.default.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600])
         }
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }
 
