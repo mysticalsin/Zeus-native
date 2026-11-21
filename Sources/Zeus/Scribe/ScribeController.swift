@@ -1892,6 +1892,9 @@ final class ScribeController {
         tickTimer = nil
     }
 
+    /// True after connecting begins, until the session leaves `.starting` or capture is acknowledged.
+    var isSessionClockRunning: Bool { tickTimer != nil }
+
     /// Same deterministic tick used by the timer and automated lifecycle scenarios with an injected clock.
     func tickClock() {
         guard let since = recordingSince else { return }
