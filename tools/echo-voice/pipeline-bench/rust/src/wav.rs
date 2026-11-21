@@ -29,7 +29,7 @@ pub fn decode(b: &[u8]) -> io::Result<Wav> {
     let rate = u32le(f, 4);
     let bits = u16le(f, 14);
     if tag == 0xFFFE && f.len() >= 26 { tag = u16le(f, 24); }
-    if channels == 0 { return Err(bad("zero channels")); }
+    if channels == 0 || rate == 0 { return Err(bad("invalid channels or rate")); }
     let samples: Vec<f32> = match (tag, bits) {
         (1, 16) => d.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 * (1.0 / 32768.0)).collect(),
         (1, 24) => d.chunks_exact(3).map(|c| ((i32::from_le_bytes([0, c[0], c[1], c[2]]) >> 8) as f32) * (1.0 / 8_388_608.0)).collect(),

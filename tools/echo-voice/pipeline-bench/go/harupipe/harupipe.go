@@ -49,6 +49,9 @@ func F32ToI16(x []float32) []int16 {
 }
 
 func ToMono(x []float32, ch int) []float32 {
+	if ch <= 0 {
+		return nil
+	}
 	if ch == 1 {
 		return append([]float32(nil), x...)
 	}
@@ -317,12 +320,30 @@ func DecodeWav(b []byte) (*Wav, error) {
 	if tag == 0xFFFE && len(fmtc) >= 26 {
 		tag = binary.LittleEndian.Uint16(fmtc[24:])
 	}
+	if ch == 0 || rate == 0 {
+		return nil, errors.New("invalid channels or rate")
+	}
 	var s []float32
 	switch {
 	case tag == 1 && bits == 16:
 		s = make([]float32, len(data)/2)
 		for i := range s {
 			s[i] = float32(int16(binary.LittleEndian.Uint16(data[2*i:]))) * (1.0 / 32768.0)
+		}
+	case tag == 1 && bits == 24:
+		s = make([]float32, len(data)/3)
+		for i := range s {
+			v := int32(data[3*i]) | int32(data[3*i+1])<<8 | int32(data[3*i+2])<<16
+			if v&0x800000 != 0 {
+				v |= ^0xffffff
+			}
+			s[i] = float32(v) * (1.0 / 8388608.0)
+		}
+	case tag == 1 && bits == 32:
+		s = make([]float32, len(data)/4)
+		for i := range s {
+			v := int32(binary.LittleEndian.Uint32(data[4*i:]))
+			s[i] = float32(float64(v) / 2147483648.0)
 		}
 	case tag == 3 && bits == 32:
 		s = make([]float32, len(data)/4)
