@@ -55,7 +55,7 @@ GROUPS = {
         tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
     ),
     "keychain": (
-        core("Keychain/KeychainStore.swift"),
+        core("Keychain/KeychainStore.swift", "Keychain/DataProtectionKeychain.swift"),
         tests("KeychainStoreTests", "DataProtectionKeychainTests"),
     ),
     "wiki-export": (
