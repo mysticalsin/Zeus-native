@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import statistics
 import unittest
 from pathlib import Path
 
@@ -66,6 +67,21 @@ class SummaryStageTests(unittest.TestCase):
         self.assertNotIn("0.06 %", text)
         self.assertIn("0.05 %", text)
         self.assertIn("not in this tree", text)
+
+
+class RawJsonlTests(unittest.TestCase):
+    def test_summary_medians_match_raw_jsonl(self):
+        raw = [json.loads(line) for line in (PARITY / "raw.jsonl").read_text().splitlines() if line.strip()]
+        summary = json.loads((PARITY / "summary.json").read_text())
+        for impl in ("python", "rust", "go"):
+            benches = [r for r in raw if r["impl"] == impl and r["kind"] == "bench"]
+            self.assertEqual(summary[impl]["runs"], len(benches))
+            got = statistics.median(r["stream"]["per_frame"]["p50_ms"] for r in benches)
+            self.assertAlmostEqual(got, summary[impl]["stream_frame_p50_ms"], places=6)
+            got95 = statistics.median(r["stream"]["per_frame"]["p95_ms"] for r in benches)
+            self.assertAlmostEqual(got95, summary[impl]["stream_frame_p95_ms"], places=6)
+            walls = statistics.median(r["stream"]["wall_s"] for r in benches)
+            self.assertAlmostEqual(walls, summary[impl]["stream_wall_s"], places=6)
 
 
 class ReproduceCommandTests(unittest.TestCase):
