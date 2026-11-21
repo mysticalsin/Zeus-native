@@ -1,6 +1,26 @@
 import Foundation
 import ZeusCore
 
+/// DEBUG builds may retarget an HTTP provider at a loopback stub.
+/// Off unless `ZEUS_DEBUG_PROVIDER_STUB` is `1`. Release builds ignore both variables.
+enum ProviderEndpointOverride {
+    static func resolved(production: URL, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        #if DEBUG
+        guard environment["ZEUS_DEBUG_PROVIDER_STUB"] == "1",
+              let raw = environment["ZEUS_DEBUG_PROVIDER_BASE_URL"],
+              let url = URL(string: raw),
+              url.scheme == "http",
+              url.host == "127.0.0.1" else {
+            return production
+        }
+        return url
+        #else
+        _ = environment
+        return production
+        #endif
+    }
+}
+
 /// OpenAI-compatible streaming chat. Ollama on this Mac is the default. Anthropic stays on its own provider.
 /// A key, when one is set, is read from the Keychain and never logged.
 final class OpenAICompatProvider: BrainProvider, @unchecked Sendable {
@@ -23,11 +43,13 @@ final class OpenAICompatProvider: BrainProvider, @unchecked Sendable {
     }
 
     static func ollama(model: String = ModelCap.httpModel(.ollama, tier: .fast) ?? "llama3.2") -> OpenAICompatProvider {
-        OpenAICompatProvider(id: .ollama, baseURL: URL(string: "http://127.0.0.1:11434/v1")!, model: model, key: nil, keepAlive: "45m")
+        let production = URL(string: "http://127.0.0.1:11434/v1")!
+        return OpenAICompatProvider(id: .ollama, baseURL: ProviderEndpointOverride.resolved(production: production), model: model, key: nil, keepAlive: "45m")
     }
 
     static func openAI(model: String, key: String) -> OpenAICompatProvider {
-        OpenAICompatProvider(id: .openAIAPI, baseURL: URL(string: "https://api.openai.com/v1")!, model: model, key: key, keepAlive: nil)
+        let production = URL(string: "https://api.openai.com/v1")!
+        return OpenAICompatProvider(id: .openAIAPI, baseURL: ProviderEndpointOverride.resolved(production: production), model: model, key: key, keepAlive: nil)
     }
 
     func healthCheck() async -> ProviderHealth { .ready(version: model) }
