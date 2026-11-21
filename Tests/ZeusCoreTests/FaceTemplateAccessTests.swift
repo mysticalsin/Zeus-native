@@ -272,6 +272,21 @@ struct FaceTemplateAccessTests {
         #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .succeeded(Data("epoch-b".utf8)), enrolled: true) == .changedDelete)
     }
 
+    @Test func epochReadErrorOrFailedFirstWriteKeepsTheTemplate() {
+        let state = Data("epoch-a".utf8)
+        #expect(FaceTemplateDomainGate.effect(stored: nil, evaluation: .succeeded(state), enrolled: true) == .denyKeep)
+        #expect(FaceTemplateDomainGate.effect(stored: nil, evaluation: .failed, enrolled: true) == .denyKeep)
+        #expect(FaceTemplateDomainGate.effect(stored: nil, evaluation: .succeeded(state), enrolled: true, epochUnreadable: true) == .denyKeep)
+    }
+
+    @Test func reenrolmentAfterFingerprintChangeClearsTheEpoch() {
+        let old = Data("epoch-a".utf8)
+        let new = Data("epoch-b".utf8)
+        #expect(FaceTemplateDomainGate.effect(stored: old, evaluation: .succeeded(new), enrolled: true) == .changedDelete)
+        #expect(FaceTemplateEpochWrite.afterTemplateDeleted(epoch: old) == nil)
+        #expect(FaceTemplateDomainGate.effect(stored: nil, evaluation: .succeeded(new), enrolled: false) == .allow(new))
+    }
+
     @Test func failedEpochAddKeepsThePreviousRecord() {
         let existing = Data("epoch-a".utf8)
         let next = Data("epoch-b".utf8)
