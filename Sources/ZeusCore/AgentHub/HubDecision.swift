@@ -2,6 +2,7 @@ import Foundation
 
 /// The approval queue and the reply gate. A state and an event go in, and the next state comes out.
 /// A pair that is not in the target table leaves the state unchanged. A missing fact denies.
+/// Cancel is its own event. It is neither an approval nor a denial.
 /// Nothing here types a line or draws a button.
 
 public enum HubDecision {
@@ -50,6 +51,7 @@ public enum HubDecision {
 
     /// A typed reply. Trust does not skip the approval. A destination that cannot take text never asks.
     /// The script line is absent until the reply is approved, and a failed script drops it.
+    /// A reply that is waiting returns to drafting only through `HubReplyCancel`.
     public static func reply(
         _ state: HubReplyState,
         _ event: HubReplyEvent,
@@ -84,6 +86,25 @@ public enum HubDecision {
             return HubReplyOutcome(state: next)
         default:
             return .unchanged(state)
+        }
+    }
+
+    /// Cancel a reply that is waiting on approval. The draft stays editable.
+    /// Trust and the destination are not read, so this step cannot approve or deny.
+    /// A second cancel, and a cancel from any other status, leaves the state as it is.
+    public static func reply(
+        _ state: HubReplyState,
+        _ event: HubReplyCancel,
+        context _: HubReplyContext = HubReplyContext()
+    ) -> HubReplyOutcome {
+        switch event {
+        case .cancel:
+            guard state.status == .awaitingDecision else { return .unchanged(state) }
+            var next = state
+            next.status = .drafting
+            next.receipt = nil
+            next.script = nil
+            return HubReplyOutcome(state: next)
         }
     }
 
@@ -256,6 +277,11 @@ public struct HubReplyState: Equatable, Sendable {
         self.receipt = receipt
         self.script = script
     }
+}
+
+/// Cancel while a typed reply is waiting. It is not an approval verdict.
+public enum HubReplyCancel: String, CaseIterable, Codable, Equatable, Hashable, Sendable, HubStoredLabel {
+    case cancel
 }
 
 /// Facts the reply gate is told. An unknown destination cannot take text. Trust never skips the approval.
