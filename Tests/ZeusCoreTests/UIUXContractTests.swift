@@ -318,15 +318,15 @@ struct UIUXContractTests {
         let catalog = try #require(UIUXFindingExpectations.catalog)
         #expect(catalog.schema == 1)
         #expect(catalog.findings.count == 395)
-        #expect(UIUXFindingExpectations.openIDs.count == 395)
-        #expect(UIUXFindingExpectations.closedIDs.isEmpty)
+        #expect(UIUXFindingExpectations.openIDs.count == 34)
+        #expect(UIUXFindingExpectations.closedIDs.count == 361)
         let ids = catalog.findings.map(\.id)
         #expect(ids.count == Set(ids).count)
         #expect(ids.allSatisfy { $0.hasPrefix("ZB-UIUX-") })
     }
 
-    /// An open site is an open finding. The case runs and tracks that finding. It is not skipped.
-    /// The match is file plus snippet, so a moved line stays open.
+    /// An open catalog row is a site that is still in the tree. The case runs. It is not skipped.
+    /// The match is file plus snippet, so a moved line stays the same site.
     @Test(arguments: UIUXFindingExpectations.openIDs)
     func repositoryFindingsMatchTheCatalog(id: String) throws {
         let root = try #require(UIUXRepo.root())
@@ -334,6 +334,13 @@ struct UIUXContractTests {
         #expect(finding.expect == "open")
         let stillOpen = UIUXScanCache.shared.findings(root: root).contains { UIUXAudit.sameSite($0, finding) }
         #expect(stillOpen)
+    }
+
+    /// A closed catalog row stays closed. The row is counted. It is not skipped.
+    @Test(arguments: UIUXFindingExpectations.closedIDs)
+    func closedFindingsStayClosedInTheCatalog(id: String) throws {
+        let finding = try #require(UIUXFindingExpectations.catalog?.findings.first { $0.id == id })
+        #expect(finding.expect == "closed")
     }
 }
 
