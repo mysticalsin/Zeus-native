@@ -140,14 +140,18 @@ func gcd(a, b int) int {
 }
 
 func i0(x float64) float64 {
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return math.NaN()
+	}
 	sum, term, q := 1.0, 1.0, x*x/4
-	for k := 1.0; ; k++ {
+	for k := 1.0; k < 200; k++ {
 		term *= q / (k * k)
 		sum += term
 		if term < sum*1e-17 {
 			return sum
 		}
 	}
+	return sum
 }
 
 func sinc(x float64) float64 {
@@ -159,6 +163,12 @@ func sinc(x float64) float64 {
 }
 
 func FirwinKaiser(numtaps int, cutoff, beta float64) []float64 {
+	if numtaps <= 0 {
+		return nil
+	}
+	if numtaps == 1 {
+		return []float64{1} // DC-normalised single tap; the window ratio is undefined at numtaps-1 == 0
+	}
 	alpha := 0.5 * float64(numtaps-1)
 	h := make([]float64, numtaps)
 	s := 0.0
