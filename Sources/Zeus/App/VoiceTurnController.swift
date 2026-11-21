@@ -397,7 +397,7 @@ final class VoiceTurnController {
         }
     }
 
-    /// Milliseconds in a `Duration`, for the same `>=` quiet check the speech model uses.
+    /// Milliseconds in a `Duration`, for the wake and idle quiet checks.
     private static func milliseconds(_ duration: Duration) -> Int {
         let parts = duration.components
         return Int((parts.seconds * 1_000) + (parts.attoseconds / 1_000_000_000_000_000))
@@ -408,7 +408,7 @@ final class VoiceTurnController {
         guard press() else { return }
         handsFreeTask?.cancel()
         let opened = ContinuousClock.now
-        let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(STTQuiet.handsFreeSilenceMs)
+        let wakeSilenceMs = Self.milliseconds(.seconds(WakeConversationTiming.silenceAfterSpeech))
         let idleLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceWhenEmpty) : .seconds(4)
         let hardLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.hardLimit) : .seconds(12)
         handsFreeTask = Task { @MainActor [weak self] in
@@ -417,8 +417,15 @@ final class VoiceTurnController {
                 let now = ContinuousClock.now
                 let quietFor = self.lastPartialAt.map { now - $0 } ?? (now - opened)
                 let quietMs = Self.milliseconds(quietFor)
-                let limitMs = self.heardSomething ? Self.milliseconds(silenceLimit) : Self.milliseconds(idleLimit)
-                if STTQuiet.reached(quietForMs: quietMs, thresholdMs: limitMs) { break }
+                let stop: Bool
+                if self.heardSomething, self.wakeConversationActive {
+                    stop = STTQuiet.reached(quietForMs: quietMs, thresholdMs: wakeSilenceMs)
+                } else if self.heardSomething {
+                    stop = STTHandsFree.quietEnded(quietForMs: quietMs)
+                } else {
+                    stop = STTQuiet.reached(quietForMs: quietMs, thresholdMs: Self.milliseconds(idleLimit))
+                }
+                if stop { break }
                 if now - opened > hardLimit { break }
             }
             guard let self, !Task.isCancelled, self.listening else { return }

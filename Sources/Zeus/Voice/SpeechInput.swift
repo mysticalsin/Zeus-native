@@ -127,6 +127,8 @@ final class SpeechInput: @unchecked Sendable {
     private var traceArmed = false
     private var armedGeneration = 0
     private var traceCancelled = false
+    /// Same generation and cancelled flag `noteDelivered` asks. The call site cannot pass a literal.
+    private var delivery = STTLiveDelivery()
     private var keyDownUptime: TimeInterval?
     private var heardSpeech = false
     private var silenceMarked = false
@@ -353,10 +355,13 @@ final class SpeechInput: @unchecked Sendable {
                 for index in 0..<Int(buffer.frameLength) { sum += samples[index] * samples[index] }
                 let rms = sqrt(sum / Float(buffer.frameLength))
                 let live = self.lock.withLock { self.generation }
-                if STTBufferGate.loudnessApplies(bufferSession: current, currentSession: live) {
+                let effect = STTBufferGate.effect(bufferSession: current, currentSession: live)
+                if effect.applyLoudness {
                     self.noteLoudness(rms)
                 }
-                self.onLevel?(Double(min(max((rms - 0.008) * 10.2, 0), 1)))
+                if effect.publishLevel {
+                    self.onLevel?(Double(min(max((rms - 0.008) * 10.2, 0), 1)))
+                }
             }
         }
     }
@@ -782,7 +787,8 @@ final class SpeechInput: @unchecked Sendable {
         let taken = lock.withLock { () -> (SFSpeechRecognitionTask?, Capture)? in
             if let only, generation != only { return nil }
             stopRequested = true
-            traceCancelled = true
+            delivery.cancel()
+            traceCancelled = delivery.traceCancelled
             defer { task = nil }
             return (task, takeCapture())
         }
@@ -893,9 +899,9 @@ final class SpeechInput: @unchecked Sendable {
         lock.lock()
         keyDownUptime = now
         traceArmed = true
-        armedGeneration += 1
+        armedGeneration = delivery.begin()
         generation = armedGeneration
-        traceCancelled = false
+        traceCancelled = delivery.traceCancelled
         heardSpeech = false
         silenceMarked = false
         lastEmittedPartial = ""
@@ -912,7 +918,7 @@ final class SpeechInput: @unchecked Sendable {
     func noteDelivered(generation: Int) {
         let ms = elapsedMs()
         let snapshot: (STTPath, STTFailure, String)? = lock.withLock {
-            guard STTUtteranceBook.accepts(owner: generation, current: armedGeneration, cancelled: traceCancelled) else { return nil }
+            guard delivery.allowed(owner: generation) else { return nil }
             if trace.marks[.finalTranscript] == nil {
                 trace.mark(.finalTranscript, atMs: ms)
                 turnFailure = heardSpeech ? .emptyText : .noText

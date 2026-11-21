@@ -10,7 +10,7 @@ No open review comments, review threads, or failing checks were on head `2d6e059
 
 1. A pause in the middle of a phrase became the endpoint silence. `STTLatencyTrace.mark` keeps the first time, and speech resuming only cleared the local silence flag. On the injected clock, silence stayed at 200 ms and the key-up endpoint at 900 ms was 700 ms later, past the 400 ms silence budget. The listening indicator itself still leaves "listening" at key-up (`VoiceTurnController.release` sets think). The bad feel was the VAD stage, not a stuck orb.
 2. A deliver for an older press wrote `delivered_to_ui` on the utterance that had replaced it. Cancel of the old press did not stop that write after the next begin. Rapid start/stop (20 cycles, alternating talk-hold and murmur-tap) showed the same cross-talk.
-3. A long quiet stretch already endpoints at silence plus 400 ms, not at the late sample. Silence at 100 ms, next sample at 10_000 ms, endpoint at 500 ms. That case passed before the fix.
+3. A long quiet stretch endpoints at the crossing sample, silence plus the 400 ms budget. Silence at 100 ms, next observed sample at 10_000 ms, endpoint at 500 ms. The stamp is not the late clock.
 
 ### Fixes
 

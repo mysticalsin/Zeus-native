@@ -445,11 +445,10 @@ public enum STTBufferGate {
         bufferSession == currentSession
     }
 
-    /// Loudness and the level meter share one owner check. The meter flag is wrong until the fix:
-    /// a stale tap still publishes level.
+    /// Loudness and the level meter share one owner check. A stale tap publishes neither.
     public static func effect(bufferSession: Int, currentSession: Int) -> STTTapEffect {
         let owns = loudnessApplies(bufferSession: bufferSession, currentSession: currentSession)
-        return STTTapEffect(applyLoudness: owns, publishLevel: true)
+        return STTTapEffect(applyLoudness: owns, publishLevel: owns)
     }
 }
 
@@ -475,33 +474,34 @@ public struct STTLiveDelivery: Equatable, Sendable {
     }
 
     public func allowed(owner: Int) -> Bool {
-        STTUtteranceBook.accepts(owner: owner, current: current, cancelled: false)
+        STTUtteranceBook.accepts(owner: owner, current: current, cancelled: traceCancelled)
     }
 }
 
 /// Quiet-time endpoint. Hands-free polls every 100 ms. The predicate is `>=` so a sample
-/// that lands on the threshold counts. Non-wake hands-free stays at 1000 ms.
+/// that lands on the threshold counts. The effective silence is the production budget.
+/// The legacy policy still records 1000 ms and is not the effective value. Pending Tony.
 public enum STTQuiet {
-    public static let handsFreeSilenceMs = 1_000
+    public static var handsFreeSilenceMs: Int { STTSessionPolicy.production.silenceToEndpointMs }
 
     public static func reached(quietForMs: Int, thresholdMs: Int) -> Bool {
         quietForMs >= thresholdMs
     }
 
-    /// Stamps the observed clock. The crossing sample is silence plus the budget.
+    /// The sample where quiet time reaches the budget, even when the next observed sample is later.
     public static func endpointStampMs(silenceAt: Int, thresholdMs: Int, observedAtMs: Int) -> Int {
-        _ = silenceAt
-        _ = thresholdMs
-        return observedAtMs
+        let crossing = silenceAt + thresholdMs
+        if observedAtMs < crossing { return observedAtMs }
+        return crossing
     }
 }
 
-/// Non-wake hands-free quiet. The red path still uses the legacy 1000 ms and a strict `>`.
+/// Non-wake hands-free quiet. One production threshold, compared with `>=`.
 public enum STTHandsFree {
-    public static var silenceMs: Int { STTQuiet.handsFreeSilenceMs }
+    public static var silenceMs: Int { STTSessionPolicy.production.silenceToEndpointMs }
 
     public static func quietEnded(quietForMs: Int) -> Bool {
-        quietForMs > silenceMs
+        quietForMs >= silenceMs
     }
 }
 

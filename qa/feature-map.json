@@ -1213,6 +1213,38 @@
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "latencyRegressionBothPathsStayInsideTheBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "endpointBoundariesKillComparisonMutants"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aStaleMarkDoesNotWriteTheOpenUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "generationZeroIsNotAnOpenUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "anOlderCancelDoesNotCloseTheNewerUtterance"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aChangedTokenDuringSilenceIsSpeechOnTheFixedPolicy"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aCancelledDeliverIsRefused"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aStaleBufferDoesNotSetSpeechOrSilence"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "quietReachesExactlyAtTheHandsFreeThreshold"
             }
           ],
           "id": "F01.stt-latency"
