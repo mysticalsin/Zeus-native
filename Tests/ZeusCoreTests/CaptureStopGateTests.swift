@@ -10,7 +10,8 @@ import Testing
         #expect(gate.start() == false)
         #expect(gate.running == false)
         gate.stopFinished()
-        #expect(gate.start())
+        let started = gate.start()
+        #expect(started)
         #expect(gate.running)
     }
 
@@ -43,7 +44,8 @@ import Testing
             gate.requestStop()
             #expect(gate.start() == false)
             gate.stopFinished()
-            #expect(gate.start())
+            let started = gate.start()
+            #expect(started)
             gate.requestStop()
             gate.stopFinished()
         }
