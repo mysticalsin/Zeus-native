@@ -1,5 +1,10 @@
 import Foundation
 import Testing
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 @testable import ZeusCore
 
 @Suite("Chrome bridge reply ownership", .serialized)
@@ -130,17 +135,115 @@ struct BridgePendingRepliesTests {
         #expect(!pending.complete(.success("deadline"), token: token))
     }
 
-    @Test func finishBeforeAttachRemovesTheSocketFile() throws {
+    private func lifetimeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-life-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }
+
+    private func reader() throws -> (Pipe, NativeMessageInput) {
+        let pipe = Pipe()
+        let input = try NativeMessageInput(handle: pipe.fileHandleForReading)
+        return (pipe, input)
+    }
+
+    @Test func finishBeforeAttachLeavesAFileThisProcessDidNotBind() throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("chrome.sock")
+        let marker = Data("keep-me".utf8)
+        try marker.write(to: url)
+        let lifetime = BridgeHostLifetime(socketPath: url.path)
+        lifetime.finish()
+        #expect(FileManager.default.fileExists(atPath: url.path))
+        #expect(try Data(contentsOf: url) == marker)
+    }
+
+    @Test func finishAfterASuccessfulBindUnlinksTheSocket() throws {
+        let root = try lifetimeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let path = root.appendingPathComponent("chrome.sock").path
+        let (pipe, input) = try reader()
+        defer { input.stop(); try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close() }
         let server = UnixSocketServer(path: path) { _, _ in }
         try server.start()
-        defer { server.stop() }
         let lifetime = BridgeHostLifetime(socketPath: path)
+        lifetime.attach(input: input, server: server)
         lifetime.finish()
         #expect(!FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test func finishLeavesAPathReplacedByAnotherInodeOrASymlink() throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("chrome.sock")
+        let elsewhere = root.appendingPathComponent("other")
+        try Data("target".utf8).write(to: elsewhere)
+        let (pipe, input) = try reader()
+        defer { input.stop(); try? pipe.fileHandleForReading.close(); try? pipe.fileHandleForWriting.close() }
+        let server = UnixSocketServer(path: url.path) { _, _ in }
+        try server.start()
+        let lifetime = BridgeHostLifetime(socketPath: url.path)
+        lifetime.attach(input: input, server: server)
+        #expect(unlink(url.path) == 0)
+        let replacement = Data("replaced".utf8)
+        try replacement.write(to: url)
+        lifetime.finish()
+        #expect(try Data(contentsOf: url) == replacement)
+
+        let second = root.appendingPathComponent("fresh.sock")
+        let server2 = UnixSocketServer(path: second.path) { _, _ in }
+        try server2.start()
+        let lifetime2 = BridgeHostLifetime(socketPath: second.path)
+        lifetime2.attach(input: input, server: server2)
+        #expect(unlink(second.path) == 0)
+        #expect(symlink(elsewhere.path, second.path) == 0)
+        lifetime2.finish()
+        var info = stat()
+        #expect(lstat(second.path, &info) == 0)
+        #expect((info.st_mode & S_IFMT) == S_IFLNK)
+    }
+
+    @Test func socketIsBoundBeforeStdinAndIdentityFollowsTheReader() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/zeus-bridge/main.swift"), encoding: .utf8)
+        let bound = try #require(source.range(of: "try? server.start()"))
+        let reading = try #require(source.range(of: "input.start("))
+        let identity = try #require(source.range(of: "PeerSigning.captureOwnIdentity()"))
+        let ready = try #require(source.range(of: "relay.noteIdentityReady()"))
+        #expect(bound.lowerBound < reading.lowerBound)
+        #expect(reading.lowerBound < identity.lowerBound)
+        #expect(identity.lowerBound < ready.lowerBound)
+    }
+
+    @Test func aPeerIsRefusedBeforeOwnIdentityIsCaptured() async throws {
+        let root = try lifetimeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("peer.sock").path
+        let saw = Box(0)
+        let ownName = URL(fileURLWithPath: CommandLine.arguments[0]).lastPathComponent
+        let server = UnixSocketServer(path: path, peerPolicy: .sameUserExecutable([ownName]), peerVerifier: { _ in
+            .deny("own code signature unavailable")
+        }) { _, reply in
+            saw.change { $0 += 1 }
+            reply(Data("open".utf8))
+        }
+        try server.start()
+        defer { server.stop() }
+        let fd = UnixSocket.makeSocket()
+        try #require(fd >= 0)
+        defer { close(fd) }
+        var address = try #require(UnixSocket.address(for: path))
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        try #require(connected == 0)
+        try #require(UnixSocket.prepare(fd))
+        _ = UnixSocket.writeAll(fd, Data("{\"id\":\"p\",\"type\":\"ping\"}\n".utf8))
+        let reply = await Task.detached { UnixSocket.readLine(fd, timeout: 1) }.value
+        #expect(reply == nil)
+        #expect(saw.read() == 0)
     }
 
     @Test func beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered() throws {
