@@ -50,6 +50,10 @@ public final class KeychainStore: @unchecked Sendable {
     private let defaults: UserDefaults
     private let now: @Sendable () -> Date
     private var lastRefresh: [String: Date] = [:]
+    /// Alias value removed while loading. A failed OpenAI `remove` writes it back.
+    private var aliasRemovedAtLoad: String?
+    /// Set for the load that `remove` itself triggers, so that load keeps the alias value.
+    private var keepAliasSnapshot = false
     /// Least time between two backend re-reads of the same account.
     public static let refreshInterval: TimeInterval = 5
     /// Legacy items that exist but could not be read without a dialog.
@@ -65,6 +69,7 @@ public final class KeychainStore: @unchecked Sendable {
     /// Reads everything once (and migrates once). Safe to call again; later calls do nothing.
     public func load() {
         lock.lock(); defer { lock.unlock() }
+        defer { if !keepAliasSnapshot { aliasRemovedAtLoad = nil } }
         guard !loaded else { return }
         loaded = true
         for account in backend.accounts(service: Self.service) {
@@ -83,9 +88,19 @@ public final class KeychainStore: @unchecked Sendable {
                 return true
             },
             deleteAlias: {
-                guard backend.delete(service: Self.service, account: AssistantKeyAccount.aliasOpenAI) else { return false }
-                cache[AssistantKeyAccount.aliasOpenAI] = nil
-                return true
+                // Not-found is success. A real refusal leaves the alias cached for the next launch.
+                let saved = cache[AssistantKeyAccount.aliasOpenAI]
+                switch Self.deleteOutcome(AssistantKeyAccount.aliasOpenAI, backend: backend) {
+                case .removed:
+                    cache[AssistantKeyAccount.aliasOpenAI] = nil
+                    if let saved { aliasRemovedAtLoad = saved }
+                    return true
+                case .absent:
+                    cache[AssistantKeyAccount.aliasOpenAI] = nil
+                    return true
+                case .failed:
+                    return false
+                }
             }
         )
         if let migrated { cache[AssistantKeyAccount.canonicalOpenAI] = migrated }
@@ -152,28 +167,89 @@ public final class KeychainStore: @unchecked Sendable {
         return true
     }
 
-    /// Success means the backend confirmed deletion or the item was already absent.
-    /// Keep cached state on failure so callers cannot falsely report a removed secret.
-    /// Removing either OpenAI spelling deletes both. Deleting only `assistant.key.openAI` left
-    /// `assistant.key.openai` for the next load to copy back.
+    /// Success means every targeted account was deleted or already absent.
+    /// The legacy OpenAI spelling is removed before the canonical account. A refusal restores any
+    /// spelling already removed in this call, so a partial delete cannot drop the canonical secret
+    /// or leave `assistant.key.openai` behind to be copied back.
     @discardableResult
     public func remove(_ account: String) -> Bool {
+        let openAI = account == AssistantKeyAccount.canonicalOpenAI || account == AssistantKeyAccount.aliasOpenAI
+        if openAI {
+            lock.lock()
+            keepAliasSnapshot = true
+            aliasRemovedAtLoad = nil
+            lock.unlock()
+        }
         load()
         lock.lock(); defer { lock.unlock() }
-        let targets = Self.removalAccounts(for: account)
-        for item in targets {
-            guard backend.delete(service: Self.service, account: item) else { return false }
+        if openAI { keepAliasSnapshot = false }
+        let removed = deleteAccounts(Self.removalAccounts(for: account))
+        if openAI, !removed { restoreAliasRemovedAtLoad() }
+        else { aliasRemovedAtLoad = nil }
+        return removed
+    }
+
+    /// Deletes one account. Not-found is success. Unlike `remove`, this does not delete the other
+    /// OpenAI spelling. Migration uses it so a cleanup of `assistant.key.openai` cannot erase the
+    /// canonical secret that was just verified.
+    @discardableResult
+    public func deleteAccount(_ account: String) -> Bool {
+        load()
+        lock.lock(); defer { lock.unlock() }
+        return deleteAccounts([account])
+    }
+
+    /// Legacy spelling first, canonical account last. A refused legacy delete never reaches the canonical item.
+    static func removalAccounts(for account: String) -> [String] {
+        guard account == AssistantKeyAccount.canonicalOpenAI || account == AssistantKeyAccount.aliasOpenAI else {
+            return [account]
         }
-        for item in targets { cache[item] = nil }
+        return [AssistantKeyAccount.aliasOpenAI, AssistantKeyAccount.canonicalOpenAI]
+    }
+
+    private func deleteAccounts(_ targets: [String]) -> Bool {
+        var removed: [(account: String, value: String)] = []
+        for item in targets {
+            let saved = cache[item] ?? backend.read(service: Self.service, account: item)
+            switch Self.deleteOutcome(item, backend: backend) {
+            case .removed:
+                cache[item] = nil
+                if let saved { removed.append((item, saved)) }
+            case .absent:
+                cache[item] = nil
+            case .failed:
+                for prior in removed.reversed() {
+                    if backend.write(prior.value, service: Self.service, account: prior.account) {
+                        cache[prior.account] = prior.value
+                    }
+                }
+                return false
+            }
+        }
         return true
     }
 
-    /// The requested account is first, so a refusal leaves that item in place.
-    static func removalAccounts(for account: String) -> [String] {
-        let spellings = [AssistantKeyAccount.canonicalOpenAI, AssistantKeyAccount.aliasOpenAI]
-        guard spellings.contains(account) else { return [account] }
-        return [account] + spellings.filter { $0 != account }
+    /// `remove` of an OpenAI spelling that fails puts back an alias this load already deleted.
+    private func restoreAliasRemovedAtLoad() {
+        guard let value = aliasRemovedAtLoad else { return }
+        aliasRemovedAtLoad = nil
+        guard backend.accounts(service: Self.service).contains(AssistantKeyAccount.canonicalOpenAI) else { return }
+        guard !backend.accounts(service: Self.service).contains(AssistantKeyAccount.aliasOpenAI) else { return }
+        if backend.write(value, service: Self.service, account: AssistantKeyAccount.aliasOpenAI) {
+            cache[AssistantKeyAccount.aliasOpenAI] = value
+        }
     }
+
+    /// `errSecItemNotFound` is success: an account that is gone after the call was absent or deleted.
+    /// An account that is still present is a real failure, whatever status the backend reported.
+    private static func deleteOutcome(_ account: String, backend: KeychainBackend) -> AccountDelete {
+        let present = backend.accounts(service: service).contains(account)
+        _ = backend.delete(service: service, account: account)
+        if backend.accounts(service: service).contains(account) { return .failed }
+        return present ? .removed : .absent
+    }
+
+    private enum AccountDelete { case removed, absent, failed }
 }
 
 /// An in-memory Keychain for tests and snapshots. `locked` items cannot be read or removed.
@@ -236,19 +312,29 @@ public enum AssistantKeyAccount {
 
     /// Copies the alias into the canonical account when the canonical account is empty.
     /// Reads the legacy value, writes the canonical account, reads that account back, and only then
-    /// deletes `assistant.key.openai`. A canonical value already present is left in place.
-    /// Returns the canonical value after the attempt.
+    /// deletes `assistant.key.openai`. When the canonical value is already present, that value stays
+    /// and a stale alias is deleted. A failed delete is tried once more. Nil means the alias is still
+    /// present, so the migration is not done. The canonical value is returned only after the alias is gone.
     public static func migrateOpenAI(
         get: (String) -> String?,
         writeCanonical: (String) -> Bool,
         deleteAlias: () -> Bool
     ) -> String? {
-        if let canonical = nonempty(get(canonicalOpenAI)) { return canonical }
+        if let canonical = nonempty(get(canonicalOpenAI)) {
+            guard nonempty(get(aliasOpenAI)) != nil else { return canonical }
+            guard deleteAliasConfirmed(deleteAlias) else { return nil }
+            return canonical
+        }
         guard let alias = nonempty(get(aliasOpenAI)) else { return nil }
         guard writeCanonical(alias),
               let stored = nonempty(get(canonicalOpenAI)),
               stored == alias else { return alias }
-        _ = deleteAlias()
+        guard deleteAliasConfirmed(deleteAlias) else { return nil }
         return stored
+    }
+
+    private static func deleteAliasConfirmed(_ deleteAlias: () -> Bool) -> Bool {
+        if deleteAlias() { return true }
+        return deleteAlias()
     }
 }
