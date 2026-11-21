@@ -7,27 +7,27 @@ import Testing
 struct RightOptionPushToTalkTests {
     @Test func holdingRightOptionStartsListeningAndARepeatDoesNotToggle() {
         var machine = RightOptionPushToTalk()
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
         #expect(machine.phase == .listening)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)).isEmpty)
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)).isEmpty)
         #expect(machine.phase == .listening)
     }
 
     @Test func releasingRightOptionStopsListening() {
         var machine = RightOptionPushToTalk()
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)) == [.stop])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)) == [.stop])
         #expect(machine.phase == .idle)
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)).isEmpty)
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)).isEmpty)
     }
 
     @Test func aQuickTapStartsAndStopsAndNeverLatches() {
         var machine = RightOptionPushToTalk()
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)) == [.stop])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)) == [.stop])
         #expect(machine.phase == .idle)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)) == [.stop])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)) == [.stop])
         #expect(machine.phase == .idle)
         #expect(machine.send(.otherKey).isEmpty)
         #expect(machine.phase == .idle)
@@ -35,11 +35,11 @@ struct RightOptionPushToTalkTests {
 
     @Test func optionWithAnotherKeyDoesNotCancelOrToggle() {
         var machine = RightOptionPushToTalk()
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
         #expect(machine.send(.otherKey).isEmpty)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)).isEmpty)
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)).isEmpty)
         #expect(machine.phase == .listening)
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)) == [.stop])
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)) == [.stop])
         #expect(machine.phase == .idle)
     }
 
@@ -48,7 +48,7 @@ struct RightOptionPushToTalkTests {
         #expect(machine.send(.leftOption(down: true)).isEmpty)
         #expect(machine.send(.leftOption(down: false)).isEmpty)
         #expect(machine.phase == .idle)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
         #expect(machine.send(.leftOption(down: true)).isEmpty)
         #expect(machine.send(.leftOption(down: false)).isEmpty)
         #expect(machine.phase == .listening)
@@ -78,7 +78,7 @@ struct RightOptionPushToTalkTests {
             var machine = RightOptionPushToTalk()
             machine.yieldedTo = RightOptionPushToTalk.yield(named: yield.yieldsTo)
             #expect(machine.yieldedTo != nil)
-            #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)).isEmpty)
+            #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)).isEmpty)
             #expect(machine.phase != .listening)
         }
         #expect(RightOptionPushToTalk.yield(named: "Talk to Zeus") == nil)
@@ -86,23 +86,23 @@ struct RightOptionPushToTalkTests {
 
     @Test func aPressDuringAnotherTurnDoesNotStart() {
         var machine = RightOptionPushToTalk()
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: true)).isEmpty)
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: true)).isEmpty)
         #expect(machine.phase != .listening)
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)).isEmpty)
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)).isEmpty)
         #expect(machine.phase == .idle)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
     }
 
     @Test func aLostKeyUpOnFocusChangeStopsListening() {
         var machine = RightOptionPushToTalk()
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
         #expect(machine.send(.focusChanged) == [.stop])
         #expect(machine.phase != .listening)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)).isEmpty)
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)).isEmpty)
         #expect(machine.phase != .listening)
-        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)).isEmpty)
+        #expect(machine.send(.rightOption(down: false, at: 0, otherTurnOpen: false)).isEmpty)
         #expect(machine.phase == .idle)
-        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])
         #expect(machine.phase == .listening)
     }
 

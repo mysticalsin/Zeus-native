@@ -5745,7 +5745,7 @@
         {
           "id": "F11.right-option-strict-ptt",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Right Option is strict push-to-talk. Key-down starts listening and key-up stops it. A tap never latches. Option together with another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A key-up lost on focus change stops listening.",
+          "acceptance": "Right Option is strict push-to-talk. Key-down starts listening and key-up stops it. A tap never latches. Option together with another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A missed key-up is the global flags, on a later event and on the 3 s look. The hold ends at the 45 s talk limit, on a screen lock, and when secure input is on or unknown.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
@@ -5774,6 +5774,30 @@
             {
               "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
               "function": "aLostKeyUpOnFocusChangeStopsListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aLostKeyUpOnTheLiveFlagsStopsListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theThreeSecondLookStopsWhenRightOptionIsUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theHoldStopsAtTheTalkLimit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "secureInputStopsAndFailsClosed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aScreenLockStopsTheHold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theRightOptionHintSaysHoldToTalkReleaseToStop"
             }
           ]
         },

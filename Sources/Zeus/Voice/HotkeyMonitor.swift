@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 import ZeusCore
 
 /// Turns NSEvent flags into the portable modifier set.
@@ -27,6 +28,8 @@ enum KeyListenAccess {
     static var accessibility: Bool { AXIsProcessTrusted() }
     static var inputMonitoring: Bool { CGPreflightListenEventAccess() }
     static var granted: Bool { accessibility || inputMonitoring }
+    /// How often a granted key listen is retried, and how often a Right Option hold re-reads the global flags.
+    static let pollSeconds: TimeInterval = 3
     private static var waiting: [() -> Void] = []
     private static var timer: Timer?
 
@@ -35,7 +38,7 @@ enum KeyListenAccess {
         if granted { work(); return }
         waiting.append(work)
         guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: pollSeconds, repeats: true) { _ in
             MainActor.assumeIsolated {
                 guard granted else { return }
                 timer?.invalidate(); timer = nil
@@ -109,9 +112,12 @@ final class HotkeyMonitor {
     /// reads it, and it is read on every event, so the owner hands back a value its sync points stored (docs/RIGHT-OPTION-TALK-PLAN.md).
     var secondKeyProvider: () -> Shortcut? = { nil }
     /// The modifiers the system reports right now, to find a release no event told the machine about.
+    /// Global modifier flags (`CGEventSource.flagsState`), not the app's own focus. Nil when a test has not supplied them.
     var liveModifiers: () -> ShortcutModifiers? = {
-        ShortcutModifiers(NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
+        HotkeyMonitor.modifiers(CGEventSource.flagsState(.hidSystemState))
     }
+    /// Password fields hide key-ups. Nil is not used here: the system call always answers, and true stops the hold.
+    var secureInput: () -> Bool = { IsSecureEventInputEnabled() }
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     /// Of these ordinary keys, the ones the system reports down now. Nil until `start()` asks the keyboard itself, so a
     /// test that feeds keys with no key-up is not undone by the real keyboard.
@@ -152,11 +158,6 @@ final class HotkeyMonitor {
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
             return event
         }) { keyMonitors.append(local) }
-        // Focus leaving this app can drop the Right Option key-up. This is an application notification, not an event tap, and it raises no permission prompt.
-        keyMonitors.append(NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.focusChanged() }
-        })
         if let localMouse = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.mouseDown(at: event.timestamp) }
             return event
@@ -210,8 +211,10 @@ final class HotkeyMonitor {
            keysStillDown?([chord]).contains(chord) == true {
             send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
+        reconcileRightOption(at: at)
         send(.key(event, at: at))
-        driveRightOption(event)
+        driveRightOption(event, at: at)
+        reconcileRightOption(at: at)
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
@@ -225,7 +228,7 @@ final class HotkeyMonitor {
         send(.interrupt(live: liveModifiers()))
     }
 
-    /// Focus left this app. A Right Option key-up that never arrives stops listening.
+    /// A key-up that will not arrive. Screen lock and secure input use this. Focus loss in any app is the global flags, not this app resigning active.
     func focusChanged() { stopRightOptionBecauseTheKeyUpWillNotArrive() }
 
     /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
@@ -245,6 +248,7 @@ final class HotkeyMonitor {
         // in between must not decide whether the press had already started.
         let arrived = now()
         let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
+        reconcileRightOption(at: at)
         let config = config, second = secondConfig
         let before = pair.generation
         run(pair.mouseDownTagged(at: at, primary: config, second: second), before: before, config, second)
@@ -258,10 +262,20 @@ final class HotkeyMonitor {
     }
 
     /// Sleep and wake tell the machine to drop an open turn. Idempotent.
-    func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
+    func observeSleep(center: NotificationCenter = NSWorkspace.shared.notificationCenter,
+                      distributed: NotificationCenter = DistributedNotificationCenter.default()) {
         guard sleepObservers.isEmpty else { return }
-        for name in [NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification] {
+        let names = [NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification,
+                     NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.screensDidSleepNotification,
+                     Notification.Name("com.apple.screenIsLocked")]
+        for name in names {
             sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.interrupt() }
+            })
+        }
+        if distributed !== center {
+            sleepObservers.append(distributed.addObserver(
+                forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.interrupt() }
             })
         }
@@ -303,14 +317,16 @@ final class HotkeyMonitor {
         return keyProvider() == .rightOption || secondKeyProvider() == .rightOption
     }
 
-    private func driveRightOption(_ event: ShortcutEvent) {
+    private var rightOptionWatch: DispatchWorkItem?
+
+    private func driveRightOption(_ event: ShortcutEvent, at time: TimeInterval) {
         guard strictRightOption else { return }
         let otherTurn = pair.owner != nil
         switch event {
         case .flags(let code, _):
             if code == RightOptionPushToTalk.rightKeyCode {
                 let down = pair.keys.deviceKeys.contains(code)
-                applyRightOption(rightOptionTalk.send(.rightOption(down: down, otherTurnOpen: otherTurn)))
+                applyRightOption(rightOptionTalk.send(.rightOption(down: down, at: time, otherTurnOpen: otherTurn)))
             } else if code == RightOptionPushToTalk.leftKeyCode {
                 let down = pair.keys.deviceKeys.contains(code)
                 applyRightOption(rightOptionTalk.send(.leftOption(down: down)))
@@ -326,17 +342,52 @@ final class HotkeyMonitor {
         applyRightOption(rightOptionTalk.send(.focusChanged))
     }
 
+    /// While Right Option is held, every event and the 3 s tick read the global flags. Option absent, secure input, or the talk limit stops the hold.
+    private func reconcileRightOption(at time: TimeInterval) {
+        guard strictRightOption, rightOptionTalk.phase == .listening else { return }
+        applyRightOption(rightOptionTalk.send(.secureInput(secureInput())))
+        guard rightOptionTalk.phase == .listening else { return }
+        applyRightOption(rightOptionTalk.send(.liveFlags(liveModifiers(), at: time)))
+    }
+
+    private func armRightOptionWatch() {
+        rightOptionWatch?.cancel()
+        guard rightOptionTalk.phase == .listening else { return }
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.reconcileRightOption(at: self.now())
+                if self.rightOptionTalk.phase == .listening { self.armRightOptionWatch() }
+            }
+        }
+        rightOptionWatch = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + KeyListenAccess.pollSeconds, execute: work)
+    }
+
     private func applyRightOption(_ effects: [RightOptionPushToTalk.Effect]) {
         for effect in effects {
             switch effect {
             case .start:
                 VoiceLog.log("key", "talk shortcut down (Right Option)")
                 if onPress?() == false { rightOptionTalk.refuseStart() }
+                if rightOptionTalk.phase == .listening { armRightOptionWatch() }
             case .stop:
+                rightOptionWatch?.cancel()
+                rightOptionWatch = nil
                 VoiceLog.log("key", "talk shortcut (Right Option) released")
                 onRelease?()
             }
         }
+    }
+
+    private static func modifiers(_ flags: CGEventFlags) -> ShortcutModifiers {
+        var mods: ShortcutModifiers = []
+        if flags.contains(.maskControl) { mods.insert(.control) }
+        if flags.contains(.maskAlternate) { mods.insert(.option) }
+        if flags.contains(.maskShift) { mods.insert(.shift) }
+        if flags.contains(.maskCommand) { mods.insert(.command) }
+        if flags.contains(.maskSecondaryFn) { mods.insert(.function) }
+        return mods
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from

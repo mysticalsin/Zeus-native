@@ -34,6 +34,7 @@ struct HotkeyMonitorMachineTests {
         monitor.voiceOverProvider = { voiceOver }
         monitor.confirmProvider = { confirm }
         monitor.liveModifiers = { live }
+        monitor.secureInput = { false }
         monitor.chordProvider = { chord }
         monitor.onPress = { calls.presses += 1; calls.log.append("press"); return calls.takes }
         monitor.onRelease = { calls.releases += 1; calls.log.append("release") }
@@ -265,8 +266,15 @@ struct HotkeyMonitorMachineTests {
         rightOptionDown(monitor)
         #expect(calls.log == ["press"], "\(calls.log)")
         monitor.liveModifiers = { [] }
-        try await wait(3.3)
+        try await wait(KeyListenAccess.pollSeconds + 0.4)
         #expect(calls.log == ["press", "release"], "the 3 s look sees the key up: \(calls.log)")
+    }
+
+    @Test func secureInputStopsTheHold() async throws {
+        let (monitor, calls) = make(second: .rightOption, live: .option)
+        monitor.secureInput = { true }
+        rightOptionDown(monitor)
+        #expect(calls.log == ["press", "release"], "secure input stops, and an unknown answer would too: \(calls.log)")
     }
 
     @Test func aScreenLockWithoutSleepStopsTheHold() async throws {
@@ -287,6 +295,7 @@ struct HotkeyMonitorMachineTests {
         center.post(name: NSWorkspace.sessionDidResignActiveNotification, object: nil)
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
         #expect(calls.log == ["press", "release"], "session resign stops: \(calls.log)")
+        rightOptionUp(monitor)
         rightOptionDown(monitor)
         center.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))

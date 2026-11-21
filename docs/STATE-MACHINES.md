@@ -78,10 +78,10 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 
 ### 29. Right Option strict push-to-talk. EXPLICIT (2026-11-21)
 - Where: `ZeusCore/RightOptionPushToTalk.swift` (`RightOptionPushToTalk`), driven by `Zeus/Voice/HotkeyMonitor.swift` when the talk key or the second talk key is Right Option. The hold machine does not see that key. A recorded second key that is not Right Option still uses `TalkKeyPair`.
-- States: idle, listening, quiet. Events: right option down or up, left option, another key, focus changed. Effects: start, stop.
-- Rules: key-down starts and key-up stops. A repeated down does not toggle. A tap returns to idle. Another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A key-up lost on focus change stops listening and ignores further downs until an up. Another open talk turn does not start a second listen.
-- No new event tap and no new permission. Focus uses `NSApplication.didResignActiveNotification`.
-- Tests: `RightOptionPushToTalkTests`.
+- States: idle, listening, quiet. Events: right option down or up, left option, another key, global flags, the 3 s look, secure input, screen lock. Effects: start, stop.
+- Rules: key-down starts and key-up stops. A repeated down does not toggle. A tap returns to idle. Another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A missed key-up is the global modifier flags, on any later event and on the 3 s look (`KeyListenAccess.pollSeconds`). The hold ends at `FastTier.conversationWindowSeconds` (45 s). Secure input stops, and an unknown answer stops. A screen lock stops. Another open talk turn does not start a second listen.
+- No new event tap and no new permission. Focus loss in any app is that global flags read, not `NSApplication.didResignActiveNotification`.
+- Tests: `RightOptionPushToTalkTests`, `HotkeyMonitorMachineTests`.
 
 ## Fixed
 

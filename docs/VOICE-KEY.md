@@ -163,7 +163,7 @@ and Polyglot give it no second key, and then it passes every effect through (`aP
 - **I8p.** From rest, pressing exactly either key's own set acts. When a hands-free turn is open, only the key that opened
   it ends it. The other key is swallowed: it neither continues nor ends the turn.
 
-Right Option in the talk monitor is strict push-to-talk (`RightOptionPushToTalk`). Key-down starts listening and key-up stops it. A tap never latches, a repeated key-down does not toggle, and another key does not cancel. Left Option does nothing. If the key-up is lost because focus changed, listening stops and does not start again until the key is seen up. The yields in `VoiceKey.secondTalkKey` still apply: Chat, pointing, dictation, Polyglot, and VoiceOver keep the key quiet.
+Right Option in the talk monitor is strict push-to-talk (`RightOptionPushToTalk`). Key-down starts listening and key-up stops it. A tap never latches, a repeated key-down does not toggle, and another key does not cancel. Left Option does nothing. A missed key-up, including when focus is in another app, is the global modifier flags (`CGEventSource.flagsState`), read on any later event and every 3 s while the hold is up. The hold also ends at the 45 s talk limit, when the screen locks, and when secure input is on. The yields in `VoiceKey.secondTalkKey` still apply: Chat, pointing, dictation, Polyglot, and VoiceOver keep the key quiet.
 
 A second talk key the owner recorded that is not Right Option still uses `TalkKeyPair` and the hold machine, including its confirm and its latch. The pair's proofs are unchanged.
 

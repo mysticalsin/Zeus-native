@@ -8760,6 +8760,66 @@
         "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
         "function": "aLostKeyUpOnFocusChangeStopsListening"
       }
+    },
+    {
+      "id": "REG-998",
+      "failure": "A missed Right Option key-up left listening on because a later event did not read the global modifier flags.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "aLostKeyUpOnTheLiveFlagsStopsListening"
+      }
+    },
+    {
+      "id": "REG-999",
+      "failure": "The 3 s look left Right Option listening after the key was already up.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "theThreeSecondLookStopsWhenRightOptionIsUp"
+      }
+    },
+    {
+      "id": "REG-1000",
+      "failure": "A Right Option hold longer than the 45 s talk limit stayed listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "theHoldStopsAtTheTalkLimit"
+      }
+    },
+    {
+      "id": "REG-1001",
+      "failure": "Secure input, or an unknown secure-input answer, left the Right Option hold listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "secureInputStopsAndFailsClosed"
+      }
+    },
+    {
+      "id": "REG-1002",
+      "failure": "A screen lock without sleep left the Right Option hold listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "aScreenLockStopsTheHold"
+      }
     }
   ]
 }

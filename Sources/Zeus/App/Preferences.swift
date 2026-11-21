@@ -63,13 +63,8 @@ extension Preferences {
     /// One line for `zeus status` and hints: what the talk key does right now.
     var talkKeyHint: String {
         let d = DictationSettings.shared
-        if d.enabled, d.key == pushToTalk {
-            return "double-tap \(pushToTalk.title) to talk, hold it to dictate"
-        }
-        var line = "hold \(pushToTalk.title) to talk, double-tap to latch"
-        if let second = SecondTalkRouting.current().key { line += " (or hold \(second.title))" }
-        if d.enabled { line += "; dictation: " + (d.key.map { "hold \($0.title)" } ?? "off") }
-        return line
+        return RightOptionPushToTalk.hint(talk: pushToTalk, second: SecondTalkRouting.current().key,
+                                          dictationOn: d.enabled, dictation: d.key)
     }
 }
 
