@@ -49,7 +49,7 @@ final class VoiceSettings {
             engineAuto = false
         }
     }
-    /// Automatic (the default): the best working engine with low latency, chosen by `UltronEngineRouter`.
+    /// Automatic (the default): the local voice, then the Mac voice. A saved key does not add a cloud.
     /// Off only after the owner picks one engine; an install that never changed it stays automatic.
     var engineAuto: Bool { didSet { defaults.set(engineAuto, forKey: "voice.engine.auto") } }
     /// How Zeus talks: the prompt's persona section, the instant voice lines and the ElevenLabs delivery.
@@ -117,8 +117,8 @@ final class VoiceSettings {
         let userSelected = UserDefaults.standard.bool(forKey: "voice.engine.userSelected")
         let pausedUntil = UserDefaults.standard.object(forKey: "voice.elevenlabs.pausedUntil") as? Date
         let keyValid = Keychain.get("elevenlabs.api-key") != nil && !UltronVoicePlan.isPaused(until: pausedUntil, now: Date())
-        // Ultron default: ElevenLabs when its key is usable and not paused, Kokoro as the failsafe, the
-        // Mac voice last. Only an explicit owner pick (`voice.engine.userSelected`) overrides that order.
+        // The default is the local voice. A saved cloud key is not a pick. Only an explicit
+        // owner choice (`voice.engine.userSelected` or a provider in Settings) overrides that.
         engine = Self.engine(UltronVoicePlan.initialEngine(
             stored: stored.map(Self.plan), userSelected: userSelected, kokoroReady: kokoroSetUp, elevenLabsKeyValid: keyValid))
         if let raw = UserDefaults.standard.string(forKey: "voice.ttsProvider"),
