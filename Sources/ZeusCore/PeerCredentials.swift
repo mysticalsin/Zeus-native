@@ -85,6 +85,8 @@ public enum PeerCheck {
         guard peer.uid == ownUID else { return .deny("peer uid \(peer.uid) is not the owner") }
         switch policy {
         case .sameUser:
+            guard let path = peer.executablePath, !path.isEmpty else { return .deny("peer executable unknown") }
+            guard !path.hasSuffix(" (deleted)") else { return .deny("peer executable deleted") }
             return .allow
         case .sameUserExecutable(let names):
             guard let path = peer.executablePath, !path.isEmpty else { return .deny("peer executable unknown") }
@@ -119,12 +121,8 @@ public enum PeerCheck {
         guard MemoryLayout<SocketPeerCredentials>.size == 12,
               getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &credentials, &size) == 0,
               size == 12 else { return nil }
-        var identity = PeerIdentity(uid: UInt32(credentials.uid))
-        if credentials.pid > 0 {
-            identity.pid = Int32(credentials.pid)
-            identity.executablePath = executablePath(pid: credentials.pid)
-        }
-        return identity
+        guard credentials.pid > 0, let path = executablePath(pid: credentials.pid) else { return nil }
+        return PeerIdentity(uid: UInt32(credentials.uid), pid: Int32(credentials.pid), executablePath: path)
         #endif
     }
 
@@ -163,7 +161,8 @@ public enum PeerCheck {
         guard length > 0, length < buffer.count else { return nil }
         let bytes = buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }
         let path = String(decoding: bytes, as: UTF8.self)
-        return path.isEmpty ? nil : path
+        guard !path.isEmpty, !path.hasSuffix(" (deleted)") else { return nil }
+        return path
     }
     #endif
 }

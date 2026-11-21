@@ -19,7 +19,7 @@ struct PeerCredentialsTests {
     }
 
     @Test func sameUserPolicyAllowsOnlyTheOwner() {
-        #expect(PeerCheck.decide(.sameUser, ownUID: 501, peer: PeerIdentity(uid: 501)) == .allow)
+        #expect(PeerCheck.decide(.sameUser, ownUID: 501, peer: PeerIdentity(uid: 501, executablePath: "/usr/local/bin/zeus")) == .allow)
         #expect(PeerCheck.decide(.sameUser, ownUID: 501, peer: PeerIdentity(uid: 0)).isAllowed == false)
         #expect(PeerCheck.decide(.sameUser, ownUID: 501, peer: PeerIdentity(uid: 502)).isAllowed == false)
     }
