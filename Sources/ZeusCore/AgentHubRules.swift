@@ -184,6 +184,7 @@ public struct TrustedChats: Equatable, Sendable {
         if let tool, Self.humanTools.contains(tool) { return false }
         if tool == "Bash" {
             guard let command = input?["command"]?.stringValue else { return false }
+            if ApprovalRisk.effective(tool: tool, input: input, command: command).risk == .high { return false }
             let assessment = ShellRiskClassifier.assess(command)
             return assessment.risk < .network
         }
