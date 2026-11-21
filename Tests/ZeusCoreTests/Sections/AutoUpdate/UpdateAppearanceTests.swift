@@ -21,8 +21,34 @@ struct UpdateAppearanceTests {
         #expect(UpdateAppearance.startsCheckOnAppear(.upToDate, automaticChecks: true, configured: true))
         #expect(UpdateAppearance.startsCheckOnAppear(.idle, automaticChecks: false, configured: true) == false)
         #expect(UpdateAppearance.startsCheckOnAppear(.downloading(candidate), automaticChecks: true, configured: false) == false)
+        #expect(UpdateAppearance.startsCheckOnAppear(.readyToInstall(candidate), automaticChecks: true, configured: true) == false)
         let wouldCancel = UpdateSession.reduce(.downloading(candidate), .checkRequested, Self.context())
         #expect(wouldCancel.effects.contains(.cancelNetwork))
+    }
+
+    @Test func missingFeedOrKeyShowsUpdatesNotConfiguredAndDoesNotFetch() {
+        let key = Data(repeating: 7, count: 32).base64EncodedString()
+        let feed = "https://updates.example.com/appcast.xml"
+        let configurations = [
+            UpdateConfiguration(automaticChecks: true, feedURL: "", publicKey: key),
+            UpdateConfiguration(automaticChecks: true, feedURL: feed, publicKey: ""),
+            UpdateConfiguration(automaticChecks: true, feedURL: feed, publicKey: "not-a-key"),
+        ]
+        for configuration in configurations {
+            let context = UpdateContext(
+                configuration: configuration,
+                currentVersion: ZeusVersion(major: 1, minor: 0, patch: 0),
+                duringTests: true,
+                disposableCopy: false,
+                now: Self.now,
+                reduceMotion: true,
+                acceptsUpdates: true
+            )
+            let card = UpdatesCard.model(state: .disabled, context: context, lastChecked: nil, confirmingInstall: false)
+            #expect(card.status == "updates not configured")
+            let step = UpdateSession.reduce(.idle, .checkRequested, context)
+            #expect(step.effects.isEmpty)
+        }
     }
 
     @Test func theCardUsesTheAppearGate() throws {
