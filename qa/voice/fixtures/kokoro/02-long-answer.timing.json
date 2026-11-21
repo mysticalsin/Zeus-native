@@ -1,0 +1,14 @@
+{
+  "provider": "kokoro",
+  "script": "02-long-answer",
+  "voice": "bm_george",
+  "speed": 0.88,
+  "lang": "en-gb",
+  "text": "The reply is spoken one sentence at a time. Each sentence is rendered by the engine that is ready, then handed to the player while the next sentence is still being prepared. A short pause sits between sentences so the line does not run together. If the preferred engine has no key, no model, or a recent failure, the next engine in the chain takes that sentence. The last engine is the system voice: it renders buffers, lowers the pitch, and slows the rate before the same player speaks them. This paragraph is synthetic fixture text for a voice harness. It names no person, no account, and no private recording. The numbers here are only a shape, such as section 4 and step 2, and they are not a measurement.",
+  "request_start_s": 0.0,
+  "wav_origin_s": 0.0,
+  "first_audio_s": 5.313161961999981,
+  "ttfa_note": "Wall clock of Kokoro.create. The call returns the whole utterance; this engine does not stream.",
+  "sample_rate": 24000,
+  "barge_in_marker_char": null
+}

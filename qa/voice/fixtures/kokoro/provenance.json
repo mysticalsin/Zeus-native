@@ -1,0 +1,96 @@
+{
+  "provider": "kokoro",
+  "voice": "bm_george",
+  "speed": 0.88,
+  "kokoro_onnx_version": "0.6.1",
+  "kokoro_onnx_license": {
+    "spdx": "MIT",
+    "sha256": "f61fdd0217de9ece8fa699912848d91187d84879fc2e689f0906d0c1299e955e",
+    "opens_with_mit_heading": true,
+    "version": "0.6.1"
+  },
+  "weights": [
+    {
+      "name": "kokoro-v1.0.onnx",
+      "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx",
+      "min_bytes": 100000000,
+      "sha256": "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5",
+      "bytes": 325532387
+    },
+    {
+      "name": "voices-v1.0.bin",
+      "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+      "min_bytes": 5000000,
+      "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
+      "bytes": 28214398
+    }
+  ],
+  "weights_license": {
+    "spdx": "Apache-2.0",
+    "name": "Kokoro-82M",
+    "url": "https://raw.githubusercontent.com/hexgrad/kokoro/main/LICENSE",
+    "model_card": "https://huggingface.co/hexgrad/Kokoro-82M",
+    "fetched": true,
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "bytes": 11357,
+    "opens_with_apache_heading": true
+  },
+  "model_load_s": 0.812193322999974,
+  "rendered": [
+    {
+      "script": "01-short-ack",
+      "bytes": 57388,
+      "first_audio_s": 0.22620510100000502,
+      "lang": "en-gb"
+    },
+    {
+      "script": "02-long-answer",
+      "bytes": 2291468,
+      "first_audio_s": 5.313161961999981,
+      "lang": "en-gb"
+    },
+    {
+      "script": "03-numbers-dates-currency-code",
+      "bytes": 573484,
+      "first_audio_s": 1.8923400859999902,
+      "lang": "en-gb"
+    },
+    {
+      "script": "04-question",
+      "bytes": 120876,
+      "first_audio_s": 0.43179259800001546,
+      "lang": "en-gb"
+    },
+    {
+      "script": "05-error",
+      "bytes": 349228,
+      "first_audio_s": 0.8990088770000284,
+      "lang": "en-gb"
+    },
+    {
+      "script": "06-markdown-url",
+      "bytes": 814124,
+      "first_audio_s": 1.8821939540000585,
+      "lang": "en-gb"
+    },
+    {
+      "script": "07-french",
+      "bytes": 306220,
+      "first_audio_s": 0.8737022340000067,
+      "lang": "fr-fr"
+    },
+    {
+      "script": "08-barge-in",
+      "bytes": 321580,
+      "first_audio_s": 0.7732545450000998,
+      "lang": "en-gb"
+    }
+  ],
+  "failures": [],
+  "bm_voices": [
+    "bm_daniel",
+    "bm_fable",
+    "bm_george",
+    "bm_lewis"
+  ]
+}
