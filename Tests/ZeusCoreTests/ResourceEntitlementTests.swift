@@ -40,9 +40,36 @@ struct ResourceEntitlementTests {
         let file = try entitlements()
         #expect(Set(file.keys) == ResourceEntitlementRule.keys)
         #expect(file["com.apple.security.app-sandbox"] as? Bool == false)
+        #expect(file["com.apple.security.automation.apple-events"] as? Bool == true)
+        #expect(file["com.apple.security.device.audio-input"] as? Bool == true)
+        #expect(file["com.apple.security.device.camera"] as? Bool == true)
+        #expect(file["com.apple.security.network.client"] as? Bool == true)
         #expect(file["com.apple.security.personal-information.location"] as? Bool == true)
         #expect(file["com.apple.security.personal-information.calendars"] as? Bool == true)
         #expect(ResourceEntitlementRule.allows(file))
+    }
+
+    @Test func aSixKeyFileIsRejected() throws {
+        var file = try entitlements()
+        file.removeValue(forKey: "com.apple.security.automation.apple-events")
+        #expect(file.count == 6)
+        #expect(ResourceEntitlementRule.keys.isSuperset(of: Set(file.keys)))
+        #expect(Set(file.keys) != ResourceEntitlementRule.keys)
+        #expect(!ResourceEntitlementRule.allows(file))
+    }
+
+    @Test func aSandboxTrueValueIsRejected() throws {
+        var file = try entitlements()
+        file["com.apple.security.app-sandbox"] = true
+        #expect(file["com.apple.security.app-sandbox"] as? Bool == true)
+        #expect(!ResourceEntitlementRule.allows(file))
+    }
+
+    @Test func aWrongCameraValueIsRejected() throws {
+        var file = try entitlements()
+        file["com.apple.security.device.camera"] = false
+        #expect(file["com.apple.security.device.camera"] as? Bool == false)
+        #expect(!ResourceEntitlementRule.allows(file))
     }
 
     @Test func addingNetworkServerIsNotTheSameKeySet() throws {
