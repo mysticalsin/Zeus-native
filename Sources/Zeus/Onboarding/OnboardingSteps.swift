@@ -488,13 +488,13 @@ enum HaloChoices {
     /// A binding that shows titles but stores the stable id in `halo.style`.
     @MainActor static var styleTitle: Binding<String> {
         Binding(get: { HaloStyle.resolve(SettingsStore.shared.string("halo.style")).title },
-                set: { SettingsStore.shared.set("halo.style", HaloStyle.resolve($0).rawValue) })
+                set: { SettingsStore.shared.set("halo.style", HaloStyle.resolve($0).rawValue, origin: .person) })
     }
 
     /// Same for `halo.entrance`.
     @MainActor static var entranceTitle: Binding<String> {
         Binding(get: { HaloEntrance.resolve(SettingsStore.shared.string("halo.entrance")).title },
-                set: { SettingsStore.shared.set("halo.entrance", HaloEntrance.resolve($0).rawValue) })
+                set: { SettingsStore.shared.set("halo.entrance", HaloEntrance.resolve($0).rawValue, origin: .person) })
     }
 }
 

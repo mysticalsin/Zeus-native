@@ -61,7 +61,7 @@ struct AssistantSettings: View {
                 GlassDivider()
                 GlassRow(title: "Model", note: modelNote) {
                     GlassMenu(options: models.map { ($0, $0) }, selection: Binding(get: { models.contains(store.string("assistant.model")) ? store.string("assistant.model") : models[0] },
-                                                                              set: { store.set("assistant.model", $0) }))
+                                                                              set: { store.set("assistant.model", $0, origin: .person) }))
                 }
             }
         }

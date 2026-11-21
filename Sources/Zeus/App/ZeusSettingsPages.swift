@@ -275,7 +275,7 @@ struct KeepAwakeSettingsPage: View {
                 GlassRow(title: "While agents work", note: "Settings › General also has a toggle that holds sleep only while an agent is working.") {
                     GlassToggle(isOn: Binding(
                         get: { SettingsStore.shared.bool("general.keepAwake") },
-                        set: { SettingsStore.shared.set("general.keepAwake", $0 ? "true" : "false") }
+                        set: { SettingsStore.shared.set("general.keepAwake", $0 ? "true" : "false", origin: .person) }
                     ), label: "Agents keep awake")
                 }
             }

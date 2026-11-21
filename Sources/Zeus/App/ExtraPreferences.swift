@@ -43,6 +43,7 @@ enum ShortcutPreset: String, CaseIterable, Identifiable {
 final class ExtraPreferences {
     static let shared = ExtraPreferences()
     @ObservationIgnored private let defaults = UserDefaults.standard
+    @ObservationIgnored private var applyingReload = false
     @ObservationIgnored var onShortcutsChange: (() -> Void)?
 
     private func store(_ value: Any, _ key: String) {
@@ -80,11 +81,20 @@ final class ExtraPreferences {
     }
 
     // Interview: keep every ZEUS window out of screen shares and recordings.
-    var hideFromScreenShare = bool("interview.hide", false) { didSet { store(hideFromScreenShare, "interview.hide") } }
+    var hideFromScreenShare = !ZeusScreenSharePolicy.showInScreenSharing(from: UserDefaults.standard) {
+        didSet {
+            guard !applyingReload else { return }
+            if !TopBarStyle.isSnapshot {
+                let shown = hideFromScreenShare ? "false" : "true"
+                SettingsStore.shared.set(ZeusScreenSharePolicy.showInSharingKey, shown, origin: .person)
+            }
+        }
+    }
 
     /// Forgets the given keys, then reads every value again (section reset).
+    /// Resetting `interview.hide` also forces the live screen-share string to hidden.
     func reset(_ keys: [String]) {
-        if !TopBarStyle.isSnapshot { keys.forEach { defaults.removeObject(forKey: $0) } }
+        if !TopBarStyle.isSnapshot { ZeusScreenSharePolicy.reset(keys, defaults: defaults) }
         if TopBarStyle.isSnapshot { return }
         reload()
     }
@@ -108,7 +118,9 @@ final class ExtraPreferences {
         soundVoiceError = Self.bool("sound.voiceError", true)
         openNotch = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.openNotch") ?? "") ?? .optionCommandZ
         quickTodo = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.quickTodo") ?? "") ?? .controlOptionT
-        hideFromScreenShare = Self.bool("interview.hide", false)
+        applyingReload = true
+        hideFromScreenShare = !ZeusScreenSharePolicy.showInScreenSharing(from: defaults)
+        applyingReload = false
     }
 }
 

@@ -150,7 +150,7 @@ private struct GeneralPage: View {
 
     private func agentChoice(_ name: String) -> some View {
         let selected = SettingsStore.binding("general.defaultAgent").wrappedValue == name || (name == "Codex" && store.string("general.defaultAgent").isEmpty)
-        return Button { store.set("general.defaultAgent", name) } label: {
+        return Button { store.set("general.defaultAgent", name, origin: .person) } label: {
             HStack(spacing: 14) {
                 EngineBrandLogo(agentLabel: name, size: 18, tint: .white)
                     .accessibilityHidden(true)
@@ -198,7 +198,7 @@ private struct AppearancePage: View {
         Binding(
             get: { context.topBar?.liveMusicWings ?? store.bool("topBar.musicWings") },
             set: { value in
-                if let topBar = context.topBar { topBar.liveMusicWings = value } else { store.set("topBar.musicWings", value ? "true" : "false") }
+                if let topBar = context.topBar { topBar.liveMusicWings = value } else { store.set("topBar.musicWings", value ? "true" : "false", origin: .person) }
             }
         )
     }
@@ -209,7 +209,7 @@ private struct AppearancePage: View {
                 let raw = store.string("appearance.physicalFinish")
                 return raw == "Same everywhere" ? "Same all" : raw
             },
-            set: { store.set("appearance.physicalFinish", $0) }
+            set: { store.set("appearance.physicalFinish", $0, origin: .person) }
         )
     }
 
@@ -312,7 +312,7 @@ private struct AppearancePage: View {
                 let current = HaloStyle.resolve(store.string("halo.style"))
                 ForEach(HaloStyle.allCases) { halo in
                     GSPictureChoice(title: halo.title, selected: current == halo,
-                                    action: { store.set("halo.style", halo.rawValue) }) {
+                                    action: { store.set("halo.style", halo.rawValue, origin: .person) }) {
                         HaloOutline(style: halo, arm: "Medium", thickness: 1, drawn: 1, animated: current == halo).frame(width: 150, height: 81).clipped()
                     }
                 }
@@ -323,12 +323,12 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "bolt.fill", title: "Entrance intensity") {
-                OBTickSlider(value: Binding(get: { min(max(store.double("halo.intensity"), 50), 150) }, set: { store.set("halo.intensity", String(Int($0))) }), range: 50...150, step: 10)
+                OBTickSlider(value: Binding(get: { min(max(store.double("halo.intensity"), 50), 150) }, set: { store.set("halo.intensity", String(Int($0)), origin: .person) }), range: 50...150, step: 10)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Entrance intensity")
             }
             GSDivider()
             GSRow(symbol: "speedometer", title: "Entrance speed") {
-                OBTickSlider(value: Binding(get: { min(max(store.double("halo.speed"), 50), 200) }, set: { store.set("halo.speed", String(Int($0))) }), range: 50...200, step: 10)
+                OBTickSlider(value: Binding(get: { min(max(store.double("halo.speed"), 50), 200) }, set: { store.set("halo.speed", String(Int($0)), origin: .person) }), range: 50...200, step: 10)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Entrance speed")
             }
             GSDivider()
@@ -342,7 +342,7 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "line.3.horizontal", title: "Light thickness") {
-                OBTickSlider(value: Binding(get: { max(100, store.double("halo.thickness")) }, set: { store.set("halo.thickness", String(Int($0))) }), range: 100...200, step: 5)
+                OBTickSlider(value: Binding(get: { max(100, store.double("halo.thickness")) }, set: { store.set("halo.thickness", String(Int($0)), origin: .person) }), range: 100...200, step: 5)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Light thickness")
             }
             GSDivider()
@@ -375,7 +375,7 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "slider.horizontal.3", title: "Sensitivity") {
-                OBTickSlider(value: Binding(get: { min(max(store.double("waves.sensitivity"), 50), 200) }, set: { store.set("waves.sensitivity", String(Int($0))) }), range: 50...200, step: 10)
+                OBTickSlider(value: Binding(get: { min(max(store.double("waves.sensitivity"), 50), 200) }, set: { store.set("waves.sensitivity", String(Int($0)), origin: .person) }), range: 50...200, step: 10)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Waves sensitivity")
             }
             GSDivider()
@@ -426,7 +426,7 @@ private struct AppearancePage: View {
 
     private func style(_ name: String, _ caption: String) -> some View {
         GSPictureChoice(title: name, caption: caption, selected: SettingsStore.binding("appearance.cardStyle").wrappedValue == name,
-                        action: { store.set("appearance.cardStyle", name) }) {
+                        action: { store.set("appearance.cardStyle", name, origin: .person) }) {
             ThemePreview(style: name).frame(width: 400, height: 240).scaleEffect(0.38).frame(width: 152, height: 91)
         }
     }
@@ -434,7 +434,7 @@ private struct AppearancePage: View {
     private func runningTheme(_ name: String, _ caption: String) -> some View {
         let current = SettingsStore.binding("appearance.runningCard").wrappedValue
         return GSPictureChoice(title: name, caption: caption, selected: current == name || (current.isEmpty && name == "Wave"),
-                               action: { store.set("appearance.runningCard", name) }) {
+                               action: { store.set("appearance.runningCard", name, origin: .person) }) {
             RunningCardMini(essentials: name == "Essentials").frame(width: 152, height: 91)
         }
     }
@@ -495,7 +495,7 @@ private struct HomeAppearanceCard: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                 ForEach(HomeBackdrop.allCases) { backdrop in
                     GSPictureChoice(title: backdrop.title, selected: current == backdrop,
-                                    action: { SettingsStore.shared.set(HomeBackdrop.settingID, backdrop.title) }) {
+                                    action: { SettingsStore.shared.set(HomeBackdrop.settingID, backdrop.title, origin: .person) }) {
                         BackdropSwatch(backdrop: backdrop, size: 76)
                     }
                 }
@@ -1037,7 +1037,7 @@ private struct VoicePage: View {
 
     private func words(_ symbol: String, _ title: String, _ id: String) -> some View {
         GSRow(symbol: symbol, title: title) {
-            TextField("comma-separated words", text: Binding(get: { store.string(id) }, set: { store.set(id, $0) }))
+            TextField("comma-separated words", text: Binding(get: { store.string(id) }, set: { store.set(id, $0, origin: .person) }))
                 .textFieldStyle(.plain)
                 .snapshotSafeText(store.string(id), placeholder: "comma-separated words")
                 .font(OB.font(13.5)).foregroundStyle(GS.text)
@@ -1061,7 +1061,7 @@ private struct TalkMicrophoneRow: View {
             GSPopup(selection: Binding(get: { choice.title(devices: devices) },
                                        set: { title in
                                            guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
-                                           store.set(TalkMicrophoneChoice.settingID, new.stored)
+                                           store.set(TalkMicrophoneChoice.settingID, new.stored, origin: .person)
                                        }),
                     options: choice.options(devices: devices), label: "Talk microphone")
         }
@@ -1442,14 +1442,14 @@ private struct AirDropPermissionRow: View {
                 if status == .granted {
                     Toggle("Glow when AirDrop arrives", isOn: Binding(
                         get: { SettingsStore.shared.bool("lights.airDrop") },
-                        set: { SettingsStore.shared.set("lights.airDrop", $0 ? "true" : "false") }
+                        set: { SettingsStore.shared.set("lights.airDrop", $0 ? "true" : "false", origin: .person) }
                     ))
                     .toggleStyle(GSToggleStyle())
                     .labelsHidden()
                 } else if status == .notDetermined {
                     Button("Allow") {
                         if FolderAccess.request(for: .downloads) == .granted {
-                            SettingsStore.shared.set("lights.airDrop", "true")
+                            SettingsStore.shared.set("lights.airDrop", "true", origin: .person)
                         }
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))
@@ -1474,14 +1474,14 @@ private struct ScreenshotPermissionRow: View {
                 if status == .granted {
                     Toggle("Screenshot cue", isOn: Binding(
                         get: { SettingsStore.shared.bool("lights.screenshot") },
-                        set: { SettingsStore.shared.set("lights.screenshot", $0 ? "true" : "false") }
+                        set: { SettingsStore.shared.set("lights.screenshot", $0 ? "true" : "false", origin: .person) }
                     ))
                     .toggleStyle(GSToggleStyle())
                     .labelsHidden()
                 } else if status == .notDetermined {
                     Button("Allow") {
                         if FolderAccess.request(for: .desktop) == .granted {
-                            SettingsStore.shared.set("lights.screenshot", "true")
+                            SettingsStore.shared.set("lights.screenshot", "true", origin: .person)
                         }
                     }
                     .buttonStyle(GSButtonStyle(prominent: true))

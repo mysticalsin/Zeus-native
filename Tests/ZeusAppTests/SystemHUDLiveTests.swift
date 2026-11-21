@@ -20,8 +20,8 @@ import ZeusCore
         let id = "lights.hud.volume"
         let store = SettingsStore.shared
         let saved = store.string(id)
-        defer { store.set(id, saved) }
-        store.set(id, "true")
+        defer { store.set(id, saved, origin: .person) }
+        store.set(id, "true", origin: .person)
         let topBar = TopBarModel()
         topBar.presentSystemHUD(.volume, value: 0.2, muted: false)
         let firstID = topBar.lights.first?.id
@@ -43,8 +43,8 @@ import ZeusCore
         let id = "lights.hud.volume"
         let store = SettingsStore.shared
         let saved = store.string(id)
-        defer { store.set(id, saved) }
-        store.set(id, "true")
+        defer { store.set(id, saved, origin: .person) }
+        store.set(id, "true", origin: .person)
         let topBar = TopBarModel()
         topBar.presentSystemHUD(.volume, value: 1.0, muted: false)
         topBar.presentSystemHUD(.volume, value: 1.0, muted: false) // same direction at the bound

@@ -24,8 +24,8 @@ struct FlingArrivalTests {
     private func withSettings(_ values: [String: String], _ body: () async -> Void) async {
         let store = SettingsStore.shared
         let saved = values.keys.map { ($0, store.string($0)) }
-        defer { for (id, value) in saved { store.set(id, value) } }
-        for (id, value) in values { store.set(id, value) }
+        defer { for (id, value) in saved { store.set(id, value, origin: .person) } }
+        for (id, value) in values { store.set(id, value, origin: .person) }
         await body()
     }
 

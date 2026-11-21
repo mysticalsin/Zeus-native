@@ -149,7 +149,7 @@ enum SnapshotRenderer {
             let tall = model.approval != nil && model.presentation == .panel
             let wide = name.hasPrefix("4") || name.hasPrefix("5")
             if name.contains("waves") { // the Waves tab in each of its three styles
-                SettingsStore.shared.set(AudioSpectrumService.styleKey, name.hasSuffix("-wave") ? "Wave" : name.hasSuffix("-mirror") ? "Mirror" : "Bars")
+                SettingsStore.shared.set(AudioSpectrumService.styleKey, name.hasSuffix("-wave") ? "Wave" : name.hasSuffix("-mirror") ? "Mirror" : "Bars", origin: .person)
             }
             save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)),
                  size: wide ? CGSize(width: 1000, height: 120) : CGSize(width: 960, height: tall ? 520 : 400),
@@ -863,28 +863,28 @@ enum SnapshotRenderer {
         let savedStyle = store.string("appearance.cardStyle"), savedLyrics = store.string("privacy.lyrics"), savedMusic = store.string("home.variant.music")
         let savedSlots = (1...4).map { store.string(HomeSlots.settingID(slot: $0)) }
         defer {
-            store.set("appearance.cardStyle", savedStyle); store.set("privacy.lyrics", savedLyrics); store.set("home.variant.music", savedMusic)
-            for (index, value) in savedSlots.enumerated() { store.set(HomeSlots.settingID(slot: index + 1), value) }
+            store.set("appearance.cardStyle", savedStyle, origin: .person); store.set("privacy.lyrics", savedLyrics, origin: .person); store.set("home.variant.music", savedMusic, origin: .person)
+            for (index, value) in savedSlots.enumerated() { store.set(HomeSlots.settingID(slot: index + 1), value, origin: .person) }
             LyricsToggle.snapshotShow = false
         }
         // Every card style on Home.
         for (index, finish) in CardFinish.allCases.enumerated() {
-            store.set("appearance.cardStyle", finish.rawValue)
+            store.set("appearance.cardStyle", finish.rawValue, origin: .person)
             let (model, topBar) = sampleModel()
             save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent(String(format: "parity-card-%d-%@.png", index + 1, finish.rawValue.replacingOccurrences(of: " ", with: "-"))))
         }
         for (index, style) in ["Borderless", "Borderless colour"].enumerated() {
-            store.set("appearance.homeStyle", style)
+            store.set("appearance.homeStyle", style, origin: .person)
             let (model, topBar) = sampleModel()
             save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-home-\(index + 1)-\(style.replacingOccurrences(of: " ", with: "-")).png"))
         }
-        store.set("appearance.homeStyle", "Device")
-        store.set("appearance.cardStyle", "Liquid Glass")
+        store.set("appearance.homeStyle", "Device", origin: .person)
+        store.set("appearance.cardStyle", "Liquid Glass", origin: .person)
 
         // Lyrics: the Music page and the Home music variant.
-        store.set("privacy.lyrics", "true")
+        store.set("privacy.lyrics", "true", origin: .person)
         let lines = ["Waiting in a car", "Waiting for a ride in the dark", "The night city grows", "Look at the horizon and the stars", "Waiting in a car",
                      "Waiting for a ride in the dark", "Drinking in the lights", "Following the neon signs", "Waiting for a roar", "Looking at the mountains"]
             .enumerated().map { LyricLine(time: 80 + Double($0.offset) * 8, text: $0.element) }
@@ -895,13 +895,13 @@ enum SnapshotRenderer {
             save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-lyrics-music.png"))
             LyricsToggle.snapshotShow = false
-            store.set("home.variant.music", "Lyrics")
-            for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name) }
+            store.set("home.variant.music", "Lyrics", origin: .person)
+            for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name, origin: .person) }
             let (homeModel, homeBar) = sampleModel()
             if let playing = homeBar.nowPlaying { LyricsStore.shared.seed(.synced(lines), for: playing) }
             save(NotchStage(model: homeModel, topBar: homeBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-lyrics-home.png"))
-            store.set("home.variant.music", "Art")
+            store.set("home.variant.music", "Art", origin: .person)
         }
 
         // Clipboard with pictures and files.
@@ -967,9 +967,9 @@ enum SnapshotRenderer {
         let store = SettingsStore.shared
         let ids = (1...4).map { HomeSlots.settingID(slot: $0) } + ["home.variant.music"]
         let saved = ids.map { ($0, store.string($0)) }
-        defer { for (id, value) in saved { store.set(id, value) } }
-        for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name) }
-        store.set("home.variant.music", "Art")
+        defer { for (id, value) in saved { store.set(id, value, origin: .person) } }
+        for (slot, name) in ["Music", "Focus", "Weather", "Calendar"].enumerated() { store.set(HomeSlots.settingID(slot: slot + 1), name, origin: .person) }
+        store.set("home.variant.music", "Art", origin: .person)
         let tab = NowPlayingSource.browser(BrowserMediaKey(tabID: 7, documentID: "doc-7", host: "radio.example.com", fingerprint: "ab12cd"))
         let spotify = NowPlayingSource.player(.spotify)
         func item(_ source: NowPlayingSource, duration: Double = 243) -> NowPlaying {
@@ -1004,11 +1004,11 @@ enum SnapshotRenderer {
         let store = SettingsStore.shared
         let ids = (1...4).map { HomeSlots.settingID(slot: $0) } + ["home.variant.clock", "home.variant.music", "home.variant.weather", "home.variant.calendar", HomeBackdrop.settingID]
         let saved = ids.map { ($0, store.string($0)) }
-        defer { for (id, value) in saved { store.set(id, value) } }
+        defer { for (id, value) in saved { store.set(id, value, origin: .person) } }
         func apply(_ widgets: [String], _ variants: [String: String] = [:], backdrop: String = "None") {
-            for (index, name) in widgets.enumerated() { store.set(HomeSlots.settingID(slot: index + 1), name) }
-            for (id, value) in variants { store.set(id, value) }
-            store.set(HomeBackdrop.settingID, backdrop)
+            for (index, name) in widgets.enumerated() { store.set(HomeSlots.settingID(slot: index + 1), name, origin: .person) }
+            for (id, value) in variants { store.set(id, value, origin: .person) }
+            store.set(HomeBackdrop.settingID, backdrop, origin: .person)
         }
         func render(_ name: String, _ configure: (TopBarModel) -> Void = { _ in }) {
             let (model, topBar) = sampleModel(configure)
@@ -1023,8 +1023,8 @@ enum SnapshotRenderer {
         render("02-analog-disc-hourly-aurora")
         apply(["Music", "Clock", "Weather", "Agenda"], ["home.variant.music": "Cassette", "home.variant.clock": "Blue halo", "home.variant.weather": "Days"], backdrop: "Sunset")
         render("03-cassette-halo-days-sunset")
-        store.set("home.countdown.title", "Launch day")
-        store.set("home.countdown.date", TodoQuickAdd.dayString(Date().addingTimeInterval(23 * 86_400)))
+        store.set("home.countdown.title", "Launch day", origin: .person)
+        store.set("home.countdown.date", TodoQuickAdd.dayString(Date().addingTimeInterval(23 * 86_400)), origin: .person)
         apply(["Clock", "World clock", "Weather", "Countdown"], ["home.variant.clock": "Elastic", "home.variant.weather": "Wind"], backdrop: "Halftone")
         render("04-elastic-world-wind-countdown-halftone")
         apply(["Calendar", "Note", "Weather", "Battery"], ["home.variant.calendar": "Week", "home.variant.weather": "Feels like"], backdrop: "Watercolor")

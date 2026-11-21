@@ -148,7 +148,7 @@ final class OnboardingOptions {
             case "notify.approvals": ExtraPreferences.shared.peekApprovals = value == "true"
             case "notify.agentDone": ExtraPreferences.shared.peekAgentDone = value == "true"
             case "sound.on": ExtraPreferences.shared.soundsOn = value == "true"
-            default: SettingsStore.shared.set(key, value)
+            default: SettingsStore.shared.set(key, value, origin: .person)
             }
         }, talkKey: { Preferences.shared.pushToTalk.title }, preview: { SoundStyles.preview($0) }))
     }

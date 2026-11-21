@@ -553,16 +553,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         commands.onDebugScreenShare = { arg in
             let store = SettingsStore.shared
-            switch arg.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-            case "on":
-                store.set(ZeusScreenSharePolicy.showInSharingKey, "true")
+            let key = ZeusScreenSharePolicy.showInSharingKey
+            switch ScreenShareDebug.verb(arg) {
+            case .on:
+                store.set(key, "true", origin: .agent)
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: false)
-                return "screen-share on"
-            case "off":
-                store.set(ZeusScreenSharePolicy.showInSharingKey, "false")
+                return store.bool(key) ? "screen-share on" : "screen-share stays off"
+            case .off:
+                store.set(key, "false", origin: .agent)
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: false)
                 return "screen-share off"
-            case "state":
+            case .state:
                 let show = store.bool(ZeusScreenSharePolicy.showInSharingKey)
                 let visible = ZeusScreenSharePolicy.zeusSurfacesVisible(
                     showInScreenSharing: show,
@@ -570,7 +571,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     teleprompterSessionHidden: false
                 )
                 return "showInScreenSharing=\(show) visibleInCapture=\(visible) statusItem=always"
-            default:
+            case .unrecognized:
                 return "screen-share usage: on | off | state"
             }
         }
@@ -1006,6 +1007,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case MusicAwakeHold.settingID: MusicAwakeHold.shared.setEnabled(store.bool(id))
             case ScribeAutoStartMode.settingID: ScribeCallWatcher.shared.follow()
             case ZeusScreenSharePolicy.showInSharingKey:
+                ExtraPreferences.shared.reload()
                 ZeusWindowSharing.refreshFromAppState(teleprompterSessionHidden: self?.teleprompterPrivate ?? false)
             case FacePresenceController.switchID, FacePresenceController.lockAfterID:
                 FacePresenceController.shared.settingChanged(id)
@@ -1022,7 +1024,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "general.runSetup": { [weak self] in self?.showOnboarding() },
             "voice.resetWords": {
                 for id in ["voice.approveWords", "voice.denyWords", "voice.openWords"] {
-                    store.set(id, SettingsCatalog.option(id)?.defaultValue ?? "")
+                    store.set(id, SettingsCatalog.option(id)?.defaultValue ?? "", origin: .person)
                 }
             },
             "dictation.copyLast": { [weak self] in

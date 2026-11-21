@@ -337,8 +337,8 @@ final class AIConnections {
     func setOffers(_ provider: AIProvider, _ on: Bool) {
         guard provider.supportsNewChats else { return }
         switch provider {
-        case .claudeCode: SettingsStore.shared.set("integrations.offerClaude", on ? "true" : "false")
-        case .codex: SettingsStore.shared.set("integrations.offerCodex", on ? "true" : "false")
+        case .claudeCode: SettingsStore.shared.set("integrations.offerClaude", on ? "true" : "false", origin: .person)
+        case .codex: SettingsStore.shared.set("integrations.offerCodex", on ? "true" : "false", origin: .person)
         default: defaults.set(on, forKey: provider.offerKey)
         }
         offerRevision &+= 1

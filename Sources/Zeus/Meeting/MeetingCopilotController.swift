@@ -28,7 +28,9 @@ final class MeetingCopilotController {
     }
 
     var hiddenFromCapture: Bool {
-        MeetingPanelVisibility.isHiddenFromCapture(meetingActive: isActive, showInScreenShare: !ExtraPreferences.shared.hideFromScreenShare)
+        MeetingPanelVisibility.isHiddenFromCapture(
+            meetingActive: isActive,
+            showInScreenShare: ZeusScreenSharePolicy.showInScreenSharing(from: .standard))
     }
 }
 

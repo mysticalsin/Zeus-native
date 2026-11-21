@@ -180,7 +180,7 @@ struct OnboardingView: View {
         return Button {
             model.themeChoice = name
             model.themePreviewed = true
-            SettingsStore.shared.set("appearance.cardStyle", name == "Physical" ? "Physical" : "Liquid Glass")
+            SettingsStore.shared.set("appearance.cardStyle", name == "Physical" ? "Physical" : "Liquid Glass", origin: .person)
             model.react(.curious)
         } label: {
             VStack(spacing: 10) {

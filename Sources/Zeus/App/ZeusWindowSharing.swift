@@ -89,7 +89,7 @@ enum ScreenShareQuickToggle {
     }
 
     static func toggle() {
-        SettingsStore.shared.set(ZeusScreenSharePolicy.showInSharingKey, isShown ? "false" : "true")
+        SettingsStore.shared.set(ZeusScreenSharePolicy.showInSharingKey, isShown ? "false" : "true", origin: .person)
     }
 }
 

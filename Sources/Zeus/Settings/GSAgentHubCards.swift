@@ -31,7 +31,7 @@ struct GSOtherAppsCards: View {
                         isOn: Binding(
                             get: { store.bool("notify.replaceBanners") },
                             set: { value in
-                                store.set("notify.replaceBanners", value ? "true" : "false")
+                                store.set("notify.replaceBanners", value ? "true" : "false", origin: .person)
                                 BannerAutoDismisser.shared.update()
                             }
                         ))
@@ -56,7 +56,7 @@ struct GSOtherAppsCards: View {
                                 set: { isOn in
                                     var next = ticked
                                     if isOn { next.insert(appID) } else { next.remove(appID) }
-                                    store.set("notify.dismissApps", BannerDismissDecision.formatTickedApps(next))
+                                    store.set("notify.dismissApps", BannerDismissDecision.formatTickedApps(next), origin: .person)
                                     BannerAutoDismisser.shared.update()
                                 }
                             ))
@@ -116,7 +116,7 @@ struct GSOtherAppsCards: View {
     private func toggle(_ id: String, muted: Set<String>) {
         var next = muted
         if next.contains(id) { next.remove(id) } else { next.insert(id) }
-        store.set("notify.mutedApps", NotificationPeekRules.mutedText(next))
+        store.set("notify.mutedApps", NotificationPeekRules.mutedText(next), origin: .person)
         notifications.refresh()
     }
 }
