@@ -43,6 +43,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :ZeusBuildStamp string $(date +%Y%m%d%H%M%S)-$$" "$APP/Contents/Info.plist" >/dev/null
 cp Resources/AppIcon.icns Resources/Logo.png Resources/Logo.pdf Resources/MenuBarTemplate.png Resources/MenuBarTemplate@2x.png \
   Resources/NOTICES.txt \
+  LICENSES/jarvis2.0-LICENSE \
   "$APP/Contents/Resources/"
 cp "$BIN/Zeus" "$APP/Contents/MacOS/Zeus"
 cp "$BIN/zeus-hook" "$BIN/zeus-bridge" "$APP/Contents/Helpers/"
