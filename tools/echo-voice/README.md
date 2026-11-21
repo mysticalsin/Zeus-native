@@ -102,6 +102,10 @@ simulated.
 | Rust `haru-pipe` | 0.0181 ms | 0.0215 ms |
 | Go | 0.0358 ms | 0.0443 ms |
 
+![Stream per-frame latency](docs/stream-latency.svg)
+
+The picture uses the unrounded medians in `pipeline-bench/results/summary.json`: Python p50 0.124581 ms and p95 0.160699 ms, Rust p50 0.018127499999999998 ms and p95 0.02150425 ms, Go p50 0.035847 ms and p95 0.044256149999999994 ms. The table above is that file rounded to four decimals, the same rounding as `pipeline-bench/results/table.md`.
+
 On the stream path Rust takes 0.018 ms per frame and Python takes 0.125 ms
 (6.9×). Rust also uses 0.71 s of CPU per run against Python's 3.90 s (5.5×)
 and peaks at 223 MB RSS against Python's 431 MB. Go sits between them
