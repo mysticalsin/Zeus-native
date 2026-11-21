@@ -143,6 +143,50 @@ def test_control_characters_are_refused_before_the_ledger_is_charged(tmp_path: P
     assert not (tmp_path / "tab.wav").exists()
 
 
+def test_a_key_longer_than_256_characters_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    meter = load("meter.py")
+    eleven = load("render_elevenlabs.py")
+    assert meter.MAX_KEY_CHARACTERS == 256
+    accepted = "A" * 256
+    assert meter.read_key("VOICE_QA_TEST_KEY", {"VOICE_QA_TEST_KEY": f"  {accepted}\n"}) == accepted
+    refused = "K" * 257
+    with pytest.raises(meter.MeterError) as caught:
+        meter.read_key("VOICE_QA_TEST_KEY", {"VOICE_QA_TEST_KEY": f"  {refused}\n"})
+    assert str(caught.value) == "API key refused"
+    assert caught.value.__cause__ is None
+    assert "K" * 4 not in str(caught.value)
+
+    calls = []
+
+    def fail_if_called(*_args, **_kwargs):
+        calls.append(True)
+        raise AssertionError("provider was called")
+
+    patch_transport(monkeypatch, fail_if_called)
+    with pytest.raises(meter.MeterError) as posted:
+        meter.http_post("https://example.invalid/tts", b"{}", {"xi-api-key": refused}, [refused], timeout=1)
+    assert str(posted.value) in {"API key refused", "request refused"}
+    assert "K" * 4 not in str(posted.value)
+    assert calls == []
+
+    monkeypatch.setenv("VOICE_QA_TEST_KEY", refused)
+    ledger = tmp_path / "long.json"
+    meter.initialize(ledger)
+    code = eleven.main([
+        "--text", "hello",
+        "--voice", "EXAVITQu4vr4xnSDxMaL",
+        "--key-env", "VOICE_QA_TEST_KEY",
+        "--ledger", str(ledger),
+        "--output", str(tmp_path / "long.wav"),
+    ])
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "API key refused" in captured.err
+    assert "K" * 4 not in captured.out + captured.err
+    assert meter.status(ledger)["elevenlabs"]["used"] == 0
+    assert not (tmp_path / "long.wav").exists()
+
+
 def test_header_errors_do_not_echo_the_exception_text() -> None:
     meter = load("meter.py")
     dirty = KEY + "\n"
