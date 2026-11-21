@@ -253,6 +253,18 @@ struct FaceTemplateAccessTests {
         #expect(!FaceTemplateDomainGate.denies(stored: nil, evaluation: .succeeded(stored)))
     }
 
+    @Test func failedEpochAddKeepsThePreviousRecord() {
+        let existing = Data("epoch-a".utf8)
+        let next = Data("epoch-b".utf8)
+        #expect(FaceTemplateEpochWrite.plan(existing: existing) == .update)
+        let kept = FaceTemplateEpochWrite.kept(existing: existing, next: next, succeeded: false)
+        #expect(kept == existing)
+        #expect(FaceTemplateDomainGate.denies(stored: kept, evaluation: .succeeded(next), enrolled: true))
+        #expect(FaceTemplateDomainGate.denies(stored: nil, evaluation: .succeeded(next), enrolled: true))
+        #expect(FaceTemplateEpochWrite.kept(existing: nil, next: next, succeeded: false) == nil)
+        #expect(FaceTemplateEpochWrite.plan(existing: nil) == .add)
+    }
+
     @Test func faceTemplateQueryUsesTheSharedAccessGroup() {
         let team = "TEAMID1234"
         let group = CredentialKeychainPolicy.accessGroup(teamIdentifier: team)
