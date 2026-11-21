@@ -1,5 +1,124 @@
-import SwiftUI
+import Foundation
+#if canImport(ZeusCore)
 import ZeusCore
+#endif
+
+struct ChatBarState: Equatable {
+    var transcript: HubTranscript
+    var selectedID: UUID?
+    var showsNewChatForm: Bool
+    var draft: String
+    var composerFocused: Bool
+}
+
+struct ChatBarLog: Equatable {
+    var source: String
+    var stage: String
+    var detail: String
+}
+
+enum ChatBarEvent: Equatable {
+    case send(String)
+    case delta(String)
+    case finish(String)
+    case finishEmpty
+    case stop
+    case failure(String)
+    case transcriptTap
+    case selectHistory(UUID)
+    case newChat
+    case copy(String)
+}
+
+struct ChatBarEffect: Equatable {
+    var state: ChatBarState
+    var opensWindow: Bool
+    var writes: Bool
+    var log: ChatBarLog?
+    var sendToModel: Bool
+    var stopModel: Bool
+}
+
+struct ChatBarPresentedLine: Equatable {
+    var id: String
+    var role: HubLineRole
+    var text: String
+    var parsesAsMarkdown: Bool { role == .agent && !text.isEmpty }
+}
+
+struct ChatBarPresentation: Equatable {
+    var status: HubTranscriptStatus
+    var lines: [ChatBarPresentedLine]
+}
+
+struct ChatBarComposerChrome: Equatable {
+    var placeholder: String
+    var showsStop: Bool
+    var sendEnabled: Bool
+    var sendQuiet: Bool
+}
+
+struct ChatBarHistorySection: Equatable {
+    var title: String
+    var ids: [UUID]
+}
+
+struct ChatBarMotion: Equatable {
+    var offset: Double
+    var scale: Double
+}
+
+enum ChatBarPage {
+    static let listWidth = 270.0
+    static let emptyTitle = "New conversation"
+    static let emptyDetail = "Chats stay in History on this Mac."
+    static let newChatTitle = "New chat"
+    static let composerPlaceholder = "Message Zeus"
+    static let selectionOpacity = 0.12
+    static let idleRowOpacity = 0.0
+    static let sectionOrder = ["Pinned", "Today", "Yesterday", "Previous 7 days", "Older"]
+    static let historyRowsUseStatusColor = false
+    static let newChatAccentFill = false
+
+    static func reduce(_ state: ChatBarState, _ event: ChatBarEvent, lineID: UUID = UUID()) -> ChatBarEffect {
+        _ = event
+        _ = lineID
+        return ChatBarEffect(state: state, opensWindow: true, writes: true, log: nil, sendToModel: false, stopModel: false)
+    }
+
+    static func present(messages: [ChatMessage], sending: Bool) -> ChatBarPresentation {
+        let lines = messages.map {
+            ChatBarPresentedLine(id: $0.id.uuidString, role: .agent, text: $0.text)
+        }
+        return ChatBarPresentation(status: sending ? .streaming : .settled, lines: lines)
+    }
+
+    static func composer(draft: String, sendingHere: Bool, busyElsewhere: Bool) -> ChatBarComposerChrome {
+        _ = draft
+        _ = sendingHere
+        _ = busyElsewhere
+        return ChatBarComposerChrome(placeholder: "Message", showsStop: false, sendEnabled: true, sendQuiet: false)
+    }
+
+    static func history(_ conversations: [ChatConversation], now: Date = Date(), calendar: Calendar = .current) -> [ChatBarHistorySection] {
+        _ = now
+        _ = calendar
+        return [ChatBarHistorySection(title: "History", ids: conversations.map(\.id))]
+    }
+
+    static func motion(reduceMotion: Bool) -> ChatBarMotion {
+        _ = reduceMotion
+        return ChatBarMotion(offset: 8, scale: 0.985)
+    }
+
+    static func save(_ conversation: ChatConversation, to store: ChatStore) throws {
+        _ = conversation
+        try Data("stub".utf8).write(to: store.root.appendingPathComponent("notes.txt"))
+    }
+}
+
+#if canImport(SwiftUI)
+import SwiftUI
 
 /// Chat tab as the agent hub. Running Claude Code, Codex, Gemini and Cursor sessions on the left,
 /// the selected one on the right with a reply field that types into its terminal (after an approval
@@ -291,3 +410,4 @@ private struct NewChatForm: View {
 
     private func start() { Task { await hub.launch() } }
 }
+#endif
