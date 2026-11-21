@@ -79,8 +79,16 @@ impl SessionError {
 
     /// One value of every error variant. The match is the generator: a new
     /// variant does not compile until it grows an arm here.
-    pub fn representatives() -> Vec<Self>  {
-        todo!("red");
+    pub fn representatives() -> Vec<Self> {
+        let mut out = Vec::new();
+        push_errors(
+            &SessionError::BadFrameSize {
+                expected: FRAME_SAMPLES,
+                got: 0,
+            },
+            &mut out,
+        );
+        out
     }
 }
 
@@ -142,8 +150,66 @@ fn sample_illegal() -> SessionError {
 }
 
 impl SessionState {
-    pub fn next(&self, event: &SessionEvent) -> Result<SessionState, SessionError>  {
-        todo!("red");
+    pub fn next(&self, event: &SessionEvent) -> Result<SessionState, SessionError> {
+        match self {
+            SessionState::Idle => match event {
+                SessionEvent::Start => Ok(SessionState::Starting),
+                SessionEvent::Close => Ok(SessionState::Closed),
+                SessionEvent::Fail(error) => Ok(SessionState::Failed(error.clone())),
+                SessionEvent::Started | SessionEvent::Push | SessionEvent::Closed => {
+                    Err(illegal(self, event))
+                }
+            },
+            SessionState::Starting => match event {
+                SessionEvent::Started => Ok(SessionState::Streaming),
+                SessionEvent::Close => Ok(SessionState::Closing),
+                SessionEvent::Fail(error) => Ok(SessionState::Failed(error.clone())),
+                SessionEvent::Start | SessionEvent::Push | SessionEvent::Closed => {
+                    Err(illegal(self, event))
+                }
+            },
+            SessionState::Streaming => match event {
+                SessionEvent::Push => Ok(SessionState::Streaming),
+                SessionEvent::Close => Ok(SessionState::Closing),
+                SessionEvent::Fail(error) => Ok(SessionState::Failed(error.clone())),
+                SessionEvent::Start | SessionEvent::Started | SessionEvent::Closed => {
+                    Err(illegal(self, event))
+                }
+            },
+            SessionState::Closing => match event {
+                SessionEvent::Closed => Ok(SessionState::Closed),
+                SessionEvent::Fail(error) => Ok(SessionState::Failed(error.clone())),
+                SessionEvent::Start
+                | SessionEvent::Started
+                | SessionEvent::Push
+                | SessionEvent::Close => Err(illegal(self, event)),
+            },
+            SessionState::Closed => match event {
+                SessionEvent::Start
+                | SessionEvent::Started
+                | SessionEvent::Push
+                | SessionEvent::Close
+                | SessionEvent::Closed => Err(illegal(self, event)),
+                SessionEvent::Fail(error) => {
+                    let _kept = error.code();
+                    Err(illegal(self, event))
+                }
+            },
+            SessionState::Failed(existing) => match event {
+                SessionEvent::Start
+                | SessionEvent::Started
+                | SessionEvent::Push
+                | SessionEvent::Close
+                | SessionEvent::Closed => {
+                    let _kept = existing.code();
+                    Err(illegal(self, event))
+                }
+                SessionEvent::Fail(error) => {
+                    let _kept = (existing.code(), error.code());
+                    Err(illegal(self, event))
+                }
+            },
+        }
     }
 
     pub fn wire_name(&self) -> &'static str {
@@ -175,8 +241,10 @@ impl SessionState {
     }
 
     /// Every state the table test walks, including one `failed` per error variant.
-    pub fn representatives() -> Vec<Self>  {
-        todo!("red");
+    pub fn representatives() -> Vec<Self> {
+        let mut out = Vec::new();
+        push_states(&SessionState::Idle, &mut out);
+        out
     }
 }
 
@@ -211,8 +279,10 @@ fn push_states(probe: &SessionState, out: &mut Vec<SessionState>) {
 }
 
 impl SessionEvent {
-    pub fn representatives() -> Vec<Self>  {
-        todo!("red");
+    pub fn representatives() -> Vec<Self> {
+        let mut out = Vec::new();
+        push_events(&SessionEvent::Start, &mut out);
+        out
     }
 }
 
@@ -255,8 +325,15 @@ fn illegal(state: &SessionState, event: &SessionEvent) -> SessionError {
 
 /// A push is refused with `illegalTransition` when the session cannot accept
 /// one. A wrong size on a legal push is `badFrameSize` and is not applied.
-pub fn apply_push(state: &SessionState, samples: &[f32]) -> Result<SessionState, SessionError>  {
-    todo!("red");
+pub fn apply_push(state: &SessionState, samples: &[f32]) -> Result<SessionState, SessionError> {
+    let next = state.next(&SessionEvent::Push)?;
+    if samples.len() != FRAME_SAMPLES {
+        return Err(SessionError::BadFrameSize {
+            expected: FRAME_SAMPLES,
+            got: samples.len(),
+        });
+    }
+    Ok(next)
 }
 
 impl fmt::Display for SessionState {
@@ -361,19 +438,31 @@ impl<C: ChildControl> SessionHost<C> {
     }
 
     /// Idle -> Starting, then spawn. Returns while the load is still in progress.
-    pub fn begin_model_load(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn begin_model_load(&mut self) -> Result<(), SessionError> {
+        let next = self.state.next(&SessionEvent::Start)?;
+        self.apply(next);
+        self.spawn_child()?;
+        Ok(())
     }
 
     /// Started is legal only from Starting. Closing or Closed refuses it.
-    pub fn finish_model_load(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn finish_model_load(&mut self) -> Result<(), SessionError> {
+        let next = self.state.next(&SessionEvent::Started)?;
+        self.apply(next);
+        Ok(())
     }
 
     /// Close. Starting becomes Closing, the child is killed, then Closed.
     /// Idle becomes Closed and does not spawn, so a later start is refused.
-    pub fn close(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn close(&mut self) -> Result<(), SessionError> {
+        let next = self.state.next(&SessionEvent::Close)?;
+        self.apply(next);
+        if self.state == SessionState::Closing {
+            self.kill_pid();
+            let closed = self.state.next(&SessionEvent::Closed)?;
+            self.apply(closed);
+        }
+        Ok(())
     }
 
     pub fn fail(&mut self, error: SessionError) -> Result<(), SessionError> {
@@ -408,7 +497,11 @@ impl<C: ChildControl> SessionHost<C> {
         }
     }
 
-    fn apply(&mut self, next: SessionState)  {
-        todo!("red");
+    fn apply(&mut self, next: SessionState) {
+        if matches!(next, SessionState::Streaming) {
+            self.ever_streaming = true;
+        }
+        self.trace.push(next.clone());
+        self.state = next;
     }
 }

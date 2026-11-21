@@ -63,8 +63,34 @@ pub enum LaunchDecision {
     },
 }
 
-pub fn decide(request: &LaunchRequest) -> LaunchDecision  {
-    todo!("red");
+pub fn decide(request: &LaunchRequest) -> LaunchDecision {
+    if !request.conversation_mode {
+        return LaunchDecision::NoLaunch {
+            reason: NoLaunchReason::FlagOff,
+        };
+    }
+    let Some(python) = present(&request.python) else {
+        return LaunchDecision::NoLaunch {
+            reason: NoLaunchReason::MissingPython,
+        };
+    };
+    let Some(model) = present(&request.model) else {
+        return LaunchDecision::NoLaunch {
+            reason: NoLaunchReason::MissingModel,
+        };
+    };
+    let Some(socket) = present(&request.socket) else {
+        return LaunchDecision::NoLaunch {
+            reason: NoLaunchReason::NotRequested,
+        };
+    };
+    LaunchDecision::Launch {
+        python,
+        model,
+        private_socket: private_socket(&socket),
+        socket,
+        quantize: request.quantize,
+    }
 }
 
 fn present(path: &Option<PathBuf>) -> Option<PathBuf> {
@@ -118,8 +144,26 @@ where
     C: ChildControl,
     B: SocketBind,
     N: NetGate,
- {
-    todo!("red");
+{
+    let _observed = net.attempts();
+    match decision {
+        LaunchDecision::NoLaunch { reason } => Err(reason.clone()),
+        LaunchDecision::Launch {
+            python,
+            model,
+            socket,
+            private_socket,
+            quantize,
+        } => {
+            sockets
+                .bind_unix(socket)
+                .map_err(|_| NoLaunchReason::NotRequested)?;
+            let argv = child_argv(python, model, private_socket, *quantize);
+            processes
+                .spawn(&argv)
+                .map_err(|_| NoLaunchReason::NotRequested)
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -357,16 +401,50 @@ impl<C: ChildControl> Supervisor<C> {
         self.child.spawn_count()
     }
 
-    pub fn advance(&mut self, ms: u64)  {
-        todo!("red");
+    pub fn advance(&mut self, ms: u64) {
+        self.now_ms = self.now_ms.saturating_add(ms);
     }
 
-    pub fn start(&mut self) -> Result<(), ChildState>  {
-        todo!("red");
+    pub fn start(&mut self) -> Result<(), ChildState> {
+        self.state = self.state.step(&ChildEvent::Launch)?;
+        let pid = self
+            .child
+            .spawn(&self.argv)
+            .map_err(|_| self.state.clone())?;
+        self.pid = Some(pid);
+        self.state = self.state.step(&ChildEvent::Spawned)?;
+        self.state = self.state.step(&ChildEvent::Loaded)?;
+        Ok(())
     }
 
-    pub fn on_exit(&mut self, code: i32) -> &ChildState  {
-        todo!("red");
+    pub fn on_exit(&mut self, code: i32) -> &ChildState {
+        if let Some(pid) = self.pid.take() {
+            self.child.kill(pid);
+        }
+        self.state = self
+            .state
+            .step(&ChildEvent::Exited { code })
+            .unwrap_or(ChildState::Unhealthy);
+        if self.budget.allow(self.now_ms) {
+            if let Ok(next) = self.state.step(&ChildEvent::Restart) {
+                self.state = next;
+                if let Ok(pid) = self.child.spawn(&self.argv) {
+                    self.pid = Some(pid);
+                    if let Ok(spawned) = self.state.step(&ChildEvent::Spawned) {
+                        self.state = spawned;
+                    }
+                    if let Ok(loaded) = self.state.step(&ChildEvent::Loaded) {
+                        self.state = loaded;
+                    }
+                }
+            }
+        } else {
+            self.state = self
+                .state
+                .step(&ChildEvent::BudgetExhausted)
+                .unwrap_or(ChildState::Stopped { failed: true });
+        }
+        &self.state
     }
 }
 

@@ -20,12 +20,16 @@ pub struct StartRequest {
     pub speak_first: bool,
 }
 
-pub fn downsample_48k(pcm48: &[f32]) -> Vec<f32>  {
-    todo!("red");
+pub fn downsample_48k(pcm48: &[f32]) -> Vec<f32> {
+    let mut out = Vec::new();
+    downsample_2x_into(pcm48, &mut out);
+    out
 }
 
-pub fn upsample_24k(pcm24: &[f32]) -> Vec<f32>  {
-    todo!("red");
+pub fn upsample_24k(pcm24: &[f32]) -> Vec<f32> {
+    let mut out = vec![0.0; pcm24.len() * 2];
+    upsample_2x_into(pcm24, &mut out);
+    out
 }
 
 pub fn frame(kind: u8, payload: &[u8]) -> Vec<u8> {
@@ -38,8 +42,15 @@ pub fn frame(kind: u8, payload: &[u8]) -> Vec<u8> {
 }
 
 /// START for the Python child. v1 never sends `reference_path`.
-pub fn encode_start(request: &StartRequest) -> Vec<u8>  {
-    todo!("red");
+pub fn encode_start(request: &StartRequest) -> Vec<u8> {
+    let payload = format!(
+        "{{\"language\":{},\"system_prompt\":{},\"speak_first\":{}}}",
+        crate::protocol::json_string(&request.language),
+        crate::protocol::json_string(&request.system_prompt),
+        if request.speak_first { "true" } else { "false" }
+    );
+    debug_assert!(!payload.contains("reference"));
+    frame(START, payload.as_bytes())
 }
 
 pub fn encode_audio(pcm48: &[f32]) -> Vec<u8> {
@@ -113,6 +124,14 @@ fn lossy(payload: &[u8]) -> String {
 }
 
 /// 24 kHz model frame recovered from an upstream 48 kHz FRAME.
-pub fn model_frame_from_upstream(message: &UpstreamMessage) -> Option<Vec<f32>>  {
-    todo!("red");
+pub fn model_frame_from_upstream(message: &UpstreamMessage) -> Option<Vec<f32>> {
+    match message {
+        UpstreamMessage::Frame { pcm48, .. } => Some(downsample_48k(pcm48)),
+        UpstreamMessage::Assets(_)
+        | UpstreamMessage::Hello(_)
+        | UpstreamMessage::Text(_)
+        | UpstreamMessage::Error(_)
+        | UpstreamMessage::Ready(_)
+        | UpstreamMessage::Other { .. } => None,
+    }
 }

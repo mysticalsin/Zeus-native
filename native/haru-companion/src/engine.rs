@@ -96,37 +96,110 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
         self.start_timeout_ms = timeout_ms;
     }
 
-    pub fn begin_model_load(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn begin_model_load(&mut self) -> Result<(), SessionError> {
+        self.host.begin_model_load()?;
+        self.loading = true;
+        self.load_started_ms = self.clock_ms;
+        self.child_phase = ChildState::NotStarted
+            .step(&ChildEvent::Launch)
+            .and_then(|state| state.step(&ChildEvent::Spawned))
+            .unwrap_or(ChildState::Loading);
+        Ok(())
     }
 
-    pub fn finish_model_load(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn finish_model_load(&mut self) -> Result<(), SessionError> {
+        self.host.finish_model_load()?;
+        self.loading = false;
+        self.child_phase = self
+            .child_phase
+            .step(&ChildEvent::Loaded)
+            .unwrap_or(ChildState::Ready);
+        Ok(())
     }
 
-    pub fn close(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn close(&mut self) -> Result<(), SessionError> {
+        let was_open = matches!(
+            self.host.state(),
+            SessionState::Starting | SessionState::Streaming
+        );
+        self.host.close()?;
+        self.loading = false;
+        if was_open {
+            self.child_phase = ChildState::Stopped { failed: false };
+        }
+        Ok(())
     }
 
     /// In-process fake session: the state moves, and no child is spawned.
-    pub fn enter_streaming_without_spawn(&mut self) -> Result<(), SessionError>  {
-        todo!("red");
+    pub fn enter_streaming_without_spawn(&mut self) -> Result<(), SessionError> {
+        self.host.transition(SessionEvent::Start)?;
+        self.host.transition(SessionEvent::Started)?;
+        self.child_phase = ChildState::Ready;
+        Ok(())
     }
 
-    pub fn advance(&mut self, ms: u64)  {
-        todo!("red");
+    pub fn advance(&mut self, ms: u64) {
+        self.clock_ms = self.clock_ms.saturating_add(ms);
+        if self.loading
+            && self.clock_ms.saturating_sub(self.load_started_ms) >= self.start_timeout_ms
+        {
+            self.loading = false;
+            let _ = self.fail_and_restart(SessionError::StartTimeout);
+        }
     }
 
-    pub fn report_memory_gb(&mut self, gb: f32)  {
-        todo!("red");
+    pub fn report_memory_gb(&mut self, gb: f32) {
+        self.mem_gb = Some(gb);
+        if !self.watchdog_on {
+            return;
+        }
+        let mut observation = Observation::quiet();
+        observation.mem_gb = Some(gb);
+        observation.turn = self.turn.state();
+        observation.streaming = matches!(self.host.state(), SessionState::Streaming);
+        self.apply_watchdog(&observation);
     }
 
-    pub fn push(&mut self, samples: &[f32], seq: u32) -> Result<Vec<OutFrame>, SessionError>  {
-        todo!("red");
+    pub fn push(&mut self, samples: &[f32], seq: u32) -> Result<Vec<OutFrame>, SessionError> {
+        self.host.state().next(&SessionEvent::Push)?;
+        if samples.len() != FRAME_SAMPLES {
+            return Err(SessionError::BadFrameSize {
+                expected: FRAME_SAMPLES,
+                got: samples.len(),
+            });
+        }
+        match self.backend.exchange(samples) {
+            BackendEvent::Frame {
+                samples: model,
+                text,
+                delay_ms,
+                step_ms,
+            } => self.emit(seq, model, text, delay_ms, step_ms),
+            BackendEvent::Stall { delay_ms } => self.emit(
+                seq,
+                vec![0.0; FRAME_SAMPLES],
+                String::new(),
+                delay_ms,
+                delay_ms as f32,
+            ),
+            BackendEvent::Exited { code } => {
+                let error = SessionError::ProcessExited { code };
+                self.fail_and_restart(error.clone())?;
+                Err(error)
+            }
+            BackendEvent::SocketClosed => {
+                let error = SessionError::SocketClosed;
+                self.fail_and_restart(error.clone())?;
+                Err(error)
+            }
+        }
     }
 
-    pub fn handle_raw(&mut self, raw: &RawFrame) -> Vec<Vec<u8>>  {
-        todo!("red");
+    pub fn handle_raw(&mut self, raw: &RawFrame) -> Vec<Vec<u8>> {
+        match protocol::decode_client_frame(raw) {
+            Err(error) => vec![protocol::protocol_error_frame(&error)],
+            Ok(message) => self.handle_message(message),
+        }
     }
 
     fn handle_message(&mut self, message: ClientMessage) -> Vec<Vec<u8>> {
@@ -347,8 +420,47 @@ impl SelftestReport {
     }
 }
 
-pub fn selftest_report(frames: usize) -> SelftestReport  {
-    todo!("red");
+pub fn selftest_report(frames: usize) -> SelftestReport {
+    use crate::backend::FakeBackend;
+    use crate::supervisor::{
+        apply, decide, LaunchRequest, NetGate, SocketBind, SpyBinder, SpyLauncher, SpyNet,
+    };
+
+    let mut processes = SpyLauncher::default();
+    let mut sockets = SpyBinder::default();
+    let mut net = SpyNet::default();
+    let decision = decide(&LaunchRequest::default());
+    let _ = apply(&decision, &mut processes, &mut sockets, &mut net);
+
+    let mut engine = Engine::new(
+        FakeBackend::quiet(),
+        SpyLauncher::default(),
+        Vec::new(),
+        true,
+    );
+    engine
+        .enter_streaming_without_spawn()
+        .expect("fake session reaches streaming");
+    let silence = vec![0.0f32; FRAME_SAMPLES];
+    let mut overhead_ms = Vec::with_capacity(frames);
+    for seq in 0..frames {
+        let started = Instant::now();
+        let produced = engine
+            .push(&silence, u32::try_from(seq).unwrap_or(0))
+            .expect("fake push");
+        overhead_ms.push(started.elapsed().as_secs_f64() * 1_000.0);
+        assert_eq!(produced.len(), 1);
+    }
+    SelftestReport {
+        frames: frames as u64,
+        overhead_p50_ms: percentile(&overhead_ms, 0.50),
+        overhead_p95_ms: percentile(&overhead_ms, 0.95),
+        rss_bytes: rss_bytes(),
+        underruns: engine.underruns(),
+        spawned: processes.spawn_count() + engine.spawn_count(),
+        binds: sockets.binds(),
+        network_attempts: net.attempts(),
+    }
 }
 
 fn percentile(values: &[f64], q: f64) -> f64 {

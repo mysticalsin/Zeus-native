@@ -128,8 +128,34 @@ impl Watchdog {
         }
     }
 
-    pub fn next(&mut self, obs: &Observation) -> WdState  {
-        todo!("red");
+    pub fn next(&mut self, obs: &Observation) -> WdState {
+        self.lat.push_back(obs.step_ms);
+        while self.lat.len() > self.cfg.latency_window {
+            self.lat.pop_front();
+        }
+        if self.state == WdState::Cooldown {
+            self.cool = self.cool.saturating_sub(1);
+            if self.cool == 0 {
+                self.state = WdState::Ok;
+                self.reason = None;
+            }
+            return self.state;
+        }
+        if let Some(reason) = self.hard(obs) {
+            self.state = WdState::Restart;
+            self.reason = Some(reason);
+            return self.state;
+        }
+        if let Some(reason) = self.soft(obs) {
+            if self.state == WdState::Ok {
+                self.state = WdState::Pending;
+                self.reason = Some(reason);
+            }
+        }
+        if self.state == WdState::Pending && obs.turn == Turn::Idle {
+            self.state = WdState::Restart;
+        }
+        self.state
     }
 
     pub fn restarted(&mut self) {
@@ -140,8 +166,18 @@ impl Watchdog {
     }
 
     /// Feed model text and a turn. A repeated block becomes a soft fault.
-    pub fn observe_text(&mut self, text: &str, turn: Turn) -> WdState  {
-        todo!("red");
+    pub fn observe_text(&mut self, text: &str, turn: Turn) -> WdState {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let found = find_loop(
+            &words,
+            self.cfg.loop_min_period,
+            self.cfg.loop_max_period,
+            self.cfg.loop_repeats,
+        );
+        let mut obs = Observation::quiet();
+        obs.turn = turn;
+        obs.loop_found = found;
+        self.next(&obs)
     }
 
     fn hard(&self, obs: &Observation) -> Option<WatchdogReason> {
@@ -291,8 +327,19 @@ impl TurnTracker {
         }
     }
 
-    pub fn push(&mut self, samples: &[f32]) -> Turn  {
-        todo!("red");
+    pub fn push(&mut self, samples: &[f32]) -> Turn {
+        let voiced = frame_dbfs(samples) > -45.0;
+        self.quiet = if voiced {
+            0
+        } else {
+            self.quiet.saturating_add(1)
+        };
+        self.state = if self.quiet < self.hang {
+            Turn::Model
+        } else {
+            Turn::Idle
+        };
+        self.state
     }
 
     pub fn state(&self) -> Turn {

@@ -11,8 +11,20 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::time::Duration;
 
-pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener>  {
-    todo!("red");
+pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    let listener = UnixListener::bind(path)?;
+    let mut permissions = std::fs::metadata(path)?.permissions();
+    permissions.set_mode(0o600);
+    std::fs::set_permissions(path, permissions)?;
+    Ok(listener)
 }
 
 pub fn current_uid() -> u32 {

@@ -1,0 +1,41 @@
+name: haru-companion
+
+on:
+  pull_request:
+    paths:
+      - "native/**"
+      - ".github/workflows/haru-companion.yml"
+  push:
+    paths:
+      - "native/**"
+      - ".github/workflows/haru-companion.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cargo:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - native/haru-companion
+          - native/haru-pipe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - name: rustfmt
+        working-directory: ${{ matrix.crate }}
+        run: cargo fmt --check
+      - name: clippy
+        working-directory: ${{ matrix.crate }}
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: test
+        working-directory: ${{ matrix.crate }}
+        run: cargo test --locked

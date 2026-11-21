@@ -95,8 +95,28 @@ pub fn frame(kind: u8, payload: &[u8]) -> Vec<u8> {
 }
 
 impl ClientMessage {
-    pub fn encode(&self) -> Result<Vec<u8>, ProtocolError>  {
-        todo!("red");
+    pub fn encode(&self) -> Result<Vec<u8>, ProtocolError> {
+        match self {
+            ClientMessage::Hello { v } => Ok(frame(HELLO, format!("{{\"v\":{v}}}").as_bytes())),
+            ClientMessage::Start {
+                language,
+                system_prompt,
+                speak_first,
+            } => {
+                if language != "en" && language != "fr" {
+                    return Err(ProtocolError::BadLanguage);
+                }
+                let payload = format!(
+                    "{{\"language\":{},\"system_prompt\":{},\"speak_first\":{}}}",
+                    json_string(language),
+                    json_string(system_prompt),
+                    if *speak_first { "true" } else { "false" }
+                );
+                Ok(frame(START, payload.as_bytes()))
+            }
+            ClientMessage::Push { seq, samples } => encode_push(*seq, samples),
+            ClientMessage::Close => Ok(frame(CLOSE, b"")),
+        }
     }
 }
 
@@ -116,8 +136,68 @@ pub fn encode_push(seq: u32, samples: &[f32]) -> Result<Vec<u8>, ProtocolError> 
 }
 
 impl ServerMessage {
-    pub fn encode(&self) -> Vec<u8>  {
-        todo!("red");
+    pub fn encode(&self) -> Vec<u8> {
+        match self {
+            ServerMessage::HelloAck {
+                v,
+                sample_rate,
+                frame_samples,
+            } => frame(
+                HELLO_ACK,
+                format!(
+                    "{{\"v\":{v},\"sample_rate\":{sample_rate},\"frame_samples\":{frame_samples}}}"
+                )
+                .as_bytes(),
+            ),
+            ServerMessage::State {
+                session,
+                child,
+                watchdog,
+            } => frame(
+                STATE,
+                format!(
+                    "{{\"session\":{},\"child\":{},\"watchdog\":{}}}",
+                    json_string(session),
+                    json_string(child),
+                    json_string(watchdog)
+                )
+                .as_bytes(),
+            ),
+            ServerMessage::Frame {
+                seq,
+                step_ms,
+                samples,
+            } => {
+                let mut payload = Vec::with_capacity(8 + samples.len() * 4);
+                payload.extend_from_slice(&seq.to_le_bytes());
+                payload.extend_from_slice(&step_ms.to_le_bytes());
+                for sample in samples {
+                    payload.extend_from_slice(&sample.to_le_bytes());
+                }
+                frame(FRAME, &payload)
+            }
+            ServerMessage::Text { text } => frame(TEXT, text.as_bytes()),
+            ServerMessage::Error {
+                code,
+                message,
+                expected,
+                got,
+            } => {
+                let mut payload = format!(
+                    "{{\"code\":{},\"message\":{}",
+                    json_string(code),
+                    json_string(message)
+                );
+                if let Some(expected) = expected {
+                    payload.push_str(&format!(",\"expected\":{expected}"));
+                }
+                if let Some(got) = got {
+                    payload.push_str(&format!(",\"got\":{got}"));
+                }
+                payload.push('}');
+                frame(ERROR, payload.as_bytes())
+            }
+        }
     }
 
     pub fn hello_ack() -> Self {
@@ -184,13 +264,40 @@ pub struct FrameBuf {
 }
 
 impl FrameBuf {
-    pub fn push(&mut self, bytes: &[u8]) -> Result<Vec<RawFrame>, ProtocolError>  {
-        todo!("red");
+    pub fn push(&mut self, bytes: &[u8]) -> Result<Vec<RawFrame>, ProtocolError> {
+        self.buf.extend_from_slice(bytes);
+        let mut out = Vec::new();
+        loop {
+            if self.buf.len() < 5 {
+                break;
+            }
+            let kind = self.buf[0];
+            let len =
+                u32::from_le_bytes([self.buf[1], self.buf[2], self.buf[3], self.buf[4]]) as usize;
+            if len > 8 * 1024 * 1024 {
+                return Err(ProtocolError::Oversized);
+            }
+            if self.buf.len() < 5 + len {
+                break;
+            }
+            let payload = self.buf[5..5 + len].to_vec();
+            self.buf.drain(..5 + len);
+            out.push(RawFrame { kind, payload });
+        }
+        Ok(out)
     }
 }
 
-pub fn decode_client(bytes: &[u8]) -> Result<ClientMessage, ProtocolError>  {
-    todo!("red");
+pub fn decode_client(bytes: &[u8]) -> Result<ClientMessage, ProtocolError> {
+    let mut buf = FrameBuf::default();
+    let mut frames = buf.push(bytes)?;
+    let Some(frame) = frames.pop() else {
+        return Err(ProtocolError::Truncated);
+    };
+    if !frames.is_empty() || !buf.buf.is_empty() {
+        return Err(ProtocolError::BadJson);
+    }
+    decode_client_frame(&frame)
 }
 
 pub fn decode_client_frame(frame: &RawFrame) -> Result<ClientMessage, ProtocolError> {
@@ -203,8 +310,13 @@ pub fn decode_client_frame(frame: &RawFrame) -> Result<ClientMessage, ProtocolEr
     }
 }
 
-pub fn decode_server(bytes: &[u8]) -> Result<ServerMessage, ProtocolError>  {
-    todo!("red");
+pub fn decode_server(bytes: &[u8]) -> Result<ServerMessage, ProtocolError> {
+    let mut buf = FrameBuf::default();
+    let mut frames = buf.push(bytes)?;
+    let Some(frame) = frames.pop() else {
+        return Err(ProtocolError::Truncated);
+    };
+    decode_server_frame(&frame)
 }
 
 pub fn decode_server_frame(frame: &RawFrame) -> Result<ServerMessage, ProtocolError> {
