@@ -59,7 +59,8 @@ actor MCPStdioClient: MCPToolCalling {
     static let maximumMessageBytes = 8 * 1024 * 1024
     static let maximumPendingRequests = 16
     private var nextID = 1
-    private var pending: [Int: CheckedContinuation<JSONValue?, Error>] = [:]
+    /// Released with this actor. Its deinit resumes any reply that `close` did not.
+    nonisolated let replies = ContinuationBag<JSONValue?>()
     private var timeouts: [Int: Task<Void, Never>] = [:]
     private let errorTail = LineTail()
     private(set) var serverInfo: ServerInfo?
@@ -79,7 +80,7 @@ actor MCPStdioClient: MCPToolCalling {
 
     var isRunning: Bool { process?.isRunning == true && !ended }
     var stderrTail: String { errorTail.text }
-    var pendingRequestCount: Int { pending.count }
+    var pendingRequestCount: Int { replies.openCount }
 
     // MARK: Lifecycle
 
@@ -190,13 +191,13 @@ actor MCPStdioClient: MCPToolCalling {
         try Task.checkCancellation()
         guard isRunning else { throw MCPClientError.notRunning(errorTail.text) }
         guard timeout.isFinite, timeout > 0, timeout <= 3_600,
-              pending.count < Self.maximumPendingRequests else { throw MCPClientError.badResponse("invalid timeout or too many pending requests") }
+              replies.openCount < Self.maximumPendingRequests else { throw MCPClientError.badResponse("invalid timeout or too many pending requests") }
         let id = nextID
         nextID += 1
         let label = method == "tools/call" ? (params?["name"]?.stringValue ?? method) : method
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<JSONValue?, Error>) in
-                pending[id] = continuation
+                replies.store(id, continuation, failure: MCPClientError.notRunning(errorTail.text))
                 timeouts[id] = Task { [weak self] in
                     try? await Task.sleep(for: .seconds(timeout))
                     if !Task.isCancelled { await self?.expire(id, label: label, seconds: Int(timeout)) }
@@ -218,7 +219,7 @@ actor MCPStdioClient: MCPToolCalling {
     }
 
     private func cancel(_ id: Int) async {
-        guard pending[id] != nil else { return }
+        guard replies.contains(id) else { return }
         stopIO() // Publish shutdown before resuming the cancelled caller.
         resolve(id, .failure(CancellationError()))
         await close()
@@ -233,18 +234,20 @@ actor MCPStdioClient: MCPToolCalling {
 
     private func resolve(_ id: Int, _ result: Result<JSONValue?, Error>) {
         timeouts.removeValue(forKey: id)?.cancel()
-        pending.removeValue(forKey: id)?.resume(with: result)
+        replies.resume(id, with: result)
     }
 
     private func expire(_ id: Int, label: String, seconds: Int) {
-        guard pending[id] != nil else { return }
+        guard replies.contains(id) else { return }
         stopIO()
         resolve(id, .failure(MCPClientError.timedOut(label, seconds)))
         Task { await close() }
     }
 
     private func failAll(_ error: Error) {
-        for id in Array(pending.keys) { resolve(id, .failure(error)) }
+        for task in timeouts.values { task.cancel() }
+        timeouts.removeAll()
+        replies.failAll(error)
     }
 
     // MARK: Incoming
