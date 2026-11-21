@@ -59,6 +59,9 @@ final class NotchController {
     private var dragMonitors: [Any] = []
     private var dragChangeCount = 0
     private var hoverTask: Task<Void, Never>?
+    /// The approval card's wait. `approvalTimeout` is the sleep armed for that phase.
+    private var approvalWait: ApprovalWait.Phase = .idle
+    private var approvalTimeout: Task<Void, Never>?
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
     /// The pin rules live in ZeusCore; this only reports the current facts.
@@ -310,17 +313,26 @@ final class NotchController {
                          detail: ApprovalDetail? = nil,
                          trust: (session: String, onTrust: @MainActor () -> Void)? = nil) async -> HookDecision.Verdict {
         // A cancelled caller (`zeus cancel`, Esc) must not spin here: sleep throws at once when cancelled.
-        while model.approval != nil, !Task.isCancelled {
+        while (model.approval != nil || approvalWait != .idle), !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(200))
         }
         if Task.isCancelled { return .deny }
         return await withCheckedContinuation { continuation in
             let id = UUID().uuidString
-            var finished = false
-            let finish: @MainActor (HookDecision.Verdict) -> Void = { [weak self] verdict in
-                guard !finished else { return }
-                finished = true
-                if self?.model.approval?.id == id { self?.model.approval = nil }
+            let (phase, began) = ApprovalWait.reduce(approvalWait, .begin(id: id))
+            guard began == [.armTimeout(id: id)] else {
+                continuation.resume(returning: .deny)
+                return
+            }
+            approvalWait = phase
+            let settle: @MainActor (ApprovalWait.Event, HookDecision.Verdict) -> Void = { [weak self] event, verdict in
+                guard let self else { return }
+                let (next, effects) = ApprovalWait.reduce(self.approvalWait, event)
+                guard effects.contains(.resolve(id: id)) else { return }
+                self.approvalWait = next
+                self.approvalTimeout?.cancel()
+                self.approvalTimeout = nil
+                if self.model.approval?.id == id { self.model.approval = nil }
                 continuation.resume(returning: verdict)
             }
             let seconds = Double(timeout.components.seconds)
@@ -331,14 +343,14 @@ final class NotchController {
             }
             var trustChat: (@MainActor () -> Void)?
             if let onTrust = trust?.onTrust {
-                trustChat = { onTrust(); finish(.allow) }
+                trustChat = { onTrust(); settle(.answer(id: id), .allow) }
             }
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
                 deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
                 trustChat: trustChat,
-                resolve: finish
+                resolve: { settle(.answer(id: id), $0) }
             )
             model.completion = nil
             model.recap = nil
@@ -349,9 +361,10 @@ final class NotchController {
             ])
             if model.presentation == .closed { show(.peek) }
             setIgnoresMouse(ignoresMouse(for: model.presentation))
-            Task { @MainActor in
+            approvalTimeout = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: timeout)
-                finish(onTimeout)
+                guard let self, !Task.isCancelled else { return }
+                settle(.timeout(id: id), onTimeout)
             }
         }
     }

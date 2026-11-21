@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "An approval card's timeout task was not stored. Answering was idempotent, so the late timeout did not resume twice, but the sleep held the continuation until the full timeout after the person had answered.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ApprovalWaitTests.swift",
+        "function": "answeringAnApprovalCancelsItsTimeout"
+      }
     }
-]
+  ]
 }
