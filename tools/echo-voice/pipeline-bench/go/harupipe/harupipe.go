@@ -95,7 +95,12 @@ type Ring struct {
 	r, n int
 }
 
-func NewRing(capacity int) *Ring { return &Ring{buf: make([]float32, capacity)} }
+func NewRing(capacity int) *Ring {
+	if capacity < 1 {
+		capacity = 1 // match the Rust ring, which refuses a zero-length buffer
+	}
+	return &Ring{buf: make([]float32, capacity)}
+}
 func (q *Ring) Len() int        { return q.n }
 
 func (q *Ring) Push(x []float32) error {
@@ -494,12 +499,18 @@ func StreamRun(raw []byte, maxFrames int, model time.Duration, first func()) (*S
 // ---------------------------------------------------------------- stats
 
 func Percentile(sorted []float64, q float64) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
 	pos := float64(len(sorted)-1) * q / 100
 	lo, hi := int(math.Floor(pos)), int(math.Ceil(pos))
 	return sorted[lo] + (sorted[hi]-sorted[lo])*(pos-float64(lo))
 }
 
 func Summary(ns []int64) map[string]float64 {
+	if len(ns) == 0 {
+		return map[string]float64{"n": 0, "p50_ms": 0, "p95_ms": 0, "p99_ms": 0, "max_ms": 0, "mean_ms": 0}
+	}
 	ms := make([]float64, len(ns))
 	sum := 0.0
 	for i, v := range ns {
