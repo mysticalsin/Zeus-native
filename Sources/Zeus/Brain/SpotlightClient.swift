@@ -19,15 +19,30 @@ enum SpotlightClient {
 
 /// Reads a page as text when the ask names a URL. Short timeout, no screenshot.
 enum PageFetch {
+    /// Stop reading once a page is larger than this. The spoken extract is much shorter.
+    static let maximumBytes = 1_048_576
+
     static func text(from url: URL) async -> String? {
-        guard let scheme = url.scheme, scheme == "http" || scheme == "https" else { return nil }
-        var request = URLRequest(url: url, timeoutInterval: 3)
-        request.setValue("Zeus", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-              let html = String(data: data, encoding: .utf8) else { return nil }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = nil
+        configuration.urlCache = nil
+        let policy = SafeRemoteFetch.Policy(
+            allowsHTTP: false, maximumRedirects: 3, maximumBytes: maximumBytes,
+            acceptedStatusCodes: 200..<300,
+            allowedContentTypes: ["text/html", "application/xhtml+xml", "text/plain"])
+        guard let data = await SafeRemoteFetch.data(
+            from: url, policy: policy, configuration: configuration, requestTimeout: 3,
+            headers: ["User-Agent": "Zeus"]
+        ), let html = String(data: data, encoding: .utf8) else { return nil }
         let plain = PageText.plain(html)
         guard !plain.isEmpty else { return nil }
         return PageText.truncate(plain, to: PageText.defaultExtractLimit)
+    }
+
+    /// The spoken request stays outside the fence. The page is untrusted data.
+    static func prompt(transcript: String, page: String) -> String {
+        SafeRemoteFetch.untrustedPagePrompt(page: page, transcript: transcript)
     }
 }

@@ -99,7 +99,7 @@ public enum ArtworkSource {
     private static let privateSuffixes = [".local", ".localhost", ".lan", ".internal", ".home.arpa"]
 
     /// Whether a page's cover link may be fetched: https only, a named host (no IP address in any spelling), and
-    /// no name that ends in a private suffix. A public name that resolves to a private address is not caught here.
+    /// no name that ends in a private suffix. The resolved address is checked when the bytes are read.
     public static func pageImageAllowed(_ url: URL) -> Bool {
         guard url.scheme?.lowercased() == "https", var host = url.host?.lowercased(), !host.isEmpty else { return false }
         if host.hasSuffix(".") { host.removeLast() }

@@ -532,7 +532,7 @@ final class VoiceTurnController {
                                  deep: deep, speak: speak, awaitActions: awaitActions, pageText: true)
         }
         if case .web(let query) = route, let url = URL(string: query), let page = await PageFetch.text(from: url) {
-            let told = "Page text:\n\(page)\n\n\(transcript)"
+            let told = PageFetch.prompt(transcript: transcript, page: page)
             return await runTurn(transcript: told, screenshots: [], activeTab: activeTab, turn: turn,
                                  deep: deep, speak: speak, awaitActions: awaitActions, pageText: true)
         }

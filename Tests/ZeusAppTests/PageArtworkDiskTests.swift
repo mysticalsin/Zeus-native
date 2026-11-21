@@ -82,12 +82,20 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) ?? Data()
     }
 
+    /// Cover hosts in these tests are documentation names. They are public addresses here, and nowhere else.
+    private nonisolated static func coverAddresses(_ host: String) -> [String] {
+        switch host.lowercased() {
+        case "img.example.com", "cdn.example.net": return ["93.184.216.34"]
+        default: return []
+        }
+    }
+
     private func makeStore() throws -> (store: ArtworkStore, directory: URL) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("PageArtworkDiskTests-\(UUID().uuidString)", isDirectory: true)
         // The configuration the app uses, with only the network swapped for the stub.
         let config = ArtworkStore.sessionConfiguration()
         config.protocolClasses = [StubProtocol.self]
-        return (ArtworkStore(directory: directory, session: URLSession(configuration: config)), directory)
+        return (ArtworkStore(directory: directory, session: URLSession(configuration: config), addresses: coverAddresses), directory)
     }
 
     private func tab(_ cover: String?) -> NowPlaying {

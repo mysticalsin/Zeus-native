@@ -24,6 +24,7 @@ final class ArtworkStore {
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var failed: Set<String> = []
     @ObservationIgnored private let session: URLSession
+    @ObservationIgnored private let addresses: SafeRemoteFetch.AddressResolver
     @ObservationIgnored private let directory: URL
 
     /// The one session for every cover request. It takes no cookie, keeps none and caches nothing, so a host named by
@@ -39,9 +40,10 @@ final class ArtworkStore {
         return config
     }
 
-    /// `session` is for tests, which answer every request themselves.
-    init(directory: URL? = nil, session: URLSession? = nil) {
+    /// `session` is for tests, which answer every request themselves. `addresses` replaces name lookup in those tests.
+    init(directory: URL? = nil, session: URLSession? = nil, addresses: SafeRemoteFetch.AddressResolver? = nil) {
         self.session = session ?? URLSession(configuration: Self.sessionConfiguration())
+        self.addresses = addresses ?? SafeRemoteFetch.systemAddresses
         self.directory = directory ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Zeus/artwork", isDirectory: true)
     }
@@ -153,29 +155,28 @@ final class ArtworkStore {
     /// The page's own cover link, only when `pageImageAllowed`. Nothing else is tried.
     private func pageCover(_ playing: NowPlaying) async -> Data? {
         guard let url = playing.artworkURL, ArtworkSource.pageImageAllowed(url) else { return nil }
-        guard let data = await Self.fetchPageImage(url, session: session), NSImage(data: data) != nil else { return nil }
+        guard let data = await remote(url, policy: Self.imagePolicy(page: true)), NSImage(data: data) != nil else { return nil }
         return data
     }
 
-    /// Largest cover Zeus takes from a page.
+    /// Largest cover Zeus takes from a page, and from a catalog image.
     private nonisolated static let pageImageLimit = 2_000_000
 
-    /// One request, read as it arrives and dropped past the limit, with every redirect checked against the same rule.
-    private nonisolated static func fetchPageImage(_ url: URL, session: URLSession) async -> Data? {
-        guard let (bytes, response) = try? await session.bytes(for: URLRequest(url: url), delegate: PageRedirectGuard()),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              response.expectedContentLength <= Int64(pageImageLimit) else { return nil }
-        var data = Data()
-        do {
-            for try await byte in bytes {
-                data.append(byte)
-                if data.count > pageImageLimit { return nil }
-            }
-        } catch {
-            return nil
-        }
-        return data
+    private nonisolated static let imageTypes: Set<String> = [
+        "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+        "image/bmp", "image/tiff", "image/heic", "image/heif", "image/avif",
+    ]
+
+    private nonisolated static func imagePolicy(page: Bool) -> SafeRemoteFetch.Policy {
+        SafeRemoteFetch.Policy(
+            allowsHTTP: false, maximumRedirects: 3, maximumBytes: pageImageLimit, acceptedStatusCodes: 200..<201,
+            allowedContentTypes: imageTypes,
+            permitsDestination: page ? { ArtworkSource.pageImageAllowed($0) } : { _ in true })
     }
+
+    private nonisolated static let catalogPolicy = SafeRemoteFetch.Policy(
+        allowsHTTP: false, maximumRedirects: 3, maximumBytes: 1_048_576, acceptedStatusCodes: 200..<201,
+        allowedContentTypes: ["application/json"])
 
     private func spotifyCover(_ playing: NowPlaying) async -> Data? {
         if let id = ArtworkSource.spotifyTrackID(playing.trackID), let oembed = ArtworkSource.spotifyOEmbedURL(trackID: id),
@@ -208,14 +209,16 @@ final class ArtworkStore {
         return error == nil ? result : nil
     }
 
+    private func remote(_ url: URL, policy: SafeRemoteFetch.Policy) async -> Data? {
+        await SafeRemoteFetch.data(from: url, policy: policy, resolver: addresses, configuration: session.configuration)
+    }
+
     private func fetch(_ url: URL) async -> Data? {
-        guard let (data, response) = try? await session.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return data
+        await remote(url, policy: Self.catalogPolicy)
     }
 
     private func fetchImage(_ url: URL) async -> Data? {
-        guard let data = await fetch(url), NSImage(data: data) != nil else { return nil }
+        guard let data = await remote(url, policy: Self.imagePolicy(page: false)), NSImage(data: data) != nil else { return nil }
         return data
     }
 
@@ -258,10 +261,3 @@ final class ArtworkStore {
     }
 }
 
-/// Follows a page cover's redirect only to an address `pageImageAllowed` accepts: https, a named host, nothing local.
-private final class PageRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
-    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        completionHandler(request.url.map(ArtworkSource.pageImageAllowed) == true ? request : nil)
-    }
-}
