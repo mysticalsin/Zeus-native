@@ -57,6 +57,11 @@ public struct STTLatencyTrace: Equatable, Sendable {
         marks[stage] = max(0, atMs)
     }
 
+    /// Replaces a stage that was already marked. Used when a recognizer final arrives inside the cap.
+    mutating func replace(_ stage: Stage, atMs: Int) {
+        marks[stage] = max(0, atMs)
+    }
+
     /// Drops the silence mark when speech resumes, so a pause in the middle is not the endpoint silence.
     public mutating func reviseSilence(speechResumed: Bool, endpointAlreadyFired: Bool) {
         guard speechResumed, !endpointAlreadyFired else { return }
@@ -246,6 +251,8 @@ public struct STTLiveTurn: Equatable, Sendable {
     public private(set) var taskCancelled = false
     public private(set) var hasText = false
     public private(set) var heardSpeech = false
+    /// True once a recognizer final inside the push-to-talk cap has been accepted.
+    private var acceptedRecognizerFinal = false
     private var lastVoicedMs: Int?
     private var silenceAt: Int?
     private var endpointAt: Int?
@@ -319,9 +326,17 @@ public struct STTLiveTurn: Equatable, Sendable {
     }
 
     /// Key release, or the second Murmur tap. That is the endpoint when silence has not already ended the turn.
+    /// A second release does not move the endpoint or extend the cap. A recognizer final that arrives
+    /// after the first release still wins when it is inside the cap.
     public mutating func keyUp(clock: STTClock, recognizerFinalMs: Int? = nil) {
         armEndpoint(clock: clock)
-        conclude(atMs: endpointAt ?? clock.nowMs, recognizerFinalMs: recognizerFinalMs)
+        if !concluded {
+            conclude(atMs: endpointAt ?? clock.nowMs, recognizerFinalMs: recognizerFinalMs)
+            return
+        }
+        if let recognizerFinalMs {
+            _ = adoptRecognizerFinal(atMs: recognizerFinalMs)
+        }
     }
 
     /// Records the endpoint at this clock without inventing the final time.
@@ -336,7 +351,14 @@ public struct STTLiveTurn: Equatable, Sendable {
         guard !concluded else { return }
         concluded = true
         let cap = atMs + policy.endpointToFinalMs
-        let finalAt = min(recognizerFinalMs ?? cap, cap)
+        let finalAt: Int
+        if let recognizerFinalMs, recognizerFinalMs >= atMs, recognizerFinalMs <= cap {
+            finalAt = recognizerFinalMs
+            acceptedRecognizerFinal = true
+        } else {
+            finalAt = cap
+            acceptedRecognizerFinal = false
+        }
         trace.mark(.finalTranscript, atMs: finalAt)
         let delivered = finalAt + policy.deliveredHopMs(for: trace.path)
         trace.mark(.deliveredToUI, atMs: delivered)
@@ -352,6 +374,19 @@ public struct STTLiveTurn: Equatable, Sendable {
         } else {
             failure = .none
         }
+    }
+
+    /// A recognizer final after key-up. It wins only inside the cap, and only while the cap is still provisional.
+    private mutating func adoptRecognizerFinal(atMs: Int) -> Bool {
+        guard !acceptedRecognizerFinal, let endpointAt else { return false }
+        let cap = endpointAt + policy.endpointToFinalMs
+        guard atMs >= endpointAt, atMs <= cap else { return false }
+        trace.replace(.finalTranscript, atMs: atMs)
+        trace.replace(.deliveredToUI, atMs: atMs + policy.deliveredHopMs(for: trace.path))
+        acceptedRecognizerFinal = true
+        taskCancelled = true
+        if hasText || heardSpeech { failure = .none }
+        return true
     }
 
     /// A first token is a change. A later token is a change only when it differs.
