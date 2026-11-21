@@ -115,6 +115,39 @@ import Testing
         #expect(!model.contains("cues.first"))
     }
 
+    /// A cue inside its window is showing. Returning armed here used to pass the older suite.
+    @Test func aCueInsideItsWindowIsShowing() {
+        let meeting = occasion(.meeting, id: "standup", minutesFromStart: 10)
+        let now = meeting.start.addingTimeInterval(-5 * 60)
+        let plan = MeetingHeadsUpScheduler.plan(
+            settings: settings(enabled: true, lead: 15),
+            occasions: [meeting],
+            now: now
+        )
+        #expect(plan.phase == .showing)
+        #expect(plan.firstDueTitle == "standup")
+        #expect(plan.cues.first?.title != plan.firstDueTitle || plan.cues.count == 1)
+    }
+
+    @Test func duplicateOccasionIdsDoNotTrap() throws {
+        let source = try schedulerSource()
+        #expect(!source.contains("uniqueKeysWithValues"))
+    }
+
+    @Test func thePlanRefreshesAfterSleepWakeAndAMovedMeeting() throws {
+        let notch = try repoSource("Sources/Zeus/Notch/NotchController.swift")
+        let watcher = try repoSource("Sources/Zeus/Scribe/ScribeCallWatcher.swift")
+        #expect(notch.contains("willSleepNotification"))
+        #expect(notch.contains("onSlotsUpdated"))
+        #expect(watcher.contains("onSlotsUpdated"))
+        if let range = notch.range(of: "didWakeNotification") {
+            let window = notch[range.upperBound...].prefix(500)
+            #expect(window.contains("refreshMeetingHeadsUp"))
+        } else {
+            #expect(Bool(false))
+        }
+    }
+
     @Test func thePeekCallsPlanAndNotificationsBindsTheCard() throws {
         let notch = try repoSource("Sources/Zeus/Notch/NotchController.swift")
         let page = try repoSource("Sources/Zeus/Settings/GlanceSettingsPages.swift")
