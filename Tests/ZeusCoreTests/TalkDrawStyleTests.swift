@@ -94,6 +94,25 @@ import Testing
         #expect(kept?.marks[0].shape.style == .underline)
     }
 
+    /// Mock-up figure 3: an ink ellipse and a diagram card, not an orange circle and a text chip.
+    @Test func figureThreeIsAnInkEllipseAndADiagramCard() {
+        let draw = TalkDrawParser.parse(#"""
+        {"s":1,"m":[
+        {"k":"ring","x":200,"y":160,"r":36,"at":0},
+        {"k":"card","x":80,"y":220,"t":"Diagram","at":0}
+        ]}
+        """#)!
+        let objects = TalkDrawScene.objects(draw, shot: Self.shot(), captureID: UUID())[0] ?? []
+        let ring = objects.first { $0.geometry.kind == .ring }
+        #expect(ring?.style.stroke == .ink)
+        #expect(ring?.style.fill == .clear)
+        let card = objects.first { $0.geometry.kind == .card }
+        #expect(card?.text == "Diagram")
+        #expect(card?.geometry.size != nil)
+        #expect(card?.style.stroke == .ink)
+        #expect(objects.contains { $0.geometry.kind == .label } == false)
+    }
+
     @Test func atMostSixMarks() {
         let underline = #"{"k":"underline","from":[1,1],"to":[8,4],"at":0}"#
         let many = TalkDrawParser.parse(#"{"m":[\#(Array(repeating: underline, count: 8).joined(separator: ","))]}"#)
