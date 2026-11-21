@@ -154,8 +154,29 @@ struct TalkVisualTurnTests {
     @Test func bargeInCancelsScheduledMarks() {
         let log = TurnLog()
         let turn = controller(consent: true, log: log)
-        turn.bargeIn()
-        #expect(log.events == ["cancelMarks"])
+        _ = turn.press()
+        #expect(log.events.contains("cancelMarks"))
+        turn.release()
+    }
+
+    @Test func aFutureMarkIsHeldUntilTheRealSpeechClock() {
+        let frame = CGRect(x: 0, y: 0, width: 1280, height: 800)
+        let shot = ScreenShot(jpegData: Data(), label: "screen", pixelWidth: 1280, pixelHeight: 800, displayFrame: frame)
+        var times = [0.0, 1.2]
+        let presenter = TalkVisualPresenter(
+            screens: { [TalkVisualPresenter.Screen(id: 1, frame: frame, scale: 1)] },
+            reduceMotion: { true },
+            speechClock: { times.removeFirst() })
+        let draw = TalkDraw(screen: 1, marks: [
+            .init(shape: .ring(center: .init(x: 100, y: 100), radius: 20), at: 0, audioTime: 0),
+            .init(shape: .ring(center: .init(x: 220, y: 140), radius: 16), at: 0, audioTime: 1.2),
+        ])
+        let token = UUID()
+        presenter.begin(draw, shot: shot, token: token)
+        presenter.reveal(sentence: 0, token: token)
+        #expect(presenter.visibleMarkCount == 1)
+        presenter.sampleSpeechClock(token: token)
+        #expect(presenter.visibleMarkCount == 2)
     }
 
     @Test func theNextKeyPressClearsADrawingAndANeverDrawnTurnClearsNothing() async {

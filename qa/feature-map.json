@@ -5543,6 +5543,10 @@
             },
             {
               "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
+              "function": "aFutureMarkIsHeldUntilTheRealSpeechClock"
+            },
+            {
+              "file": "Tests/ZeusAppTests/TalkVisualTurnTests.swift",
               "function": "bargeInCancelsScheduledMarks"
             },
             {
