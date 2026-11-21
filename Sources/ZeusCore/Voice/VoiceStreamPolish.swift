@@ -43,6 +43,25 @@ public final class VoiceStreamPolish: SpeechOutputProcessing, @unchecked Sendabl
         SpeechClauseChunker.chunks(of: text)
     }
 
+    /// The seam's chunked path: the first clause is shaped and handed to `schedule` before later clauses render.
+    public func speakClauses(
+        text: String,
+        sampleRate: Double,
+        clock: inout SpeechManualClock,
+        token: SpeechCancelToken? = nil,
+        synthesize: (String, inout SpeechManualClock) -> [Float],
+        schedule: ([Float], Double) -> Void
+    ) -> ClauseScheduleReceipt {
+        ClauseSpeechScheduler.speak(
+            text: text,
+            sampleRate: sampleRate,
+            clock: &clock,
+            output: self,
+            token: token,
+            synthesize: synthesize,
+            schedule: schedule)
+    }
+
     public func process(_ samples: [Float], sampleRate: Double) -> [Float] {
         lock.lock()
         defer { lock.unlock() }
