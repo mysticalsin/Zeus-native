@@ -254,14 +254,23 @@ struct ChatPage: View {
             HStack(alignment: .top, spacing: 10) {
                 historyColumn.frame(width: CGFloat(ChatBarPage.listWidth))
                 Tile(padding: 14) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        transcript
-                        composer
+                    if let session = selectedAgent {
+                        AgentReplyPane(hub: hub, session: session)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            transcript
+                            composer
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
+    }
+
+    private var selectedAgent: NotchModel.Session? {
+        hub.sessions.first { $0.id == hub.selectedSession }
     }
 
     private func snapshot() -> ChatBarState {
@@ -284,7 +293,10 @@ struct ChatPage: View {
             Button {
                 let effect = ChatBarPage.reduce(snapshot(), .newChat)
                 note(effect.log)
-                if effect.state.showsNewChatForm { hub.beginNewChat() } else { hub.creating = false }
+                if effect.state.showsNewChatForm {
+                    hub.selectedSession = nil
+                    hub.beginNewChat()
+                } else { hub.creating = false }
             } label: {
                 Text(ChatBarPage.newChatTitle)
                     .font(TopBarStyle.label(12, .semibold))
@@ -297,43 +309,63 @@ struct ChatPage: View {
             .buttonStyle(PressableStyle())
             .accessibilityLabel(ChatBarPage.newChatTitle)
 
-            if chat.conversations.isEmpty {
-                Text("No chats yet.")
-                    .font(TopBarStyle.label(12))
-                    .foregroundStyle(Theme.cloudQuiet)
-                    .padding(.horizontal, 8)
-            } else {
-                PageScroll(.vertical) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        let sections = ChatBarPage.history(chat.conversations)
-                        ForEach(sections, id: \.title) { section in
-                            Text(section.title)
-                                .font(TopBarStyle.label(10, .semibold))
-                                .tracking(0.8)
-                                .foregroundStyle(Theme.cloudQuiet)
-                                .padding(.top, 8)
-                                .padding(.horizontal, 8)
-                                .accessibilityAddTraits(.isHeader)
-                            ForEach(section.ids, id: \.self) { id in
-                                if let conversation = chat.conversations.first(where: { $0.id == id }) {
-                                    historyRow(conversation)
+            if !hub.sessions.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agents")
+                        .font(TopBarStyle.label(10, .semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.cloudQuiet)
+                        .padding(.top, 4)
+                        .padding(.horizontal, 8)
+                        .accessibilityAddTraits(.isHeader)
+                    ForEach(hub.sessions) { session in
+                        agentRow(session)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Agents")
+            }
+
+            Group {
+                if chat.conversations.isEmpty {
+                    Text("No chats yet.")
+                        .font(TopBarStyle.label(12))
+                        .foregroundStyle(Theme.cloudQuiet)
+                        .padding(.horizontal, 8)
+                } else {
+                    PageScroll(.vertical) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            let sections = ChatBarPage.history(chat.conversations)
+                            ForEach(sections, id: \.title) { section in
+                                Text(section.title)
+                                    .font(TopBarStyle.label(10, .semibold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(Theme.cloudQuiet)
+                                    .padding(.top, 8)
+                                    .padding(.horizontal, 8)
+                                    .accessibilityAddTraits(.isHeader)
+                                ForEach(section.ids, id: \.self) { id in
+                                    if let conversation = chat.conversations.first(where: { $0.id == id }) {
+                                        historyRow(conversation)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("History")
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("History")
     }
 
     private func historyRow(_ conversation: ChatConversation) -> some View {
-        let picked = conversation.id == chat.currentID
+        let picked = selectedAgent == nil && conversation.id == chat.currentID
         return Button {
             let effect = ChatBarPage.reduce(snapshot(), .selectHistory(conversation.id))
             note(effect.log)
             chat.select(conversation.id)
+            hub.selectedSession = nil
             hub.creating = effect.state.showsNewChatForm
         } label: {
             Text(conversation.displayTitle)
@@ -351,6 +383,37 @@ struct ChatPage: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel(conversation.displayTitle)
+        .accessibilityAddTraits(picked ? .isSelected : [])
+    }
+
+    private func agentRow(_ session: NotchModel.Session) -> some View {
+        let picked = session.id == hub.selectedSession
+        let subtitle = MeetingState.hideDetails ? session.status.label : "\(session.project) · \(session.status.label)"
+        return Button {
+            hub.selectedSession = session.id
+        } label: {
+            HStack(spacing: 8) {
+                Text(session.agent)
+                    .font(TopBarStyle.label(12.5, picked ? .semibold : .regular))
+                    .foregroundStyle(picked ? Theme.cloudPrimary : Theme.cloudSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(subtitle)
+                    .font(TopBarStyle.label(10.5))
+                    .foregroundStyle(Theme.cloudQuiet)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                Color.white.opacity(picked ? ChatBarPage.selectionOpacity : ChatBarPage.idleRowOpacity),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("\(session.agent), \(subtitle)")
+        .accessibilityHint("Reply from this page")
         .accessibilityAddTraits(picked ? .isSelected : [])
     }
 

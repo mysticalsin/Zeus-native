@@ -56,6 +56,8 @@ final class AgentHub {
     @ObservationIgnored private var replyGate = HubReplyDispatch()
     @ObservationIgnored private var replyTimeout: Task<Void, Never>?
     @ObservationIgnored private var replyEpoch = 0
+    /// When the current inline wait ends. The sleep below stays 30 seconds.
+    private(set) var replyWaitDeadline: Date?
 
     func canReply(to session: String) -> Bool {
         AgentReply.supports(AgentTerminals.shared.info(for: session))
@@ -136,6 +138,7 @@ final class AgentHub {
             replyEpoch += 1
             replyTimeout?.cancel()
             replyTimeout = nil
+            replyWaitDeadline = nil
         }
     }
 
@@ -145,6 +148,7 @@ final class AgentHub {
         replyEpoch += 1
         let epoch = replyEpoch
         let session = selectedSession
+        replyWaitDeadline = Date().addingTimeInterval(30)
         replyTimeout = Task { @MainActor in
             try? await Task.sleep(for: .seconds(30))
             guard !Task.isCancelled, epoch == self.replyEpoch, self.selectedSession == session else { return }
