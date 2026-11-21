@@ -77,6 +77,8 @@ final class VoiceTurnController {
     private var fastRace: FastRaceRun?
     /// When the talk key was released, for the per-stage timing log.
     private var turnReleasedAt: ContinuousClock.Instant?
+    /// Open, quit, media, and volume decided locally. A quit confirmation lasts until the next turn ends, or 10 seconds.
+    private var localCommands = LocalCommandMachine()
     /// When the last fast answer finished: the deep follow-up is spoken only inside the conversation window.
     private var lastAnswerAt: Date?
     private var history: [Exchange] = []
@@ -463,6 +465,9 @@ final class VoiceTurnController {
 
     /// A finished transcript: approval answers, walkthrough steering, the fast path, then the LLM.
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
+        // A quit question asked on the previous turn dies here if this turn did not confirm it.
+        // A question asked during this turn is armed for the turn after it.
+        defer { localCommands.finishTurn() }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
         guard !transcript.isEmpty else {
             VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")
@@ -589,9 +594,21 @@ final class VoiceTurnController {
         return TurnResult(spoken: answer, actions: ["files \(path)"])
     }
 
-    /// Everything answered without the LLM, in order: local rules (`FastIntent`), the to-do and
-    /// brief phrases (`LocalTurns`), then the decision engine (Jev). nil means "LLM".
+    /// Everything answered without the LLM, in order: the local command machine, local rules
+    /// (`FastIntent`), the to-do and brief phrases (`LocalTurns`), then the decision engine (Jev).
+    /// nil means "LLM".
     private func understand(_ transcript: String, finalAt: ContinuousClock.Instant, speak: Bool) async -> TurnResult? {
+        // Restricted command-line turns keep the existing refusal. This path must not act ahead of it.
+        if !FeatureSettings.fastPathEnabled() || CLIAccess.turnRestricted {
+            localCommands.reset()
+        } else {
+            let decision = localCommands.receive(transcript, finalAt: finalAt, clock: .system,
+                                                 apps: LocalCommandWorkspace.installedApps())
+            let hasSession = notch.topBar.nowPlayingHub?.hasPlayerSession ?? false
+            if LocalCommandHook.shouldPerform(decision, hasSession: hasSession, spotifyInstalled: SpotifyPlayer.isInstalled) {
+                return localCommandResult(decision, transcript: transcript, speak: speak)
+            }
+        }
         let fast = FastPath.shared
         switch fast.rules(transcript) {
         case .hit(let plan, let engine): return await perform(plan, engine: engine, transcript: transcript, finalAt: finalAt, speak: speak)
@@ -625,6 +642,30 @@ final class VoiceTurnController {
         case .ask(let question, let engine): return askBack(question, engine: engine, transcript: transcript, speak: speak)
         case .miss: return nil
         }
+    }
+
+    /// A local command already decided. The action is started before the line is spoken.
+    private func localCommandResult(_ decision: LocalCommandDecision, transcript: String, speak: Bool) -> TurnResult {
+        var spoken = ""
+        var actions: [String] = []
+        for effect in decision.effects {
+            switch effect {
+            case .perform(let action):
+                LocalCommandWorkspace.perform(action, isPlaying: notch.topBar.nowPlaying?.isPlaying)
+                actions.append("local \(LocalCommandWorkspace.summary(action))")
+            case .speak(let line):
+                spoken = line
+            case .fallThrough:
+                break
+            }
+        }
+        VoiceLog.log("route", "local")
+        buddy.idle()
+        if !spoken.isEmpty {
+            if speak { say(spoken) } else { buddy.showCaption(spoken); buddy.hideCaption() }
+        }
+        remember(transcript, spoken)
+        return TurnResult(spoken: spoken, actions: actions)
     }
 
     /// Runs a fast action. The action starts first; the spoken ack follows in parallel.

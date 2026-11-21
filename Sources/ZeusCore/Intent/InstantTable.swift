@@ -200,14 +200,3 @@ public enum SpotlightQuery {
     }
 }
 
-/// Play resumes a paused session in place. Otherwise Spotify, when it is installed.
-public enum MediaPlayPolicy {
-    public enum Choice: Equatable, Sendable { case mediaKey, resumeSpotify }
-
-    /// A session that is already playing or paused stays on the media key. Spotify is only the fallback when nothing is loaded.
-    public static func choose(hasSession: Bool, spotifyInstalled: Bool) -> Choice {
-        if hasSession { return .mediaKey }
-        if spotifyInstalled { return .resumeSpotify }
-        return .mediaKey
-    }
-}
