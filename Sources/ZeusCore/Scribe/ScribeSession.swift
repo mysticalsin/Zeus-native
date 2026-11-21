@@ -220,10 +220,8 @@ public enum ScribeConnectingClock {
         now: TimeInterval,
         deadline: TimeInterval?
     ) -> ScribeTransition {
-        guard deadline != nil else { return .invalid }
+        guard let deadline, deadline.isFinite, now.isFinite, now >= deadline else { return .invalid }
         guard case .starting = machine.phase else { return .invalid }
-        // Armed, but this clock does not yet hand `now` to the session machine.
-        _ = now
-        return .invalid
+        return machine.tick(now: now)
     }
 }
