@@ -365,9 +365,13 @@ import Testing
             "com.zeus.app|assistant.key.openAI": "sk-canonical",
             "com.zeus.app|assistant.key.openai": "sk-legacy",
         ])
+        // Load must leave the legacy item in place, so the removal itself is what deletes it.
+        backend.failDelete = [AssistantKeyAccount.aliasOpenAI]
+        let store = KeychainStore(backend: backend, defaults: defaults())
+        #expect(store.get(AssistantKeyAccount.canonicalOpenAI) == "sk-canonical")
+        #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
         backend.failDelete = [AssistantKeyAccount.canonicalOpenAI]
         backend.failWrite = [AssistantKeyAccount.aliasOpenAI]
-        let store = KeychainStore(backend: backend, defaults: defaults())
         #expect(store.remove(AssistantKeyAccount.canonicalOpenAI) == false)
         #expect(backend.items["com.zeus.app|assistant.key.openAI"] == "sk-canonical")
         #expect(backend.items["com.zeus.app|assistant.key.openai"] == "sk-legacy")
