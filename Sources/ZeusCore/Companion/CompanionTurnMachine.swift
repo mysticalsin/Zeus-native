@@ -225,7 +225,8 @@ public struct CompanionTurnMachine: Sendable {
                 return Decision(phase: .error(line), commands: [.cancelLLM, .speakError(line)])
             case .timeout:
                 return Decision(phase: .error(timeoutSpokenLine), commands: [.cancelLLM, .speakError(timeoutSpokenLine)])
-            case .bargeIn, .cancel: return Decision(phase: .interrupted, commands: bargeCancels)
+            case .bargeIn: return Decision(phase: .listening, commands: bargeCancels + beginListening)
+            case .cancel: return Decision(phase: .interrupted, commands: bargeCancels)
             case .reset: return Decision(phase: .idle, commands: bargeCancels)
             default: return nil
             }
@@ -234,7 +235,8 @@ public struct CompanionTurnMachine: Sendable {
             case .firstAudio: return Decision(phase: .speaking, commands: [])
             case .audioFinished: return Decision(phase: .idle, commands: [])
             case .timeout: return Decision(phase: .idle, commands: [.stopSpeech])
-            case .bargeIn, .cancel: return Decision(phase: .interrupted, commands: bargeCancels)
+            case .bargeIn: return Decision(phase: .listening, commands: bargeCancels + beginListening)
+            case .cancel: return Decision(phase: .interrupted, commands: bargeCancels)
             case .reset: return Decision(phase: .idle, commands: bargeCancels)
             default: return nil
             }
