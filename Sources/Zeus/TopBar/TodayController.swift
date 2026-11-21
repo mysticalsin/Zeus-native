@@ -123,6 +123,7 @@ final class RemindersController {
     var draft = ""
     private let store = EKEventStore()
     private var observer: NSObjectProtocol?
+    private var snapshots = SnapshotGate()
 
     var allowed: Bool { access == .fullAccess }
 
@@ -136,6 +137,7 @@ final class RemindersController {
 
     func refresh() {
         guard !seeded else { return }
+        let token = snapshots.begin()
         access = EKEventStore.authorizationStatus(for: .reminder)
         guard allowed else { return }
         if observer == nil {
@@ -152,7 +154,12 @@ final class RemindersController {
                      flagged: (1...4).contains(reminder.priority), hasTime: reminder.dueDateComponents?.hour != nil)
             }
             .sorted { ($0.due ?? .distantFuture, $0.title) < ($1.due ?? .distantFuture, $1.title) }
-            DispatchQueue.main.async { MainActor.assumeIsolated { let shared = RemindersController.shared; shared.items = mapped; shared.loaded = true } }
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                let shared = RemindersController.shared
+                guard shared.snapshots.accepts(token) else { return }
+                shared.items = mapped
+                shared.loaded = true
+            } }
         }
     }
 
@@ -160,6 +167,7 @@ final class RemindersController {
     private var seeded = false
 
     func complete(_ id: String) {
+        _ = snapshots.begin()
         guard let reminder = store.calendarItem(withIdentifier: id) as? EKReminder else { return }
         reminder.isCompleted = true
         // Only leave the list once Reminders accepted the change; otherwise it would reappear on refresh.
@@ -227,15 +235,18 @@ final class NotificationsController {
     init() { enabled = UserDefaults.standard.bool(forKey: "notifications.mirror") }
 
     private var seeded = false
+    private var snapshots = SnapshotGate()
     func seedForSnapshot(_ items: [MirroredNotification]) { seeded = true; enabled = true; self.items = items; failure = nil; clearedThrough = 0; dismissed = [] }
 
     func refresh() {
         guard !seeded else { return }
+        let token = snapshots.begin()
         guard enabled else { items = []; failure = nil; return }
         let muted: Set<String> = [Bundle.main.bundleIdentifier ?? "app.zeus.mac"]
         Task.detached(priority: .utility) {
             let result = NotificationMirror.recent(limit: 40, muted: muted)
             await MainActor.run {
+                guard NotificationsController.shared.snapshots.accepts(token) else { return }
                 switch result {
                 case .success(let list):
                     // Muted apps (Settings > Notifications) stay out of the Alerts tab too.
