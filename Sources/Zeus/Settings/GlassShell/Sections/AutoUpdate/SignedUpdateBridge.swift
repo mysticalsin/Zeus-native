@@ -95,6 +95,7 @@ final class SignedUpdateBridge: NSObject {
 
     #if canImport(Sparkle)
     private var updater: SPUUpdater?
+    private var lastTrust: UpdateAppcastTrust = .unchecked
     private let userDriver = UpdatesUserDriver()
     private var installReply: ((SPUUserUpdateChoice) -> Void)?
     private var downloadCancellation: (() -> Void)?
@@ -123,8 +124,7 @@ final class SignedUpdateBridge: NSObject {
 
     fileprivate func sparkleReadyToInstall(reply: @escaping (SPUUserUpdateChoice) -> Void) {
         installReply = reply
-        finish(.downloadFinished)
-        finish(.verifyFinished(.valid))
+        finish(.downloaded(UpdateVerification.verdict(status: lastTrust)))
     }
 
     fileprivate func sparkleFailed(_ error: Error) {
@@ -142,8 +142,7 @@ final class SignedUpdateBridge: NSObject {
         )
         let downgrade = ns.domain == SUSparkleErrorDomain && ns.code == Int(SUError.downgradeError.rawValue)
         if signature {
-            finish(.downloadFinished)
-            finish(.verifyFinished(.invalid))
+            finish(.downloaded(.invalid))
         } else if downgrade {
             finish(.downloadFailed(.downgrade))
         } else {
@@ -192,11 +191,22 @@ extension SignedUpdateBridge: SPUUpdaterDelegate {
     }
 
     private func accepts(_ item: SUAppcastItem) -> Bool {
-        guard item.signingValidationStatus != .failed else { return false }
+        let status = Self.trust(item.signingValidationStatus)
+        lastTrust = status
+        guard UpdateVerification.allows(status: status, signatureString: enclosureSignature(item)) else { return false }
         guard let url = item.fileURL, UpdateFeedPolicy.isSecure(url) else { return false }
         guard let version = UpdateVersions.release(item.displayVersionString), version > context.currentVersion else { return false }
         guard let accepted, version == accepted.version else { return false }
-        return enclosureSignature(item).isEmpty == false
+        return true
+    }
+
+    private static func trust(_ status: SPUAppcastSigningValidationStatus) -> UpdateAppcastTrust {
+        switch status {
+        case .succeeded: return .valid
+        case .failed: return .failed
+        case .skipped: return .unchecked
+        @unknown default: return .unchecked
+        }
     }
 
     private func enclosureSignature(_ item: SUAppcastItem) -> String {

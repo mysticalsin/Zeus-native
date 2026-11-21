@@ -138,6 +138,30 @@ public enum UpdateSignatureVerdict: Equatable, Sendable {
     case missing
 }
 
+/// What the updater reported about the appcast signature. A signature string is not a result.
+public enum UpdateAppcastTrust: Equatable, Sendable {
+    case unchecked
+    case valid
+    case failed
+}
+
+public enum UpdateVerification {
+    /// Only an explicit valid status is accepted. An unchecked item stays refused.
+    public static func allows(status: UpdateAppcastTrust, signatureString: String) -> Bool {
+        _ = signatureString
+        return status == .valid
+    }
+
+    public static func verdict(status: UpdateAppcastTrust) -> UpdateSignatureVerdict {
+        status == .valid ? .valid : .invalid
+    }
+
+    /// One event, so a scheduler cannot deliver the download and the verdict out of order.
+    public static func events(for status: UpdateAppcastTrust) -> [UpdateEvent] {
+        [.downloaded(verdict(status: status))]
+    }
+}
+
 public enum UpdateSessionState: Equatable, Sendable {
     case disabled
     case idle
@@ -160,6 +184,8 @@ public enum UpdateEvent: Equatable, Sendable {
     case downloadRequested
     case downloadFinished
     case downloadFailed(UpdateFailureReason)
+    /// Download and verdict together. A separate verify event cannot arrive first.
+    case downloaded(UpdateSignatureVerdict)
     case verifyFinished(UpdateSignatureVerdict)
     case installRequested
     case installFinished(Bool)
@@ -296,6 +322,9 @@ public enum UpdateSession {
         case .downloadFinished:
             guard case .downloading(let candidate) = state else { return UpdateStep(state: state) }
             return UpdateStep(state: .verifying(candidate), effects: [.verify])
+        case .downloaded(let verdict):
+            guard case .downloading(let candidate) = state else { return UpdateStep(state: state) }
+            return finishVerify(candidate, verdict: verdict, context: context)
         case .downloadFailed(let reason):
             guard case .downloading = state else { return UpdateStep(state: state) }
             return UpdateStep(state: .failed(reason), effects: [.discardStagedUpdate])
