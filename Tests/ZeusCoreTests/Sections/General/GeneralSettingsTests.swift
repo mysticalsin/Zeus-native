@@ -266,6 +266,39 @@ struct GeneralSettingsTests {
         #expect(GeneralSettingsResolver.resolve(input).hapticsPlay == false)
     }
 
+    @Test func cardResetRestoresContributedKeysTheCatalogDoesNotHold() {
+        let blur = GeneralSectionSlot.backgroundBlur
+        let fullScreen = GeneralSectionSlot.hideInFullScreen
+        let haptic = GeneralSectionSlot.hapticFeedback
+        let writes = GeneralCardReset.valuesToWrite(GeneralCardReset.Input(
+            catalogValues: [
+                "general.windowTheme": "Light",
+                "general.launchAtLogin": "false",
+                "license.server": "https://licenses.example.com",
+            ],
+            catalogDefaults: [
+                "general.windowTheme": "Dark",
+                "general.launchAtLogin": "true",
+                "license.server": "",
+            ],
+            contributions: [blur, fullScreen, haptic],
+            contributionValues: [
+                blur.id: "55",
+                fullScreen.id: "true",
+                haptic.id: "true",
+            ],
+            menuBarShown: false
+        ))
+        #expect(writes[blur.id] == "40")
+        #expect(writes[fullScreen.id] == "false")
+        #expect(writes[haptic.id] == "false")
+        #expect(writes["general.windowTheme"] == "Dark")
+        #expect(writes["general.launchAtLogin"] == "false")
+        #expect(writes["license.server"] == "https://licenses.example.com")
+        #expect(writes[GeneralMenuBarIcon.key] == "true")
+        #expect(!writes.keys.contains("custom.extra"))
+    }
+
     @Test func resetKeepsTheLoginItemAndTheLicense() {
         let values = [
             "general.launchAtLogin": "false",
