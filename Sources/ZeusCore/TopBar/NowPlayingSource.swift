@@ -67,12 +67,15 @@ public enum ArtworkStrategy: Equatable, Sendable {
 public enum NowPlayingSource: Hashable, Sendable {
     case player(NowPlaying.Player)
     case browser(BrowserMediaKey)
+    /// This Mac's current audio, read by the local helper. It never outranks a player or a browser tab.
+    case system
 
     /// The word the notch uses for the source.
     public var kindName: String {
         switch self {
         case .player(let player): player.rawValue
         case .browser: "Chrome"
+        case .system: "This Mac"
         }
     }
 
@@ -81,6 +84,7 @@ public enum NowPlayingSource: Hashable, Sendable {
         switch self {
         case .player(let player): player.bundleID
         case .browser: "com.google.Chrome"
+        case .system: ""
         }
     }
 
@@ -89,6 +93,7 @@ public enum NowPlayingSource: Hashable, Sendable {
         switch self {
         case .player: [.playPause, .next, .previous, .seek, .shuffle, .repeatMode, .lyrics]
         case .browser: [.playPause, .seek, .lyrics]
+        case .system: []
         }
     }
 
@@ -100,6 +105,7 @@ public enum NowPlayingSource: Hashable, Sendable {
             case .spotify: .spotifyOEmbed
             }
         case .browser: .pageImage
+        case .system: .none
         }
     }
 
@@ -108,7 +114,7 @@ public enum NowPlayingSource: Hashable, Sendable {
     public var scriptedPlayer: NowPlaying.Player? {
         switch self {
         case .player(let player): player
-        case .browser: nil
+        case .browser, .system: nil
         }
     }
 
@@ -116,7 +122,7 @@ public enum NowPlayingSource: Hashable, Sendable {
     public var persistsDerivedData: Bool {
         switch self {
         case .player: true
-        case .browser: false
+        case .browser, .system: false
         }
     }
 }

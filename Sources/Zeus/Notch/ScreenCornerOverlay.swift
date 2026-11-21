@@ -89,6 +89,7 @@ final class ScreenCornerOverlay {
         for panel in panels {
             panel.orderOut(nil)
             panel.contentView = nil
+            panel.close()
         }
         panels = wanted.map { placement in
             let panel = Self.makePanel(visibleInShare: lastVisibleInShare)

@@ -585,6 +585,14 @@ final class LyricsToggle: ObservableObject {
     @Published var show = TopBarStyle.isSnapshot && LyricsToggle.snapshotShow
 }
 
+/// The music page asks this before it draws the large player. The same function is what the wiring test calls.
+enum PlayerChrome {
+    @MainActor
+    static func collapsed(model: TopBarModel, settingOn: Bool) -> Bool {
+        PlaybackCollapse.collapsed(isPlaying: model.nowPlaying?.isPlaying, settingOn: settingOn)
+    }
+}
+
 struct MusicPage: View {
     let topBar: TopBarModel
     /// The SwiftUI @State macro is unavailable to this toolchain, so the toggle lives in an ObservableObject.
@@ -598,8 +606,9 @@ struct MusicPage: View {
         let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
         // Lyrics a source cannot give are not shown, even if the toggle was on for the last one.
         let showLyrics = lyricsToggle.show && shown.contains(.lyrics)
+        let collapsed = PlayerChrome.collapsed(model: topBar, settingOn: SettingsStore.shared.bool(PlaybackCollapse.settingID))
         HStack(spacing: 14) {
-            AlbumTile(playing: topBar.nowPlaying, size: 132)
+            AlbumTile(playing: topBar.nowPlaying, size: collapsed ? 64 : 132)
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     if let playing = topBar.nowPlaying {
@@ -607,8 +616,16 @@ struct MusicPage: View {
                             .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
                             .lineLimit(1).truncationMode(.middle)
                     }
+                    if topBar.lockScreenPlayer != .off {
+                        Text(LockScreenPlayerText.line(topBar.lockScreenPlayer))
+                            .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
+                            .lineLimit(1)
+                    }
                     VStack(alignment: .leading, spacing: 8) {
-                        if showLyrics {
+                        if collapsed {
+                            Text(topBar.nowPlaying?.title ?? "Nothing playing")
+                                .font(TopBarStyle.label(15, .bold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
+                        } else if showLyrics {
                             Text([topBar.nowPlaying?.title, topBar.nowPlaying?.artist].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " \u{00B7} "))
                                 .font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
                             LyricsView(playing: topBar.nowPlaying, rows: 3, rowHeight: 24, fontSize: 14)
@@ -621,7 +638,7 @@ struct MusicPage: View {
                     }
                 }
                 Spacer(minLength: 0)
-                if let playing = topBar.nowPlaying {
+                if let playing = topBar.nowPlaying, !collapsed {
                     let tint = ArtworkStore.shared.tint(for: playing, saturation: 0.55, brightness: 1)
                     TickingView(interval: 1) { context in
                         let elapsed = scrub.fraction.map { $0 * playing.duration } ?? playing.elapsed(at: context.date)
@@ -658,6 +675,7 @@ struct MusicPage: View {
             }
         }
         .padding(.vertical, 6)
+        .animation(PlaybackCollapse.animates(reduceMotion: Motion.reduced) ? TopBarStyle.pageSpring : nil, value: collapsed)
         .onAppear { topBar.musicPageVisible = true }
         .onDisappear { topBar.musicPageVisible = false }
     }
@@ -1126,7 +1144,6 @@ private struct ClipboardRow: View {
 struct ShelfPage: View {
     let topBar: TopBarModel
     /// The stack whose files are laid out in a ribbon, if one is open.
-    @State private var openStack: UUID?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1142,23 +1159,13 @@ struct ShelfPage: View {
             .frame(maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous)
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
-            .animation(Motion.live(MotionTokens.panelResize), value: topBar.shelfTargeted)
+            .animation(Motion.live(MotionTokens.shelfTarget), value: topBar.shelfTargeted)
 
             VStack(alignment: .leading, spacing: 4) {
-                if let fling = topBar.fling { FlingNearbyStrip(fling: fling, topBar: topBar) }
                 PageScroll(.horizontal) {
                     HStack(spacing: 8) {
-                        if let openStack, case let files = topBar.shelf.filter({ $0.stackID == openStack }), files.count > 1 {
-                            FlingStackRibbon(items: files, topBar: topBar) { self.openStack = nil }
-                        } else {
-                            ForEach(ShelfStacks.cells(topBar.shelf)) { cell in
-                                switch cell {
-                                case .item(let item):
-                                    ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item, fling: topBar.fling) }
-                                case .stack(let id, let items):
-                                    FlingStackCell(stack: id, items: items, topBar: topBar) { openStack = id }
-                                }
-                            }
+                        ForEach(topBar.shelf) { item in
+                            ShelfCell(item: item, topBar: topBar).contextMenu { ShelfBrainMenu(url: item.url, item: item) }
                         }
                     }
                 }
@@ -1186,21 +1193,10 @@ struct ShelfCell: View {
         VStack(spacing: 5) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                 .resizable().frame(width: 52, height: 52)
-                .overlay(alignment: .bottomTrailing) {
-                    if item.verified {
-                        Image(systemName: "checkmark.seal.fill").font(.system(size: 11)).foregroundStyle(Theme.leaf)
-                            .accessibilityLabel("Verified")
-                    }
-                }
             Text(item.name).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 84)
             HStack(spacing: 0) {
-                if let fling = topBar.fling, fling.isEnabled {
-                    FlingPickerMenu(items: [item], fling: fling)
-                    FlingFlickHandle(items: [item], fling: fling, sensitivity: fling.flickSensitivity)
-                } else {
-                    GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
-                        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
-                    }
+                GlyphButton(symbol: "airplayaudio", size: 9, tint: Theme.cloudSecondary, label: "AirDrop") {
+                    NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [item.url])
                 }
                 if item.isMedia {
                     GlyphButton(symbol: "text.bubble", size: 9, tint: Theme.cloudSecondary, label: "Transcribe") { topBar.transcribeFile(item.url) }
@@ -1274,6 +1270,12 @@ struct FocusPage: View {
                             NotchActionButton(title: "Stop", tint: Theme.cloudSecondary, filled: false) { topBar.focus.stop() }
                         }
                     }
+                }
+                if topBar.systemFocus != .off {
+                    Text(FocusNameStatusText.line(topBar.systemFocus))
+                        .font(TopBarStyle.label(10.5))
+                        .foregroundStyle(Theme.cloudSecondary)
+                        .lineLimit(2)
                 }
                 Spacer()
             }
@@ -1618,8 +1620,6 @@ struct ClosedWings: View {
         case .rain: ("cloud.rain.fill", Theme.sky)
         case .decided: ("checkmark.circle.fill", Theme.bolt)
         case .screenshot: ("camera.fill", Theme.bolt)
-        case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
-        case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1654,12 +1654,6 @@ struct ClosedWings: View {
             Text("+\(count)").font(TopBarStyle.label(11, .bold)).foregroundStyle(Theme.bolt)
         case .screenshot(let title):
             Text(title).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
-        case .flingArrived(let count, let from):
-            Text("\(count) from \(from)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
-        case .flingSent(let count, let to):
-            Text("Sent \(count) to \(to)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
-        case .flingProblem(let text):
-            Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .permission(let text, let pane):

@@ -2,7 +2,7 @@ import Foundation
 
 /// One word of a lyric line with the estimated seconds it starts and ends being sung.
 /// `text` keeps the whitespace that followed the word, so the words of a line join back into the line.
-public struct LyricWord: Equatable, Sendable {
+public struct LyricWord: Equatable, Codable, Sendable {
     public var text: String
     public var start: Double
     public var end: Double
@@ -26,6 +26,22 @@ public enum LyricWordTiming {
             if isCJK(scalar) { cjk += 1 } else { other.unicodeScalars.append(scalar) }
         }
         return cjk + otherUnits(other)
+    }
+
+    /// Stamped words when the line has them, with the last word ending at `lineEnd`. Otherwise the span is split evenly.
+    public static func displayWords(in line: LyricLine, lineEnd: Double) -> [LyricWord] {
+        if var stamps = line.wordStamps, !stamps.isEmpty {
+            if let last = stamps.indices.last, lineEnd > stamps[last].start {
+                stamps[last].end = lineEnd
+            }
+            return stamps
+        }
+        let end = max(line.time, lineEnd)
+        let slices = WordTiming.words(line.text, start: line.time, end: end)
+        return slices.enumerated().map { index, word in
+            let text = index == slices.count - 1 ? word.text : word.text + " "
+            return LyricWord(text: text, start: word.start, end: word.end)
+        }
     }
 
     /// The words of `line`, timed over a sung span of `min(lineEnd - line.time, max(1.0, units * 0.45))`.

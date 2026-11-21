@@ -19,6 +19,12 @@ public enum MotionTokens {
     public static let panelOpenHeight = SpringToken(response: 0.105, damping: 1.0)
     /// Panel close: critically damped, no overshoot, fitted to the recorded close heights.
     public static let panelClose = SpringToken(response: 0.175, damping: 1.0)
+    /// The close the notch actually plays: linear, a tenth of a second.
+    public static let closeDuration = 0.1
+    /// Agent session count in the notch.
+    public static let sessionCount = SpringToken(response: 0.42, damping: 0.8)
+    /// The shelf drop target lighting up.
+    public static let shelfTarget = SpringToken(response: 0.3, damping: 0.7)
     /// Panel resize on a tab change, and page content.
     public static let panelResize = SpringToken(response: 0.34, damping: 0.84)
     /// HUD cue wings growing: settles in about 105 ms over 120 pt.

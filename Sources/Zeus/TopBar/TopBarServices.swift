@@ -12,6 +12,11 @@ final class TopBarServices {
     let model: TopBarModel
     /// What the notch shows from Music, Spotify and later sources, and where a music command goes.
     let nowPlayingHub: NowPlayingHub
+    let systemNowPlaying: SystemNowPlayingFeed
+    let receiverNames: ReceiverNameBrowser
+    let earbudOverlay: EarbudOverlayController
+    let focusName: FocusNameController
+    let lockScreenPlayer: LockScreenPlayerController
     private let musicFeed: MusicPlayerFeed
     private let browserFeed: BrowserMediaFeed
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
@@ -32,21 +37,36 @@ final class TopBarServices {
     private var rainGate = RainAlertGate()
     private var hudMonitor: SystemHUDMonitor?
     private var intakeWatcher: AirDropScreenshotWatcher?
-    private(set) var flingService: FlingService?
-    private var flingPrompts: FlingPromptPanelController?
-    private var flingPapers: FlingPaperController?
-    /// Whether the notch is open. Fling reads it only when background receiving is off.
-    var notchIsOpen: @MainActor () -> Bool = { true }
 
     init(model: TopBarModel) {
         self.model = model
         nowPlayingHub = NowPlayingHub(model: model, ports: NowPlayingHub.livePorts(model: model))
+        systemNowPlaying = SystemNowPlayingFeed(hub: nowPlayingHub)
+        receiverNames = ReceiverNameBrowser()
+        earbudOverlay = EarbudOverlayController(model: model)
+        focusName = FocusNameController(model: model)
+        lockScreenPlayer = LockScreenPlayerController(model: model)
         musicFeed = MusicPlayerFeed(hub: nowPlayingHub, model: model)
         browserFeed = BrowserMediaFeed(hub: nowPlayingHub, model: model)
     }
 
     func start() {
         nowPlayingHub.attach()
+        if SettingsStore.shared.bool(SystemNowPlayingLaunch.settingID) {
+            systemNowPlaying.setEnabled(true)
+        }
+        if SettingsStore.shared.bool(ReceiverCatalog.settingID) {
+            receiverNames.setEnabled(true)
+        }
+        if SettingsStore.shared.bool(EarbudOverlayRule.settingID) {
+            earbudOverlay.setEnabled(true)
+        }
+        if SettingsStore.shared.bool(FocusNameStore.settingID) {
+            focusName.setEnabled(true)
+        }
+        if SettingsStore.shared.bool(LockScreenPlayerGate.settingID) {
+            lockScreenPlayer.setEnabled(true)
+        }
         model.chooseOutputDevice = { [weak self] in self?.showOutputDevices() }
         model.requestCalendarAccess = { [weak self] in self?.requestCalendar() }
         model.refreshWeather = { [weak self] in self?.fetchWeather(force: true) }
@@ -66,7 +86,6 @@ final class TopBarServices {
         refreshCalendarIfAllowed()
         fetchWeather(force: false)
         updateIntakeWatcher()
-        updateFlingService()
         BannerAutoDismisser.shared.update()
 
         every(1) { [weak self] in self?.tickFocus() }
@@ -98,16 +117,26 @@ final class TopBarServices {
     // MARK: Output devices
 
     private func showOutputDevices() {
-        let devices = OutputDevices.all()
+        let devices = OutputDeviceMenuRows.make(OutputDevices.all())
+        let receivers = OutputDeviceMenuRows.receivers(receiverNames.names)
         let menu = NSMenu(title: "Output")
         for device in devices {
             let item = NSMenuItem(title: device.name, action: #selector(OutputDeviceTarget.choose(_:)), keyEquivalent: "")
             item.target = OutputDeviceTarget.shared
             item.representedObject = device.id
             item.state = device.isDefault ? .on : .off
+            item.image = NSImage(systemSymbolName: device.symbol, accessibilityDescription: device.name)
             menu.addItem(item)
         }
-        if devices.isEmpty { menu.addItem(withTitle: "No outputs found", action: nil, keyEquivalent: "") }
+        if devices.isEmpty, receivers.isEmpty { menu.addItem(withTitle: "No outputs found", action: nil, keyEquivalent: "") }
+        if !receivers.isEmpty {
+            if !devices.isEmpty { menu.addItem(.separator()) }
+            for row in receivers {
+                let item = NSMenuItem(title: row.name, action: nil, keyEquivalent: "")
+                item.image = NSImage(systemSymbolName: row.symbol, accessibilityDescription: row.name)
+                menu.addItem(item)
+            }
+        }
         model.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
         model.menuOpen = false
@@ -433,27 +462,6 @@ final class TopBarServices {
             throw URLError(.cannotFindHost)
         }
         return place
-    }
-
-    // MARK: Fling
-
-    /// Builds Fling once and lets Settings drive it. Nothing listens until `fling.enabled` is on.
-    func updateFlingService() {
-        if flingService == nil {
-            let service = FlingService(model: model, transport: FlingService.liveEndpoint())
-            service.notchIsOpen = { [weak self] in self?.notchIsOpen() ?? true }
-            model.shelfPersistence = FlingShelfPersistence(url: FlingService.supportDirectory.appendingPathComponent("Shelf/shelf.json"))
-            model.loadPersistedShelf()
-            model.fling = service
-            flingService = service
-            FlingService.current = service
-            flingPrompts = FlingPromptPanelController(fling: service)
-            let papers = FlingPaperController()
-            flingPapers = papers
-            service.presentPapers = { [weak papers] urls, peer in papers?.show(urls: urls, from: peer) }
-            service.observeSettings()
-        }
-        flingService?.reconfigure()
     }
 
     // MARK: Intake (AirDrop and Screenshots)

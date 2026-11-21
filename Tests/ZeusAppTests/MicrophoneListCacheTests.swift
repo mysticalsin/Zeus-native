@@ -85,14 +85,21 @@ struct MicrophoneListCacheTests {
 
     @Test @MainActor func readsAfterAnInvalidationReturnThePreviousSnapshotWithoutEnumeratingOnMain() {
         let counter = Counter()
+        let gate = Gate()
         let box = Box([Self.usb, Self.builtIn])
-        let cache = Self.gated(counter, Gate(), box)
+        let cache = Self.gated(counter, gate, box)
         Self.warm(cache)
         #expect(counter.enumerations == 1)
         box.devices = [Self.builtIn]
+        // Hold the refresh open. On a quiet machine it otherwise lands before the next read, and the
+        // stale snapshot the contract promises is gone before the assertion.
+        gate.arm()
         cache.invalidate()
+        _ = cache.devices()
+        gate.entered.wait()
         for _ in 0..<10 { #expect(cache.devices() == [Self.usb, Self.builtIn], "stale while revalidating") }
         #expect(counter.mainEnumerations == 0, "no enumeration on the main thread after a device event")
+        gate.release.signal()
         Self.settle(cache)
         #expect(cache.devices() == [Self.builtIn], "the background refresh landed")
         #expect(counter.enumerations == 2)
