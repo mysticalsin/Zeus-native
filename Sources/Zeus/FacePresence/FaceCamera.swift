@@ -93,6 +93,14 @@ final class FaceCamera: NSObject, FaceFrameSource, @unchecked Sendable {
     /// The output does not keep its delegate alive, so this does.
     private var delegate: FrameDelegate?
     private var observers: [NSObjectProtocol] = []
+    private let deviceLock = NSLock()
+    private var externalDevice = false
+
+    /// True when the opened camera is not a built-in camera. A check treats that as a virtual camera.
+    var openedExternal: Bool {
+        deviceLock.lock(); defer { deviceLock.unlock() }
+        return externalDevice
+    }
 
     func start(deliver: @escaping @Sendable (FaceFrame) -> Void, report: @escaping @Sendable (FaceCameraEvent) -> Void) {
         let run = gate.open(deliver: deliver)
@@ -148,6 +156,9 @@ final class FaceCamera: NSObject, FaceFrameSource, @unchecked Sendable {
                 if gate.isCurrent(run) { report(event) }
             }
         }
+        deviceLock.lock()
+        externalDevice = device.deviceType != .builtInWideAngleCamera
+        deviceLock.unlock()
         session.startRunning()
     }
 
