@@ -103,6 +103,14 @@ Each real defect was committed as a failing test, then the fix.
 - Test: `65ac6dc` `tests/sweep_hunt.rs`
 - Fix: `10a7474`
 
+## 16. Security review (ARTEX at 583c3dcc)
+
+- Lens: IPC sockets. Checked against head `c569f6fa`.
+- Test: `c582fb4` `tests/sweep_security.rs`
+- Fix: `69572c9`
+- E-02: fixed in `69572c9`. `serve` accepts Zeus only on the 0600 socket and applies `SO_PEERCRED` / `getpeereid` against `geteuid`. `serve_one_with` takes an injected `PeerCheck`, and a scripted foreign uid is `PermissionDenied`. The child socket is bound the same way, its connection is peer-checked, and both sockets are unlinked on exit. The child socket is mode 0600 and its parent, when created here, is mode 0700.
+- E-04: the chmod-after-bind race was already fixed by `10a7474` (umask `0177` and `fchmod` on the bound fd, no `set_permissions` on the path). `69572c9` also creates a missing parent directory at mode 0700. `e02_child_socket_is_0600_inside_a_0700_dir` locks both modes.
+
 ## H-external
 
 | ID | Test | Fix | Result |
