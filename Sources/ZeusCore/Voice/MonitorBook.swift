@@ -8,13 +8,14 @@ public struct MonitorBook: Equatable, Sendable {
     public init() {}
 
     public mutating func startLocal() -> Bool {
-        // Red: every call installs another local monitor.
-        local += 1
+        if local > 0 { return false }
+        local = 1
         return true
     }
 
     public mutating func startGlobal() -> Bool {
-        global += 1
+        if global > 0 { return false }
+        global = 1
         return true
     }
 }

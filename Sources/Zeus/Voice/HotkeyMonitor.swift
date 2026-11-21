@@ -118,6 +118,7 @@ final class HotkeyMonitor {
     var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
 
     private var keyMonitors: [Any] = []
+    private var monitors = MonitorBook()
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
     private var pair = TalkKeyPair()
@@ -140,6 +141,7 @@ final class HotkeyMonitor {
     }
 
     func start() {
+        guard monitors.startLocal() else { return }
         if keysStillDown == nil { keysStillDown = ordinaryKeysDownInTheSystem }
         observeConsumedKeys()
         observeSleep()
@@ -160,6 +162,7 @@ final class HotkeyMonitor {
 
     /// Global monitors only once access is on, so macOS never prompts mid-use.
     private func startGlobal() {
+        guard monitors.startGlobal() else { return }
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
             let time = event.timestamp
