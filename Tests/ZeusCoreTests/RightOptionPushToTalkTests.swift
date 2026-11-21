@@ -84,6 +84,15 @@ struct RightOptionPushToTalkTests {
         #expect(RightOptionPushToTalk.yield(named: "Talk to Zeus") == nil)
     }
 
+    @Test func aPressDuringAnotherTurnDoesNotStart() {
+        var machine = RightOptionPushToTalk()
+        #expect(machine.send(.rightOption(down: true, otherTurnOpen: true)).isEmpty)
+        #expect(machine.phase != .listening)
+        #expect(machine.send(.rightOption(down: false, otherTurnOpen: false)).isEmpty)
+        #expect(machine.phase == .idle)
+        #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])
+    }
+
     @Test func aLostKeyUpOnFocusChangeStopsListening() {
         var machine = RightOptionPushToTalk()
         #expect(machine.send(.rightOption(down: true, otherTurnOpen: false)) == [.start])

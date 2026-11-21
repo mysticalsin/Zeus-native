@@ -109,13 +109,9 @@ struct HotkeyMonitorMachineTests {
     @Test func theSecondKeyCallsPressOnceAndReleaseOnce() async throws {
         let (monitor, calls) = make(second: .rightOption)
         rightOptionDown(monitor)
-        try await wait(0.1)
-        #expect(calls.presses == 0, "Right Option waits a quarter second: \(calls.log)")
-        try await wait(0.4)
-        #expect(calls.presses == 1, "\(calls.log)")
+        #expect(calls.log == ["press"], "key-down starts listening: \(calls.log)")
         rightOptionUp(monitor)
-        try await wait(0.1)
-        #expect(calls.log == ["press", "release"], "\(calls.log)")
+        #expect(calls.log == ["press", "release"], "key-up stops: \(calls.log)")
     }
 
     @Test func aSecondKeyPressDuringAPrimaryTurnCallsNothing() async throws {
@@ -157,14 +153,15 @@ struct HotkeyMonitorMachineTests {
         let clock = FakeClock()
         monitor.now = { clock.seconds }
         rightOptionDown(monitor)
+        #expect(calls.log == ["press"], "key-down starts: \(calls.log)")
         clock.seconds = 0.3
         monitor.feed(.flags(keyCode: 59, modifiers: [.control, .option]), at: 0.3)
-        #expect(calls.log == ["press", "cancel"], "Right Option started at 0.25, Control cancelled it, and the primary start is swallowed: \(calls.log)")
+        #expect(calls.log == ["press"], "Control beside Option does not cancel or toggle: \(calls.log)")
         try await wait(0.4)
         monitor.feed(.flags(keyCode: 59, modifiers: [.option]), at: 0.8)
         monitor.feed(.flags(keyCode: 61, modifiers: []), at: 0.8)
         try await wait(0.1)
-        #expect(calls.log == ["press", "cancel"], "\(calls.log)")
+        #expect(calls.log == ["press", "release"], "release stops: \(calls.log)")
     }
 
     @Test func aGapSendDueBeforeASecondKeyReleaseIsOneSendWhenTheTimerIsLate() async throws {
@@ -182,64 +179,53 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log == ["press", "release"], "one turn, sent once, no second start: \(calls.log)")
     }
 
-    @Test func aSpaceDownAtTheReleaseOfASecondKeyTurnCancelsItInsteadOfSendingIt() async throws {
-        // Space may be held by a launcher on Option-Space that Zeus cannot see; the system's own key state says it is down.
+    @Test func aSpaceDownAtTheReleaseOfRightOptionStillStops() async throws {
+        // Option together with Space does not cancel push-to-talk. Release stops.
         let (monitor, calls) = make(second: .rightOption)
         var spaceDown = false
         monitor.keysStillDown = { spaceDown ? $0.intersection([49]) : [] }
         rightOptionDown(monitor)
-        try await wait(0.5)
         spaceDown = true
         rightOptionUp(monitor)
-        try await wait(0.1)
-        #expect(calls.log == ["press", "cancel"], "\(calls.log)")
+        #expect(calls.log == ["press", "release"], "Space beside Option does not cancel: \(calls.log)")
         spaceDown = false
         rightOptionDown(monitor)
-        try await wait(0.5)
         rightOptionUp(monitor)
-        try await wait(0.1)
-        #expect(calls.log == ["press", "cancel", "press", "release"], "a plain release still sends: \(calls.log)")
+        #expect(calls.log == ["press", "release", "press", "release"], "a plain release still stops: \(calls.log)")
     }
 
-    @Test func aMouseDownWhileTheSecondKeyIsHeldCancelsItAndNeverSendsIt() async throws {
+    @Test func aMouseDownWhileRightOptionIsHeldDoesNotCancelIt() async throws {
         let (monitor, calls) = make(second: .rightOption)
         rightOptionDown(monitor)
-        try await wait(0.5)
         monitor.mouseDown()
         rightOptionUp(monitor)
-        try await wait(0.1)
-        #expect(calls.log == ["press", "cancel"], "\(calls.log)")
+        #expect(calls.log == ["press", "release"], "a click does not cancel the hold: \(calls.log)")
     }
 
-    @Test func aMouseClickHeardLateIsReadAtTheTimeItHappened() async throws {
-        // Right Option down at 0, the click at 0.2, the main thread busy until 0.3: the 0.25 confirm has not passed at the click, so
-        // the press is dropped, and onPress is never called.
+    @Test func aMouseClickDoesNotDropRightOption() async throws {
+        // Right Option down at 0, the click at 0.2, heard at 0.3. The click does not cancel. Release stops.
         let (monitor, calls) = make(second: .rightOption)
         let clock = FakeClock()
         monitor.now = { clock.seconds }
         rightOptionDown(monitor)
         clock.seconds = 0.3
         monitor.mouseDown(at: 0.2)
-        #expect(calls.log == [], "the click came inside the confirm: \(calls.log)")
-        try await wait(0.4)
+        #expect(calls.log == ["press"], "the click did not drop the hold: \(calls.log)")
         rightOptionUp(monitor)
-        try await wait(0.1)
-        #expect(calls.log == [], "nothing started, nothing sent: \(calls.log)")
+        #expect(calls.log == ["press", "release"], "\(calls.log)")
     }
 
-    @Test func aLauncherSpaceTappedDuringTheHoldCancelsItAtTheRelease() async throws {
-        // Option-Space tapped and let go inside the hold, between two looks at the keyboard, is never in the picture at the release.
+    @Test func aLauncherSpaceDuringRightOptionDoesNotCancelIt() async throws {
+        // Option together with Space does not end the hold. A repeated Right Option down is not a toggle.
         let (monitor, calls) = make(second: .rightOption)
         var spaceDown = false
         monitor.keysStillDown = { spaceDown ? $0.intersection([49]) : [] }
         rightOptionDown(monitor)
-        try await wait(0.4)
         spaceDown = true
         monitor.feed(.flags(keyCode: 61, modifiers: [.option]))
         spaceDown = false
         rightOptionUp(monitor)
-        try await wait(0.1)
-        #expect(calls.log == ["press", "cancel"], "a Space seen during the hold means the person was not talking: \(calls.log)")
+        #expect(calls.log == ["press", "release"], "Space beside Option does not cancel the hold: \(calls.log)")
     }
 
     @Test func aMouseDownDuringTheControlOptionKeyChangesNothing() async throws {
@@ -252,16 +238,17 @@ struct HotkeyMonitorMachineTests {
         #expect(calls.log == ["press", "release"], "\(calls.log)")
     }
 
-    @Test func aSecondKeyTurnedOffDuringAHandsFreeTurnIsCancelledAtOnce() async throws {
+    @Test func aDoubleTapOfRightOptionDoesNotLatch() async throws {
         let (monitor, calls) = make(second: .rightOption)
         var second: Shortcut? = .rightOption
         monitor.secondKeyProvider = { second }
         rightOptionDown(monitor); rightOptionUp(monitor)
         rightOptionDown(monitor); rightOptionUp(monitor)
-        #expect(calls.log == ["press"], "a double tap goes hands-free: \(calls.log)")
+        #expect(calls.log == ["press", "release", "press", "release"], "a tap does not latch: \(calls.log)")
+        rightOptionDown(monitor)
         second = nil
         monitor.configChanged()
-        #expect(calls.log == ["press", "cancel"], "the next sync point applies the change at once: \(calls.log)")
+        #expect(calls.log == ["press", "release", "press", "release", "press", "release"], "turning the key off stops the hold: \(calls.log)")
     }
 
     @Test func theDictationMonitorNeverHearsTheSecondKey() async throws {

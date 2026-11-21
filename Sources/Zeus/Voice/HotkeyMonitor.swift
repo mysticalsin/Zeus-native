@@ -121,6 +121,8 @@ final class HotkeyMonitor {
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
     private var pair = TalkKeyPair()
+    /// Right Option is strict push-to-talk. The hold machine can latch a second tap and cancel when another key joins, so Right Option does not go through it.
+    private var rightOptionTalk = RightOptionPushToTalk()
     /// A Space was seen down while the second key's turn was open (`lookForALauncherSpace`).
     private var launcherSpaceSeen = false
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
@@ -150,6 +152,11 @@ final class HotkeyMonitor {
             MainActor.assumeIsolated { if let converted { self?.feed(converted, at: time) } }
             return event
         }) { keyMonitors.append(local) }
+        // Focus leaving this app can drop the Right Option key-up. This is an application notification, not an event tap, and it raises no permission prompt.
+        keyMonitors.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.focusChanged() }
+        })
         if let localMouse = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDowns, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.mouseDown(at: event.timestamp) }
             return event
@@ -204,6 +211,7 @@ final class HotkeyMonitor {
             send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         send(.key(event, at: at))
+        driveRightOption(event)
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
@@ -212,11 +220,22 @@ final class HotkeyMonitor {
     func turnEnded() { send(.abandon(turn: ownerTurn)) }
 
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
-    func interrupt() { send(.interrupt(live: liveModifiers())) }
+    func interrupt() {
+        stopRightOptionBecauseTheKeyUpWillNotArrive()
+        send(.interrupt(live: liveModifiers()))
+    }
+
+    /// Focus left this app. A Right Option key-up that never arrives stops listening.
+    func focusChanged() { stopRightOptionBecauseTheKeyUpWillNotArrive() }
 
     /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
-    /// second key off in the middle of a hands-free turn must.
-    func configChanged() { tick() }
+    /// second key off in the middle of a hands-free turn must. Right Option that is no longer the talk key stops at once.
+    func configChanged() {
+        if rightOptionTalk.phase == .listening, !strictRightOption {
+            stopRightOptionBecauseTheKeyUpWillNotArrive()
+        }
+        tick()
+    }
 
     /// A mouse button went down (left, right, other, a drag starts with one): an Option-click or Option-drag is not a talk turn.
     /// The second talk key's turn, armed or held, is over and never sent; the primary key is not told (`TalkKeyPair.mouseDown`).
@@ -256,7 +275,8 @@ final class HotkeyMonitor {
     // MARK: Effects
 
     private var config: VoiceKeyMachine.Config {
-        let key = keyProvider()
+        var key = keyProvider()
+        if role == .talk, key == .rightOption { key = nil }
         let shared = sharedProvider()
         let toggle = role == .dictation && !shared && directPressProvider()
         return VoiceKeyMachine.Config(key: key,
@@ -268,12 +288,55 @@ final class HotkeyMonitor {
     }
 
     /// The second talk key's config: a hold key with the typing confirm (or tiling's, when longer) and no chord. Only the talk
-    /// role has one.
+    /// role has one. Right Option is handled by `rightOptionTalk`, so this machine never sees it.
     private var secondConfig: VoiceKeyMachine.Config {
         let key = role == .talk ? secondKeyProvider() : nil
-        return VoiceKeyMachine.Config(key: key, role: .talk, mode: .hold,
-                                      voiceOverHoldsKey: key == .controlOption && voiceOverProvider(),
-                                      confirm: key.map { VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm($0)) } ?? 0, chord: nil)
+        let machineKey: Shortcut? = key == .rightOption ? nil : key
+        return VoiceKeyMachine.Config(key: machineKey, role: .talk, mode: .hold,
+                                      voiceOverHoldsKey: machineKey == .controlOption && voiceOverProvider(),
+                                      confirm: machineKey.map { VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm($0)) } ?? 0, chord: nil)
+    }
+
+    /// Right Option is the talk key or the second talk key. Yields already return nil from those providers.
+    private var strictRightOption: Bool {
+        guard role == .talk else { return false }
+        return keyProvider() == .rightOption || secondKeyProvider() == .rightOption
+    }
+
+    private func driveRightOption(_ event: ShortcutEvent) {
+        guard strictRightOption else { return }
+        let otherTurn = pair.owner != nil
+        switch event {
+        case .flags(let code, _):
+            if code == RightOptionPushToTalk.rightKeyCode {
+                let down = pair.keys.deviceKeys.contains(code)
+                applyRightOption(rightOptionTalk.send(.rightOption(down: down, otherTurnOpen: otherTurn)))
+            } else if code == RightOptionPushToTalk.leftKeyCode {
+                let down = pair.keys.deviceKeys.contains(code)
+                applyRightOption(rightOptionTalk.send(.leftOption(down: down)))
+            } else {
+                applyRightOption(rightOptionTalk.send(.otherKey))
+            }
+        case .keyDown, .keyUp:
+            applyRightOption(rightOptionTalk.send(.otherKey))
+        }
+    }
+
+    private func stopRightOptionBecauseTheKeyUpWillNotArrive() {
+        applyRightOption(rightOptionTalk.send(.focusChanged))
+    }
+
+    private func applyRightOption(_ effects: [RightOptionPushToTalk.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .start:
+                VoiceLog.log("key", "talk shortcut down (Right Option)")
+                if onPress?() == false { rightOptionTalk.refuseStart() }
+            case .stop:
+                VoiceLog.log("key", "talk shortcut (Right Option) released")
+                onRelease?()
+            }
+        }
     }
 
     /// The effects of one event run in order after the machine has handled it, so an owner that calls `turnEnded()` from
@@ -296,6 +359,10 @@ final class HotkeyMonitor {
                 started += 1
                 let turn = before + started
                 ownerTurn = turn
+                if rightOptionTalk.phase == .listening {
+                    send(.abandon(turn: turn))
+                    break
+                }
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
                 if onPress?() == false { send(.abandon(turn: turn)) }

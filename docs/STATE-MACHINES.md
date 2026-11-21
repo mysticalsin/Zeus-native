@@ -76,6 +76,13 @@ reviewed and left, Pointing is explicit (22). Nothing could be compiled in the a
 - Rules: I10 one talk turn across both keys (a start while a turn is open never reaches the owner), I11 the other key waits after a turn ends until every key is up, I8p only the key that opened a hands-free turn ends it. Right Option waits 0.25 s, so a letter inside it (an accent) starts nothing.
 - Tests: `TalkKeyPairTests` (the cases of the plan), `VoiceKeyWalkTests` runs K and K0 with the arbiter checked on every order and `theSearchSeesAPairThatLetsTheOtherKeyStart`, `HotkeyMonitorMachineTests` (the adapter).
 
+### 29. Right Option strict push-to-talk. EXPLICIT (2026-11-21)
+- Where: `ZeusCore/RightOptionPushToTalk.swift` (`RightOptionPushToTalk`), driven by `Zeus/Voice/HotkeyMonitor.swift` when the talk key or the second talk key is Right Option. The hold machine does not see that key. A recorded second key that is not Right Option still uses `TalkKeyPair`.
+- States: idle, listening, quiet. Events: right option down or up, left option, another key, focus changed. Effects: start, stop.
+- Rules: key-down starts and key-up stops. A repeated down does not toggle. A tap returns to idle. Another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A key-up lost on focus change stops listening and ignores further downs until an up. Another open talk turn does not start a second listen.
+- No new event tap and no new permission. Focus uses `NSApplication.didResignActiveNotification`.
+- Tests: `RightOptionPushToTalkTests`.
+
 ## Fixed
 
 ### 1. Dictation job phase (live, file, history re-run). FIXED, severity high

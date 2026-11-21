@@ -5743,6 +5743,41 @@
           ]
         },
         {
+          "id": "F11.right-option-strict-ptt",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Right Option is strict push-to-talk. Key-down starts listening and key-up stops it. A tap never latches. Option together with another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A key-up lost on focus change stops listening.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "holdingRightOptionStartsListeningAndARepeatDoesNotToggle"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "releasingRightOptionStopsListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aQuickTapStartsAndStopsAndNeverLatches"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "optionWithAnotherKeyDoesNotCancelOrToggle"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "leftOptionDoesNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "eachYieldKeepsRightOptionQuiet"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aLostKeyUpOnFocusChangeStopsListening"
+            }
+          ]
+        },
+        {
           "id": "F11.speech-input-recovery",
           "check": "native-SpeechInputRecoveryTests",
           "acceptance": "A stop that lands during capture recovery never reopens the microphone, an input with no format is retried a bounded number of times and ends the turn, a turn that is already over schedules no retry, and a changed format with no converter ends the turn. A fake capture engine: no audio hardware or speech recognition.",
