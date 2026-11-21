@@ -4,15 +4,30 @@ import Testing
 
 @Suite("Right Command tap")
 struct RightCommandTapTests {
-    @Test func soloTapTogglesListeningAndPlaysTheTalkCues() {
+    @Test func aSoloTapAsksForMurmurAndDoesNotArmTalk() {
         var tap = RightCommandTap()
         #expect(tap.rightDown(at: 0, otherKeyDown: false).isEmpty)
         let started = tap.rightUp(at: 0.12)
-        #expect(tap.listening)
-        #expect(started == [.toggle(listening: true, cue: startCue)])
-        let stopped = tap.rightUp(at: 1.2, afterDownAt: 1.05)
+        #expect(started == [.murmur])
         #expect(!tap.listening)
-        #expect(stopped == [.toggle(listening: false, cue: endCue)])
+        let again = tap.rightUp(at: 1.2, afterDownAt: 1.05)
+        #expect(again == [.murmur])
+        #expect(!tap.listening)
+    }
+
+    @Test func leftCommandHeldAcrossARightCommandTapDoesNotStartListening() {
+        var tap = RightCommandTap()
+        #expect(tap.leftDown(at: 0).isEmpty)
+        #expect(tap.rightDown(at: 0.01, otherKeyDown: false).isEmpty)
+        #expect(tap.rightUp(at: 0.12).isEmpty)
+        #expect(!tap.listening)
+    }
+
+    @Test func aSoloRightCommandTapDoesNotArmTalk() {
+        var tap = RightCommandTap()
+        #expect(tap.rightDown(at: 0, otherKeyDown: false).isEmpty)
+        _ = tap.rightUp(at: 0.12)
+        #expect(!tap.listening)
     }
 
     @Test func chordedOrLongHeldOrLeftCommandDoesNothing() {
@@ -38,14 +53,13 @@ struct RightCommandTapTests {
         #expect(!left.listening)
     }
 
-    @Test func toggleWhileListeningStops() {
+    @Test func aSecondTapIsAnotherMurmurNotATalkStop() {
         var tap = RightCommandTap()
         _ = tap.rightDown(at: 0, otherKeyDown: false)
-        _ = tap.rightUp(at: 0.08)
-        #expect(tap.listening)
+        #expect(tap.rightUp(at: 0.08) == [.murmur])
+        #expect(!tap.listening)
         _ = tap.rightDown(at: 2, otherKeyDown: false)
-        let stopped = tap.rightUp(at: 2.1)
-        #expect(stopped == [.toggle(listening: false, cue: endCue)])
+        #expect(tap.rightUp(at: 2.1) == [.murmur])
         #expect(!tap.listening)
     }
 
@@ -57,33 +71,42 @@ struct RightCommandTapTests {
         #expect(!tap.listening)
     }
 
-    @Test func aMissingCueFileUsesTheNeutralMacSound() {
+    @Test func aTapDoesNotCarryATalkCue() {
         var tap = RightCommandTap()
         let started = tap.rightUp(at: 0.1, afterDownAt: 0, fileIsReadable: { _ in false })
-        #expect(started == [.toggle(listening: true, cue: TalkCuePlay(kind: .start, source: .system(TalkCueFiles.fallbackSystemSound)))])
+        #expect(started == [.murmur])
     }
 
-    @Test func aRejectedStartLeavesTheNextTapAbleToStart() {
+    @Test func aRefusedTalkFlagDoesNotTurnTheNextTapIntoAStop() {
         var tap = RightCommandTap()
         _ = tap.rightUp(at: 0.1, afterDownAt: 0)
+        tap.noteSession(listening: true)
         tap.noteStartRejected()
         #expect(!tap.listening)
-        let again = tap.rightUp(at: 1.1, afterDownAt: 1)
-        #expect(again == [.toggle(listening: true, cue: startCue)])
+        #expect(tap.rightUp(at: 1.1, afterDownAt: 1) == [.murmur])
     }
 
-    @Test func cuesStillPlayWhenReduceMotionIsOn() {
+    @Test func reduceMotionDoesNotChangeTheTap() {
         #expect(RightCommandTap.playsAudio(reduceMotion: true))
         var tap = RightCommandTap()
         let started = tap.rightUp(at: 0.1, afterDownAt: 0, reduceMotion: true)
-        #expect(started == [.toggle(listening: true, cue: startCue)])
+        #expect(started == [.murmur])
     }
 
-    private var startCue: TalkCuePlay {
-        TalkCuePlay(kind: .start, source: .file(TalkCueFiles.startPath))
+    @Test func aMissedKeyUpLetsTheNextTapStartMurmur() {
+        var tap = RightCommandTap()
+        _ = tap.rightDown(at: 0, otherKeyDown: false)
+        #expect(tap.hardwareRightCommandUp(at: 1).isEmpty)
+        _ = tap.rightDown(at: 2, otherKeyDown: false)
+        #expect(tap.rightUp(at: 2.1) == [.murmur])
     }
 
-    private var endCue: TalkCuePlay {
-        TalkCuePlay(kind: .end, source: .file(TalkCueFiles.endPath))
+    @Test func theTapBoundaryIsClosedAtTheMaximum() {
+        var inside = RightCommandTap()
+        _ = inside.rightDown(at: 0, otherKeyDown: false)
+        #expect(inside.rightUp(at: RightCommandTap.maximumTap) == [.murmur])
+        var outside = RightCommandTap()
+        _ = outside.rightDown(at: 0, otherKeyDown: false)
+        #expect(outside.rightUp(at: RightCommandTap.maximumTap + 0.001).isEmpty)
     }
 }
