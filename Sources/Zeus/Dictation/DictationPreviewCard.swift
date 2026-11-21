@@ -140,8 +140,10 @@ struct DictationPreviewView: View {
                 Spacer()
                 Button("Cancel", action: cancel).buttonStyle(PlainTextButtonStyle()).foregroundStyle(Theme.cloudSecondary)
                     .accessibilityHint("Throws this dictation away.")
+                    .accessibilityIdentifier("dictation.dictation-preview-card.cancel")
                 Button("Insert", action: insert).buttonStyle(PlainTextButtonStyle()).foregroundStyle(Theme.bolt)
                     .accessibilityHint("Types this text into the app you were in.")
+                    .accessibilityIdentifier("dictation.dictation-preview-card.insert")
             }
             .font(TopBarStyle.label(12, .semibold))
         }

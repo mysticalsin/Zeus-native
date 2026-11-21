@@ -17,10 +17,13 @@ struct DictationExtrasSection: View {
                     Text(device.isDefault ? "\(device.name) (system default)" : device.name).tag(String?.some(device.uid))
                 }
             }
+                .accessibilityIdentifier("dictation.dictation-extras-settings.microphone")
             HStack(spacing: 10) {
                 Button(tester.running ? "Stop Test" : "Test Microphone") {
                     if tester.running { tester.stop() } else { tester.start(uid: settings.microphoneUID) }
                 }
+                    .accessibilityLabel(tester.running ? "Stop Test" : "Test Microphone")
+                    .accessibilityIdentifier("dictation.dictation-extras-settings.stop-test")
                 MicLevelMeter(level: tester.level)
                     .frame(height: 8)
                     .accessibilityLabel("Microphone level")
@@ -35,9 +38,11 @@ struct DictationExtrasSection: View {
 
         Section("Typing") {
             Toggle("Show the text to correct before it goes in", isOn: Binding(get: { settings.previewBeforeInsert }, set: { settings.previewBeforeInsert = $0 }))
+                .accessibilityIdentifier("dictation.dictation-extras-settings.show-the-text-to-correct-before-it-goes-in")
             Text("Return inserts it into the app you were in, Esc throws it away.")
                 .font(.callout).foregroundStyle(.secondary)
             Toggle("Type text key by key instead of pasting", isOn: Binding(get: { settings.alwaysType }, set: { settings.alwaysType = $0 }))
+                .accessibilityIdentifier("dictation.dictation-extras-settings.type-text-key-by-key-instead-of-pasting")
             Text("Slower, but works where ⌘V is blocked. These apps are always typed into:")
                 .font(.callout).foregroundStyle(.secondary)
             ForEach(settings.typedApps, id: \.self) { bundleID in
@@ -49,11 +54,14 @@ struct DictationExtrasSection: View {
                     } label: { Image(systemName: "minus.circle") }
                     .buttonStyle(PlainTextButtonStyle())
                     .accessibilityLabel("Stop typing into \(Self.appName(bundleID))")
+                    .accessibilityIdentifier("dictation.dictation-extras-settings.stop-typing-into")
                 }
             }
             Menu("Add an App") {
                 ForEach(Self.runningApps(excluding: settings.typedApps), id: \.bundleID) { app in
                     Button(app.name) { settings.typedApps.append(app.bundleID) }
+                        .accessibilityLabel(app.name)
+                        .accessibilityIdentifier("dictation.dictation-extras-settings.app-name")
                 }
             }
             .fixedSize()
@@ -61,6 +69,7 @@ struct DictationExtrasSection: View {
 
         Section("History") {
             Button("Open Dictation History…") { DictationHistoryWindow.shared.show(topBar: topBar) }
+                .accessibilityIdentifier("dictation.dictation-extras-settings.open-dictation-history")
             Text("Correct a dictation to teach Zeus a word, or run it again with another mode or engine.")
                 .font(.callout).foregroundStyle(.secondary)
         }
@@ -83,6 +92,8 @@ struct DictationExtrasSection: View {
 
 private struct MicLevelMeter: View {
     let level: Double
+    /// Reads `accessibilityReduceMotion`. The setting is never written.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
@@ -90,7 +101,7 @@ private struct MicLevelMeter: View {
                 Capsule().fill(Color.secondary.opacity(0.2))
                 Capsule().fill(level > 0.95 ? Color.orange : Color.green)
                     .frame(width: proxy.size.width * level)
-                    .animation(.linear(duration: 0.08), value: level)
+                    .animation(reduceMotion ? nil : .linear(duration: MotionTokens.pageOutDuration), value: level)
             }
         }
     }

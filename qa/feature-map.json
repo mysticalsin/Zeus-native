@@ -6656,6 +6656,59 @@
               "function": "offeredAgentsFollowTheIntegrationToggles"
             }
           ]
+        },
+        {
+          "id": "F12.uiux-chrome",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Pure island, peek and expanded-panel state machine: hover dwell, click trigger, repeated clicks, hold, shift peek, file swipe, picker Escape and Return, and approval focus. No window, no system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "hoverDwellOpensFromIdleAndFromPeek"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "escapeClosesOnlyThePicker"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "approvalButtonsDecideAndFocusStaysInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "aFileSwipeOpensTheShelfAndABareSwipeDoesNot"
+            }
+          ]
+        },
+        {
+          "id": "F12.uiux-motion",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Motion specs read the token table, springs collapse under Reduce Motion while the crossfade stays, and the source audit matches the committed finding catalog. No production edit and no system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "reduceMotionCollapsesSpringsAndKeepsTheCrossfade"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "motionTokenTableIsTheOnlySpringDefinition"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "repositoryFindingsMatchTheCatalog"
+            }
+          ]
+        },
+        {
+          "id": "F12.uiux-decisions",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Decision rows load once, show a confidence when ready, and retry only when a person does not have to act. No provider call.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "decisionRowsRetryExceptWhenAPersonMustAct"
+            }
+          ]
         }
       ]
     },
@@ -8179,6 +8232,25 @@
               "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
             }
           ]
+        },
+        {
+          "id": "F13.uiux-settings",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Settings focus clamps across the live sidebar, the twelve canonical sections walk empty, loading, error and recovery, and every contract control has a label, trait and identifier. No settings window.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "settingsFocusClampsAcrossTheLiveSidebar"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "everyCanonicalSectionWalksEmptyLoadingErrorAndRecovery"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "contractControlsCarryLabelTraitAndIdentifier"
+            }
+          ]
         }
       ]
     },
@@ -8212,6 +8284,25 @@
           "acceptance": "Automated known idle browser/Zoom versus active mic owners, stale/unknown ownership, live text and UI transition traces on supported OS.",
           "cases": [],
           "id": "S01.3"
+        },
+        {
+          "id": "S01.uiux-scribe-murmur",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Scribe start, end, keep and permission recovery, Murmure hold and toggle, and the hub empty, loading, error and recovery walk. No microphone and no system setting write.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "scribeStartEndKeepAndRecover"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "murmurHoldAndToggleMatchTheBehaviorContract"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
+              "function": "hubsWalkEmptyLoadingErrorAndRecovery"
+            }
+          ]
         }
       ]
     },
