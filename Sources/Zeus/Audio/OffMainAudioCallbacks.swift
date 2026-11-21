@@ -1,5 +1,6 @@
 import AVFAudio
 import Speech
+import ZeusCore
 
 /// Audio and speech callbacks that run on a realtime or background thread.
 ///
@@ -23,11 +24,18 @@ enum OffMainAudioCallbacks {
     /// Runs one recognition and reports only the final text, or the error message, on the main actor.
     nonisolated static func recognizeFinal(_ recognizer: SFSpeechRecognizer, request: SFSpeechRecognitionRequest,
                                            completion: @escaping @MainActor @Sendable (String, String?) -> Void) {
-        recognizer.recognitionTask(with: request) { result, error in
+        let gate = STTOnce()
+        let task = recognizer.recognitionTask(with: request) { result, error in
             guard result?.isFinal == true || error != nil else { return }
             let text = result?.bestTranscription.formattedString ?? ""
             let message = error?.localizedDescription
-            DispatchQueue.main.async { MainActor.assumeIsolated { completion(text, message) } }
+            gate.run {
+                DispatchQueue.main.async { MainActor.assumeIsolated { completion(text, message) } }
+            }
+        }
+        let giveUp = Double(STTSessionPolicy.production.batchGiveUpMs(audioMs: 4_000)) / 1000
+        DispatchQueue.global().asyncAfter(deadline: .now() + giveUp) {
+            task.cancel()
         }
     }
 }

@@ -163,8 +163,8 @@ public struct STTSessionPolicy: Equatable, Sendable {
         allowsServerRoundTrip: false
     )
 
-    /// The policy the app and the regression read. The red commit keeps `.legacy`.
-    public static let production = STTSessionPolicy.legacy
+    /// The policy the app and the regression read.
+    public static let production = STTSessionPolicy.fixed
 }
 
 /// Injected clock. Callers pass milliseconds; nothing here reads the wall clock.
@@ -311,11 +311,16 @@ public struct STTLiveTurn: Equatable, Sendable {
 
     /// Key release, or the second Murmur tap. That is the endpoint when silence has not already ended the turn.
     public mutating func keyUp(clock: STTClock, recognizerFinalMs: Int? = nil) {
+        armEndpoint(clock: clock)
+        conclude(atMs: endpointAt ?? clock.nowMs, recognizerFinalMs: recognizerFinalMs)
+    }
+
+    /// Records the endpoint at this clock without inventing the final time.
+    public mutating func armEndpoint(clock: STTClock) {
         if endpointAt == nil {
             endpointAt = clock.nowMs
             trace.mark(.endpointFired, atMs: clock.nowMs)
         }
-        conclude(atMs: endpointAt ?? clock.nowMs, recognizerFinalMs: recognizerFinalMs)
     }
 
     public mutating func conclude(atMs: Int, recognizerFinalMs: Int?) {
@@ -353,6 +358,33 @@ public struct STTLiveTurn: Equatable, Sendable {
             }
         }
         return turn
+    }
+}
+
+public enum STTOutcome {
+    /// How a finished turn is counted. A partial that is handed over inside the budget is not a failure.
+    public static func failure(hadSpeech: Bool, hasText: Bool, recognizerFinished: Bool,
+                               policy: STTSessionPolicy = .production) -> STTFailure {
+        if !hadSpeech, !hasText { return .noText }
+        if !hasText { return .emptyText }
+        if !recognizerFinished, !policy.cancelsTaskWhenAudioEnds { return .hang }
+        if !recognizerFinished, policy.endpointToFinalMs > STTSessionPolicy.fixed.endpointToFinalMs { return .timeout }
+        return .none
+    }
+}
+
+/// Process-wide failure counts. The log line is counts only.
+public final class STTFailureLog: @unchecked Sendable {
+    public static let shared = STTFailureLog()
+    private let lock = NSLock()
+    private var ledger = STTFailureLedger()
+
+    public func record(path: STTPath, failure: STTFailure) -> String {
+        lock.lock()
+        ledger.record(path: path, failure: failure)
+        let line = ledger.line(path)
+        lock.unlock()
+        return line
     }
 }
 

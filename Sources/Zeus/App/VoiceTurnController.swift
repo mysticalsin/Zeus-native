@@ -204,6 +204,7 @@ final class VoiceTurnController {
 
     @discardableResult
     func press(builtinCue: Bool = true) -> Bool {
+        speech.noteKeyDown(path: .talkHold)
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -244,6 +245,7 @@ final class VoiceTurnController {
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
             if !listening { speech.onCaptureFailure = nil }
+            speech.noteDelivered()
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -398,7 +400,7 @@ final class VoiceTurnController {
         guard press() else { return }
         handsFreeTask?.cancel()
         let opened = ContinuousClock.now
-        let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(1000)
+        let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(STTSessionPolicy.production.silenceToEndpointMs)
         let idleLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceWhenEmpty) : .seconds(4)
         let hardLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.hardLimit) : .seconds(12)
         handsFreeTask = Task { @MainActor [weak self] in
@@ -458,6 +460,7 @@ final class VoiceTurnController {
         }
         turnEngine = nil
         buddy.model.audioLevel = nil
+        speech.noteDelivered()
         return await complete(transcript: transcript, finalAt: .now)
     }
 

@@ -621,6 +621,7 @@ final class DictationController {
         let turnGeneration = ownership.beginTurn()
         do {
             // The start cue sounds first: on key down, before the microphone warms up.
+            speech.noteKeyDown(path: .murmurTap)
             let sessionID = try DictationCueRule.beginCapture(cue: { cue($0) }) {
                 try seams.speechStart(speech, turnGeneration)
             }
@@ -628,6 +629,7 @@ final class DictationController {
             turnContext = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
                                                selection: selection, useLocal: local, engine: turnEngine, insertionField: insertionField)
         } catch {
+            speech.noteDelivered()
             speech.onCaptureFailure = nil
             ownership.invalidate()
             insertionTracker.invalidate()
@@ -930,7 +932,10 @@ final class DictationController {
         let isCurrent: () -> Bool = { [ownership] in ownership.owns(generation: context.generation) }
         // A ready local engine makes the final text, so release does not wait for Apple's second pass.
         let live = await seams.speechStop(speech, !(context.useLocal && context.engine != nil))
-        guard isCurrent() else { return .init(text: "", engine: .apple, samples: []) }
+        guard isCurrent() else {
+            speech.noteDelivered()
+            return .init(text: "", engine: .apple, samples: [])
+        }
         speech.onCaptureFailure = nil
         let samples = speech.takeSamples()
         speech.onSamples = nil
@@ -939,10 +944,12 @@ final class DictationController {
             stream?.cancel()
             let note = !context.useLocal && settings.engine.isCloud
                 ? "\(settings.engine.title) needs its key, Apple took over." : nil
+            speech.noteDelivered()
             return .init(text: live, engine: .apple, samples: samples, note: note)
         }
         let (text, kind, note) = await resolve(engine: engine, stream: stream, samples: samples, live: live,
                                                isCurrent: isCurrent)
+        speech.noteDelivered()
         return .init(text: text, engine: kind, samples: samples, note: note)
     }
 

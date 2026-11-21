@@ -122,6 +122,16 @@ final class SpeechInput: @unchecked Sendable {
     /// Builds each turn's engine. Tests swap in a fake; production wraps a fresh `AVAudioEngine`.
     var captureEngineFactory: () -> any CaptureEngine = { AVCaptureEngine(AVAudioEngine()) }
     private var recognizer: SFSpeechRecognizer?
+    /// Stage clock for this turn. Milliseconds from key-down. Never stores transcript text.
+    private var trace = STTLatencyTrace(path: .talkHold)
+    private var traceArmed = false
+    private var keyDownUptime: TimeInterval?
+    private var heardSpeech = false
+    private var silenceMarked = false
+    private var lastEmittedPartial = ""
+    private var modelGate = STTModelGate()
+    private var warmupTask: SFSpeechRecognitionTask?
+    private var turnFailure: STTFailure = .none
     private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -176,6 +186,8 @@ final class SpeechInput: @unchecked Sendable {
 
     init(locale: Locale = .current) {
         recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        // One on-device load for the process. Later utterances reuse this recognizer.
+        if modelGate.prewarm(policy: .production) { warmOnDeviceRecognizer() }
     }
 
     var localeIdentifier: String { lock.withLock { recognizer?.locale.identifier ?? "en-US" } }
@@ -263,6 +275,9 @@ final class SpeechInput: @unchecked Sendable {
         }
         if !stored { NotificationCenter.default.removeObserver(observer) }
 
+        // The warm-up task must be gone before this turn's task: Apple runs one at a time.
+        cancelWarmup()
+        _ = lock.withLock { modelGate.beginUtterance(policy: .production) }
         if recognizes, let activeRecognizer {
             beginRecognition(request: request, recognizer: activeRecognizer,
                              turn: RecognitionTurn(sessionID: current, origin: controllerGeneration))
@@ -276,6 +291,8 @@ final class SpeechInput: @unchecked Sendable {
             if !cancelTurn(ifSession: current) { release((capture, nil)) }
             throw error
         }
+        if !traceArmed { noteKeyDown(path: .talkHold) }
+        markTrace(.captureStart)
         closeCaptureIfNotOwned(capture, session: current)
         return current
     }
@@ -333,6 +350,7 @@ final class SpeechInput: @unchecked Sendable {
                 var sum: Float = 0
                 for index in 0..<Int(buffer.frameLength) { sum += samples[index] * samples[index] }
                 let rms = sqrt(sum / Float(buffer.frameLength))
+                self.noteLoudness(rms)
                 self.onLevel?(Double(min(max((rms - 0.008) * 10.2, 0), 1)))
             }
         }
@@ -431,6 +449,8 @@ final class SpeechInput: @unchecked Sendable {
         guard recognizes, let activeRecognizer, activeRecognizer.isAvailable else { throw InputError.recognizerUnavailable }
         guard Self.canRecognize(onDeviceSupported: activeRecognizer.supportsOnDeviceRecognition,
                                 serverAllowed: allowServerRecognition) else { throw InputError.onDeviceUnavailable }
+        if !traceArmed { noteKeyDown(path: .murmurTap) }
+        cancelWarmup()
         cancel()
         let freshEngine = AVAudioEngine()
         let request = makeRequest(recognizer: activeRecognizer)
@@ -449,6 +469,7 @@ final class SpeechInput: @unchecked Sendable {
         lock.unlock()
         beginRecognition(request: request, recognizer: activeRecognizer,
                          turn: RecognitionTurn(sessionID: current, origin: controllerGeneration))
+        markTrace(.captureStart)
         return current
     }
 
@@ -494,7 +515,17 @@ final class SpeechInput: @unchecked Sendable {
                     return joined
                 }
                 guard let combined else { return }
-                turn.emit(combined, legacy: self.onPartial, identified: self.onIdentifiedPartial)
+                let changed = self.lock.withLock { () -> Bool in
+                    guard combined != self.lastEmittedPartial else { return false }
+                    self.lastEmittedPartial = combined
+                    return true
+                }
+                if changed {
+                    if !combined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        self.markTrace(.firstPartial)
+                    }
+                    turn.emit(combined, legacy: self.onPartial, identified: self.onIdentifiedPartial)
+                }
                 if result.isFinal {
                     let nextRequest = self.makeRequest(recognizer: recognizer)
                     let effects = self.lock.withLock { () -> [SpeechRecorder.Effect] in
@@ -507,9 +538,14 @@ final class SpeechInput: @unchecked Sendable {
                         return effects
                     }
                     if effects.contains(.finishTurn) {
-                        self.finish(ifSession: turn.sessionID)
+                        self.finish(ifSession: turn.sessionID, recognizerFinished: true)
                     } else if effects.contains(.restart) {
-                        self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
+                        let stillOpen = self.lock.withLock { !self.stopRequested && self.generation == turn.sessionID }
+                        if stillOpen {
+                            self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
+                        } else {
+                            self.finish(ifSession: turn.sessionID, recognizerFinished: true)
+                        }
                     }
                 }
             }
@@ -530,9 +566,14 @@ final class SpeechInput: @unchecked Sendable {
                     return effects
                 }
                 if effects.contains(.finishTurn) {
-                    self.finish(ifSession: turn.sessionID)
+                    self.finish(ifSession: turn.sessionID, recognizerFinished: false)
                 } else if effects.contains(.restart) {
-                    self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
+                    let stillOpen = self.lock.withLock { !self.stopRequested && self.generation == turn.sessionID }
+                    if stillOpen {
+                        self.beginRecognition(request: nextRequest, recognizer: recognizer, turn: turn.restarted())
+                    } else {
+                        self.finish(ifSession: turn.sessionID, recognizerFinished: false)
+                    }
                 }
             }
         }
@@ -610,6 +651,11 @@ final class SpeechInput: @unchecked Sendable {
             }
             let currentRequest = lock.withLock { request }
             currentRequest?.append(chunk)
+            if let samples = chunk.floatChannelData?[0], length > 0 {
+                var sum: Float = 0
+                for index in 0..<Int(length) { sum += samples[index] * samples[index] }
+                noteLoudness((sum / Float(length)).squareRoot())
+            }
             chunksSent += 1
             offset += length
             let seconds = Double(length) / targetFormat.sampleRate
@@ -670,7 +716,9 @@ final class SpeechInput: @unchecked Sendable {
         }
     }
 
-    /// Stops listening and returns the final transcript (waits at most 1.5 s for it).
+    /// Stops listening and returns the transcript.
+    /// The wait after `endAudio` is `STTSessionPolicy.production.endpointToFinalMs`.
+    /// A recognizer that never sends `isFinal` is cancelled then, and the latest partial is returned.
     /// Without Apple recognition it returns at once with an empty transcript.
     /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
     /// final text, so release must not wait for Apple's second pass).
@@ -680,13 +728,23 @@ final class SpeechInput: @unchecked Sendable {
             return (generation, takeCapture())
         }
         beforeStopAudioForTesting?()
+        markTrace(.endpointFired)
         release(capture)
-        guard recognizes else { return "" }
+        guard recognizes else {
+            noteFinal(recognizerFinished: false)
+            return ""
+        }
         let (alreadyDone, text) = lock.withLock { () -> (Bool, String) in
             request?.endAudio()
             return (finished, latest)
         }
-        if alreadyDone || !waitForFinal { return text }
+        if alreadyDone || !waitForFinal {
+            if !alreadyDone {
+                cancelRecognitionTask()
+                noteFinal(recognizerFinished: false)
+            }
+            return text
+        }
 
         return await withCheckedContinuation { continuation in
             let doneText: String? = lock.withLock {
@@ -698,14 +756,10 @@ final class SpeechInput: @unchecked Sendable {
                 continuation.resume(returning: doneText)
                 return
             }
-            // QA7 round 10 (real E2E, flaky): a self-correction turn needs an extra recognition
-            // pass (the mid-hold-pause fix above opens a fresh request when Apple ends the first
-            // utterance early), so its true final result can take a little longer to land than a
-            // single-pass turn's -- 1.5 s cut one off before it arrived, returning a stale/garbage
-            // partial (e.g. "Yeah.") instead of waiting the extra few hundred ms for the real one.
-            DispatchQueue.global().asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            let wait = Double(STTSessionPolicy.production.endpointToFinalMs) / 1000
+            DispatchQueue.global().asyncAfter(deadline: .now() + wait) { [weak self] in
                 guard let self else { return }
-                self.finish(ifSession: session)
+                self.finish(ifSession: session, recognizerFinished: false)
             }
         }
     }
@@ -820,12 +874,147 @@ final class SpeechInput: @unchecked Sendable {
         return pending
     }
 
-    private func finish(ifSession session: Int) {
+    /// Key down for one path. Capture, VAD, recognition and delivery are marked from here.
+    func noteKeyDown(path: STTPath) {
+        let now = ProcessInfo.processInfo.systemUptime
+        lock.lock()
+        keyDownUptime = now
+        traceArmed = true
+        heardSpeech = false
+        silenceMarked = false
+        lastEmittedPartial = ""
+        turnFailure = .none
+        trace = STTLatencyTrace(path: path)
+        trace.mark(.keyDown, atMs: 0)
+        if modelGate.ready { trace.mark(.modelReady, atMs: 0) }
+        lock.unlock()
+        STTSignpost.event("key_down")
+    }
+
+    /// The controller has the transcript. This is the delivery stage, still with no text in the log.
+    func noteDelivered() {
+        guard lock.withLock({ traceArmed }) else { return }
+        let ms = elapsedMs()
+        let (path, failure, report) = lock.withLock { () -> (STTPath, STTFailure, String) in
+            if trace.marks[.finalTranscript] == nil {
+                trace.mark(.finalTranscript, atMs: ms)
+                turnFailure = heardSpeech ? .emptyText : .noText
+            }
+            trace.mark(.deliveredToUI, atMs: ms)
+            return (trace.path, turnFailure, trace.grouped(failure: turnFailure))
+        }
+        let rate = STTFailureLog.shared.record(path: path, failure: failure)
+        VoiceLog.log("stt-latency", report.replacingOccurrences(of: "\n", with: " | "))
+        VoiceLog.log("stt-failure", rate)
+        STTSignpost.event("delivered_to_ui")
+    }
+
+    private func elapsedMs() -> Int {
+        let now = ProcessInfo.processInfo.systemUptime
+        let start = lock.withLock { keyDownUptime } ?? now
+        return max(0, Int(((now - start) * 1000).rounded()))
+    }
+
+    private func markTrace(_ stage: STTLatencyTrace.Stage) {
+        let ms = elapsedMs()
+        let fresh = lock.withLock { () -> Bool in
+            let fresh = trace.marks[stage] == nil
+            trace.mark(stage, atMs: ms)
+            return fresh
+        }
+        guard fresh else { return }
+        switch stage {
+        case .captureStart: STTSignpost.event("capture_start")
+        case .speechStart: STTSignpost.event("speech_start")
+        case .silenceDetected: STTSignpost.event("silence_detected")
+        case .endpointFired: STTSignpost.event("endpoint_fired")
+        case .modelReady: STTSignpost.event("model_ready")
+        case .firstPartial: STTSignpost.event("first_partial")
+        case .finalTranscript: STTSignpost.event("final_transcript")
+        case .deliveredToUI: STTSignpost.event("delivered_to_ui")
+        case .keyDown: STTSignpost.event("key_down")
+        }
+    }
+
+    private func noteLoudness(_ rms: Float) {
+        let ms = elapsedMs()
+        let stage: STTLatencyTrace.Stage? = lock.withLock {
+            if rms >= 0.008 {
+                heardSpeech = true
+                silenceMarked = false
+                let fresh = trace.marks[.speechStart] == nil
+                trace.mark(.speechStart, atMs: ms)
+                return fresh ? .speechStart : nil
+            }
+            guard heardSpeech, !silenceMarked else { return nil }
+            silenceMarked = true
+            trace.mark(.silenceDetected, atMs: ms)
+            return .silenceDetected
+        }
+        if stage == .speechStart { STTSignpost.event("speech_start") }
+        if stage == .silenceDetected { STTSignpost.event("silence_detected") }
+    }
+
+    private func noteFinal(recognizerFinished: Bool) {
+        let ms = elapsedMs()
+        lock.lock()
+        trace.mark(.finalTranscript, atMs: ms)
+        let text = latest.trimmingCharacters(in: .whitespacesAndNewlines)
+        turnFailure = STTOutcome.failure(hadSpeech: heardSpeech, hasText: !text.isEmpty,
+                                         recognizerFinished: recognizerFinished)
+        lock.unlock()
+        STTSignpost.event("final_transcript")
+    }
+
+    private func cancelRecognitionTask() {
+        let running = lock.withLock { () -> SFSpeechRecognitionTask? in
+            guard STTSessionPolicy.production.cancelsTaskWhenAudioEnds else { return nil }
+            defer { task = nil }
+            return task
+        }
+        running?.cancel()
+    }
+
+    /// Loads the on-device model once, on silence, so the first real utterance does not pay for it.
+    /// Nothing here asks for permission and nothing is sent off the Mac.
+    private func warmOnDeviceRecognizer() {
+        guard let recognizer, recognizer.supportsOnDeviceRecognition else { return }
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.requiresOnDeviceRecognition = true
+        request.shouldReportPartialResults = false
+        if let buffer = Self.silenceBuffer() {
+            request.append(buffer)
+        }
+        request.endAudio()
+        let task = recognizer.recognitionTask(with: request) { _, _ in }
+        lock.withLock { warmupTask = task }
+    }
+
+    private func cancelWarmup() {
+        let running = lock.withLock { () -> SFSpeechRecognitionTask? in
+            defer { warmupTask = nil }
+            return warmupTask
+        }
+        running?.cancel()
+    }
+
+    private static func silenceBuffer() -> AVAudioPCMBuffer? {
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1_600) else { return nil }
+        buffer.frameLength = 1_600
+        return buffer
+    }
+
+    private func finish(ifSession session: Int, recognizerFinished: Bool) {
         lock.lock()
         let pending = Self.finishWaitersIfOwned(session: session, current: generation,
                                                 finished: &finished, waiters: &waiters)
         let text = latest
+        let running: SFSpeechRecognitionTask? = pending == nil ? nil : task
+        if pending != nil, STTSessionPolicy.production.cancelsTaskWhenAudioEnds { task = nil }
         lock.unlock()
+        if STTSessionPolicy.production.cancelsTaskWhenAudioEnds { running?.cancel() }
+        if pending != nil { noteFinal(recognizerFinished: recognizerFinished) }
         pending?.forEach { $0.resume(returning: text) }
     }
 
