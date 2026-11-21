@@ -118,7 +118,9 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
                 if ProviderSentencePump.canDequeue(queueEmpty: self.queue.isEmpty, providerPlaying: ProviderPlaybackGate.shared.isPlaying) {
                     let line = self.queue.removeFirst()
                     _ = await self.speakLine(line.text, onStart: line.onStart)
-                } else if ProviderSentencePump.holds(chainPlaying: self.chain.isPlaying, systemRendering: self.systemRendering, providerPlaying: ProviderPlaybackGate.shared.isPlaying) {
+                } else if ProviderPlaybackGate.shared.isPlaying {
+                    await self.giveUpOnProviderClip(after: ProviderClipWait.limit)
+                } else if ProviderSentencePump.holds(chainPlaying: self.chain.isPlaying, systemRendering: self.systemRendering, providerPlaying: false) {
                     try? await Task.sleep(for: .milliseconds(40))
                 } else {
                     break
@@ -143,12 +145,13 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
             if Task.isCancelled { break }
             let text = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
-            while ProviderPlaybackGate.shared.isPlaying, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
+            await giveUpOnProviderClip(after: ProviderClipWait.limit)
             let played = await speakLine(text, began: count == 0 ? began : Date())
             if first == nil { first = played }
             count += 1
         }
-        while ProviderSentencePump.holds(chainPlaying: chain.isPlaying, systemRendering: systemRendering, providerPlaying: ProviderPlaybackGate.shared.isPlaying), !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
+        await giveUpOnProviderClip(after: ProviderClipWait.limit)
+        while ProviderSentencePump.holds(chainPlaying: chain.isPlaying, systemRendering: systemRendering, providerPlaying: false), !Task.isCancelled { try? await Task.sleep(for: .milliseconds(40)) }
         return SpeakOutcome(engine: first?.engine.logName ?? "none", voice: first?.voice ?? "", reason: first?.reason ?? "nothing was spoken",
                             firstAudioMs: first?.firstAudioMs, sentences: count)
     }
@@ -402,9 +405,28 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
                 feeder.discard()
             }
         } catch {
-            if Task.isCancelled { feeder.discard() } else { feeder.finish() }
+            let end = CloudSentenceEnd.decide(scheduledAudio: feeder.scheduledAny, transportFailed: true, cancelled: Task.isCancelled)
+            switch end {
+            case .spoken:
+                feeder.finish()
+                return Self.routeVoice(route)
+            case .cancelled, .failed:
+                feeder.discard()
+                return nil
+            }
         }
         return feeder.scheduledAny ? Self.routeVoice(route) : nil
+    }
+
+    /// Stops waiting for a provider clip at the same bound the self-test already uses, then drops the gate
+    /// so the Mac voice can speak. Does not change the gate's token counter.
+    private func giveUpOnProviderClip(after limit: TimeInterval) async {
+        let started = Date()
+        while ProviderPlaybackGate.shared.isPlaying, !Task.isCancelled,
+              !ProviderClipWait.expired(started: started, now: Date(), limit: limit) {
+            try? await Task.sleep(for: .milliseconds(40))
+        }
+        if ProviderPlaybackGate.shared.isPlaying { ProviderPlaybackGate.shared.reset() }
     }
 
     /// 50 ms of 24 kHz 16-bit mono PCM: small enough to start fast, with a one-buffer look-ahead for the tail fade.
@@ -419,8 +441,19 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         guard let prepared = OpenAITTSVoice.streamingRequest(text) else { return nil }
         let deadline = began.addingTimeInterval(VoiceTTSChain.firstAudioTimeout)
         let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
+        let header = Task { try await Self.openAISession.bytes(for: prepared.request) }
+        let timer = Task {
+            let remaining = ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()) ?? 0
+            try? await Task.sleep(for: .seconds(max(remaining, 0)))
+            if CloudHeaderWait.shouldAbandon(began: began, now: Date(), receivedAudio: feeder.receivedAny) {
+                header.cancel()
+            }
+        }
+        let opened: (URLSession.AsyncBytes, URLResponse)?
+        do { opened = try await header.value } catch { opened = nil }
+        timer.cancel()
+        guard let (bytes, response) = opened else { feeder.discard(); return nil }
         do {
-            let (bytes, response) = try await Self.openAISession.bytes(for: prepared.request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
             if prepared.rawPCM {
                 var chunk = Data()
@@ -460,8 +493,19 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         guard let config = GeminiTTSVoice.config(),
               let request = GeminiTTSRequest.makeRequest(text: text, config: config, timeout: 20) else { return nil }
         let feeder = PCMStreamFeeder(chain: chain) { [weak self] in self?.markAudioReady() }
+        let header = Task { try await Self.urlSession.data(for: request) }
+        let timer = Task {
+            let remaining = ElevenLabsFailsafe.firstAudioRemaining(began: began, now: Date()) ?? 0
+            try? await Task.sleep(for: .seconds(max(remaining, 0)))
+            if CloudHeaderWait.shouldAbandon(began: began, now: Date(), receivedAudio: feeder.receivedAny) {
+                header.cancel()
+            }
+        }
+        let opened: (Data, URLResponse)?
+        do { opened = try await header.value } catch { opened = nil }
+        timer.cancel()
+        guard let (data, response) = opened else { feeder.discard(); return nil }
         do {
-            let (data, response) = try await Self.urlSession.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200, let pcm = GeminiTTSRequest.pcm(fromResponse: data) else { return nil }
             guard SpeechAttemptPolicy.mayPlay(cancelled: Task.isCancelled) else { return nil }
             feeder.push(pcm)
