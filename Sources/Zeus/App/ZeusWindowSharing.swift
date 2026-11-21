@@ -18,6 +18,13 @@ enum ZeusWindowSharing {
     }
 
     static func sharingType(visibleInShare: Bool, surface: Surface) -> NSWindow.SharingType {
+        if case .zeusStandard = surface,
+           DeckNotesCapturePolicy.sharingAfterRefresh(
+               notesVisible: DeckNotesCaptureHold.notesAreUp,
+               requestedVisibleInShare: visibleInShare
+           ) == .none {
+            return .none
+        }
         switch surface {
         case .zeusStandard:
             return visibleInShare ? .readOnly : .none

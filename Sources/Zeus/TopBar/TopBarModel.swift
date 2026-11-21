@@ -219,6 +219,8 @@ final class TopBarModel {
     /// Where the line being read sits, measured from the top of the page (closest to the camera).
     static let prompterReadingLine: Double = 34
     var prompterActive: Bool { roll.phase != .idle }
+    /// In-browser speaker notes drawn on this page. Idle means the script stays as it is.
+    var deckNotesState: DeckNotesState = .idle
 
     /// Display stays awake while on. Not saved across launches on purpose.
     var keepAwake = false {
