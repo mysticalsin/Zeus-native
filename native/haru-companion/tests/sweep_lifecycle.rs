@@ -149,7 +149,7 @@ fn child_is_armed_to_die_with_its_parent() {
     let flag = dir.join("sig");
     std::fs::write(
         &script,
-        "import ctypes, sys\nlibc = ctypes.CDLL('libc.so.6')\nsig = ctypes.c_int(0)\nlibc.prctl(2, ctypes.byref(sig))\nopen(sys.argv[1], 'w').write(str(sig.value))\n",
+        "import ctypes, os, sys\nlibc = ctypes.CDLL('libc.so.6')\nsig = ctypes.c_int(0)\nlibc.prctl(2, ctypes.byref(sig))\npath = sys.argv[1]\ntmp = path + '.tmp'\nhandle = open(tmp, 'w')\nhandle.write(str(sig.value))\nhandle.flush()\nos.fsync(handle.fileno())\nhandle.close()\nos.replace(tmp, path)\n",
     )
     .unwrap();
     let mut launcher = StdLauncher::new();
@@ -162,7 +162,11 @@ fn child_is_armed_to_die_with_its_parent() {
         .expect("spawn python");
     let _guard = KillOnDrop(pid);
     assert!(
-        wait_until(Duration::from_secs(3), || flag.exists()),
+        wait_until(Duration::from_secs(3), || {
+            std::fs::read_to_string(&flag)
+                .map(|text| !text.trim().is_empty())
+                .unwrap_or(false)
+        }),
         "helper did not report PR_GET_PDEATHSIG"
     );
     let text = std::fs::read_to_string(&flag).unwrap();
