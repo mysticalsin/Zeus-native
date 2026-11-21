@@ -25,7 +25,7 @@ import ZeusCore
         let ids = HomeSlots.settingIDs + [HomeBackdrop.settingID, "home.variant.clock"]
         let saved = ids.map { ($0, store.string($0)) }
         defer { for (id, value) in saved { store.set(id, value) } }
-        let topBar = TopBarModel()
+        let topBar = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-\(UUID().uuidString)")!)
         topBar.setHomeWidget(slot: 2, to: .clock)
         topBar.setHomeVariant(.clock, to: HomeWidgetKind.clock.variants[3])
         topBar.setHomeBackdrop(.cosmos)
@@ -36,7 +36,7 @@ import ZeusCore
     }
 
     @Test func customizeModeOnlyOnHomeAndAddsBarHeight() {
-        let topBar = TopBarModel()
+        let topBar = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-\(UUID().uuidString)")!)
         topBar.selectedTab = .music
         topBar.beginHomeCustomize()
         #expect(!topBar.homeCustomizing)
@@ -50,10 +50,8 @@ import ZeusCore
     }
 
     @Test func tabEditorPersistsToTheLayoutStore() {
-        let defaults = UserDefaults.standard
-        let saved = (defaults.string(forKey: "topBar.tabs"), defaults.string(forKey: "topBar.tabs.known"))
-        defer { defaults.set(saved.0, forKey: "topBar.tabs"); defaults.set(saved.1, forKey: "topBar.tabs.known") }
-        let topBar = TopBarModel()
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-tabs-\(UUID().uuidString)")!
+        let topBar = TopBarModel(defaults: defaults)
         topBar.layout = TopBarLayout(tabs: [.home, .chat, .todo])
         topBar.beginTabEditing()
         topBar.addTab(.music)
@@ -68,10 +66,8 @@ import ZeusCore
     }
 
     @Test func tabEditorRefusesAnEleventhTab() {
-        let defaults = UserDefaults.standard
-        let saved = (defaults.string(forKey: "topBar.tabs"), defaults.string(forKey: "topBar.tabs.known"))
-        defer { defaults.set(saved.0, forKey: "topBar.tabs"); defaults.set(saved.1, forKey: "topBar.tabs.known") }
-        let topBar = TopBarModel()
+        let defaults = UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-cap-\(UUID().uuidString)")!
+        let topBar = TopBarModel(defaults: defaults)
         topBar.layout = TopBarLayout(tabs: Array(TopBarTab.allCases.prefix(GlanceTopBar.maxTabs)))
         topBar.addTab(TopBarTab.allCases[GlanceTopBar.maxTabs])
         #expect(topBar.layout.tabs.count == GlanceTopBar.maxTabs)
@@ -82,14 +78,14 @@ import ZeusCore
         let store = SettingsStore.shared
         let saved = store.string("lights.eventGlow")
         defer { store.set("lights.eventGlow", saved) }
-        let topBar = TopBarModel()
+        let topBar = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-\(UUID().uuidString)")!)
         topBar.createEvent = { _ in .created(id: "x") }
         store.set("lights.eventGlow", "true")
         let problem = await topBar.addEvent(from: "lunch with Ana tomorrow at 1 pm")
         #expect(problem == nil)
         #expect(topBar.lights.contains { $0.kind == .eventRibbon })
 
-        let quiet = TopBarModel()
+        let quiet = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-\(UUID().uuidString)")!)
         quiet.createEvent = { _ in .created(id: "y") }
         store.set("lights.eventGlow", "false")
         _ = await quiet.addEvent(from: "lunch with Ana tomorrow at 1 pm")
@@ -97,7 +93,7 @@ import ZeusCore
     }
 
     @Test func noRibbonWhenTheEventIsNotSaved() async {
-        let topBar = TopBarModel()
+        let topBar = TopBarModel(defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "home-app-\(UUID().uuidString)")!)
         topBar.createEvent = { _ in .needsAccess }
         let problem = await topBar.addEvent(from: "lunch with Ana tomorrow at 1 pm")
         #expect(problem != nil)

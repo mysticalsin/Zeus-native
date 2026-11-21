@@ -1285,8 +1285,8 @@ final class VoiceTurnController {
     }
 
     /// What the voice is handed: no ominous trailing hedge, and no ellipsis in an Ultron reply.
-    static func voiced(_ text: String) -> String {
-        UltronSpeechText.prepared(PersonaCompliance.stripOminousHedges(text), personality: ZeusPersonality.current())
+    static func voiced(_ text: String, personality: ZeusPersonality = ZeusPersonality.current()) -> String {
+        UltronSpeechText.prepared(PersonaCompliance.stripOminousHedges(text), personality: personality)
     }
 
     /// The last ~240 characters of the reply, cut at a word boundary.

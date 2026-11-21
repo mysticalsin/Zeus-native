@@ -395,11 +395,9 @@ struct TalkVisualTurnTests {
         return await body()
     }
 
-    @Test func voicedTextHasNoEllipsisForUltronAndKeepsItForPlain() async {
-        await asUltron { #expect(VoiceTurnController.voiced("Fine... that works.") == "Fine, that works.") }
-        UserDefaults.standard.set(ZeusPersonality.plain.rawValue, forKey: ZeusPersonality.defaultsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ZeusPersonality.defaultsKey) }
-        #expect(VoiceTurnController.voiced("Fine... that works.") == "Fine... that works.")
+    @Test func voicedTextHasNoEllipsisForUltronAndKeepsItForPlain() {
+        #expect(VoiceTurnController.voiced("Fine... that works.", personality: .ultron) == "Fine, that works.")
+        #expect(VoiceTurnController.voiced("Fine... that works.", personality: .plain) == "Fine... that works.")
     }
 
     @Test func aStreamedEllipsisReplyIsOneSpokenLineForUltron() async {
