@@ -94,6 +94,8 @@ enum DebugCommands {
         let question = arguments[flag + 1]
         Task { @MainActor in
             let started = Date()
+            // --ask has no talk key. Invocation is time zero for the action-speed trace.
+            _ = ActionSpeedLog.shared.beginTurn()
             let shots = await ScreenCapture.captureAll()
             print("screens: \(shots.count) \(shots.map(\.label))")
             let request = BrainRequest(transcript: question, screenshots: shots,
@@ -103,12 +105,18 @@ enum DebugCommands {
             var splitter = SentenceSplitter()
             var first: TimeInterval?
             do {
+                ActionSpeedLog.shared.mark(.requestSent)
                 for try await event in ClaudeCLIProvider().send(request) {
                     guard case .textDelta(let delta) = event else { continue }
                     for output in parser.feed(delta) {
-                        if first == nil { first = Date().timeIntervalSince(started) }
+                        if first == nil {
+                            first = Date().timeIntervalSince(started)
+                            ActionSpeedLog.shared.mark(.firstModelToken)
+                        }
                         switch output {
-                        case .tag(let tag): print("TAG \(tag)")
+                        case .tag(let tag):
+                            ActionSpeedLog.shared.mark(.firstToolDecision)
+                            print("TAG \(tag)")
                         case .text(let text): splitter.feed(text).forEach { print("SAY \($0)") }
                         }
                     }

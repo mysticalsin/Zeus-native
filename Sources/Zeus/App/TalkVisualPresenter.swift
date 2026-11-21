@@ -85,6 +85,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
                                      objects: Dictionary(shown.map { ($0.id, $0) }, uniquingKeysWith: { $1 }))
         if !overlay.present(scene: scene, capture: capture, reduceMotion: reduceMotion()) {
             VoiceLog.log("draw", "marks could not be drawn")
+        } else {
+            ActionSpeedLog.shared.mark(.firstOverlayPaint)
         }
     }
 
