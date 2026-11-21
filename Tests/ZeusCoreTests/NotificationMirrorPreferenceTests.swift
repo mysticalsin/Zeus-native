@@ -11,14 +11,37 @@ struct NotificationMirrorPreferenceTests {
         return defaults
     }
 
-    @Test func aLegacyCatalogStringIsCopiedIntoTheBooleanAndKept() throws {
+    @Test func aLegacyTrueStringDoesNotTurnMirroringOn() throws {
         let defaults = try fresh()
         defaults.set("true", forKey: NotificationMirrorPreference.legacyKey)
-        #expect(NotificationMirrorPreference.isOn(defaults))
+        #expect(!NotificationMirrorPreference.isOn(defaults))
         #expect(defaults.object(forKey: NotificationMirrorPreference.key) == nil)
-        #expect(NotificationMirrorPreference.migrate(defaults))
-        #expect(defaults.object(forKey: NotificationMirrorPreference.key) as? Bool == true)
+        #expect(!NotificationMirrorPreference.migrate(defaults))
+        #expect(defaults.object(forKey: NotificationMirrorPreference.key) == nil)
         #expect(defaults.string(forKey: NotificationMirrorPreference.legacyKey) == "true")
+    }
+
+    @Test func aLegacyFalseStringIsCopiedAndKept() throws {
+        let defaults = try fresh()
+        defaults.set("false", forKey: NotificationMirrorPreference.legacyKey)
+        #expect(!NotificationMirrorPreference.isOn(defaults))
+        #expect(NotificationMirrorPreference.migrate(defaults))
+        #expect(defaults.object(forKey: NotificationMirrorPreference.key) as? Bool == false)
+        #expect(defaults.string(forKey: NotificationMirrorPreference.legacyKey) == "false")
+        #expect(!NotificationMirrorPreference.isOn(defaults))
+    }
+
+    @Test func anImportCannotEnableTheMirror() throws {
+        let defaults = try fresh()
+        #expect(NotificationMirrorPreference.importWouldEnable(true))
+        #expect(NotificationMirrorPreference.importWouldEnable("true"))
+        #expect(!NotificationMirrorPreference.applyImport(true, defaults: defaults))
+        #expect(!NotificationMirrorPreference.applyImport("true", defaults: defaults))
+        #expect(defaults.object(forKey: NotificationMirrorPreference.key) == nil)
+        #expect(!NotificationMirrorPreference.isOn(defaults))
+        #expect(NotificationMirrorPreference.applyImport(false, defaults: defaults))
+        #expect(defaults.object(forKey: NotificationMirrorPreference.key) as? Bool == false)
+        #expect(!NotificationMirrorPreference.isOn(defaults))
     }
 
     @Test func anExistingBooleanWinsAndTheLegacyStringStays() throws {
