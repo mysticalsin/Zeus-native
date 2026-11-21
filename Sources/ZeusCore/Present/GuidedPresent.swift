@@ -48,10 +48,17 @@ public enum GuidedPresent {
         )
     }
 
+    /// Closed on the far edges, so the last point of the rect counts. `scale` is the display scale:
+    /// a 2x click is in pixels and is brought back to points, with one pixel of slop.
     public static func clickHits(_ click: CGPoint, target: ResolvedTarget, scale: CGFloat = 1) -> Bool {
-        _ = scale
-        if let rect = target.hitRect { return rect.contains(click) }
-        return hypot(click.x - target.screenPoint.x, click.y - target.screenPoint.y) <= 60
+        let scale = scale > 0 ? scale : 1
+        let point = CGPoint(x: click.x / scale, y: click.y / scale)
+        let slop: CGFloat = scale > 1 ? (1 / scale) : 0
+        if let rect = target.hitRect {
+            return point.x >= rect.minX - slop && point.x <= rect.maxX + slop
+                && point.y >= rect.minY - slop && point.y <= rect.maxY + slop
+        }
+        return hypot(point.x - target.screenPoint.x, point.y - target.screenPoint.y) <= 60 + slop
     }
 
     private static func axHitRect(element: AXSnapshotElement, mapper: ScreenCoordinateMapper) -> CGRect? {

@@ -10,6 +10,7 @@ final class WalkthroughController {
     private var resolved: GuidedPresent.ResolvedTarget?
     private var clickMonitor: Any?
     private var escMonitor: Any?
+    private var guided: GuidedSteps?
     private var autoAdvance: Task<Void, Never>?
     private var clickAdvance: Task<Void, Never>?
     weak var buddy: BuddyController?
@@ -21,6 +22,11 @@ final class WalkthroughController {
         stop()
         session = WalkthroughSession(walkthrough)
         shots = screenshots
+        guided = GuidedSteps(steps: walkthrough.steps.map { step in
+            GuidedSteps.Step(
+                say: step.say,
+                target: GuidedPresent.ResolvedTarget(screenPoint: .zero, label: step.say, waitForClick: step.waitForClick, hitRect: .zero))
+        })
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { _ in
             MainActor.assumeIsolated { WalkthroughController.shared.clicked(at: NSEvent.mouseLocation) }
         }
@@ -55,9 +61,14 @@ final class WalkthroughController {
     }
 
     private func clicked(at point: CGPoint) {
-        guard isRunning, let target = resolved, let revision = session?.revision, clickAdvance == nil else { return }
-        guard target.waitForClick else { return }
-        guard GuidedPresent.clickHits(point, target: target) else {
+        guard isRunning, let revision = session?.revision, clickAdvance == nil else { return }
+        guard var guided else { return }
+        let before = guided.index
+        let hadTarget = guided.target != nil
+        guided.click(at: point)
+        self.guided = guided
+        let stepped = guided.index != before || (hadTarget && guided.target == nil)
+        guard stepped else {
             NSLog("[ZEUS] walkthrough: ignored click outside target")
             return
         }
@@ -95,11 +106,21 @@ final class WalkthroughController {
         guard let session, let step = session.current else { return }
         let snapshot = AXSnapshotter.shared.latest
         resolved = GuidedPresent.resolve(step: step, shots: shots, snapshot: snapshot)
-        NSLog("[ZEUS] walkthrough: %@", session.progress)
-        if let target = resolved {
-            buddy?.point(to: target.screenPoint, label: target.label)
+        if var guided {
+            guided.move(to: session.index)
+            if let resolved {
+                let rect = resolved.hitRect ?? CGRect(x: resolved.screenPoint.x - 24, y: resolved.screenPoint.y - 24, width: 48, height: 48)
+                guided.setRect(rect, forStep: session.index, label: resolved.label)
+                self.resolved = guided.target
+            }
+            self.guided = guided
         }
-        say?("\(session.progress). \(step.say)")
+        NSLog("[ZEUS] walkthrough: %@", session.progress)
+        let access = guided?.accessibilityLabel ?? session.progress
+        if let target = resolved {
+            buddy?.point(to: target.screenPoint, label: access)
+        }
+        say?("\(access). \(step.say)")
         if !step.waitForClick || (step.target == nil && step.targetLabel == nil) {
             let revision = session.revision
             autoAdvance = Task { @MainActor in
@@ -119,6 +140,7 @@ final class WalkthroughController {
         escMonitor = nil
         buddy?.idle()
         session = nil
+        guided = nil
         resolved = nil
     }
 }
