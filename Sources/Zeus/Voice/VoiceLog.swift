@@ -64,7 +64,9 @@ enum VoiceLog {
         let record = VoiceLogRecord(stage: stage, detail: detail)
         let line = record.line(at: Date())
         FlightRecorder.shared.record(record.stage == "error" ? "error" : "voice", record.stage, record.detail)
-        if mirror { NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail) }
+        if mirror {
+            NSLog("[ZEUS] voice: %@ %@", record.stage, VoiceLogRecord.systemLogDetail(stage: record.stage, detail: record.detail))
+        }
         if echo { print(line) }
         queue.async {
             let fm = FileManager.default

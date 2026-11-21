@@ -15,6 +15,15 @@ public struct VoiceLogRecord: Sendable, Equatable {
         includeContent ? text : "(\(text.count) chars)"
     }
 
+    /// Stages whose words must never reach the system log.
+    public static let conversationStages: Set<String> = ["transcript", "spoken", "wake"]
+
+    /// What `NSLog` may print. The file line may still hold the words when content logging is on.
+    public static func systemLogDetail(stage: String, detail: String) -> String {
+        guard conversationStages.contains(stage) else { return detail }
+        return "(\(detail.utf8.count) bytes)"
+    }
+
     public func line(at date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
