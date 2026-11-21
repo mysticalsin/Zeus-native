@@ -15,10 +15,10 @@ fn scratch(name: &str) -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    std::env::temp_dir().join(format!(
-        "zeus-haru-{name}-{}-{nanos}.sock",
-        std::process::id()
-    ))
+    let root =
+        std::env::temp_dir().join(format!("zeus-haru-{name}-{}-{nanos}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    root.join("zeus.sock")
 }
 
 #[test]

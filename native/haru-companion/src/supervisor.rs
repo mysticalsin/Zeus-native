@@ -120,10 +120,17 @@ pub fn private_socket(public: &Path) -> PathBuf {
     public.with_file_name(name)
 }
 
-/// Argv `serve` passes to the model process. The red test locks the current
-/// behaviour: this still forwards the parent gate path.
+/// Listen path handed to Python. It is not the socket the parent accepts on.
+pub fn model_socket(gate: &Path) -> PathBuf {
+    let mut name = gate.file_name().unwrap_or_default().to_os_string();
+    name.push(".model");
+    gate.with_file_name(name)
+}
+
+/// Argv `serve` passes to the model process. Python binds `model_socket`,
+/// not the parent gate, so it cannot replace the uid-checked listener.
 pub fn serve_child_argv(python: &Path, model: &Path, gate: &Path, quantize: u8) -> Vec<String> {
-    child_argv(python, model, gate, quantize)
+    child_argv(python, model, &model_socket(gate), quantize)
 }
 
 pub fn child_argv(python: &Path, model: &Path, socket: &Path, quantize: u8) -> Vec<String> {
@@ -175,7 +182,7 @@ where
             sockets
                 .bind_unix(socket)
                 .map_err(|_| NoLaunchReason::NotRequested)?;
-            let argv = child_argv(python, model, private_socket, *quantize);
+            let argv = serve_child_argv(python, model, private_socket, *quantize);
             processes
                 .spawn(&argv)
                 .map_err(|_| NoLaunchReason::NotRequested)

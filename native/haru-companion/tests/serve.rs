@@ -25,10 +25,9 @@ fn requested_session_round_trips_on_a_private_socket() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let path = std::env::temp_dir().join(format!(
-        "zeus-haru-test-{}-{nanos}.sock",
-        std::process::id()
-    ));
+    let root = std::env::temp_dir().join(format!("zeus-haru-test-{}-{nanos}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join("zeus.sock");
     let listener = bind_socket(&path).unwrap();
     let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
@@ -107,5 +106,5 @@ fn requested_session_round_trips_on_a_private_socket() {
     drop(client);
     let spawns = server.join().unwrap();
     assert_eq!(spawns, 1);
-    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir_all(&root);
 }

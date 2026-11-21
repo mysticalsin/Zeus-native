@@ -154,6 +154,15 @@ Each real defect was committed as a failing test, then the fix.
 - Fix: `6ffb0aa`. Edge labels are offset off the nodes, off each other, and at least 16 px from the motion path. `serve_one_with` writes an error frame with code `peer_uid` before it returns `PermissionDenied`. `docs/state-machine.svg` matches the generator.
 - Counts after the fix, `cargo +stable test --locked` (default threads): haru-companion 87 passed, 0 failed. haru-pipe 16 passed, 0 failed. `cargo +stable fmt --check` and `cargo +stable clippy --locked --all-targets -- -D warnings` passed for both crates.
 
+## 18. Bind window and child rebind
+
+- Time: 2026-11-21T06:17:00Z. Hammer re-check at `f8704c45` (report sha256 `60b09ec7`) plus Sentinel FIRST AGREED 0.65 Low.
+- Lens: security. N-1, E-04(1) through E-04(5), E-02 test gaps.
+- Test: `12d88e4` `tests/sweep_bind.rs`. Six tests failed: world-writable parent accepted, sticky 01777 left writable, Python received the parent gate path, a replaced socket was accepted, `unlink_if_ours` deleted a different inode, and `O_DIRECTORY` was the literal `0x10000`.
+- Fix: this commit. Python is given `gate.model`. The parent records the directory-entry dev/ino and refuses a later path that does not match; a connect to the listener confirms the replacement. `fchmodat` and `unlinkat` use the parent directory fd. A non-sticky group or world writable parent is refused. A sticky directory we own is tightened to 0700. A directory this call creates is `fchmod` 0700 before bind, including under umask 000. Open flags come from `libc` 0.2.191. `/proc/self/fd` is documented as fail closed; the test printed `haru-companion skip: fchmodat AT_SYMLINK_NOFOLLOW uses /proc/self/fd; bind fails closed when it is absent (1 skipped)`.
+- N-2: `serve` still uses `FakeBackend::quiet()`, and the probe child is dropped so `StdLauncher::drop` kills it. Not changed.
+- Counts: `cargo +stable test --locked` haru-companion 97 passed, 0 failed. haru-pipe 16 passed, 0 failed.
+
 ## Checked, not a new defect
 
 - Cross compile, stable 1.100, target `aarch64-apple-darwin`: `cargo check --locked` exits 0 for both crates. `cargo build --locked` compiles and fails at link. `xcrun --sdk macosx` is missing (`os error 2`) and the host `cc` rejects `-arch arm64` (`unsupported option '-arch' for target 'x86_64-pc-linux-gnu'`). No Mach-O was produced.

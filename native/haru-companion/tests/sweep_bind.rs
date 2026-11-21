@@ -4,8 +4,8 @@ use haru_companion::backend::FakeBackend;
 use haru_companion::engine::Engine;
 use haru_companion::protocol::{decode_server, ServerMessage};
 use haru_companion::serve::{
-    bind_socket, current_uid, listener_matches, peer_uid, serve_one_with, unlink_if_ours, FixedPeer,
-    OsPeer, PeerCheck,
+    bind_socket, current_uid, listener_matches, peer_uid, serve_one_with, unlink_if_ours,
+    FixedPeer, OsPeer, PeerCheck,
 };
 use haru_companion::supervisor::{decide, serve_child_argv, LaunchDecision, LaunchRequest};
 use std::io::Read;
@@ -32,7 +32,11 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 fn mode(path: &std::path::Path) -> u32 {
-    std::fs::symlink_metadata(path).unwrap().permissions().mode() & 0o777
+    std::fs::symlink_metadata(path)
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777
 }
 
 fn set_mode(path: &std::path::Path, bits: u32) {
@@ -64,7 +68,11 @@ fn a_sticky_directory_we_own_is_tightened_before_bind() {
     set_mode(&parent, 0o1777);
     let socket = parent.join("zeus.sock");
     let listener = bind_socket(&socket).unwrap();
-    assert_eq!(mode(&parent) & 0o022, 0, "parent stayed group or world writable");
+    assert_eq!(
+        mode(&parent) & 0o022,
+        0,
+        "parent stayed group or world writable"
+    );
     assert_eq!(mode(&parent), 0o700);
     assert_eq!(mode(&socket), 0o600);
     drop(listener);
@@ -155,6 +163,32 @@ fn unlink_if_ours_keeps_a_different_inode() {
 }
 
 #[test]
+fn fchmodat_nofollow_documents_the_proc_dependency() {
+    let source = include_str!("../src/serve.rs");
+    assert!(
+        source.contains("/proc/self/fd"),
+        "the /proc dependency of fchmodat AT_SYMLINK_NOFOLLOW is not documented"
+    );
+    assert!(
+        source.contains("fails closed"),
+        "bind must document that a missing /proc fails closed"
+    );
+    if std::path::Path::new("/proc/self/fd").is_dir() {
+        println!(
+            "haru-companion skip: fchmodat AT_SYMLINK_NOFOLLOW uses /proc/self/fd; bind fails closed when it is absent (1 skipped)"
+        );
+        return;
+    }
+    let root = scratch("noproc");
+    let error = bind_socket(&root.join("priv").join("zeus.sock")).unwrap_err();
+    assert!(
+        error.kind() != std::io::ErrorKind::NotFound,
+        "missing /proc must fail closed, got {error}"
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
 fn open_flags_are_not_hardcoded_x86_values() {
     let source = include_str!("../src/serve.rs");
     assert!(
@@ -209,9 +243,7 @@ fn peer_uid_refusal_ends_with_eof() {
     let mut tail = [0u8; 8];
     let n = client.read(&mut tail).unwrap();
     assert_eq!(n, 0, "the socket stayed open after peer_uid");
-    let outcome = rx
-        .recv_timeout(std::time::Duration::from_secs(2))
-        .unwrap();
+    let outcome = rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
     assert_eq!(outcome, Err(std::io::ErrorKind::PermissionDenied));
     let _ = std::fs::remove_dir_all(&root);
 }

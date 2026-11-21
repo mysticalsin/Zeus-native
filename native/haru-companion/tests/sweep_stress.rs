@@ -13,14 +13,16 @@ fn fd_count() -> usize {
 
 #[test]
 fn ten_thousand_connect_cycles_do_not_leak_fds() {
-    let path = std::env::temp_dir().join(format!(
-        "zeus-haru-stress-{}-{}.sock",
+    let root = std::env::temp_dir().join(format!(
+        "zeus-haru-stress-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos()
     ));
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join("zeus.sock");
     let before = fd_count();
     for _ in 0..10_000 {
         let listener = bind_socket(&path).unwrap();
@@ -38,7 +40,7 @@ fn ten_thousand_connect_cycles_do_not_leak_fds() {
         drop(client);
         server.join().unwrap();
     }
-    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_dir_all(&root);
     let after = fd_count();
     assert!(
         after <= before + 2,

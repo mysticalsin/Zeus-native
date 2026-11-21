@@ -3,11 +3,10 @@
 
 use crate::backend::FakeBackend;
 use crate::engine::{selftest_report, Engine};
-use crate::serve::{accept_authorized, bind_socket, serve_one, OsPeer};
+use crate::serve::{accept_authorized, bind_socket, serve_one, unlink_if_ours, BoundWatch, OsPeer};
 use crate::session::ChildControl;
 use crate::supervisor::{
-    apply, decide, LaunchDecision, LaunchRequest, NetGate, serve_child_argv, SocketBind,
-    SpyBinder,
+    apply, decide, serve_child_argv, LaunchDecision, LaunchRequest, NetGate, SocketBind, SpyBinder,
     SpyLauncher, SpyNet, StdLauncher,
 };
 use std::path::PathBuf;
@@ -75,11 +74,29 @@ fn run_serve(
     watchdog: bool,
 ) -> std::io::Result<()> {
     let listener = bind_socket(socket)?;
+    let public_watch = match BoundWatch::watch(&listener, socket) {
+        Ok(watch) => watch,
+        Err(error) => {
+            drop(listener);
+            let _ = std::fs::remove_file(socket);
+            return Err(error);
+        }
+    };
     let child_listener = match bind_socket(private_socket) {
         Ok(listener) => listener,
         Err(error) => {
             drop(listener);
-            let _ = std::fs::remove_file(socket);
+            let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
+            return Err(error);
+        }
+    };
+    let child_watch = match BoundWatch::watch(&child_listener, private_socket) {
+        Ok(watch) => watch,
+        Err(error) => {
+            drop(listener);
+            drop(child_listener);
+            let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
+            let _ = std::fs::remove_file(private_socket);
             return Err(error);
         }
     };
@@ -87,12 +104,15 @@ fn run_serve(
     if let Err(error) = probe.spawn(argv) {
         drop(listener);
         drop(child_listener);
-        let _ = std::fs::remove_file(socket);
-        let _ = std::fs::remove_file(private_socket);
+        let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
+        let _ = unlink_if_ours(private_socket, child_watch.dev, child_watch.ino);
         return Err(error);
     }
+    // The probe proves the interpreter can be spawned. Dropping it kills that
+    // process (`StdLauncher::drop`). The engine owns a later child. `serve`
+    // still answers Zeus from `FakeBackend::quiet`, so frames are silence
+    // rather than model audio. That scaffold is unchanged in this socket fix.
     drop(probe);
-    let wake = private_socket.to_path_buf();
     let child_gate = std::thread::spawn(move || {
         let _ = accept_authorized(child_listener, &OsPeer);
     });
@@ -103,10 +123,17 @@ fn run_serve(
         watchdog,
     );
     let served = serve_one(listener, &mut engine);
-    let _ = std::os::unix::net::UnixStream::connect(&wake);
+    let child_same = child_watch.still_ours(private_socket);
+    child_watch.wake(private_socket);
     let _ = child_gate.join();
-    let _ = std::fs::remove_file(socket);
-    let _ = std::fs::remove_file(private_socket);
+    let _ = unlink_if_ours(socket, public_watch.dev, public_watch.ino);
+    let _ = unlink_if_ours(private_socket, child_watch.dev, child_watch.ino);
+    if !child_same {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "child socket replaced",
+        ));
+    }
     served
 }
 
