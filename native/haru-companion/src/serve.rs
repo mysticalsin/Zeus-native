@@ -4,15 +4,14 @@ use crate::backend::ModelBackend;
 use crate::engine::Engine;
 use crate::protocol::FrameBuf;
 use crate::session::ChildControl;
+use std::ffi::CString;
 use std::io::{Read, Write};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::Duration;
-
-static BIND_UMASK: Mutex<()> = Mutex::new(());
 
 pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
     if let Ok(meta) = std::fs::symlink_metadata(path) {
@@ -40,30 +39,53 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
             ));
         }
     }
-    let listener = {
-        let _guard = BIND_UMASK
-            .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() && !parent.exists() {
-                // 0777 & ~0077 = 0700. A directory we create is private from the start.
-                let old = unsafe { umask(0o077) };
-                let created = std::fs::create_dir_all(parent);
-                unsafe { umask(old) };
-                created?;
-            }
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+            chmod_directory(parent, 0o700)?;
         }
-        // 0777 & ~0177 = 0600. The socket mode is set before the name is visible
-        // to a chmod of the path.
-        let old = unsafe { umask(0o177) };
-        let bound = UnixListener::bind(path);
-        unsafe { umask(old) };
-        bound?
-    };
-    if unsafe { fchmod(listener.as_raw_fd(), 0o600) } != 0 {
-        return Err(std::io::Error::last_os_error());
+    }
+    let listener = UnixListener::bind(path)?;
+    // fchmod on the listening fd does not change the directory entry.
+    // fchmodat(AT_SYMLINK_NOFOLLOW) sets the socket mode and refuses to
+    // follow a symlink swapped in under the path.
+    if let Err(error) = chmod_path_nofollow(path, 0o600) {
+        let _ = std::fs::remove_file(path);
+        return Err(error);
     }
     Ok(listener)
+}
+
+fn c_path(path: &Path) -> std::io::Result<CString> {
+    CString::new(path.as_os_str().as_bytes()).map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains a nul")
+    })
+}
+
+fn chmod_directory(path: &Path, mode: u32) -> std::io::Result<()> {
+    let path = c_path(path)?;
+    let fd = unsafe { open(path.as_ptr(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW) };
+    if fd < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let rc = unsafe { fchmod(fd, mode) };
+    let error = std::io::Error::last_os_error();
+    unsafe { close(fd) };
+    if rc != 0 {
+        Err(error)
+    } else {
+        Ok(())
+    }
+}
+
+fn chmod_path_nofollow(path: &Path, mode: u32) -> std::io::Result<()> {
+    let path = c_path(path)?;
+    let rc = unsafe { fchmodat(AT_FDCWD, path.as_ptr(), mode, AT_SYMLINK_NOFOLLOW) };
+    if rc != 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 pub fn current_uid() -> u32 {
@@ -281,10 +303,45 @@ const SOL_SOCKET: i32 = 1;
 #[cfg(target_os = "linux")]
 const SO_PEERCRED: i32 = 17;
 
+#[cfg(target_os = "linux")]
+const O_RDONLY: i32 = 0;
+#[cfg(target_os = "linux")]
+const O_DIRECTORY: i32 = 0x10000;
+#[cfg(target_os = "linux")]
+const O_NOFOLLOW: i32 = 0x20000;
+#[cfg(target_os = "linux")]
+const AT_FDCWD: i32 = -100;
+#[cfg(target_os = "linux")]
+const AT_SYMLINK_NOFOLLOW: i32 = 0x100;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const O_RDONLY: i32 = 0;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const O_DIRECTORY: i32 = 0x10_0000;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const O_NOFOLLOW: i32 = 0x100;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const AT_FDCWD: i32 = -2;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const AT_SYMLINK_NOFOLLOW: i32 = 0x20;
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "ios")))]
+const O_RDONLY: i32 = 0;
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "ios")))]
+const O_DIRECTORY: i32 = 0;
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "ios")))]
+const O_NOFOLLOW: i32 = 0;
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "ios")))]
+const AT_FDCWD: i32 = -100;
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "ios")))]
+const AT_SYMLINK_NOFOLLOW: i32 = 0x100;
+
 extern "C" {
     fn geteuid() -> u32;
-    fn umask(mask: u32) -> u32;
     fn fchmod(fd: i32, mode: u32) -> i32;
+    fn fchmodat(dirfd: i32, path: *const i8, mode: u32, flags: i32) -> i32;
+    fn open(path: *const i8, flags: i32, ...) -> i32;
+    fn close(fd: i32) -> i32;
     #[cfg(target_os = "linux")]
     fn getsockopt(
         sockfd: i32,
