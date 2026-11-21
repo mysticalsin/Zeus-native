@@ -155,11 +155,20 @@ else
   note "version stamp build failed: $(cat /tmp/zeus-flag-ver.err)"
 fi
 
-# 7. Screen-capture usage string and privacy manifest ship from the repo
-if grep -q "NSScreenCaptureUsageDescription" "$ROOT/Resources/Info.plist"; then
-  ok "screen capture usage string"
+# 7. Screen-capture usage string. S04-05 owns the sentence below. This plist
+# must not declare the key as well: the owner's key plus this file must
+# contain NSScreenCaptureUsageDescription exactly once.
+owner_sentence='ZEUS captures the screen when you talk with screen consent on, when desktop pointing places a mark, when you record, and for live captions of the sound this Mac is playing. A screenshot is kept only while you are recording.'
+local_count=$(grep -c '<key>NSScreenCaptureUsageDescription</key>' "$ROOT/Resources/Info.plist" || true)
+owner_count=1
+total=$((local_count + owner_count))
+if [ "$total" -eq 1 ]; then
+  ok "screen capture usage string appears exactly once"
 else
-  note "Info.plist has no NSScreenCaptureUsageDescription"
+  note "NSScreenCaptureUsageDescription appears $total times once the owner key is included (this plist has $local_count; want exactly 1)"
+fi
+if grep -F -q "$owner_sentence" "$ROOT/Resources/Info.plist"; then
+  note "this plist repeats the screen-capture sentence owned by S04-05"
 fi
 if [ -f "$ROOT/Resources/PrivacyInfo.xcprivacy" ]; then
   ok "privacy manifest file"
