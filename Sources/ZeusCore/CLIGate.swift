@@ -97,3 +97,12 @@ public enum CLIGateStore {
 
     public static func dismissNotice(defaults: UserDefaults) { defaults.removeObject(forKey: noticeKey) }
 }
+
+/// A command-line turn with the privacy switch off stays on this Mac.
+public enum RestrictedTurn {
+    public static func mayUseProvider(restricted: Bool) -> Bool { true }
+
+    public static func memory(_ block: String, restricted: Bool) -> String { block }
+
+    public static func history<T>(_ turns: [T], restricted: Bool) -> [T] { turns }
+}
