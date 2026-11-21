@@ -3,6 +3,20 @@
 ZEUS ships or downloads the following third-party work. Attribution lives here and in About,
 never in the product UI.
 
+## Signed updates
+- Package pin 2.10.1, https://github.com/sparkle-project/Sparkle, MIT License.
+  Copyright (c) 2006-2013 Andy Matuschak. Copyright (c) 2009-2013 Elgato Systems GmbH.
+  Copyright (c) 2011-2014 Kornel Lesiński. Copyright (c) 2015-2017 Mayur Pawashe.
+  Copyright (c) 2014 C.W. Betts. Copyright (c) 2014 Petroules Corporation.
+  Copyright (c) 2014 Big Nerd Ranch.
+- The package LICENSE also carries the BSD notices for bsdiff (Colin Percival), sais-lite
+  (Yuta Mori), and the signature verifier (Mark Hamlin).
+- Ed25519 verification inside that package is the portable implementation from
+  https://github.com/orlp/ed25519, Copyright (c) 2015 Orson Peters. The origin notice
+  stays in that distribution.
+- No private key is in this repository. The public key is read from the host Info.plist
+  key SUPublicEDKey. Nothing is published from this tree.
+
 ## Qwen 2.5 (last-resort fallback through Ollama, optional, not bundled)
 - qwen2.5:7b by the Qwen team, Alibaba Cloud, Apache License 2.0, run only through a separately
   installed Ollama and only when Jev gave no answer.

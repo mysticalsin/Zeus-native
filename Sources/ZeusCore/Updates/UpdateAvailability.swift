@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// N6: version compare and update badge state (no network in tests).
 public struct ZeusVersion: Equatable, Sendable, Comparable {

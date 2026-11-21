@@ -20,6 +20,8 @@ let package = Package(
         .package(url: "https://github.com/FluidInference/FluidAudio.git", .upToNextMinor(from: "0.18.0")),
         // Whisper large-v3 turbo on CoreML (WhisperKit, MIT). The model downloads only on click.
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift.git", from: "1.1.1"),
+        // Signed updates. Exact pin. The app target links it on macOS only.
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", exact: "2.10.1"),
     ],
     targets: [
         .target(name: "ZeusCore"),
@@ -33,6 +35,7 @@ let package = Package(
             "ZeusObjCGuard",
             .product(name: "FluidAudio", package: "FluidAudio"),
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
+            .product(name: "Sparkle", package: "Sparkle", condition: .when(platforms: [.macOS])),
         ], resources: [
             .copy("Avatar/Poses"), .copy("Avatar/Anim"), .copy("Fonts"),
             .copy("Onboarding/Media"), .copy("Integrations/Brands"), .copy("Sounds"), .copy("Personality"),
