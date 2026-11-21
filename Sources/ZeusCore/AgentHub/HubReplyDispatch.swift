@@ -286,19 +286,23 @@ public enum HubReplyScriptGuard {
         return script.split(separator: "\n", omittingEmptySubsequences: false).map {
             $0.trimmingCharacters(in: .whitespaces)
         }.filter { row in
-            let normalized = normalizedCommand(row)
-            return markers.contains { normalized.contains($0) }
+            markers.contains { containsCommand(row, marker: $0) }
         }
     }
 
-    /// NFKC, format characters removed, every space separator folded to one ASCII space, then lowercased.
+    /// NFKC, case-folded, then NFD so a composed accent becomes a mark. Format characters,
+    /// nonspacing marks, and zero-width glue are removed.
+    /// Spaces collapse to one ASCII space. Matching also ignores those spaces, so a dotted I,
+    /// a combining mark, or a zero-width joiner cannot hide a command.
     static func normalizedCommand(_ text: String) -> String {
         let folded = text.precomposedStringWithCompatibilityMapping
+            .lowercased()
+            .decomposedStringWithCanonicalMapping
         var output = ""
         var pendingSpace = false
         var started = false
         for scalar in folded.unicodeScalars {
-            if scalar.properties.generalCategory == .format { continue }
+            if isIgnoredMark(scalar) { continue }
             let isSpace = scalar.properties.generalCategory == .spaceSeparator
                 || scalar.value == 0x09 || scalar.value == 0x0A || scalar.value == 0x0D
             if isSpace {
@@ -310,9 +314,32 @@ public enum HubReplyScriptGuard {
                 pendingSpace = false
             }
             started = true
-            output.append(contentsOf: String(scalar).lowercased())
+            output.append(Character(scalar))
         }
         return output
+    }
+
+    static func containsCommand(_ text: String, marker: String) -> Bool {
+        let normalized = normalizedCommand(text)
+        if normalized.contains(marker) { return true }
+        let tight = normalized.replacingOccurrences(of: " ", with: "")
+        let tightMarker = marker.replacingOccurrences(of: " ", with: "")
+        return !tightMarker.isEmpty && tight.contains(tightMarker)
+    }
+
+    private static func isIgnoredMark(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.properties.generalCategory {
+        case .format, .nonspacingMark:
+            return true
+        default:
+            break
+        }
+        switch scalar.value {
+        case 0x034F, 0x180E, 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF:
+            return true
+        default:
+            return false
+        }
     }
 
     /// iTerm's one `write text` of the escaped line. Anything else that types, including `do script`, fails.
@@ -320,9 +347,9 @@ public enum HubReplyScriptGuard {
         let wrapper = "write text \"\(escaped)\""
         let parts = script.components(separatedBy: wrapper)
         guard parts.count - 1 == 1 else { return false }
-        let remainder = normalizedCommand(parts.joined())
+        let remainder = parts.joined()
         let blocked = ["do script", "do shell script", "shell script", "keystroke", "key code", "key down", "key up", "system events", "write text"]
-        return blocked.allSatisfy { !remainder.contains($0) }
+        return blocked.allSatisfy { !containsCommand(remainder, marker: $0) }
     }
 
     private static func isStructuralBreak(_ scalar: Unicode.Scalar) -> Bool {
