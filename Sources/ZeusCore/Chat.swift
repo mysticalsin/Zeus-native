@@ -157,17 +157,22 @@ public enum ChatDiskSave {
         public var notice: String?
     }
 
-    /// Red: a failed save still clears the draft.
     public static func recover(draft: String, saved: Bool) -> Recovery {
-        Recovery(draft: "", notice: nil)
+        if saved { return Recovery(draft: "", notice: nil) }
+        return Recovery(draft: draft, notice: notice)
     }
 }
 
 /// Conversations as JSON files under one folder (`chats/<id>.json`), on this Mac only.
 public struct ChatStore: Sendable {
     public let root: URL
-    /// Test fault. Red: ignored, so a full disk still looks like a successful save.
-    public var failNextSave = false
+    private final class FaultBox: @unchecked Sendable { var fail = false }
+    private let faultBox = FaultBox()
+    /// Test fault. The next save throws a no-space error and writes nothing.
+    public var failNextSave: Bool {
+        get { faultBox.fail }
+        nonmutating set { faultBox.fail = newValue }
+    }
 
     public init(root: URL) { self.root = root }
 
@@ -193,7 +198,10 @@ public struct ChatStore: Sendable {
     /// Empty, unlinked conversations are never written, so opening the window
     /// doesn't litter history. Visual-only conversations retain their actual record link.
     public func save(_ conversation: ChatConversation) throws {
-        if failNextSave { failNextSave = false }
+        if faultBox.fail {
+            faultBox.fail = false
+            throw CocoaError(.fileWriteOutOfSpace)
+        }
         guard !conversation.isEmpty || conversation.visualExplanationID != nil else { return }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Self.encoder().encode(conversation).write(to: url(for: conversation.id), options: .atomic)

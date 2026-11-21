@@ -24,8 +24,10 @@ final class ChatModel {
     var onDeleteConversation: (UUID, UUID) -> Void = { _, _ in }
     private var failedVisualLinkIDs = Set<UUID>()
     private var visualLinkProblem: String?
+    private var saveProblem: String?
     var hasUnsavedVisualLinks: Bool { !failedVisualLinkIDs.isEmpty }
     var visualStoreError: String? {
+        if let saveProblem { return saveProblem }
         if hasUnsavedVisualLinks {
             return "Some explanation sidebar links could not be saved. Keep Zeus open and check local storage before quitting."
         }
@@ -159,10 +161,10 @@ final class ChatModel {
     func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
-        draft = ""
         var conversation = current
         let history = conversation.exchanges()
         conversation.append(ChatMessage(role: .user, text: text))
+        guard kept(persist(conversation), draft: text) else { return }
         if let spoken = InstantTable.spokenAnswer(for: text) {
             conversation.append(ChatMessage(role: .assistant, text: spoken, engine: "local", engineReason: "Instant"))
             upsert(conversation)
@@ -254,10 +256,32 @@ final class ChatModel {
             ChatMessage(role: .assistant, text: assistant, date: now, engine: nil, engineReason: engine.map { "Answered by \($0)" }),
         ])
         conversations.insert(conversation, at: 0)
-        try? store.save(conversation)
+        if !persist(conversation) { saveProblem = ChatDiskSave.notice }
     }
 
     // MARK: Storage
+
+    private func persist(_ conversation: ChatConversation) -> Bool {
+        do {
+            try store.save(conversation)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Clears the draft only after the file is stored. A failure puts the words back and shows the notice.
+    private func kept(_ saved: Bool, draft text: String) -> Bool {
+        let recovery = ChatDiskSave.recover(draft: text, saved: saved)
+        if saved {
+            draft = ""
+            saveProblem = nil
+            return true
+        }
+        draft = recovery.draft
+        saveProblem = recovery.notice
+        return false
+    }
 
     private func upsert(_ conversation: ChatConversation) {
         if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
@@ -266,13 +290,13 @@ final class ChatModel {
             conversations.insert(conversation, at: 0)
         }
         currentID = conversation.id
-        try? store.save(conversation)
+        if !persist(conversation) { saveProblem = ChatDiskSave.notice }
     }
 
     private func mutate(_ id: UUID, save: Bool = true, _ change: (inout ChatConversation) -> Void) {
         guard let index = conversations.firstIndex(where: { $0.id == id }) else { return }
         change(&conversations[index])
-        if save { try? store.save(conversations[index]) }
+        if save, !persist(conversations[index]) { saveProblem = ChatDiskSave.notice }
     }
 }
 
