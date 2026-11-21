@@ -140,12 +140,25 @@ import Testing
         #expect(tries.value == 2)
     }
 
+    @Test func theTransitionSwitchHasNoDefault() throws {
+        let source = try voiceSource("Sources/ZeusCore/Voice/VoiceSessionState.swift")
+        #expect(source.contains("default:") == false)
+    }
+
     @Test func thisSuiteAddsNoSkipOrXfail() throws {
         let source = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
         for token in ["XCT" + "Skip", "expected" + "Failure", "with" + "KnownIssue", ".dis" + "abled"] {
             #expect(source.contains(token) == false)
         }
     }
+}
+
+private func voiceSource(_ relative: String) throws -> String {
+    var url = URL(fileURLWithPath: #filePath)
+    url.deleteLastPathComponent()
+    url.deleteLastPathComponent()
+    url.deleteLastPathComponent()
+    return try String(contentsOf: url.appendingPathComponent(relative), encoding: .utf8)
 }
 
 private enum VerifyInfrastructure: Error, Equatable {
