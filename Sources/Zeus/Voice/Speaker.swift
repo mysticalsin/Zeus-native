@@ -456,28 +456,42 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         let engineVoice = VoiceSettings.shared.kokoroVoice
         let output = speechOutput
         let token = SpeechCancelToken()
-        var clock = SpeechManualClock()
-        let result = KokoroClausePlayback.play(
-            text: text,
-            personaVoiceID: voice,
-            sampleRate: 24_000,
-            clock: &clock,
-            output: output,
-            token: token,
-            directory: directory,
-            deadline: VoiceTTSChain.firstAudioTimeout + 30,
-            render: { chunk, _ in
-                if Task.isCancelled {
-                    token.cancel()
-                    return nil
+        let deadline = VoiceTTSChain.firstAudioTimeout + 30
+        // Playback waits on Kokoro off the main actor. `waitForKokoro` posts its render back here,
+        // so waiting on this actor would deadlock the first clause.
+        nonisolated(unsafe) let speaker = self
+        let result = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<KokoroPlayReceipt, Never>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    var clock = SpeechManualClock()
+                    let played = KokoroClausePlayback.play(
+                        text: text,
+                        personaVoiceID: voice,
+                        sampleRate: 24_000,
+                        clock: &clock,
+                        output: output,
+                        token: token,
+                        directory: directory,
+                        deadline: deadline,
+                        render: { chunk, _ in
+                            if token.isCancelled { return nil }
+                            return Self.waitForKokoro(chunk, voice: engineVoice, speed: speed, began: began, token: token)
+                        },
+                        play: { url in
+                            DispatchQueue.main.sync {
+                                MainActor.assumeIsolated {
+                                    let ok = speaker.chain.scheduleFile(url)
+                                    if ok { speaker.markAudioReady() }
+                                    return ok
+                                }
+                            }
+                        })
+                    continuation.resume(returning: played)
                 }
-                return Self.waitForKokoro(chunk, voice: engineVoice, speed: speed, began: began, token: token)
-            },
-            play: { url in
-                let ok = self.chain.scheduleFile(url)
-                if ok { self.markAudioReady() }
-                return ok
-            })
+            }
+        } onCancel: {
+            token.cancel()
+        }
         return KokoroClausePlayback.holdsTheUtterance(result)
     }
 
@@ -489,7 +503,8 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         Task { @MainActor in
             if Task.isCancelled { token.cancel() }
             box.url = await KokoroVoice.render(text, voice: voice, speed: speed)
-            if box.url != nil, Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30 {
+            // The same first-audio budget covers every clause, not only the one before playback starts.
+            if token.isCancelled || (box.url != nil && Date().timeIntervalSince(began) > VoiceTTSChain.firstAudioTimeout + 30) {
                 if let url = box.url { try? FileManager.default.removeItem(at: url) }
                 box.url = nil
                 token.cancel()
@@ -698,6 +713,11 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         guard let pick = UltronSystemVoicePick.pick(from: candidates, languageCode: languageCode) else { return nil }
         return AVSpeechSynthesisVoice(identifier: pick.identifier)
     }
+}
+
+/// Holds the WAV URL across `waitForKokoro`'s main-actor hop. The background caller reads it after the signal.
+private final class KokoroRenderBox: @unchecked Sendable {
+    var url: URL?
 }
 
 /// Schedules streamed PCM for one sentence with a one-buffer look-ahead, so the last buffer of the sentence
