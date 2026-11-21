@@ -57,3 +57,34 @@ fn stream_messages_stay_bounded() {
     assert!(st.index > 10, "produced only {} frames", st.index);
     assert!(st.msgs.len() <= 32 * 1024, "msgs grew to {} bytes", st.msgs.len());
 }
+
+fn wav_pcm(rate: u32, ch: u16, bits: u16, payload: &[u8]) -> Vec<u8> {
+    let mut fmt = vec![0u8; 16];
+    fmt[0..2].copy_from_slice(&1u16.to_le_bytes());
+    fmt[2..4].copy_from_slice(&ch.to_le_bytes());
+    fmt[4..8].copy_from_slice(&rate.to_le_bytes());
+    let block = ch.saturating_mul(bits / 8);
+    fmt[8..12].copy_from_slice(&(rate.saturating_mul(block as u32)).to_le_bytes());
+    fmt[12..14].copy_from_slice(&block.to_le_bytes());
+    fmt[14..16].copy_from_slice(&bits.to_le_bytes());
+    let chunk = |id: &[u8; 4], body: &[u8]| {
+        let mut c = id.to_vec();
+        c.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        c.extend_from_slice(body);
+        if body.len() % 2 == 1 { c.push(0); }
+        c
+    };
+    let mut body = chunk(b"fmt ", &fmt);
+    body.extend(chunk(b"data", payload));
+    let mut out = b"RIFF".to_vec();
+    out.extend_from_slice(&((4 + body.len()) as u32).to_le_bytes());
+    out.extend_from_slice(b"WAVE");
+    out.extend(body);
+    out
+}
+
+#[test]
+fn wav_rejects_zero_rate() {
+    let err = haru_pipe::wav::decode(&wav_pcm(0, 1, 16, &[0, 0]));
+    assert!(err.is_err(), "rate 0 decoded: {err:?}");
+}

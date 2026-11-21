@@ -1,10 +1,91 @@
 package harupipe
 
 import (
+	"encoding/binary"
 	"math"
 	"testing"
 	"time"
 )
+
+func pcmWav(tag, bits, ch uint16, rate uint32, payload []byte) []byte {
+	fmtc := make([]byte, 16)
+	binary.LittleEndian.PutUint16(fmtc[0:], tag)
+	binary.LittleEndian.PutUint16(fmtc[2:], ch)
+	binary.LittleEndian.PutUint32(fmtc[4:], rate)
+	block := uint16(int(ch) * int(bits) / 8)
+	binary.LittleEndian.PutUint32(fmtc[8:], rate*uint32(block))
+	binary.LittleEndian.PutUint16(fmtc[12:], block)
+	binary.LittleEndian.PutUint16(fmtc[14:], bits)
+	chunk := func(id string, body []byte) []byte {
+		b := append([]byte(id), make([]byte, 4)...)
+		binary.LittleEndian.PutUint32(b[4:], uint32(len(body)))
+		b = append(b, body...)
+		if len(body)%2 == 1 {
+			b = append(b, 0)
+		}
+		return b
+	}
+	body := append(chunk("fmt ", fmtc), chunk("data", payload)...)
+	out := append([]byte("RIFF"), make([]byte, 4)...)
+	binary.LittleEndian.PutUint32(out[4:], uint32(4+len(body)))
+	return append(append(out, []byte("WAVE")...), body...)
+}
+
+func TestDecode24And32BitPCM(t *testing.T) {
+	var data24 []byte
+	for _, s := range []int32{1, -1, 8388607, -8388608} {
+		var b [4]byte
+		binary.LittleEndian.PutUint32(b[:], uint32(int32(s)))
+		data24 = append(data24, b[:3]...)
+	}
+	w, err := DecodeWav(pcmWav(1, 24, 1, 24000, data24))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want24 := []float32{1.0 / 8388608.0, -1.0 / 8388608.0, 8388607.0 / 8388608.0, -1}
+	if len(w.Samples) != len(want24) {
+		t.Fatalf("24-bit len %d", len(w.Samples))
+	}
+	for i := range want24 {
+		if math.Abs(float64(w.Samples[i]-want24[i])) > 1e-6 {
+			t.Fatalf("24-bit %d got %v want %v", i, w.Samples[i], want24[i])
+		}
+	}
+	var data32 []byte
+	for _, s := range []int32{0, 2147483647, -2147483648} {
+		var b [4]byte
+		binary.LittleEndian.PutUint32(b[:], uint32(s))
+		data32 = append(data32, b[:]...)
+	}
+	w, err = DecodeWav(pcmWav(1, 32, 1, 24000, data32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	scale := 2147483648.0
+	want32 := []float32{0, float32(2147483647 / scale), -1}
+	for i := range want32 {
+		if math.Abs(float64(w.Samples[i]-want32[i])) > 1e-6 {
+			t.Fatalf("32-bit %d got %v want %v", i, w.Samples[i], want32[i])
+		}
+	}
+}
+
+func TestDecodeRejectsZeroChannelsAndRate(t *testing.T) {
+	if _, err := DecodeWav(pcmWav(1, 16, 0, 24000, []byte{0, 0})); err == nil {
+		t.Fatal("zero channels accepted")
+	}
+	if _, err := DecodeWav(pcmWav(1, 16, 1, 0, []byte{0, 0})); err == nil {
+		t.Fatal("zero rate accepted")
+	}
+	defer func() {
+		if recover() != nil {
+			t.Fatal("ToMono panicked on zero channels")
+		}
+	}()
+	if ToMono([]float32{0.5, -0.5}, 0) != nil {
+		t.Fatal("ToMono(ch=0) should return nil, not a partial mix")
+	}
+}
 
 func TestFiveByteSplitMatchesSingleRead(t *testing.T) {
 	raw := make([]byte, 64)
