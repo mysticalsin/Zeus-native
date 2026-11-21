@@ -85,13 +85,18 @@ public enum PermissionDesk {
             if status == .allowed || status == .unavailable {
                 return Decision(can: false, reason: can(resource: resource, action: .describe, status: status).reason)
             }
+            if status == .denied {
+                return Decision(can: true, reason: "Open Settings")
+            }
             let prompts = rows.first { $0.kind == resource }?.canPrompt == true
             return Decision(can: true, reason: prompts ? "Allow" : "Open Settings")
         }
     }
 
-    /// Red: a denial is stored as not asked.
+    /// Allowed wins. A denial stays a denial. Anything else has not been asked.
     public static func observed(authorized: Bool, denied: Bool) -> Status {
-        authorized ? .allowed : .unknown
+        if authorized { return .allowed }
+        if denied { return .denied }
+        return .unknown
     }
 }
