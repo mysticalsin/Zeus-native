@@ -1,6 +1,43 @@
 import Foundation
 import Testing
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 @testable import ZeusCore
+
+/// Waits that keep the calling thread. An async sleep lets its deadline run while the cooperative
+/// pool is busy, so these helpers block here and run socket calls on a dispatch thread.
+enum OwnedBridgeWait {
+    static func until(seconds: Double, _ condition: () -> Bool) -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+        while ContinuousClock.now < deadline {
+            if condition() { return true }
+            usleep(5_000)
+        }
+        return condition()
+    }
+
+    final class Pending<T: Sendable>: @unchecked Sendable {
+        private let done = DispatchSemaphore(value: 0)
+        private var result: T?
+        fileprivate func finish(_ value: T) {
+            result = value
+            done.signal()
+        }
+        func wait() -> T {
+            done.wait()
+            return result!
+        }
+    }
+
+    static func start<T: Sendable>(_ work: @escaping @Sendable () -> T) -> Pending<T> {
+        let pending = Pending<T>()
+        DispatchQueue.global(qos: .userInitiated).async { pending.finish(work()) }
+        return pending
+    }
+}
 
 @Suite("Chrome bridge reply ownership", .serialized)
 struct BridgePendingRepliesTests {
@@ -12,13 +49,12 @@ struct BridgePendingRepliesTests {
         func change(_ update: (inout Value) -> Void) { lock.withLock { update(&value) } }
     }
 
-    private func eventually(_ condition: @Sendable () -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while !condition(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(condition())
+    private func eventually(_ condition: @Sendable () -> Bool) {
+        let met = OwnedBridgeWait.until(seconds: 2, condition)
+        #expect(met)
     }
 
-    @Test func duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete() async throws {
+    @Test func duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-br-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -32,19 +68,19 @@ struct BridgePendingRepliesTests {
         try server.start()
         defer { server.stop() }
         let request = try JSONEncoder().encode(BridgeRequest(id: "same-id", type: "page.read"))
-        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }
-        try await eventually { pending.count == 1 && forwarded.read() == 1 }
-        let duplicateBytes = await Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }.value
+        let original = OwnedBridgeWait.start { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }
+        eventually { pending.count == 1 && forwarded.read() == 1 }
+        let duplicateBytes = UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3)
         let duplicate = try JSONDecoder().decode(BridgeResponse.self, from: #require(duplicateBytes))
         #expect(duplicate.id == "same-id" && !duplicate.ok && duplicate.error?.code == "duplicate_request")
         #expect(pending.count == 1)
         #expect(forwarded.read() == 1, "Only the original request may be forwarded to Chrome")
         let success = BridgeResponse.success("same-id", .object(["original": .bool(true)]))
         #expect(pending.complete(success))
-        let originalBytes = await original.value
+        let originalBytes = original.wait()
         #expect(try JSONDecoder().decode(BridgeResponse.self, from: #require(originalBytes)) == success)
         #expect(!pending.complete(success))
-        try await eventually { pending.count == 0 && server.activeConnectionCount == 0 }
+        eventually { pending.count == 0 && server.activeConnectionCount == 0 }
     }
 
     @Test func anOldTimeoutCannotSettleAReusedRequestID() throws {
@@ -118,16 +154,42 @@ struct BridgePendingRepliesTests {
         #expect(replies.read().count == 2 && pending.count == 0)
     }
 
-    @Test func aLiveReservationDeadlineProducesOneTimeoutReply() async throws {
+    @Test func aLiveReservationDeadlineProducesOneTimeoutReply() throws {
         let pending = BridgePendingReplies()
         let replies = Box<[Data?]>([])
         let token = try #require(pending.reserve(id: "deadline") { data in replies.change { $0.append(data) } })
         #expect(pending.armTimeout(id: "deadline", token: token, after: 0.03))
-        try await eventually { replies.read().count == 1 }
+        eventually { replies.read().count == 1 }
         let item = try #require(replies.read().first)
         let response = try JSONDecoder().decode(BridgeResponse.self, from: #require(item))
         #expect(response.error?.code == "timeout" && pending.count == 0)
         #expect(!pending.complete(.success("deadline"), token: token))
+    }
+
+    /// The bridge socket admits a same-user peer inside the 3 second timeout already on main.
+    /// The kernel has to name that peer. A missing identity is a refusal, and the request ends with no reply.
+    @Test func aSameUserPeerIsAdmittedInsideTheExistingSocketDeadline() throws {
+        var pair = [Int32](repeating: 0, count: 2)
+        #if canImport(Darwin)
+        let stream = SOCK_STREAM
+        #else
+        let stream = Int32(SOCK_STREAM.rawValue)
+        #endif
+        try #require(socketpair(AF_UNIX, stream, 0, &pair) == 0)
+        defer { close(pair[0]); close(pair[1]) }
+        #expect(PeerCheck.identify(fd: pair[0])?.uid == UInt32(geteuid()))
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-br-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("peer.sock").path
+        let server = UnixSocketServer(path: path) { _, reply in
+            reply(Data("{\"ok\":true}".utf8))
+        }
+        try server.start()
+        defer { server.stop() }
+        let reply = UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 3)
+        #expect(reply == Data("{\"ok\":true}".utf8))
     }
 
 }
