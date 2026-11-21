@@ -109,7 +109,7 @@ Each real defect was committed as a failing test, then the fix.
 - Test: `c582fb4` `tests/sweep_security.rs`
 - Fix: `69572c9`
 - E-02: fixed in `69572c9`. `serve` accepts Zeus only on the 0600 socket and applies `SO_PEERCRED` / `getpeereid` against `geteuid`. `serve_one_with` takes an injected `PeerCheck`, and a scripted foreign uid is `PermissionDenied`. The child socket is bound the same way, its connection is peer-checked, and both sockets are unlinked on exit. The child socket is mode 0600 and its parent, when created here, is mode 0700.
-- E-04: the chmod-after-bind race was already fixed by `10a7474` (umask `0177` and `fchmod` on the bound fd, no `set_permissions` on the path). `69572c9` also creates a missing parent directory at mode 0700. `e02_child_socket_is_0600_inside_a_0700_dir` locks both modes.
+- E-04: the chmod-after-bind race was already fixed by `10a7474` (no `set_permissions` on the path). `69572c9` also creates a missing parent directory at mode 0700. `e02_child_socket_is_0600_inside_a_0700_dir` locks both modes. `848116b` replaced the process umask with `fchmodat(..., AT_SYMLINK_NOFOLLOW)`.
 
 ## H-external
 
@@ -129,11 +129,30 @@ Each real defect was committed as a failing test, then the fix.
 | HC-12 | `64059b0`, `65ac6dc` | `3214ea9` | nesting deeper than 16 is `BadJson`. Depth 20_000 does not abort |
 | HC-13 | `65ac6dc` | `10a7474` | a socket that still accepts a connection is `AddrInUse` and is not unlinked |
 | HC-14 | `2b9632f` | `40ce10c` | a dangling symlink is removed with `symlink_metadata` and the bind succeeds |
-| HC-15 | `65ac6dc` | `10a7474` | the socket is created with umask `0177` and `fchmod` on the bound fd. The path is not chmod'd |
+| HC-15 | `65ac6dc` | `10a7474`, `848116b` | the path is not chmod'd through a symlink. `848116b` sets mode 0600 with `fchmodat` and `AT_SYMLINK_NOFOLLOW` and does not change the process umask |
 | HC-16 | `25d2b85` | `4dd7966` | a non-finite step is an immediate latency restart |
 | HC-17 | `538094d` | `c391c76` | a failed exec is `process_exited` and the session is `failed`, not `Starting` |
 | HC-18 | `65ac6dc` | `10a7474` | a directory whose name contains `reference` is not refused. `reference_path` is still rejected on START |
 | HC-19 | `65ac6dc` | `10a7474` | the restart window is `Instant`, so `advance(10 min)` does not grant another restart |
+
+## CI on `0e7065d`
+
+- Time: 2026-11-21T05:23:12Z. Pull request run `44862869399` and push run `44862867972` both failed. Companion job `136719942210` failed `hc05_kill_reaps_the_process_group` at `tests/sweep_hunt.rs:173` and `hc18_a_model_directory_may_contain_the_word_reference` at line 470, both `PermissionDenied` (os error 13). The pipe job passed.
+- Cause: `bind_socket` set the process umask to `0177` while other tests created directories, so those directories were mode 0600 and a later write was `EACCES`.
+- Test: `588188e` `tests/sweep_umask.rs`. It failed on the umask build with `PermissionDenied` at `create`/`write`.
+- Fix: `848116b`. A new parent is `fchmod`'d to 0700 on a directory fd. The socket is `fchmodat` mode 0600 with `AT_SYMLINK_NOFOLLOW`. `umask` is not called.
+- After that fix, `e02_child_socket_is_0600_inside_a_0700_dir` still sees socket 0600 and parent 0700.
+- One parallel `cargo test --locked` then failed `thirty_minute_synthetic_soak_stays_flat` with fd count 5 before and 6 after, while `ten_thousand_connect_cycles_do_not_leak_fds` ran in the same process. The soak alone passed. It now lives in `tests/sweep_soak.rs`.
+
+## 17. UX polish and motion
+
+- Time: 2026-11-21T05:23:12Z.
+- Lens: UX polish and motion.
+- Findings: `state_machine_svg` placed `close` and `fail(socket_closed)` on the same point `(185, 142)`. The streaming-to-closing `close` label sat on the `animateMotion` path. A foreign peer was dropped with no bytes; the client `read_exact` returned `UnexpectedEof`.
+- Stress: 20 foreign-uid connections in a row. Each must read one `peer_uid` error frame, and the server must return `PermissionDenied`.
+- Test: `a822b99` `tests/sweep_ux.rs`. Both tests failed before the fix.
+- Fix: this commit. Edge labels are offset off the nodes, off each other, and at least 16 px from the motion path. `serve_one_with` writes an error frame with code `peer_uid` before it returns `PermissionDenied`. `docs/state-machine.svg` matches the generator.
+- Counts after the fix, `cargo +stable test --locked` (default threads): haru-companion 87 passed, 0 failed. haru-pipe 16 passed, 0 failed. `cargo +stable fmt --check` and `cargo +stable clippy --locked --all-targets -- -D warnings` passed for both crates.
 
 ## Checked, not a new defect
 

@@ -377,6 +377,97 @@ impl fmt::Display for WatchdogReason {
 
 impl std::error::Error for SessionError {}
 
+fn point_gap(point: (f64, f64), path: &[(f64, f64)]) -> f64 {
+    path.windows(2)
+        .map(|segment| {
+            let (a, b) = (segment[0], segment[1]);
+            let dx = b.0 - a.0;
+            let dy = b.1 - a.1;
+            let len2 = dx * dx + dy * dy;
+            let t = if len2 == 0.0 {
+                0.0
+            } else {
+                ((point.0 - a.0) * dx + (point.1 - a.1) * dy) / len2
+            };
+            let t = t.clamp(0.0, 1.0);
+            let x = a.0 + t * dx;
+            let y = a.1 + t * dy;
+            ((point.0 - x).powi(2) + (point.1 - y).powi(2)).sqrt()
+        })
+        .fold(f64::MAX, f64::min)
+}
+
+fn claim_label(
+    x: f64,
+    y: f64,
+    path: &[(f64, f64)],
+    nodes: &[(f64, f64)],
+    taken: &mut Vec<(f64, f64)>,
+) -> (f64, f64) {
+    for step in 0..8 {
+        let candidate = (x, y - f64::from(step) * 12.0);
+        if label_fits(candidate, path, nodes, taken) {
+            taken.push(candidate);
+            return candidate;
+        }
+    }
+    taken.push((x, y));
+    (x, y)
+}
+
+fn offset_label(
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    path: &[(f64, f64)],
+    nodes: &[(f64, f64)],
+    taken: &mut Vec<(f64, f64)>,
+) -> (f64, f64) {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let len = (dx * dx + dy * dy).sqrt().max(1.0);
+    let px = -dy / len;
+    let py = dx / len;
+    let mx = (x1 + x2) / 2.0;
+    let my = (y1 + y2) / 2.0;
+    for step in 1..8 {
+        for sign in [1.0_f64, -1.0] {
+            let distance = 18.0 * f64::from(step);
+            let candidate = (mx + px * distance * sign, my + py * distance * sign);
+            if label_fits(candidate, path, nodes, taken) {
+                taken.push(candidate);
+                return candidate;
+            }
+        }
+    }
+    taken.push((mx, my));
+    (mx, my)
+}
+
+fn label_fits(
+    candidate: (f64, f64),
+    path: &[(f64, f64)],
+    nodes: &[(f64, f64)],
+    taken: &[(f64, f64)],
+) -> bool {
+    if !(12.0..=628.0).contains(&candidate.0) || !(14.0..=326.0).contains(&candidate.1) {
+        return false;
+    }
+    if point_gap(candidate, path) < 16.0 {
+        return false;
+    }
+    if nodes
+        .iter()
+        .any(|(x, y)| (candidate.0 - x).abs() <= 68.0 && (candidate.1 - y).abs() <= 26.0)
+    {
+        return false;
+    }
+    taken
+        .iter()
+        .all(|(x, y)| (x - candidate.0).abs() >= 12.0 || (y - candidate.1).abs() >= 12.0)
+}
+
 /// SVG of the legal transitions. Node positions are fixed; every edge is an
 /// `Ok` result from [`SessionState::next`], and the moving dot walks
 /// idle → starting → streaming → closing → closed by calling `next`.
@@ -440,6 +531,9 @@ pub fn state_machine_svg() -> String {
     for (x, y) in walk_points.iter().skip(1) {
         path.push_str(&format!(" L {x} {}", y + 28.0));
     }
+    let node_points: Vec<(f64, f64)> = nodes.iter().map(|(_, x, y)| (*x, *y)).collect();
+    let mut taken: Vec<(f64, f64)> = nodes.iter().map(|(_, x, y)| (*x, *y + 5.0)).collect();
+    let path_points: Vec<(f64, f64)> = walk_points.iter().map(|(x, y)| (*x, y + 28.0)).collect();
     let mut lines = String::new();
     for (from, event, to, fail) in &edges {
         let (x1, y1) = pos(from);
@@ -449,19 +543,19 @@ pub fn state_machine_svg() -> String {
             lines.push_str(&format!(
                 "<path d=\"M {x1} {y1} m 28 -18 a 18 18 0 1 1 -1 0\" fill=\"none\" stroke=\"{color}\" stroke-width=\"1.4\"/>"
             ));
+            let label = claim_label(x1, y1 - 46.0, &path_points, &node_points, &mut taken);
             lines.push_str(&format!(
-                "<text x=\"{x1}\" y=\"{}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{color}\">{event}</text>",
-                y1 - 46.0
+                "<text x=\"{:.0}\" y=\"{:.0}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{color}\">{event}</text>",
+                label.0, label.1
             ));
             continue;
         }
-        let mx = (x1 + x2) / 2.0;
-        let my = (y1 + y2) / 2.0 - 8.0;
         lines.push_str(&format!(
             "<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{color}\" stroke-width=\"1.4\" marker-end=\"url(#arrow)\"/>"
         ));
+        let (mx, my) = offset_label(x1, y1, x2, y2, &path_points, &node_points, &mut taken);
         lines.push_str(&format!(
-            "<text x=\"{mx}\" y=\"{my}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{color}\">{event}</text>"
+            "<text x=\"{mx:.0}\" y=\"{my:.0}\" text-anchor=\"middle\" font-size=\"11\" fill=\"{color}\">{event}</text>"
         ));
     }
     let mut circles = String::new();

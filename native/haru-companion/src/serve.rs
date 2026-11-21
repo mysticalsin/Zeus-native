@@ -57,9 +57,8 @@ pub fn bind_socket(path: &Path) -> std::io::Result<UnixListener> {
 }
 
 fn c_path(path: &Path) -> std::io::Result<CString> {
-    CString::new(path.as_os_str().as_bytes()).map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains a nul")
-    })
+    CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains a nul"))
 }
 
 fn chmod_directory(path: &Path, mode: u32) -> std::io::Result<()> {
@@ -155,14 +154,14 @@ where
     C: ChildControl,
     P: PeerCheck,
 {
-    let (stream, _) = listener.accept()?;
+    let (mut stream, _) = listener.accept()?;
     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
     if let Err(error) = peer.allow(&stream) {
+        let _ = stream.write_all(&crate::protocol::peer_error_frame());
         finish_session(engine);
         return Err(error);
     }
-    let mut stream = stream;
     let mut framer = FrameBuf::default();
     let mut buffer = [0u8; 8192];
     let mut outcome = Ok(());

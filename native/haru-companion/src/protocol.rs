@@ -230,6 +230,16 @@ pub fn error_frame(error: &SessionError) -> Vec<u8> {
     .encode()
 }
 
+pub fn peer_error_frame() -> Vec<u8> {
+    ServerMessage::Error {
+        code: "peer_uid".to_string(),
+        message: "peer uid".to_string(),
+        expected: None,
+        got: None,
+    }
+    .encode()
+}
+
 pub fn protocol_error_frame(error: &ProtocolError) -> Vec<u8> {
     let (expected, got) = match error {
         ProtocolError::BadFrameSize { expected, got } => (
