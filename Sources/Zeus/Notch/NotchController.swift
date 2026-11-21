@@ -498,7 +498,7 @@ final class NotchController {
 
     /// Settings > Appearance > Notch behavior.
     static var openDelayMilliseconds: Int {
-        switch SettingsStore.shared.string("notch.openDelay") { case "Fast": 100; case "Relaxed": 600; default: 250 }
+        NotchOpenDelay.milliseconds(label: SettingsStore.shared.string("notch.openDelay"))
     }
     /// Settings > Appearance > Notch behavior > Open the notch on.
     static var openTrigger: NotchOpenTrigger {

@@ -1,6 +1,8 @@
 # UI/UX journeys
 
 Executable contracts for these journeys live in `Tests/ZeusCoreTests/UIUXContractTests.swift`.
+Linux runs the ZeusCore types: `NotchOpenRules`, `NotchOpenDelay`, `TopBarLayout`, `DictationBehavior`, `ScribeSessionMachine`, `MotionTokens`, and `MotionReduction`.
+Hover dwell, shift peek, file swipe, Escape, Return, approval focus, settings focus, section phases, hub phases, the decision row, and the dynamic-type ramp stay Mac-only. Those production types are AppKit, and the phase machines were not extracted.
 The Mac acceptance below is a person-level pass: screenshots and pixel samples from the running app.
 It follows the same step record as `scripts/human-qa.sh` (action, visible result, evidence file).
 This document does not run that pass. A Linux host cannot compile the app.
@@ -180,7 +182,9 @@ Now playing, agents and Murmure each walk empty, loading, error, recovery and re
 
 1. Every spring and duration in the panel, peek, press and window fades comes from
    `Sources/ZeusCore/TopBar/MotionTokens.swift`. A literal duration or spring in a view is a
-   finding in `qa/uiux/findings.json`, not a pass.
+   finding in `qa/uiux/findings.json`, not a pass. Each finding marked `expect: closed` fails
+   its catalog case while that site is still open. #257, #258, #259, #260, #262, and #263 each
+   flip their own cases. Findings marked `expect: open` are deferred.
 2. Reduce Motion: springs and the press scale collapse to instant (press scale becomes 1). The
    crossfade stays 0.12 s. Screenshot `shot-motion-reduced.png` beside `shot-motion-full.png`.
 3. Reduce Transparency: a blurred surface becomes opaque. Screenshot `shot-glass-opaque.png`.

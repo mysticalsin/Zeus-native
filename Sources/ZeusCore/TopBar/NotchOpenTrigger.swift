@@ -13,6 +13,18 @@ public enum NotchOpenTrigger: Sendable, Equatable {
     }
 }
 
+/// Settings > Appearance > Notch behavior > open dwell. Unknown labels stay on Standard.
+/// This reads a label. It does not read or write the system setting.
+public enum NotchOpenDelay {
+    public static func milliseconds(label: String) -> Int {
+        switch label {
+        case "Fast": 100
+        case "Relaxed": 600
+        default: 250
+        }
+    }
+}
+
 /// Pure rules for opening the notch with a click. AppKit coordinates (origin bottom-left).
 public enum NotchOpenRules {
     /// How far the click zone reaches past each side of the pill on a display without a notch.

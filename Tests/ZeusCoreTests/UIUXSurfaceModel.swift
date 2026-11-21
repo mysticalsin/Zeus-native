@@ -32,6 +32,9 @@ enum ReturnEffect: Equatable {
     case closedPicker
 }
 
+/// Mac-only sketch of notch phases. Production open rules are `NotchOpenRules` and `NotchOpenDelay`.
+/// `NotchModel` and `NotchController` are AppKit types, and the pointer, screen, and task machine
+/// is not a tiny behaviour-neutral extraction, so Linux tests do not drive this desk.
 struct ChromeDesk: Equatable {
     var phase: ChromePhase = .idle
     var trigger: OpenTrigger = .hover
@@ -233,6 +236,9 @@ struct SettingsSectionRef: Equatable, Hashable, Identifiable {
     var group: String
 }
 
+/// Mac-only sketch of sidebar focus and section content phases.
+/// `GSSection` and `GSNavigation` live in the AppKit settings window. There is no content-phase
+/// type in ZeusCore, and moving the section enum would not be a tiny behaviour-neutral extraction.
 struct SettingsDesk: Equatable {
     var sections: [SettingsSectionRef]
     var index = 0
@@ -277,6 +283,7 @@ enum HubKind: String, Equatable, CaseIterable {
     case murmur = "hub.murmur"
 }
 
+/// Mac-only sketch. Now Playing, agents, and Murmure hubs do not have a Linux-reachable phase type.
 struct HubDesk: Equatable {
     var kind: HubKind
     var content = ContentDesk()
@@ -296,115 +303,6 @@ struct HubDesk: Equatable {
     }
 }
 
-enum ScribePhase: String, Equatable, CaseIterable {
-    case idle, loading, recording, ending, writing, notes, error, recovery
-}
-
-struct ScribeDesk: Equatable {
-    var phase: ScribePhase = .idle
-    var permission = true
-    var finishing = false
-
-    var endNowEnabled: Bool { phase == .recording && !finishing }
-    var keepEnabled: Bool { phase == .ending && !finishing }
-    var startEnabled: Bool { phase == .idle || phase == .recovery }
-
-    mutating func start() {
-        guard startEnabled else { return }
-        if permission {
-            phase = .recording
-        } else {
-            phase = .error
-        }
-    }
-
-    mutating func endNow() {
-        guard endNowEnabled else { return }
-        phase = .ending
-    }
-
-    mutating func keep() {
-        guard keepEnabled else { return }
-        phase = .recording
-    }
-
-    mutating func countdownFinished() {
-        guard phase == .ending else { return }
-        finishing = true
-        phase = .writing
-    }
-
-    mutating func notesReady() {
-        guard phase == .writing else { return }
-        finishing = false
-        phase = .notes
-    }
-
-    mutating func fail() {
-        guard phase == .recording || phase == .writing || phase == .loading else { return }
-        finishing = false
-        phase = .error
-    }
-
-    mutating func retry() {
-        guard phase == .error else { return }
-        phase = .recovery
-    }
-}
-
-enum MurmurMode: String, Equatable, CaseIterable {
-    case holdToSpeak
-    case pressToToggle
-}
-
-enum MurmurPhase: String, Equatable {
-    case idle, holding, recording, committing, error, recovery
-}
-
-struct MurmurDesk: Equatable {
-    var mode: MurmurMode
-    var phase: MurmurPhase = .idle
-    var permission = true
-
-    mutating func press() {
-        guard permission else { phase = .error; return }
-        switch mode {
-        case .holdToSpeak:
-            if phase == .idle || phase == .recovery { phase = .holding }
-        case .pressToToggle:
-            switch phase {
-            case .idle, .recovery: phase = .recording
-            case .recording: phase = .committing
-            case .holding, .committing, .error: break
-            }
-        }
-    }
-
-    mutating func release() {
-        guard mode == .holdToSpeak, phase == .holding else { return }
-        phase = .committing
-    }
-
-    mutating func commitFinished() {
-        guard phase == .committing else { return }
-        phase = .idle
-    }
-
-    mutating func fail() {
-        guard phase == .holding || phase == .recording || phase == .committing else { return }
-        phase = .error
-    }
-
-    mutating func retry() {
-        guard phase == .error else { return }
-        phase = .recovery
-    }
-
-    /// A second and third click are further presses. Hold-to-speak ignores them until release.
-    mutating func clicks(_ count: Int) {
-        for _ in 0..<min(max(count, 1), 3) { press() }
-    }
-}
 
 enum DecisionFault: String, Equatable, CaseIterable {
     case noKey, capReached, inFlight, reconciliation, unavailable, http, badResponse
@@ -417,6 +315,8 @@ enum DecisionFault: String, Equatable, CaseIterable {
     }
 }
 
+/// Mac-only sketch of a decision row. Production errors are `DecisionError` on `DecisionProvider`.
+/// The row's load, retry, and focus machine is not a ZeusCore type and was not extracted.
 struct DecisionRow: Equatable {
     var phase: ContentPhase = .empty
     var fault: DecisionFault?
@@ -454,53 +354,6 @@ struct DecisionRow: Equatable {
     }
 }
 
-enum MotionValue: Equatable {
-    case spring(response: Double, damping: Double)
-    case seconds(Double)
-    case scale(Double)
-    case instant
-}
-
-struct MotionSpec: Equatable {
-    var name: String
-    var full: MotionValue
-    var reduced: MotionValue
-}
-
-enum MotionContract {
-    /// Springs disappear under Reduce Motion. The short crossfade is the one fade that stays.
-    static func specs(from tokens: [String: Double]) -> [MotionSpec] {
-        let springs = ["panelOpen", "panelOpenHeight", "panelClose", "panelResize", "cueGrow", "peekContent"]
-        var rows: [MotionSpec] = springs.map { name in
-            MotionSpec(
-                name: name,
-                full: .spring(response: tokens[name + ".response"] ?? -1, damping: tokens[name + ".damping"] ?? -1),
-                reduced: .instant
-            )
-        }
-        let instantDurations = ["pageOutDuration", "pressDuration", "windowFadeInDuration", "windowFadeOutDuration", "peekContentDelay"]
-        rows += instantDurations.map { name in
-            MotionSpec(name: name, full: .seconds(tokens[name] ?? -1), reduced: .instant)
-        }
-        rows.append(MotionSpec(name: "pressScale", full: .scale(tokens["pressScale"] ?? -1), reduced: .scale(1)))
-        rows.append(MotionSpec(
-            name: "crossfadeDuration",
-            full: .seconds(tokens["crossfadeDuration"] ?? -1),
-            reduced: .seconds(tokens["crossfadeDuration"] ?? -1)
-        ))
-        return rows
-    }
-}
-
-enum SurfaceFill: Equatable {
-    case blurred, opaque
-}
-
-enum TransparencyContract {
-    static func fill(reduceTransparency: Bool) -> SurfaceFill {
-        reduceTransparency ? .opaque : .blurred
-    }
-}
 
 enum TypeStep: String, Equatable, CaseIterable {
     case extraSmall, small, medium, large, extraLarge, extraExtraLarge, extraExtraExtraLarge
@@ -567,14 +420,6 @@ enum UIUXSourceMap {
         "shortcuts", "integrations", "permissions", "privacy", "diagnostics", "license",
     ]
 
-    static func dwellTable(in controller: String) -> [String: Int] {
-        let body = slice(controller, from: "static var openDelayMilliseconds", until: "static var openTrigger")
-        var found: [String: Int] = [:]
-        if let fast = first(#"case "Fast":\s*(\d+)"#, in: body) { found["Fast"] = Int(fast) }
-        if let relaxed = first(#"case "Relaxed":\s*(\d+)"#, in: body) { found["Relaxed"] = Int(relaxed) }
-        if let standard = first(#"default:\s*(\d+)"#, in: body) { found["Standard"] = Int(standard) }
-        return found
-    }
 
     static func sidebar(in window: String) -> [SettingsSectionRef] {
         let enumBody = slice(window, from: "enum GSSection", until: "var id: String")
@@ -601,33 +446,6 @@ enum UIUXSourceMap {
         return rows
     }
 
-    static func defaultTabs(in layout: String) -> [(id: String, title: String)] {
-        let seven = names(in: firstLine(layout, containing: "static let glanceSeven"))
-        let row = firstLine(layout, containing: "static let defaultRow")
-        let head = names(in: row.split(separator: "+").first.map(String.init) ?? "")
-        let tail = names(in: row.components(separatedBy: "dropFirst()").dropFirst().joined())
-        let ids = head + Array(seven.dropFirst()) + tail
-        let titles = pairs(in: slice(layout, from: "public var title: String", until: "public var help: String"))
-        return ids.map { ($0, titles[$0] ?? $0) }
-    }
-
-    static func springs(in tokens: String) -> [String: Double] {
-        var values: [String: Double] = [:]
-        let pattern = #"static let ([A-Za-z0-9]+) = SpringToken\(response: ([0-9.]+), damping: ([0-9.]+)\)"#
-        for match in matches(pattern, in: tokens) where match.count >= 4 {
-            if let response = Double(match[2]), let damping = Double(match[3]) {
-                values[match[1] + ".response"] = response
-                values[match[1] + ".damping"] = damping
-            }
-        }
-        let durations = #"static let ([A-Za-z0-9]+) = ([0-9.]+)"#
-        for match in matches(durations, in: tokens) where match.count >= 3 {
-            if let number = Double(match[2]), values[match[1] + ".response"] == nil {
-                values[match[1]] = number
-            }
-        }
-        return values
-    }
 
     private static func groupMembers(in body: String) -> [String: String] {
         var map: [String: String] = [:]
@@ -653,13 +471,6 @@ enum UIUXSourceMap {
         return map
     }
 
-    private static func names(in line: String) -> [String] {
-        matches(#"\.([A-Za-z0-9]+)"#, in: line).compactMap { $0.count > 1 ? $0[1] : nil }
-    }
-
-    private static func firstLine(_ text: String, containing needle: String) -> String {
-        text.components(separatedBy: "\n").first { $0.contains(needle) } ?? ""
-    }
 
     private static func slice(_ text: String, from start: String, until end: String) -> String {
         guard let lower = text.range(of: start)?.lowerBound else { return "" }
@@ -668,10 +479,6 @@ enum UIUXSourceMap {
         return String(rest[..<upper])
     }
 
-    private static func first(_ pattern: String, in text: String) -> String? {
-        guard let row = matches(pattern, in: text).first else { return nil }
-        return row.count > 1 ? row[1] : row.first
-    }
 
     static func matches(_ pattern: String, in text: String) -> [[String]] {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
@@ -693,6 +500,45 @@ struct UIUXFinding: Codable, Equatable {
     var file: String
     var line: Int
     var detail: String
+    /// `closed`: the case fails while the scan still reports this site.
+    /// `open`: the site is deferred, and the case fails if the scan drops it.
+    var expect: String = "closed"
+
+    enum CodingKeys: String, CodingKey {
+        case id, kind, surface, file, line, detail, expect
+    }
+
+    init(id: String, kind: String, surface: String, file: String, line: Int, detail: String, expect: String = "closed") {
+        self.id = id
+        self.kind = kind
+        self.surface = surface
+        self.file = file
+        self.line = line
+        self.detail = detail
+        self.expect = expect
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        kind = try values.decode(String.self, forKey: .kind)
+        surface = try values.decode(String.self, forKey: .surface)
+        file = try values.decode(String.self, forKey: .file)
+        line = try values.decode(Int.self, forKey: .line)
+        detail = try values.decode(String.self, forKey: .detail)
+        expect = try values.decodeIfPresent(String.self, forKey: .expect) ?? "closed"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(kind, forKey: .kind)
+        try values.encode(surface, forKey: .surface)
+        try values.encode(file, forKey: .file)
+        try values.encode(line, forKey: .line)
+        try values.encode(detail, forKey: .detail)
+        try values.encode(expect, forKey: .expect)
+    }
 }
 
 struct UIUXFindingCatalog: Codable, Equatable {
@@ -774,6 +620,10 @@ enum UIUXAudit {
                            "Escape is not bound on the approval card or the expanded panel"))
         }
         return number(drafts)
+    }
+
+    static func sameSite(_ lhs: UIUXFinding, _ rhs: UIUXFinding) -> Bool {
+        lhs.file == rhs.file && lhs.kind == rhs.kind && lhs.line == rhs.line && lhs.detail == rhs.detail
     }
 
     static func number(_ drafts: [(kind: String, surface: String, file: String, line: Int, detail: String)]) -> [UIUXFinding] {

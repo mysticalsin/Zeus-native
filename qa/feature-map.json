@@ -6660,7 +6660,7 @@
         {
           "id": "F12.uiux-chrome",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Pure island, peek and expanded-panel state machine: hover dwell, click trigger, repeated clicks, hold, shift peek, file swipe, picker Escape and Return, and approval focus. No window, no system setting write.",
+          "acceptance": "Click and hover rules call NotchOpenRules. Hover dwell, shift peek, file swipe, Escape, Return, and approval focus are Mac-only because those phases live on AppKit NotchController and were not extracted. No window and no system setting write.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -6683,7 +6683,7 @@
         {
           "id": "F12.uiux-motion",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Motion specs read the token table, springs collapse under Reduce Motion while the crossfade stays, and the source audit matches the committed finding catalog. No production edit and no system setting write.",
+          "acceptance": "MotionTokens and MotionReduction collapse springs under Reduce Motion, keep the 0.12s crossfade, and set press scale to 1. Each catalog finding marked expect closed fails while its site is still in the scan. No system setting write.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -6702,7 +6702,7 @@
         {
           "id": "F12.uiux-decisions",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Decision rows load once, show a confidence when ready, and retry only when a person does not have to act. No provider call.",
+          "acceptance": "Mac-only decision-row sketch. DecisionError is the production error. The row phase machine is not a ZeusCore type and was not extracted. No provider call.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -8236,7 +8236,7 @@
         {
           "id": "F13.uiux-settings",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Settings focus clamps across the live sidebar, the twelve canonical sections walk empty, loading, error and recovery, and every contract control has a label, trait and identifier. No settings window.",
+          "acceptance": "Sidebar focus and the twelve section phases are Mac-only because GSSection is AppKit and was not extracted. Contract control order is compared with TopBarLayout.defaultRow and the sidebar parsed from GlanceSettingsWindow. No settings window.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
@@ -8288,7 +8288,7 @@
         {
           "id": "S01.uiux-scribe-murmur",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Scribe start, end, keep and permission recovery, Murmure hold and toggle, and the hub empty, loading, error and recovery walk. No microphone and no system setting write.",
+          "acceptance": "ScribeSessionMachine covers start, acknowledge, end, keep, capture end, and notes. DictationBehavior covers hold and toggle. Hub phases are Mac-only because there is no Linux-reachable hub type. No microphone and no system setting write.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/UIUXContractTests.swift",
