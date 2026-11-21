@@ -104,14 +104,28 @@ enum WhisperModelDownloader {
         try FileManager.default.createDirectory(at: WhisperCppEngine.modelsDirectory, withIntermediateDirectories: true)
         let target = WhisperCppEngine.modelURL(model)
         let partial = target.appendingPathExtension("partial")
-        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial, target] }) {
-            let delegate = Progress(progress)
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        guard let known = PinnedModelBytes.whisperKnownBytes(id: model.id) else { throw DownloadCapExceeded() }
+        let maximum = PinnedModelBytes.cap(known)
+        let outcome = await DownloadRunner.run(kind: .model, clock: { Date().timeIntervalSinceReferenceDate }, partials: { [partial] }) {
+            let transfer = DownloadTransferGuard(maximumBytes: maximum, allowedHosts: PinnedDownloadHosts.whisper, report: progress)
+            let session = URLSession(configuration: .default, delegate: transfer, delegateQueue: nil)
             try await withTaskCancellationHandler {
-                let (temp, response) = try await session.download(from: model.url)
-                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-                try? FileManager.default.removeItem(at: partial)
-                try FileManager.default.moveItem(at: temp, to: partial)
+                do {
+                    let (temp, response) = try await session.download(from: model.url)
+                    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+                    let size = ((try? FileManager.default.attributesOfItem(atPath: temp.path))?[.size] as? NSNumber)?.int64Value ?? 0
+                    if transfer.stopped || size > maximum || (ArchiveUnpackCap.isArchive(model.file) && ArchiveUnpackCap.exceeds(producedBytes: size, maximumBytes: maximum)) {
+                        try? FileManager.default.removeItem(at: temp)
+                        throw DownloadCapExceeded()
+                    }
+                    try? FileManager.default.removeItem(at: partial)
+                    try FileManager.default.moveItem(at: temp, to: partial)
+                } catch is DownloadCapExceeded {
+                    throw DownloadCapExceeded()
+                } catch {
+                    if transfer.stopped { throw DownloadCapExceeded() }
+                    throw error
+                }
                 session.finishTasksAndInvalidate()
             } onCancel: {
                 session.invalidateAndCancel()
@@ -126,20 +140,11 @@ enum WhisperModelDownloader {
             throw DownloadTookTooLong()
         case .cancelled:
             throw CancellationError()
+        case .capped:
+            throw DownloadCapExceeded()
         case .failed(let message):
             throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
         }
-    }
-
-    private final class Progress: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-        let report: (@Sendable (Double) -> Void)?
-        init(_ report: (@Sendable (Double) -> Void)?) { self.report = report }
-        func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
-                        totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-            guard totalBytesExpectedToWrite > 0 else { return }
-            report?(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
-        }
-        func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
     }
 }
 
@@ -199,6 +204,7 @@ final class FasterWhisperEngine: TranscriptionEngine, @unchecked Sendable {
         case .finished: progress?(1)
         case .tookTooLong: throw DownloadTookTooLong()
         case .cancelled: throw CancellationError()
+        case .capped: throw DownloadCapExceeded()
         case .failed(let message): throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
         }
     }

@@ -1,0 +1,134 @@
+import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
+/// Byte counts of the pinned model files, from their published Content-Length.
+/// The cap is that size plus 25 percent, using integer division.
+public enum PinnedModelBytes {
+    public static let whisperBaseEn: Int64 = 147_964_211
+    public static let whisperSmall: Int64 = 487_601_967
+    public static let whisperLargeTurboQ5: Int64 = 574_041_195
+    public static let kokoroOnnx: Int64 = 325_532_387
+    public static let kokoroVoices: Int64 = 28_214_398
+
+    public static func cap(_ known: Int64) -> Int64 { known + known / 4 }
+
+    public static func whisperKnownBytes(id: String) -> Int64? {
+        switch id {
+        case "base.en": whisperBaseEn
+        case "small": whisperSmall
+        case "large-v3-turbo-q5_0": whisperLargeTurboQ5
+        default: nil
+        }
+    }
+}
+
+/// Hosts a redirect may use. A different host, or a scheme other than https, is refused.
+public enum PinnedDownloadHosts {
+    public static let whisper: Set<String> = ["huggingface.co", "us.aws.cdn.hf.co"]
+    public static let kokoro: Set<String> = ["github.com", "release-assets.githubusercontent.com"]
+}
+
+/// An extracted archive must stay within the same byte cap. These pinned downloads are single files.
+public enum ArchiveUnpackCap {
+    public static func exceeds(producedBytes: Int64, maximumBytes: Int64) -> Bool {
+        producedBytes > maximumBytes
+    }
+
+    public static func isArchive(_ name: String) -> Bool {
+        let ext = (name as NSString).pathExtension.lowercased()
+        return ["zip", "tar", "gz", "tgz", "bz2", "xz"].contains(ext)
+    }
+}
+
+public protocol DownloadTransferTask: AnyObject {
+    func cancel()
+}
+
+public final class FakeDownloadTask: DownloadTransferTask, @unchecked Sendable {
+    public private(set) var cancelCount = 0
+    public init() {}
+    public func cancel() { cancelCount += 1 }
+}
+
+/// URLSession delegate for one model file. At most five redirects, https, allowlisted hosts.
+/// expectedContentLength and bytes written both cancel the task past the cap.
+public final class DownloadTransferGuard: NSObject, @unchecked Sendable {
+    public static let redirectLimit = 5
+    public let maximumBytes: Int64
+    public let allowedHosts: Set<String>
+    public let report: (@Sendable (Double) -> Void)?
+    public private(set) var redirectCount = 0
+    public private(set) var stopped = false
+
+    public init(maximumBytes: Int64, allowedHosts: Set<String>, report: (@Sendable (Double) -> Void)? = nil) {
+        self.maximumBytes = maximumBytes
+        self.allowedHosts = allowedHosts
+        self.report = report
+    }
+
+    public func evaluateRedirect(_ url: URL, task: DownloadTransferTask, completion: (URLRequest?) -> Void) {
+        redirectCount += 1
+        let host = url.host?.lowercased()
+        let allowed = redirectCount <= Self.redirectLimit
+            && url.scheme == "https"
+            && host.map { allowedHosts.contains($0) } == true
+        if allowed {
+            completion(URLRequest(url: url))
+        } else {
+            stopped = true
+            task.cancel()
+            completion(nil)
+        }
+    }
+
+    public func evaluateWrite(written: Int64, expected: Int64, task: DownloadTransferTask) {
+        let expectedOver = expected >= 0 && expected > maximumBytes
+        if written > maximumBytes || expectedOver {
+            stopped = true
+            task.cancel()
+            return
+        }
+        if expected > 0 {
+            report?(min(Double(written) / Double(expected), 1))
+        }
+    }
+
+}
+
+#if os(macOS)
+extension URLSessionTask: DownloadTransferTask {}
+
+extension DownloadTransferGuard: URLSessionDownloadDelegate {
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard let url = request.url else {
+            stopped = true
+            task.cancel()
+            completionHandler(nil)
+            return
+        }
+        evaluateRedirect(url, task: task) { decision in
+            completionHandler(decision == nil ? nil : request)
+        }
+    }
+
+    public func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        evaluateWrite(written: totalBytesWritten, expected: totalBytesExpectedToWrite, task: downloadTask)
+    }
+
+    public func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+}
+#endif

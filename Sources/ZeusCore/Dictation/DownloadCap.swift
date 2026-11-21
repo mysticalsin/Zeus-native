@@ -140,10 +140,15 @@ public enum PartialFiles {
     }
 }
 
+public struct DownloadCapExceeded: Error, Equatable, Sendable {
+    public init() {}
+}
+
 public enum DownloadRunResult: Equatable, Sendable {
     case finished
     case tookTooLong
     case cancelled
+    case capped
     case failed(String)
 }
 
@@ -165,6 +170,8 @@ public enum DownloadRunner {
                     return .finished
                 } catch is CancellationError {
                     return .cancelled
+                } catch is DownloadCapExceeded {
+                    return .capped
                 } catch {
                     return .failed(error.localizedDescription)
                 }
@@ -181,7 +188,7 @@ public enum DownloadRunner {
             while await group.next() != nil {}
             return first
         }
-        if outcome == .tookTooLong || outcome == .cancelled { _ = PartialFiles.remove(partials()) }
+        if outcome == .tookTooLong || outcome == .cancelled || outcome == .capped { _ = PartialFiles.remove(partials()) }
         return outcome
     }
 }

@@ -93,6 +93,8 @@ public final class WhisperKitDownloadMachine: @unchecked Sendable {
                     lock.withLock { current = .failed(DownloadBarState.tookTooLong) }
                 case .cancelled:
                     lock.withLock { current = .idle }
+                case .capped:
+                    lock.withLock { current = .failed("This download is larger than the model cap.") }
                 case .failed(let message):
                     lock.withLock { current = .failed(message) }
                 }

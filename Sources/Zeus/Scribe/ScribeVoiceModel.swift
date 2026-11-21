@@ -27,6 +27,7 @@ enum SpeakerModelStore {
         case .finished: return
         case .tookTooLong: throw DownloadTookTooLong()
         case .cancelled: throw CancellationError()
+        case .capped: throw DownloadCapExceeded()
         case .failed(let message): throw NSError(domain: "Zeus", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
         }
     }
