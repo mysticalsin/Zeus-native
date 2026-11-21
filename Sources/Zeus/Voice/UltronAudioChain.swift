@@ -229,6 +229,7 @@ final class UltronAudioChain {
     @discardableResult
     func schedule(_ buffer: AVAudioPCMBuffer) -> Bool {
         guard buffer.frameLength > 0, let converted = Self.convert(buffer), prepare() else { return false }
+        Self.publishOrbBands(from: converted)
         if firstScheduledAt == nil { firstScheduledAt = Date() }
         let generation = pending.increment()
         let counter = pending
@@ -240,6 +241,18 @@ final class UltronAudioChain {
         }
         if !player.isPlaying { player.play() }
         return true
+    }
+
+    /// Publishes bass and mid for the optional orb. Classic skips the work, and playback itself is unchanged.
+    private static func publishOrbBands(from buffer: AVAudioPCMBuffer) {
+        guard PersonaCatalog.current().mascotKind == .orb, let channel = buffer.floatChannelData?[0] else { return }
+        let count = Int(buffer.frameLength)
+        guard count > 0 else { return }
+        let take = min(OrbAnalyser.fftSize, count)
+        let start = count - take
+        var samples = [Float](repeating: 0, count: take)
+        for index in 0..<take { samples[index] = channel[start + index] }
+        OrbPlaybackMeter.shared.ingest(samples: samples, sampleRate: buffer.format.sampleRate)
     }
 
     /// 16-bit little-endian mono PCM at 24 kHz, as ElevenLabs and OpenAI stream it.
