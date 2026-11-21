@@ -357,7 +357,7 @@ import Testing
     }
 
     /// The pending quit lasts 10 seconds, or until the next turn ends, whichever comes first.
-    @Test func quitConfirmationExpiresAtTenSecondsOrTheNextTurn() {
+    @Test func quitConfirmationExpiresAtTenSecondsOrTheNextTurn() throws {
         let unsaved = Self.harbor.withUnsaved(nil)
         let askedAt = Self.origin.advanced(by: .milliseconds(6))
 
@@ -383,16 +383,33 @@ import Testing
                                        clock: Self.clock(at: deadline), apps: [unsaved])
         #expect(Self.performed(paused) == .media(.pause))
 
-        var ended = LocalCommandMachine()
-        _ = ended.receive("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
-        ended.armQuitExpiryAtEndOfNextTurn()
-        ended.endTurn()
+        var ended = LocalCommandTurn()
+        _ = ended.complete("quit harbor", finalAt: Self.origin, clock: Self.clock(at: askedAt), apps: [unsaved])
         let afterTurn = askedAt.advanced(by: .seconds(2))
-        let ignored = ended.receive("yes", finalAt: afterTurn.advanced(by: .milliseconds(-4)),
-                                     clock: Self.clock(at: afterTurn), apps: [unsaved])
+        _ = ended.complete("", finalAt: afterTurn, clock: Self.clock(at: afterTurn), apps: [unsaved])
+        let ignored = try #require(ended.complete("yes", finalAt: afterTurn.advanced(by: .milliseconds(-4)),
+                                                   clock: Self.clock(at: afterTurn), apps: [unsaved]))
         #expect(Self.performed(ignored) == nil)
         #expect(ignored.effects == [.fallThrough])
-        #expect(ended.state == .idle)
+        #expect(ended.machine.state == .idle)
+    }
+
+    /// "ok" is not a confirmation in any case. "Okay" is, in any case.
+    @Test func quitConfirmationFoldsOkayAndOk() {
+        let unsaved = Self.harbor.withUnsaved(nil)
+        let clock = Self.clock(after: 6)
+        for phrase in ["ok", "OK", "Ok"] {
+            var turn = LocalCommandTurn()
+            _ = turn.complete("quit harbor", finalAt: Self.origin, clock: clock, apps: [unsaved])
+            let reply = turn.complete(phrase, finalAt: Self.origin, clock: clock, apps: [unsaved])
+            #expect(Self.performed(reply!) == nil, phrase)
+        }
+        for phrase in ["okay", "Okay", "OKAY"] {
+            var turn = LocalCommandTurn()
+            _ = turn.complete("quit harbor", finalAt: Self.origin, clock: clock, apps: [unsaved])
+            let reply = turn.complete(phrase, finalAt: Self.origin, clock: clock, apps: [unsaved])
+            #expect(Self.performed(reply!) == .quit(unsaved), phrase)
+        }
     }
 
     /// The spoken catalog is /Applications and the user's Applications folder. Nothing else.
@@ -400,16 +417,30 @@ import Testing
         let home = "/Users/ada"
         #expect(LocalAppCatalog.included("/Applications/Harbor.app", home: home))
         #expect(LocalAppCatalog.included("/Applications/Utilities/Terminal.app", home: home))
+        #expect(LocalAppCatalog.included("/Applications/Utilities/../Harbor.app", home: home))
         #expect(LocalAppCatalog.included("/Users/ada/Applications/Field Notes.app", home: home))
         #expect(LocalAppCatalog.included("/Users/ada/Applications/Set/Field Notes.app", home: home))
-        #expect(!LocalAppCatalog.included("/System/Applications/Calendar.app", home: home))
-        #expect(!LocalAppCatalog.included("/System/Applications/Utilities/Terminal.app", home: home))
+        #expect(LocalAppCatalog.included("/System/Applications/Utilities/Terminal.app", home: home))
+        #expect(!LocalAppCatalog.included("/Applications/../Library/Terminal.app", home: home))
+        #expect(!LocalAppCatalog.included("/Applications/Utilities/../../usr/bin/evil", home: home))
         #expect(!LocalAppCatalog.included("/System/Library/CoreServices/Finder.app", home: home))
         #expect(!LocalAppCatalog.included("/ApplicationsExtra/Harbor.app", home: home))
         #expect(!LocalAppCatalog.included("/Users/ada/ApplicationsExtra/Harbor.app", home: home))
         #expect(!LocalAppCatalog.included("/opt/homebrew/Caskroom/Harbor.app", home: home))
         #expect(!LocalAppCatalog.included("", home: home))
         #expect(!LocalAppCatalog.included("/Applications/Harbor.app", home: ""))
+    }
+
+    @Test func quitUsesTheAppleEventNotTerminate() throws {
+        #expect(LocalQuit.action == .appleEvent(interact: true, waitForReply: false))
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zeus/Intent/LocalCommandWorkspace.swift"), encoding: .utf8)
+        let quit = source.split(separator: "case .quit").dropFirst().first.map(String.init) ?? ""
+        let branch = quit.split(separator: "case .media").first.map(String.init) ?? ""
+        #expect(branch.contains("quitAllowingSavePrompt"))
+        #expect(!branch.contains(".terminate("))
+        #expect(!branch.contains("forceTerminate"))
     }
 }
 
