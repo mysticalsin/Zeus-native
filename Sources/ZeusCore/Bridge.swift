@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 /// A request from ZEUS to the Chrome extension (or back), relayed by `zeus-bridge`.
 public struct BridgeRequest: Codable, Equatable, Sendable {
@@ -177,5 +182,94 @@ public enum NativeMessagingFrame {
             body = Data()
             expectedLength = nil
         }
+    }
+}
+
+/// What one Chrome frame may do. Before our own identity is captured, the only answers are ping
+/// and `unknown_type`. A response must not settle a pending reply in that window.
+public enum BridgeChromeAdmission {
+    public enum Action: Equatable, Sendable {
+        case reply(BridgeResponse)
+        case completePending(BridgeResponse)
+        case close
+    }
+
+    public static func action(for message: Data, identityReady: Bool) -> Action {
+        if let response = try? JSONDecoder().decode(BridgeResponse.self, from: message) {
+            guard response.id.utf8.count <= 256 else { return .close }
+            guard identityReady else {
+                return .reply(.failure(response.id, BridgeError(code: "unknown_type", message: "response")))
+            }
+            return .completePending(response)
+        }
+        guard let request = try? JSONDecoder().decode(BridgeRequest.self, from: message),
+              request.id.utf8.count <= 256 else { return .close }
+        if request.type == "ping" {
+            return .reply(.success(request.id, .object([
+                "pong": .bool(true), "host": .string(ZeusPaths.nativeHostName),
+                "version": .string(ZeusCoreVersion.string),
+            ])))
+        }
+        return .reply(.failure(request.id, BridgeError(code: "unknown_type", message: request.type)))
+    }
+}
+
+/// The host runs these steps in order. Identity is captured immediately after stdin is armed,
+/// so a blocking signature read cannot sit in front of the reader, and it is not postponed past that.
+public enum BridgeHostStartup {
+    public enum Step: Equatable, Sendable {
+        case bindSocket
+        case armStdin
+        case captureIdentity
+        case markIdentityReady
+    }
+
+    public static let steps: [Step] = [.bindSocket, .armStdin, .captureIdentity, .markIdentityReady]
+
+    /// The only order the host runs. `main` performs each step and does not keep a second list.
+    public static func drive(_ perform: (Step) -> Void) {
+        for step in steps {
+            perform(step)
+        }
+    }
+
+    public static func identityIsCapturedImmediatelyAfterStdin(_ steps: [Step] = steps) -> Bool {
+        guard steps.first == .bindSocket, steps.last == .markIdentityReady, steps.count == 4,
+              let stdin = steps.firstIndex(of: .armStdin),
+              let identity = steps.firstIndex(of: .captureIdentity) else { return false }
+        return stdin + 1 == identity
+    }
+}
+
+/// Owns the bridge stdin reader and the local socket so a terminal frame can stop both.
+/// `finish` does not exit the process. The host calls `exit` after it returns.
+public final class BridgeHostLifetime: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stopped = false
+    private var input: NativeMessageInput?
+    private var server: UnixSocketServer?
+
+    public init() {}
+
+    public func attach(input: NativeMessageInput, server: UnixSocketServer) {
+        let alreadyStopped = lock.withLock { () -> Bool in
+            self.input = input
+            self.server = server
+            return stopped
+        }
+        if alreadyStopped {
+            input.stop()
+            server.stop()
+        }
+    }
+
+    public func finish() {
+        let resources = lock.withLock { () -> (NativeMessageInput?, UnixSocketServer?) in
+            let current = (input, server)
+            stopped = true
+            return current
+        }
+        resources.0?.stop()
+        resources.1?.stop()
     }
 }

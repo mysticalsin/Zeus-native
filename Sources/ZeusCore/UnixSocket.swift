@@ -211,6 +211,23 @@ public final class UnixSocketServer: @unchecked Sendable {
     private var listener: DispatchSourceRead?
     private var listenFD: Int32 = -1
     private var connections: [UUID: Connection] = [:]
+    /// dev/inode of the socket created by a successful bind. A later file at the same path is left alone.
+    private var boundDevice: UInt64?
+    private var boundInode: UInt64?
+    /// What `lstat` reports for one directory entry. A symlink keeps its own inode.
+    struct DirectoryEntry: Equatable, Sendable {
+        var device: UInt64
+        var inode: UInt64
+        enum Kind: Equatable, Sendable { case socket, symlink, regular, other }
+        var kind: Kind
+    }
+    /// Test hook. When set, unlink reads this instead of `lstat`. Nil in production.
+    static let unlinkProbeLock = NSLock()
+    nonisolated(unsafe) static var unlinkProbe: (@Sendable (String) -> DirectoryEntry?)?
+    nonisolated(unsafe) static var lastUnlinkProbe: DirectoryEntry?
+    /// Test hook. Called after bind and before chmod/listen. Return false to take the failure path.
+    nonisolated(unsafe) static let rejectListenLock = NSLock()
+    nonisolated(unsafe) static var rejectListenAfterBind: (@Sendable (String) -> Bool)?
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
 
@@ -251,8 +268,10 @@ public final class UnixSocketServer: @unchecked Sendable {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
             }
             guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            guard chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
-                unlink(path)
+            rememberBoundNode()
+            let listenAccepted = Self.rejectListenLock.withLock { Self.rejectListenAfterBind?(path) ?? true }
+            guard listenAccepted, chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
+                unlinkIfStillBound()
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
             let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: acceptQueue)
@@ -261,8 +280,47 @@ public final class UnixSocketServer: @unchecked Sendable {
             listener = source
             listenFD = fd
             started = true
+            rememberBoundNode()
             source.resume()
         }
+    }
+
+    /// `lstat` of one path. A symlink is reported as a symlink, not as the file it names.
+    private static func directoryEntry(_ path: String) -> DirectoryEntry? {
+        var info = stat()
+        guard lstat(path, &info) == 0 else { return nil }
+        let type = info.st_mode & mode_t(S_IFMT)
+        let kind: DirectoryEntry.Kind
+        if type == mode_t(S_IFSOCK) { kind = .socket }
+        else if type == mode_t(S_IFLNK) { kind = .symlink }
+        else if type == mode_t(S_IFREG) { kind = .regular }
+        else { kind = .other }
+        return DirectoryEntry(device: UInt64(info.st_dev), inode: UInt64(info.st_ino), kind: kind)
+    }
+
+    /// `lstat` of the socket we just bound. A symlink is not recorded, so finish cannot follow it.
+    private func rememberBoundNode() {
+        guard let node = Self.directoryEntry(path), node.kind == .socket else {
+            boundDevice = nil
+            boundInode = nil
+            return
+        }
+        boundDevice = node.device
+        boundInode = node.inode
+    }
+
+    /// Unlink only the socket inode from a successful bind. Device and inode must both match.
+    /// `lstat` does not follow a symlink. The check and `unlink` are still two calls, so a path
+    /// swapped in that window can be removed.
+    private func unlinkIfStillBound() {
+        guard let boundDevice, let boundInode else { return }
+        let probe = Self.unlinkProbeLock.withLock { Self.unlinkProbe }
+        let node = probe?(path) ?? Self.directoryEntry(path)
+        Self.unlinkProbeLock.withLock { Self.lastUnlinkProbe = node }
+        guard let node, node.kind == .socket, node.device == boundDevice, node.inode == boundInode else { return }
+        unlink(path)
+        self.boundDevice = nil
+        self.boundInode = nil
     }
 
     public func stop() {
@@ -271,7 +329,7 @@ public final class UnixSocketServer: @unchecked Sendable {
                 self.listener = nil
                 listenFD = -1
                 listener.cancel()
-                unlink(path)
+                unlinkIfStillBound()
             }
             return Array(connections.values)
         }

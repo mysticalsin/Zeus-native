@@ -6926,6 +6926,10 @@
             {
               "file": "Tests/ZeusCoreTests/UnixSocketSafetyTests.swift",
               "function": "serverDoesNotRemoveRegularFilesOrSymlinks"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PeerBinaryRuleTests.swift",
+              "function": "nilOwnSignatureFromCaptureOwnIdentityRefusesThePeer"
             }
           ]
         },
@@ -7089,6 +7093,62 @@
               "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
             },
             {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishBeforeAttachLeavesAFileThisProcessDidNotBind"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishAfterASuccessfulBindUnlinksTheSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAPathReplacedByAnotherInodeOrASymlink"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "socketIsBoundBeforeStdinAndIdentityFollowsTheReader"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "driveRunsTheSharedStartupListInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "theHostDrivesThatListAndNoOtherOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesASocketWithTheSameInodeOnAnotherDevice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishKeepsASymlinkToARegularFileByLstat"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "failedListenAfterBindLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "aPeerIsRefusedBeforeOwnIdentityIsCaptured"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered"
+            },
+            {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
               "function": "startedInputClosesItsReadDescriptorBeforeCompletion"
             }
@@ -7206,6 +7266,62 @@
             {
               "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
               "function": "cleanEOFAndTruncatedFrameEOFHaveDistinctExitOutcomes"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+              "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishBeforeAttachLeavesAFileThisProcessDidNotBind"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishAfterASuccessfulBindUnlinksTheSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAPathReplacedByAnotherInodeOrASymlink"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "socketIsBoundBeforeStdinAndIdentityFollowsTheReader"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "driveRunsTheSharedStartupListInOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "theHostDrivesThatListAndNoOtherOrder"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesASocketWithTheSameInodeOnAnotherDevice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishKeepsASymlinkToARegularFileByLstat"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "finishLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "failedListenAfterBindLeavesAReplacementSocket"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "aPeerIsRefusedBeforeOwnIdentityIsCaptured"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+              "function": "beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered"
             },
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
