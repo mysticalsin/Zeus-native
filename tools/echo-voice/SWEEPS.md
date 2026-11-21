@@ -209,3 +209,34 @@ Non-soak files only. A sweep with no defect is still listed.
 - Checked: stream p50, p95, and wall seconds for Python, Rust, and Go.
 - Finding: none. They match to 6 decimal places.
 - Test: `test_summary_medians_match_raw_jsonl`. Commit `527daef`. Fix: none.
+
+## 24. Security (Hammer ARTEX at 2e9f0d56)
+
+Checked against `ee9de8e`. Soak files were not edited. Red commit `71fdbc0`. Fix commit `955a377`.
+
+### E-01
+
+- Status: fixed.
+- Lens: manifest `file` entries joined onto the workload and output directories.
+- Checked: Go `filepath.Join`, Python `Path /`, and Rust `Path::join` on a `../` name and an absolute name, for the read and the `reply_` write. A temp-dir sentinel sat outside `--out`.
+- Finding: the `../` name was read and the reply was written outside `--out` (Go exit 0, Rust exit 0). An absolute name is also accepted by Python and Rust (`Path /` and `Path::join` replace the base). Go `filepath.Join` does not replace an absolute name, but it still trusted the string.
+- Test: `TestManifestEscapeRefused`, `manifest_escape_is_refused`, `test_dotdot_and_absolute_are_refused`. Commit `71fdbc0`.
+- Fix: commit `955a377`. Each implementation rejects an empty name, an absolute name, and a `..` element, then checks the cleaned path stays inside the base (`filepath.IsLocal` plus a prefix check after `Clean`; Rust refuses `ParentDir`, `RootDir`, and `Prefix`; Python uses `resolve()` and `is_relative_to`). The Python refusal runs before the haru import.
+
+### E-03
+
+- Status: fixed.
+- Lens: `pipeline-bench/scripts/run_bench.py` toolchain probe.
+- Checked: `sh()` at the old line 23.
+- Finding: `subprocess.run(..., shell=True)`.
+- Test: `test_sh_uses_an_argv_list`. Commit `71fdbc0`.
+- Fix: commit `955a377`. `sh()` takes an argv list. `lscpu` and `free` are parsed in Python. The source no longer contains `shell=True`.
+
+### E-05
+
+- Status: fixed. The minimum toolchain is go1.23.10.
+- Lens: stdlib GO-2025-3750 in go 1.22 (Windows-only).
+- Checked: `pipeline-bench/go/go.mod` and `go env GOVERSION` from that directory.
+- Finding: the go line was `go 1.22`.
+- Test: `test_go_directive_is_at_least_1_23_10`. Commit `71fdbc0`.
+- Fix: commit `955a377`. The go line is `go 1.23.10`, which selects toolchain go1.23.10. `go env GOVERSION` is `go1.23.10`, and `go test ./...` plus `go vet ./...` exit 0. A separate `toolchain go1.23.10` line is not kept: go 1.23.10 treats it as implied by the go line, `go mod tidy` deletes it, and `go test` refuses to run while it is present.
