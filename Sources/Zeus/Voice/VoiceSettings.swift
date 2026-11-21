@@ -111,26 +111,26 @@ final class VoiceSettings {
     }
 
     private init() {
-        let stored = UserDefaults.standard.string(forKey: "voice.engine").flatMap(VoiceEngine.init(rawValue:))
+        let persisted = PersistedVoiceSettings.load(UserDefaults.standard)
+        let stored = persisted.engine.flatMap(VoiceEngine.init(rawValue:))
         // Files only here: the Python import probe runs off the main thread right after init.
         let kokoroSetUp = KokoroWorker.modelFilesPresent()
-        let userSelected = UserDefaults.standard.bool(forKey: "voice.engine.userSelected")
+        let userSelected = persisted.userSelected
         let pausedUntil = UserDefaults.standard.object(forKey: "voice.elevenlabs.pausedUntil") as? Date
         let keyValid = Keychain.get("elevenlabs.api-key") != nil && !UltronVoicePlan.isPaused(until: pausedUntil, now: Date())
         // Ultron default: ElevenLabs when its key is usable and not paused, Kokoro as the failsafe, the
         // Mac voice last. Only an explicit owner pick (`voice.engine.userSelected`) overrides that order.
         engine = Self.engine(UltronVoicePlan.initialEngine(
             stored: stored.map(Self.plan), userSelected: userSelected, kokoroReady: kokoroSetUp, elevenLabsKeyValid: keyValid))
-        if let raw = UserDefaults.standard.string(forKey: "voice.ttsProvider"),
-           let provider = VoiceTTSProvider(rawValue: raw) {
+        if let raw = persisted.ttsProvider, let provider = VoiceTTSProvider(rawValue: raw) {
             ttsProvider = provider
         } else {
             ttsProvider = UltronVoicePlan.defaultProvider(kokoroReady: kokoroSetUp, elevenLabsKeyValid: keyValid)
         }
         personality = ZeusPersonality.current()
         engineAuto = ElevenLabsFailsafe.defaultEngineAuto(
-            explicit: UserDefaults.standard.object(forKey: "voice.engine.auto") as? Bool,
-            storedProvider: UserDefaults.standard.string(forKey: "voice.ttsProvider"))
+            explicit: persisted.engineAuto,
+            storedProvider: persisted.ttsProvider)
         kokoroVoice = UserDefaults.standard.string(forKey: "voice.kokoro.voice") ?? ElevenLabsVoice.offlineKokoroVoice
         kokoroSpeed = UserDefaults.standard.object(forKey: "voice.kokoro.speed") as? Double ?? ElevenLabsVoice.offlineKokoroSpeed
         elevenKeySaved = Keychain.get("elevenlabs.api-key") != nil
