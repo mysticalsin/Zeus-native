@@ -132,6 +132,30 @@ struct FaceVerificationMachineTests {
         #expect(machine.phase != .matched)
     }
 
+    /// ZB-001. The action that is already open cannot leave `.lockedOut` through a successful fallback.
+    @Test func zb001TheOpenActionCannotFallbackOutOfLockout() {
+        var machine = FaceVerificationMachine()
+        _ = machine.handle(.enable(enrolled: true, camera: .authorized, uptime: 1))
+        let limit = FaceVerificationPolicy.failureLimit
+        for index in 0..<(limit - 1) {
+            let warmup = ApprovalAction(id: "warmup", nonce: "n\(index)")
+            _ = machine.handle(.beginApproval(warmup, uptime: 10 + Double(index)))
+            _ = machine.handle(.capture(.noFace, uptime: 10 + Double(index)))
+        }
+        let open = ApprovalAction(id: "pay", nonce: "open-nonce")
+        _ = machine.handle(.beginApproval(open, uptime: 100))
+        _ = machine.handle(.capture(.noFace, uptime: 100))
+        #expect(machine.phase == .lockedOut)
+        #expect(machine.grant == nil)
+        let failures = machine.failures
+        let started = machine.lockoutStarted
+        _ = machine.handle(.fallbackResult(succeeded: true, action: open, uptime: 101))
+        #expect(machine.phase == .lockedOut)
+        #expect(machine.grant == nil)
+        #expect(machine.failures == failures)
+        #expect(machine.lockoutStarted == started)
+    }
+
     @Test func fallbackApprovesOnlyTheOpenActionAndNotDuringLockout() {
         let action = FaceVerificationFixtures.action("fallback-nonce")
         var machine = FaceVerificationFixtures.fallback(nonce: action.nonce)
