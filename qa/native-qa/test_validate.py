@@ -113,6 +113,7 @@ class ReceiptSlots(unittest.TestCase):
         receipt["opened_by_harness"] = False
         receipt["runtime_app_pid"] = 4242
         receipt["runtime_app_bundle"] = str(app)
+        receipt["log"] = "swift build finished\n"
         self.fills += 1
         shots = self.dir / f"shots-{self.fills}"
         shots.mkdir()
@@ -202,6 +203,29 @@ class ReceiptSlots(unittest.TestCase):
         verdict, reasons = self.v.judge(bundle_only, self.dir)
         self.assertEqual(reasons, [])
         self.assertEqual(verdict, "pass")
+
+    def test_steps_out_of_order_are_not_a_pass(self):
+        receipt = self.filled()
+        receipt["steps"][0], receipt["steps"][1] = receipt["steps"][1], receipt["steps"][0]
+        verdict, reasons = self.v.judge(receipt, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("order" in reason for reason in reasons), reasons)
+
+    def test_empty_or_truncated_log_is_not_a_pass(self):
+        for log in ("", "   ", "\n", None):
+            receipt = self.filled()
+            if log is None:
+                receipt.pop("log", None)
+            else:
+                receipt["log"] = log
+            verdict, reasons = self.v.judge(receipt, self.dir)
+            self.assertEqual(verdict, "fail", repr(log))
+            self.assertTrue(any("empty" in reason.lower() and "log" in reason.lower() for reason in reasons), reasons)
+        receipt = self.filled()
+        receipt["log"] = "swift build started"
+        verdict, reasons = self.v.judge(receipt, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("truncat" in reason.lower() and "log" in reason.lower() for reason in reasons), reasons)
 
     def test_opening_zeus_or_a_fail_mark_is_not_a_pass(self):
         opened = self.filled()
@@ -336,8 +360,13 @@ class HarnessGuards(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_exact_six_gib_allows_the_swift_build(self):
-        receipt = self.v.prepare(HEAD, self.home, self.repo, self.usage(self.v.MIN_FREE_BYTES), self.calls.append)
-        self.assertEqual(self.calls, [["swift", "build", "-c", "release"]])
+        seen = []
+
+        def run(command, cwd=None):
+            seen.append((list(command), None if cwd is None else Path(cwd)))
+
+        receipt = self.v.prepare(HEAD, self.home, self.repo, self.usage(self.v.MIN_FREE_BYTES), run)
+        self.assertEqual(seen, [(["swift", "build", "-c", "release"], self.repo)])
         self.assertEqual(receipt["verdict"], "not-run")
         self.assertEqual(Path(receipt["app"]).name, "Zeus-latest-2722dcb7.app")
         self.assertTrue(all(step["result"] == "" and step["screenshot"] == "" for step in receipt["steps"]))
@@ -351,6 +380,22 @@ class HarnessGuards(unittest.TestCase):
             )
         self.assertIn("macOS", str(caught.exception))
         self.assertEqual(self.calls, [])
+
+    def test_harness_build_uses_the_repo_cwd(self):
+        import harness
+        calls = []
+        original = harness.subprocess.run
+
+        def fake(command, cwd=None, check=False, **kwargs):
+            calls.append((list(command), None if cwd is None else Path(cwd), check))
+            return type("R", (), {"returncode": 0})()
+
+        harness.subprocess.run = fake
+        try:
+            harness._run(["swift", "build", "-c", "release"], cwd=self.repo)
+        finally:
+            harness.subprocess.run = original
+        self.assertEqual(calls, [(["swift", "build", "-c", "release"], self.repo, True)])
 
     def test_missing_desktop_refuses_before_a_build(self):
         shutil.rmtree(self.home / "Desktop")
