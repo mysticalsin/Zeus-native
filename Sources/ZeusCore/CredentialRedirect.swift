@@ -32,6 +32,7 @@ public enum CredentialRedirect {
     }
 }
 
+#if canImport(Darwin)
 public final class CredentialRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     public func urlSession(_ session: URLSession, task: URLSessionTask,
                            willPerformHTTPRedirection response: HTTPURLResponse,
@@ -40,3 +41,4 @@ public final class CredentialRedirectDelegate: NSObject, URLSessionTaskDelegate,
         completionHandler(CredentialRedirect.apply(to: request, original: task.originalRequest?.url ?? response.url))
     }
 }
+#endif
