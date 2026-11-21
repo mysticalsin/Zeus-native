@@ -21,8 +21,20 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "upstream" / "haru_speech_mlx-0.1.0"))
 
 import numpy as np  # noqa: E402
-from haru_mlx.audio import load_audio, save_audio  # noqa: E402  (upstream, unchanged)
-from haru_mlx.native import upsample_2x, downsample_2x  # noqa: E402  (upstream, unchanged)
+
+
+def manifest_path(base: Path, name: str) -> Path:
+    """Reject absolute paths, empty names, and '..', then keep the resolved path inside base."""
+    rel = Path(name)
+    root = Path(base).resolve()
+    if name == "" or rel.is_absolute() or ".." in rel.parts:
+        print(f"haru-pipe: refusing manifest path {name!r}", file=sys.stderr)
+        raise SystemExit(2)
+    full = (root / rel).resolve()
+    if not full.is_relative_to(root):
+        print(f"haru-pipe: refusing manifest path {name!r}", file=sys.stderr)
+        raise SystemExit(2)
+    return full
 
 SR, FRAME = 24_000, 3200
 FRAME_MSG, CLIENT_BLOCK = 0x11, 480  # 10 ms speaker callback at 48 kHz
@@ -76,6 +88,7 @@ def stats(ns):
 
 # --------------------------------------------------------------- file mode (haru-mlx-inference)
 def file_one(src: Path, dst: Path):
+    from haru_mlx.audio import load_audio, save_audio  # upstream, unchanged
     t0 = now()
     user = load_audio(src)                                    # read + int16->f32 + mono + resample_poly
     t1 = now()
@@ -112,6 +125,7 @@ class Stream:
     def emit(self, user_frame):
         reply = sim_model(user_frame)
         if self.model_ns: spin_until(now() + self.model_ns)
+        from haru_mlx.native import upsample_2x  # upstream, unchanged
         pcm = upsample_2x(reply).astype("<f4").tobytes()                       # send_frame, verbatim
         payload = struct.pack("<If", self.index, 0.0) + pcm
         msg = struct.pack("<BI", FRAME_MSG, len(payload)) + payload
@@ -124,6 +138,7 @@ class Stream:
         x = np.concatenate([self.leftover, np.frombuffer(payload, dtype="<f4")])  # _serve, verbatim
         even = len(x) // 2 * 2
         self.leftover = x[even:]
+        from haru_mlx.native import downsample_2x  # upstream, unchanged
         pcm = downsample_2x(x[:even])
         if not len(pcm): return
         self.inbuf.push(pcm.astype(np.float32))
@@ -157,16 +172,21 @@ def stream_run(raw: bytes, max_frames=0, model_ns=0, first_cb=None):
 def cmd_bench(a):
     wl, out = Path(a.workload), Path(a.out); out.mkdir(parents=True, exist_ok=True)
     man = json.loads((wl / "manifest.json").read_text()); res = {"impl": "python"}
+    file_jobs = []
+    if a.mode in ("all", "file"):
+        for f in man["files"]:
+            file_jobs.append((manifest_path(wl, f["file"]), manifest_path(out, "reply_" + f["file"])))
+    stream_src = manifest_path(wl, man["stream"]["file"]) if a.mode in ("all", "stream") else None
     t = now(); import scipy.signal, soundfile  # noqa: F401  first-use imports, timed separately
     res["lazy_import_ms"] = (now() - t) / 1e6
     if a.mode in ("all", "file"):
         files, per_all, t0 = [], [], now()
-        for f in man["files"]:
-            r, per = file_one(wl / f["file"], out / ("reply_" + f["file"])); files.append(r); per_all += per
+        for src, dst in file_jobs:
+            r, per = file_one(src, dst); files.append(r); per_all += per
         wall = (now() - t0) / 1e9; audio = sum(r["audio_s"] for r in files)
         res["file"] = {"files": files, "wall_s": wall, "audio_s": audio, "rtf": wall / audio, "per_frame": stats(per_all)}
     if a.mode in ("all", "stream"):
-        raw = (wl / man["stream"]["file"]).read_bytes()
+        raw = stream_src.read_bytes()
         t0 = now(); st, per = stream_run(raw); wall = (now() - t0) / 1e9
         audio = len(raw) / 4 / 48000
         (out / "stream_frames.bin").write_bytes(b"".join(st.msgs))
@@ -177,7 +197,7 @@ def cmd_bench(a):
 
 def cmd_e2e(a):
     wl = Path(a.workload); man = json.loads((wl / "manifest.json").read_text())
-    with open(wl / man["stream"]["file"], "rb") as fh: raw = fh.read(a.frames * 2 * FRAME * 4 + 1_000_000)
+    with open(manifest_path(wl, man["stream"]["file"]), "rb") as fh: raw = fh.read(a.frames * 2 * FRAME * 4 + 1_000_000)
     def first(): sys.stdout.write("FIRST_AUDIO\n"); sys.stdout.flush()
     _, per = stream_run(raw, a.frames, int(a.model_ms * 1e6), first)
     s = stats(per); s["overhead_p50_ms"] = s["p50_ms"] - a.model_ms

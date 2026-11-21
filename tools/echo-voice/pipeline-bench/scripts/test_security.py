@@ -69,14 +69,27 @@ class RunBenchShellTests(unittest.TestCase):
         self.assertNotIn("shell=True", RUN_BENCH.read_text(encoding="utf-8"))
 
 
+def _go_tuple(text: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in text.split("."))
+
+
 class GoToolchainTests(unittest.TestCase):
     def test_go_directive_is_at_least_1_23_10(self):
         text = GO_MOD.read_text(encoding="utf-8")
         go_line = next(line for line in text.splitlines() if line.startswith("go "))
-        toolchain = next((line for line in text.splitlines() if line.startswith("toolchain ")), "")
-        got = tuple(int(p) for p in go_line.split()[1].split("."))
+        got = _go_tuple(go_line.split()[1])
         self.assertGreaterEqual(got, (1, 23, 10))
-        self.assertIn("go1.23.10", toolchain)
+        # go 1.23.10 drops a toolchain line that repeats the go line, and
+        # `go test` will not run until that line is gone. The go line is what
+        # selects the toolchain. A newer explicit toolchain line must still
+        # be at least go1.23.10.
+        for line in text.splitlines():
+            if line.startswith("toolchain "):
+                pinned = line.split()[1].removeprefix("go")
+                self.assertGreaterEqual(_go_tuple(pinned), (1, 23, 10))
+        proc = subprocess.run(["go", "env", "GOVERSION"], cwd=GO_MOD.parent, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertGreaterEqual(_go_tuple(proc.stdout.strip().removeprefix("go")), (1, 23, 10))
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
 //!   haru-pipe info    IN.wav                rate, channels, seconds, Haru frame count
 use haru_pipe::{bench, frame, stats, wav};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
 
 fn arg(args: &[String], name: &str, default: Option<&str>) -> String {
@@ -52,6 +52,35 @@ fn file_names(text: &str) -> Vec<String> {
     out
 }
 
+/// Reject absolute names, empty names, and `..` / root / prefix components, then
+/// keep the cleaned path inside `base`.
+fn confined(base: &Path, name: &str) -> PathBuf {
+    if name.is_empty() || Path::new(name).is_absolute() {
+        die(&format!("refusing manifest path {name:?}"));
+    }
+    for c in Path::new(name).components() {
+        match c {
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                die(&format!("refusing manifest path {name:?}"));
+            }
+            Component::CurDir | Component::Normal(_) => {}
+        }
+    }
+    let base = std::fs::canonicalize(base).unwrap_or_else(|e| die(&e.to_string()));
+    let mut full = PathBuf::new();
+    for c in base.join(name).components() {
+        match c {
+            Component::ParentDir => { full.pop(); }
+            Component::CurDir => {}
+            other => full.push(other.as_os_str()),
+        }
+    }
+    if full != base && !full.starts_with(&base) {
+        die(&format!("refusing manifest path {name:?}"));
+    }
+    full
+}
+
 /// Tiny manifest reader: the workload manifest's "file" entries, in order.
 fn manifest(dir: &Path) -> (Vec<String>, String) {
     let text = std::fs::read_to_string(dir.join("manifest.json")).unwrap_or_else(|e| die(&format!("manifest: {e}")));
@@ -75,7 +104,9 @@ fn main() {
                 let t0 = Instant::now();
                 let (mut jsons, mut per, mut audio) = (Vec::new(), Vec::new(), 0.0);
                 for f in &files {
-                    let r = bench::file_one(&wl.join(f), &out.join(format!("reply_{f}"))).unwrap_or_else(|e| die(&format!("{f}: {e}")));
+                    let src = confined(&wl, f);
+                    let dst = confined(&out, &format!("reply_{f}"));
+                    let r = bench::file_one(&src, &dst).unwrap_or_else(|e| die(&format!("{f}: {e}")));
                     jsons.push(r.json); per.extend(r.per_frame_ns); audio += r.audio_s;
                 }
                 let wall = t0.elapsed().as_secs_f64();
@@ -83,7 +114,7 @@ fn main() {
                     jsons.join(", "), rtf(wall, audio), stats::summary_json(&per)));
             }
             if mode == "all" || mode == "stream" {
-                let raw = std::fs::read(wl.join(&stream)).unwrap();
+                let raw = std::fs::read(confined(&wl, &stream)).unwrap();
                 let t0 = Instant::now();
                 let mut frames_out = std::fs::File::create(out.join("stream_frames.bin")).unwrap();
                 let (st, per) = bench::stream_run_to(&raw, 0, Duration::ZERO, move |msg| {
@@ -103,7 +134,7 @@ fn main() {
             let (_, stream) = manifest(&wl);
             use std::io::Read;
             let mut raw = vec![0u8; frames * 2 * frame::FRAME_SAMPLES * 4 + 1_000_000];
-            let mut f = std::fs::File::open(wl.join(stream)).unwrap();
+            let mut f = std::fs::File::open(confined(&wl, &stream)).unwrap();
             let n = f.read(&mut raw).unwrap(); raw.truncate(n);
             let (_, per) = bench::stream_run(&raw, frames, Duration::from_nanos((model_ms * 1e6) as u64), || {
                 let mut o = std::io::stdout().lock(); o.write_all(b"FIRST_AUDIO\n").unwrap(); o.flush().unwrap();

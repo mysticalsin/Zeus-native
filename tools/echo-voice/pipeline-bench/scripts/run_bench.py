@@ -21,7 +21,22 @@ IMPLS = {
 
 
 def sh(cmd):
-    return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
+
+
+def cpu_model():
+    for line in sh(["lscpu"]).splitlines():
+        if "Model name" in line and ":" in line:
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def mem_total():
+    for line in sh(["free", "-m"]).splitlines():
+        parts = line.split()
+        if parts and parts[0] == "Mem:":
+            return parts[1] + " MiB"
+    return ""
 
 
 def sha(p):
@@ -70,11 +85,11 @@ def main():
     }
     env = {
         "date": time.strftime("%Y-%m-%d %H:%M:%S %Z"), "host": platform.node(), "kernel": platform.release(),
-        "cpu": sh("lscpu | grep 'Model name' | sed 's/.*: *//'"), "nproc": os.cpu_count(),
-        "mem_total": sh("free -m | awk '/Mem/{print $2\" MiB\"}'"), "loadavg_start": open("/proc/loadavg").read().strip(),
-        "toolchains": {"python": sh(f"{IMPLS['python'][0]} -V"),
-                       "numpy/scipy/soundfile/libsndfile": sh(f"{IMPLS['python'][0]} -c \"import numpy,scipy,soundfile;print(numpy.__version__,scipy.__version__,soundfile.__version__,soundfile.__libsndfile_version__)\""),
-                       "rustc": sh("rustc -V"), "cargo": sh("cargo -V"), "go": sh("go version")},
+        "cpu": cpu_model(), "nproc": os.cpu_count(),
+        "mem_total": mem_total(), "loadavg_start": open("/proc/loadavg").read().strip(),
+        "toolchains": {"python": sh([IMPLS["python"][0], "-V"]),
+                       "numpy/scipy/soundfile/libsndfile": sh([IMPLS["python"][0], "-c", "import numpy,scipy,soundfile;print(numpy.__version__,scipy.__version__,soundfile.__version__,soundfile.__libsndfile_version__)"]),
+                       "rustc": sh(["rustc", "-V"]), "cargo": sh(["cargo", "-V"]), "go": sh(["go", "version"])},
         "rust_profile": "release, opt-level=3, lto=fat, codegen-units=1, no target-cpu flag (portable x86-64)",
         "go_build": "go build -trimpath (default GOAMD64=v1)",
         "source_sha256": {k: tree_sha(v) for k, v in srcs.items()},

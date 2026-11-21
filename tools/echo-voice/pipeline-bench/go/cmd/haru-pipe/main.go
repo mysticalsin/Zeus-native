@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	hp "echo.local/harupipe/harupipe"
@@ -23,6 +24,25 @@ func must(err error) {
 		fmt.Fprintln(os.Stderr, "haru-pipe:", err)
 		os.Exit(2)
 	}
+}
+
+// manifestPath rejects absolute names, empty names, and any ".." element, then
+// checks the cleaned path is still inside base.
+func manifestPath(base, name string) (string, error) {
+	if name == "" || !filepath.IsLocal(name) {
+		return "", fmt.Errorf("refusing manifest path %q", name)
+	}
+	absBase, err := filepath.Abs(base)
+	if err != nil {
+		return "", err
+	}
+	absBase = filepath.Clean(absBase)
+	full := filepath.Clean(filepath.Join(absBase, name))
+	prefix := absBase + string(filepath.Separator)
+	if full != absBase && !strings.HasPrefix(full, prefix) {
+		return "", fmt.Errorf("refusing manifest path %q", name)
+	}
+	return full, nil
 }
 
 func fileOne(src, dst string) (map[string]any, []int64, float64) {
@@ -96,14 +116,20 @@ func main() {
 			var per []int64
 			audio := 0.0
 			for _, f := range man.Files {
-				r, p, a := fileOne(filepath.Join(*wl, f.File), filepath.Join(*out, "reply_"+f.File))
+				src, err := manifestPath(*wl, f.File)
+				must(err)
+				dst, err := manifestPath(*out, "reply_"+f.File)
+				must(err)
+				r, p, a := fileOne(src, dst)
 				files, per, audio = append(files, r), append(per, p...), audio+a
 			}
 			wall := time.Since(t0).Seconds()
 			res["file"] = map[string]any{"files": files, "wall_s": wall, "audio_s": audio, "rtf": rtf(wall, audio), "per_frame": hp.Summary(per)}
 		}
 		if *mode == "all" || *mode == "stream" {
-			raw, err := os.ReadFile(filepath.Join(*wl, man.Stream.File))
+			streamPath, err := manifestPath(*wl, man.Stream.File)
+			must(err)
+			raw, err := os.ReadFile(streamPath)
 			must(err)
 			framesOut, err := os.Create(filepath.Join(*out, "stream_frames.bin"))
 			must(err)
@@ -115,7 +141,9 @@ func main() {
 			res["stream"] = map[string]any{"frames": len(per), "wall_s": wall, "audio_s": audio, "rtf": rtf(wall, audio), "per_frame": hp.Summary(per), "drained_samples": st.Drained}
 		}
 	case "e2e":
-		f, err := os.Open(filepath.Join(*wl, man.Stream.File))
+		streamPath, err := manifestPath(*wl, man.Stream.File)
+		must(err)
+		f, err := os.Open(streamPath)
 		must(err)
 		raw := make([]byte, *nframes*2*hp.FrameSamples*4+1_000_000)
 		n, _ := io.ReadFull(f, raw)
