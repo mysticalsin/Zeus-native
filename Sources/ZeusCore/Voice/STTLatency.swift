@@ -361,6 +361,45 @@ public struct STTLiveTurn: Equatable, Sendable {
     }
 }
 
+/// The one live utterance. A newer begin replaces the trace. Delivery is still applied to
+/// whatever utterance is current, which is what a late stop does today.
+public struct STTUtteranceBook: Equatable, Sendable {
+    public private(set) var generation = 0
+    public private(set) var trace = STTLatencyTrace(path: .talkHold)
+    public private(set) var cancelled = false
+    private var keyDownAt = 0
+
+    public init() {}
+
+    public mutating func begin(path: STTPath, atMs: Int) -> Int {
+        generation += 1
+        cancelled = false
+        keyDownAt = atMs
+        trace = STTLatencyTrace(path: path)
+        trace.mark(.keyDown, atMs: atMs)
+        return generation
+    }
+
+    @discardableResult
+    public mutating func mark(_ stage: STTLatencyTrace.Stage, atMs: Int, generation owner: Int) -> Bool {
+        guard owner == generation, !cancelled else { return false }
+        trace.mark(stage, atMs: atMs)
+        return true
+    }
+
+    /// True when this call wrote `delivered_to_ui`.
+    public mutating func deliver(generation owner: Int, atMs: Int) -> Bool {
+        guard !cancelled else { return false }
+        trace.mark(.deliveredToUI, atMs: atMs)
+        return trace.marks[.deliveredToUI] != nil
+    }
+
+    public mutating func cancel(generation owner: Int) {
+        guard owner == generation else { return }
+        cancelled = true
+    }
+}
+
 public enum STTOutcome {
     /// How a finished turn is counted. A partial that is handed over inside the budget is not a failure.
     public static func failure(hadSpeech: Bool, hasText: Bool, recognizerFinished: Bool,

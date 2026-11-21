@@ -123,4 +123,93 @@ struct STTLatencyTests {
             #expect(after.trace.offset(.modelReady) == 0)
         }
     }
+
+    @Test func aMidPhrasePauseDoesNotBecomeTheEndpointSilence() {
+        var clock = STTClock()
+        var turn = STTLiveTurn(path: .talkHold, policy: .production, endOnSilence: false)
+        clock.advance(to: 0)
+        turn.keyDown(clock: clock)
+        clock.advance(to: 40)
+        turn.feed(clock: clock, rms: 0.05, partialToken: 1)
+        clock.advance(to: 200)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 1)
+        clock.advance(to: 500)
+        turn.feed(clock: clock, rms: 0.05, partialToken: 2)
+        clock.advance(to: 800)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 2)
+        clock.advance(to: 900)
+        turn.keyUp(clock: clock)
+        let silence = turn.trace.offset(.silenceDetected)
+        let endpoint = turn.trace.offset(.endpointFired)
+        #expect(silence == 800)
+        #expect(endpoint == 900)
+        #expect(endpoint! - silence! <= STTSessionPolicy.fixed.silenceToEndpointMs)
+    }
+
+    @Test func aLateDeliveryDoesNotCloseTheNextUtterance() {
+        var book = STTUtteranceBook()
+        let first = book.begin(path: .talkHold, atMs: 0)
+        let second = book.begin(path: .murmurTap, atMs: 100)
+        let applied = book.deliver(generation: first, atMs: 180)
+        let delivered = book.trace.offset(.deliveredToUI)
+        #expect(second == first + 1)
+        #expect(!applied)
+        #expect(delivered == nil)
+        #expect(book.trace.path == .murmurTap)
+    }
+
+    @Test func rapidStartStopCyclesDoNotCrossDeliver() {
+        var book = STTUtteranceBook()
+        for index in 0..<20 {
+            let at = index * 100
+            let path: STTPath = index.isMultiple(of: 2) ? .talkHold : .murmurTap
+            let id = book.begin(path: path, atMs: at)
+            let captured = book.mark(.captureStart, atMs: at + 10, generation: id)
+            let ended = book.mark(.endpointFired, atMs: at + 40, generation: id)
+            #expect(captured)
+            #expect(ended)
+            if index > 0 {
+                let stale = book.deliver(generation: id - 1, atMs: at + 50)
+                #expect(!stale)
+            }
+            let wrote = book.deliver(generation: id, atMs: at + 60)
+            let shown = book.trace.offset(.deliveredToUI)
+            #expect(wrote)
+            #expect(shown == 60)
+            #expect(book.trace.path == path)
+        }
+    }
+
+    @Test func cancelDropsALateDeliver() {
+        var book = STTUtteranceBook()
+        let id = book.begin(path: .talkHold, atMs: 0)
+        book.cancel(generation: id)
+        let late = book.deliver(generation: id, atMs: 80)
+        #expect(!late)
+        #expect(book.trace.offset(.deliveredToUI) == nil)
+        let next = book.begin(path: .murmurTap, atMs: 100)
+        let stale = book.deliver(generation: id, atMs: 120)
+        let fresh = book.deliver(generation: next, atMs: 140)
+        #expect(!stale)
+        #expect(fresh)
+        #expect(book.trace.offset(.deliveredToUI) == 40)
+    }
+
+    @Test func aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample() {
+        var clock = STTClock()
+        var turn = STTLiveTurn(path: .murmurTap, policy: .production, endOnSilence: true)
+        clock.advance(to: 0)
+        turn.keyDown(clock: clock)
+        clock.advance(to: 40)
+        turn.feed(clock: clock, rms: 0.05, partialToken: 1)
+        clock.advance(to: 100)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 1)
+        clock.advance(to: 10_000)
+        turn.feed(clock: clock, rms: 0.001, partialToken: 1)
+        let silence = turn.trace.offset(.silenceDetected)
+        let endpoint = turn.trace.offset(.endpointFired)
+        #expect(silence == 100)
+        #expect(endpoint == 100 + STTSessionPolicy.fixed.silenceToEndpointMs)
+        #expect(endpoint != 10_000)
+    }
 }
