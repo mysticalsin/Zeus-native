@@ -32,14 +32,20 @@ public enum AgentReply {
 
     /// The AppleScript that types `text` and Return into the session's exact tab.
     /// Terminal receives literal keystrokes in the tab that is already open. The text is not a new shell command.
-    public static func script(for info: TerminalInfo, text: String) -> String? {
-        guard let line = sanitize(text) else { return nil }
+    /// Immediately before those keystrokes the script checks that Terminal is frontmost, that the front tab's
+    /// tty is still `info.tty`, and that the tab's foreground process is still one of `expectedCLI`.
+    /// Any other front app, tty, or process returns false and types nothing.
+    /// iTerm checks the same facts immediately before `write text`.
+    /// `expectedCLI` empty fails closed: the script returns before it types.
+    public static func script(for info: TerminalInfo, text: String, expectedCLI: Set<String> = []) -> String? {
+        guard let line = sanitize(text), !HubReplyHidden.containsMark(line) else { return nil }
         let escaped = appleScriptString(line)
         switch info.targetBundleID {
         case "com.apple.Terminal":
             guard let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
             let strokes = literalKeystrokes(line)
             guard !strokes.isEmpty else { return nil }
+            let guardLines = foregroundGuard(expected: expectedCLI)
             return """
             tell application "Terminal"
                 repeat with w in windows
@@ -48,9 +54,18 @@ public enum AgentReply {
                             set selected of t to true
                             set index of w to 1
                             activate
-                            tell application "System Events" to tell process "Terminal"
-                                \(strokes)
-                                keystroke return
+                            if frontmost is false then return false
+                            if (tty of selected tab of front window) is not "\(tty)" then return false
+                            set fgNames to processes of selected tab of front window
+                            if (count of fgNames) is 0 then return false
+                            set fg to last item of fgNames as text
+                            \(guardLines)
+                            tell application "System Events"
+                                if (name of first application process whose frontmost is true) is not "Terminal" then return false
+                                tell process "Terminal"
+                                    \(strokes)
+                                    keystroke return
+                                end tell
                             end tell
                             return true
                         end if
@@ -65,12 +80,21 @@ public enum AgentReply {
             guard uuid != nil || tty != nil else { return nil }
             let test = [uuid.map { "unique id of s is \"\($0)\"" }, tty.map { "tty of s is \"\($0)\"" }]
                 .compactMap { $0 }.joined(separator: " or ")
+            let ttyAgain = tty.map { "if tty of s is not \"\($0)\" then return false" } ?? ""
+            let guardLines = foregroundGuard(expected: expectedCLI)
             return """
             tell application "iTerm2"
                 repeat with w in windows
                     repeat with t in tabs of w
                         repeat with s in sessions of t
                             if \(test) then
+                                if frontmost is false then return false
+                                \(ttyAgain)
+                                set fg to ""
+                                try
+                                    set fg to variable named "jobName" of s as text
+                                end try
+                                \(guardLines)
                                 tell s to write text "\(escaped)"
                                 return true
                             end if
@@ -83,6 +107,27 @@ public enum AgentReply {
         default:
             return nil
         }
+    }
+
+    /// Normalizes the process name the terminal just returned and refuses a shell or an unexpected CLI.
+    /// The name read is the one taken in this same script, after the frontmost and tty checks.
+    private static func foregroundGuard(expected: Set<String>) -> String {
+        let names = expected.compactMap(TerminalTabScript.safe).sorted()
+        let allowed = names.isEmpty
+            ? "if true then return false"
+            : "if not (\(names.map { "fg is \"\($0)\"" }.joined(separator: " or "))) then return false"
+        return """
+        if fg is "" then return false
+        if fg starts with "-" then set fg to text 2 thru -1 of fg
+        if fg contains "/" then
+            set savedDelimiters to AppleScript's text item delimiters
+            set AppleScript's text item delimiters to "/"
+            set fg to last text item of fg
+            set AppleScript's text item delimiters to savedDelimiters
+        end if
+        if fg is "bash" or fg is "zsh" or fg is "sh" or fg is "fish" or fg is "dash" or fg is "ksh" or fg is "tcsh" or fg is "csh" then return false
+        \(allowed)
+        """
     }
 
     /// Escapes a line for a double-quoted AppleScript string.
@@ -128,7 +173,8 @@ public struct AgentReplySender: Sendable {
     @MainActor
     public func send(_ text: String, to session: String, agent: String) async -> AgentReplyOutcome {
         guard let line = AgentReply.sanitize(text) else { return .empty }
-        guard let info = terminal(session), let script = AgentReply.script(for: info, text: line) else { return .unsupported }
+        let expected = HubReplyForeground.expectedCLI(agent: agent)
+        guard let info = terminal(session), let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return .unsupported }
         guard await approve(agent, line) else { return .declined }
         return await run(script) ? .sent : .failed
     }

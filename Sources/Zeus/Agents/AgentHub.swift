@@ -56,8 +56,6 @@ final class AgentHub {
     @ObservationIgnored var sender: AgentReplySender?
     /// Tests supply the foreground process name. Production reads it with AppleScript.
     @ObservationIgnored var foregroundProbe: ((TerminalInfo) -> String?)?
-    /// The name read at Approve. Typing uses this read again instead of asking the terminal twice.
-    @ObservationIgnored private var approvedForeground: String?
     @ObservationIgnored private var syncingReply = false
     @ObservationIgnored private var replyGate = HubReplyDispatch()
     @ObservationIgnored private var replyTimeout: Task<Void, Never>?
@@ -180,13 +178,18 @@ final class AgentHub {
         guard HubReplyTyping.canType(line) else { return false }
         let typer = sender ?? liveSender
         guard let info = typer.terminal(sessionID) else { return false }
+        let expected = replyGate.state.target?.expectedCLI ?? []
         if sender == nil {
+            let name = foregroundName(info)
+            let path = name?.contains("/") == true ? name : nil
             let verdict = HubReplyForeground.verdict(
-                name: approvedForeground,
-                expected: replyGate.state.target?.expectedCLI ?? [])
+                name: name,
+                expected: expected,
+                executablePath: path,
+                allowedPaths: allowedAgentPaths(expected))
             guard verdict == .agent else { return false }
         }
-        guard let script = AgentReply.script(for: info, text: line) else { return false }
+        guard let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return false }
         guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
         guard sessionID == selectedSession else { return false }
         if let sender {
@@ -211,9 +214,16 @@ final class AgentHub {
         } else {
             name = info.flatMap(foregroundName)
         }
-        approvedForeground = name
         guard sender == nil || foregroundProbe != nil else { return nil }
         return HubReplyForeground.verdict(name: name, expected: expected)
+    }
+
+    /// Paths of the expected CLIs, resolved later against the process path when the terminal returns one.
+    /// A bare name from `processes` or `jobName` has no path to compare. See `HubReplyForeground`.
+    private func allowedAgentPaths(_ expected: Set<String>) -> Set<String> {
+        Set(CLILocator.tools.compactMap { tool in
+            expected.contains(tool.name) ? CLILocator.locate(tool) : nil
+        })
     }
 
     /// Terminal's `processes` or iTerm's `jobName`. The automation permission is the one the app already has.

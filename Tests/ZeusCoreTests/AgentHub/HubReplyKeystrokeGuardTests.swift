@@ -130,4 +130,16 @@ struct HubReplyKeystrokeGuardTests {
         #expect(before.contains("return false"))
         #expect(script.components(separatedBy: "/dev/ttys004").count - 1 >= 2)
     }
+
+    @Test func theGuardedScriptsStillMayRun() throws {
+        let line = "hi $(id)"
+        let script = try #require(AgentReply.script(for: terminal, text: line, expectedCLI: ["claude"]))
+        #expect(HubReplyScriptGuard.mayRun(script: script, line: line, approved: true))
+        let key = try #require(script.range(of: "keystroke"))
+        #expect(String(script[..<key.lowerBound]).contains("fg is \"claude\""))
+        let iterm = TerminalInfo(bundleID: "com.googlecode.iterm2", program: nil, sessionID: "w0t1p0:ABCD-1234", tty: "/dev/ttys004")
+        let written = try #require(AgentReply.script(for: iterm, text: "go", expectedCLI: ["claude"]))
+        #expect(HubReplyScriptGuard.mayRun(script: written, line: "go", approved: true))
+        #expect(written.contains("fg is \"claude\""))
+    }
 }

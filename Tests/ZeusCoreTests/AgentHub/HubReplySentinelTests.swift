@@ -181,9 +181,29 @@ struct HubReplySentinelTests {
     }
 
     /// A path is not trusted because its last component is the agent name.
-    @Test func aSlashPathIsNotTheAgentByNameAlone() {
+    /// A resolved real path is accepted only when it is on the allowlist.
+    @Test func aSlashPathIsNotTheAgentByNameAlone() throws {
         #expect(HubReplyForeground.verdict(name: "/tmp/evil/claude", expected: ["claude"]) == .unknown)
         #expect(HubReplyForeground.verdict(name: "zsh", expected: ["claude"]) == .bareShell)
+        #expect(HubReplyForeground.verdict(name: "/bin/zsh", expected: ["claude"]) == .bareShell)
+
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zn283-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let binary = root.appendingPathComponent("claude")
+        #expect(FileManager.default.createFile(atPath: binary.path, contents: Data("#!/bin/sh\n".utf8)))
+        let link = root.appendingPathComponent("via")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: binary)
+        let decoyDir = root.appendingPathComponent("other")
+        try FileManager.default.createDirectory(at: decoyDir, withIntermediateDirectories: true)
+        let decoy = decoyDir.appendingPathComponent("claude")
+        #expect(FileManager.default.createFile(atPath: decoy.path, contents: Data()))
+
+        #expect(HubReplyForeground.verdict(name: "claude", expected: ["claude"], executablePath: link.path, allowedPaths: [binary.path]) == .agent)
+        #expect(HubReplyForeground.verdict(name: link.path, expected: ["claude"], allowedPaths: [binary.path]) == .agent)
+        #expect(HubReplyForeground.verdict(name: "claude", expected: ["claude"], executablePath: decoy.path, allowedPaths: [binary.path]) == .unknown)
+        #expect(HubReplyForeground.verdict(name: "claude", expected: ["claude"], executablePath: link.path, allowedPaths: []) == .unknown)
+        #expect(HubReplyForeground.verdict(name: "python", expected: ["claude"], executablePath: link.path, allowedPaths: [binary.path]) == .unknown)
     }
 
     /// Typing must not reuse the name read at Approve, and the script must carry the expected CLI.

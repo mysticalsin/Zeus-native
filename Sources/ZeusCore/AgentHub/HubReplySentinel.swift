@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 /// The terminal tab a pending reply names. `expectedCLI` is the agent process, not part of the tab identity.
 public struct HubReplyTarget: Equatable, Sendable {
@@ -39,15 +44,23 @@ public enum HubReplyTargetGate {
     }
 }
 
-/// Zero-width and bidirectional marks. They are refused and left in the draft. They are not stripped.
+/// Hidden and bidirectional scalars. They are refused and left in the draft. They are not stripped.
+/// Every Unicode `Cf` (format) scalar is refused. So are U+FEFF, U+00AD, U+180E, U+2061...U+2064,
+/// the tag block U+E0000...U+E007F, variation selectors U+FE00...U+FE0F and U+E0100...U+E01EF,
+/// and the bidi controls, including when a Unicode version files one of them outside `Cf`.
 public enum HubReplyHidden {
     public static func containsMark(_ text: String) -> Bool {
         text.unicodeScalars.contains(where: isMark)
     }
 
     public static func isMark(_ scalar: Unicode.Scalar) -> Bool {
+        if scalar.properties.generalCategory == .format { return true }
         switch scalar.value {
-        case 0x200B...0x200F, 0x2060, 0x061C, 0x202A...0x202E, 0x2066...0x2069:
+        case 0x00AD, 0x061C, 0x180E, 0x200E, 0x200F, 0xFEFF:
+            return true
+        case 0x202A...0x202E, 0x2061...0x2064, 0x2066...0x2069:
+            return true
+        case 0xFE00...0xFE0F, 0xE0000...0xE007F, 0xE0100...0xE01EF:
             return true
         default:
             return false
@@ -56,6 +69,13 @@ public enum HubReplyHidden {
 }
 
 /// The process in the target tab, read with the terminal's own AppleScript. A shell prompt is not an agent.
+///
+/// Terminal's `processes` and iTerm's `jobName` are process names, not executable paths. A bare name is
+/// matched against `expected` and the shell set. That is the limit of those dictionaries: a renamed
+/// binary can still match a name, and this type cannot see the inode behind it.
+/// When `executablePath` is set, or `name` itself contains a slash, the path is resolved with `realpath`
+/// and must be one of `allowedPaths` after the same resolution. A path that does not resolve, or is not
+/// on that allowlist, is `.unknown`. A shell stays `.bareShell` even when a path is allowlisted.
 public enum HubReplyForeground {
     public enum Verdict: Equatable, Sendable {
         case agent
@@ -67,14 +87,43 @@ public enum HubReplyForeground {
 
     /// `name` is the foreground process, or nil when the query could not see one.
     /// A shell is refused. Any other process that is not the expected CLI is unknown, and also refused.
-    public static func verdict(name: String?, expected: Set<String>) -> Verdict {
-        guard var token = name?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else { return .unknown }
+    /// A path is accepted only when its resolved real path is on `allowedPaths` and its final component is expected.
+    public static func verdict(
+        name: String?,
+        expected: Set<String>,
+        executablePath: String? = nil,
+        allowedPaths: Set<String> = []
+    ) -> Verdict {
+        if let token = normalizedToken(name), shells.contains(token) { return .bareShell }
+        let pathCandidate = executablePath ?? name.flatMap { $0.contains("/") ? $0 : nil }
+        if let pathCandidate {
+            if let token = normalizedToken(pathCandidate), shells.contains(token) { return .bareShell }
+            guard let resolved = resolve(pathCandidate), let base = normalizedToken(resolved), expected.contains(base) else {
+                return .unknown
+            }
+            if let token = normalizedToken(name), name?.contains("/") != true, token != base { return .unknown }
+            let allowed = Set(allowedPaths.compactMap(resolve))
+            return allowed.contains(resolved) ? .agent : .unknown
+        }
+        guard let token = normalizedToken(name), expected.contains(token) else { return .unknown }
+        return .agent
+    }
+
+    /// The last path component, without one leading dash, lowercased. Nil when nothing is left.
+    static func normalizedToken(_ name: String?) -> String? {
+        guard var token = name?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else { return nil }
         if token.hasPrefix("-") { token.removeFirst() }
         if let slash = token.lastIndex(of: "/") { token = String(token[token.index(after: slash)...]) }
         token = token.lowercased()
-        if shells.contains(token) { return .bareShell }
-        if expected.contains(token) { return .agent }
-        return .unknown
+        return token.isEmpty ? nil : token
+    }
+
+    /// `realpath(3)`. Nil when the path does not exist.
+    public static func resolve(_ path: String) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard realpath(path, &buffer) != nil, let end = buffer.firstIndex(of: 0) else { return nil }
+        let bytes = buffer[..<end].map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     /// The CLI Zeus expects in that tab, from the session's agent name.

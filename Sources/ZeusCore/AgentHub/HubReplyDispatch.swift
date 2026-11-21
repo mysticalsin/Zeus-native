@@ -134,7 +134,11 @@ public struct HubReplyDispatch: Equatable, Sendable {
         if let shown = state.target, let reason = HubReplyTargetGate.refusal(shown: shown, current: context.target) {
             return refuse(keeping: state.draft, receipt: reason)
         }
-        if let foreground = context.foreground, foreground != .agent {
+        // A missing read is not an agent. Nothing is typed until the foreground is known.
+        guard let foreground = context.foreground else {
+            return refuse(keeping: state.draft, receipt: .foregroundUnknown)
+        }
+        if foreground != .agent {
             let receipt: HubReplyReceipt = foreground == .bareShell ? .bareShell : .foregroundUnknown
             return refuse(keeping: state.draft, receipt: receipt)
         }
@@ -267,11 +271,40 @@ public enum HubReplyScriptGuard {
     }
 
     /// Lines that type, run a script, or press a key. The tab-selection boilerplate is not in this list.
+    /// Markers are matched on case-folded, compatibility-normalized text so `Do script` and a
+    /// nonbreaking space cannot hide a command beside an otherwise exact keystroke list.
     private static func typingLines(_ script: String) -> [String] {
         let markers = ["keystroke", "key code", "key down", "key up", "do script", "do shell script", "write text"]
         return script.split(separator: "\n", omittingEmptySubsequences: false).map {
             $0.trimmingCharacters(in: .whitespaces)
-        }.filter { row in markers.contains { row.contains($0) } }
+        }.filter { row in
+            let normalized = normalizedCommand(row)
+            return markers.contains { normalized.contains($0) }
+        }
+    }
+
+    /// NFKC, format characters removed, every space separator folded to one ASCII space, then lowercased.
+    static func normalizedCommand(_ text: String) -> String {
+        let folded = text.precomposedStringWithCompatibilityMapping
+        var output = ""
+        var pendingSpace = false
+        var started = false
+        for scalar in folded.unicodeScalars {
+            if scalar.properties.generalCategory == .format { continue }
+            let isSpace = scalar.properties.generalCategory == .spaceSeparator
+                || scalar.value == 0x09 || scalar.value == 0x0A || scalar.value == 0x0D
+            if isSpace {
+                if started { pendingSpace = true }
+                continue
+            }
+            if pendingSpace {
+                output.append(" ")
+                pendingSpace = false
+            }
+            started = true
+            output.append(contentsOf: String(scalar).lowercased())
+        }
+        return output
     }
 
     /// iTerm's one `write text` of the escaped line. Anything else that types, including `do script`, fails.
@@ -279,8 +312,8 @@ public enum HubReplyScriptGuard {
         let wrapper = "write text \"\(escaped)\""
         let parts = script.components(separatedBy: wrapper)
         guard parts.count - 1 == 1 else { return false }
-        let remainder = parts.joined()
-        let blocked = ["do script", "do shell script", "shell script", "keystroke", "key code", "key down", "key up", "System Events", "write text"]
+        let remainder = normalizedCommand(parts.joined())
+        let blocked = ["do script", "do shell script", "shell script", "keystroke", "key code", "key down", "key up", "system events", "write text"]
         return blocked.allSatisfy { !remainder.contains($0) }
     }
 
