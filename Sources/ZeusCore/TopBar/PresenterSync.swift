@@ -220,8 +220,7 @@ public struct GoogleSlidesNotesProvider: PresenterNotesProvider {
 
     /// `https://docs.google.com/presentation/d/…` (editor, present or presenter view).
     public static func isPresentation(url: String) -> Bool {
-        guard let components = URLComponents(string: url), let host = components.host?.lowercased() else { return false }
-        return host == "docs.google.com" && components.path.hasPrefix("/presentation/")
+        DeckURL.isPresentation(url)
     }
 }
 
