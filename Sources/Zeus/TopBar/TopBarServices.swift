@@ -6,6 +6,17 @@ import ZeusCore
 
 /// Feeds `TopBarModel` from the system. Every source is optional: nothing here asks for a
 /// permission until the person opens the matching page and taps the button that needs it.
+final class ClipboardGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var watch = PasteboardWatch()
+
+    func note(_ count: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return watch.note(count)
+    }
+}
+
 @MainActor
 final class TopBarServices {
     let model: TopBarModel
@@ -16,6 +27,9 @@ final class TopBarServices {
     /// A voice timer ran out (the voice says so; the notch cue and sound play either way).
     var onTimerFinished: () -> Void = {}
     private var timers: [Timer] = []
+    private var clipboardTimer: DispatchSourceTimer?
+    private let clipboardWatch = ClipboardGate()
+    private var cooldownTask: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
     private var flagsMonitor: Any?
     private var capsOn = NSEvent.modifierFlags.contains(.capsLock)
@@ -72,7 +86,6 @@ final class TopBarServices {
 
         every(1) { [weak self] in self?.tickFocus() }
         every(60) { [weak self] in
-            self?.deliverBatteryOverlay()
             self?.refreshCalendarIfAllowed()
             self?.fetchWeather(force: false)
             self?.updateIntakeWatcher()
@@ -117,7 +130,16 @@ final class TopBarServices {
     // MARK: Clipboard (concealed and transient items, like passwords, are never kept)
 
     private func observeClipboard() {
-        every(0.5) { [weak self] in self?.checkClipboard() }
+        let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        timer.schedule(deadline: .now() + 2, repeating: 2)
+        timer.setEventHandler { [weak self] in
+            let count = NSPasteboard.general.changeCount
+            let changed = self?.clipboardWatch.note(count) ?? false
+            guard changed else { return }
+            Task { @MainActor in self?.checkClipboard() }
+        }
+        timer.resume()
+        clipboardTimer = timer
     }
 
     private func checkClipboard() {
@@ -296,6 +318,20 @@ final class TopBarServices {
             case .dismiss:
                 break
             }
+        }
+        armCooldown()
+    }
+
+    /// One wake when the cooldown ends. The power-source notification covers the charger edge.
+    private func armCooldown() {
+        cooldownTask?.cancel()
+        guard case .cooldown(let until) = batteryOverlay.phase else { return }
+        let delay = until - ProcessInfo.processInfo.systemUptime
+        guard delay > 0 else { return }
+        cooldownTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            self?.deliverBatteryOverlay()
         }
     }
 

@@ -6,8 +6,9 @@ public struct PasteboardWatch: Equatable, Sendable {
 
     public init(lastCount: Int = 0) { self.lastCount = lastCount }
 
-    /// The first cut always reports a change, including when the count did not move.
+    /// True only when the count moved. The caller reads the pasteboard on that wake.
     public mutating func note(_ count: Int) -> Bool {
+        guard count != lastCount else { return false }
         lastCount = count
         return true
     }
