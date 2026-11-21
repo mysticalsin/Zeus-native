@@ -45,7 +45,7 @@ struct HubReplyGateTests {
 
             log.record(gate.perform(.textChanged, sessionID: session, field: "hello there", destinationCanTakeText: true, trusted: trusted))
             log.record(gate.perform(.send, sessionID: session, field: "hello there", destinationCanTakeText: true, trusted: trusted))
-            let approved = gate.perform(.approved, sessionID: session, field: "ignored", destinationCanTakeText: true, trusted: trusted)
+            let approved = gate.perform(.approved, sessionID: session, field: "ignored", destinationCanTakeText: true, trusted: trusted, foreground: .agent)
             log.record(approved)
             #expect(log.lines == ["hello there"])
             #expect(approved.state.status == .sending)
@@ -134,8 +134,8 @@ struct HubReplyGateTests {
         #expect(trusted.asksInline)
         #expect(trusted.typedLine == nil)
         #expect(trusted.state.script == nil)
-        let trustedApproved = trustedGate.perform(.approved, sessionID: session, field: "keep going", destinationCanTakeText: true, trusted: true)
-        let plainApproved = plainGate.perform(.approved, sessionID: session, field: "keep going", destinationCanTakeText: true, trusted: false)
+        let trustedApproved = trustedGate.perform(.approved, sessionID: session, field: "keep going", destinationCanTakeText: true, trusted: true, foreground: .agent)
+        let plainApproved = plainGate.perform(.approved, sessionID: session, field: "keep going", destinationCanTakeText: true, trusted: false, foreground: .agent)
         #expect(trustedApproved == plainApproved)
         #expect(trustedApproved.typedLine == "keep going")
     }
@@ -192,25 +192,25 @@ struct HubReplyGateTests {
             destinationCanTakeText: true,
             trusted: true)
         #expect(messy.asksInline)
-        let approved = gate.perform(.approved, sessionID: session, field: "nope", destinationCanTakeText: true, trusted: false)
+        let approved = gate.perform(.approved, sessionID: session, field: "nope", destinationCanTakeText: true, trusted: false, foreground: .agent)
         #expect(approved.typedLine == "run the tests please")
 
         var long = HubReplyDispatch(boundSessionID: session)
         let huge = String(repeating: "a", count: 2_001)
         _ = long.perform(.send, sessionID: session, field: huge, destinationCanTakeText: true, trusted: false)
-        let capped = long.perform(.approved, sessionID: session, field: huge, destinationCanTakeText: true, trusted: true)
+        let capped = long.perform(.approved, sessionID: session, field: huge, destinationCanTakeText: true, trusted: true, foreground: .agent)
         #expect(capped.typedLine?.count == 2_000)
         #expect(capped.typedLine == String(repeating: "a", count: 2_000))
 
         var exact = HubReplyDispatch(boundSessionID: session)
         let full = String(repeating: "b", count: 2_000)
         _ = exact.perform(.send, sessionID: session, field: full, destinationCanTakeText: true, trusted: true)
-        #expect(exact.perform(.approved, sessionID: session, field: full, destinationCanTakeText: true, trusted: false).typedLine == full)
+        #expect(exact.perform(.approved, sessionID: session, field: full, destinationCanTakeText: true, trusted: false, foreground: .agent).typedLine == full)
 
         var injected = HubReplyDispatch(boundSessionID: session)
         let tail = String(repeating: "a", count: 2_000) + "\"; do shell script \"id"
         _ = injected.perform(.send, sessionID: session, field: tail, destinationCanTakeText: true, trusted: true)
-        let typed = injected.perform(.approved, sessionID: session, field: tail, destinationCanTakeText: true, trusted: true)
+        let typed = injected.perform(.approved, sessionID: session, field: tail, destinationCanTakeText: true, trusted: true, foreground: .agent)
         #expect(typed.typedLine == String(repeating: "a", count: 2_000))
         #expect(typed.typedLine?.contains("shell") == false)
 
@@ -237,7 +237,7 @@ struct HubReplyGateTests {
         let asked = gate.perform(.send, sessionID: session, field: line, destinationCanTakeText: true, trusted: true)
         #expect(asked.asksInline)
         #expect(asked.typedLine == nil)
-        let approved = gate.perform(.approved, sessionID: session, field: line, destinationCanTakeText: true, trusted: true)
+        let approved = gate.perform(.approved, sessionID: session, field: line, destinationCanTakeText: true, trusted: true, foreground: .agent)
         #expect(approved.typedLine == line)
         #expect(isScript(approved.typedLine ?? "") == false)
 
@@ -249,7 +249,7 @@ struct HubReplyGateTests {
         #expect(HubReplyScriptGuard.mayRun(script: doubled, line: "hi", approved: true) == false)
         let repeatedWord = "tell application \"Host\"\nwrite text \"Host\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: repeatedWord, line: "Host", approved: true))
-        #expect(HubReplyScriptGuard.mayRun(script: "do script \"\(escaped)\" in t\n", line: line, approved: true))
+        #expect(HubReplyScriptGuard.mayRun(script: "do script \"\(escaped)\" in t\n", line: line, approved: true) == false)
         let split = "write text \"hi\u{2028}\"\n"
         #expect(HubReplyScriptGuard.mayRun(script: split, line: "hi", approved: true) == false)
         #expect(HubReplyTyping.canType("hello\u{2029}there") == false)
@@ -283,8 +283,8 @@ struct HubReplyGateTests {
                             var trustedGate = make(status: status, draft: draft)
                             var plainGate = trustedGate
                             let field = event == .textChanged || event == .send ? draft : "next"
-                            let trustedStep = trustedGate.perform(event, sessionID: sessionID, field: field, destinationCanTakeText: destination, trusted: true)
-                            let plainStep = plainGate.perform(event, sessionID: sessionID, field: field, destinationCanTakeText: destination, trusted: false)
+                            let trustedStep = trustedGate.perform(event, sessionID: sessionID, field: field, destinationCanTakeText: destination, trusted: true, foreground: .agent)
+                            let plainStep = plainGate.perform(event, sessionID: sessionID, field: field, destinationCanTakeText: destination, trusted: false, foreground: .agent)
                             #expect(trustedStep == plainStep)
                             #expect(trustedGate == plainGate)
                             expectClosed(

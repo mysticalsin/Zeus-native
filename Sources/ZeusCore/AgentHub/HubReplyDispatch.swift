@@ -60,10 +60,14 @@ public struct HubReplyDispatch: Equatable, Sendable {
         sessionID: String,
         field: String,
         destinationCanTakeText: Bool,
-        trusted: Bool
+        trusted: Bool,
+        target: HubReplyTarget? = nil,
+        foreground: HubReplyForeground.Verdict? = nil
     ) -> Step {
         guard sessionID == boundSessionID, !sessionID.isEmpty else { return .hold(state) }
-        let context = HubReplyContext(text: field, destinationCanTakeText: destinationCanTakeText, trusted: trusted)
+        let context = HubReplyContext(
+            text: field, destinationCanTakeText: destinationCanTakeText, trusted: trusted,
+            target: target, foreground: foreground)
         switch event {
         case .textChanged:
             return edit(field, context: context)
@@ -108,6 +112,7 @@ public struct HubReplyDispatch: Equatable, Sendable {
         }
         let drafted = HubDecision.reply(HubReplyState(), .textChanged, context: context)
         guard drafted.script == nil, drafted.state.script == nil else { return failClosed(keeping: field) }
+        if HubReplyHidden.containsMark(field) { return refuse(keeping: field, receipt: .hiddenCharacter) }
         guard let cleaned = HubDecision.cleanedLine(field) else {
             return absorb(HubDecision.reply(drafted.state, .send, context: context))
         }
@@ -116,12 +121,26 @@ public struct HubReplyDispatch: Equatable, Sendable {
         }
         // A line that cannot be embedded must not reach the approval, or approval would release it.
         guard HubReplyTyping.canType(cleaned) else { return failClosed(keeping: field) }
-        return absorb(HubDecision.reply(drafted.state, .send, context: context))
+        var outcome = HubDecision.reply(drafted.state, .send, context: context)
+        if outcome.asksApproval { outcome.state.target = context.target }
+        return absorb(outcome)
     }
 
     private mutating func approve(context: HubReplyContext) -> Step {
         guard state.status == .awaitingDecision else {
             return absorb(HubDecision.reply(state, .approved, context: context))
+        }
+        if HubReplyHidden.containsMark(state.draft) { return refuse(keeping: state.draft, receipt: .hiddenCharacter) }
+        if let shown = state.target, let reason = HubReplyTargetGate.refusal(shown: shown, current: context.target) {
+            return refuse(keeping: state.draft, receipt: reason)
+        }
+        // A missing read is not an agent. Nothing is typed until the foreground is known.
+        guard let foreground = context.foreground else {
+            return refuse(keeping: state.draft, receipt: .foregroundUnknown)
+        }
+        if foreground != .agent {
+            let receipt: HubReplyReceipt = foreground == .bareShell ? .bareShell : .foregroundUnknown
+            return refuse(keeping: state.draft, receipt: receipt)
         }
         guard let preview = HubDecision.cleanedLine(state.draft) else {
             return absorb(HubDecision.reply(state, .approved, context: context))
@@ -133,7 +152,12 @@ public struct HubReplyDispatch: Equatable, Sendable {
     }
 
     private mutating func failClosed(keeping field: String) -> Step {
-        state = HubReplyState(status: .idle, draft: field, receipt: .notSent, script: nil)
+        refuse(keeping: field, receipt: .notSent)
+    }
+
+    /// The draft stays, including any hidden character. Nothing is asked and nothing is typed.
+    private mutating func refuse(keeping field: String, receipt: HubReplyReceipt) -> Step {
+        state = HubReplyState(status: .idle, draft: field, receipt: receipt, script: nil)
         return .hold(state)
     }
 
@@ -169,7 +193,7 @@ public enum HubReplyTyping {
     public static let maxLength = 2_000
 
     public static func canType(_ line: String) -> Bool {
-        guard !line.isEmpty, line.count <= maxLength else { return false }
+        guard !line.isEmpty, line.count <= maxLength, !HubReplyHidden.containsMark(line) else { return false }
         return line.unicodeScalars.allSatisfy { !isBreak($0) }
     }
 
@@ -221,29 +245,111 @@ public enum HubReplyTyping {
 }
 
 /// The last check before a script is executed. `approved` false never passes, including a well-formed script.
+/// Terminal may type only the stripped line, as literal keystrokes, and then Return.
+/// `do script` is not a Terminal reply. iTerm may still `write text` that same line, once.
 public enum HubReplyScriptGuard {
     public static func mayRun(script: String, line: String, approved: Bool) -> Bool {
         guard approved, let escaped = HubReplyTyping.escape(line) else { return false }
+        guard !HubReplyHidden.containsMark(line) else { return false }
+        guard AgentReply.sanitize(line) == line else { return false }
         guard script.unicodeScalars.allSatisfy({ !isStructuralBreak($0) }) else { return false }
-        // Match the typed-text call, not every quoted word. A reply can repeat a word the
-        // surrounding script already quotes. Exactly one call, and nothing else may type.
-        let wrappers = [
-            "do script \"\(escaped)\"",
-            "write text \"\(escaped)\"",
-        ]
-        var hits = 0
-        var remainder = script
-        for wrapper in wrappers {
-            let parts = remainder.components(separatedBy: wrapper)
-            hits += parts.count - 1
-            remainder = parts.joined()
+        if let expected = literalKeystrokes(line), expected == typingLines(script) { return true }
+        return acceptsWriteText(script: script, escaped: escaped)
+    }
+
+    /// The Return script, and nothing else that types. Frontmost was checked again in the script before Return.
+    public static func maySubmit(script: String, approved: Bool) -> Bool {
+        guard approved else { return false }
+        guard typingLines(script) == ["keystroke return"] else { return false }
+        guard let key = script.range(of: "keystroke return") else { return false }
+        let before = script[..<key.lowerBound]
+        return before.contains("frontmost") && before.contains("return false")
+    }
+
+    /// The keystroke lines Z-03 builds: each chunk of the stripped line. Return is a separate script.
+    private static func literalKeystrokes(_ line: String) -> [String]? {
+        let pieces = KeystrokeTyping.pieces(line, limit: 20)
+        guard !pieces.isEmpty else { return nil }
+        var statements: [String] = []
+        for piece in pieces {
+            guard case .text(let chunk) = piece, !chunk.isEmpty, let escaped = HubReplyTyping.escape(chunk) else { return nil }
+            statements.append("keystroke \"\(escaped)\"")
         }
-        guard hits == 1 else { return false }
-        let blocked = ["do shell script", "shell script", "keystroke", "key code", "key down", "key up", "System Events"]
-        for phrase in blocked where remainder.contains(phrase) {
+        return statements
+    }
+
+    /// Lines that type, run a script, or press a key. The tab-selection boilerplate is not in this list.
+    /// Markers are matched on case-folded, compatibility-normalized text so `Do script` and a
+    /// nonbreaking space cannot hide a command beside an otherwise exact keystroke list.
+    private static func typingLines(_ script: String) -> [String] {
+        let markers = ["keystroke", "key code", "key down", "key up", "do script", "do shell script", "write text"]
+        return script.split(separator: "\n", omittingEmptySubsequences: false).map {
+            $0.trimmingCharacters(in: .whitespaces)
+        }.filter { row in
+            markers.contains { containsCommand(row, marker: $0) }
+        }
+    }
+
+    /// NFKC, case-folded, then NFD so a composed accent becomes a mark. Format characters,
+    /// nonspacing marks, and zero-width glue are removed.
+    /// Spaces collapse to one ASCII space. Matching also ignores those spaces, so a dotted I,
+    /// a combining mark, or a zero-width joiner cannot hide a command.
+    static func normalizedCommand(_ text: String) -> String {
+        let folded = text.precomposedStringWithCompatibilityMapping
+            .lowercased()
+            .decomposedStringWithCanonicalMapping
+        var output = ""
+        var pendingSpace = false
+        var started = false
+        for scalar in folded.unicodeScalars {
+            if isIgnoredMark(scalar) { continue }
+            let isSpace = scalar.properties.generalCategory == .spaceSeparator
+                || scalar.value == 0x09 || scalar.value == 0x0A || scalar.value == 0x0D
+            if isSpace {
+                if started { pendingSpace = true }
+                continue
+            }
+            if pendingSpace {
+                output.append(" ")
+                pendingSpace = false
+            }
+            started = true
+            output.append(Character(scalar))
+        }
+        return output
+    }
+
+    static func containsCommand(_ text: String, marker: String) -> Bool {
+        let normalized = normalizedCommand(text)
+        if normalized.contains(marker) { return true }
+        let tight = normalized.replacingOccurrences(of: " ", with: "")
+        let tightMarker = marker.replacingOccurrences(of: " ", with: "")
+        return !tightMarker.isEmpty && tight.contains(tightMarker)
+    }
+
+    private static func isIgnoredMark(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.properties.generalCategory {
+        case .format, .nonspacingMark:
+            return true
+        default:
+            break
+        }
+        switch scalar.value {
+        case 0x034F, 0x180E, 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF:
+            return true
+        default:
             return false
         }
-        return true
+    }
+
+    /// iTerm's one `write text` of the escaped line. Anything else that types, including `do script`, fails.
+    private static func acceptsWriteText(script: String, escaped: String) -> Bool {
+        let wrapper = "write text \"\(escaped)\""
+        let parts = script.components(separatedBy: wrapper)
+        guard parts.count - 1 == 1 else { return false }
+        let remainder = parts.joined()
+        let blocked = ["do script", "do shell script", "shell script", "keystroke", "key code", "key down", "key up", "system events", "write text"]
+        return blocked.allSatisfy { !containsCommand(remainder, marker: $0) }
     }
 
     private static func isStructuralBreak(_ scalar: Unicode.Scalar) -> Bool {

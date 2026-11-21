@@ -48,10 +48,14 @@ final class AgentHub {
     /// Inline approval for the selected row. Trust does not set this by itself.
     var replyNeedsApproval: Bool { replyGate.state.status == .awaitingDecision }
     var replyPhase: HubReplyStatus { replyGate.state.status }
+    /// The app and tty the pending reply will type into. Nil until that reply asks.
+    var replyTarget: HubReplyTarget? { replyGate.state.target }
 
     /// The injected steps of the reply path. Tests and previews replace the runner.
     /// The bundled `send` is not called: its approval closure refuses, so it cannot type.
     @ObservationIgnored var sender: AgentReplySender?
+    /// Tests supply the foreground process name. Production reads it with AppleScript.
+    @ObservationIgnored var foregroundProbe: ((TerminalInfo) -> String?)?
     @ObservationIgnored private var syncingReply = false
     @ObservationIgnored private var replyGate = HubReplyDispatch()
     @ObservationIgnored private var replyTimeout: Task<Void, Never>?
@@ -66,12 +70,14 @@ final class AgentHub {
         guard session.id == selectedSession, !session.id.isEmpty else { return }
         guard replyGate.state.status != .sending else { return }
         let wasAwaiting = replyGate.state.status == .awaitingDecision
+        let target = HubReplyTarget.make(info: AgentTerminals.shared.info(for: session.id), agent: session.agent)
         let step = replyGate.perform(
             .send,
             sessionID: session.id,
             field: replyDraft,
             destinationCanTakeText: canReply(to: session.id),
-            trusted: replyIsTrusted(session.id))
+            trusted: replyIsTrusted(session.id),
+            target: target)
         publish(step, wasAwaiting: wasAwaiting)
     }
 
@@ -79,12 +85,21 @@ final class AgentHub {
     func approveReply() async {
         guard let session = selectedSession, !session.isEmpty else { return }
         guard replyGate.state.status == .awaitingDecision else { return }
+        let info = (sender ?? liveSender).terminal(session)
+        let fresh = HubReplyTarget.make(info: info, agent: "")
+        if let shown = replyTarget {
+            _ = HubReplyTargetGate.refusal(shown: shown, current: fresh)
+        }
+        let expected = replyTarget?.expectedCLI ?? []
+        let verdict = foregroundVerdict(info: info, expected: expected)
         let step = replyGate.perform(
             .approved,
             sessionID: session,
             field: replyDraft,
             destinationCanTakeText: canReply(to: session),
-            trusted: replyIsTrusted(session))
+            trusted: replyIsTrusted(session),
+            target: fresh,
+            foreground: verdict)
         publish(step, wasAwaiting: true)
         guard let line = step.typedLine, step.sessionID == session else { return }
         let typed = await typeApprovedLine(line, sessionID: session)
@@ -163,13 +178,42 @@ final class AgentHub {
         guard HubReplyTyping.canType(line) else { return false }
         let typer = sender ?? liveSender
         guard let info = typer.terminal(sessionID) else { return false }
-        guard let script = AgentReply.script(for: info, text: line) else { return false }
-        guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
-        guard sessionID == selectedSession else { return false }
+        let expected = replyGate.state.target?.expectedCLI ?? []
         if let sender {
+            guard let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return false }
+            guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
+            guard sessionID == selectedSession else { return false }
             return await sender.run(script)
         }
-        return await Self.runGuardedScript(script)
+        let allowed = allowedAgentPaths(expected)
+        let appName = replyAppName(info)
+        let before = foregroundSnapshot(info, frontmost: nil)
+        guard HubReplyJobGuard.mayType(
+            snapshot: before, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
+        guard let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return false }
+        guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
+        guard sessionID == selectedSession else { return false }
+        // iTerm's write text submits, so the second process-group read is immediately before that script.
+        // Terminal types the chunks first, then reads again before Return. Neither bundle skips the second read.
+        if info.targetBundleID != "com.apple.Terminal" {
+            let after = foregroundSnapshot(info, frontmost: NSWorkspace.shared.frontmostApplication?.localizedName)
+            guard HubReplyJobGuard.maySubmit(
+                before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
+            guard sessionID == selectedSession else { return false }
+            return await Self.runGuardedScript(script)
+        }
+        guard await Self.runGuardedScript(script) else { return false }
+        let after = foregroundSnapshot(info, frontmost: NSWorkspace.shared.frontmostApplication?.localizedName)
+        guard HubReplyJobGuard.maySubmit(
+            before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed) else { return false }
+        guard let submit = AgentReply.submitScript(
+            for: info,
+            verified: HubReplyJobGuard.maySubmit(
+                before: before, after: after, expectedApp: appName, expectedCLI: expected, allowedPaths: allowed)
+        ) else { return false }
+        guard HubReplyScriptGuard.maySubmit(script: submit, approved: true) else { return false }
+        guard sessionID == selectedSession else { return false }
+        return await Self.runGuardedScript(submit)
     }
 
     private var liveSender: AgentReplySender {
@@ -178,6 +222,44 @@ final class AgentHub {
             terminal: { session in MainActor.assumeIsolated { AgentTerminals.shared.info(for: session) } },
             approve: { _, _ in false },
             run: { script in await Self.runGuardedScript(script) })
+    }
+
+    /// Production reads the tty foreground process group. An injected sender uses the test probe.
+    private func foregroundVerdict(info: TerminalInfo?, expected: Set<String>) -> HubReplyForeground.Verdict? {
+        if sender != nil {
+            guard foregroundProbe != nil else { return nil }
+            let name = info.flatMap { foregroundProbe?($0) }
+            return HubReplyForeground.verdict(name: name, expected: expected)
+        }
+        guard let info else { return .unknown }
+        return HubReplyJobGuard.verdict(
+            snapshot: foregroundSnapshot(info, frontmost: nil),
+            expectedApp: replyAppName(info),
+            expectedCLI: expected,
+            allowedPaths: allowedAgentPaths(expected))
+    }
+
+    private func replyAppName(_ info: TerminalInfo) -> String {
+        switch info.targetBundleID {
+        case "com.apple.Terminal": "Terminal"
+        case "com.googlecode.iterm2": "iTerm2"
+        default: info.targetBundleID ?? ""
+        }
+    }
+
+    /// `frontmost` is nil before the typing script activates the terminal. The second read passes the live app.
+    private func foregroundSnapshot(_ info: TerminalInfo, frontmost: String?) -> HubReplyTTYSnapshot {
+        guard let tty = info.tty else {
+            return HubReplyTTYSnapshot(frontmostApp: frontmost, foregroundPgid: nil, processes: [])
+        }
+        return HubReplyTTYReader.read(tty: tty, frontmostApp: frontmost)
+    }
+
+    /// Paths of the expected CLIs. The foreground pid's executable must resolve onto this set.
+    private func allowedAgentPaths(_ expected: Set<String>) -> Set<String> {
+        Set(CLILocator.tools.compactMap { tool in
+            expected.contains(tool.name) ? CLILocator.locate(tool) : nil
+        })
     }
 
     private static func runGuardedScript(_ script: String) async -> Bool {

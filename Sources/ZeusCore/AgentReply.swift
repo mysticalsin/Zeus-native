@@ -7,14 +7,21 @@ import Foundation
 public enum AgentReply {
     public static let maxLength = 2000
 
-    /// One line, no control characters. Nil when nothing is left to send.
+    /// One line, no control characters and no newlines. Nil when nothing is left to send.
     public static func sanitize(_ text: String) -> String? {
         let flat = text.unicodeScalars.map { scalar -> Character in
-            scalar.value < 0x20 || scalar.value == 0x7F ? " " : Character(scalar)
+            isStripped(scalar) ? " " : Character(scalar)
         }
         let line = String(flat).split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
         guard !line.isEmpty else { return nil }
         return String(line.prefix(maxLength))
+    }
+
+    /// C0 and C1 controls, DEL, and Unicode newlines. They are not typed.
+    private static func isStripped(_ scalar: Unicode.Scalar) -> Bool {
+        if scalar.value < 0x20 || scalar.value == 0x7F { return true }
+        if (0x80...0x9F).contains(scalar.value) { return true }
+        return CharacterSet.newlines.contains(scalar)
     }
 
     /// Whether ZEUS can type into this terminal.
@@ -23,19 +30,36 @@ public enum AgentReply {
         return script(for: info, text: "x") != nil
     }
 
-    /// The AppleScript that types `text` and Return into the session's exact tab.
-    public static func script(for info: TerminalInfo, text: String) -> String? {
-        guard let line = sanitize(text) else { return nil }
-        let escaped = line.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    /// The AppleScript that types `text` into the session's exact tab. Return is `submitScript`, so the caller
+    /// can read the tty foreground process group again before Return. A line is at most 2,000 characters,
+    /// which is 100 keystroke chunks of 20 UTF-16 units.
+    /// Immediately before the first keystroke the script checks that Terminal is frontmost and that the front
+    /// tab's tty is still the stored tty. It does not guess a foreground process from `processes`.
+    /// iTerm checks the front app, the tty, and `jobName` immediately before `write text`.
+    public static func script(for info: TerminalInfo, text: String, expectedCLI: Set<String> = []) -> String? {
+        guard let line = sanitize(text), !HubReplyHidden.containsMark(line) else { return nil }
+        let escaped = appleScriptString(line)
         switch info.targetBundleID {
         case "com.apple.Terminal":
             guard let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
+            let strokes = literalKeystrokes(line)
+            guard !strokes.isEmpty else { return nil }
             return """
             tell application "Terminal"
                 repeat with w in windows
                     repeat with t in tabs of w
                         if tty of t is "\(tty)" then
-                            do script "\(escaped)" in t
+                            set selected of t to true
+                            set index of w to 1
+                            activate
+                            if frontmost is false then return false
+                            if (tty of selected tab of front window) is not "\(tty)" then return false
+                            tell application "System Events"
+                                if (name of first application process whose frontmost is true) is not "Terminal" then return false
+                                tell process "Terminal"
+                                    \(strokes)
+                                end tell
+                            end tell
                             return true
                         end if
                     end repeat
@@ -49,12 +73,24 @@ public enum AgentReply {
             guard uuid != nil || tty != nil else { return nil }
             let test = [uuid.map { "unique id of s is \"\($0)\"" }, tty.map { "tty of s is \"\($0)\"" }]
                 .compactMap { $0 }.joined(separator: " or ")
+            let ttyAgain = tty.map { "if tty of s is not \"\($0)\" then return false" } ?? ""
+            let names = expectedCLI.compactMap(TerminalTabScript.safe).sorted()
+            let jobCheck = names.isEmpty
+                ? "return false"
+                : """
+                set fg to variable named "jobName" of s as text
+                if fg is "" then return false
+                if not (\(names.map { "fg is \"\($0)\"" }.joined(separator: " or "))) then return false
+                """
             return """
             tell application "iTerm2"
                 repeat with w in windows
                     repeat with t in tabs of w
                         repeat with s in sessions of t
                             if \(test) then
+                                if frontmost is false then return false
+                                \(ttyAgain)
+                                \(jobCheck)
                                 tell s to write text "\(escaped)"
                                 return true
                             end if
@@ -67,6 +103,40 @@ public enum AgentReply {
         default:
             return nil
         }
+    }
+
+    /// Return, after a fresh frontmost and tty check.
+    /// `verified` is the process-group read taken immediately before this script. A false read produces no script.
+    public static func submitScript(for info: TerminalInfo, verified: Bool = true) -> String? {
+        guard verified else { return nil }
+        guard info.targetBundleID == "com.apple.Terminal", let tty = info.tty.flatMap(TerminalTabScript.safe) else { return nil }
+        return """
+        tell application "Terminal"
+            if frontmost is false then return false
+            if (tty of selected tab of front window) is not "\(tty)" then return false
+            tell application "System Events"
+                if (name of first application process whose frontmost is true) is not "Terminal" then return false
+                tell process "Terminal"
+                    keystroke return
+                end tell
+            end tell
+            return true
+        end tell
+        return false
+        """
+    }
+
+    /// Escapes a line for a double-quoted AppleScript string.
+    private static func appleScriptString(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    /// Literal keystrokes, each at most 20 UTF-16 units. Controls and newlines are already gone.
+    private static func literalKeystrokes(_ line: String) -> String {
+        KeystrokeTyping.pieces(line, limit: 20).compactMap { piece -> String? in
+            guard case .text(let chunk) = piece, !chunk.isEmpty else { return nil }
+            return "keystroke \"\(appleScriptString(chunk))\""
+        }.joined(separator: "\n")
     }
 }
 
@@ -99,7 +169,8 @@ public struct AgentReplySender: Sendable {
     @MainActor
     public func send(_ text: String, to session: String, agent: String) async -> AgentReplyOutcome {
         guard let line = AgentReply.sanitize(text) else { return .empty }
-        guard let info = terminal(session), let script = AgentReply.script(for: info, text: line) else { return .unsupported }
+        let expected = HubReplyForeground.expectedCLI(agent: agent)
+        guard let info = terminal(session), let script = AgentReply.script(for: info, text: line, expectedCLI: expected) else { return .unsupported }
         guard await approve(agent, line) else { return .declined }
         return await run(script) ? .sent : .failed
     }
