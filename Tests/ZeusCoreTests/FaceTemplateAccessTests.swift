@@ -253,6 +253,25 @@ struct FaceTemplateAccessTests {
         #expect(!FaceTemplateDomainGate.denies(stored: nil, evaluation: .succeeded(stored)))
     }
 
+    @Test func emptyDomainStateIsUnavailableAndIsNeverStored() {
+        let stored = Data("epoch-a".utf8)
+        let empty = Data()
+        #expect(FaceTemplateDomainGate.denies(stored: stored, evaluation: .succeeded(empty)))
+        #expect(FaceTemplateDomainGate.denies(stored: empty, evaluation: .succeeded(empty)))
+        #expect(FaceTemplateDomainGate.denies(stored: nil, evaluation: .succeeded(empty)))
+        #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .succeeded(empty)) == .denyKeep)
+        #expect(FaceTemplateEpochWrite.kept(existing: stored, next: empty, succeeded: true) == stored)
+        #expect(FaceTemplateEpochWrite.kept(existing: nil, next: empty, succeeded: true) == nil)
+    }
+
+    @Test func unavailableCurrentStateDeniesWithoutDeleting() {
+        let stored = Data("epoch-a".utf8)
+        #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .failed) == .denyKeep)
+        #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .succeeded(nil)) == .denyKeep)
+        #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .succeeded(Data())) == .denyKeep)
+        #expect(FaceTemplateDomainGate.effect(stored: stored, evaluation: .succeeded(Data("epoch-b".utf8)), enrolled: true) == .changedDelete)
+    }
+
     @Test func failedEpochAddKeepsThePreviousRecord() {
         let existing = Data("epoch-a".utf8)
         let next = Data("epoch-b".utf8)
