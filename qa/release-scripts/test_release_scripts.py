@@ -15,17 +15,40 @@ import unittest
 
 REPO = Path(__file__).resolve().parents[2]
 MOCK = r'''
-import json, os, pathlib, shutil, sys
+import json, os, pathlib, re, shutil, sys
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
+logged = []
+redact = False
+for arg in args:
+    if redact:
+        logged.append("REDACTED")
+        redact = False
+    elif name == "security" and arg == "-p":
+        logged.append(arg)
+        redact = True
+    else:
+        logged.append(arg)
 with open(os.environ["ZEUS_TEST_LOG"], "a") as log:
-    log.write(json.dumps([name] + args) + "\n")
+    log.write(json.dumps([name] + logged) + "\n")
+
+def pinned(constant, fallback):
+    script = pathlib.Path(os.environ["ZEUS_TEST_ROOT"]) / "scripts/verify-release-signature.sh"
+    text = script.read_text() if script.exists() else ""
+    match = re.search(r'^' + constant + r'="([^"]*)"', text, re.M)
+    return match.group(1) if match else fallback
+
 if name == "codesign" and "--display" in args:
     state = os.environ.get("SIGNATURE_STATE", "valid")
+    team = "OTHERTEAM1" if state == "wrong-team" else pinned("EXPECTED_TEAM_ID", "TEST123456")
+    bundle = "com.example.notzeus" if state == "wrong-bundle" else pinned("EXPECTED_BUNDLE_ID", "app.zeus.mac")
+    print("Identifier=" + bundle)
     print("Authority=" + ("Developer ID Application: Test" if state != "adhoc" else "Zeus Local Dev"))
-    print("TeamIdentifier=TEST123456")
+    print("TeamIdentifier=" + team)
     print("CodeDirectory v=20500 size=1 flags=" + ("0x10000(runtime)" if state != "no-runtime" else "0x0(none)"))
     if state != "no-timestamp": print("Timestamp=Nov 9, 2026")
+elif name == "security" and args[:2] == ["find-identity", "-p"] and "codesigning" in args:
+    print('  1) AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "Zeus Local Dev"')
 elif name == "ditto":
     if os.environ.get("FAIL_BACKUP") == "1" and "Rollbacks" in args[-1]: sys.exit(1)
     if "-c" in args: pathlib.Path(args[-1]).write_text("zip")
@@ -68,7 +91,7 @@ class ReleaseScripts(unittest.TestCase):
         self.log = self.root / "commands.jsonl"
         self.bin = self.root / "bin"
         self.bin.mkdir()
-        for command in ("codesign", "ditto", "hdiutil", "xcrun", "spctl", "plutil", "pgrep", "mv", "rm", "defaults", "xcode-select", "swift", "npm", "plistbuddy"):
+        for command in ("codesign", "ditto", "hdiutil", "xcrun", "spctl", "plutil", "pgrep", "mv", "rm", "defaults", "xcode-select", "swift", "npm", "plistbuddy", "security"):
             path = self.bin / command
             path.write_text(f"#!{sys.executable}\n" + MOCK)
             path.chmod(0o755)
@@ -224,6 +247,39 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         displayed = [c for c in self.commands() if c[:2] == ["codesign", "--display"] and c[-1] == str(extra)]
         self.assertEqual(displayed, [["codesign", "--display", "--verbose=4", str(extra)]])
+
+    def test_release_signature_pins_team_bundle_and_verifies_the_helper(self):
+        app = self.app(self.root / "build/Zeus.app", "new-app")
+        extra = app / "Contents/Resources/zeus-now-playing"
+        extra.parent.mkdir(parents=True)
+        extra.write_text("helper")
+        extra.chmod(0o755)
+        for state in ("wrong-team", "wrong-bundle"):
+            with self.subTest(state=state):
+                self.log.write_text("")
+                result = self.run_script("verify-release-signature.sh", app, SIGNATURE_STATE=state)
+                self.assertNotEqual(result.returncode, 0, result.stderr)
+        self.log.write_text("")
+        result = self.run_script("verify-release-signature.sh", app)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(["codesign", "--verify", "--strict", str(extra)], self.commands())
+
+    def test_dev_partition_list_omits_the_resource_helper_cdhash(self):
+        # The helper reads MediaRemote and prints text. It does not open the Keychain, so its cdhash
+        # must not be added to the dev partition list. The keychain file below is an empty fixture.
+        self.bundle_fixture()
+        home = self.root / "home"
+        keychain = home / "Library/Keychains"
+        keychain.mkdir(parents=True)
+        (keychain / "zeus-dev.keychain-db").write_text("fixture-keychain")
+        (home / ".zeus").mkdir()
+        (home / ".zeus/devkeychain.pass").write_text("fixture-pass\n")
+        (home / ".zeus-dev/codesign").mkdir(parents=True)
+        result = self.run_script("bundle.sh", HOME=str(home))
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        targets = [Path(c[-1]).name for c in self.commands() if c[:2] == ["codesign", "-dvvv"]]
+        self.assertIn("Zeus", targets)
+        self.assertNotIn("zeus-now-playing", targets)
 
     def test_installer_keeps_verified_rollback(self):
         source, target = self.install_fixture()
