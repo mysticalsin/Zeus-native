@@ -104,13 +104,10 @@ struct SecBundledHelperSignature: BundledHelperSignatureChecking, BundledHelperA
         }
         return Facts(team: string(kSecCodeInfoTeamIdentifier),
                      identifier: string(kSecCodeInfoIdentifier),
-                     leafSHA1: leafData.map { hex(Insecure.SHA1.hash(data: $0)) },
+                     leafSHA1: leafData.map { BundledHelperLaunchPolicy.asciiHex(Insecure.SHA1.hash(data: $0)) },
                      isAdHoc: codeFlags & adHocFlag != 0)
     }
 
-    private static func hex<S: Sequence>(_ bytes: S) -> String where S.Element == UInt8 {
-        bytes.map { String(format: "%02x", $0) }.joined()
-    }
 }
 
 enum BundledHelperLaunchLog {

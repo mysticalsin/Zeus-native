@@ -31,6 +31,7 @@ public enum BundledHelperPublish {
         }
         let hadDestination = files.fileExists(atPath: destination.path)
         let previousBridge = hadDestination ? try? Data(contentsOf: destination) : nil
+        let previousMode = (try? files.attributesOfItem(atPath: destination.path)[.posixPermissions] as? NSNumber)?.uint16Value ?? 0o755
         let hadRegistration = files.fileExists(atPath: registration.path)
         let previousRegistration = hadRegistration ? try? Data(contentsOf: registration) : nil
         do {
@@ -40,12 +41,12 @@ public enum BundledHelperPublish {
                 try writeRegistration()
             } catch {
                 if let previousBridge {
-                    try? restore(previousBridge, to: destination)
+                    try? restore(previousBridge, to: destination, mode: previousMode)
                 } else {
                     try? files.removeItem(at: destination)
                 }
                 if let previousRegistration {
-                    try? restore(previousRegistration, to: registration)
+                    try? restore(previousRegistration, to: registration, mode: 0o644)
                 } else if files.fileExists(atPath: registration.path) {
                     try? files.removeItem(at: registration)
                 }
@@ -70,9 +71,10 @@ public enum BundledHelperPublish {
         if result != 0 { throw CocoaError(.fileWriteUnknown) }
     }
 
-    private static func restore(_ data: Data, to url: URL) throws {
+    private static func restore(_ data: Data, to url: URL, mode: UInt16) throws {
         let temporary = url.appendingPathExtension("restore")
         try data.write(to: temporary, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: temporary.path)
         try replaceFile(url, with: temporary)
     }
 }

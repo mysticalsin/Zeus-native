@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 /// What to do with Zeus's own native-messaging host file after a bridge signature check.
 /// Other host files in the same directory are never named here.
@@ -41,7 +46,7 @@ public enum NativeHostRegistration {
     public static func apply(action: Action, in directory: URL, remove: (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }) -> Outcome {
         guard action == .remove else { return .kept }
         let url = directory.appendingPathComponent(zeusHostFileName)
-        guard FileManager.default.fileExists(atPath: url.path) else { return .removed }
+        guard nodeExists(url.path) else { return .removed }
         do {
             try remove(url)
             return .removed
@@ -63,6 +68,12 @@ public enum NativeHostRegistration {
         let chosen = action(decision: decision, checkedPath: checkedPath, manifestFileName: zeusHostFileName,
                             manifestExecutablePath: named, passedPaths: passedPaths)
         return apply(action: chosen, in: hostsDirectory, remove: remove)
+    }
+
+    /// `fileExists` follows links and reports a dangling symlink as absent.
+    private static func nodeExists(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0
     }
 
     private static func executablePath(in file: URL) -> String? {

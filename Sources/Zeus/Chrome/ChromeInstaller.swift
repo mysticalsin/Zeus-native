@@ -76,37 +76,39 @@ enum ChromeInstaller {
             throw error
         }
         let path = bridgeExecutable.path
-        guard BundledHelperLaunchPolicy.executableToPublish(checkedPath: path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier) == path else {
+        let decision = BundledHelperLaunch.decide(path: path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier)
+        guard BundledHelperLaunchPolicy.mayStage(bundlePath: path, decision: decision) else {
+            BundledHelperLaunchLog.refused(path: path)
             throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
         }
         let directory = ZeusPaths.binDirectory
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let staged = directory.appendingPathComponent("zeus-bridge.new")
-        try? FileManager.default.removeItem(at: staged)
-        try FileManager.default.copyItem(at: bridgeExecutable, to: staged)
-        let registration = ZeusPaths.chromeNativeHostManifest
-        let manifest = try manifestData(path: path)
-        let outcome = BundledHelperPublish.replaceIfAccepted(
-            staged: staged,
-            destination: directory.appendingPathComponent(BundledHelperLaunchPolicy.bridgeSigningIdentifier),
-            registration: registration,
-            accept: { url in
-                let checked = BundledHelperLaunch.decide(path: url.path, signingIdentifier: BundledHelperLaunchPolicy.bridgeSigningIdentifier)
-                guard BundledHelperLaunchPolicy.publishedExecutable(checkedPath: url.path, helperName: BundledHelperLaunchPolicy.bridgeSigningIdentifier, decision: checked) == url.path else {
-                    BundledHelperLaunchLog.refused(path: url.path)
-                    return false
-                }
-                return true
-            },
-            writeRegistration: {
-                try FileManager.default.createDirectory(at: registration.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try manifest.write(to: registration, options: .atomic)
-            })
-        if case .failure = outcome {
-            throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
+        do {
+            try? FileManager.default.removeItem(at: staged)
+            try FileManager.default.copyItem(at: bridgeExecutable, to: staged)
+            let registration = ZeusPaths.chromeNativeHostManifest
+            let manifest = try manifestData(path: path)
+            let outcome = BundledHelperPublish.replaceIfAccepted(
+                staged: staged,
+                destination: directory.appendingPathComponent(BundledHelperLaunchPolicy.bridgeSigningIdentifier),
+                registration: registration,
+                accept: { _ in
+                    BundledHelperLaunchPolicy.mayStage(bundlePath: path, decision: decision)
+                },
+                writeRegistration: {
+                    try FileManager.default.createDirectory(at: registration.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try manifest.write(to: registration, options: .atomic)
+                })
+            if case .failure = outcome {
+                throw InstallError.helperRefused(BundledHelperLaunchPolicy.refusalSentence)
+            }
+            try refreshExtension()
+            removeSupportCopy()
+        } catch {
+            try? FileManager.default.removeItem(at: staged)
+            throw error
         }
-        try refreshExtension()
-        removeSupportCopy()
     }
 
     private static func manifestData(path: String) throws -> Data {
