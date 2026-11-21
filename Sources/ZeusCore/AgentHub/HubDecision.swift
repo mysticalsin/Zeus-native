@@ -97,6 +97,9 @@ public enum HubDecision {
         return String(line.prefix(2_000))
     }
 
+    /// Waiting approvals behind the one on screen. A further request is left unchanged.
+    static let maxWaiting = 40
+
     private static func enqueue(_ queue: HubApprovalQueue, _ request: HubApprovalRequest?) -> HubApprovalOutcome {
         guard let request, isBound(request) else { return .unchanged(queue) }
         if queue.showing?.id == request.id || queue.waiting.contains(where: { $0.id == request.id }) {
@@ -108,6 +111,7 @@ public enum HubDecision {
         if step.status == .showing, step.verdict == nil, queue.showing == nil, queue.waiting.isEmpty {
             next.showing = request
         } else if step.status == .queued, step.verdict == nil {
+            if next.waiting.count >= Self.maxWaiting { return .unchanged(queue) }
             next.waiting.append(request)
         } else {
             return .unchanged(queue)
