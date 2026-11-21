@@ -62,6 +62,9 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     private(set) var lastElevenModel: String?
     private var lastElevenStatus: Int?
     private var systemVoices: [String: AVSpeechSynthesisVoice?] = [:]
+    private var talkRegistration = TalkKeyRegistration()
+    private var talkToken: Int?
+    private var talkKeyObserver: NSObjectProtocol?
 
     /// Apple's own default speaking rate: the premium voices are tuned for it.
     nonisolated static let systemRate = AVSpeechUtteranceDefaultSpeechRate
@@ -69,11 +72,20 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
     /// Posted when the talk key goes down. The first one warms the engine the next reply will use.
     nonisolated static let talkKeyPressed = Notification.Name("app.zeus.voice.talkKeyPressed")
 
-    init(languageCode: String) {
+    init(languageCode: String, observesTalkKey: Bool = true) {
         voice = Self.bestVoice(for: languageCode)
-        NotificationCenter.default.addObserver(forName: Self.talkKeyPressed, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.prewarm() }
+        talkToken = talkRegistration.register(subscribes: observesTalkKey)
+        if observesTalkKey {
+            talkKeyObserver = NotificationCenter.default.addObserver(forName: Self.talkKeyPressed, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.prewarm() }
+            }
         }
+    }
+
+    isolated deinit {
+        talkRegistration.unregister(talkToken)
+        if let talkKeyObserver { NotificationCenter.default.removeObserver(talkKeyObserver) }
+    }
         let fallback = voice.map { "\($0.name) \(Self.qualityName($0.quality))" } ?? "none found"
         NSLog("[ZEUS] voice: ready engines=%@ fallback=system %@", VoiceSettings.shared.routeDecisions().map(\.engine.logName).joined(separator: ","), fallback)
     }
