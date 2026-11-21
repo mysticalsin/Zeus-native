@@ -8724,6 +8724,18 @@
         "file": "Tests/ZeusCoreTests/TabHoldPolicyTests.swift",
         "function": "tabDownModifiersAndReleaseReachTheGate"
       }
+    },
+    {
+      "id": "REG-995",
+      "failure": "The notch opened on a single click and treated a drag as a file drag. It never emitted pointer down, up, hold, settle, or right-swipe samples, so a later gesture router had nothing to read.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchGestureAdapterTests.swift",
+        "function": "syntheticTimingsEmitDownHoldUpSettleAndRightSwipe"
+      }
     }
   ]
 }
