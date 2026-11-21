@@ -437,8 +437,19 @@ final class RecordlyController {
     func pressRecord(topBar: TopBarModel?) {
         guard phase == .idle else { return }
         countdownTopBar = topBar
+        let devicePhase = RecordlyDeviceCaptureController.shared.phase
+        guard !RecordlyPrimaryRecord.blocksScreenStart(devicePhase: devicePhase) else { return }
+        let devicesReady = RecordlyPrimaryRecord.mayStartDeviceRecorder(
+            phase: devicePhase,
+            screenSessionActive: RecordlyPrimaryRecord.blocksScreenStart(devicePhase: devicePhase))
         if !isCountingDown {
             screenRecordingGranted = RecordlyPermissionGate.screenRecordingReady()
+            // No display to record: the same Record control starts the one device file.
+            if devicesReady, !screenRecordingGranted || !canStart {
+                actionNotice = nil
+                RecordlyDeviceCaptureController.shared.record()
+                return
+            }
             guard screenRecordingGranted else {
                 actionNotice = "Screen Recording is off for Zeus. Open Screen Recording settings to turn it on."
                 return
@@ -577,8 +588,10 @@ final class RecordlyController {
             return
         }
         actionNotice = nil
-        // Microphone capture is not implemented, so a project must never claim it.
-        audio.microphone = false
+        let devices = RecordlyDeviceCaptureController.shared
+        guard !RecordlyPrimaryRecord.blocksScreenStart(devicePhase: devices.phase) else { return }
+        // The screen file drops microphone samples and does not open the camera.
+        audio.microphone = RecordlyPrimaryRecord.screenFileIncludesMicrophone
         let request = RecordlyStartRequest(
             intent: selectionIntent,
             systemAudio: audio.systemAudio,
@@ -595,6 +608,7 @@ final class RecordlyController {
         timeout.cancel()
         switch outcome {
         case .started(let attempt, let resolved):
+            // The screen session is the recorder. A ready chip stays on the microphone flag and does not open a second file.
             let captureSource = RecordlySourceSelection.CaptureAdapter(resolved).source
             source = captureSource
             currentAttemptID = attempt.id
@@ -639,6 +653,8 @@ final class RecordlyController {
     }
 
     func stop() async {
+        // The same Stop ends the device file. Idle is a no-op inside the machine.
+        RecordlyDeviceCaptureController.shared.stop()
         switch phase {
         case .starting:
             await cancelStart()

@@ -1454,10 +1454,11 @@ struct ClosedWings: View {
     /// The width between the wings: the footprint's wing base, so the gap is exactly the notch.
     var notchGap: CGFloat = NotchClosedBodyLayout.noNotchGap
 
-    enum Kind: Equatable { case recordly, scribe, recordingFeedback, cue(NotchCue), dictation, avatar(AvatarState), focus, music, none }
+    enum Kind: Equatable { case recordly, deviceCapture, scribe, recordingFeedback, cue(NotchCue), dictation, avatar(AvatarState), focus, music, none }
 
     static func kind(of topBar: TopBarModel) -> Kind {
         if RecordlyController.shared.isRecording { return .recordly }
+        if RecordlyDeviceCaptureController.shared.isRecording { return .deviceCapture }
         if ScribeController.shared.isRecording { return .scribe }
         if topBar.isDictating { return .dictation }
         if RecordlyController.shared.topBarFeedback() != nil || ScribeController.shared.topBarFeedback() != nil {
@@ -1492,6 +1493,33 @@ struct ClosedWings: View {
                         Task { await RecordlyController.shared.stop() }
                     }
                 }
+            }
+        case .deviceCapture:
+            let capture = RecordlyDeviceCaptureController.shared
+            wings {
+                Circle().fill(TopBarStyle.rec).frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+            } right: {
+                HStack(spacing: 8) {
+                    if ScribeController.shared.isRecording {
+                        ScribeWings.Leading(elapsed: ScribeController.shared.elapsed, compact: true, announces: true)
+                    }
+                    Text(capture.statusText)
+                        .font(TopBarStyle.label(11, .semibold))
+                        .foregroundStyle(Theme.cloudPrimary)
+                        .lineLimit(1)
+                    if let started = capture.startedAt {
+                        TickingView(interval: 0.5) { context in
+                            Text(RecordlyElapsed.format(max(0, context.date.timeIntervalSince(started))))
+                                .font(TopBarStyle.label(11, .semibold).monospacedDigit())
+                                .foregroundStyle(TopBarStyle.rec)
+                                .accessibilityLabel("Elapsed time")
+                        }
+                    }
+                    NotchActionButton(title: "Stop", tint: TopBarStyle.rec) { capture.stop() }
+                        .accessibilityLabel("Stop recording")
+                }
+                .accessibilityElement(children: .contain)
             }
         case .scribe:
             let scribe = ScribeController.shared
@@ -1589,6 +1617,8 @@ struct ClosedWings: View {
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }
             return ScribeController.shared.topBarFeedback() != nil ? 300 : 110
+        case .deviceCapture:
+            return ScribeController.shared.isRecording ? 300 : 230
         case .scribe: return RecordlyController.shared.topBarFeedback() != nil ? 300 : 230
         case .recordingFeedback:
             return RecordlyController.shared.topBarFeedback() != nil && ScribeController.shared.topBarFeedback() != nil ? 300 : 180

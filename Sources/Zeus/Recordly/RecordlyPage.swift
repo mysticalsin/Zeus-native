@@ -340,14 +340,26 @@ private struct RecordlySideColumn: View {
         VStack(alignment: .leading, spacing: RecordlyRecordLayout.sectionGap) {
             Group {
                 if recordly.showsRunning {
-                    RecordlyLiveCapsule(recordly: recordly)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    if RecordlyDeviceCaptureController.shared.phase == .idle {
+                        RecordlyLiveCapsule(recordly: recordly)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .transition(.opacity)
+                    } else {
+                        VStack(alignment: .leading, spacing: RecordlyRecordLayout.sectionGap) {
+                            RecordlyDeviceCaptureStatus()
+                            RecordlyLiveCapsule(recordly: recordly)
+                                .frame(maxHeight: .infinity, alignment: .top)
+                        }
                         .transition(.opacity)
+                    }
                 } else {
                     VStack(alignment: .leading, spacing: RecordlyRecordLayout.sectionGap) {
                         RecordlyOptionChips(recordly: recordly)
                             .frame(height: RecordlyRecordLayout.optionsHeight, alignment: .top)
                             .recordlyEntrance(.chips, enabled: entrance)
+                        if RecordlyDeviceCaptureController.shared.phase != .idle {
+                            RecordlyDeviceCaptureStatus()
+                        }
                         RecordlyNotices(recordly: recordly, showsPermission: showsPermission)
                             .frame(maxHeight: .infinity, alignment: .topLeading)
                     }
@@ -834,6 +846,7 @@ private struct RecordlyPermissionPill: View {
 
 private struct RecordlyOptionChips: View {
     let recordly: RecordlyController
+    private var capture: RecordlyDeviceCaptureController { .shared }
 
     private var systemState: RecordlySourceChipState {
         .resolve(on: recordly.audio.systemAudio, available: true, needsPermission: !recordly.screenRecordingGranted)
@@ -842,8 +855,8 @@ private struct RecordlyOptionChips: View {
     var body: some View {
         Grid(horizontalSpacing: 6, verticalSpacing: 6) {
             GridRow {
-                RecordlySourceChip(symbol: "mic", title: "Microphone", state: .unavailable,
-                                   help: "Microphone in recordings is coming soon") { }
+                RecordlySourceChip(symbol: "mic", title: "Microphone", state: deviceState(.microphone),
+                                   help: deviceHelp(.microphone)) { capture.press(.microphone) }
                     .frame(maxWidth: .infinity)
                 RecordlySourceChip(symbol: "speaker.wave.2", title: "System audio", state: systemState,
                                    help: systemState == .needsPermission
@@ -852,8 +865,8 @@ private struct RecordlyOptionChips: View {
                     .frame(maxWidth: .infinity)
             }
             GridRow {
-                RecordlySourceChip(symbol: "camera", title: "Camera", state: .unavailable,
-                                   help: "Camera in recordings is coming soon") { }
+                RecordlySourceChip(symbol: "camera", title: "Camera", state: deviceState(.camera),
+                                   help: deviceHelp(.camera)) { capture.press(.camera) }
                     .frame(maxWidth: .infinity)
                 RecordlySourceChip(symbol: "cursorarrow.rays", title: "Cursor zoom",
                                    state: .resolve(on: recordly.exportSettings.followCursor, available: true, needsPermission: false),
@@ -864,6 +877,23 @@ private struct RecordlyOptionChips: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    private func deviceState(_ device: RecordlyDeviceCaptureDevice) -> RecordlySourceChipState {
+        if capture.denied(device) { return .needsPermission }
+        let on = device == .microphone ? capture.selection.microphone : capture.selection.camera
+        return .resolve(on: on, available: true, needsPermission: false)
+    }
+
+    private func deviceHelp(_ device: RecordlyDeviceCaptureDevice) -> String {
+        if capture.denied(device) { return device.recoveryMessage }
+        let on = device == .microphone ? capture.selection.microphone : capture.selection.camera
+        if on, capture.showsRecordingIndicator { return "Recording. Stop or cancel before changing this." }
+        if on, capture.phase == .requestingPermission {
+            return "Zeus is asking permission. Nothing records until you press Record."
+        }
+        if on { return "Ready. Press Record. Nothing is recorded until you do." }
+        return "Turn this on to include it. Zeus asks permission the first time you turn it on, and nothing records until you press Record."
     }
 
     private func toggleSystemAudio() {
@@ -1073,7 +1103,12 @@ private struct RecordlyControlRow: View {
         }
     }
 
+    private var deviceReady: Bool {
+        RecordlyPrimaryRecord.startsDeviceCapture(phase: RecordlyDeviceCaptureController.shared.phase)
+    }
+
     private var disabledReason: String? {
+        if deviceReady { return nil }
         if !recordly.screenRecordingGranted { return "Allow Screen Recording in System Settings to record." }
         if recordly.canStart { return nil }
         return "Choose a display or window first."
@@ -1081,7 +1116,7 @@ private struct RecordlyControlRow: View {
 
     private func enabled(_ visual: RecordlyControlVisual) -> Bool {
         switch visual {
-        case .idle: recordly.canRecord
+        case .idle: recordly.canRecord || deviceReady
         case .countdown, .starting, .recording: true
         case .stopping: false
         }
@@ -1111,7 +1146,13 @@ private struct RecordlyControlRow: View {
         switch visual {
         case .idle:
             if let reason = disabledReason { return reason }
-            return "Records \(recordly.selectedSourceName ?? "the selected source")"
+            let source = recordly.selectedSourceName ?? "the selected source"
+            let capture = RecordlyDeviceCaptureController.shared
+            let screenWillRecord = recordly.screenRecordingGranted && recordly.canStart
+            if RecordlyPrimaryRecord.startsDeviceCapture(phase: capture.phase), !screenWillRecord {
+                return "Records the \(capture.selection.deviceName)"
+            }
+            return "Records \(source)"
         case .countdown: return "Press Esc or the button to cancel"
         case .starting: return "Checking the source"
         case .recording: return "Saves when you stop"
