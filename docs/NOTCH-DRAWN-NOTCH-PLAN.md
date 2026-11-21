@@ -32,7 +32,7 @@ D3 first. D4 is last.
 | D0 | `codex/notch-footprint-YYYYMMDD` | new `Sources/ZeusCore/TopBar/NotchFootprint.swift`, new `Tests/ZeusCoreTests/NotchFootprintTests.swift`, `Sources/Zeus/Notch/NotchView.swift`, `Sources/Zeus/Notch/NotchController.swift`, `Sources/Zeus/App/SnapshotRenderer.swift` (`NotchStage`, `:1010-1023`), `Sources/ZeusCore/AgentHubRules.swift` (`:146`), `Tests/ZeusCoreTests/AgentHubTests.swift` (`:273` and one new case in `DisplaySelectionTests`) | P1 | base |
 | D1 | `codex/notch-drawn-rules-YYYYMMDD` | new `Sources/ZeusCore/TopBar/DrawnNotch.swift`, `NotchFootprint.swift` (the `drawn` case), new `DrawnNotchTests.swift` and `DrawnNotchCalibrationTests.swift`, additions to `NotchFootprintTests.swift`, `docs/STATE-MACHINES.md` | P1, P2 | D0 |
 | D2 | `codex/notch-drawn-surface-YYYYMMDD` | new `Sources/Zeus/Notch/DrawnNotchModel.swift`, `NotchView.swift`, `NotchController.swift`, `SnapshotRenderer.swift` (`NotchStage` and three new fixtures), `AppDelegate.swift` (the model's `start()` and one wiring line at `:820`), new `Tests/ZeusAppTests/DrawnNotchModelTests.swift`, new `qa/closed-loop/tests/test_drawn_notch_lint.py`, `qa/feature-map.json` | D3, P2 | D1 |
-| D3 | `codex/notch-drawn-card-YYYYMMDD` | new `Sources/Zeus/Settings/GSDrawnNotchCard.swift`, `GlanceSettingsPages.swift` (one property in `:9-22`, `:91`, one line after `:260`), `GlanceSettingsWindow.swift` (two delegate methods on the controller at `:106`), `SettingsStore.swift` (one guard beside `:263-270`, one line at `:314`), `scripts/gen-settings-catalog.py` and its two outputs, new `Tests/ZeusAppTests/DrawnNotchCardTests.swift`, new `qa/closed-loop/tests/test_drawn_notch_card_lint.py`, `qa/feature-map.json` | D2, P2 | D1 |
+| D3 | `codex/notch-drawn-card-YYYYMMDD` | new `Sources/Zeus/Settings/GSDrawnNotchCard.swift`, `GlanceSettingsPages.swift` (one property in `:9-22`, `:91`, one line after `:260`), `SettingsWindow.swift` (two delegate methods on the controller at `:106`), `SettingsStore.swift` (one guard beside `:263-270`, one line at `:314`), `scripts/gen-settings-catalog.py` and its two outputs, new `Tests/ZeusAppTests/DrawnNotchCardTests.swift`, new `qa/closed-loop/tests/test_drawn_notch_card_lint.py`, `qa/feature-map.json` | D2, P2 | D1 |
 | D4 | `codex/notch-drawn-place-YYYYMMDD` | `NotchFootprint.swift` (`NotchAnchor`), `NotchController.swift`, `NotchView.swift`, `GSDrawnNotchCard.swift`, `SnapshotRenderer.swift` (one new fixture), the generator and outputs, `test_drawn_notch_lint.py` | none | D2, D3 |
 | P1 | `codex/music-hold-rules-YYYYMMDD` | new `Sources/ZeusCore/TopBar/MusicWingsHold.swift`, new `Tests/ZeusCoreTests/MusicWingsHoldTests.swift`, `docs/STATE-MACHINES.md` | D0, D1 | base |
 | P2 | `codex/music-hold-surface-YYYYMMDD` | new `Sources/Zeus/TopBar/MusicWingsHoldController.swift`, `TopBarModel.swift` (`:116-117`, `:128-134`, `:344-346`), `TopBarViews.swift` (`:1362`, `:1448-1451`), `AppDelegate.swift` (one case in `:885-897`), `GlanceSettingsPages.swift` (one row after `:354`), the generator and outputs, new `Tests/ZeusAppTests/MusicWingsHoldControllerTests.swift`, new `qa/closed-loop/tests/test_music_wings_lint.py`, `qa/feature-map.json` | D1, D2, D3 | P1 |
@@ -93,7 +93,7 @@ to REG-579, claimed in merge order (D0 560-561, D1 562-565, D2 566-569, D3 570-5
   pressed today only because the closed window ignores the mouse.
 - Every change of the closed width springs (`NotchView.swift:119-121`, `:201`), with no Reduce Motion check. The
   alert stack is an overlay attached after the top alignment and the drop (`:203-204`, `:209-217`).
-- The Settings window is built once and kept (`GlanceSettingsWindow.swift:121-135`); its controller is the window
+- The Settings window is built once and kept (`SettingsWindow.swift:121-135`); its controller is the window
   delegate (`:106`) and implements no delegate method. A page change replaces the page view (`:230`), so
   `onDisappear` fires then (as `GSBeamerPage.swift:84` relies on). Whether it fires when the window closes or is
   minimised is unverified, so no ticket relies on it.
@@ -346,7 +346,7 @@ closed-state `setIgnoresMouse` goes through the helper; `build` reports the disp
   "Cancel" and "Done".
 - Row 2 follows `availability`. `ready`: as above. `notShown`: the status "Not shown on that display" with the
   symbol `display.trianglebadge.exclamationmark` and a button "Show the notch on" that opens General, where that
-  row is (`GSNavigation.section`, `GlanceSettingsWindow.swift:98`). `noDisplay`: the status "No display without a
+  row is (`GSNavigation.section`, `SettingsWindow.swift:98`). `noDisplay`: the status "No display without a
   notch", same symbol, no button, since nothing in Settings can change it. A word with a symbol, never colour alone.
 - No helper text on any new row. The sentence under "Show the notch on" (`GlanceSettingsPages.swift:91`) and two
   generator notes stop being true and are corrected: the pill claim at `gen-settings-catalog.py:18`, and "or the
@@ -370,7 +370,7 @@ and the `notShown` button sets the section to General; the two delegate methods 
 in place, one holding "Pill" over Notch is applied, sizes are applied; the snapshot never touches the model.
 `qa/closed-loop/tests/test_drawn_notch_card_lint.py`: the card sends `surfaceGone` from `onDisappear`; `begin`, the
 sets, `step`, `reset`, `done` and `cancel` are sent from the card file only, and `surfaceGone` only from the card
-file, `GlanceSettingsWindow.swift` and `DrawnNotchModel.swift`; the card is placed on a page
+file, `SettingsWindow.swift` and `DrawnNotchModel.swift`; the card is placed on a page
 (`test_source_lint.py:313`); no U+2013 or U+2014 in the card file.
 
 ## D4. Place

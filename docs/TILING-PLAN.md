@@ -555,7 +555,7 @@ inventory; never hand-edit either. `scripts/check-settings-catalog.sh` must pass
 - `FeatureSettings.swift`: add `tilingEnabled`, `tilingInnerGap`, `tilingOuterGap`, `tilingSplitRatio`,
   `tilingFocusBorder`, `tilingKeyBase` and `tilingExcludedApps`, reading through `bool(_:default:)` and the number and
   string readers, with every default equal to the catalog default.
-- `GlanceSettingsWindow.swift`: add `case tiling` to `GSSection`, its `group` (`.tools`), `title` and `symbol`.
+- `SettingsWindow.swift`: add `case tiling` to `GSSection`, its `group` (`.tools`), `title` and `symbol`.
 - `GlanceSettingsPages.swift`: route `.tiling` to a new `TilingSettingsPage` in `Sources/Zeus/Settings/GSTilingPage.swift`,
   built from `GSPageHeading`, `GSCard`, `GSToggleRow`, `GSRow`, `GSPopup`, `GSInfo` and `store.boolBinding`, following
   `GSFeaturesPage`. The route satisfies the lint that every `*Page` and `*Card` under Settings is placed.

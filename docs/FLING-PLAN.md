@@ -32,7 +32,7 @@ Not in v1: resume after a dropped connection (a failed send shows "Failed, tap t
 | Light catalog rows | `SettingsCatalog.swift:62, 78, 79` |
 | Freshness and missing-id check | `scripts/check-settings-catalog.sh` |
 | `SettingOption.section` is a `SettingsNavigation.Section` (`Sources/Zeus/App/SettingsStore.swift:19`); that enum is at `Sources/Zeus/App/SettingsView.swift:10`, page switch at 260-290 (tiling uses `EmptyView()`) | as stated |
-| The live sidebar is a second enum, `GSSection`, in groups settings, tools and app | `Sources/Zeus/Settings/GlanceSettingsWindow.swift:7-23` |
+| The live sidebar is a second enum, `GSSection`, in groups settings, tools and app | `Sources/Zeus/Settings/SettingsWindow.swift:7-23` |
 | Page dispatch | `Sources/Zeus/Settings/GlanceSettingsPages.swift:40-70` |
 | Section id and alias lists | `Sources/ZeusCore/Settings/GlanceSettingsSnapshotMapping.swift:18, 47` |
 | Existing light rows | `GlanceSettingsPages.swift:359`, AirDrop row 1368-1380, screenshot row 1400-1412 |
@@ -185,7 +185,7 @@ Changed:
 - **`ShelfBrainMenu.swift`**: optional `fling: FlingService?`, plus a "Fling to" submenu listing peers and AirDrop.
 - **Settings**
   - `SettingsView.swift:10`: `.shelf` with title, subtitle, icon and `EmptyView()` page.
-  - `GlanceSettingsWindow.swift:7`: `GSSection.shelf` in the tools group, "Shelf", `tray.fill`.
+  - `SettingsWindow.swift:7`: `GSSection.shelf` in the tools group, "Shelf", `tray.fill`.
   - `GlanceSettingsSnapshotMapping.swift:18, 47`: add "shelf".
   - `GlanceSettingsPages.swift:65`: `case .shelf: ShelfSettingsPage()`.
 - **`scripts/gen-settings-catalog.py`**: rows (section 7), `'shelf':'Shelf'`, and `fling.enabled` added to the opt-in guard. Regenerate `SettingsCatalog.swift` and `docs/settings-inventory.md`.
