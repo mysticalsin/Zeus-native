@@ -8,8 +8,11 @@ public struct VoiceFrame: Equatable, Sendable {
     public static let sampleRateHertz = 24_000
 
     public var samples: [Float]
+    /// Counts `init` so a test can see a validation copy. Copies of an existing frame do not increment it.
+    public static var constructions = 0
 
     public init(samples: [Float]) throws {
+        Self.constructions += 1
         guard samples.count == Self.sampleCount else {
             throw VoiceSessionError.badFrameSize(expected: Self.sampleCount, got: samples.count)
         }
