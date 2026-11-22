@@ -46,6 +46,15 @@ public enum DevKeychain {
 
 /// The Keychain, with user interaction switched off for every call. `com.zeus.app` uses the
 /// dev keychain on local builds (see `DevKeychain`), the login keychain otherwise.
+/// One generic-password read. `SecItemCopyMatching` stays in this module.
+public enum KeychainPasswordQuery {
+    public static func copyPassword(_ query: [String: Any]) -> String? {
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+
 public struct SystemKeychain: KeychainBackend {
     private var dev: SecKeychain? { DevKeychain.shared }
     public init() {}

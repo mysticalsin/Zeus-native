@@ -43,6 +43,9 @@ JOURNEYS = {
     "talk": ["talk.text-answer", "talk.voice"],
     "quit": ["quit.clean"],
     "persist": ["persist.launch", "persist.screenshare", "persist.position", "persist.restore", "persist.quit"],
+    # Fake-provider Mac run only. A full human-qa run does not include these (see expected_ids).
+    "voice-providers": ["voice.open", "voice.key", "voice.validate", "voice.pick", "voice.test"],
+    "voice-providers-fail": ["voice.fail.open", "voice.fail.key", "voice.fail.validate", "voice.fail.test", "voice.fail.remove"],
 }
 SECRET = re.compile(r"sk-[A-Za-z0-9_-]{16,}|xi-api|api[_-]?key\s*[:=]|authorization:|bearer\s+[A-Za-z0-9]", re.I)
 
@@ -138,6 +141,8 @@ def expected_ids(only=None, persist=True):
                 ids += items
             continue
         if journey == "quit" and only is not None:
+            continue
+        if journey in ("voice-providers", "voice-providers-fail") and only != journey:
             continue
         if only is None or only == journey:
             ids += items
