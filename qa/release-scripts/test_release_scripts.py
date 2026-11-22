@@ -109,6 +109,9 @@ class ReleaseScripts(unittest.TestCase):
         bundle.write_text(bundle.read_text().replace("/usr/libexec/PlistBuddy", "plistbuddy"))
         for name in ("Info.plist", "Logo.png", "Logo.pdf", "MenuBarTemplate.png", "MenuBarTemplate@2x.png", "NOTICES.txt", "Zeus.entitlements"):
             (self.root / "Resources" / name).write_text("fixture")
+        licenses = self.root / "LICENSES"
+        licenses.mkdir()
+        (licenses / "jarvis2.0-LICENSE").write_text("fixture")
         for name in ("dist", "icons", "node_modules"):
             (self.root / "extension" / name).mkdir(parents=True)
         for name in ("manifest.json", "popup.html"):

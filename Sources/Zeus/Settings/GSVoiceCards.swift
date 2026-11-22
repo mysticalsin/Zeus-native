@@ -65,7 +65,7 @@ struct ZeusVoiceCards: View {
                     .accessibilityValue(String(format: "%.0f percent", UltronVoiceEffect.intensity * 100))
             }
             GSDivider()
-            VoiceProviderPicker(embedded: true)
+            VoiceProvidersCard(embedded: true)
             GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
                 GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in

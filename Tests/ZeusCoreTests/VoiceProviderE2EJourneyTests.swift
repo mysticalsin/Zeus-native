@@ -366,7 +366,7 @@ private struct JourneyHarness {
     var log: ProviderLog { ProviderLog { [logBox] line in logBox.add(line) } }
 
     init(localEmpty: Bool = false) throws {
-        let suite = "zeus.e2e.providers.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.e2e.providers.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         preferences = VoiceProviderPreferences(defaults: defaults)
