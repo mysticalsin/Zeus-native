@@ -7,6 +7,21 @@ import ZeusCore
 enum DebugCommands {
     static func runIfRequested() -> Bool {
         let arguments = CommandLine.arguments
+        // `Zeus --orb-proof <directory> [--reduce-motion]`: offscreen PNGs and frame-times.csv, then exit.
+        // No microphone, no provider, no network. Synthetic speaking bands are bass 0.35 and mid 0.55.
+        if let flag = arguments.firstIndex(of: "--orb-proof"), flag + 1 < arguments.count {
+            let directory = URL(fileURLWithPath: arguments[flag + 1], isDirectory: true)
+            let reduceMotion = arguments.contains("--reduce-motion")
+            do {
+                let proof = try OrbOffscreenHarness.writeProof(to: directory, reduceMotion: reduceMotion)
+                let summary = try OrbOffscreenHarness.summarize(proof, reduceMotion: reduceMotion)
+                print(summary.text)
+                exit(summary.passed ? 0 : 1)
+            } catch {
+                fputs("ERROR \(error)\n", stderr)
+                exit(1)
+            }
+        }
         // `ZEUS_CLAUDE_SETTINGS=copy.json Zeus --install-hooks` (or --uninstall-hooks)
         if arguments.contains("--install-hooks") || arguments.contains("--uninstall-hooks") {
             do {

@@ -11,28 +11,24 @@ public enum UltronVoicePlan {
         case system
     }
 
-    /// Default order, from `UltronEngineRouter`: ElevenLabs when its key is valid (lowest latency designed
-    /// voice), then Kokoro on this Mac, otherwise the deepest Mac voice with the Ultron effect.
+    /// Default order is the local voice. A cloud key does not change it.
     public static func preferred(kokoroReady: Bool, elevenLabsKeyValid: Bool) -> Engine {
-        let chain = UltronEngineRouter.chain(
-            choice: .auto, availability: UltronEngineAvailability(elevenLabsConfigured: elevenLabsKeyValid, kokoroReady: kokoroReady))
-        switch chain.first?.engine {
-        case .elevenLabs: return .elevenLabs
-        case .kokoro: return .kokoro
-        default: return .system
-        }
+        _ = elevenLabsKeyValid
+        return kokoroReady ? .kokoro : .system
     }
 
     /// The engine a launch starts on. Only an explicit owner pick (`voice.engine.userSelected`) beats the
-    /// default order: ElevenLabs, then Kokoro, then the Mac voice.
+    /// local default. A saved key is not a pick.
     public static func initialEngine(stored: Engine?, userSelected: Bool, kokoroReady: Bool, elevenLabsKeyValid: Bool) -> Engine {
         if let stored, userSelected { return stored }
         return preferred(kokoroReady: kokoroReady, elevenLabsKeyValid: elevenLabsKeyValid)
     }
 
-    /// The provider shown in Settings when the owner never picked one: ElevenLabs whenever its key is usable.
+    /// The provider shown in Settings when the owner never picked one. A key does not select a cloud voice.
     public static func defaultProvider(kokoroReady: Bool, elevenLabsKeyValid: Bool) -> VoiceTTSProvider {
-        elevenLabsKeyValid ? .elevenLabs : .kokoro
+        _ = kokoroReady
+        _ = elevenLabsKeyValid
+        return .kokoro
     }
 
     /// How long ElevenLabs stays out of the chain after a failed request: a bad key or empty credits

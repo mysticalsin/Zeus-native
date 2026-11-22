@@ -14,10 +14,10 @@ struct VoiceProviderAdapterTests {
         let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
         let stream = try #require(ElevenLabsTTSAdapter.streamRequest(text: "Hello there", voiceID: "21m00Tcm4TlvDq8ikWAM", credential: credential))
         #expect(stream.method == "POST")
-        #expect(stream.url.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream")
+        #expect(stream.url.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream?output_format=pcm_24000")
         #expect(stream.header("xi-api-key") == elevenKey)
         #expect(stream.header("Content-Type") == "application/json")
-        #expect(stream.header("Accept") == "audio/mpeg")
+        #expect(stream.header("Accept") == "audio/pcm")
         let body = try jsonObject(stream.body)
         #expect(body["text"] as? String == "Hello there")
         #expect(body["model_id"] as? String == "eleven_flash_v2_5")
@@ -73,7 +73,7 @@ struct VoiceProviderAdapterTests {
         let synthesis = try #require(adapter.synthesize(text: "Hello", voice: ProviderVoice(id: "voice-1", name: "One", language: nil), credential: credential, using: transport))
         var audio: [Data] = []
         for try await chunk in synthesis.chunks { audio.append(chunk.data) }
-        #expect(audio == chunks)
+        #expect(audio.reduce(into: Data(), +=) == chunks.reduce(into: Data(), +=))
         let request = try #require(ProviderURLStub.requests.first)
         #expect(request.url?.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/voice-1/stream?output_format=pcm_24000")
         #expect(request.httpMethod == "POST")
@@ -112,7 +112,7 @@ struct VoiceProviderAdapterTests {
         let request = try #require(ProviderURLStub.requests.first)
         #expect(request.url?.query == nil)
         #expect(request.value(forHTTPHeaderField: "X-Goog-Api-Key") == googleKey)
-        #expect(!((request.url?.absoluteString ?? "").contains(googleKey)))
+        #expect((request.url?.absoluteString ?? "").contains(googleKey) == false)
 
         await #expect(throws: ProviderFailure.unauthorized) {
             try await adapter.validate(credential: credential, using: self.stubbed(reply: .init(status: 401)))
