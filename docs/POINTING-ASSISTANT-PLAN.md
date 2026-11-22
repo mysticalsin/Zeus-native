@@ -586,6 +586,6 @@ Add a `qa/regressions.json` entry for each defect found.
 - <project-root>/Sources/Zeus/Explanation/ExplanationScreenContext.swift
 - <project-root>/Sources/ZeusCore/Explanation/ExplanationProtocol.swift (with ExplanationStream.swift and ExplanationReducer.swift)
 - <project-root>/Sources/Zeus/Voice/HotkeyMonitor.swift (with Sources/ZeusCore/Shortcut.swift)
-- <project-root>/Sources/Zeus/App/AppDelegate.swift (wiring at :260 and :558), plus qa/feature-map.json and qa/closed-loop/tests/test_source_lint.py
+- <project-root>/Sources/Zeus/App/AppDelegate.swift (wiring at :362 and :732), plus qa/feature-map.json and qa/closed-loop/tests/test_source_lint.py
 
 Sources: [WWDC25 session 288](https://developer.apple.com/videos/play/wwdc2025/288/), [Bringing your SceneKit projects to RealityKit](https://developer.apple.com/documentation/realitykit/bringing-your-scenekit-projects-to-realitykit.md), [DEV Community summary of the SceneKit deprecation](https://dev.to/arshtechpro/wwdc-2025-scenekit-deprecation-and-realitykit-migration-a-comprehensive-guide-for-ios-developers-o26), [Fatbobman weekly 090](https://fatbobman.com/en/weekly/issue-090/). The AVSpeechSynthesizer marker-callback page returned no content, so that fact stays marked [Verify].

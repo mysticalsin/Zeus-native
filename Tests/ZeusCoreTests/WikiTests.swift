@@ -797,7 +797,7 @@ import Testing
     }
 
     @Test func scannerDoesNotFlagPathsOrSlugsAsSecrets() {
-        #expect(!kinds("see /Users/example/dev/zeus-wt/takeover-20261102-1834/notes").contains(.secret))
+        #expect(!kinds("see /Users/example/dev/project/notes").contains(.secret))
         #expect(!kinds("the-quick-brown-fox-jumps-over-the-lazy-dog-again-and-again").contains(.secret))
         #expect(!kinds("a short token like abc123 is fine").contains(.secret))
     }
