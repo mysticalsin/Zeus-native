@@ -70,9 +70,15 @@ struct VoiceProviderAdapterTests {
         let adapter = ElevenLabsTTSAdapter()
         let credential = ProviderCredential(fields: [ProviderCredentialLocation.account: elevenKey])
         let synthesis = try #require(adapter.synthesize(text: "Hello", voice: ProviderVoice(id: "voice-1", name: "One", language: nil), credential: credential, using: transport))
-        var audio: [Data] = []
-        for try await chunk in synthesis.chunks { audio.append(chunk.data) }
-        #expect(audio == chunks)
+        var audio = Data()
+        var pieces = 0
+        for try await chunk in synthesis.chunks {
+            audio.append(chunk.data)
+            pieces += 1
+        }
+        let expected = chunks.reduce(into: Data()) { $0.append($1) }
+        #expect(pieces > 0)
+        #expect(audio == expected)
         let request = try #require(ProviderURLStub.requests.first)
         #expect(request.url?.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/voice-1/stream")
         #expect(request.httpMethod == "POST")
@@ -111,7 +117,8 @@ struct VoiceProviderAdapterTests {
         let request = try #require(ProviderURLStub.requests.first)
         #expect(request.url?.query == nil)
         #expect(request.value(forHTTPHeaderField: "X-Goog-Api-Key") == googleKey)
-        #expect(!((request.url?.absoluteString ?? "").contains(googleKey)))
+        let address = request.url?.absoluteString ?? ""
+        #expect(address.contains(googleKey) == false)
 
         await #expect(throws: ProviderFailure.unauthorized) {
             try await adapter.validate(credential: credential, using: self.stubbed(reply: .init(status: 401)))

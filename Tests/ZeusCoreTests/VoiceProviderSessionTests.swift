@@ -210,7 +210,8 @@ private struct Harness {
             local: local,
             preferences: VoiceProviderPreferences(defaults: defaults),
             log: log,
-            signposter: signposter
+            signposter: signposter,
+            firstAudioBudgetMs: 60_000
         )
     }
 }

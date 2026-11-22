@@ -374,7 +374,7 @@ private struct JourneyHarness {
         let box = logBox
         session = VoiceProviderSession(store: store, transport: transport, local: local,
                                        preferences: preferences, log: ProviderLog { box.add($0) },
-                                       signposter: signposter, system: system)
+                                       signposter: signposter, system: system, firstAudioBudgetMs: 60_000)
     }
 }
 
