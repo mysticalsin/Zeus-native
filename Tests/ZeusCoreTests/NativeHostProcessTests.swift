@@ -160,7 +160,9 @@ struct NativeHostProcessTests {
         }
 
         func waitForForwardedBytes() async throws -> Bool {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            // The child is already bound. A busy runner can still take more than two seconds
+            // to schedule the first forwarded frame.
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
             repeat {
                 var ready = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
                 if poll(&ready, 1, 0) > 0, ready.revents & Int16(POLLIN) != 0 { return true }

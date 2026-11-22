@@ -37,7 +37,9 @@ struct BridgePendingRepliesTests {
         try server.start()
         defer { server.stop() }
         let request = try JSONEncoder().encode(BridgeRequest(id: "same-id", type: "page.read"))
-        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }
+        // The original stays open through the duplicate exchange. Three seconds is shorter than that
+        // wait on a busy runner, so the client would drop the reply this test then completes.
+        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 20) }
         try await eventually { pending.count == 1 && forwarded.read() == 1 }
         let duplicateBytes = await Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }.value
         let duplicate = try JSONDecoder().decode(BridgeResponse.self, from: #require(duplicateBytes))
