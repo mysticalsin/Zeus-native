@@ -648,7 +648,7 @@ import Testing
 
 @Suite struct WeatherSettingsPersistenceTests {
     @Test func eachStoredKeySurvivesANewReader() {
-        let suite = "zeus-weather-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus-weather-\(UUID().uuidString)"
         let first = UserDefaults(suiteName: suite)!
         defer { first.removePersistentDomain(forName: suite) }
         WeatherSettingsDisk.save(city: "Lisbon", unit: .fahrenheit, layout: .hourly, defaults: first)
@@ -666,7 +666,7 @@ import Testing
     }
 
     @Test func aFreshStoreStaysOffAndImportCannotEnablePreciseLocation() {
-        let suite = "zeus-weather-fresh-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus-weather-fresh-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let fresh = WeatherSettingsDisk.load(defaults: defaults, localeUsesUSCustomary: false)
