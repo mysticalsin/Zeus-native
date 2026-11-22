@@ -174,13 +174,13 @@ private enum MarkJSON {
     }
 }
 
-public struct PlacedMark: Equatable, Sendable {
-    public var mark: DrawingMark
-    public var box: CGRect
-}
-
 /// Places marks in unit space and nudges labels off arrows and lines.
 public enum DrawingLayout {
+    public struct PlacedMark: Equatable, Sendable {
+        public var mark: DrawingMark
+        public var box: CGRect
+    }
+
     public static func place(_ marks: [DrawingMark]) -> [PlacedMark] {
         var placed: [PlacedMark] = []
         var strokes: [DrawingMark] = []
