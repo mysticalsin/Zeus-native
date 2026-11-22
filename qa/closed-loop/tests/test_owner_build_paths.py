@@ -47,7 +47,7 @@ class OwnerBuildPaths(unittest.TestCase):
         self.assertIn('exec python3 qa/closed-loop/trusted_ax.py --build-dir "$BUILD_DIR" --receipts "$RECEIPTS_DIR"', text)
 
     def test_trusted_ax_defaults_equal_the_swift_build_paths(self):
-        """The Python defaults are $HOME-relative and equal the directories the Swift build script uses."""
+        # The Python defaults are $HOME-relative and equal the directories the Swift build script uses.
         runner = (ROOT / "qa/closed-loop/trusted_ax.py").read_text()
         self.assertIn("os.path.expanduser('~/AI-Brain-build/zeus-native-build')", runner)
         self.assertIn("os.path.expanduser('~/AI-Brain-build/zeus-trusted-ax')", runner)
