@@ -57,22 +57,19 @@ public enum VoiceKey {
     /// the stored key (`ShortcutStore.loadSecondTalk`), `explicit` whether the owner chose it, `heard` the talk key as the
     /// monitor hears it (`effectiveTalkKey`), the others nil when off. A key one of them already uses is theirs: the default
     /// gives way to a key chosen for pointing, an explicit second key keeps it and pointing stands down (`pointingStartsTurns`).
-    /// A Carbon shortcut on Option alone (Chat on Option-Space) beats an Option-only key, as Carbon beats the chord: it may
-    /// hide the key-down of its Space from the monitors.
+    /// An Option-plus-key shortcut does not take Right Option away. Holding Right Option is push-to-talk
+    /// whether or not another key is down with it.
     public static func secondTalkKey(chosen: Shortcut?, explicit: Bool, heard: Shortcut, dictation: Shortcut?, pointing: Shortcut?,
                                      polyglot: Shortcut?, voiceOverOn: Bool,
                                      carbonHolders: [(name: String, shortcut: Shortcut?)]) -> (key: Shortcut?, yieldsTo: String?) {
         guard let chosen else { return (nil, nil) }
+        _ = carbonHolders
         func meets(_ other: Shortcut?) -> Bool { other.map { $0 == chosen || ShortcutConflicts.overlaps(chosen, $0) } ?? false }
         if meets(heard) { return (nil, "Talk to Zeus") }
         if meets(dictation) { return (nil, "Dictation") }
         if meets(polyglot) { return (nil, "Polyglot") }
         if !explicit, meets(pointing) { return (nil, "Pointing") }
         if voiceOverOn, chosen == .controlOption { return (nil, "VoiceOver") }
-        if chosen.isModifierOnly, chosen.modifiers == .option,
-           let holder = carbonHolders.first(where: { $0.shortcut.map { $0.keyCode != nil && $0.modifiers == .option } ?? false }) {
-            return (nil, holder.name)
-        }
         return (chosen, nil)
     }
 

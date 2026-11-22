@@ -8,12 +8,17 @@ import Foundation
 public enum ModifierFlagsRepeat {
     /// True when `keyCode` is a modifier that is still physically down, its flag is set,
     /// and the other side is tracked down. A lone key is never this case.
+    /// Command key codes this path may hold for a hardware check. 55 is left, 54 is right.
+    /// Every other modifier, including Right Option (61), is answered here and does not read hardware.
+    public static let ownedKeyCodes: Set<UInt16> = [54, 55]
+
     public static func isHardwareStillDown(
         keyCode: UInt16,
         modifiers: ShortcutModifiers,
         deviceKeys: Set<UInt16>,
         hardwareDown: (UInt16) -> Bool
     ) -> Bool {
+        guard ownedKeyCodes.contains(keyCode) else { return false }
         guard let entry = entry(for: keyCode), modifiers.contains(entry.flag) else { return false }
         guard deviceKeys.contains(keyCode) else { return false }
         let sibling = entry.left == keyCode ? entry.right : entry.left
