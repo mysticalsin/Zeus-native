@@ -10,7 +10,6 @@ struct HubReplyWiringTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .deletingLastPathComponent()
             .appendingPathComponent("Sources/Zeus/Agents/AgentHub.swift")
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }()
