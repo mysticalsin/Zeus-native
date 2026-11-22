@@ -388,7 +388,10 @@ public actor VoiceProviderSession {
                                     signpostName: ProviderSignpostName.firstAudio, statusLine: line)
             } catch {
                 currentCancel = nil
-                let failure = ProviderFailure.wrap(error)
+                if speakCancelled {
+                    return cancelled(started: started, providerID: id)
+                }
+                let failure = heard.fired ? ProviderFailure.timedOut : ProviderFailure.wrap(error)
                 return await fallback(failure, providerID: id, text: trimmed, started: started, secret: key)
             }
         }
