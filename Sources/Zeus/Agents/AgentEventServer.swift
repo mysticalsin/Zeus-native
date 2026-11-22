@@ -7,10 +7,17 @@ final class AgentEventServer {
     private let notch: NotchController
     private var server: UnixSocketServer?
     private var collapseTask: Task<Void, Never>?
-    /// Last answer per session, for agents that report it separately from "stop" (Cursor).
+    /// Last answer per session, for agents that report it separately from stop.
     private var lastResponse: [String: String] = [:]
     private var codexWatcher: CodexSessionWatcher?
-    private(set) var lastError: String?
+    /// Hub sessions driven by hook lines. The notch rows follow this book.
+    private var hubBook = HubHookBook()
+    /// The one sound decision from the latest finish. This server does not play a second sound.
+    private(set) var lastFinishDecisions: [HubSoundDecision] = []
+    /// Down until the socket binds. A failure stays the connection-error sentence, with no path in it.
+    private(set) var lastError: String? = HubScreen.connectionError.sentence
+
+    var hubScreen: HubScreen { hubBook.screen }
     /// Answers `zeus` CLI commands, which share this socket with hook events. The peer context says
     /// whether the sender is this app's own signed `zeus` command.
     var commandHandler: (@MainActor (Data, PeerContext) async -> Data?)?
@@ -20,7 +27,22 @@ final class AgentEventServer {
     }
 
     func start() {
-        let server = UnixSocketServer(path: ZeusPaths.socket.path, contextHandler: { [weak self] line, peer, reply in
+        if server != nil { return }
+        codexWatcher?.stop()
+        let watcher = CodexSessionWatcher { [weak self] event in
+            Task { @MainActor in _ = await self?.process(event) }
+        }
+        watcher.start()
+        codexWatcher = watcher
+        let path = ZeusPaths.socket.path
+        // The listener admits the same user before a line is read. A path that cannot bind
+        // becomes a connection error, and the error text does not include the path.
+        guard HubHookGate.acceptsSocketPath(path, expected: path) else {
+            noteSocketFailed()
+            return
+        }
+        hubBook.beginOpening()
+        let server = UnixSocketServer(path: path, peerPolicy: .sameUser, contextHandler: { [weak self] line, peer, reply in
             // With command-line control on, the sender's signature is read here, off the main thread,
             // so the main actor only reads the remembered answer.
             if CLIAccess.enabled, ZeusCommand.isCommand(line) { _ = peer.verifiedApp() }
@@ -29,21 +51,30 @@ final class AgentEventServer {
                 reply(await self.handle(line, peer: peer))
             }
         })
-        let watcher = CodexSessionWatcher { [weak self] event in
-            Task { @MainActor in _ = await self?.process(event) }
-        }
-        watcher.start()
-        codexWatcher = watcher
         do {
             try server.start()
             self.server = server
+            lastError = nil
+            hubBook.open()
         } catch {
-            lastError = "Could not open the agent socket: \(error)"
-            NSLog("[ZEUS] %@", lastError ?? "")
+            noteSocketFailed()
         }
     }
 
-    func stop() { server?.stop() }
+    func stop() {
+        server?.stop()
+        server = nil
+        hubBook.fail()
+        lastError = HubScreen.connectionError.sentence
+    }
+
+    private func noteSocketFailed() {
+        server?.stop()
+        server = nil
+        hubBook.fail()
+        lastError = HubScreen.connectionError.sentence
+        NSLog("[ZEUS] agent socket failed")
+    }
 
     /// Returns the reply line for decision events, nil otherwise.
     private func handle(_ line: Data, peer: PeerContext) async -> Data? {
@@ -55,125 +86,207 @@ final class AgentEventServer {
             }
             return await commandHandler(line, peer)
         }
+        // The listener already refused a peer that is not this user. The line is bounded here,
+        // and a rejection is returned without the payload.
+        guard case .success(let message) = HubHookGate.inspect(line: line, peer: .allow) else { return nil }
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: line) else { return nil }
-        return await process(event)
+        return await accept(event, message: message)
     }
 
     /// One agent event from a hook or a log watcher. Returns the reply for decision events.
     func process(_ event: HookEvent) async -> Data? {
-        // The client's risk label is never trusted below what the app computes from the input.
-        let risk = HookClientInput.effectiveRisk(claimed: event.risk, tool: event.tool, input: event.input)
-        let sessionID = event.session ?? "unknown"
+        guard let line = try? JSONEncoder().encode(event),
+              case .success(let message) = HubHookGate.inspect(line: line, peer: .allow) else { return nil }
+        return await accept(event, message: message)
+    }
+
+    private func accept(_ event: HookEvent, message: HubHookMessage) async -> Data? {
+        var message = message
+        let sessionID = message.sessionID
         let agent = Self.agentName(event.source)
         let project = event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "No project"
         FlightRecorder.shared.record("agent", event.event, "\(agent) \(project) session \(sessionID.prefix(8))\(event.tool.map { " tool \($0)" } ?? "")")
         AgentTerminals.shared.remember(event.terminal, for: sessionID)
-        // Any event is a sign of life; it also lifts a stalled session.
-        if event.event != "SessionEnd" { notch.touch(sessionID: sessionID) }
-
-        switch event.event {
-        case "SessionStart":
-            notch.upsertSession(id: sessionID, agent: agent, project: project, task: "ready", status: .idle)
-
-        case "UserPromptSubmit":
-            let task = event.detail.map(Self.oneLine) ?? "working"
-            notch.upsertSession(id: sessionID, agent: agent, project: project, task: task, status: .working, restartClock: true)
-            peekBriefly()
-
-        case "PreToolUse", "PostToolUse":
-            if event.event == "PostToolUse", event.tool == "AskUserQuestion" {
-                QuestionAnswers.shared.toolResult(session: sessionID, text: event.detail)
-            }
-            if let tool = event.tool {
-                notch.upsertSession(id: sessionID, agent: agent, project: project,
-                                    task: Self.describe(tool: tool, input: event.input), status: .working)
-            }
-
-        case "StopFailure":
-            notch.failSession(id: sessionID, agent: agent, project: project,
-                              reason: event.detail.map(Self.oneLine) ?? "The agent stopped with an error")
-
-        case "PermissionRequest":
-            if let command = event.input?["command"]?.stringValue, let reason = HandsBlocklist.reason(command) {
-                HandsCommandLogger.append(command: command, verdict: "blocked", outcome: reason)
-                notch.failSession(id: sessionID, agent: agent, project: project, reason: reason)
-                let decision = HookDecision(id: event.id, decision: .deny, reason: reason)
-                return try? JSONEncoder().encode(decision)
-            }
-            // A chat the person trusted ("Allow this whole chat") runs without a card, unless it is risky.
-            if TrustedChatStore.shared.autoApproves(session: sessionID, tool: event.tool, input: event.input, risk: risk) {
-                notch.upsertSession(id: sessionID, agent: agent, project: project,
-                                    task: Self.describe(tool: event.tool ?? "Tool", input: event.input), status: .working)
-                return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .allow))
-            }
-            notch.upsertSession(id: sessionID, agent: agent, project: project,
-                                task: Self.describe(tool: event.tool ?? "Tool", input: event.input), status: .needsYou)
-            collapseTask?.cancel()
-            let detail = ApprovalDetail.make(tool: event.tool, input: event.input, session: sessionID)
-            var trust: (session: String, onTrust: @MainActor () -> Void)?
-            if sessionID != "unknown", TrustedChats.canOffer(tool: event.tool, input: event.input, risk: risk) {
-                let onTrust: @MainActor () -> Void = { TrustedChatStore.shared.trust(session: sessionID, agent: agent, project: project) }
-                trust = (sessionID, onTrust)
-            }
-            let verdict = await notch.requestApproval(
-                agent: agent,
-                project: project,
-                tool: Self.cardTitle(tool: event.tool),
-                command: Self.command(tool: event.tool, input: event.input),
-                risk: risk,
-                timeout: .seconds(100),
-                onTimeout: .ask,
-                detail: detail,
-                trust: trust
-            )
-            notch.update(sessionID: sessionID, status: verdict == .deny ? .idle : .working)
-            peekBriefly()
-            let decision: HookDecision
-            if let detail, detail.answered, verdict == .allow {
-                // Answers go the way this Claude Code is known to honour (learned, see QuestionAnswers).
-                decision = QuestionAnswers.shared.decision(id: event.id, session: sessionID, input: detail.input, answers: detail.choices)
-            } else {
-                decision = HookDecision(id: event.id, decision: verdict,
-                                        reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
-                                        updatedInput: verdict == .allow ? detail?.updatedInput : nil)
-            }
-            return try? JSONEncoder().encode(decision)
-
-        case "AgentResponse":
-            if let text = event.detail { lastResponse[sessionID] = text }
-
-        case "Stop":
-            let detail = event.detail ?? lastResponse.removeValue(forKey: sessionID)
-            let summary = detail.map(Self.oneLine) ?? "finished"
+        let risk = HookClientInput.effectiveRisk(claimed: event.risk, tool: event.tool, input: event.input)
+        if event.event == "PermissionRequest",
+           HubHookFamily.canAsk(event.source),
+           !HubHookFamily.isQuestion(event: event.event, tool: event.tool),
+           event.input?["command"]?.stringValue.flatMap(HandsBlocklist.reason) == nil,
+           TrustedChatStore.shared.autoApproves(session: sessionID, tool: event.tool, input: event.input, risk: risk) {
+            message.autoApproves = true
+        }
+        let before = hubBook.sessions[sessionID] ?? HubSessionState()
+        let step = hubBook.apply(
+            message,
+            now: Date(),
+            systemFinishSound: AgentSettings.shared.completionSound
+        )
+        if event.event == "PostToolUse", event.tool == "AskUserQuestion" {
+            QuestionAnswers.shared.toolResult(session: sessionID, text: event.detail)
+        }
+        if event.event == "AgentResponse", let text = event.detail {
+            lastResponse[sessionID] = text
+        }
+        if event.event == "PermissionRequest" {
+            return await permission(event, message: message, step: step, before: before, agent: agent, project: project, risk: risk)
+        }
+        if event.event == "Stop" {
+            if step.soundDecisions.count == 1 { lastFinishDecisions = step.soundDecisions }
+            let detail = event.detail ?? lastResponse[sessionID]
             let startedAt = notch.model.sessions.first { $0.id == sessionID }?.startedAt
-            notch.upsertSession(id: sessionID, agent: agent, project: project, task: summary, status: .done)
             showCompletion(AgentCompletion(sessionID: sessionID, agent: agent, project: project, summary: detail, startedAt: startedAt))
-
-        case "Notification":
-            // Permission prompts arrive as PermissionRequest. A prompt right after ZEUS sent
-            // answers means the terminal is still asking: answers switch to the message path.
-            if QuestionAnswers.shared.waitingForInput(session: sessionID) {
-                notch.upsertSession(id: sessionID, agent: agent, project: project, task: "answer in the terminal", status: .needsYou)
-                peekBriefly(seconds: 5)
-            }
-
-        case "SessionEnd":
-            notch.removeSession(id: sessionID)
+        }
+        if event.event == "UserPromptSubmit" { peekBriefly() }
+        let task = taskLine(event, state: step.state)
+        sync(sessionID, agent: agent, project: project, task: task, before: before, after: step.state)
+        if event.event == "Stop" || event.event == "SessionEnd" { lastResponse[sessionID] = nil }
+        if event.event == "SessionEnd" {
             AgentTerminals.shared.forget(sessionID)
             TrustedChatStore.shared.revoke(session: sessionID)
-
-        default:
-            break
+        }
+        if event.event == "Notification", QuestionAnswers.shared.waitingForInput(session: sessionID) {
+            notch.upsertSession(id: sessionID, agent: agent, project: project, task: "answer in the terminal", status: .needsYou)
+            peekBriefly(seconds: 5)
         }
         return nil
     }
 
-    /// The finished card with a sound, unless a full-screen app asks for quiet.
+    private func permission(
+        _ event: HookEvent,
+        message: HubHookMessage,
+        step: HubHookStep,
+        before: HubSessionState,
+        agent: String,
+        project: String,
+        risk: HookEvent.Risk
+    ) async -> Data? {
+        let sessionID = message.sessionID
+        if let command = event.input?["command"]?.stringValue, let reason = HandsBlocklist.reason(command) {
+            HandsCommandLogger.append(command: command, verdict: "blocked", outcome: reason)
+            sync(sessionID, agent: agent, project: project, task: reason, before: before, after: step.state)
+            return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .deny, reason: reason))
+        }
+        if message.autoApproves {
+            let task = Self.describe(tool: event.tool ?? "Tool", input: event.input)
+            sync(sessionID, agent: agent, project: project, task: task, before: before, after: step.state)
+            return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .allow))
+        }
+        let task = taskLine(event, state: step.state)
+        sync(sessionID, agent: agent, project: project, task: task, before: before, after: step.state)
+        guard step.growsApprove else {
+            guard event.needsDecision else { return nil }
+            if HubHookFamily.isQuestion(event: event.event, tool: event.tool) {
+                return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .ask))
+            }
+            return try? JSONEncoder().encode(HookDecision(id: event.id, decision: .deny, reason: "Zeus can't approve this session."))
+        }
+        collapseTask?.cancel()
+        let detail = ApprovalDetail.make(tool: event.tool, input: event.input, session: sessionID)
+        var trust: (session: String, onTrust: @MainActor () -> Void)?
+        if TrustedChats.canOffer(tool: event.tool, input: event.input, risk: risk) {
+            let onTrust: @MainActor () -> Void = { TrustedChatStore.shared.trust(session: sessionID, agent: agent, project: project) }
+            trust = (sessionID, onTrust)
+        }
+        let verdict = await notch.requestApproval(
+            agent: agent,
+            project: project,
+            tool: Self.cardTitle(tool: event.tool),
+            command: Self.command(tool: event.tool, input: event.input),
+            risk: risk,
+            timeout: .seconds(100),
+            onTimeout: .ask,
+            detail: detail,
+            trust: trust
+        )
+        let resolved = hubBook.resolve(sessionID: sessionID, verdict: verdict, now: Date())
+        sync(sessionID, agent: agent, project: project, task: task, before: step.state, after: resolved.state)
+        peekBriefly()
+        let decision: HookDecision
+        if let detail, detail.answered, verdict == .allow {
+            decision = QuestionAnswers.shared.decision(id: event.id, session: sessionID, input: detail.input, answers: detail.choices)
+        } else {
+            decision = HookDecision(id: event.id, decision: verdict,
+                                    reason: verdict == .deny ? (detail?.denyMessage ?? "Denied in Zeus") : nil,
+                                    updatedInput: verdict == .allow ? detail?.updatedInput : nil)
+        }
+        return try? JSONEncoder().encode(decision)
+    }
+
+    private func taskLine(_ event: HookEvent, state: HubSessionState) -> String {
+        switch state.status {
+        case .absent:
+            return ""
+        case .loading:
+            return "ready"
+        case .running:
+            if event.event == "UserPromptSubmit" { return event.detail.map(Self.oneLine) ?? "working" }
+            if let tool = event.tool { return Self.describe(tool: tool, input: event.input) }
+            return "working"
+        case .waitingForInput:
+            return event.detail.map(Self.oneLine) ?? "waiting for input"
+        case .needsApproval:
+            return Self.describe(tool: event.tool ?? "Tool", input: event.input)
+        case .done:
+            let detail = event.detail ?? lastResponse[event.session ?? ""]
+            return detail.map(Self.oneLine) ?? "finished"
+        case .error(.quiet):
+            return Self.quietReason(event.detail)
+        case .error(.failed):
+            return event.detail.map(Self.oneLine) ?? "The agent stopped with an error"
+        }
+    }
+
+    private static func quietReason(_ detail: String?) -> String {
+        guard let detail else { return "No activity for the limit" }
+        let line = oneLine(detail)
+        guard line.range(of: #"^No activity for [1-9][0-9]{0,3} min$"#, options: .regularExpression) != nil else {
+            return "No activity for the limit"
+        }
+        return line
+    }
+
+    private func sync(
+        _ id: String,
+        agent: String,
+        project: String,
+        task: String,
+        before: HubSessionState,
+        after: HubSessionState
+    ) {
+        if after.status == .absent {
+            if before.status != .absent { notch.removeSession(id: id) }
+            return
+        }
+        let restart = after.clockGeneration > before.clockGeneration
+        switch after.status {
+        case .absent:
+            break
+        case .loading:
+            notch.upsertSession(id: id, agent: agent, project: project, task: task, status: .idle)
+        case .running:
+            notch.upsertSession(id: id, agent: agent, project: project, task: task, status: .working, restartClock: restart)
+        case .waitingForInput, .needsApproval:
+            notch.upsertSession(id: id, agent: agent, project: project, task: task, status: .needsYou)
+        case .done:
+            notch.upsertSession(id: id, agent: agent, project: project, task: task, status: .done)
+        case .error:
+            if before.status != after.status {
+                notch.failSession(id: id, agent: agent, project: project, reason: task)
+            } else {
+                notch.upsertSession(id: id, agent: agent, project: project, task: task, status: .failed)
+            }
+        }
+    }
+
+    /// The finished card. The sound decision was recorded once on the way in, so this does not play another.
     private func showCompletion(_ completion: AgentCompletion) {
         let settings = AgentSettings.shared
-        let outcome = AgentQuietPolicy.outcome(for: .completion, fullScreen: FullScreenDetector.frontAppIsFullScreen(),
-                                               quietEnabled: settings.quietInFullScreen, soundsEnabled: settings.completionSound)
-        if outcome.sound { NSSound(named: NSSound.Name("Glass"))?.play() }
+        let outcome = AgentQuietPolicy.outcome(
+            for: .completion,
+            fullScreen: FullScreenDetector.frontAppIsFullScreen(),
+            quietEnabled: settings.quietInFullScreen,
+            soundsEnabled: false
+        )
         guard outcome.present else { return }
         guard settings.completionCards, notch.model.approval == nil else {
             // No card to show: a macOS banner (when Settings > Notifications allows it) says it finished.
