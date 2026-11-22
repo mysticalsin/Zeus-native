@@ -8738,7 +8738,7 @@
       }
     },
     {
-      "id": "REG-980",
+      "id": "REG-991",
       "failure": "chmod or listen failing after bind unlinked the path by name, so a socket that had replaced that path was deleted.",
       "features": [
         "F13"
@@ -8750,7 +8750,7 @@
       }
     },
     {
-      "id": "REG-981",
+      "id": "REG-992",
       "failure": "The host could ignore BridgeHostStartup.steps and capture identity before stdin while the startup-order tests still passed. main now runs only BridgeHostStartup.drive, and that function walks the shared list.",
       "features": [
         "F13"
@@ -8762,7 +8762,7 @@
       }
     },
     {
-      "id": "REG-982",
+      "id": "REG-993",
       "failure": "Deleting the st_dev compare still passed the replacement, failed-listen and symlink tests, because those paths differ by inode or by file type. Unlink now refuses a socket that has the same inode on another device.",
       "features": [
         "F13"
@@ -8774,7 +8774,7 @@
       }
     },
     {
-      "id": "REG-983",
+      "id": "REG-994",
       "failure": "stat() in place of lstat still passed the symlink-to-file test, because a followed regular file is not a socket. finish now records the lstat node, so a symlink to a regular file must stay a symlink.",
       "features": [
         "F13"
