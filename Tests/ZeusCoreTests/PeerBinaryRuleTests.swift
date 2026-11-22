@@ -3,7 +3,40 @@ import Testing
 @testable import ZeusCore
 #if canImport(Darwin)
 import Darwin
+#else
+import Glibc
 #endif
+
+/// The socket-safety package compiles this file without the bridge reply tests, so this wait stays here.
+private enum PeerSignatureWait {
+    static func until(seconds: Double, _ condition: () -> Bool) -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+        while ContinuousClock.now < deadline {
+            if condition() { return true }
+            usleep(5_000)
+        }
+        return condition()
+    }
+
+    final class Pending<T: Sendable>: @unchecked Sendable {
+        private let done = DispatchSemaphore(value: 0)
+        private var result: T?
+        fileprivate func finish(_ value: T) {
+            result = value
+            done.signal()
+        }
+        func wait() -> T {
+            done.wait()
+            return result!
+        }
+    }
+
+    static func start<T: Sendable>(_ work: @escaping @Sendable () -> T) -> Pending<T> {
+        let pending = Pending<T>()
+        DispatchQueue.global(qos: .userInitiated).async { pending.finish(work()) }
+        return pending
+    }
+}
 
 /// Who a socket peer IS (signature and location), not what its file is called.
 /// Pure rule tests plus disposable AF_UNIX peers. No app, no network, no permissions.
@@ -437,11 +470,7 @@ struct PeerVerificationWiringTests {
     }
 
     private var ownName: String {
-        #if canImport(Darwin)
-        return (PeerCheck.executablePath(pid: getpid()).map { ($0 as NSString).lastPathComponent }) ?? "unknown"
-        #else
-        return "unknown"
-        #endif
+        (PeerCheck.executablePath(pid: getpid()).map { ($0 as NSString).lastPathComponent }) ?? "unknown"
     }
 
     @Test func aNamedProgramPolicyAlsoNeedsTheSignatureVerifierToAgree() async throws {
@@ -461,7 +490,11 @@ struct PeerVerificationWiringTests {
         #expect(reply == nil)
         #expect(handled.value == 0, "the handler never sees a refused peer's bytes")
         #expect(asked.value == 1)
+        #if canImport(Darwin)
         #expect(asked.tokenSizes == [32], "the verifier gets the kernel's audit token, not a pid")
+        #else
+        #expect(asked.tokenSizes == [nil], "this platform has no audit token, so the verifier is not handed a pid")
+        #endif
     }
 
     @Test func aNamedProgramPolicyAdmitsAPeerTheVerifierAccepts() async throws {
@@ -526,7 +559,7 @@ struct PeerVerificationWiringTests {
         func open() { release.signal() }
     }
 
-    @Test func aSlowSignatureCheckDoesNotHoldUpAnotherConnection() async throws {
+    @Test func aSlowSignatureCheckDoesNotHoldUpAnotherConnection() throws {
         let (root, path) = try socketPath("f.sock")
         defer { try? FileManager.default.removeItem(at: root) }
         let gate = FirstCallGate()
@@ -536,12 +569,12 @@ struct PeerVerificationWiringTests {
         }) { _, reply in reply(Data("{\"ok\":true}".utf8)) }
         try server.start()
         defer { server.stop() }
-        let slow = Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 8) }
-        for _ in 0..<200 where gate.entered == 0 { try await Task.sleep(nanoseconds: 10_000_000) }
+        let slow = PeerSignatureWait.start { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 8) }
+        _ = PeerSignatureWait.until(seconds: 2) { gate.entered > 0 }
         #expect(gate.entered == 1, "the first peer is being checked")
-        let second = await Task.detached { UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 2) }.value
+        let second = UnixSocket.request(path: path, payload: Data("{}".utf8), expectReply: true, timeout: 2)
         #expect(second == Data("{\"ok\":true}".utf8), "the second peer is not queued behind the first check")
         gate.open()
-        #expect(await slow.value == Data("{\"ok\":true}".utf8), "the slow peer is admitted once its check passes")
+        #expect(slow.wait() == Data("{\"ok\":true}".utf8), "the slow peer is admitted once its check passes")
     }
 }
