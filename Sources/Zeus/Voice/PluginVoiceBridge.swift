@@ -145,12 +145,15 @@ enum PluginVoiceBridge {
         if fake { VoiceProviderFakeProtocol.failSynthesis = VoiceProviderE2E.failsSynthesis() }
         let log = ProviderLog { line in NSLog("[ZEUS] voice-provider %@", line) }
         let classes: [AnyClass] = fake ? [VoiceProviderFakeProtocol.self] : []
-        let serviceName: @Sendable (String) -> String = fake
-            ? { VoiceProviderE2E.service(for: $0) }
-            : { _ in VoiceProviderAccounts.service }
-        let keyAccount: @Sendable (String) -> String = fake
-            ? { _ in ProviderCredentialLocation.account }
-            : { VoiceProviderAccounts.keyAccount(for: $0) }
+        let serviceName: @Sendable (String) -> String
+        let keyAccount: @Sendable (String) -> String
+        if fake {
+            serviceName = { VoiceProviderE2E.service(for: $0) }
+            keyAccount = { _ in ProviderCredentialLocation.account }
+        } else {
+            serviceName = { _ in VoiceProviderAccounts.service }
+            keyAccount = { VoiceProviderAccounts.keyAccount(for: $0) }
+        }
         let created = VoiceProviderSession(
             store: KeychainCredentialStore(),
             transport: URLSessionProviderTransport(protocolClasses: classes, log: log),
