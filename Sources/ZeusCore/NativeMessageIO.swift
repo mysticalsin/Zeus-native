@@ -65,20 +65,22 @@ public final class NativeMessageOutput: @unchecked Sendable {
     @discardableResult
     public func enqueue(_ frame: Data, completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Admission {
         guard frame.count >= 4, frame.count <= NativeMessagingFrame.maxHostToChromeBytes + 4 else { return .tooLarge }
-        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
         return lock.withLock {
             guard terminal == nil, !finishing else { return .closed }
             guard frames < Self.maximumQueuedFrames, frame.count <= Self.maximumQueuedBytes - bytes else { return .full }
             frames += 1
             bytes += frame.count
             // Queue submission shares the admission lock, so finish cannot overtake accepted work.
-            queue.async { [self] in performWrite(frame, deadline: deadline, completion: completion) }
+            // The write bound starts when this worker runs. Time spent waiting for the queue is not
+            // a stalled Chrome read, and must not expire the frame before its first byte.
+            queue.async { [self] in performWrite(frame, completion: completion) }
             return .accepted
         }
     }
 
-    private func performWrite(_ frame: Data, deadline: TimeInterval,
+    private func performWrite(_ frame: Data,
                               completion: @escaping @Sendable (Result<Void, Failure>) -> Void) {
+        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
         let result: Result<Void, Failure>
         do {
             try write(frame, deadline: deadline)
