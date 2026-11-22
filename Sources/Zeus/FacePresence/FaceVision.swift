@@ -76,10 +76,10 @@ enum FaceVision {
         let glare = FaceSelection.paddedCrop(pixelBox, imageSize: size).flatMap { image.cropping(to: $0) }
             .flatMap { glareSample(of: $0) }
         let overlap = deviceOverlap(in: image, faceBox: pixelBox)
-        let motion = faceLandmarks.map { livenessNumbers(from: $0, imageSize: size) }
+        let motion = faceLandmarks.flatMap { livenessNumbers(from: $0, imageSize: size) }
         return FrameAnalysis(faceCount: faces.count, faceBox: box, observation: observation, quality: faceQuality,
                              alignment: aligned.tier, spoofFrame: SpoofFrame(glare: glare, deviceOverlapFraction: overlap),
-                             eyeAspect: motion?.aspect, yaw: motion?.yaw)
+                             eyeAspect: motion.map(\.aspect), yaw: motion.map(\.yaw))
     }
 
     // MARK: Feature print

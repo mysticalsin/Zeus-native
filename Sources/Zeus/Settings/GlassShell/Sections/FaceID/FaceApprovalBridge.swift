@@ -65,6 +65,9 @@ private struct PresenceCameraPort: FaceApprovalCameraDriving {
     mutating func requestAccessIfNeeded() -> FaceCameraAccess { access }
 
     mutating func setRunning(_ running: Bool) {
-        FacePresenceController.shared.setApprovalCapture(running)
+        // The session calls this synchronously from the main-actor bridge.
+        MainActor.assumeIsolated {
+            FacePresenceController.shared.setApprovalCapture(running)
+        }
     }
 }
