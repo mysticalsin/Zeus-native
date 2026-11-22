@@ -204,6 +204,10 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         let personaVoice = PersonaSpeakRoute.resolvedVoiceID(for: PersonaCatalog.current())
         let steps = Self.personaSteps(settings)
         VoiceLog.log("speak", PersonaSpeakRoute.logLine(voiceID: personaVoice, steps: steps))
+        if attemptOverride != nil {
+            guard let voiceName = await attempt(.kokoro, text, settings: settings, began: began) else { return nil }
+            return played(.kokoro, voice: voiceName, reason: "test voice", began: began, settings: settings)
+        }
         for step in steps {
             if Task.isCancelled { return nil }
             audioReadyAt = nil

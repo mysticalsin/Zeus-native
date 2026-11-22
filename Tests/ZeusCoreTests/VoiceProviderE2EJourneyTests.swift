@@ -15,7 +15,7 @@ struct VoiceProviderE2EJourneyTests {
         let harness = try JourneyHarness()
         await harness.session.saveKey(providerID: ElevenLabsTTSAdapter.id, key: key)
         #expect(await harness.session.readiness(for: ElevenLabsTTSAdapter.id) == .ready)
-        await harness.session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: "e2e-voice")
+        await harness.session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: "zeus.synthetic")
         await harness.session.select(.provider(ElevenLabsTTSAdapter.id))
         let test = await harness.session.speak("This is Zeus.")
         guard case .cloud = test.route else { Issue.record("test voice did not use the provider"); return }
@@ -88,14 +88,15 @@ struct VoiceProviderE2EJourneyTests {
     @Test func relaunchKeepsTheKeyTheVoiceAndTheChoice() async throws {
         let harness = try JourneyHarness()
         await ready(harness, ElevenLabsTTSAdapter.id, key)
-        await harness.session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: "e2e-voice")
+        await harness.session.chooseVoice(providerID: ElevenLabsTTSAdapter.id, voiceID: "zeus.synthetic")
         await harness.session.select(.provider(ElevenLabsTTSAdapter.id))
         let again = VoiceProviderSession(store: harness.store, transport: harness.transport, local: harness.local,
-                                         preferences: harness.preferences, log: harness.log, signposter: harness.signposter)
+                                         preferences: harness.preferences, log: harness.log, signposter: harness.signposter,
+                                         firstAudioBudgetMs: 30_000)
         #expect(await again.choice == .provider(ElevenLabsTTSAdapter.id))
         let account = VoiceProviderAccounts.keyAccount(for: ElevenLabsTTSAdapter.id)
         #expect(harness.store.read(service: VoiceProviderAccounts.service, account: account) == key)
-        #expect(harness.store.read(service: VoiceProviderAccounts.service, account: "elevenlabs.voice-id") == "e2e-voice")
+        #expect(harness.store.read(service: VoiceProviderAccounts.service, account: "elevenlabs.voice-id") == "zeus.synthetic")
         let before = await again.speak("Before validate.")
         #expect(before.route == .local(.notReady))
         #expect(!harness.transport.requests.contains { $0.httpBodyContains("Before validate.") })
@@ -374,7 +375,8 @@ private struct JourneyHarness {
         let box = logBox
         session = VoiceProviderSession(store: store, transport: transport, local: local,
                                        preferences: preferences, log: ProviderLog { box.add($0) },
-                                       signposter: signposter, system: system)
+                                       signposter: signposter, system: system,
+                                       firstAudioBudgetMs: 30_000)
     }
 }
 
@@ -440,8 +442,8 @@ private final class JourneyTransport: ProviderHTTPTransport, @unchecked Sendable
         if path.hasSuffix("/user") { return ProviderHTTPResponse(status: validateStatus, body: Data("{}".utf8)) }
         if path.hasSuffix("/voices") {
             let body: [String: Any] = request.url.host?.contains("googleapis") == true
-                ? ["voices": [["name": "e2e-voice", "languageCodes": ["en-US"]]]]
-                : ["voices": [["voice_id": "e2e-voice", "name": "E2E Voice"]]]
+                ? ["voices": [["name": "zeus.synthetic", "languageCodes": ["en-US"]]]]
+                : ["voices": [["voice_id": "zeus.synthetic", "name": "E2E Voice"]]]
             let status = path.contains("texttospeech") ? validateStatus : validateStatus
             return ProviderHTTPResponse(status: status, body: try JSONSerialization.data(withJSONObject: body))
         }

@@ -199,7 +199,8 @@ public actor VoiceProviderSession {
                 adapters: [any TTSProvider]? = nil,
                 serviceName: @escaping @Sendable (String) -> String = { _ in VoiceProviderAccounts.service },
                 keyAccount: @escaping @Sendable (String) -> String = VoiceProviderAccounts.keyAccount(for:),
-                system: any SystemSpeechSpeaking = SilentSystemSpeech()) {
+                system: any SystemSpeechSpeaking = SilentSystemSpeech(),
+                firstAudioBudgetMs: Int = ProviderSpeakAbort.milliseconds) {
         self.store = store
         self.transport = transport
         self.local = local
@@ -210,6 +211,7 @@ public actor VoiceProviderSession {
         self.serviceName = serviceName
         self.keyAccount = keyAccount
         self.system = system
+        self.firstAudioBudgetMs = firstAudioBudgetMs
         var machine = VoiceProviderSelectionMachine(choice: preferences.choice)
         for entry in ProviderRegistry.entries {
             let id = entry.descriptor.id
