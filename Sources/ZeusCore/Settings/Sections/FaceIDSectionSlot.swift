@@ -1,9 +1,18 @@
 import Foundation
 
 public enum FaceIDSectionSlot: GlassSlotProviding {
-    public static var keyContributions: [SettingsKeyContribution] { [] }
+    /// Saved on this Mac. An import may turn it off and may not turn it on. The template is not a setting.
+    public static var keyContributions: [SettingsKeyContribution] {
+        [FaceApprovalPreference.contribution]
+    }
 
+    /// The card is on the existing Privacy page. It is not a sidebar row.
     public static let descriptor = GlassSectionSlot(
-        id: "glass.faceID", title: "Face ID", filled: false, keys: [], order: 0, placement: .cardOn(.privacy, 0)
+        id: "glass.faceID",
+        title: "Face ID",
+        filled: true,
+        keys: [],
+        order: 1,
+        placement: .cardOn(.privacy, 1)
     )
 }
