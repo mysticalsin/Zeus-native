@@ -93,9 +93,8 @@ private final class WavFinish: @unchecked Sendable {
     }
 }
 
-@MainActor
 private final class ProviderPlayerDelegate: NSObject, AVAudioPlayerDelegate {
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         ProviderPlaybackGate.shared.endPlayer(ObjectIdentifier(player))
     }
 }
@@ -128,15 +127,18 @@ enum PluginVoiceBridge {
         if let session { return session }
         let fake = VoiceProviderE2E.isEnabled()
         if fake { VoiceProviderFakeProtocol.failSynthesis = VoiceProviderE2E.failsSynthesis() }
-        let log = ProviderLog { line in NSLog("[ZEUS] voice-provider %@", line) }
+        let log = ProviderLog(sink: { @Sendable line in NSLog("[ZEUS] voice-provider %@", line) })
+        let protocols: [AnyClass] = fake ? [VoiceProviderFakeProtocol.self] : []
+        let serviceName: @Sendable (String) -> String = fake ? { VoiceProviderE2E.service(for: $0) } : { _ in VoiceProviderAccounts.service }
+        let keyAccount: @Sendable (String) -> String = fake ? { _ in ProviderCredentialLocation.account } : { VoiceProviderAccounts.keyAccount(for: $0) }
         let created = VoiceProviderSession(
             store: KeychainCredentialStore(),
-            transport: URLSessionProviderTransport(protocolClasses: fake ? [VoiceProviderFakeProtocol.self] : [], log: log),
+            transport: URLSessionProviderTransport(protocolClasses: protocols, log: log),
             local: MarkerLocalVoice(),
             preferences: VoiceProviderPreferences(defaults: .standard),
             log: log,
-            serviceName: fake ? { VoiceProviderE2E.service(for: $0) } : { _ in VoiceProviderAccounts.service },
-            keyAccount: fake ? { _ in ProviderCredentialLocation.account } : { VoiceProviderAccounts.keyAccount(for: $0) },
+            serviceName: serviceName,
+            keyAccount: keyAccount,
             system: MacSystemSpeech()
         )
         session = created
