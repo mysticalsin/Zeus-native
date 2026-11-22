@@ -15,59 +15,172 @@ final class AgentHub {
 
     // MARK: Reply
 
-    var selectedSession: String?
-    var replyDraft = ""
+    var selectedSession: String? {
+        didSet {
+            guard !syncingReply, oldValue != selectedSession else { return }
+            let wasAwaiting = replyGate.state.status == .awaitingDecision
+            let step = replyGate.bind(selectedSession)
+            publish(step, wasAwaiting: wasAwaiting)
+        }
+    }
+    var replyDraft = "" {
+        didSet {
+            guard !syncingReply, oldValue != replyDraft else { return }
+            let session = selectedSession ?? ""
+            let wasAwaiting = replyGate.state.status == .awaitingDecision
+            let step = replyGate.perform(
+                .textChanged,
+                sessionID: session,
+                field: replyDraft,
+                destinationCanTakeText: canReply(to: session),
+                trusted: replyIsTrusted(session))
+            publish(step, wasAwaiting: wasAwaiting)
+            if replyDraft != replyGate.state.draft {
+                syncingReply = true
+                replyDraft = replyGate.state.draft
+                syncingReply = false
+            }
+        }
+    }
     private(set) var sending = false
     /// What the last send did, shown under the field.
     private(set) var receipt: String?
+    /// Inline approval for the selected row. Trust does not set this by itself.
+    var replyNeedsApproval: Bool { replyGate.state.status == .awaitingDecision }
+    var replyPhase: HubReplyStatus { replyGate.state.status }
 
-    /// The injected steps of the reply path. Tests and previews replace them.
+    /// The injected steps of the reply path. Tests and previews replace the runner.
+    /// The bundled `send` is not called: its approval closure refuses, so it cannot type.
     @ObservationIgnored var sender: AgentReplySender?
+    @ObservationIgnored private var syncingReply = false
+    @ObservationIgnored private var replyGate = HubReplyDispatch()
+    @ObservationIgnored private var replyTimeout: Task<Void, Never>?
+    @ObservationIgnored private var replyEpoch = 0
 
     func canReply(to session: String) -> Bool {
         AgentReply.supports(AgentTerminals.shared.info(for: session))
     }
 
-    /// Types the draft into the session's terminal after an approval card.
+    /// Asks inline. Nothing is typed from this call.
     func sendReply(session: NotchModel.Session) async {
-        let text = replyDraft
-        guard !sending else { return }
-        sending = true
-        receipt = nil
-        defer { sending = false }
-        let outcome = await (sender ?? liveSender).send(text, to: session.id, agent: session.agent)
-        switch outcome {
-        case .sent:
-            replyDraft = ""
-            receipt = "Sent to \(session.agent)'s terminal."
-        case .empty: receipt = "Type something first."
-        case .declined: receipt = "Not sent."
-        case .unsupported:
-            receipt = "This terminal can't take typed replies. Open it and reply there."
-        case .failed:
-            receipt = "I couldn't find that terminal tab. Open it and reply there."
-        }
+        guard session.id == selectedSession, !session.id.isEmpty else { return }
+        guard replyGate.state.status != .sending else { return }
+        let wasAwaiting = replyGate.state.status == .awaitingDecision
+        let step = replyGate.perform(
+            .send,
+            sessionID: session.id,
+            field: replyDraft,
+            destinationCanTakeText: canReply(to: session.id),
+            trusted: replyIsTrusted(session.id))
+        publish(step, wasAwaiting: wasAwaiting)
+    }
+
+    /// Types the approved line. A missing approval, a bad destination, or an unsafe line types nothing.
+    func approveReply() async {
+        guard let session = selectedSession, !session.isEmpty else { return }
+        guard replyGate.state.status == .awaitingDecision else { return }
+        let step = replyGate.perform(
+            .approved,
+            sessionID: session,
+            field: replyDraft,
+            destinationCanTakeText: canReply(to: session),
+            trusted: replyIsTrusted(session))
+        publish(step, wasAwaiting: true)
+        guard let line = step.typedLine, step.sessionID == session else { return }
+        let typed = await typeApprovedLine(line, sessionID: session)
+        guard selectedSession == session else { return }
+        let done = replyGate.finished(sessionID: session, typed: typed)
+        publish(done, wasAwaiting: false)
+    }
+
+    func denyReply() {
+        guard let session = selectedSession, !session.isEmpty else { return }
+        let step = replyGate.perform(
+            .denied,
+            sessionID: session,
+            field: replyDraft,
+            destinationCanTakeText: canReply(to: session),
+            trusted: replyIsTrusted(session))
+        publish(step, wasAwaiting: true)
+    }
+
+    func cancelReply() {
+        guard let session = selectedSession, !session.isEmpty else { return }
+        let step = replyGate.cancel(sessionID: session)
+        publish(step, wasAwaiting: true)
+    }
+
+    func timeoutReply() {
+        guard let session = selectedSession, !session.isEmpty else { return }
+        let step = replyGate.perform(
+            .timedOut,
+            sessionID: session,
+            field: replyDraft,
+            destinationCanTakeText: canReply(to: session),
+            trusted: replyIsTrusted(session))
+        publish(step, wasAwaiting: true)
     }
 
     func openTerminal(_ session: String) { AgentTerminals.shared.jump(to: session) }
 
+    private func publish(_ step: HubReplyDispatch.Step, wasAwaiting: Bool) {
+        syncingReply = true
+        replyDraft = step.state.draft
+        receipt = step.state.receipt?.rawValue
+        sending = step.state.status == .sending
+        syncingReply = false
+        let awaiting = step.state.status == .awaitingDecision
+        if awaiting, !wasAwaiting {
+            armReplyTimeout()
+        } else if !awaiting {
+            replyEpoch += 1
+            replyTimeout?.cancel()
+            replyTimeout = nil
+        }
+    }
+
+    /// The existing reply wait. It denies. It is not the chime window and not the stall limit.
+    private func armReplyTimeout() {
+        replyTimeout?.cancel()
+        replyEpoch += 1
+        let epoch = replyEpoch
+        let session = selectedSession
+        replyTimeout = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled, epoch == self.replyEpoch, self.selectedSession == session else { return }
+            guard self.replyGate.state.status == .awaitingDecision else { return }
+            self.timeoutReply()
+        }
+    }
+
+    private func replyIsTrusted(_ session: String) -> Bool {
+        TrustedChatStore.shared.chats.isTrusted(session)
+    }
+
+    /// Builds a script only after the gate has released a line, then runs it only if the guard agrees.
+    private func typeApprovedLine(_ line: String, sessionID: String) async -> Bool {
+        guard sessionID == selectedSession, !sessionID.isEmpty else { return false }
+        guard HubReplyTyping.canType(line) else { return false }
+        let typer = sender ?? liveSender
+        guard let info = typer.terminal(sessionID) else { return false }
+        guard let script = AgentReply.script(for: info, text: line) else { return false }
+        guard HubReplyScriptGuard.mayRun(script: script, line: line, approved: true) else { return false }
+        guard sessionID == selectedSession else { return false }
+        if let sender {
+            return await sender.run(script)
+        }
+        return await Self.runGuardedScript(script)
+    }
+
     private var liveSender: AgentReplySender {
         AgentReplySender(
-            // Safe: AgentReplySender.send is @MainActor, so this closure only runs on the main thread.
+            // Safe: the terminal lookup reads main-actor state, and this closure runs on the main actor.
             terminal: { session in MainActor.assumeIsolated { AgentTerminals.shared.info(for: session) } },
-            approve: { [weak self] agent, text in await self?.approve(agent: agent, text: text) ?? false },
-            run: { script in await Self.run(script) })
+            approve: { _, _ in false },
+            run: { script in await Self.runGuardedScript(script) })
     }
 
-    /// Typing into a terminal always asks first, on a notch card.
-    private func approve(agent: String, text: String) async -> Bool {
-        guard let notch else { return false }
-        let verdict = await notch.requestApproval(agent: agent, project: "Reply", tool: "Terminal",
-                                                  command: "type: \(text)", risk: .low, timeout: .seconds(30), onTimeout: .deny)
-        return verdict == .allow
-    }
-
-    private static func run(_ script: String) async -> Bool {
+    private static func runGuardedScript(_ script: String) async -> Bool {
         await MainActor.run {
             var error: NSDictionary?
             return NSAppleScript(source: script)?.executeAndReturnError(&error).booleanValue == true
