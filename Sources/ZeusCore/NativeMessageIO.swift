@@ -65,23 +65,22 @@ public final class NativeMessageOutput: @unchecked Sendable {
     @discardableResult
     public func enqueue(_ frame: Data, completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Admission {
         guard frame.count >= 4, frame.count <= NativeMessagingFrame.maxHostToChromeBytes + 4 else { return .tooLarge }
-        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
         return lock.withLock {
             guard terminal == nil, !finishing else { return .closed }
             guard frames < Self.maximumQueuedFrames, frame.count <= Self.maximumQueuedBytes - bytes else { return .full }
             frames += 1
             bytes += frame.count
             // Queue submission shares the admission lock, so finish cannot overtake accepted work.
-            queue.async { [self] in performWrite(frame, deadline: deadline, completion: completion) }
+            queue.async { [self] in performWrite(frame, completion: completion) }
             return .accepted
         }
     }
 
-    private func performWrite(_ frame: Data, deadline: TimeInterval,
+    private func performWrite(_ frame: Data,
                               completion: @escaping @Sendable (Result<Void, Failure>) -> Void) {
         let result: Result<Void, Failure>
         do {
-            try write(frame, deadline: deadline)
+            try write(frame)
             result = .success(())
         } catch {
             let failure = error as? Failure ?? .unavailable
@@ -126,7 +125,9 @@ public final class NativeMessageOutput: @unchecked Sendable {
         }
     }
 
-    private func write(_ data: Data, deadline: TimeInterval) throws {
+    /// `writeTimeout` counts time `poll` spends waiting for the pipe. Time this thread spends
+    /// off CPU is not a Chrome reader that has stopped draining.
+    private func write(_ data: Data) throws {
         #if !canImport(Darwin)
         // Linux has no F_SETNOSIGPIPE for pipes. Mask only this worker, and consume only
         // a newly generated SIGPIPE before restoring its previous signal mask.
@@ -149,14 +150,19 @@ public final class NativeMessageOutput: @unchecked Sendable {
         try data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
             var offset = 0
+            var waitedMs = 0
+            let budgetMs = Int(writeTimeout * 1000)
             while offset < raw.count {
                 if let failure = lock.withLock({ terminal }) { throw failure }
-                guard ProcessInfo.processInfo.systemUptime < deadline else { throw Failure.timedOut }
                 var pollFD = pollfd(fd: descriptor.fd, events: Int16(POLLOUT), revents: 0)
                 let ready = poll(&pollFD, 1, 25)
                 if ready < 0 && errno == EINTR { continue }
                 guard ready >= 0 else { throw Failure.unavailable }
-                if ready == 0 { continue }
+                if ready == 0 {
+                    waitedMs += 25
+                    if waitedMs >= budgetMs { throw Failure.timedOut }
+                    continue
+                }
                 guard pollFD.revents & Int16(POLLERR | POLLHUP | POLLNVAL) == 0 else { throw Failure.unavailable }
                 #if canImport(Darwin)
                 let written = Darwin.write(descriptor.fd, base.advanced(by: offset), min(16_384, raw.count - offset))

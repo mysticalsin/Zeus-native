@@ -8676,6 +8676,114 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-975",
+      "failure": "The native-host fixture wrote Chrome's framed stdin with FileHandle.write. That call blocks until the pipe drains, so a bridge that had not armed its reader froze the pending-reply suite on the caller.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeHostProcessTests.swift",
+      "function": "unreadStdinPipeWriteReturnsBeforeTheReaderDrains"
+      }
+    },
+    {
+      "id": "REG-976",
+      "failure": "finish unlinked the socket path even when this process had not bound it, so a pre-existing file or a replaced inode could be removed. Unlink only the dev/inode from a successful bind, and only while lstat still shows that socket.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "finishBeforeAttachLeavesAFileThisProcessDidNotBind"
+      }
+    },
+    {
+      "id": "REG-977",
+      "failure": "A Chrome frame could settle a pending reply before the bridge had captured its own identity. Until that flag is set, only ping and unknown_type are answered.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "beforeOwnIdentityOnlyPingAndUnknownTypeAreAnswered"
+      }
+    },
+    {
+      "id": "REG-978",
+      "failure": "captureOwnIdentity returns nil where no signature can be kept. PeerBinaryRule.decide must refuse that nil own signature instead of trusting the peer.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-socket-safety",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PeerBinaryRuleTests.swift",
+        "function": "nilOwnSignatureFromCaptureOwnIdentityRefusesThePeer"
+      }
+    },
+    {
+      "id": "REG-979",
+      "failure": "Moving captureOwnIdentity before or after the stdin reader did not fail a test, because nothing executed the startup list. Identity must be the step immediately after stdin is armed.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "identityIsCapturedImmediatelyAfterStdinIsArmed"
+      }
+    },
+    {
+      "id": "REG-991",
+      "failure": "chmod or listen failing after bind unlinked the path by name, so a socket that had replaced that path was deleted.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "failedListenAfterBindLeavesAReplacementSocket"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The host could ignore BridgeHostStartup.steps and capture identity before stdin while the startup-order tests still passed. main now runs only BridgeHostStartup.drive, and that function walks the shared list.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "theHostDrivesThatListAndNoOtherOrder"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "Deleting the st_dev compare still passed the replacement, failed-listen and symlink tests, because those paths differ by inode or by file type. Unlink now refuses a socket that has the same inode on another device.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "finishLeavesASocketWithTheSameInodeOnAnotherDevice"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "stat() in place of lstat still passed the symlink-to-file test, because a followed regular file is not a socket. finish now records the lstat node, so a symlink to a regular file must stay a symlink.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BridgePendingRepliesTests.swift",
+        "function": "finishKeepsASymlinkToARegularFileByLstat"
+      }
     }
-]
+  ]
 }

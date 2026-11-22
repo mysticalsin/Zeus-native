@@ -7,6 +7,70 @@ import Glibc
 #endif
 @testable import ZeusCore
 
+private final class PipeWriteFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Int?
+    func store(_ count: Int) { lock.withLock { stored = count } }
+    var isReady: Bool { lock.withLock { stored != nil } }
+    var value: Int { lock.withLock { stored ?? -1 } }
+}
+
+/// A pipe write that returns when the buffer is full. `FileHandle.write` waits until a reader
+/// drains it, which freezes the host fixture when `zeus-bridge` has not armed stdin yet.
+private enum BoundedFileWrite {
+    static func write(_ handle: FileHandle, _ data: Data, timeout: TimeInterval) throws -> Int {
+        let fd = handle.fileDescriptor
+        let flags = fcntl(fd, F_GETFL)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else { throw POSIXError(.EIO) }
+        defer { _ = fcntl(fd, F_SETFL, flags) }
+        #if canImport(Darwin)
+        _ = fcntl(fd, F_SETNOSIGPIPE, 1)
+        #else
+        var mask = sigset_t(), previous = sigset_t(), pending = sigset_t()
+        sigemptyset(&mask); sigaddset(&mask, SIGPIPE)
+        let masked = pthread_sigmask(SIG_BLOCK, &mask, &previous) == 0
+        sigpending(&pending)
+        let alreadyPending = sigismember(&pending, SIGPIPE) == 1
+        defer {
+            if masked {
+                if !alreadyPending {
+                    sigpending(&pending)
+                    if sigismember(&pending, SIGPIPE) == 1 {
+                        var zero = timespec(tv_sec: 0, tv_nsec: 0)
+                        _ = sigtimedwait(&mask, nil, &zero)
+                    }
+                }
+                pthread_sigmask(SIG_SETMASK, &previous, nil)
+            }
+        }
+        #endif
+        let deadline = ContinuousClock.now.advanced(by: .seconds(timeout))
+        var offset = 0
+        try data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            while offset < raw.count {
+                if ContinuousClock.now >= deadline { return }
+                var slot = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+                let ready = poll(&slot, 1, 20)
+                if ready < 0 { if errno == EINTR { continue }; throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+                if ready == 0 { continue }
+                if slot.revents & Int16(POLLERR | POLLHUP | POLLNVAL) != 0 { throw POSIXError(.EPIPE) }
+                let count: Int
+                #if canImport(Darwin)
+                count = Darwin.write(fd, base.advanced(by: offset), min(16_384, raw.count - offset))
+                #else
+                count = Glibc.write(fd, base.advanced(by: offset), min(16_384, raw.count - offset))
+                #endif
+                if count > 0 { offset += count; continue }
+                if count < 0 && (errno == EINTR || errno == EAGAIN) { continue }
+                if count < 0 && errno == EPIPE { throw POSIXError(.EPIPE) }
+                throw POSIXError(.EIO)
+            }
+        }
+        return offset
+    }
+}
+
 /// Exact built native-host process, synthetic frames and an isolated support directory only.
 /// Does not register/open Chrome, invoke a browser action, or inspect user settings or credentials.
 @Suite("Native host process boundaries", .serialized)
@@ -47,6 +111,13 @@ struct NativeHostProcessTests {
             try? errors.fileHandleForReading.close()
             try? FileManager.default.removeItem(at: root)
         }
+        /// Chrome frames are larger than the pipe. A host that is not reading must make this return,
+        /// not leave the caller blocked in `FileHandle.write`.
+        @discardableResult
+        func send(_ data: Data, timeout: TimeInterval = 2) throws -> Int {
+            try BoundedFileWrite.write(input.fileHandleForWriting, data, timeout: timeout)
+        }
+
         func waitForSocket() async throws {
             let deadline = ContinuousClock.now.advanced(by: .seconds(2))
             while !FileManager.default.fileExists(atPath: path), process.isRunning, ContinuousClock.now < deadline {
@@ -89,7 +160,9 @@ struct NativeHostProcessTests {
         }
 
         func waitForForwardedBytes() async throws -> Bool {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            // The child is already bound. A busy runner can still take more than two seconds
+            // to schedule the first forwarded frame.
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
             repeat {
                 var ready = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
                 if poll(&ready, 1, 0) > 0, ready.revents & Int16(POLLIN) != 0 { return true }
@@ -97,6 +170,33 @@ struct NativeHostProcessTests {
             } while process.isRunning && ContinuousClock.now < deadline
             return false
         }
+    }
+
+    /// Chrome's framed stdin is larger than a pipe. The write has to return while the read end is
+    /// still open and idle. A blocking write is closed at 2 seconds so the suite fails instead of hanging.
+    @Test func unreadStdinPipeWriteReturnsBeforeTheReaderDrains() async throws {
+        let pipe = Pipe()
+        let payload = Data(repeating: 0x61, count: 512 * 1024)
+        let wrote = PipeWriteFlag()
+        let worker = Task.detached {
+            let count = try? BoundedFileWrite.write(pipe.fileHandleForWriting, payload, timeout: 0.4)
+            if let count { wrote.store(count) }
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while !wrote.isReady, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        if !wrote.isReady {
+            try? pipe.fileHandleForReading.close()
+            _ = await worker.value
+            Issue.record("stdin write did not return before the 2 second test deadline")
+            try? pipe.fileHandleForWriting.close()
+            return
+        }
+        try? pipe.fileHandleForReading.close()
+        try? pipe.fileHandleForWriting.close()
+        _ = await worker.value
+        #expect(wrote.value < payload.count)
     }
 
     @Test func oversizedHeaderIsRejectedBeforeBodyAndPendingSocketIsSettled() async throws {
@@ -107,7 +207,7 @@ struct NativeHostProcessTests {
         let reply = Task.detached { UnixSocket.request(path: fixture.path, payload: request, expectReply: true, timeout: 4) }
         #expect(try await fixture.waitForForwardedBytes())
         // The entire malformed input is four bytes, not a multi-gigabyte allocation.
-        try fixture.input.fileHandleForWriting.write(contentsOf: Data([0xff, 0xff, 0xff, 0xff]))
+        #expect(try fixture.send(Data([0xff, 0xff, 0xff, 0xff])) == 4)
         let exited = try await fixture.waitForExit(seconds: 2)
         #expect(exited)
         guard exited else { fixture.stop(); _ = await reply.value; return }
@@ -150,7 +250,8 @@ struct NativeHostProcessTests {
         try await fixture.waitForSocket()
         let type = String(repeating: "unknown-", count: 20_000)
         let request = try JSONEncoder().encode(BridgeRequest(id: "reply-before-clean-eof", type: type))
-        try fixture.input.fileHandleForWriting.write(contentsOf: NativeMessagingFrame.encode(request))
+        let frame = try NativeMessagingFrame.encode(request)
+        #expect(try fixture.send(frame) == frame.count)
         try fixture.input.fileHandleForWriting.close()
         // The response exceeds pipe capacity. Let EOF race with its blocked write before draining.
         try await Task.sleep(for: .milliseconds(50))
@@ -173,7 +274,7 @@ struct NativeHostProcessTests {
             let fixture = try Fixture()
             defer { fixture.stop() }
             try await fixture.waitForSocket()
-            if partial { try fixture.input.fileHandleForWriting.write(contentsOf: Data([1, 0])) }
+            if partial { #expect(try fixture.send(Data([1, 0])) == 2) }
             try fixture.input.fileHandleForWriting.close()
             let exited = try await fixture.waitForExit(seconds: 2)
             #expect(exited)

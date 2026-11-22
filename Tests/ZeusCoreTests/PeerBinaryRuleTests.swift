@@ -59,6 +59,14 @@ struct PeerBinaryRuleTests {
         #expect(!decide(own: signature(valid: false, team: "ABCDE12345"), peer: signature(team: "ABCDE12345"), path: appBinary).isAllowed)
     }
 
+    /// `captureOwnIdentity` returns nil where there is no signature to keep. That nil is the own
+    /// signature the bridge would hand to this rule, and it must fail closed.
+    @Test func nilOwnSignatureFromCaptureOwnIdentityRefusesThePeer() {
+        let peer = signature(team: "ABCDE12345", anchored: true)
+        let verdict = decide(own: nil, peer: peer, path: appBinary, expectedPeerIdentifier: "Zeus", trustShippingBundle: true)
+        #expect(verdict == .deny("own code signature unavailable"))
+    }
+
     // MARK: Ad hoc or locally signed (development builds, the test host)
 
     @Test func aLocalBuildTrustsPeersInsideItsOwnBundle() {
