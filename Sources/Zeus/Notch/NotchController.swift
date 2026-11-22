@@ -94,7 +94,7 @@ final class NotchController {
             MainActor.assumeIsolated {
                 self?.dragChangeCount = NSPasteboard(name: .drag).changeCount
                 // A click that can open the notch is not also a click outside it. The panel waits for settle.
-                if self?.beginClickOpen() == true { return }
+                if self?.openOnClick() == true { return }
                 self?.clickedOutside()
             }
         } as Any)
@@ -103,7 +103,7 @@ final class NotchController {
         } as Any)
         // Click mode: the global monitor misses clicks while a Zeus window is frontmost.
         dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-            MainActor.assumeIsolated { _ = self?.beginClickOpen() }
+            MainActor.assumeIsolated { _ = self?.openOnClick() }
             return event
         } as Any)
         dragMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] event in
@@ -476,12 +476,26 @@ final class NotchController {
         show(.closed)
     }
 
+    /// True once the pointer has settled and the click route may open the panel. Mouse-down leaves this false.
+    private var clickReadyToOpen = false
+
     /// Click mode: a left click on the click zone may open the panel, but only after the pointer settles.
     /// Mouse-down starts the gesture and returns true so the click is not also a click outside. The closed
     /// window stays click-through. The 14 pt zone is unchanged.
-    private func beginClickOpen() -> Bool {
+    private func openOnClick() -> Bool {
         let point = pointer()
-        guard acceptsClickOpen(at: point) else { return false }
+        guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
+        guard !drawnNotch.isCalibrating else { return false }
+        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
+        guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
+                                          point: point, zone: zone) else { return false }
+        if clickReadyToOpen {
+            clickReadyToOpen = false
+            hoverTask?.cancel()
+            hoverTask = nil
+            show(.panel)
+            return true
+        }
         deliverGesture(gestureLink.receive(.down(at: now(), x: point.x, y: point.y, clickCount: 1)))
         return true
     }
@@ -494,14 +508,6 @@ final class NotchController {
     private func moveClickOpen() {
         let point = pointer()
         deliverGesture(gestureLink.receive(.move(at: now(), x: point.x, y: point.y)))
-    }
-
-    private func acceptsClickOpen(at point: CGPoint) -> Bool {
-        guard let screen, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return false }
-        guard !drawnNotch.isCalibrating else { return false }
-        let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
-        return NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
-                                           point: point, zone: zone)
     }
 
     private func deliverGesture(_ outcome: NotchWeatherGestureLink.Outcome) {
@@ -521,19 +527,11 @@ final class NotchController {
         }
         for route in outcome.routes {
             onGestureRoute(route)
-            if route == .click { openSettledClick() }
+            if route == .click {
+                clickReadyToOpen = true
+                _ = openOnClick()
+            }
         }
-    }
-
-    /// The settled click route. Mouse-down does not reach here.
-    private func openSettledClick() {
-        guard model.presentation != .panel else { return }
-        guard screen != nil, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
-        guard !drawnNotch.isCalibrating else { return }
-        guard Self.openTrigger == .click else { return }
-        hoverTask?.cancel()
-        hoverTask = nil
-        show(.panel)
     }
 
     /// The accessibility "Open Zeus panel" action on the notch: the same result as a completed hover or click.
