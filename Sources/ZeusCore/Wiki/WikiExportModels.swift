@@ -102,7 +102,7 @@ public struct WikiExportDraft: Codable, Equatable, Identifiable, Sendable {
         }
         try checkSources(selected, in: snapshot)
         let destination = try WikiExportDestination(connection: connection)
-        let stamp = SensitiveInfoScanner.withICULock { ISO8601DateFormatter().string(from: now) }
+        let stamp = ISO8601DateFormatter().string(from: now)
         func quoted(_ value: String) throws -> String {
             // JSON strings are also valid quoted YAML scalars; no unescaped front-matter values.
             String(decoding: try JSONEncoder().encode(value), as: UTF8.self)

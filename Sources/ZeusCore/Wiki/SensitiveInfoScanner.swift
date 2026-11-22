@@ -154,9 +154,11 @@ public enum SensitiveInfoScanner {
     // MARK: Patterns
     //
     // Each pattern is compiled once. NSRegularExpression is safe to match from many threads after
-    // that (the Linux matcher clones the ICU expression per match). Compiling, and the first use of
-    // another ICU service such as the export timestamp, share one lock: concurrent uregex_open and
-    // ucal_open in this process have crashed with signal 11.
+    // that (the Linux matcher clones the ICU expression per match). Compilation itself is serialized:
+    // concurrent uregex_open in this process has crashed with signal 11. The lock stays around
+    // compilation only. Holding it across ISO8601DateFormatter deadlocks the Mac test runner,
+    // because that formatter can wait for the main thread while a scan on the main thread waits
+    // for the lock.
 
     private struct PatternKey: Hashable {
         var pattern: String
@@ -165,13 +167,6 @@ public enum SensitiveInfoScanner {
 
     private static let icuLock = NSLock()
     nonisolated(unsafe) private static var compiledPatterns: [PatternKey: NSRegularExpression] = [:]
-
-    /// Serializes the first use of an ICU service with pattern compilation.
-    static func withICULock<T>(_ body: () throws -> T) rethrows -> T {
-        icuLock.lock()
-        defer { icuLock.unlock() }
-        return try body()
-    }
 
     private static func regex(_ pattern: String, caseInsensitive: Bool = false) -> NSRegularExpression {
         let key = PatternKey(pattern: pattern, caseInsensitive: caseInsensitive)
