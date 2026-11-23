@@ -1,8 +1,10 @@
 import Foundation
 
 /// What the Scribe page and top bar show. Derived ONLY from the session machine's phase: nothing here
-/// is advanced by a timer. The one time-based input is `revealElapsed`, which only decides how long the
-/// post-`notesReady` wash is drawn (`.revealing` -> `.complete`); it never moves the machine.
+/// is advanced by a timer. Connecting stays `.connecting` for every `elapsed` value. It becomes a
+/// failure only after `ScribeSessionMachine.tick` has moved `.starting` to `.failed`. The one
+/// time-based input is `revealElapsed`, which only decides how long the post-`notesReady` wash is
+/// drawn (`.revealing` -> `.complete`); it never moves the machine.
 public enum ScribePresentation: Equatable, Sendable {
     case idle
     case connecting

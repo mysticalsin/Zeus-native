@@ -367,6 +367,9 @@ final class ScribeController {
     @ObservationIgnored private var transcriber: (any ScribeTranscriber)?
     @ObservationIgnored private var sessionTitle: String?
     @ObservationIgnored private var tickTimer: Timer?
+    /// One-shot timer bounded by the connecting deadline. Separate from the recording elapsed clock.
+    @ObservationIgnored private var connectingTimer: Timer?
+    @ObservationIgnored private var connectingDeadline: TimeInterval?
     @ObservationIgnored private var recordingSince: TimeInterval?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var transcriberEvents: AsyncStream<ScribeTranscriberEvent>.Continuation?
@@ -679,6 +682,11 @@ final class ScribeController {
             )
         } else {
             provider.start(session: id, frames: frames, events: captureEvents)
+        }
+        // The tap that entered `.starting` arms a one-shot clock bounded by the connecting deadline.
+        // A provider that already acknowledged or failed has left `.starting`.
+        if case .starting = machine.phase {
+            startConnectingClock()
         }
     }
 
@@ -1244,6 +1252,7 @@ final class ScribeController {
     private func react(to event: ScribeLifecycleEvent) {
         switch event {
         case .recordingStarted:
+            stopConnectingClock()
             ScribeAutoStartOptIn.noteRecordingBegan(defaults: optInDefaults)
             recordingSince = nowSeconds()
             elapsed = 0
@@ -1279,6 +1288,7 @@ final class ScribeController {
             transcriberEvents = nil
         case .failed:
             hideEndWindow()
+            stopConnectingClock()
             stopClock()
             stopStallWatch()
             stopLevelWatch()
@@ -1287,6 +1297,7 @@ final class ScribeController {
             router?.setActiveSession(nil)
             cancelTranscriber()
         case .cancelled:
+            stopConnectingClock()
             stopClock()
             stopStallWatch()
             stopLevelWatch()
@@ -1838,6 +1849,7 @@ final class ScribeController {
         clearCompletedNotice()
         hideEndWindow()
         endingRemaining = nil
+        stopConnectingClock()
         stopClock()
         stopStallWatch()
         stopLevelWatch()
@@ -1868,7 +1880,7 @@ final class ScribeController {
         micSharedAnnounced = false
     }
 
-    // MARK: Clock text (display only)
+    // MARK: Session clock
 
     private func clearCompletedNotice() {
         completedNoticeTask?.cancel()
@@ -1892,8 +1904,66 @@ final class ScribeController {
         tickTimer = nil
     }
 
+    /// Arms the one-shot connecting clock. Does not start a session. A second call while the timer is live does nothing.
+    func armConnectingClockIfNeeded() {
+        guard case .starting = machine.phase, connectingTimer == nil else { return }
+        startConnectingClock()
+    }
+
+    private func startConnectingClock() {
+        stopConnectingClock()
+        guard case .starting = machine.phase else { return }
+        guard let deadline = ScribeConnectingClock.begin(now: nowSeconds()) else { return }
+        connectingDeadline = deadline
+        let remaining = deadline - nowSeconds()
+        guard remaining.isFinite, remaining > 0 else {
+            fireConnectingDeadline()
+            return
+        }
+        let timer = Timer(timeInterval: remaining, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.fireConnectingDeadline() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        connectingTimer = timer
+    }
+
+    private func stopConnectingClock() {
+        connectingTimer?.invalidate()
+        connectingTimer = nil
+        connectingDeadline = nil
+    }
+
+    /// The bounded timer reached its instant. Hands that instant to the session machine, then stops.
+    /// An applied failure also stops the capture that `start` opened. The clock does not start another session.
+    private func fireConnectingDeadline() {
+        let deadline = connectingDeadline
+        let instant = deadline.map { max(nowSeconds(), $0) } ?? nowSeconds()
+        stopConnectingClock()
+        guard case .starting(let id) = machine.phase else { return }
+        let transition = run { ScribeConnectingClock.tick(&$0, now: instant, deadline: deadline) }
+        if transition.isApplied {
+            provider.stop(session: id)
+        }
+    }
+
+    /// True while a session timer is scheduled. Connecting uses the bounded clock. Recording uses the elapsed clock.
+    var isSessionClockRunning: Bool { tickTimer != nil || connectingTimer != nil }
+
     /// Same deterministic tick used by the timer and automated lifecycle scenarios with an injected clock.
+    /// While `.starting`, this hands the injected instant to the connecting clock. It does not start a session.
+    /// Elapsed text after acknowledgement is still display only.
     func tickClock() {
+        let now = nowSeconds()
+        if case .starting(let id) = machine.phase {
+            let deadline = connectingDeadline ?? machine.startedAt.flatMap(ScribeConnectingClock.begin(now:))
+            let transition = run { ScribeConnectingClock.tick(&$0, now: now, deadline: deadline) }
+            if ScribeConnectingClock.stops(after: machine.phase) {
+                stopConnectingClock()
+            }
+            if transition.isApplied {
+                provider.stop(session: id)
+            }
+        }
         guard let since = recordingSince else { return }
         switch machine.phase {
         case .recording, .ending: elapsed = max(0, nowSeconds() - since)
