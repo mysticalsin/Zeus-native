@@ -7,6 +7,10 @@
 /// sweep moves on by itself the moment the switch is on. Allowed access is skipped, a prompt macOS
 /// already refused (it never asks twice) goes to its pane instead, and nothing is asked twice in one
 /// sweep. Progress is saved so the sweep resumes when macOS reopens Zeus for Screen Recording.
+///
+/// Allow all can also ask in one press: every named access that is still missing, on the same
+/// prompt or System Settings route. A second press retries only what is still denied. Neither
+/// press grants access or answers the macOS dialog.
 public enum PermissionSweep {
     /// Every access Zeus asks for, in sweep order: in-place prompts first, then System Settings switches.
     /// Screen Recording is last because turning it on can make macOS quit and reopen Zeus.
@@ -186,6 +190,49 @@ public enum PermissionSweep {
         let prompts = open.filter { $0.askedInPlace && Self.access($0, in: access) == .notAsked }
         let settings = open.filter { !prompts.contains($0) }
         return prompts.map { Step(item: $0, route: .prompt) } + settings.map { Step(item: $0, route: .settings) }
+    }
+
+    /// What one press asks for, and which named access is still not allowed.
+    /// The press only chooses the existing prompt or System Settings route. It does not grant access.
+    public struct Click: Equatable, Sendable {
+        public var requests: [Step]
+        public var stillMissing: [Item]
+        /// True when something is still denied, so a later press has a retry.
+        /// False when nothing is denied, including when every named access is already allowed.
+        public var needsSecondClick: Bool
+        public init(requests: [Step], stillMissing: [Item], needsSecondClick: Bool) {
+            self.requests = requests
+            self.stillMissing = stillMissing
+            self.needsSecondClick = needsSecondClick
+        }
+    }
+
+    public static func missingItems(_ access: [Item: Access]) -> [Item] {
+        Item.allCases.filter { Self.access($0, in: access) != .allowed }
+    }
+
+    /// Names still not allowed, for the card under the button. Empty when the set is granted.
+    public static func missingLine(_ access: [Item: Access]) -> String {
+        let missing = missingItems(access)
+        if missing.isEmpty { return "" }
+        return "Still missing: " + missing.map(\.title).joined(separator: ", ")
+    }
+
+    /// The first press. Requests every named access that is not allowed, and no access that is.
+    /// A set that is already allowed requests nothing and needs no second press.
+    public static func oneClick(_ access: [Item: Access]) -> Click {
+        let missing = missingItems(access)
+        let denied = missing.filter { Self.access($0, in: access) == .denied }
+        return Click(requests: plan(access), stillMissing: missing, needsSecondClick: !denied.isEmpty)
+    }
+
+    /// The second press. Requests only named access that is still denied.
+    /// Not-yet-asked and already-allowed access are left alone.
+    public static func secondClick(_ access: [Item: Access]) -> Click {
+        let missing = missingItems(access)
+        let denied = missing.filter { Self.access($0, in: access) == .denied }
+        let requests = plan(access).filter { denied.contains($0.item) }
+        return Click(requests: requests, stillMissing: missing, needsSecondClick: !denied.isEmpty)
     }
 
     /// Whether saved progress is recent enough to pick up again.

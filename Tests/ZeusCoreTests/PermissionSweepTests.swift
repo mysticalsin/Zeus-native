@@ -241,7 +241,44 @@ struct PermissionSweepTests {
     @Test func userTextHasNoEmDash() {
         let phases: [S.Phase] = S.Item.allCases.flatMap { [.prompting($0), .guiding($0)] }
             + [.finished(needsRestart: true), .finished(needsRestart: false)]
-        let texts = phases.map(S.guideText) + S.Item.allCases.map(\.title)
+        let texts = phases.map(S.guideText) + S.Item.allCases.map(\.title) + [S.missingLine(fresh), S.missingLine(all(.allowed))]
         #expect(texts.allSatisfy { !$0.contains("\u{2014}") })
+    }
+
+    /// Synthetic access only. Nothing here opens a microphone, a screen, or an OS dialog.
+    @Test func oneClickRequestsOnlyWhatIsMissingAndAGrantedSetNeedsNoSecondClick() {
+        var access = all(.allowed)
+        access[.microphone] = .notAsked
+        access[.calendar] = .denied
+        access[.accessibility] = .notAsked
+
+        let first = S.oneClick(access)
+        let granted = S.Item.allCases.filter { S.access($0, in: access) == .allowed }
+        #expect(first.requests.map(\.item) == [.microphone, .calendar, .accessibility])
+        #expect(first.requests.map(\.route) == [.prompt, .settings, .settings])
+        #expect(first.requests.allSatisfy { !granted.contains($0.item) })
+        #expect(first.stillMissing == [.microphone, .calendar, .accessibility])
+        #expect(first.needsSecondClick)
+        #expect(S.missingLine(access) == "Still missing: Microphone, Calendar, Accessibility")
+        #expect(!S.missingLine(access).contains("\u{2014}"))
+
+        let done = S.oneClick(all(.allowed))
+        #expect(done.requests.isEmpty)
+        #expect(done.stillMissing.isEmpty)
+        #expect(!done.needsSecondClick)
+        #expect(S.missingLine(all(.allowed)) == "")
+        let noRetry = S.secondClick(all(.allowed))
+        #expect(noRetry.requests.isEmpty)
+        #expect(!noRetry.needsSecondClick)
+
+        var after = all(.allowed)
+        after[.calendar] = .denied
+        after[.reminders] = .notAsked
+        let second = S.secondClick(after)
+        #expect(second.requests.map(\.item) == [.calendar])
+        #expect(second.requests.map(\.route) == [.settings])
+        #expect(second.requests.allSatisfy { S.access($0.item, in: after) == .denied })
+        #expect(second.stillMissing == [.calendar, .reminders])
+        #expect(second.needsSecondClick)
     }
 }
