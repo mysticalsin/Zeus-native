@@ -53,7 +53,13 @@ public struct TopBarWidgetClicks: Equatable, Sendable {
         }
     }
 
-    private var pending: (target: TopBarWidgetTarget, until: Date)?
+    /// A named value so Equatable can be synthesized. A tuple property cannot.
+    private struct Pending: Equatable, Sendable {
+        var target: TopBarWidgetTarget
+        var until: Date
+    }
+
+    private var pending: Pending?
 
     public init() {}
 
@@ -74,7 +80,7 @@ public struct TopBarWidgetClicks: Equatable, Sendable {
             }
         }
         let until = date.addingTimeInterval(Self.doubleClickWindow)
-        self.pending = (target, until)
+        self.pending = Pending(target: target, until: until)
         return Step(effects: effects, arm: until)
     }
 
