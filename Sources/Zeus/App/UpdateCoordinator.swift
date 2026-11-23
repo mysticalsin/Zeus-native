@@ -14,6 +14,8 @@ final class UpdateCoordinator {
     private let source: BundleUpdateSource
     private let defaults: UserDefaults
     private var pollTask: Task<Void, Never>?
+    private var poll = UpdatePoll()
+    private var announcement = UpdateAnnouncement()
     private var refreshState = UpdateRefresh.State.idle
     private var refreshTask: Task<Void, Never>?
     private var lastRefreshToken: UInt64 = 0
@@ -26,6 +28,8 @@ final class UpdateCoordinator {
     }
 
     func startPolling() {
+        let effects = poll.start()
+        guard effects.contains(.replaceTimer) else { return }
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -117,10 +121,7 @@ final class UpdateCoordinator {
 
     func performUpdate() {
         guard case .available(let offer, _) = badgeState else { return }
-        // The offer's link is re-checked here: only HTTPS ever reaches the browser.
-        if let url = offer.downloadURL, UpdateFeedPolicy.isSecure(url) {
-            NSWorkspace.shared.open(url)
-        } else if let url = URL(string: "https://zeus.app") {
+        if let url = UpdateOpen.destination(offer: offer.downloadURL) {
             NSWorkspace.shared.open(url)
         }
     }
@@ -135,9 +136,16 @@ final class UpdateCoordinator {
     }
 
     private func maybePresentHUD() {
-        guard case .available(let offer, _) = badgeState else { return }
-        guard UpdateHUDPresentation.shouldShowHUD(for: offer, defaults: defaults) else { return }
+        guard case .available(let offer, _) = badgeState else {
+            _ = announcement.badgeHidden()
+            return
+        }
+        let version = offer.latest.displayFull
+        let shownKey = defaults.string(forKey: UpdateHUDPresentation.shownKey)
+        let effects = announcement.badgeAvailable(version, shownKey: shownKey)
+        guard effects.contains(.present) else { return }
         UpdateHUDPresentation.markHUDShown(for: offer, defaults: defaults)
+        announcement.didPresent(version)
         NotchControllerBridge.controller?.showUpdateBadge(offer: offer)
     }
 }
