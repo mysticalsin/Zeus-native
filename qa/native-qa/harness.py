@@ -248,7 +248,7 @@ def execute(repo, home, head, platform_name, receipt_path=None, usage=None, run=
     path = _receipt_path(dest, receipt_path, repo)
     if platform_name != "Darwin":
         return _write_unproven(head, dest, platform_name, path)
-    if _ci_build():
+    if run is None and _ci_build():
         raise Refused("refusing to build in CI")
     log = []
 
