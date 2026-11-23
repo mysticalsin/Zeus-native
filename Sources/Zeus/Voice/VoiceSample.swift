@@ -33,7 +33,7 @@ enum VoiceSample {
             var status = 0
             var firstByteMs = -1
             do {
-                let (bytes, response) = try await URLSession.shared.bytes(for: voice.request(for: text))
+                let (bytes, response) = try await Speaker.elevenLabsSession.bytes(for: voice.request(for: text))
                 status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 for try await byte in bytes {
                     if firstByteMs < 0 { firstByteMs = Int(Date().timeIntervalSince(started) * 1000) }

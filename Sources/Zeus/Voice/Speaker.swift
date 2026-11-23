@@ -21,7 +21,7 @@ extension LineSpeaking {
 /// as its first audio arrives, so the next sentence is requested while the previous one plays.
 @MainActor
 final class Speaker: SentenceSpeaking, LineSpeaking {
-    nonisolated(unsafe) static var urlSession: URLSession = .shared
+    nonisolated(unsafe) static var urlSession: URLSession = CredentialRedirect.session
     /// One warm HTTP/2 session per TTS provider: the connection the key-down warm-up opens is the one the
     /// first sentence reuses.
     nonisolated(unsafe) static var elevenLabsSession: URLSession = TTSHTTP.makeSession()

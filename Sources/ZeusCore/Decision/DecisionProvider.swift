@@ -40,7 +40,7 @@ public struct SystemOneClient: DecisionProvider {
     let transport: @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     public init(source: Decision.Source, endpoint: URL, key: String?, timeout: TimeInterval,
-                transport: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) }) {
+                transport: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse) = { try await CredentialRedirect.session.data(for: $0) }) {
         self.source = source; self.endpoint = endpoint; self.key = key; self.timeout = timeout; self.transport = transport
     }
 

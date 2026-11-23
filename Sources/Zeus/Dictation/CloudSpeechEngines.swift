@@ -48,7 +48,7 @@ final class OpenAITranscribeEngine: TranscriptionEngine, @unchecked Sendable {
     let kind = TranscriptionEngineKind.openAI
     private let session: URLSession
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = CredentialRedirect.session) {
         self.session = session
     }
 
@@ -101,7 +101,7 @@ final class ElevenLabsScribeEngine: StreamingTranscriptionEngine, @unchecked Sen
 
 final class ElevenLabsStream: TranscriptionStream, @unchecked Sendable {
     private let lock = NSLock()
-    private let session = URLSession(configuration: .ephemeral)
+    private let session = CredentialRedirect.makeSession(configuration: .ephemeral)
     private var task: URLSessionWebSocketTask?
     private var pending = Data()
     private var transcript = RealtimeTranscript()

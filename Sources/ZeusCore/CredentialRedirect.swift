@@ -6,8 +6,19 @@ import FoundationNetworking
 /// What a credentialed HTTP client may do with a redirect.
 public enum CredentialRedirect {
     public static let sensitiveHeaders: Set<String> = [
-        "authorization", "proxy-authorization", "cookie", "x-api-key", "xi-api-key", "api-key",
+        "authorization", "proxy-authorization", "cookie", "x-api-key", "xi-api-key", "api-key", "x-goog-api-key",
     ]
+
+    /// A session that applies `forwarded` on Darwin. Linux tests the decision; they do not run the delegate.
+    public static func makeSession(configuration: URLSessionConfiguration = .default) -> URLSession {
+        #if canImport(Darwin)
+        URLSession(configuration: configuration, delegate: CredentialRedirectDelegate(), delegateQueue: nil)
+        #else
+        URLSession(configuration: configuration)
+        #endif
+    }
+
+    public static let session: URLSession = makeSession()
 
     public static func forwarded(proposed: URL, from original: URL, headers: [String: String]) -> (url: URL, headers: [String: String])? {
         guard let proposedHost = proposed.host?.lowercased(), !proposedHost.isEmpty,

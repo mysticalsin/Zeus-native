@@ -390,7 +390,7 @@ final class VoiceSettings {
         request.setValue(key, forHTTPHeaderField: "xi-api-key")
         libraryMessage = "Loading voices."
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await Speaker.elevenLabsSession.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { libraryMessage = "ElevenLabs refused the key."; return }
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             let voices = (json?["voices"] as? [[String: Any]] ?? []).compactMap { item -> LibraryVoice? in

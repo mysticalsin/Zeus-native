@@ -14,7 +14,7 @@ enum GeminiTTSVoice {
     static var isConfigured: Bool { config() != nil }
 
     /// Raw 24 kHz 16-bit mono PCM for `text`, or nil on any failure. `voice` overrides the saved one (previews).
-    static func renderPCM(_ text: String, voice: String? = nil, session: URLSession = .shared) async -> Data? {
+    static func renderPCM(_ text: String, voice: String? = nil, session: URLSession = CredentialRedirect.session) async -> Data? {
         guard var config = config() else { return nil }
         if let voice { config.voice = voice }
         guard let request = GeminiTTSRequest.makeRequest(text: text, config: config) else { return nil }
@@ -28,7 +28,7 @@ enum GeminiTTSVoice {
     }
 
     /// Writes a WAV file in the temporary folder and returns its URL, or nil on failure.
-    static func render(_ text: String, session: URLSession = .shared) async -> URL? {
+    static func render(_ text: String, session: URLSession = CredentialRedirect.session) async -> URL? {
         guard let pcm = await renderPCM(text, session: session) else { return nil }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-gemini-tts-\(UUID().uuidString).wav")
         do {

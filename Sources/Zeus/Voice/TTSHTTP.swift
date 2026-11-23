@@ -11,7 +11,7 @@ enum TTSHTTP {
         configuration.waitsForConnectivity = false
         configuration.timeoutIntervalForResource = 60
         configuration.urlCache = nil
-        return URLSession(configuration: configuration, delegate: CredentialRedirectDelegate(), delegateQueue: nil)
+        return CredentialRedirect.makeSession(configuration: configuration)
     }
 
     private static let lock = NSLock()
