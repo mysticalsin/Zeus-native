@@ -1,0 +1,16 @@
+{
+  "clickFile": {
+    "id": "p0",
+    "kind": "guidance",
+    "tool": "awaitClick",
+    "targetID": "t3",
+    "summary": "Wait for your click on File"
+  },
+  "javascript": {
+    "id": "p1",
+    "kind": "action",
+    "tool": "openURL",
+    "url": "javascript:alert(1)",
+    "summary": "Open the link"
+  }
+}
