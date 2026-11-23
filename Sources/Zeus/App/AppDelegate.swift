@@ -101,6 +101,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointing?.stop()
         // Every shaping tap is destroyed and the claim released, so no app is left muted.
         equaliser?.shutdown()
+        topBarServices.systemNowPlaying.stop()
+        topBarServices.receiverNames.setEnabled(false)
+        topBarServices.earbudOverlay.stop()
+        topBarServices.focusName.stop()
+        topBarServices.lockScreenPlayer.stop()
         // Tiling removes its key tap, observers and overlays. It never moves a window on the way out. The controller
         // is not even made when the service is denied.
         if on(.tiling) { TilingController.shared.stop() }
@@ -158,7 +163,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Top bar live data (music, clipboard, system cues, weather, calendar on request).
         if on(.topBarServices) {
             topBarServices = TopBarServices(model: topBar)
-            topBarServices.notchIsOpen = { [weak self] in self?.notch.model.presentation != .closed }
             topBarServices.start()
         }
         // Continuity: a cue from Zeus when Beamer moves your keyboard to another machine.
@@ -1013,6 +1017,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))
             case "audio.equaliser": self?.equaliser?.setSwitch(store.bool(id))
+            case SystemNowPlayingLaunch.settingID: self?.topBarServices.systemNowPlaying.setEnabled(store.bool(id))
+            case ReceiverCatalog.settingID: self?.topBarServices.receiverNames.setEnabled(store.bool(id))
+            case EarbudOverlayRule.settingID: self?.topBarServices.earbudOverlay.setEnabled(store.bool(id))
+            case FocusNameStore.settingID: self?.topBarServices.focusName.setEnabled(store.bool(id))
+            case LockScreenPlayerGate.settingID: self?.topBarServices.lockScreenPlayer.setEnabled(store.bool(id))
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
             case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break

@@ -264,6 +264,12 @@ struct LyricsView: View {
 }
 
 /// Which line is lit at a playback position. A short lead (the line lights as it is sung, not after).
+enum LyricViewTiming {
+    static func words(in line: LyricLine, lineEnd: Double) -> [LyricWord] {
+        LyricWordTiming.displayWords(in: line, lineEnd: lineEnd)
+    }
+}
+
 enum LyricTiming {
     static let lead = 0.25
     static func index(_ lines: [LyricLine], elapsed: Double) -> Int { lines.currentIndex(at: elapsed + lead) ?? -1 }
@@ -335,7 +341,7 @@ private struct WordLitText: View {
     @State private var revision = 0
 
     init(line: LyricLine, lineEnd: Double, playing: NowPlaying, tick: Date) {
-        words = LyricWordTiming.words(in: line, lineEnd: lineEnd)
+        words = LyricViewTiming.words(in: line, lineEnd: lineEnd)
         self.playing = playing
         self.tick = tick
     }

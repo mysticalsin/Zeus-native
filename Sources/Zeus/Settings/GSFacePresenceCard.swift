@@ -153,7 +153,8 @@ enum FacePresenceCardFixtures {
         return [
             fixture("off", [], faces: [], isOn: false),
             fixture("needs-camera", [on(camera: .notDetermined)], faces: one),
-            fixture("enrolling", [on(faces: 0)], faces: []),
+            fixture("confirm", [on(faces: 0)], faces: []),
+            fixture("enrolling", [on(faces: 0), .enroll], faces: []),
             fixture("watching", [on()], faces: two, label: "5 minutes"),
             fixture("present", [on(), .observed(.owner, uptime: 101)], faces: two),
             fixture("away", [on(), .observed(.notOwner, uptime: 101)], faces: two, at: 118),

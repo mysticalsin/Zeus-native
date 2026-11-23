@@ -30,6 +30,7 @@ public enum NowPlayingDisplay {
         switch source {
         case .player: source.kindName
         case .browser(let key): host(key).map { source.kindName + separator + $0 } ?? source.kindName
+        case .system: source.kindName
         }
     }
 
@@ -42,6 +43,7 @@ public enum NowPlayingDisplay {
             case .spotify: "dot.radiowaves.left.and.right"
             }
         case .browser: "globe"
+        case .system: "music.note"
         }
     }
 
@@ -78,6 +80,7 @@ public enum NowPlayingDisplay {
         switch item.source {
         case .player: place = item.source.kindName
         case .browser(let key): place = host(key).map { item.source.kindName + ", " + $0 } ?? item.source.kindName
+        case .system: place = item.source.kindName
         }
         return (item.isPlaying ? "Playing in " : "Paused in ") + place + ": " + item.title
     }

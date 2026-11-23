@@ -379,6 +379,12 @@ struct NotchView: View {
             }
 
             content
+                .overlay(alignment: .bottom) {
+                    if let reading = topBar?.earbud, model.presentation == .panel {
+                        EarbudOverlayView(reading: reading)
+                            .padding(.bottom, 8)
+                    }
+                }
                 .padding(.horizontal, glanceOpen ? shoulder : shoulder + (model.presentation == .panel ? 18 : 14))
                 // Laid out at the final size and revealed by the growing outline, like Glance
                 // (laying it out at the in-between size squeezed the cards and cut their text).
@@ -430,7 +436,7 @@ struct NotchView: View {
             topBar.flash(.edgeWave(tint))
         }
         .animation(Motion.live(MotionTokens.peekContent), value: model.approval?.id)
-        .animation(Motion.live(MotionTokens.panelResize), value: model.sessions.count)
+        .animation(Motion.live(MotionTokens.sessionCount), value: model.sessions.count)
         .animation(Self.wingsSpring, value: topBar.map { ClosedWings.kind(of: $0) })
     }
 

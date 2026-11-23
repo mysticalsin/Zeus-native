@@ -90,6 +90,8 @@ public enum ArtworkSource {
         case .browser:
             // The image's own link decides, hashed: nothing of the page shows in a name.
             return "page-" + fnv(playing.artworkURL?.absoluteString ?? "")
+        case .system:
+            prefix = "system-"
         }
         let album = playing.album.isEmpty ? playing.title : playing.album
         return prefix + fnv(normalize(playing.artist) + "|" + normalize(album))

@@ -274,7 +274,7 @@ final class BrowserMediaFeed {
     private static func isBrowser(_ source: NowPlayingSource) -> Bool {
         switch source {
         case .browser: return true
-        case .player: return false
+        case .player, .system: return false
         }
     }
 

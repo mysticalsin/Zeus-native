@@ -86,7 +86,13 @@ final class MusicAwakeHold {
                                   power: readPower(), rules: rules)
         if verdict.holds {
             if assertion == nil || renewLease { renew() }
-            startRenewTimer()
+            // No assertion means there is nothing to renew. Do not leave the timer retrying.
+            if assertion != nil {
+                startRenewTimer()
+            } else {
+                cancelRenew?()
+                cancelRenew = nil
+            }
         } else {
             drop()
         }

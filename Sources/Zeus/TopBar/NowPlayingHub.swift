@@ -180,6 +180,7 @@ final class NowPlayingHub {
         switch target {
         case .player: return kind
         case .browser: return item?.isPlaying == true ? .pause : .play
+        case .system: return kind
         }
     }
 
@@ -198,6 +199,8 @@ final class NowPlayingHub {
             guard let browserCommand else { return false }
             browserCommand(kind, seconds, key)
             sent = true
+        case .system:
+            sent = false
         }
         guard sent, var guess = item else { return sent }
         let now = ports.now()
