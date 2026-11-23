@@ -1,0 +1,40 @@
+{
+  "plans": [
+    {
+      "name": "file-then-export",
+      "reduceMotion": false,
+      "steps": [
+        {
+          "id": "file",
+          "bolt": { "x": 80, "y": 740 },
+          "ring": { "x": 40, "y": 720, "width": 80, "height": 28 },
+          "caption": "Click File"
+        },
+        {
+          "id": "export",
+          "bolt": { "x": 180, "y": 640 },
+          "ring": { "x": 140, "y": 620, "width": 120, "height": 32 },
+          "caption": "Export as PDF"
+        }
+      ]
+    },
+    {
+      "name": "file-then-export-reduced",
+      "reduceMotion": true,
+      "steps": [
+        {
+          "id": "file",
+          "bolt": { "x": 80, "y": 740 },
+          "ring": { "x": 40, "y": 720, "width": 80, "height": 28 },
+          "caption": "Click File"
+        },
+        {
+          "id": "export",
+          "bolt": { "x": 180, "y": 640 },
+          "ring": { "x": 140, "y": 620, "width": 120, "height": 32 },
+          "caption": "Export as PDF"
+        }
+      ]
+    }
+  ]
+}

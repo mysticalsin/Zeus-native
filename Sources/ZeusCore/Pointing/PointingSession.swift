@@ -41,6 +41,8 @@ public struct PointingSession: Equatable, Sendable {
         case stopListening     // mic.finish(): build the request
         case discardCapture    // cancel the mic, discard audio, send nothing
         case hideInk
+        /// Draw the admitted plan's current bolt, ring and caption. Local to this session.
+        case showGuideStep
     }
 
     public struct Transition: Equatable, Sendable {
@@ -53,10 +55,31 @@ public struct PointingSession: Equatable, Sendable {
 
     public private(set) var state: State = .idle
     public private(set) var generation = 0
+    /// The one plan admitted for this guiding wait. Empty until `admitGuide`.
+    public private(set) var guide: PointerGuidePlan?
 
     public init() {}
 
     public func isCurrent(_ token: Int) -> Bool { token == generation }
+
+    /// Admit the model plan once, while speaking, and wait on its first step.
+    @discardableResult
+    public mutating func admitGuide(_ plan: PointerGuidePlan) -> Transition {
+        guard state == .speaking else {
+            return Transition(from: state, to: state, generation: generation, effects: [])
+        }
+        guide = plan
+        return send(.guidanceAdmitted)
+    }
+
+    /// A click on the current ring. A miss leaves the step where it is.
+    @discardableResult
+    public mutating func guideClick(at point: PointerGuidePoint) -> Transition {
+        guard state == .guiding, let step = guide?.current, step.ring.contains(point) else {
+            return Transition(from: state, to: state, generation: generation, effects: [])
+        }
+        return send(.clickInTarget)
+    }
 
     /// `generation`: the token the sender captured; a mismatch drops the event.
     @discardableResult
