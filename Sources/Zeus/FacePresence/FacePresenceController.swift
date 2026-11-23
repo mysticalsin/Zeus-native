@@ -67,7 +67,7 @@ final class FacePresenceController {
     static let switchID = "face.presence"
     static let lockAfterID = "face.lockAfter"
     /// Frames Vision could not read in a row before the camera is called unavailable.
-    static let visionFailureLimit = 5
+    static let visionFailureLimit = FaceFrameGate.failureLimit
 
     // MARK: State
 
@@ -77,13 +77,13 @@ final class FacePresenceController {
     private(set) var vaultReadable = true
 
     @ObservationIgnored var environment: Environment
-    @ObservationIgnored private(set) var cameraRun = 0
-    @ObservationIgnored private var cameraRunning = false
+    @ObservationIgnored private var frameGate = FaceFrameGate()
+    var cameraRun: Int { frameGate.generation }
     @ObservationIgnored private var started = false
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var spoofWindow = SpoofCues.Window()
     @ObservationIgnored private var previousFace: CGRect?
-    @ObservationIgnored private var visionFailures = 0
+    @ObservationIgnored private var enrollmentOffer = EnrollmentOfferGate()
     @ObservationIgnored private var enrollment: EnrollmentSession?
     @ObservationIgnored private var enrollmentWatchdog: Task<Void, Never>?
     @ObservationIgnored private(set) var consentTask: Task<Void, Never>?
@@ -192,7 +192,7 @@ final class FacePresenceController {
     func tick() { send(.tick(uptime: environment.uptime())) }
 
     func cameraEvent(_ event: FaceCameraEvent, run: Int) {
-        guard run == cameraRun, cameraRunning else { return }
+        guard frameGate.accepts(run) else { return }
         switch event {
         case .deviceLost, .interrupted, .runtimeError: send(.cameraFailed)
         case .interruptionEnded: send(.cameraReturned(uptime: environment.uptime()))
@@ -223,11 +223,12 @@ final class FacePresenceController {
             environment.permissions.openCameraSettings()
         case .beginEnrollment(let token):
             spoofWindow.reset()
+            enrollmentOffer.begin(token)
             enrollment = EnrollmentSession(token: token, plan: EnrollmentPlan(revision: environment.featurePrintRevision,
                                                                               startedAt: environment.uptime()))
             watchEnrollmentWindow()
         case .cancelEnrollment(let token):
-            guard enrollment?.token == token else { return }
+            guard enrollmentOffer.offer(token) else { return }
             endEnrollmentSession()
         case .lockNow:
             // The one lock call, asked for once. The result goes back as an event; a failure is never retried.
@@ -237,20 +238,17 @@ final class FacePresenceController {
 
     /// Keeps the camera and the one second timer in step with the machine.
     private func reconcile() {
-        if machine.wantsCamera != cameraRunning {
-            cameraRunning = machine.wantsCamera
-            cameraRun += 1
-            if cameraRunning {
-                spoofWindow.reset()
-                previousFace = nil
-                visionFailures = 0
-                let run = cameraRun
-                environment.source.start(
-                    deliver: { [weak self] frame in Task { @MainActor in await self?.process(frame, run: run) } },
-                    report: { [weak self] event in Task { @MainActor in self?.cameraEvent(event, run: run) } })
-            } else {
-                environment.source.stop()
-            }
+        switch frameGate.setCamera(machine.wantsCamera) {
+        case .unchanged:
+            break
+        case .started(let run):
+            spoofWindow.reset()
+            previousFace = nil
+            environment.source.start(
+                deliver: { [weak self] frame in Task { @MainActor in await self?.process(frame, run: run) } },
+                report: { [weak self] event in Task { @MainActor in self?.cameraEvent(event, run: run) } })
+        case .stopped:
+            environment.source.stop()
         }
         setTicking(machine.wantsTicks && environment.usesTimers)
     }
@@ -271,7 +269,7 @@ final class FacePresenceController {
     /// One admitted frame: analyzed off the main actor, then judged here. A frame that arrives after the camera was
     /// stopped, or after the run it belonged to ended, is dropped without being looked at.
     func process(_ frame: FaceFrame, run: Int) async {
-        guard run == cameraRun, machine.wantsCamera else {
+        guard frameGate.accepts(run) else {
             environment.source.analysisFinished()
             return
         }
@@ -279,14 +277,13 @@ final class FacePresenceController {
         let previous = previousFace
         let result = await Task.detached(priority: .utility) { Result { try analyze(frame.image, previous) } }.value
         environment.source.analysisFinished()
-        guard run == cameraRun, machine.wantsCamera else { return }
+        guard frameGate.accepts(run) else { return }
 
         switch result {
         case .failure:
-            visionFailures += 1
-            if visionFailures >= Self.visionFailureLimit { send(.cameraFailed) }
+            if frameGate.visionFailed() == .failCamera { send(.cameraFailed) }
         case .success(let analysis):
-            visionFailures = 0
+            frameGate.visionOk()
             previousFace = analysis.faceBox
             let latched = spoofWindow.observe(analysis.spoofFrame)
             switch machine.state {
@@ -305,7 +302,7 @@ final class FacePresenceController {
     // MARK: Enrollment
 
     private func offerToEnrollment(token: Int, analysis: FaceVision.FrameAnalysis, spoofCues: Set<SpoofCue>, uptime: Double) {
-        guard var session = enrollment, session.token == token else { return }
+        guard enrollmentOffer.offer(token), var session = enrollment else { return }
         let candidate = analysis.observation.map {
             EnrollmentCandidate(embedding: $0.embedding, revision: $0.revision, quality: analysis.quality,
                                 alignment: analysis.alignment ?? .paddedCrop, spoofCues: spoofCues)
@@ -323,7 +320,7 @@ final class FacePresenceController {
     private func finishEnrollment(token: Int, result: EnrollmentPlan.Result?) {
         var saved = false
         if let result {
-            let face = FaceRecord(id: UUID().uuidString, name: nextFaceName(), isEnabled: true, revision: result.revision,
+            let face = FaceRecord(id: UUID().uuidString, name: FaceNameSequence.next(taken: Set(faces.map(\.name))), isEnabled: true, revision: result.revision,
                                   samples: result.samples, threshold: result.threshold)
             if environment.vault.save(faces + [face]) == .saved {
                 faces.append(face)
@@ -335,22 +332,15 @@ final class FacePresenceController {
     }
 
     private func endEnrollmentSession() {
+        enrollmentOffer.end()
         enrollment = nil
         enrollmentWatchdog?.cancel()
         enrollmentWatchdog = nil
     }
 
-    /// The lowest "Face N" not in use, so a deleted number is used again.
-    private func nextFaceName() -> String {
-        let taken = Set(faces.map(\.name))
-        var number = 1
-        while taken.contains("Face \(number)") { number += 1 }
-        return "Face \(number)"
-    }
-
     /// An enrollment whose camera sends no frames still has to end: this closes it when its window has passed.
     func checkEnrollmentWindow() {
-        guard var session = enrollment, case .enrolling(let token) = machine.state, session.token == token,
+        guard var session = enrollment, case .enrolling(let token) = machine.state, enrollmentOffer.offer(token),
               session.plan.tick(at: environment.uptime()) != nil else { return }
         enrollment = session
         finishEnrollment(token: token, result: nil)

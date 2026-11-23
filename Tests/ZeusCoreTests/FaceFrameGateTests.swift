@@ -5,26 +5,34 @@ import Testing
 struct FaceFrameGateTests {
     @Test func aStaleGenerationDropsTheFrameAndTheSignal() {
         var gate = FaceFrameGate()
-        #expect(gate.setCamera(true) == .started(1))
+        let started = gate.setCamera(true)
+        #expect(started == .started(1))
         #expect(gate.accepts(1))
         #expect(gate.accepts(0) == false)
         #expect(gate.failures == 0)
-        #expect(gate.setCamera(false) == .stopped)
+        let stopped = gate.setCamera(false)
+        #expect(stopped == .stopped)
         #expect(gate.accepts(1) == false)
-        #expect(gate.visionFailed() == nil)
+        let ignored = gate.visionFailed()
+        #expect(ignored == nil)
     }
 
     @Test func theFifthVisionFailureFailsTheCameraOnce() {
         var gate = FaceFrameGate()
-        #expect(gate.setCamera(true) == .started(1))
+        let started = gate.setCamera(true)
+        #expect(started == .started(1))
         for _ in 1..<FaceFrameGate.failureLimit {
-            #expect(gate.visionFailed() == nil)
+            let early = gate.visionFailed()
+            #expect(early == nil)
         }
-        #expect(gate.visionFailed() == .failCamera)
-        #expect(gate.visionFailed() == nil)
-        #expect(gate.visionOk())
+        let fifth = gate.visionFailed()
+        #expect(fifth == .failCamera)
+        let sixth = gate.visionFailed()
+        #expect(sixth == nil)
+        gate.visionOk()
         #expect(gate.failures == 0)
-        #expect(gate.setCamera(true) == .unchanged)
+        let again = gate.setCamera(true)
+        #expect(again == .unchanged)
         #expect(gate.generation == 1)
     }
 
@@ -35,13 +43,17 @@ struct FaceFrameGateTests {
 
     @Test func anEnrollmentOfferForAnotherTokenIsIgnored() {
         var offer = EnrollmentOfferGate()
-        #expect(offer.offer(1) == false)
+        let idle = offer.offer(1)
+        #expect(idle == false)
         offer.begin(4)
         #expect(offer.state == .offering(4))
-        #expect(offer.offer(4))
-        #expect(offer.offer(9) == false)
+        let same = offer.offer(4)
+        #expect(same)
+        let other = offer.offer(9)
+        #expect(other == false)
         offer.end()
         #expect(offer.state == .idle)
-        #expect(offer.offer(4) == false)
+        let after = offer.offer(4)
+        #expect(after == false)
     }
 }
