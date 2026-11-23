@@ -404,6 +404,13 @@
       "scope": "Actual receipt/replacement flow with injected native read/write ports; no real focused field or OS event proof."
     },
     {
+      "id": "portable-onboarding-presentation",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "onboarding-presentation",
+      "scope": "Welcome-guide fold state on the pure presentation: Escape and the minimize control keep the step, choices and permission state, a second Escape is a no-op, reopen restores the same step, and Reduce Motion skips the resize animation. No window, key focus, VoiceOver announcement or visible chip."
+    },
+    {
       "id": "portable-wiki-export",
       "kind": "portable",
       "tier": "contract",
@@ -6807,7 +6814,7 @@
         {
           "id": "F13.onboarding-isolation",
           "check": "native-OnboardingIsolationTests",
-          "acceptance": "All ten onboarding steps preserve injected progress, cancellation and explicit completion; deferred and denied capability presentation uses fixture services, preview preferences stay isolated, and actual bundled typography/mascot assets resolve. These are policy and resource assertions, not a user-control journey or OS-consent proof.",
+          "acceptance": "All ten onboarding steps preserve injected progress, cancellation and explicit completion; deferred and denied capability presentation uses fixture services, preview preferences stay isolated, and actual bundled typography/mascot assets resolve. Escape and the minimize command fold that same injected guide without dropping its step, choices or permission state, and a restore still finishes exactly once. These are policy and resource assertions, not a key-window, visible-chip, or OS-consent proof.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
@@ -6848,6 +6855,41 @@
             {
               "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
               "function": "optionsStayIndependentAndSoundOffPreventsPreviewDispatch"
+            },
+            {
+              "file": "Tests/ZeusAppTests/OnboardingIsolationTests.swift",
+              "function": "escapeCollapsesAndReopenRestoresTheSameStep"
+            }
+          ]
+        },
+        {
+          "id": "F13.onboarding-presentation",
+          "check": "portable-onboarding-presentation",
+          "acceptance": "Escape and the minimize control fold the welcome guide and keep the step, choices and permission state. Reopen restores that same step. A second Escape while folded does nothing. Reduce Motion reports an immediate resize. This is the pure presentation contract, not a key-window, VoiceOver or visible-chip proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/OnboardingPresentationTests.swift",
+              "function": "escapeCollapsesAndKeepsTheStep"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OnboardingPresentationTests.swift",
+              "function": "reopenRestoresTheSameStep"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OnboardingPresentationTests.swift",
+              "function": "theMinimizeControlMatchesEscape"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OnboardingPresentationTests.swift",
+              "function": "aSecondEscapeWhileMinimizedIsHarmless"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OnboardingPresentationTests.swift",
+              "function": "reduceMotionSkipsTheResizeAnimation"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/OnboardingPresentationTests.swift",
+              "function": "everyStepSurvivesMinimizeAndTheSizeEdgesStayPut"
             }
           ]
         },

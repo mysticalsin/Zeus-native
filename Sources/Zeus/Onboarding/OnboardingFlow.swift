@@ -147,11 +147,11 @@ final class OnboardingFlow {
     }
 
     func sendPresentation(_ command: OnboardingPresentation.Command) {
+        let permissions = presentation.progress.permissionState
         presentation.progress = OnboardingPresentation.Progress(
-            step: step.rawValue, choices: [agent.rawValue], permissionState: [])
+            step: step.rawValue, choices: [agent.rawValue], permissionState: permissions)
         presentation.reduceMotion = reducesMotion
-        let effects = presentation.send(command)
-        onPresentation?(effects)
+        onPresentation?(presentation.send(command))
     }
 
     func beginPresentation() {
@@ -339,6 +339,15 @@ struct OnboardingRoot: View {
             }
         }
         .frame(width: canvas.width, height: canvas.height)
+        .background {
+            // Escape reaches a key window even when the guide content itself is not focused.
+            // The control stays out of the layout and out of VoiceOver; the visible Minimize button is the one control.
+            Button("Minimize setup") { flow.sendPresentation(.minimizeControl) }
+                .keyboardShortcut(.escape, modifiers: [])
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        }
         .onKeyPress(.escape) {
             flow.sendPresentation(.escape)
             return .handled

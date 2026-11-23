@@ -71,6 +71,10 @@ GROUPS = {
         core("Dictation/TextInsertionReceipt.swift"),
         tests("TextInsertionReceiptTests"),
     ),
+    "onboarding-presentation": (
+        core("Onboarding/OnboardingPresentation.swift"),
+        tests("OnboardingPresentationTests"),
+    ),
     "polyglot": (
         core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
         tests("PolyglotTests", "PolyglotPinPolicyTests", "PolyglotTargetChangeTests", "W7PolyglotTests"),

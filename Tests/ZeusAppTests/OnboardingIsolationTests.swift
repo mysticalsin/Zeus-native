@@ -205,29 +205,46 @@ struct OnboardingIsolationTests {
     @Test func escapeCollapsesAndReopenRestoresTheSameStep() async throws {
         let memory = Memory()
         let flow = memory.flow()
+        var effects: [[OnboardingPresentation.Effect]] = []
+        flow.onPresentation = { effects.append($0) }
         flow.next()
         try await settle(flow, at: .murmure)
-        var presentation = OnboardingPresentation(
-            progress: .init(step: flow.step.rawValue, choices: [flow.agent.rawValue], permissionState: ["not-granted"]),
-            reduceMotion: true)
-        let collapsed = presentation.send(.escape)
-        #expect(presentation.phase == .minimized)
-        #expect(presentation.progress.step == OnboardingStep.murmure.rawValue)
-        #expect(collapsed.contains(.animated(false)))
-        let restored = presentation.send(.reopen)
-        #expect(presentation.phase == .expanded)
-        #expect(presentation.progress.step == OnboardingStep.murmure.rawValue)
-        #expect(restored.contains(.announce("Setup restored")))
-        #expect(presentation.send(.escape).isEmpty == false)
-        let again = presentation
-        #expect(presentation.send(.escape).isEmpty)
-        #expect(presentation.phase == again.phase)
-        for step in OnboardingStep.allCases.dropFirst().dropFirst() {
+        flow.presentation.progress.permissionState = ["not-granted"]
+        let step = flow.step
+        flow.sendPresentation(.escape)
+        #expect(flow.presentation.phase == .minimized)
+        #expect(flow.step == step)
+        #expect(flow.presentation.progress.step == step.rawValue)
+        #expect(flow.presentation.progress.choices == [flow.agent.rawValue])
+        #expect(flow.presentation.progress.permissionState == ["not-granted"])
+        #expect(effects.last?.contains(.resize(OnboardingPresentation.minimizedSize)) == true)
+        #expect(effects.last?.contains(.announce("Setup minimized")) == true)
+        #expect(effects.last?.contains(.releaseKeyFocus) == true)
+        #expect(effects.last?.contains(.animated(false)) == true)
+        #expect(!memory.dismissed && !memory.completed)
+        flow.sendPresentation(.escape)
+        #expect(effects.last?.isEmpty == true)
+        #expect(flow.presentation.phase == .minimized)
+        #expect(flow.step == step)
+        flow.sendPresentation(.minimizeControl)
+        #expect(effects.last?.isEmpty == true)
+        #expect(flow.presentation.phase == .minimized)
+        flow.sendPresentation(.reopen)
+        #expect(flow.presentation.phase == .expanded)
+        #expect(flow.step == step)
+        #expect(flow.presentation.progress.step == step.rawValue)
+        #expect(flow.presentation.progress.choices == [flow.agent.rawValue])
+        #expect(flow.presentation.progress.permissionState == ["not-granted"])
+        #expect(effects.last?.contains(.announce("Setup restored")) == true)
+        #expect(effects.last?.contains(.resize(OnboardingPresentation.expandedSize)) == true)
+        #expect(effects.last?.contains(.animated(false)) == true)
+        for nextStep in OnboardingStep.allCases.dropFirst().dropFirst() {
             flow.next()
-            try await settle(flow, at: step)
+            try await settle(flow, at: nextStep)
         }
         #expect(flow.complete())
         #expect(memory.completed && memory.finishes == 1)
+        #expect(!memory.dismissed)
     }
 
     @Test func pollingFollowsOwnWindowMiniaturizeRestoreAndCloseWithoutActions() async throws {
