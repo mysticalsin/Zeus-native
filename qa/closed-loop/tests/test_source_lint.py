@@ -480,7 +480,7 @@ class VoiceLatencyLint(unittest.TestCase):
         init = text[text.index("init("):text.index("private func armAhead")]
         for forbidden in ("prewarm", "BrainLaunchWarm", "ClaudeFlags.warm", "warmSelectedVoice"):
             self.assertNotIn(forbidden, init, f"{forbidden} runs at launch")
-        press = text[text.index("func press()"):text.index("func release()")]
+        press = text[text.index("func press(builtinCue: Bool = true)"):text.index("func release(builtinCue: Bool = true)")]
         self.assertIn("KeyDownWarmer.talkKeyDown()", press)
         self.assertIn("abortBusy()", press)
 
@@ -606,7 +606,7 @@ class Pass3VoiceTurnWiring(unittest.TestCase):
         self.assertNotRegex(self.TEXT, r"turnRunning\s*=\s*(true|false)")
 
     def test_press_stops_the_hands_free_timer(self):
-        body = pass3_function_body(self.TEXT, "func press() -> Bool")
+        body = pass3_function_body(self.TEXT, "func press(builtinCue: Bool = true) -> Bool")
         self.assertIn("handsFreeTask?.cancel()", body)
         self.assertIn("turnRun.invalidate()", body)
 

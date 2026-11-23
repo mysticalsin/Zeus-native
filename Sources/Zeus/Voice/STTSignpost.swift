@@ -1,3 +1,4 @@
+import Foundation
 import os
 
 /// Signposts for the speech-to-text stages. Debug builds only, so a release app does not

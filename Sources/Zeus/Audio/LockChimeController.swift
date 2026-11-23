@@ -27,7 +27,7 @@ final class LockChimeController {
     private var tokens: [(NotificationCenter, NSObjectProtocol)] = []
     private var loadGeneration = 0
     private let log = Logger(subsystem: "app.zeus.mac", category: "chime")
-    private static let fileLog = Logger(subsystem: "app.zeus.mac", category: "chime")
+    nonisolated private static let fileLog = Logger(subsystem: "app.zeus.mac", category: "chime")
 
     private init() {}
 
