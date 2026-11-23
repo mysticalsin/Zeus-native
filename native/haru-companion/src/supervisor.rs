@@ -114,10 +114,14 @@ fn directory(path: &Option<PathBuf>) -> Option<PathBuf> {
     })
 }
 
-/// Flat path. The app-support layout (a 0700 directory beside `zeus.sock`)
-/// is not applied yet.
+/// `Application Support/Zeus/haru/zeus.sock`. The `haru` directory is the
+/// socket parent and must be mode 0700. The child gate and the model socket
+/// are created beside `zeus.sock` in that directory.
 pub fn haru_socket_path(application_support: &Path) -> PathBuf {
-    application_support.join("zeus.sock")
+    application_support
+        .join("Zeus")
+        .join("haru")
+        .join("zeus.sock")
 }
 
 pub fn private_socket(public: &Path) -> PathBuf {
@@ -615,7 +619,10 @@ fn terminate_child(child: &mut Child) {
 }
 
 fn arm_parent_death() {
-    // Linux only. On macOS a parent that dies from SIGKILL can leave the child running.
+    // Known limit: parent death is armed only on Linux (`PR_SET_PDEATHSIG`).
+    // On macOS a parent that dies from SIGKILL can leave the child running,
+    // because Drop does not run. The child is still a process-group leader
+    // and is signalled when the supervisor shuts down normally.
     #[cfg(target_os = "linux")]
     unsafe {
         let parent = getppid();

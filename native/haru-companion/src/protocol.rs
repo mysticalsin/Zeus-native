@@ -2,6 +2,9 @@
 //!
 //! Each message is `u8 type | u32 LE length | payload`. Audio frames are
 //! 24 kHz mono, 3200 samples. There is no `reference_path` in v1.
+//! START `language` must be English or French. A talk locale such as
+//! `en-US` or `fr-CA` is stored as `en` or `fr`. Anything else is
+//! `bad_language`.
 
 use crate::session::{SessionError, FRAME_SAMPLES, SAMPLE_RATE};
 
@@ -103,9 +106,7 @@ impl ClientMessage {
                 system_prompt,
                 speak_first,
             } => {
-                if language != "en" && language != "fr" {
-                    return Err(ProtocolError::BadLanguage);
-                }
+                let language = canonical_language(language)?;
                 let payload = format!(
                     "{{\"language\":{},\"system_prompt\":{},\"speak_first\":{}}}",
                     json_string(language),
@@ -369,6 +370,17 @@ pub fn decode_server_frame(frame: &RawFrame) -> Result<ServerMessage, ProtocolEr
     }
 }
 
+/// Primary language subtag `en` or `fr`, compared case-insensitively.
+/// `en-US` and `fr_CA` are accepted. Other tags are `bad_language`.
+pub fn canonical_language(language: &str) -> Result<&'static str, ProtocolError> {
+    let primary = language.split(['-', '_']).next().unwrap_or("");
+    match primary.to_ascii_lowercase().as_str() {
+        "en" => Ok("en"),
+        "fr" => Ok("fr"),
+        _ => Err(ProtocolError::BadLanguage),
+    }
+}
+
 fn decode_hello(payload: &[u8]) -> Result<ClientMessage, ProtocolError> {
     let json = parse_json(payload)?;
     let v = json
@@ -383,14 +395,8 @@ fn decode_start(payload: &[u8]) -> Result<ClientMessage, ProtocolError> {
     if json.get("reference_path").is_some() {
         return Err(ProtocolError::ReferenceNotAllowed);
     }
-    let language = json
-        .get("language")
-        .and_then(Json::as_str)
-        .unwrap_or("en")
-        .to_string();
-    if language != "en" && language != "fr" {
-        return Err(ProtocolError::BadLanguage);
-    }
+    let language = json.get("language").and_then(Json::as_str).unwrap_or("en");
+    let language = canonical_language(language)?.to_string();
     let system_prompt = json
         .get("system_prompt")
         .and_then(Json::as_str)

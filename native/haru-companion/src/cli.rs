@@ -1,13 +1,13 @@
 //! `haru-companion serve ...` and `haru-companion selftest`.
 //! Missing python, model, or the conversation flag never spawns or binds.
 
-use crate::backend::FakeBackend;
+use crate::backend::ModelLink;
 use crate::engine::{selftest_report, Engine};
 use crate::serve::{accept_authorized, bind_socket, serve_one, unlink_if_ours, BoundWatch, OsPeer};
 use crate::session::ChildControl;
 use crate::supervisor::{
-    apply, decide, serve_child_argv, LaunchDecision, LaunchRequest, NetGate, SocketBind, SpyBinder,
-    SpyLauncher, SpyNet, StdLauncher,
+    apply, decide, model_socket, serve_child_argv, LaunchDecision, LaunchRequest, NetGate,
+    SocketBind, SpyBinder, SpyLauncher, SpyNet, StdLauncher,
 };
 use std::path::PathBuf;
 
@@ -125,15 +125,15 @@ fn run_serve(
         return Err(error);
     }
     // The probe proves the interpreter can be spawned. Dropping it kills that
-    // process (`StdLauncher::drop`). The engine owns a later child. `serve`
-    // still answers Zeus from `FakeBackend::quiet`, so frames are silence
-    // rather than model audio. That scaffold is unchanged in this socket fix.
+    // process (`StdLauncher::drop`). The engine spawns the session child on
+    // START. Audio is `ModelLink`: the first push connects to the model
+    // socket and the client hears that stream, not generated silence.
     drop(probe);
     let child_gate = std::thread::spawn(move || {
         let _ = accept_authorized(child_listener, &OsPeer);
     });
     let mut engine = Engine::new(
-        FakeBackend::quiet(),
+        ModelLink::new(model_socket(private_socket)),
         StdLauncher::new(),
         argv.to_vec(),
         watchdog,

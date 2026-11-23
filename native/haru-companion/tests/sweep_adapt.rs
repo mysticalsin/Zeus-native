@@ -106,7 +106,9 @@ fn the_public_socket_returns_model_audio_not_silence() {
         std::thread::sleep(Duration::from_millis(10));
     }
     let mut client = UnixStream::connect(&public).unwrap();
-    client.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
     client
         .write_all(&ClientMessage::Hello { v: 1 }.encode().unwrap())
         .unwrap();

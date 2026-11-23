@@ -211,7 +211,15 @@ impl<B: ModelBackend, C: ChildControl> Engine<B, C> {
             ClientMessage::Hello { .. } => {
                 vec![protocol::protocol_error_frame(&ProtocolError::BadJson)]
             }
-            ClientMessage::Start { .. } => self.handle_start(),
+            ClientMessage::Start {
+                language,
+                system_prompt,
+                speak_first,
+            } => {
+                self.backend
+                    .note_start(&language, &system_prompt, speak_first);
+                self.handle_start()
+            }
             ClientMessage::Push { seq, samples } => self.handle_push(seq, &samples),
             ClientMessage::Close => self.handle_close(),
         }

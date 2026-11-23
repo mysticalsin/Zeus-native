@@ -357,7 +357,7 @@ fn id_of(st: &libc::stat) -> SocketId {
         dev: st.st_dev as u64,
         ino: st.st_ino as u64,
         ctime_sec: st.st_ctime as i64,
-        ctime_nsec: 0,
+        ctime_nsec: st.st_ctimespec.tv_nsec as i64,
     }
 }
 

@@ -11,6 +11,15 @@ The model, when a launch is allowed, is `haru-speech-mlx` 0.1.0:
 python -m haru_mlx.native --socket <private> --model <dir> --quantize 8
 ```
 
+Zeus places the socket at
+`~/Library/Application Support/Zeus/haru/zeus.sock`. The `haru` directory
+is mode 0700. `zeus.sock.child` and `zeus.sock.child.model` sit beside
+`zeus.sock`. If that directory already exists and is not 0700, serve
+refuses it and does not change its mode. START languages are `en` and
+`fr`. A talk locale such as `en-US` or `fr-CA` is stored as `en` or `fr`.
+Other tags are `bad_language`. `serve` connects the first audio push to
+the model socket, so the client hears that stream.
+
 `--kv-window` and `--reanchor-minutes` are accepted and held. They are
 not forwarded. Protocol v1 has no `reference_path`.
 
@@ -40,10 +49,12 @@ one silence frame and increments `underruns`. Each push still returns
 exactly one frame.
 
 `serve` binds the socket, checks that the interpreter can be spawned,
-then accepts one client whose uid matches this process. When that
-client disconnects, the session closes, the child is signalled, and
-the socket file is removed. A missing interpreter exits 2 and leaves
-no socket behind.
+then accepts one client whose uid matches this process. The first push
+connects to the model socket and returns that audio. When the client
+disconnects, the session closes, the child is signalled, and the socket
+file is removed. A missing interpreter exits 2 and leaves no socket
+behind. Parent-death signalling is a known limit off Linux: a SIGKILL
+of the supervisor can leave the child running.
 
 ## Session state machine
 

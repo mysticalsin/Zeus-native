@@ -171,6 +171,14 @@ Each real defect was committed as a failing test, then the fix.
 - Fix: the commit after `4e19105`. An existing parent is accepted only when it is owned by the checked uid and already mode 0700. This call does not chmod a directory it did not create. `bind_socket_as` seams that uid. Replacing the child entry makes `serve` return: `wake` calls `shutdown` on the listening socket because a `/proc/self/fd` connect is refused (`ECONNREFUSED`) and `accept` otherwise stays blocked. `BoundWatch::still_ours` compares dev, ino, and ctime. The model path is not an inherited fd (`haru_mlx.native` takes a path); a leftover socket there is unlinked and a non-socket is kept. `run_serve` cleanup uses `unlink_if_ours`. A foreign socket uid cannot be created here, so `FixedPeer` remains that seam and `OsPeer` covers the same-uid `SO_PEERCRED` path.
 - Counts: `cargo +stable test --locked` haru-companion 103 passed, 0 failed. haru-pipe 16 passed, 0 failed. `cargo +stable fmt --check` and `cargo +stable clippy --locked --all-targets -- -D warnings` passed for both crates.
 
+## 20. Inspector ADAPT, companion only
+
+- Time: 2026-11-23. Inspector FIRST FAIL APP-FIT at `43595473` tree `8f71dc01049940d27856235b4fa9a4072c4b3b49`. Report sha256 `5f55cdf0a5837308d3f554d5d312c2f3142bf1116f2f76599a9b2fcf8c070d3f`.
+- In scope: `native/haru-companion` and `native/haru-pipe` only. Speaker, SpeechInput, and UnixSocket were not edited.
+- Test: `406745ff` `tests/sweep_adapt.rs`. Five tests failed: `en-US` was `BadLanguage`, the public socket returned silence, the socket path was not `Application Support/Zeus/haru/zeus.sock`, off-Linux `ctime_nsec` was 0, and parent death was not marked as a known limit.
+- Fix: the commit after `406745ff`. `serve` uses `ModelLink`, which connects the first push to the model socket. `en-US` and `fr-CA` are stored as `en` and `fr`. Other tags stay `bad_language`. The app socket parent is `Application Support/Zeus/haru` at mode 0700, with the child and model sockets beside `zeus.sock`. Off Linux, ctime nanoseconds come from `st_ctimespec`. Parent death stays Linux-only and is a known limit on macOS.
+- Counts: `cargo +stable test --locked` haru-companion 108 passed, 0 failed. haru-pipe 16 passed, 0 failed. fmt and clippy `-D warnings` passed for both crates.
+
 ## Checked, not a new defect
 
 - Cross compile, stable 1.100, target `aarch64-apple-darwin`: `cargo check --locked` exits 0 for both crates. `cargo build --locked` compiles and fails at link. `xcrun --sdk macosx` is missing (`os error 2`) and the host `cc` rejects `-arch arm64` (`unsupported option '-arch' for target 'x86_64-pc-linux-gnu'`). No Mach-O was produced.

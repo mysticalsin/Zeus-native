@@ -40,6 +40,7 @@ pub enum BackendEvent {
 }
 
 pub trait ModelBackend {
+    fn note_start(&mut self, _language: &str, _system_prompt: &str, _speak_first: bool) {}
     fn exchange(&mut self, samples: &[f32]) -> BackendEvent;
     fn exchanges(&self) -> u32;
 }
@@ -120,6 +121,73 @@ impl ModelBackend for FakeBackend {
     fn exchanges(&self) -> u32 {
         self.exchanges
     }
+}
+
+/// Connects to the model listen socket on the first exchange and then
+/// speaks `haru_mlx.native`. Until that exchange, the client has not
+/// been given a frame.
+pub struct ModelLink {
+    path: std::path::PathBuf,
+    request: crate::upstream::StartRequest,
+    inner: Option<UpstreamBackend<UnixStream>>,
+}
+
+impl ModelLink {
+    pub fn new(path: std::path::PathBuf) -> Self {
+        Self {
+            path,
+            request: crate::upstream::StartRequest {
+                language: "en".to_string(),
+                system_prompt: String::new(),
+                speak_first: false,
+            },
+            inner: None,
+        }
+    }
+}
+
+impl ModelBackend for ModelLink {
+    fn note_start(&mut self, language: &str, system_prompt: &str, speak_first: bool) {
+        self.request.language = language.to_string();
+        self.request.system_prompt = system_prompt.to_string();
+        self.request.speak_first = speak_first;
+    }
+
+    fn exchange(&mut self, samples: &[f32]) -> BackendEvent {
+        if self.inner.is_none() {
+            let stream = match connect_model(&self.path) {
+                Ok(stream) => stream,
+                Err(_) => return BackendEvent::SocketClosed,
+            };
+            self.inner = Some(UpstreamBackend::new(stream, self.request.clone()));
+        }
+        self.inner
+            .as_mut()
+            .map(|backend| backend.exchange(samples))
+            .unwrap_or(BackendEvent::SocketClosed)
+    }
+
+    fn exchanges(&self) -> u32 {
+        self.inner
+            .as_ref()
+            .map(UpstreamBackend::exchanges)
+            .unwrap_or(0)
+    }
+}
+
+fn connect_model(path: &std::path::Path) -> std::io::Result<UnixStream> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    let mut last = std::io::Error::new(std::io::ErrorKind::NotFound, "model socket");
+    while std::time::Instant::now() < deadline {
+        match UnixStream::connect(path) {
+            Ok(stream) => return Ok(stream),
+            Err(error) => {
+                last = error;
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+    }
+    Err(last)
 }
 
 fn noise_frame() -> Vec<f32> {
