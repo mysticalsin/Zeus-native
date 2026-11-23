@@ -562,6 +562,19 @@ class VoiceLatencyScript(unittest.TestCase):
         self.assertIn("public static let apiCloudVoiceMs = 1_200", targets)
         self.assertIn("public static let firstAudioP50Ms = 2_000", targets)
 
+    def test_file_recognition_keeps_the_latest_partial_when_it_cancels(self):
+        # The 2 s file give-up used to cancel and then keep only an isFinal result, so a
+        # non-final partial became "No speech found." The give-up must settle the partial.
+        callback = (ROOT / "Sources/Zeus/Audio/OffMainAudioCallbacks.swift").read_text()
+        self.assertNotIn("result?.isFinal == true || error != nil", callback)
+        self.assertIn("STTFileRecognition()", callback)
+        self.assertIn("heard.giveUp()", callback)
+        self.assertIn("task.cancel()", callback)
+        self.assertIn("STTFileGiveUp.seconds", callback)
+        self.assertNotIn(".now() + 2.5", callback)
+        targets = (ROOT / "Sources/ZeusCore/Voice/VoiceLatencyTrace.swift").read_text()
+        self.assertIn("public static let apiCloudVoiceMs = 1_200", targets)
+
     def test_log_line_never_needs_a_transcript(self):
         row = voice_latency.parse(LINE)
         self.assertNotIn("transcript_text", row)
