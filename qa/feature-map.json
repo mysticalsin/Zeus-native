@@ -1267,6 +1267,10 @@
             },
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "aCancelledMarkDoesNotWriteTheOpenUtterance"
             },
             {

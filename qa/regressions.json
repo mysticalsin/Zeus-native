@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
         "function": "latencyRegressionBothPathsStayInsideTheBudget"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "File recognition cancelled at the 2 s stand-in and kept only an isFinal result, so a non-final partial was dropped and the file was reported as no speech.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled"
+      }
     }
   ]
 }
