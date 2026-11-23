@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import pathlib
+import subprocess
 import tempfile
 import unittest
 
@@ -15,11 +16,14 @@ BASELINE_S = action_speed.BASELINE_S
 DEFAULT_REPEATS = action_speed.DEFAULT_REPEATS
 PROMPTS = action_speed.PROMPTS
 TARGETS_S = action_speed.TARGETS_S
+drive = action_speed.drive
 group_turns = action_speed.group_turns
 load_fixture = action_speed.load_fixture
 main = action_speed.main
+measurement_exit = action_speed.measurement_exit
 parse_trace_line = action_speed.parse_trace_line
 percentile = action_speed.percentile
+reference_only = action_speed.reference_only
 report = action_speed.report
 
 TURN = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
@@ -87,6 +91,30 @@ class FixtureReportTests(unittest.TestCase):
         self.assertEqual(capital["p50_ms"], 2100)
         self.assertEqual(capital["p95_ms"], 2300)
         self.assertEqual(capital["baseline_s"], 2.4)
+        self.assertEqual(capital["reference_ms"], 2400)
+        self.assertEqual(capital["delta_p50_ms"], -300)
+        self.assertEqual(capital["versus_reference"], "faster")
+        self.assertIn("faster", table)
+        self.assertIn("-300", table)
+        self.assertIn("reference app: not launched", table)
+        audio_p50 = [
+            row for row in payload["target_verdicts"]
+            if row["kind"] == "capital" and row["stage"] == "firstTtsAudio" and row["stat"] == "p50_ms"
+        ][0]
+        audio_p95 = [
+            row for row in payload["target_verdicts"]
+            if row["kind"] == "capital" and row["stage"] == "firstTtsAudio" and row["stat"] == "p95_ms"
+        ][0]
+        paint = [
+            row for row in payload["target_verdicts"]
+            if row["kind"] == "capital" and row["stage"] == "firstOverlayPaint"
+        ][0]
+        self.assertEqual(audio_p50["status"], "over")
+        self.assertEqual(audio_p50["ceiling_ms"], 2000)
+        self.assertEqual(audio_p95["status"], "inside")
+        self.assertEqual(paint["status"], "unmeasured")
+        self.assertFalse(payload["measurement"]["reference_app_launched"])
+        self.assertFalse(payload["measurement"]["zeus_launched"])
         self.assertIn("capital", table)
         self.assertEqual(payload["baseline_s"]["router"]["firstOverlayPaint"], 29.8)
         self.assertEqual(payload["baseline_s"]["router"]["drawingEnd"], 68.9)
@@ -122,6 +150,79 @@ class FixtureReportTests(unittest.TestCase):
     def test_missing_zeus_does_not_launch(self):
         code = main([])
         self.assertEqual(code, 2)
+
+    def test_missing_binary_does_not_launch(self):
+        code = main(["--zeus", "/tmp/zeus-does-not-exist-action-speed", "--n", "1"])
+        self.assertEqual(code, 2)
+
+    def test_a_missing_key_release_is_refused(self):
+        lines = [json.dumps(event("firstTtsAudio", 10))]
+        with self.assertRaises(ValueError):
+            group_turns(lines)
+
+    def test_same_and_slower_than_the_reference(self):
+        samples = [
+            {"kind": "capital", "offsets": {"keyRelease": 0, "firstTtsAudio": 2400}},
+            {"kind": "percent", "offsets": {"keyRelease": 0, "firstTtsAudio": 5000}},
+        ]
+        _table, payload = report(samples)
+        capital = [row for row in payload["rows"] if row["kind"] == "capital" and row["stage"] == "firstTtsAudio"][0]
+        percent = [row for row in payload["rows"] if row["kind"] == "percent" and row["stage"] == "firstTtsAudio"][0]
+        window = [row for row in payload["rows"] if row["kind"] == "window" and row["stage"] == "firstTtsAudio"][0]
+        self.assertEqual(capital["versus_reference"], "same")
+        self.assertEqual(capital["delta_p50_ms"], 0)
+        self.assertEqual(percent["versus_reference"], "slower")
+        self.assertEqual(percent["delta_p50_ms"], 1100)
+        self.assertEqual(percent["reference_ms"], 3900)
+        self.assertEqual(window["versus_reference"], "unmeasured")
+        self.assertEqual(window["reference_ms"], 2800)
+        self.assertIsNone(window["delta_p50_ms"])
+
+    def test_reference_only_marks_stay_in_the_comparison(self):
+        notes = {(note["kind"], note["mark"]): note["reference_ms"] for note in reference_only()}
+        self.assertEqual(notes[("capital", "filler")], 2000)
+        self.assertEqual(notes[("capital", "answerDone")], 14800)
+        self.assertEqual(notes[("wallpaper", "pointerBox")], 4300)
+        self.assertEqual(notes[("router", "drawingEnd")], 68900)
+        self.assertNotIn(("wallpaper", "pointerArrival"), notes)
+
+    def test_a_missed_prompt_is_an_incomplete_measurement(self):
+        def runner(_command, _env, timeout):
+            raise subprocess.TimeoutExpired(_command, timeout)
+
+        with tempfile.TemporaryDirectory() as directory:
+            samples, missed = drive("/bin/true", 1, pathlib.Path(directory) / "trace.jsonl", runner=runner)
+        self.assertEqual(samples, [])
+        self.assertEqual(len(missed), 6)
+        self.assertTrue(all(item["reason"] == "timeout" for item in missed))
+        self.assertNotIn("prompt", json.dumps(missed))
+        self.assertEqual(measurement_exit(missed), 3)
+        self.assertEqual(measurement_exit([]), 0)
+
+    def test_one_trace_turn_keeps_its_prompt_kind(self):
+        by_text = {text: kind for kind, text in PROMPTS}
+        ids = {
+            "capital": "00000000-0000-0000-0000-000000000001",
+            "window": "00000000-0000-0000-0000-000000000002",
+            "percent": "00000000-0000-0000-0000-000000000003",
+            "router": "00000000-0000-0000-0000-000000000004",
+            "wallpaper": "00000000-0000-0000-0000-000000000005",
+            "shorter": "00000000-0000-0000-0000-000000000006",
+        }
+
+        def runner(command, env, _timeout):
+            kind = by_text[command[-1]]
+            path = pathlib.Path(env["ZEUS_ACTION_SPEED_TRACE_FILE"])
+            line = json.dumps({"turn": ids[kind], "stage": "keyRelease", "monoNs": 10})
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+
+        with tempfile.TemporaryDirectory() as directory:
+            samples, missed = drive(
+                "/bin/true", 1, pathlib.Path(directory) / "trace.jsonl", runner=runner,
+            )
+        self.assertEqual(missed, [])
+        self.assertEqual([sample["kind"] for sample in samples], [kind for kind, _text in PROMPTS])
 
 
 class BaselineLockTests(unittest.TestCase):

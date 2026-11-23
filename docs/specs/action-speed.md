@@ -76,9 +76,13 @@ ZEUS_ACTION_SPEED_TRACE=1 python3 qa/speed/action_speed.py --n 20 --zeus .build/
 
 Run that from the repository root on a Mac, with a Debug `Zeus` binary. `--n` defaults to 20 and is the repeat count for each of the six prompts. The script sets the flag and a private trace file on the child process, drives `Zeus --ask` once per repeat, and prints a p50/p95 table plus JSON. Nearest rank: for 20 samples, p50 is the 10th sorted value and p95 is the 19th.
 
-The script does not launch Zeus when `--zeus` is omitted (exit 2) or when `--fixture` is set. `qa/speed/test_action_speed.py` uses synthetic fixtures only. A trace line that carries `transcript` or `prompt`, or any key besides the three above, is refused.
+Each stage row also carries the reference frame time in milliseconds, `delta_p50_ms` (Zeus p50 minus that reference), and `versus_reference`: `faster`, `slower`, `same`, `unmeasured`, or `no_baseline`. A stage with no Zeus sample is `unmeasured`. It is not treated as faster than the reference and it is not inside a target ceiling. Reference marks that are not Zeus stages (`filler`, `answerDone`, `pointerBox`, `drawingEnd`) are printed beside the table so they stay in the comparison.
 
-`--ask` does not play audio or paint, so a harness run records `keyRelease`, `requestSent`, `firstModelToken`, and `firstToolDecision` when the model streams them. `firstTtsAudio`, `firstOverlayPaint`, and `pointerArrival` come from a real talk-key turn with the same flag on.
+The reference app is not launched. `baseline_s` is the owner's frame table above. There is no reference-app binary in this harness.
+
+The script does not launch Zeus when `--zeus` is omitted or the path is not a file (exit 2), or when `--fixture` is set. A `--zeus` run that loses a prompt (timeout, the process cannot start, a trace without `keyRelease`, or any count other than one turn) still prints the rows it has and exits 3. The miss record is the prompt kind and the reason. It does not store the prompt. `qa/speed/test_action_speed.py` uses synthetic fixtures only. A trace line that carries `transcript` or `prompt`, or any key besides the three above, is refused.
+
+`--ask` does not play audio or paint, so a harness run records `keyRelease`, `requestSent`, `firstModelToken`, and `firstToolDecision` when the model streams them. `firstTtsAudio`, `firstOverlayPaint`, and `pointerArrival` come from a real talk-key turn with the same flag on. Those empty stages stay `unmeasured` on the `--ask` path.
 
 ## Static profile
 
@@ -115,3 +119,5 @@ Not landed, because they are not small or they fight an existing receipt:
 ## What this does not change
 
 No new network endpoint. No new permission prompt. No `Package.swift`, SDK, or CI workflow edit. The macOS app target currently fails to compile on integration because `PlacedMark` is declared in both `Sources/ZeusCore/Pointing/MarkLayout.swift` and `Sources/ZeusCore/Present/DrawingScene.swift`. That duplicate is not fixed here.
+
+Linux cannot build or run the macOS app. The synthetic harness tests do not prove a native measurement, and they do not prove the reference app. A Mac with a Debug `Zeus` binary is required before `--zeus` can time a turn. Audio, paint, and pointer stages still need a real talk-key turn with the trace flag on. `qa/feature-map.json` has no action-speed obligation; those native suites stay on the Mac.
