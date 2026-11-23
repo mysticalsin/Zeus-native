@@ -90,15 +90,20 @@ struct ZeusScreenSharePolicyTests {
 
         var hover = ScreenShareClickLedger()
         #expect(hover.flips == 0)
-        #expect(hover.action())
-        #expect(hover.action())
+        // `#expect` captures the receiver of a bare call, so a mutating method
+        // has to run first and the Bool is what the expectation sees.
+        let firstHover = hover.action()
+        let secondHover = hover.action()
+        #expect(firstHover)
+        #expect(secondHover)
         #expect(hover.flips == 2)
 
         var afterClose = ScreenShareClickLedger()
         afterClose.pointerUpOnRow()
         #expect(afterClose.action() == false)
         afterClose.menuClosed()
-        #expect(afterClose.action())
+        let keyAfterClose = afterClose.action()
+        #expect(keyAfterClose)
         #expect(afterClose.flips == 2)
 
         let repeatHide = CaptureExclusionUpdate(
