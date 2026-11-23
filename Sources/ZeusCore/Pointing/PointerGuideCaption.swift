@@ -8,12 +8,21 @@ public enum PointerGuideCaptionSplit {
     /// Same delay the pointing label already uses between characters.
     public static let characterDelay: TimeInterval = 0.04
 
-    /// Lines drawn beside the bolt. The thread detail is still joined in, so the helper
-    /// shows one long line instead of the three short roles.
+    /// Lines drawn beside the bolt. At most three short lines: what it is, what to do,
+    /// what happens next. A blank role is skipped. A long role, a line break, or a caption
+    /// made only of thread detail is not shown. `detail` stays off the overlay.
     public static func overlayLines(whatItIs: String, whatToDo: String, whatHappensNext: String, detail: String) -> [String]? {
-        let parts = [whatItIs, whatToDo, whatHappensNext, detail].map(normalize).filter { !$0.isEmpty }
-        guard !parts.isEmpty else { return nil }
-        return [parts.joined(separator: " ")]
+        _ = detail
+        let roles = [whatItIs, whatToDo, whatHappensNext].map(normalize)
+        guard roles.contains(where: { !$0.isEmpty }) else { return nil }
+        var lines: [String] = []
+        for role in roles {
+            guard !role.isEmpty else { continue }
+            guard role.count <= maxLineCharacters, !role.contains(where: \.isNewline) else { return nil }
+            lines.append(role)
+        }
+        guard (1...maxLines).contains(lines.count) else { return nil }
+        return lines
     }
 
     public static func visibleLines(in text: String) -> [String] {
