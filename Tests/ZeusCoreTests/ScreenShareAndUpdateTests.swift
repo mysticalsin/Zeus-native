@@ -36,6 +36,89 @@ struct ZeusScreenSharePolicyTests {
         #expect(ZeusScreenSharePolicy.captureKind(visible: true) == .visibleInShare)
         #expect(ZeusScreenSharePolicy.captureKind(visible: false) == .hidden)
     }
+
+    /// The "..." row. A click with the pointer left on the row must hide, then show,
+    /// then hide again. The same mouse-up delivered twice flips once. A hover does not.
+    /// The capture write still ends on the new value when the getter is stuck on hidden
+    /// and when the pointer is on the window.
+    @Test func aClickOnTheRowFlipsHideAndShowEvenWhenThePointerStays() {
+        var shown = false
+        var ledger = ScreenShareClickLedger()
+        var remembered: Bool? = true
+        var getter: Bool? = true
+
+        func flip(pointerOnWindow: Bool) {
+            shown = ScreenShareQuickToggleLogic.nextShown(shown)
+            let update = CaptureExclusionUpdate(
+                wantHidden: !shown,
+                rememberedHidden: remembered,
+                getterHidden: getter,
+                pointerOnWindow: pointerOnWindow,
+                force: false)
+            let steps = update.steps
+            #expect(steps?.last == !shown)
+            remembered = steps?.last
+            // The getter stays at hidden, which is the failure that used to skip the next hide.
+            getter = true
+        }
+
+        #expect(ScreenShareQuickToggleLogic.title(shown: shown) == "Show Zeus in screen shares")
+        #expect(ScreenShareQuickToggleLogic.storedValue(shown: shown) == "false")
+
+        ledger.pointerUpOnRow()
+        #expect(ledger.action() == false)
+        flip(pointerOnWindow: true)
+        #expect(shown)
+        #expect(ScreenShareQuickToggleLogic.title(shown: shown) == "Hide Zeus from screen shares")
+        #expect(ScreenShareQuickToggleLogic.storedValue(shown: shown) == "true")
+        #expect(remembered == false)
+
+        ledger.menuClosed()
+        ledger.pointerUpOnRow()
+        #expect(ledger.action() == false)
+        flip(pointerOnWindow: true)
+        #expect(!shown)
+        #expect(ScreenShareQuickToggleLogic.title(shown: shown) == "Show Zeus in screen shares")
+        #expect(remembered == true)
+
+        ledger.menuClosed()
+        ledger.pointerUpOnRow()
+        flip(pointerOnWindow: true)
+        #expect(shown)
+        #expect(remembered == false)
+        #expect(ledger.flips == 3)
+
+        var hover = ScreenShareClickLedger()
+        #expect(hover.flips == 0)
+        #expect(hover.action())
+        #expect(hover.action())
+        #expect(hover.flips == 2)
+
+        var afterClose = ScreenShareClickLedger()
+        afterClose.pointerUpOnRow()
+        #expect(afterClose.action() == false)
+        afterClose.menuClosed()
+        #expect(afterClose.action())
+        #expect(afterClose.flips == 2)
+
+        let repeatHide = CaptureExclusionUpdate(
+            wantHidden: true, rememberedHidden: true, getterHidden: true, pointerOnWindow: false, force: false)
+        #expect(repeatHide.steps == nil)
+        let forced = CaptureExclusionUpdate(
+            wantHidden: true, rememberedHidden: true, getterHidden: true, pointerOnWindow: true, force: true)
+        #expect(forced.steps == [false, true])
+        let firstWrite = CaptureExclusionUpdate(
+            wantHidden: true, rememberedHidden: nil, getterHidden: false, pointerOnWindow: true, force: false)
+        #expect(firstWrite.steps == [true])
+        let awayFromThePointer = CaptureExclusionUpdate(
+            wantHidden: false, rememberedHidden: true, getterHidden: true, pointerOnWindow: false, force: false)
+        #expect(awayFromThePointer.steps == [false])
+        let stuckGetter = CaptureExclusionUpdate(
+            wantHidden: true, rememberedHidden: false, getterHidden: true, pointerOnWindow: false, force: false)
+        #expect(stuckGetter.steps == [false, true])
+        #expect(ScreenShareQuickToggleLogic.isToggleRow(ScreenShareQuickToggleLogic.rowMarker))
+        #expect(!ScreenShareQuickToggleLogic.isToggleRow("always"))
+    }
 }
 
 @Suite("Update badge logic")
