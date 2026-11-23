@@ -67,6 +67,10 @@ GROUPS = {
              "BrowserAgent/BrowserUseProtocol.swift"),
         tests("WikiExportTests"),
     ),
+    "brain-capture": (
+        core("BrainCaptureNote.swift"),
+        tests("BrainCaptureNoteTests"),
+    ),
     "dictation-insertion": (
         core("Dictation/TextInsertionReceipt.swift"),
         tests("TextInsertionReceiptTests"),

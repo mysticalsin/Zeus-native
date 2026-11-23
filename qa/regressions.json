@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Save to Brain wrote a chat or sticky with no stable id, or it would have written a path into the front matter.",
+      "features": [
+        "F10"
+      ],
+      "check": "portable-brain-capture",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+        "function": "aPathOrBlankIdentifierIsOmitted"
+      }
     }
-]
+  ]
 }

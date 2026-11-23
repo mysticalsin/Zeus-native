@@ -411,6 +411,13 @@
       "scope": "Actual selected export transaction, MCP protocol and confined filesystem with synthetic temporary vault and injected transport. Independent process checks included only when their named test executes; no personal vault."
     },
     {
+      "id": "portable-brain-capture",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "brain-capture",
+      "scope": "Explicit Save to Brain Markdown, including a stable record id when it is a safe token. No vault, network, credential or automatic chat sync."
+    },
+    {
       "id": "native-ScribeLifecycleScenarioTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -4877,6 +4884,25 @@
             }
           ],
           "id": "F10.2"
+        },
+        {
+          "id": "F10.capture-record",
+          "check": "portable-brain-capture",
+          "acceptance": "An explicit capture keeps a safe Zeus record id on one front-matter line and omits a path, a blank id or any token that would break the note. This does not send chats on its own and does not open a vault.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+              "function": "theNoteWithoutARecordMatchesTheCaptureShape"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+              "function": "aMessageIdentifierStaysOnOneFrontMatterLine"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+              "function": "aPathOrBlankIdentifierIsOmitted"
+            }
+          ]
         },
         {
           "check": "missing-F10-device",

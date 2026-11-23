@@ -279,7 +279,8 @@ private struct ChatBubble: View {
             if !message.text.isEmpty, !message.failed {
                 Button("Make Sticky") { StickiesController.shared.new(text: message.text) }
                 Button("Save to Brain…") {
-                    BrainCaptureWindow.shared.show(title: StickyNote(text: message.text).title, body: message.text, source: "chat")
+                    BrainCaptureWindow.shared.show(title: StickyNote(text: message.text).title, body: message.text,
+                                                    source: "chat", record: message.id.uuidString)
                 }
             }
         }

@@ -138,7 +138,7 @@ final class StickiesController {
             toggleEdge: { [weak self] in self?.toggleEdge(id) },
             delete: { [weak self] in self?.confirmDelete(id) },
             new: { [weak self] in self?.new() },
-            saveToBrain: { BrainCaptureWindow.shared.show(title: state.note.title, body: state.note.text, source: "sticky") }
+            saveToBrain: { BrainCaptureWindow.shared.show(title: state.note.title, body: state.note.text, source: "sticky", record: state.note.id.uuidString) }
         )))
         panel.onHover = { [weak self] inside in self?.hovered(id, inside: inside) }
         panel.onMoved = { [weak self] in self?.moved(id) }
