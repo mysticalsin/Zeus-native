@@ -53,6 +53,27 @@ struct ScribeAutoStartOptInTests {
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == optIn1)
     }
 
+    // The first flush can observe a stamp written while the suite synchronizes.
+    // A later time is a new opt-in. The time that was just removed is the stale one.
+
+    @Test func aNewerStampWrittenAfterTheFirstFlushIsKept() throws {
+        let defaults = try #require(StampPlantedAtFlush(planted: optIn2.timeIntervalSince1970))
+        defer { defaults.removePersistentDomain(forName: defaults.suite) }
+        defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
+        ScribeAutoStartOptIn.record(mode: .ask, now: optIn1, defaults: defaults)
+        #expect(defaults.flushCount >= 1)
+        #expect(ScribeAutoStartOptIn.date(defaults: defaults) == optIn2)
+    }
+
+    @Test func theSameStampRestoredAfterTheFirstFlushIsStillRemoved() throws {
+        let defaults = try #require(StampPlantedAtFlush(planted: optIn1.timeIntervalSince1970))
+        defer { defaults.removePersistentDomain(forName: defaults.suite) }
+        defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
+        ScribeAutoStartOptIn.record(mode: .ask, now: optIn1, defaults: defaults)
+        #expect(defaults.flushCount >= 1)
+        #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
+    }
+
     // MARK: Launch migration
 
     @Test func aStaleStampWithAskMeIsRemovedAtLaunch() throws {
@@ -194,5 +215,36 @@ struct ScribeAutoStartOptInTests {
         #expect(ScribeMicrophoneAccess(authorizationRaw: 2) == .denied)
         #expect(ScribeMicrophoneAccess(authorizationRaw: 3) == .allowed)
         #expect(ScribeMicrophoneAccess(authorizationRaw: 99) == .denied)
+    }
+}
+
+/// Plants one opt-in stamp when the suite flushes after that stamp was removed.
+/// Stands in for a preferences write that lands as the first flush returns.
+private final class StampPlantedAtFlush: UserDefaults {
+    let suite: String
+    private let planted: Double
+    private var removedOptIn = false
+    private var didPlant = false
+    private(set) var flushCount = 0
+
+    init?(planted: Double) {
+        let suite = NSTemporaryDirectory() + "ScribeAutoStartOptIn.flush.\(UUID().uuidString)"
+        self.suite = suite
+        self.planted = planted
+        super.init(suiteName: suite)
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        super.removeObject(forKey: defaultName)
+        if defaultName == ScribeAutoStartOptIn.key { removedOptIn = true }
+    }
+
+    override func synchronize() -> Bool {
+        let flushed = super.synchronize()
+        flushCount += 1
+        guard removedOptIn, !didPlant else { return flushed }
+        didPlant = true
+        set(planted, forKey: ScribeAutoStartOptIn.key)
+        return flushed
     }
 }
