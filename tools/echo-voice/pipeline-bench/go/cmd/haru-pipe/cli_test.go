@@ -157,4 +157,76 @@ func TestManifestEscapeRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	runCase(filepath.Join("subdir", "escape.wav"))
+	// A broken link does not exist, but creating through it would write the target.
+	created := filepath.Join(root, "keep", "CREATED.wav")
+	if err := os.Symlink(filepath.Join(root, "keep", "missing.wav"), filepath.Join(wl, "subdir", "broken.wav")); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("subdir", "broken.wav"))
+	if err := os.WriteFile(filepath.Join(wl, "subdir", "ok.wav"), wav, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(created, filepath.Join(out, "reply_subdir", "ok.wav")); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("subdir", "ok.wav"))
+	if _, err := os.Stat(created); !os.IsNotExist(err) {
+		t.Fatalf("wrote through a broken symlink: %v", err)
+	}
+	if err := os.Symlink(filepath.Join(root, "keep"), filepath.Join(wl, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "keep", "clip.wav"), wav, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("linked", "clip.wav"))
+	evil := filepath.Join(root, "a", "b", "c", "wl-evil")
+	if err := os.MkdirAll(evil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(evil, "x.wav"), wav, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(evil, "x.wav"), filepath.Join(wl, "subdir", "prefix.wav")); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("subdir", "prefix.wav"))
+	if err := os.Symlink("../../../../../keep/SENTINEL", filepath.Join(wl, "subdir", "rel.wav")); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("subdir", "rel.wav"))
+	if err := os.MkdirAll(filepath.Join(wl, "via"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wl, "via", "fresh.wav"), wav, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "keep"), filepath.Join(out, "reply_via")); err != nil {
+		t.Fatal(err)
+	}
+	runCase(filepath.Join("via", "fresh.wav"))
+	if _, err := os.Stat(filepath.Join(root, "keep", "fresh.wav")); !os.IsNotExist(err) {
+		t.Fatalf("wrote through a directory symlink: %v", err)
+	}
+	// A link that stays inside the workload is still read.
+	if err := os.Symlink("ok.wav", filepath.Join(wl, "subdir", "alias.wav")); err != nil {
+		t.Fatal(err)
+	}
+	writeManifest("m", filepath.Join("subdir", "alias.wav"))
+	if c := run(t, "bench", "--workload", wl, "--out", out, "--mode", "file"); c != 0 {
+		t.Fatalf("inside symlink exit %d", c)
+	}
+	got, err := os.ReadFile(sentinel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "stay" {
+		t.Fatalf("sentinel overwritten: %q", got)
+	}
+	if _, err := os.Stat(created); !os.IsNotExist(err) {
+		t.Fatalf("inside symlink wrote outside: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "reply_subdir", "alias.wav")); err != nil {
+		t.Fatal(err)
+	}
 }

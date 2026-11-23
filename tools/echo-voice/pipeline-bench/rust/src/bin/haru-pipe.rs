@@ -4,6 +4,7 @@
 //!   haru-pipe convert IN.wav OUT.wav        any WAV -> 24 kHz mono PCM_16, zero-padded to whole frames
 //!   haru-pipe info    IN.wav                rate, channels, seconds, Haru frame count
 use haru_pipe::{bench, frame, stats, wav};
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -52,8 +53,55 @@ fn file_names(text: &str) -> Vec<String> {
     out
 }
 
+fn inside(base: &Path, path: &Path) -> bool {
+    path == base || path.starts_with(base)
+}
+
+fn normalize(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::ParentDir => { out.pop(); }
+            Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
+/// Follow `path` from the canonical `base`. A symlink is resolved even when its
+/// target does not exist yet, and any target outside `base` is refused. The
+/// returned path has no symlink left in it.
+fn place(base: &Path, path: &Path, seen: &mut HashSet<PathBuf>) -> Result<PathBuf, ()> {
+    let cleaned = normalize(path);
+    if !inside(base, &cleaned) { return Err(()); }
+    if cleaned == base { return Ok(base.to_path_buf()); }
+    match std::fs::symlink_metadata(&cleaned) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            if !seen.insert(cleaned.clone()) { return Err(()); }
+            let target = std::fs::read_link(&cleaned).unwrap_or_else(|e| die(&e.to_string()));
+            let parent = match cleaned.parent() { Some(parent) => parent, None => return Err(()) };
+            let dest = if target.is_absolute() { target } else { parent.join(target) };
+            place(base, &dest, seen)
+        }
+        Ok(_) => {
+            let real = std::fs::canonicalize(&cleaned).unwrap_or_else(|e| die(&e.to_string()));
+            if !inside(base, &real) { return Err(()); }
+            Ok(real)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let (Some(parent), Some(name)) = (cleaned.parent(), cleaned.file_name()) else { return Err(()) };
+            let parent = place(base, parent, seen)?;
+            let full = parent.join(name);
+            if !inside(base, &full) { return Err(()); }
+            Ok(full)
+        }
+        Err(e) => die(&e.to_string()),
+    }
+}
+
 /// Reject absolute names, empty names, and `..` / root / prefix components, then
-/// keep the cleaned path inside `base`.
+/// keep the resolved path inside `base`.
 fn confined(base: &Path, name: &str) -> PathBuf {
     if name.is_empty() || Path::new(name).is_absolute() {
         die(&format!("refusing manifest path {name:?}"));
@@ -75,22 +123,12 @@ fn confined(base: &Path, name: &str) -> PathBuf {
             other => full.push(other.as_os_str()),
         }
     }
-    if full != base && !full.starts_with(&base) {
+    if !inside(&base, &full) {
         die(&format!("refusing manifest path {name:?}"));
     }
-    // A symlink under the base can still leave it. Resolve every existing
-    // ancestor and refuse a target outside the canonical base.
-    let mut existing = full.clone();
-    while !existing.exists() {
-        if !existing.pop() {
-            die(&format!("refusing manifest path {name:?}"));
-        }
-    }
-    let resolved = std::fs::canonicalize(&existing).unwrap_or_else(|e| die(&e.to_string()));
-    if resolved != base && !resolved.starts_with(&base) {
-        die(&format!("refusing manifest path {name:?}"));
-    }
-    full
+    // A symlink under the base can still leave it. `exists` is false for a
+    // broken link, and creating through that link would write the target.
+    place(&base, &full, &mut HashSet::new()).unwrap_or_else(|_| die(&format!("refusing manifest path {name:?}")))
 }
 
 /// Tiny manifest reader: the workload manifest's "file" entries, in order.

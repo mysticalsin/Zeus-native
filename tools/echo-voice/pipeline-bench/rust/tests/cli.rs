@@ -100,5 +100,36 @@ fn manifest_escape_is_refused() {
     let link = wl.join("subdir/escape.wav");
     std::os::unix::fs::symlink(&sentinel, &link).unwrap();
     run_case("subdir/escape.wav");
+    // A broken link does not exist, but creating through it would write the target.
+    let created = root.join("keep/CREATED.wav");
+    std::os::unix::fs::symlink(root.join("keep/missing.wav"), wl.join("subdir/broken.wav")).unwrap();
+    run_case("subdir/broken.wav");
+    fs::write(wl.join("subdir/ok.wav"), &wav).unwrap();
+    std::os::unix::fs::symlink(&created, out.join("reply_subdir/ok.wav")).unwrap();
+    run_case("subdir/ok.wav");
+    assert!(!created.exists(), "wrote through a broken symlink");
+    std::os::unix::fs::symlink(root.join("keep"), wl.join("linked")).unwrap();
+    fs::write(root.join("keep/clip.wav"), &wav).unwrap();
+    run_case("linked/clip.wav");
+    let evil = root.join("a/b/c/wl-evil");
+    fs::create_dir_all(&evil).unwrap();
+    fs::write(evil.join("x.wav"), &wav).unwrap();
+    std::os::unix::fs::symlink(evil.join("x.wav"), wl.join("subdir/prefix.wav")).unwrap();
+    run_case("subdir/prefix.wav");
+    std::os::unix::fs::symlink("../../../../../keep/SENTINEL", wl.join("subdir/rel.wav")).unwrap();
+    run_case("subdir/rel.wav");
+    fs::create_dir_all(wl.join("via")).unwrap();
+    fs::write(wl.join("via/fresh.wav"), &wav).unwrap();
+    std::os::unix::fs::symlink(root.join("keep"), out.join("reply_via")).unwrap();
+    run_case("via/fresh.wav");
+    assert!(!root.join("keep/fresh.wav").exists(), "wrote through a directory symlink");
+    // A link that stays inside the workload is still read.
+    std::os::unix::fs::symlink("ok.wav", wl.join("subdir/alias.wav")).unwrap();
+    fs::write(wl.join("manifest.json"), "{\"files\":[{\"file\":\"subdir/alias.wav\"}],\"stream\":{\"file\":\"unused.f32\"}}\n").unwrap();
+    let got = run(&["bench", "--workload", wl.to_str().unwrap(), "--out", out.to_str().unwrap(), "--mode", "file"]);
+    assert_eq!(got.status.code(), Some(0), "{}", String::from_utf8_lossy(&got.stderr));
+    assert_eq!(fs::read(&sentinel).unwrap(), b"stay");
+    assert!(!created.exists());
+    assert!(out.join("reply_subdir/alias.wav").is_file());
     let _ = fs::remove_dir_all(&root);
 }
