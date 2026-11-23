@@ -6,7 +6,7 @@ import Foundation
 public struct PointingSession: Equatable, Sendable {
     public enum State: Equatable, Sendable {
         case idle, listening, drawing, processing, speaking
-        /// Guided-click wait. Stubbed in Phase 1: nothing sends `guidanceAdmitted` yet.
+        /// Guided-click wait. `clickInTarget` moves the admitted plan to its next step.
         case guiding
         case interrupted, cancelled
         case failed(String)
@@ -112,7 +112,18 @@ public struct PointingSession: Equatable, Sendable {
         case (.processing, .firstPlaybackStart): next = .speaking
         case (.speaking, .buffering): next = .processing
         case (.speaking, .guidanceAdmitted): next = .guiding
-        case (.guiding, .clickInTarget): next = .processing; generation += 1
+        case (.guiding, .clickInTarget):
+            // The model already returned the whole plan. Move to the next bolt, ring and caption here.
+            guard var plan = guide else { break }
+            switch plan.confirmCurrentStep() {
+            case .step:
+                guide = plan
+                effects = [.showGuideStep]
+            case .finished:
+                next = .idle
+            case .waiting:
+                guide = plan
+            }
         case (.processing, .turnCompleted), (.speaking, .turnCompleted), (.guiding, .turnCompleted):
             next = .idle
         case (.processing, .escape), (.speaking, .escape), (.guiding, .escape):
@@ -131,6 +142,7 @@ public struct PointingSession: Equatable, Sendable {
             break
         }
         state = next
+        if next != .guiding { guide = nil }
         return Transition(from: from, to: next, generation: generation, effects: effects)
     }
 }

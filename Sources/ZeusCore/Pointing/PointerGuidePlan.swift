@@ -54,13 +54,11 @@ public struct PointerGuideRect: Equatable, Sendable, Codable {
     }
 }
 
-/// What a click on the guide did.
+/// What a click on the guide did. Every case stays on this device.
 public enum PointerGuideAdvance: Equatable, Sendable {
-    /// The click was sent back to the model.
-    case processing
-    /// The next step is ready. The model was not asked again.
+    /// The next step is ready.
     case step(PointerGuideStep)
-    /// The last step is done. The model was not asked again.
+    /// The last step is done.
     case finished
     /// The click missed the ring. The current step stays.
     case waiting
@@ -124,15 +122,19 @@ public struct PointerGuidePlan: Equatable, Sendable {
         )
     }
 
-    /// A guiding click still goes back to the model for the next step.
+    /// A click inside the current ring moves to the next step. A miss stays put.
     public mutating func click(at point: PointerGuidePoint) -> PointerGuideAdvance {
-        _ = point
-        return .processing
+        guard let step = current else { return .finished }
+        guard step.ring.contains(point) else { return .waiting }
+        return confirmCurrentStep()
     }
 
-    /// A confirmed hit still goes back to the model for the next step.
+    /// The hit is already known to be inside the current ring.
     public mutating func confirmCurrentStep() -> PointerGuideAdvance {
-        return .processing
+        guard current != nil else { return .finished }
+        index += 1
+        if let next = current { return .step(next) }
+        return .finished
     }
 
     private static func valid(_ steps: [PointerGuideStep]) -> Bool {

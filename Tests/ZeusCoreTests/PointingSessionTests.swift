@@ -93,11 +93,14 @@ struct PointingSessionTests {
         if case .failed = lost.state {} else { Issue.record("expected failed") }
     }
 
-    @Test func guidanceIsStubbedButTheTransitionsExist() {
+    @Test func guidanceClickStaysOnTheGuide() {
         var session = listening()
         session.send(.keyUp); session.send(.firstPlaybackStart)
+        let generation = session.generation
         session.send(.guidanceAdmitted); #expect(session.state == .guiding)
-        session.send(.clickInTarget); #expect(session.state == .processing)
+        session.send(.clickInTarget)
+        #expect(session.state == .guiding)
+        #expect(session.generation == generation)
     }
 
     @Test func idleIgnoresStrayEvents() {
