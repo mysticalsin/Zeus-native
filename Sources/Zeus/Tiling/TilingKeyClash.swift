@@ -6,14 +6,7 @@ import ZeusCore
 extension ShortcutPreset {
     /// The preset as a keyed shortcut, or nil when it is off. Quick to-do and the notch use these as global hot keys.
     var tilingShortcut: Shortcut? {
-        guard let code = keyCode else { return nil }
-        var modifiers: ShortcutModifiers = []
-        let mask = self.modifiers
-        if mask & UInt32(controlKey) != 0 { modifiers.insert(.control) }
-        if mask & UInt32(optionKey) != 0 { modifiers.insert(.option) }
-        if mask & UInt32(shiftKey) != 0 { modifiers.insert(.shift) }
-        if mask & UInt32(cmdKey) != 0 { modifiers.insert(.command) }
-        return Shortcut(keyCode: UInt16(code), modifiers: modifiers)
+        TilePresetBits.shortcut(keyCode: keyCode, mask: modifiers)
     }
 }
 
