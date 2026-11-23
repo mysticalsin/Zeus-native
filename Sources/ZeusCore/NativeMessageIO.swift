@@ -40,7 +40,9 @@ public final class NativeMessageOutput: @unchecked Sendable {
     public static let maximumQueuedBytes = 8 * 1024 * 1024
 
     private let descriptor: NativeMessageDescriptor
-    private let queue = DispatchQueue(label: "zeus.bridge.output", qos: .utility)
+    // User-initiated, not utility: a 2s write budget is part of the Chrome stall contract, and a
+    // utility queue can sit unscheduled for that long while other cores are busy.
+    private let queue = DispatchQueue(label: "zeus.bridge.output", qos: .userInitiated)
     private let lock = NSLock()
     private let writeTimeout: TimeInterval
     private var terminal: Failure?
@@ -65,20 +67,22 @@ public final class NativeMessageOutput: @unchecked Sendable {
     @discardableResult
     public func enqueue(_ frame: Data, completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Admission {
         guard frame.count >= 4, frame.count <= NativeMessagingFrame.maxHostToChromeBytes + 4 else { return .tooLarge }
-        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
         return lock.withLock {
             guard terminal == nil, !finishing else { return .closed }
             guard frames < Self.maximumQueuedFrames, frame.count <= Self.maximumQueuedBytes - bytes else { return .full }
             frames += 1
             bytes += frame.count
             // Queue submission shares the admission lock, so finish cannot overtake accepted work.
-            queue.async { [self] in performWrite(frame, deadline: deadline, completion: completion) }
+            queue.async { [self] in performWrite(frame, completion: completion) }
             return .accepted
         }
     }
 
-    private func performWrite(_ frame: Data, deadline: TimeInterval,
+    private func performWrite(_ frame: Data,
                               completion: @escaping @Sendable (Result<Void, Failure>) -> Void) {
+        // The budget starts when a write is actually attempted. Time spent waiting to be scheduled
+        // is not Chrome failing to read; counting it made a busy host exit before the first byte.
+        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
         let result: Result<Void, Failure>
         do {
             try write(frame, deadline: deadline)
@@ -93,7 +97,7 @@ public final class NativeMessageOutput: @unchecked Sendable {
     }
 
     /// Clean stdin EOF preserves already accepted responses. Reject new admission, then flush
-    /// existing frames under their original deadlines before closing the output descriptor.
+    /// existing frames under each write's own deadline before closing the output descriptor.
     @discardableResult
     public func finish(completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Bool {
         lock.withLock {
@@ -186,7 +190,7 @@ public final class NativeMessageInput: @unchecked Sendable {
     }
     private let state = State()
     private let descriptor: NativeMessageDescriptor
-    private let queue = DispatchQueue(label: "zeus.bridge.input", qos: .utility)
+    private let queue = DispatchQueue(label: "zeus.bridge.input", qos: .userInitiated)
 
     public init(handle: FileHandle) throws { descriptor = try NativeMessageDescriptor(handle) }
     deinit { stop() }

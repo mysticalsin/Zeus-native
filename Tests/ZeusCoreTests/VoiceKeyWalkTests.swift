@@ -317,7 +317,7 @@ private struct Held: Hashable {
     }
 }
 
-private enum Move: Hashable {
+private enum Move: Hashable, Sendable {
     /// A key goes down or up and its event reaches the machine at once; `toggleHeld`: the event of a modifier key or an
     /// unconsumed key waits for the next forwarded key.
     case toggle(Int), toggleHeld(Int), swallowed(Int), wait, waitHalfSecond, deliver, abandon, interrupt, flip
@@ -508,7 +508,7 @@ private extension VoiceKeyMachine {
     }
 }
 
-private struct Sim {
+private struct Sim: Sendable {
     static let keymap = TileKeymap.defaults(base: .standard)
     static let gate = TileKeyGate(enabled: true)
 
@@ -1493,8 +1493,19 @@ private func path(_ run: WalkRun, to index: Int, parents: [Int], via: [Move]) ->
 }
 
 /// The rest states already pressed, so a state that comes to rest where an earlier one did is not pressed again.
-private final class RestMemo {
-    var seen: Set<Int> = []
+/// Workers expanding one batch share it; the insert is the only mutable step.
+private final class RestMemo: @unchecked Sendable {
+    private let lock = NSLock()
+    private var seen: Set<Int> = []
+    func insert(_ hash: Int) -> Bool { lock.withLock { seen.insert(hash).inserted } }
+}
+
+/// Idle, latched and spent do not store a time, so waiting cannot move them. Armed, holding and tapped can.
+private func phaseIgnoresTime(_ phase: VoiceKeyMachine.Phase) -> Bool {
+    switch phase {
+    case .idle, .latched, .spent: return true
+    case .armed, .holding, .tapped: return false
+    }
 }
 
 /// The rest check of one state, on a copy: let go of everything, wait 0.5 s, press the own set (I8, last clause of I4).
@@ -1502,16 +1513,22 @@ private final class RestMemo {
 private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [String] {
     var base = sim
     base.found = []
-    base.apply(.deliver, run)
-    for index in run.keys.indices where base.down & (UInt16(1) << UInt16(index)) != 0 { base.apply(.toggle(index), run) }
-    base.apply(.deliver, run)
-    for _ in 0..<10 { base.apply(.wait, run) }
+    // Nothing is down, held or scheduled, and the phase has no clock. The ten waits would only
+    // clear `pressForeign`, which is already clear, so the rest state is this state.
+    let alreadyResting = sim.pair == nil && sim.pointing == nil && sim.down == 0 && sim.held == nil && sim.wakes.isEmpty
+        && !sim.checker.ownWasDown && !sim.checker.pressForeign && phaseIgnoresTime(sim.machine.phase)
+    if !alreadyResting {
+        base.apply(.deliver, run)
+        for index in run.keys.indices where base.down & (UInt16(1) << UInt16(index)) != 0 { base.apply(.toggle(index), run) }
+        base.apply(.deliver, run)
+        for _ in 0..<10 { base.apply(.wait, run) }
+    }
     var out = base.found
     base.found = []
     if base.turnOpenNow != base.isLatchedNow {
         out.append("I4: with every key up and every timer run out, a turn is open and the machine is not hands-free (or the reverse)")
     }
-    if let memo, !memo.seen.insert(base.key(run).hashValue).inserted { return out }
+    if let memo, !memo.insert(base.key(run).hashValue) { return out }
     let config = run.configs[base.cfg]
     guard config.key != nil, !config.voiceOverHoldsKey else { return out }
     let ownIndices = run.keys.indices.filter { run.ownMask & (UInt16(1) << UInt16($0)) != 0 }
@@ -1578,8 +1595,66 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
     return out
 }
 
+/// One state's rest check and the moves out of it. The effect log is not part of the state, so it is
+/// dropped before the copies; a deep path was otherwise copied on every edge.
+private struct WalkChild: Sendable {
+    var move: Move
+    var sim: Sim
+    var found: [String]
+    var key: Int
+}
+
+private struct WalkExpansion: Sendable {
+    var rest: [String]
+    var children: [WalkChild]
+}
+
+private func expand(_ sim: Sim, _ run: WalkRun, memo: RestMemo) -> WalkExpansion {
+    var sim = sim
+    sim.log.removeAll(keepingCapacity: false)
+    sim.found.removeAll(keepingCapacity: false)
+    let rest = restCheck(sim, run, memo: memo)
+    var children: [WalkChild] = []
+    children.reserveCapacity(16)
+    for move in sim.moves(run) {
+        var next = sim
+        next.apply(move, run)
+        let found = next.found
+        let key = next.key(run).hashValue
+        next.found.removeAll(keepingCapacity: false)
+        next.log.removeAll(keepingCapacity: false)
+        children.append(WalkChild(move: move, sim: next, found: found, key: key))
+    }
+    return WalkExpansion(rest: rest, children: children)
+}
+
+private final class ExpansionBatch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var slots: [WalkExpansion?]
+    init(_ count: Int) { slots = Array(repeating: nil, count: count) }
+    func put(_ index: Int, _ value: WalkExpansion) { lock.withLock { slots[index] = value } }
+    func get(_ index: Int) -> WalkExpansion? { lock.withLock { slots[index] } }
+}
+
+/// Complete searches are pure. The plain walk of run A asks for the same search the suite already ran.
+private final class FullSearchCache: @unchecked Sendable {
+    static let shared = FullSearchCache()
+    private let lock = NSLock()
+    private var reports: [String: Report] = [:]
+    func lookup(_ name: String) -> Report? { lock.withLock { reports[name] } }
+    func store(_ name: String, _ report: Report) { lock.withLock { reports[name] = report } }
+}
+
 /// `until`: stop as soon as a violation of this rule (its prefix, such as "I9") has been found.
 private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = nil) -> Report {
+    let cacheable = !stopAtFirst && until == nil && Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") == nil
+    if cacheable, let cached = FullSearchCache.shared.lookup(run.name) { return cached }
+    let report = explore(run, stopAtFirst: stopAtFirst, until: until)
+    if cacheable { FullSearchCache.shared.store(run.name, report) }
+    return report
+}
+
+private func explore(_ run: WalkRun, stopAtFirst: Bool, until: String?) -> Report {
     let start = Date()
     var report = Report()
     var seen: [Int: Int] = [:]
@@ -1605,40 +1680,65 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     // `WALK_LIMIT=n` stops it past n states (a violation), for measuring a run before it is put in the list.
     let progress = ProcessInfo.processInfo.environment["WALK_PROGRESS"]
     let limit = Int(ProcessInfo.processInfo.environment["WALK_LIMIT"] ?? "") ?? Int.max
+    func note(_ cursor: Int) {
+        guard let progress, cursor % 100_000 == 0 else { return }
+        let line = "[walk] \(run.name): \(seen.count) states, \(cursor) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
+        if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        }
+    }
+    // States in a batch are independent. Merging in cursor order keeps the same first parent a serial
+    // walk would have recorded. One run still occupies the suite; the batch is what lets it finish.
     var cursor = 0
     while cursor < frontier.count {
-        if let progress, cursor % 100_000 == 0 {
-            let line = "[walk] \(run.name): \(seen.count) states, \(cursor) expanded, \(Int(Date().timeIntervalSince(start))) s\n"
-            if let handle = FileHandle(forWritingAtPath: progress) ?? (FileManager.default.createFile(atPath: progress, contents: nil) ? FileHandle(forWritingAtPath: progress) : nil) {
-                handle.seekToEndOfFile()
-                handle.write(Data(line.utf8))
-                try? handle.close()
-            }
-        }
+        note(cursor)
         if seen.count > limit {
             report.violations.append("the search passed the limit of \(limit) states")
             break
         }
         if stopAtFirst, !report.violations.isEmpty { break }
         if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { break }
-        guard let sim = frontier[cursor] else { cursor += 1; continue }
-        frontier[cursor] = nil
-        record(restCheck(sim, run, memo: memo), at: cursor, move: nil)
-        for move in sim.moves(run) {
-            var next = sim
-            next.found = []
-            next.apply(move, run)
-            report.moves += 1
-            record(next.found, at: cursor, move: move)
-            let key = next.key(run).hashValue
-            if seen[key] == nil {
-                seen[key] = frontier.count
-                parents.append(cursor)
-                via.append(move)
-                frontier.append(next)
-            }
+        let width = min(32, frontier.count - cursor)
+        let seeds: [Sim?] = (0..<width).map { offset in
+            let sim = frontier[cursor + offset]
+            frontier[cursor + offset] = nil
+            return sim
         }
-        cursor += 1
+        let batch = ExpansionBatch(width)
+        DispatchQueue.concurrentPerform(iterations: width) { offset in
+            guard let sim = seeds[offset] else { return }
+            batch.put(offset, expand(sim, run, memo: memo))
+        }
+        var stop = false
+        for offset in 0..<width {
+            let index = cursor + offset
+            if offset > 0 { note(index) }
+            guard let expanded = batch.get(offset) else { continue }
+            record(expanded.rest, at: index, move: nil)
+            if stopAtFirst, !report.violations.isEmpty { stop = true; break }
+            if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { stop = true; break }
+            for child in expanded.children {
+                report.moves += 1
+                record(child.found, at: index, move: child.move)
+                if seen[child.key] == nil {
+                    seen[child.key] = frontier.count
+                    parents.append(index)
+                    via.append(child.move)
+                    frontier.append(child.sim)
+                }
+                if stopAtFirst, !report.violations.isEmpty { stop = true; break }
+                if let until, report.violations.contains(where: { $0.hasPrefix(until) }) { stop = true; break }
+            }
+            if seen.count > limit {
+                report.violations.append("the search passed the limit of \(limit) states")
+                stop = true
+            }
+            if stop { break }
+        }
+        cursor += width
+        if stop { break }
     }
     report.states = seen.count
     report.seconds = Date().timeIntervalSince(start)
@@ -1689,8 +1789,9 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     return (out + restCheck(sim, run), effects)
 }
 
-// The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
-// socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
+// The walks are exhaustive and CPU bound. One run at a time, each run expanded in batches, so the suite finishes
+// inside the Core process's hour. The bridge's stdio and deadline queues are user-initiated: a utility queue on the
+// 3-core hosted runner missed the 2s Chrome write budget and the host exited before the first stdout byte.
 @Suite(.serialized) struct VoiceKeyWalkTests {
     @Test(.serialized, arguments: WalkRun.all.filter { run in
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
