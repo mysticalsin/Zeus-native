@@ -101,9 +101,9 @@ GROUPS = {
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
+             "Present/SpeechTimeline.swift", "Present/DemoSpeech.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
              "TopBar/RecordingFeedback.swift"),
-        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
+        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "DemoSpeechTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
