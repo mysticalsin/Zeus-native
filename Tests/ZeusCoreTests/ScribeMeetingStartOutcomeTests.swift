@@ -57,10 +57,10 @@ private func moTapStarted() -> ScribeAutoStartMachine {
     return machine
 }
 
-/// The countdown ended at 8 on its own while Scribe sat on a failed earlier session.
+/// A tap at 4 on the automatic card, while Scribe sat on a failed earlier session. The card does not start itself.
 private func moAutomaticStarted() -> ScribeAutoStartMachine {
     var machine = moPrompting(.automatic)
-    machine.handle(moTick(8, scribe: .failed(moPrevious, reason: "old")))
+    machine.handle(moTap(moOffer(), 4, scribe: .failed(moPrevious, reason: "old")))
     return machine
 }
 
@@ -161,8 +161,8 @@ struct ScribeMeetingStartOutcomeTests {
 
     @Test func aLateTapIsIgnoredWhileAnythingElseIsUnderWay() {
         var counting = moPrompting(.automatic)
-        #expect(counting.handle(moTap(moOffer(), 5)).isEmpty)
-        #expect(counting.state == .countingDown(meeting: moTeams, deadline: 8))
+        #expect(counting.handle(moTap(moOffer(), 5)) == [.start(moTeams)])
+        #expect(moAttempt(counting)?.origin == .tap)
 
         var held = moPrompting()
         held.handle(moTap(moOffer(), 5, scribe: .processing(moPrevious)))
@@ -256,7 +256,7 @@ struct ScribeMeetingStartOutcomeTests {
         let phases: [ScribePhase] = [.idle, .failed(moPrevious, reason: "old"), .starting(moFresh)]
         for phase in phases {
             machine.handle(.scribe(phase, now: 8.5))
-            #expect(machine.card(now: 8.5) == .starting(moTeams, cancellable: true), "\(phase)")
+            #expect(machine.card(now: 8.5) == .starting(moTeams, cancellable: false), "\(phase)")
         }
         machine.handle(.scribe(.recording(moFresh, since: 9), now: 9))
         #expect(machine.card(now: 9) == .recording(moTeams))
@@ -289,66 +289,68 @@ struct ScribeMeetingStartOutcomeTests {
 
     // MARK: The countdown ends
 
-    @Test func aCountdownThatEndsGoesToStartingNeverStraightToRecording() {
+    @Test func aDeadlineNeverStartsAndATapGoesToStarting() {
         var machine = moPrompting(.automatic)
-        #expect(machine.state == .countingDown(meeting: moTeams, deadline: 8))
-        let early = machine.handle(moTick(7.9))
+        #expect(machine.state == .prompting(meeting: moTeams, deadline: 13, blocked: nil))
+        let early = machine.handle(moTick(12.9))
         #expect(early.isEmpty)
-        let effects = machine.handle(moTick(8))
-        #expect(effects == [.start(moTeams)])
-        #expect(machine.card(now: 8) == .starting(moTeams, cancellable: true))
-        #expect(moAttempt(machine)?.origin == .automatic)
-        // A second tick never starts a second time.
-        #expect(machine.handle(moTick(8.2)).isEmpty)
+        let effects = machine.handle(moTick(13))
+        #expect(effects.isEmpty)
+        #expect(machine.state == .idle)
+        var tapped = moPrompting(.automatic)
+        #expect(tapped.handle(moTap(moOffer(), 4)) == [.start(moTeams)])
+        #expect(tapped.card(now: 4) == .starting(moTeams, cancellable: false))
+        #expect(moAttempt(tapped)?.origin == .tap)
+        #expect(tapped.handle(moTick(4.2)).isEmpty)
     }
 
-    @Test func aCountdownThatEndsWithReadinessLostAsksInstead() {
+    @Test func aTickWhileTheCardIsUpDoesNotStartWhenReadinessIsMissing() {
         var machine = moPrompting(.automatic)
         let effects = machine.handle(moTick(8, ready: .blocked(.microphoneDenied)))
         #expect(effects.isEmpty)
-        #expect(machine.card(now: 8) == .offer(moTeams, blocked: .microphoneDenied))
+        #expect(machine.card(now: 8) == .offer(moTeams, blocked: nil))
     }
 
     // MARK: Cancel
 
-    @Test func cancelDuringTheCountdownEndsItAndNeverStarts() {
+    @Test func dismissOnTheAutomaticCardEndsItAndNeverStarts() {
         var machine = moPrompting(.automatic)
-        let effects = machine.handle(.cancel(on: moCountdownCard(), now: 5))
+        let effects = machine.handle(.dismiss(on: moOffer(), now: 5))
         #expect(effects.isEmpty)
         #expect(machine.card(now: 5) == .hidden)
         #expect(machine.ledger.mark(of: moTeams) == .declined)
-        #expect(machine.handle(moTick(8)).isEmpty)
+        #expect(machine.handle(moTick(13)).isEmpty)
         #expect(machine.handle(moEvidence(70, mode: .automatic)).isEmpty)
     }
 
-    @Test func cancelAtTheSameInstantAsExpiryNeverRecords() {
+    @Test func theDeadlineLeavesWithoutRecording() {
         var machine = moPrompting(.automatic)
-        let cancel = machine.handle(.cancel(on: moCountdownCard(), now: 8))
+        let cancel = machine.handle(.cancel(on: moCountdownCard(), now: 13))
         #expect(cancel.isEmpty)
-        let tick = machine.handle(moTick(8))
+        let tick = machine.handle(moTick(13))
         #expect(tick.isEmpty)
         #expect(machine.state == .idle)
+        #expect(machine.ledger.mark(of: moTeams) == .asked)
     }
 
-    @Test func cancelAfterExpiryAbandonsTheAutomaticStart() {
+    @Test func cancelOnATapStartDoesNotAbandonIt() {
         var machine = moAutomaticStarted()
         machine.handle(.scribe(.starting(moFresh), now: 8))
         let cancel = machine.handle(.cancel(on: moCountdownCard(), now: 8.1))
-        #expect(cancel == [.abandonStart(moFresh)])
-        #expect(machine.card(now: 8.1) == .hidden)
-        #expect(machine.ledger.mark(of: moTeams) == .declined)
-        #expect(machine.state == .idle)
+        #expect(cancel.isEmpty)
+        #expect(machine.card(now: 8.1) == .starting(moTeams, cancellable: false))
+        #expect(machine.state != .idle)
     }
 
-    @Test func cancelDuringTheConfirmationDiscardsTheAutomaticStart() {
+    @Test func cancelDuringTheConfirmationDoesNotDiscardATapStart() {
         var machine = moAutomaticStarted()
         machine.handle(.scribe(.starting(moFresh), now: 8))
         machine.handle(.scribe(.recording(moFresh, since: 9), now: 9))
         #expect(machine.card(now: 9.5) == .recording(moTeams))
         let cancel = machine.handle(.cancel(on: .starting(moTeams, cancellable: true), now: 9.5))
-        #expect(cancel == [.abandonStart(moFresh)])
-        #expect(machine.state == .idle)
-        #expect(machine.ledger.mark(of: moTeams) == .declined)
+        #expect(cancel.isEmpty)
+        #expect(moRecording(machine) != nil)
+        #expect(machine.ledger.mark(of: moTeams) != .declined)
     }
 
     @Test func cancelAfterTheConfirmationDoesNothing() {
@@ -359,12 +361,12 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(moRecording(machine) != nil)
     }
 
-    @Test func cancelOnAnAutomaticStartWithNoSessionSeenYetEndsWithNothingToDiscard() {
+    @Test func cancelOnATapStartWithNoSessionSeenYetLeavesItStarting() {
         var machine = moAutomaticStarted()
         let cancel = machine.handle(.cancel(on: .starting(moTeams, cancellable: true), now: 8.1))
         #expect(cancel.isEmpty)
-        #expect(machine.state == .idle)
-        #expect(machine.ledger.mark(of: moTeams) == .declined)
+        #expect(machine.card(now: 8.1) == .starting(moTeams, cancellable: false))
+        #expect(machine.ledger.mark(of: moTeams) != .declined)
     }
 
     @Test func aCancelNeverStartsAnything() {
@@ -411,7 +413,7 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(machine.card(now: 4.5) == .starting(moTeams, cancellable: false))
         var automatic = moAutomaticStarted()
         #expect(automatic.handle(.dismiss(on: .recording(moTeams), now: 8.5)).isEmpty)
-        #expect(automatic.card(now: 8.5) == .starting(moTeams, cancellable: true))
+        #expect(automatic.card(now: 8.5) == .starting(moTeams, cancellable: false))
     }
 
     // MARK: Slow starts and failures
@@ -434,7 +436,7 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(machine.card(now: 14) == .failed(moTeams, .noResponse))
         machine.handle(.scribe(.recording(moFresh, since: 15), now: 15))
         #expect(machine.card(now: 15) == .recording(moTeams))
-        #expect(moRecording(machine)?.origin == .automatic)
+        #expect(moRecording(machine)?.origin == .tap)
         // The previous session is never the late answer.
         var stale = moAutomaticStarted()
         stale.handle(moTick(13))
@@ -531,7 +533,7 @@ struct ScribeMeetingStartOutcomeTests {
         var machine = moAutomaticStarted()
         machine.handle(.scribe(.starting(moFresh), now: 8))
         machine.handle(moEvidence(9, mode: .off, scribe: .starting(moFresh)))
-        #expect(machine.card(now: 9) == .starting(moTeams, cancellable: true))
+        #expect(machine.card(now: 9) == .starting(moTeams, cancellable: false))
         machine.handle(.scribe(.recording(moFresh, since: 9), now: 9.2))
         machine.handle(moEvidence(9.5, mode: .off, scribe: .recording(moFresh, since: 9)))
         #expect(machine.card(now: 9.5) == .recording(moTeams))
@@ -549,10 +551,10 @@ struct ScribeMeetingStartOutcomeTests {
         machine.handle(moEvidence(5, mode: .automatic, scribe: processing))
         machine.handle(moTick(6, scribe: processing))
         #expect(machine.card(now: 6) == .waiting(moTeams))
-        // Free now: automatic counts down for a live, ready call.
+        // Free now: the card asks. A ready automatic choice does not count down.
         let free = machine.handle(moEvidence(10, mode: .automatic, scribe: .complete(moPrevious)))
         #expect(free.isEmpty)
-        #expect(machine.card(now: 10) == .countdown(moTeams, seconds: 5, deadline: 15, total: 5))
+        #expect(machine.card(now: 10) == .offer(moTeams, blocked: nil))
     }
 
     @Test func aHeldMeetingAsksWhenNotReadyAndDropsWhenGone() {
@@ -668,16 +670,16 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(moPrompting().card(now: 3) == .offer(moTeams, blocked: .notChosen))
         #expect(moPrompting(.automatic, ready: .blocked(.noOptIn)).card(now: 3) == .offer(moTeams, blocked: .noOptIn))
         let counting = moPrompting(.automatic)
-        #expect(counting.card(now: 3) == .countdown(moTeams, seconds: 5, deadline: 8, total: 5))
-        #expect(counting.card(now: 4.5) == .countdown(moTeams, seconds: 4, deadline: 8, total: 5))
-        #expect(counting.card(now: 7.2) == .countdown(moTeams, seconds: 1, deadline: 8, total: 5))
+        #expect(counting.card(now: 3) == .offer(moTeams, blocked: nil))
+        #expect(counting.card(now: 4.5) == .offer(moTeams, blocked: nil))
+        #expect(counting.card(now: 12.9) == .offer(moTeams, blocked: nil))
 
         var held = ScribeAutoStartMachine()
         held.handle(moEvidence(0, scribe: .processing(moPrevious)))
         #expect(held.card(now: 0) == .waiting(moTeams))
 
         #expect(moTapStarted().card(now: 4) == .starting(moTeams, cancellable: false))
-        #expect(moAutomaticStarted().card(now: 8) == .starting(moTeams, cancellable: true))
+        #expect(moAutomaticStarted().card(now: 4) == .starting(moTeams, cancellable: false))
 
         var recording = moTapStarted()
         recording.handle(.scribe(.recording(moFresh, since: 5), now: 5))
@@ -708,15 +710,15 @@ struct ScribeMeetingStartOutcomeTests {
 
         // The offer: its deadline.
         var prompting = moPrompting()
-        #expect(prompting.nextWake(now: 3) == 23)
+        #expect(prompting.nextWake(now: 3) == 13)
         prompting.handle(.pointer(inside: true, now: 4))
         #expect(prompting.nextWake(now: 4) == nil)
 
-        // The countdown: the next whole second, and the deadline for the last one.
+        // The automatic card is the same offer: it wakes at the ten-second deadline.
         let counting = moPrompting(.automatic)
-        #expect(counting.nextWake(now: 3) == 4)
-        #expect(counting.nextWake(now: 4.5) == 5)
-        #expect(counting.nextWake(now: 7.25) == 8)
+        #expect(counting.nextWake(now: 3) == 13)
+        #expect(counting.nextWake(now: 4.5) == 13)
+        #expect(counting.nextWake(now: 12.25) == 13)
 
         // Waiting for Scribe: only a Scribe event changes it.
         var held = ScribeAutoStartMachine()
@@ -755,9 +757,9 @@ struct ScribeMeetingStartOutcomeTests {
         #expect(machine.nextWake(now: 20) == 30)
         // A far meeting: the minute it reads changes at its whole minutes, and the deadline comes first.
         var far = moRecordingWithNext()
-        #expect(far.nextWake(now: 20) == 40)
-        far.handle(moTick(40))
-        #expect(far.nextWake(now: 40) == nil)
+        #expect(far.nextWake(now: 20) == 30)
+        far.handle(moTick(30))
+        #expect(far.nextWake(now: 30) == nil)
     }
 
     @Test func theCallLooksOverWakesEachSecond() {
@@ -775,7 +777,7 @@ struct ScribeMeetingStartOutcomeTests {
     @Test func theStateAndThePhaseHavePlainLogNames() {
         #expect(ScribeAutoStartMachine().state.logName == "idle")
         #expect(moPrompting().state.logName == "offer call:Teams")
-        #expect(moPrompting(.automatic).state.logName == "countdown call:Teams")
+        #expect(moPrompting(.automatic).state.logName == "offer call:Teams")
         #expect(moTapStarted().state.logName == "starting call:Teams")
         var failed = moPrompting()
         failed.handle(moTap(moOffer(), 5, microphone: .denied))

@@ -271,15 +271,15 @@ struct ScribeMeetingCardJourneyTests {
             #expect(!journey.panel.isOnScreen, "a call is checked for a few seconds before anything shows")
             journey.advance(3)
             journey.ingest(calls: [.zoom])
-            guard case .countdown(let meeting, let seconds, let deadline, let total) = journey.panel.drawnCard else {
-                Issue.record("the call did not draw a countdown: \(journey.panel.drawnCard)")
+            guard case .offer(let meeting, _) = journey.panel.drawnCard else {
+                Issue.record("the call did not draw an offer: \(journey.panel.drawnCard)")
                 return
             }
-            #expect(seconds == 5 && deadline == 108 && total == 5)
             #expect(journey.panel.isOnScreen)
-            #expect(journey.scheduler.delay == 1)
+            #expect(journey.scheduler.delay == 10)
 
-            try await journey.click("scribe.meetingCard.cancel")
+            try journey.pointerEnters()
+            try await journey.click("scribe.meetingCard.dismiss")
             #expect(journey.controller.drawn == .hidden)
             #expect(!journey.panel.isOnScreen)
             #expect(journey.capture.startCount == 0)
@@ -303,34 +303,17 @@ struct ScribeMeetingCardJourneyTests {
             journey.ingest(calls: [.zoom])
             journey.advance(3)
             journey.ingest(calls: [.zoom])
-            guard case .countdown(let meeting, _, _, _) = journey.panel.drawnCard else {
-                Issue.record("the call did not draw a countdown: \(journey.panel.drawnCard)")
+            guard case .offer(let meeting, _) = journey.panel.drawnCard else {
+                Issue.record("the call did not draw an offer: \(journey.panel.drawnCard)")
                 return
             }
-            for left in [4, 3, 2, 1] {
-                journey.advance(1)
-                journey.scheduler.wake()
-                #expect(journey.panel.drawnCard == .countdown(meeting, seconds: left, deadline: 108, total: 5))
-                #expect(journey.capture.startCount == 0)
-            }
-
-            journey.advance(1)
+            #expect(journey.capture.startCount == 0)
+            journey.advance(10)
             journey.scheduler.wake()
-            #expect(journey.panel.drawnCard == .starting(meeting, cancellable: true))
-            #expect(journey.capture.startCount == 1)
-            let session = try #require(journey.scribe.phase.sessionID)
-
-            journey.capture.send(.captureAcknowledged(session))
-            try await journey.waitUntil("recording") { journey.scribe.isRecording }
-            #expect(journey.panel.drawnCard == .recording(meeting))
-            #expect(journey.scheduler.delay == 1.5)
-
-            journey.advance(1.5)
-            journey.scheduler.wake()
-            #expect(journey.panel.drawnCard == .hidden, "the confirmation leaves on its own")
-            #expect(!journey.panel.isOnScreen)
-            #expect(journey.scribe.isRecording)
-            #expect(journey.capture.startCount == 1)
+            #expect(journey.panel.drawnCard == .hidden)
+            #expect(journey.capture.startCount == 0)
+            #expect(journey.scribe.phase == .idle)
+            #expect(journey.controller.machine.ledger.mark(of: meeting) == .asked)
         }
     }
 
@@ -343,26 +326,20 @@ struct ScribeMeetingCardJourneyTests {
             journey.ingest(calls: [.zoom])
             journey.advance(3)
             journey.ingest(calls: [.zoom])
-            let countdown = journey.panel.drawnCard
-            guard case .countdown(let meeting, _, _, _) = countdown else {
-                Issue.record("the call did not draw a countdown: \(countdown)")
+            let offer = journey.panel.drawnCard
+            guard case .offer(let meeting, _) = offer else {
+                Issue.record("the call did not draw an offer: \(offer)")
                 return
             }
-            journey.advance(5)
+            journey.advance(10)
             journey.scheduler.wake()
-            #expect(journey.panel.drawnCard == .starting(meeting, cancellable: true))
-            let session = try #require(journey.scribe.phase.sessionID)
-
-            // The card that replaced the countdown still has its Cancel.
-            try await journey.click("scribe.meetingCard.cancel")
+            #expect(journey.panel.drawnCard == .hidden)
             #expect(journey.scribe.phase == .idle)
-            #expect(journey.capture.startCount == 1 && journey.capture.stopCount == 1)
+            #expect(journey.capture.startCount == 0 && journey.capture.stopCount == 0)
             #expect(journey.controller.drawn == .hidden)
             #expect(!journey.panel.isOnScreen)
 
-            // A tap on the countdown card the person saw, and a late answer from the provider, change nothing.
-            journey.controller.cancel(countdown)
-            journey.capture.send(.captureAcknowledged(session))
+            journey.controller.cancel(offer)
             try await Task.sleep(for: .milliseconds(50))
             #expect(journey.scribe.phase == .idle)
             #expect(journey.controller.drawn == .hidden)
@@ -373,8 +350,9 @@ struct ScribeMeetingCardJourneyTests {
 
             journey.advance(1)
             journey.ingest(calls: [.zoom])
-            #expect(journey.controller.drawn == .hidden, "the cancelled meeting is not offered again")
-            #expect(journey.capture.startCount == 1)
+            #expect(journey.controller.drawn == .hidden, "the answered meeting is not offered again")
+            #expect(journey.capture.startCount == 0)
+            #expect(journey.controller.machine.ledger.mark(of: meeting) == .asked)
         }
     }
 

@@ -270,14 +270,14 @@ REG-429 are reserved in `qa/regressions.json` for this plan (agree the range wit
 ### Behaviour
 
 - A calendar meeting counts as started from its start time, not before.
-- Automatic start counts down only for a live call (a call app holds the microphone). A meeting that has
-  merely reached its start time is asked about, in both modes.
+- Start automatically asks, the same as Ask me. A meeting card lasts 10 seconds and never starts capture.
+  A meeting that has merely reached its start time is asked about, in both modes.
 - One meeting has one name for its whole life: from two minutes before its start to its end, a live call in
   the meeting's app is that meeting.
 - An answer covers the whole meeting. Not now, Cancel, or a recording that was started: nothing more is shown
   for that meeting, before, during or after its calendar window, and when it runs over.
-- An unanswered card is not an answer. In "Start automatically", a card that timed out does not stop the
-  countdown when the call begins.
+- An unanswered heads-up is not an answer. A card that timed out is not shown again, and it does not start
+  capture when the call begins.
 - Two calendar meetings back to back in the same app are two meetings. The second is offered.
 - A different meeting is offered as soon as it appears; there is no waiting time between meetings.
 
