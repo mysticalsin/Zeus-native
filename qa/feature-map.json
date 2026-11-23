@@ -17,6 +17,13 @@
       "group": "regressions"
     },
     {
+      "id": "portable-explain-hold",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Synthetic Right Option hold, release, cancel, and walk tap. No microphone, overlay window, or recognizer.",
+      "group": "explain-hold"
+    },
+    {
       "id": "portable-scribe",
       "kind": "portable",
       "tier": "contract",
@@ -1274,6 +1281,41 @@
             {
               "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
               "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
+            }
+          ]
+        },
+        {
+          "id": "F01.explain-hold",
+          "check": "portable-explain-hold",
+          "acceptance": "A clean Right Option hold past the existing 0.25 s confirm raises one overlay and the release hands the transcript to FastIntent.parse. A tap, another key, a click, Esc, Control-Option, and Right Command do not start that turn. A tap only advances a walk that is already running.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "explainTurnIsIdleUntilACleanHold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "holdingRightOptionAloneShowsTheOverlayAndReleaseProcesses"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "rightOptionDoesNotFireWhenAnotherKeyOrAClickHappensWhileItIsHeld"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "escapeWhileRightOptionIsHeldCancelsAndTheReleaseProcessesNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "controlOptionHoldToTalkIsUnchanged"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "aTapDoesNotStartATurnAndOnlyAdvancesARunningWalk"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+              "function": "rightCommandHoldDoesNotStartAnExplainTurn"
             }
           ]
         }
