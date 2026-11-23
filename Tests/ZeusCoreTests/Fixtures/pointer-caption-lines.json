@@ -1,0 +1,34 @@
+{
+  "captions": [
+    {
+      "name": "share-menu",
+      "reduceMotion": false,
+      "bolt": { "x": 80, "y": 740 },
+      "ring": { "x": 40, "y": 720, "width": 80, "height": 28 },
+      "whatItIs": "Share button",
+      "whatToDo": "Click Share",
+      "whatHappensNext": "The share menu opens",
+      "detail": "Exporting as PDF is a different command in the File menu and stays in the thread."
+    },
+    {
+      "name": "share-menu-reduced",
+      "reduceMotion": true,
+      "bolt": { "x": 80, "y": 740 },
+      "ring": { "x": 40, "y": 720, "width": 80, "height": 28 },
+      "whatItIs": "Share button",
+      "whatToDo": "Click Share",
+      "whatHappensNext": "The share menu opens",
+      "detail": "Exporting as PDF is a different command in the File menu and stays in the thread."
+    },
+    {
+      "name": "file-only",
+      "reduceMotion": false,
+      "bolt": { "x": 180, "y": 640 },
+      "ring": { "x": 140, "y": 620, "width": 120, "height": 32 },
+      "whatItIs": "File menu",
+      "whatToDo": "Click File",
+      "whatHappensNext": "",
+      "detail": ""
+    }
+  ]
+}
