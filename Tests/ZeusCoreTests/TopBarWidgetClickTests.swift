@@ -116,10 +116,23 @@ import Testing
     }
 
     @Test func voiceOverOpensDetailsWithoutWaiting() {
-        let clicks = TopBarWidgetClicks()
+        var clicks = TopBarWidgetClicks()
+        _ = clicks.click(.play, at: now)
         #expect(clicks.showDetails(.weather) == .openDetails(.weather))
+        #expect(clicks.tick(at: now.addingTimeInterval(1)).effects.isEmpty)
         #expect(clicks.showDetails(.agenda) == .openDetails(.calendar))
         #expect(clicks.showDetails(.nowPlaying) == .openDetails(.music))
+    }
+
+    @Test func anAccessibilityActivateRunsTheSingleActionOnly() {
+        var clicks = TopBarWidgetClicks()
+        _ = clicks.click(.weather, at: now)
+        let step = clicks.activate(.skip)
+        #expect(step.effects == [.next])
+        #expect(step.arm == nil)
+        #expect(clicks.tick(at: now.addingTimeInterval(1)).effects.isEmpty)
+        #expect(clicks.activate(.play).effects == [.play])
+        #expect(clicks.activate(.agents).effects.isEmpty)
     }
 
     @Test func reducedMotionSnapsTheDetailsTransition() {

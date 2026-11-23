@@ -83,13 +83,34 @@ struct HomeWidgetCard: View {
                 GlanceRoundButton(symbol: "backward.fill", size: size, label: "Previous track") { topBar.musicCommand(.previous) }
             }
             Spacer()
-            GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 2, filled: true,
-                              label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
+            playControl(playing, size: size + 2)
             Spacer()
             if shown.contains(.next) {
-                GlanceRoundButton(symbol: "forward.fill", size: size, label: "Next track") { topBar.musicCommand(.next) }
+                skipControl(size: size)
             }
         }
+    }
+
+    private func playbackTarget(_ playing: NowPlaying?) -> TopBarWidgetTarget {
+        playing?.isPlaying == true ? .pause : .play
+    }
+
+    private func playControl(_ playing: NowPlaying?, size: CGFloat) -> some View {
+        let target = playbackTarget(playing)
+        return GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: size, filled: true,
+                                  label: playing?.isPlaying == true ? "Pause" : "Play") {
+            topBar.receiveWidgetTap(target)
+        }
+        .accessibilityAction { topBar.activateWidget(target) }
+        .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(target) }
+    }
+
+    private func skipControl(size: CGFloat) -> some View {
+        GlanceRoundButton(symbol: "forward.fill", size: size, label: "Skip") {
+            topBar.receiveWidgetTap(.skip)
+        }
+        .accessibilityAction { topBar.activateWidget(.skip) }
+        .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(.skip) }
     }
 
     private func titles(_ playing: NowPlaying?) -> some View {
@@ -107,6 +128,7 @@ struct HomeWidgetCard: View {
                 AlbumTile(playing: playing, size: 48).accessibilityHidden(true)
                 titles(playing)
             }
+            .topBarWidgetTap(.music, model: topBar)
             Spacer(minLength: 0)
             transport(playing)
         }
@@ -120,14 +142,15 @@ struct HomeWidgetCard: View {
             }
             .frame(width: 74, height: 74)
             .accessibilityHidden(true)
+            .topBarWidgetTap(.music, model: topBar)
             VStack(alignment: .leading, spacing: 0) {
                 titles(playing)
+                    .topBarWidgetTap(.music, model: topBar)
                 Spacer(minLength: 0)
                 HStack(spacing: 8) {
-                    GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: 28, filled: true,
-                                      label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
+                    playControl(playing, size: 28)
                     if NowPlayingDisplay.visibleControls(for: playing).contains(.next) {
-                        GlanceRoundButton(symbol: "forward.fill", size: 26, label: "Next track") { topBar.musicCommand(.next) }
+                        skipControl(size: 26)
                     }
                 }
             }
@@ -142,6 +165,7 @@ struct HomeWidgetCard: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(playing.map { "\($0.title), \($0.artist)" } ?? "Nothing playing")
+            .topBarWidgetTap(.music, model: topBar)
             transport(playing, size: 22)
         }
     }
@@ -151,11 +175,11 @@ struct HomeWidgetCard: View {
             Text([playing?.title ?? "Nothing playing", playing?.artist].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " \u{00B7} "))
                 .font(GlanceType.title).foregroundStyle(Color.white.opacity(0.7)).lineLimit(1).padding(.trailing, 30)
             LyricsView(playing: playing, rows: 3, rowHeight: 24, fontSize: 11.5)
+                .topBarWidgetTap(.music, model: topBar)
             Spacer(minLength: 0)
         }
         .overlay(alignment: .topTrailing) {
-            GlanceRoundButton(symbol: playing?.isPlaying == true ? "pause.fill" : "play.fill", size: 22, filled: true,
-                              label: playing?.isPlaying == true ? "Pause" : "Play") { topBar.musicCommand(.playPause) }
+            playControl(playing, size: 22)
         }
     }
 
@@ -163,9 +187,11 @@ struct HomeWidgetCard: View {
         let tint = playing.map { ArtworkStore.shared.tint(for: $0, saturation: 0.7, brightness: 0.95) } ?? Color.white.opacity(0.4)
         return VStack(alignment: .leading, spacing: 0) {
             titles(playing)
+                .topBarWidgetTap(.music, model: topBar)
             Spacer(minLength: 0)
             LevelBars(count: 16, color: tint, active: playing?.isPlaying == true, level: nil, height: 30)
                 .accessibilityHidden(true)
+                .topBarWidgetTap(.music, model: topBar)
             Spacer(minLength: 0)
             transport(playing, size: 22)
         }
@@ -182,15 +208,19 @@ struct HomeWidgetCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .top) {
                         caption("Focus", running ? (timer.phase == .rest ? "Break" : "Focusing") : "Ready")
+                            .topBarWidgetTap(.focus, model: topBar)
                         Spacer()
                         GlanceRoundButton(symbol: running ? "stop.fill" : "play.fill", filled: true, label: running ? "Stop focus" : "Start focus") {
-                            if running { topBar.focus.stop() } else { topBar.focus.start() }
+                            topBar.receiveWidgetTap(.focus)
                         }
+                        .accessibilityAction { topBar.activateWidget(.focus) }
+                        .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(.focus) }
                     }
                     Spacer(minLength: 0)
                     Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
                         .font(GlanceType.numeral).monospacedDigit().foregroundStyle(.white)
                         .accessibilityLabel("\(seconds / 60) minutes \(seconds % 60) seconds")
+                        .topBarWidgetTap(.focus, model: topBar)
                 }
             }
         }
@@ -200,20 +230,23 @@ struct HomeWidgetCard: View {
 
     private var weather: some View {
         GlanceCard(tint: kind.tint) {
-            if let weather = topBar.weather {
-                switch variant {
-                case "hourly": weatherHourly(weather)
-                case "days": weatherDays(weather)
-                case "feels": weatherFeels(weather)
-                case "wind": weatherWind(weather)
-                default: weatherSummary(weather)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    caption("Weather", "Set up weather")
-                    Spacer(minLength: 0)
+            Group {
+                if let weather = topBar.weather {
+                    switch variant {
+                    case "hourly": weatherHourly(weather)
+                    case "days": weatherDays(weather)
+                    case "feels": weatherFeels(weather)
+                    case "wind": weatherWind(weather)
+                    default: weatherSummary(weather)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        caption("Weather", "Set up weather")
+                        Spacer(minLength: 0)
+                    }
                 }
             }
+            .topBarWidgetTap(.weather, model: topBar)
         }
     }
 
@@ -322,17 +355,23 @@ struct HomeWidgetCard: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 caption("Calendar", subtitle)
+                    .topBarWidgetTap(.calendar, model: topBar)
                 Spacer()
                 openCalendar()
             }
             Spacer(minLength: 0)
             // Glance uses the Mac's calendar (e.g. "Aban 9" on a Persian Mac).
             Text(ZeusDates.string(now, template: "MMMd")).font(GlanceType.date).foregroundStyle(.white)
+                .topBarWidgetTap(.calendar, model: topBar)
         }
     }
 
     private func calendarMonth(compact: Bool) -> some View {
-        MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar })
+        let target: TopBarWidgetTarget = kind == .month ? .month : .calendar
+        return MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar },
+                  onBody: { topBar.receiveWidgetTap(target) },
+                  onActivate: { topBar.activateWidget(target) },
+                  onDetails: { topBar.showWidgetDetails(target) })
     }
 
     private var calendarWeek: some View {
@@ -344,6 +383,7 @@ struct HomeWidgetCard: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 caption("This week", "\(calendar.component(.weekOfYear, from: today)) · \(ZeusDates.string(today, template: "MMMM"))")
+                    .topBarWidgetTap(.calendar, model: topBar)
                 Spacer()
                 openCalendar()
             }
@@ -364,11 +404,16 @@ struct HomeWidgetCard: View {
                     .frame(maxWidth: .infinity)
                 }
             }
+            .topBarWidgetTap(.calendar, model: topBar)
         }
     }
 
     private var calendarAgenda: some View {
-        AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar })
+        let target: TopBarWidgetTarget = kind == .agenda ? .agenda : .calendar
+        return AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar },
+                   onBody: { topBar.receiveWidgetTap(target) },
+                   onActivate: { topBar.activateWidget(target) },
+                   onDetails: { topBar.showWidgetDetails(target) })
     }
 
     // MARK: Clock (analog, digital, elastic, blue halo)
@@ -561,11 +606,13 @@ struct HomeWidgetCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     caption("Agents", agentSummary)
+                        .topBarWidgetTap(.agents, model: topBar)
                     Spacer()
                     GlanceRoundButton(symbol: "arrow.up.right", filled: true, label: "Open Agents") { topBar.selectedTab = .agents }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
+                    .topBarWidgetTap(.agents, model: topBar)
             }
         }
     }
@@ -813,6 +860,9 @@ struct AnalogClock: View {
 struct MiniMonth: View {
     let events: [TopBarModel.CalendarItem]
     let open: () -> Void
+    var onBody: () -> Void = {}
+    var onActivate: () -> Void = {}
+    var onDetails: () -> Void = {}
 
     var body: some View {
         let calendar = ZeusDates.calendar()
@@ -823,6 +873,9 @@ struct MiniMonth: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(ZeusDates.string(now, template: "MMMM")).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Color.white.opacity(0.78))
+                    .onTapGesture { onBody() }
+                    .accessibilityAction { onActivate() }
+                    .accessibilityAction(named: "Show details") { onDetails() }
                 Spacer()
                 Button(action: open) {
                     Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.white.opacity(0.6))
@@ -852,6 +905,10 @@ struct MiniMonth: View {
                     }
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture { onBody() }
+            .accessibilityAction { onActivate() }
+            .accessibilityAction(named: "Show details") { onDetails() }
         }
     }
 }
@@ -860,6 +917,9 @@ struct MiniMonth: View {
 struct AgendaList: View {
     let events: [TopBarModel.CalendarItem]
     let open: () -> Void
+    var onBody: () -> Void = {}
+    var onActivate: () -> Void = {}
+    var onDetails: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -868,6 +928,10 @@ struct AgendaList: View {
                     Text("Agenda").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.70))
                     Text(events.isEmpty ? "Nothing coming up" : "\(events.count) coming up").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { onBody() }
+                .accessibilityAction { onActivate() }
+                .accessibilityAction(named: "Show details") { onDetails() }
                 Spacer()
                 GlanceRoundButton(symbol: "arrow.up.right", size: 24, filled: true, label: "Open Calendar", action: open)
             }
@@ -879,6 +943,10 @@ struct AgendaList: View {
                     Text(event.isAllDay ? "All day" : event.start.formatted(date: .omitted, time: .shortened))
                         .font(.system(size: 10.5).monospacedDigit()).foregroundStyle(Color.white.opacity(0.55))
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { onBody() }
+                .accessibilityAction { onActivate() }
+                .accessibilityAction(named: "Show details") { onDetails() }
             }
             Spacer(minLength: 0)
         }

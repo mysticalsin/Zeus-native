@@ -561,12 +561,18 @@ struct MusicControls: View {
                 GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
             }
             if shown.contains(.playPause) {
-                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
-                    topBar.musicCommand(.playPause)
+                let target: TopBarWidgetTarget = topBar.nowPlaying?.isPlaying == true ? .pause : .play
+                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3,
+                            label: topBar.nowPlaying?.isPlaying == true ? "Pause" : "Play") {
+                    topBar.receiveWidgetTap(target)
                 }
+                .accessibilityAction { topBar.activateWidget(target) }
+                .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(target) }
             }
             if shown.contains(.next) {
-                GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
+                GlyphButton(symbol: "forward.fill", size: size, label: "Skip") { topBar.receiveWidgetTap(.skip) }
+                    .accessibilityAction { topBar.activateWidget(.skip) }
+                    .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(.skip) }
             }
             if shown.contains(.repeatMode) {
                 GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
@@ -1558,8 +1564,10 @@ struct ClosedWings: View {
                 AlbumTile(playing: topBar.nowPlaying, size: 18)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
+                    .topBarWidgetTap(.nowPlaying, model: topBar)
             } right: {
                 LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
+                    .topBarWidgetTap(.nowPlaying, model: topBar)
             }
         case .none:
             EmptyView()

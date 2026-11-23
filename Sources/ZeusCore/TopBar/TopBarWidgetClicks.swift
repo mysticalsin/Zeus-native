@@ -59,17 +59,68 @@ public struct TopBarWidgetClicks: Equatable, Sendable {
 
     /// Records one click. Nothing runs until the window passes, unless this click completes a double click.
     public mutating func click(_ target: TopBarWidgetTarget, at date: Date) -> Step {
-        Step(effects: [], arm: nil)
+        if let pending, date < pending.until, pending.target == target {
+            self.pending = nil
+            if let details = Self.details(for: target) {
+                return Step(effects: [.openDetails(details)], arm: nil)
+            }
+        }
+        var effects: [TopBarWidgetEffect] = []
+        if let pending {
+            if date >= pending.until {
+                effects.append(contentsOf: Self.single(pending.target))
+            } else if pending.target != target {
+                effects.append(contentsOf: Self.single(pending.target))
+            }
+        }
+        let until = date.addingTimeInterval(Self.doubleClickWindow)
+        self.pending = (target, until)
+        return Step(effects: effects, arm: until)
     }
 
     /// Runs the single-click action once `date` has reached the armed time. Earlier ticks wait.
     public mutating func tick(at date: Date) -> Step {
-        Step(effects: [], arm: nil)
+        guard let pending else { return Step(effects: [], arm: nil) }
+        if date < pending.until {
+            return Step(effects: [], arm: pending.until)
+        }
+        let target = pending.target
+        self.pending = nil
+        return Step(effects: Self.single(target), arm: nil)
+    }
+
+    /// VoiceOver and the keyboard run the single-click action at once, and drop a click that was still waiting.
+    public mutating func activate(_ target: TopBarWidgetTarget) -> Step {
+        pending = nil
+        return Step(effects: Self.single(target), arm: nil)
     }
 
     /// VoiceOver and the keyboard open details without waiting for a second click.
-    public func showDetails(_ target: TopBarWidgetTarget) -> TopBarWidgetEffect? {
-        nil
+    public mutating func showDetails(_ target: TopBarWidgetTarget) -> TopBarWidgetEffect? {
+        pending = nil
+        return Self.details(for: target).map { .openDetails($0) }
+    }
+
+    private static func single(_ target: TopBarWidgetTarget) -> [TopBarWidgetEffect] {
+        switch target {
+        case .play, .music, .nowPlaying: [.play]
+        case .pause: [.pause]
+        case .skip: [.next]
+        case .weather: [.refreshWeather]
+        case .focus: [.toggleFocus]
+        case .calendar, .agenda, .month: [.selectNextEvent]
+        case .agents: []
+        }
+    }
+
+    private static func details(for target: TopBarWidgetTarget) -> TopBarWidgetDetails? {
+        switch target {
+        case .play, .pause, .skip, .music, .nowPlaying: .music
+        case .calendar, .agenda, .month: .calendar
+        case .weather: .weather
+        case .focus: .focus
+        case .agents: .agents
+        }
     }
 
     /// How long the details page takes to appear. Reduced Motion snaps.
