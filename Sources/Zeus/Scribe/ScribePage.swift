@@ -455,6 +455,13 @@ private struct ScribeRecapDetail: View {
                     if scribe.pendingDeleteID == recap.id {
                         ScribeDeleteConfirm(scribe: scribe, id: recap.id)
                     } else {
+                        NotchActionButton(title: "Save to Brain…", tint: Theme.cloudSecondary, filled: false) {
+                            BrainCaptureWindow.shared.show(
+                                title: recap.title,
+                                body: MeetingVaultNote.body(notes: recap.notes),
+                                source: "meeting",
+                                record: recap.id.rawValue.uuidString)
+                        }
                         NotchActionButton(title: "Delete permanently", tint: Theme.cloudSecondary, filled: false) {
                             scribe.requestDelete(recap.id)
                         }

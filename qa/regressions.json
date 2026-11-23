@@ -8688,6 +8688,19 @@
         "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
         "function": "aPathOrBlankIdentifierIsOmitted"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "Saving a meeting recap into the vault copied private notes or dropped the meeting id.",
+      "features": [
+        "F04",
+        "F10"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/MeetingVaultNoteTests.swift",
+        "function": "aSavedRecapKeepsTheMeetingIdentifierAndLeavesPrivateNotesOut"
+      }
     }
   ]
 }

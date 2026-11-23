@@ -2063,6 +2063,21 @@
               "function": "callAppFollowsTheUnwrappedLink"
             }
           ]
+        },
+        {
+          "id": "F04.vault-note",
+          "check": "portable-scribe",
+          "acceptance": "A saved meeting recap can be written as an explicit vault note that keeps the meeting id and leaves private notes and audio paths out. The note is not sent until the person saves it.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/MeetingVaultNoteTests.swift",
+              "function": "aSavedRecapKeepsTheMeetingIdentifierAndLeavesPrivateNotesOut"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/MeetingVaultNoteTests.swift",
+              "function": "anEmptyRecapStillNamesTheMeetingAndSkipsPrivateNotes"
+            }
+          ]
         }
       ]
     },
