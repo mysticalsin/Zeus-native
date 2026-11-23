@@ -94,42 +94,48 @@ final class TalkChordHotkey {
     static let problemText = "Another app uses Control-Option-Space. Hold Control + Option alone to talk."
 
     private(set) var problem: String?
-    private(set) var isRegistered = false
     private let registrar: Registrar
-    private var desired: Shortcut?
-    private var paused = false
-    private var listening = true
-    /// The chord last handed to the registrar. A chord that was refused is asked again on the next sync, since the holder
-    /// that refused it (Chat or a shortcut being moved) may have let go since.
-    private var attempted: Shortcut?
+    private var registration = TalkChordRegistration()
+
+    var isRegistered: Bool {
+        if case .holding = registration.state { return true }
+        return false
+    }
 
     init(registrar: Registrar = .carbon()) { self.registrar = registrar }
 
     /// Registers the chord, or lets go of it when it is nil. Idempotent. `listening` is whether the talk monitor can hear
     /// keys at all (Accessibility or Input Monitoring): without it a taken Space would be lost and nothing would talk.
     func sync(_ chord: Shortcut?, listening: Bool = true) {
-        desired = chord
-        self.listening = listening
-        apply()
+        let before = registration.state
+        let effects = registration.sync(chord, listening: listening)
+        perform(effects, changed: registration.state != before)
     }
 
     /// Lets go of the key while a recorder listens, and takes it back after.
     func setPaused(_ paused: Bool) {
-        guard self.paused != paused else { return }
-        self.paused = paused
-        apply()
+        let before = registration.state
+        let effects = paused ? registration.pause() : registration.resume()
+        perform(effects, changed: registration.state != before)
     }
 
-    private func apply() {
-        let want = paused || !listening ? nil : desired
-        guard want != attempted || (want != nil && !isRegistered) else { return }
-        if isRegistered { registrar.unregister() }
-        isRegistered = false
+    private func perform(_ effects: [TalkChordRegistration.Effect], changed: Bool) {
+        guard changed || !effects.isEmpty else { return }
         problem = nil
-        attempted = want
-        guard let want, let code = want.keyCode else { return }
-        isRegistered = registrar.register(UInt32(code), Self.carbonModifiers(want.modifiers))
-        if !isRegistered { problem = Self.problemText }
+        for effect in effects {
+            switch effect {
+            case .unregister:
+                registrar.unregister()
+            case .register(let chord):
+                guard let code = chord.keyCode else {
+                    registration.noteRegistered(false)
+                    return
+                }
+                let registered = registrar.register(UInt32(code), Self.carbonModifiers(chord.modifiers))
+                registration.noteRegistered(registered)
+                if !registered { problem = Self.problemText }
+            }
+        }
     }
 
     private static func carbonModifiers(_ modifiers: ShortcutModifiers) -> UInt32 {
