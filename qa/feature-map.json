@@ -709,6 +709,13 @@
       "scope": "Production ChatModel with disposable stores and owned ChatPanel controls: durable visual links, immutable conversation identity, per-record failed-save retry, deletion and synchronous hide/close/minimize/Escape stop. No capture, providers or installed-app navigation."
     },
     {
+      "id": "portable-chimes",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Lock and wake chime decisions: one chime per cluster, no chime on launch or shutdown, wake after power off, sound feedback, meeting mode, unknown Focus, and store-time rejection of a link, an oversized file, or a long file. No audio device, file picker, or settings window.",
+      "group": "chimes"
+    },
+    {
       "id": "portable-pointing",
       "kind": "portable",
       "tier": "contract",
@@ -8177,6 +8184,49 @@
             {
               "file": "Tests/ZeusAppTests/KeychainImportTests.swift",
               "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
+            }
+          ]
+        },
+        {
+          "id": "F13.chimes",
+          "check": "portable-chimes",
+          "acceptance": "Lock and wake play one chime each, stay silent on launch and shutdown, recover after a cancelled power off, stay quiet without sound feedback, during a meeting, or when Focus is unknown, and refuse a linked, oversized, or long file before it is stored.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "oneChimePerCloseCluster"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "noChimeOnLaunch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "noChimeOnPowerOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "wakeAfterPowerOffPlaysOpenAndALaterClosePlays"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "aCancelledPowerOffAllowsALaterClose"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "playbackObeysSoundFeedbackMeetingModeAndUnknownFocus"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "theLockWakeCardIsInactiveWhenSoundFeedbackIsOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "importRejectsAReadableChimePath"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "aLinkedOversizedOrLongFileIsNotStored"
             }
           ]
         }

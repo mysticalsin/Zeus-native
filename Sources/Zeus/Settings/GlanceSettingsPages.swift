@@ -591,6 +591,9 @@ private struct SoundsPage: View {
             .disabled(!ExtraPreferences.shared.soundsOn)
             .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         }
+        LockWakeChimesCard()
+            .disabled(!ExtraPreferences.shared.soundsOn)
+            .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         GSCard("Your cues") {
             cue("play.circle", "Run start", "When an agent starts a new task.", "sound.startStyle", SoundStyles.runStart, .start)
             GSDivider()

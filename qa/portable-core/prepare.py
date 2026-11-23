@@ -151,6 +151,11 @@ GROUPS = {
         tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
               "EqualiserPolicyTests", "EqualiserLifecycleTests", "EqualiserConsentTests"),
     ),
+    "chimes": (
+        core("Chime/ChimeSession.swift", "Chime/ChimeSettings.swift", "Chime/ChimeSoundResolver.swift",
+             "Chime/ChimeTone.swift", "Chime/ChimeFileAccess.swift"),
+        tests("ChimeTests"),
+    ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
