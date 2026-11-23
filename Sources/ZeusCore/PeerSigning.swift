@@ -184,5 +184,9 @@ public enum PeerSigning {
     #else
     /// `expectedPeerIdentifier` is the signing identifier the peer must carry, for a server whose only client is the app.
     public static func verifyApp(auditToken: Data?, expectedPeerIdentifier: String? = nil, trustShippingBundle: Bool = false) -> PeerVerdict { .deny("peer signatures are not available on this platform") }
+
+    /// No code signature exists on this platform. The bridge still reads its identity at start, and the answer is none.
+    @discardableResult
+    public static func captureOwnIdentity() -> CodeSignature? { nil }
     #endif
 }
