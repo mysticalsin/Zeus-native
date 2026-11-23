@@ -4,6 +4,8 @@ It builds only ~/Desktop/Zeus-latest-<sha8>.app. It does not open Zeus and it
 never launches /Applications/Zeus.app. A person opens the Desktop build. The
 harness records a pid or bundle path only when that running app is observed.
 A failed run writes a receipt marked FAIL, which cannot validate.
+On any other host it does not build. It writes a receipt that marks every
+Mac hands-on journey unproven, and that receipt cannot validate.
 """
 import argparse
 import importlib.util
@@ -36,10 +38,29 @@ INSTALLED = "/Applications/Zeus.app"
 
 
 def _run(command, cwd=None):
-    subprocess.run(command, cwd=cwd, check=True)
+    return subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def real_assemble(repo, dest, bin_dir=None):
+def _command_log(command, completed):
+    stdout = getattr(completed, "stdout", None) or getattr(completed, "output", None) or ""
+    stderr = getattr(completed, "stderr", None) or ""
+    text = "$ " + " ".join(str(part) for part in command) + "\n" + stdout + stderr
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text
+
+
+def _note(log, command, text):
+    if log is None:
+        return
+    body = text or ""
+    line = "$ " + " ".join(str(part) for part in command) + "\n" + body
+    if not line.endswith("\n"):
+        line += "\n"
+    log.append(line)
+
+
+def real_assemble(repo, dest, bin_dir=None, log=None):
     """Copy the release binary into the Desktop app. Ad hoc signature only."""
     refuse_if_installed(dest)
     dest = Path(dest)
@@ -49,9 +70,13 @@ def real_assemble(repo, dest, bin_dir=None):
         raise Refused("builds go only to ~/Desktop/Zeus-latest-<sha8>.app")
     repo = Path(repo)
     if bin_dir is None:
-        bin_dir = subprocess.check_output(
-            ["swift", "build", "-c", "release", "--show-bin-path"], cwd=repo, text=True
-        ).strip()
+        command = ["swift", "build", "-c", "release", "--show-bin-path"]
+        try:
+            bin_dir = subprocess.check_output(command, cwd=repo, text=True).strip()
+        except subprocess.CalledProcessError as error:
+            _note(log, command, (error.output or "") + (error.stderr or ""))
+            raise
+        _note(log, command, bin_dir)
     exe = Path(bin_dir) / "Zeus"
     if not exe.is_file() or exe.is_symlink():
         raise Refused("the build did not produce a Zeus binary")
@@ -83,7 +108,13 @@ def real_assemble(repo, dest, bin_dir=None):
             helpers.mkdir(exist_ok=True)
             shutil.copy2(src, helpers / dest_name)
             os.chmod(helpers / dest_name, 0o755)
-    subprocess.run(["codesign", "--force", "--sign", "-", "--timestamp=none", str(dest)], check=True)
+    command = ["codesign", "--force", "--sign", "-", "--timestamp=none", str(dest)]
+    try:
+        completed = subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as error:
+        _note(log, command, (error.stdout or "") + (error.stderr or ""))
+        raise
+    _note(log, command, (completed.stdout or "") + (completed.stderr or ""))
 
 
 def capture_runtime(dest, listing):
@@ -140,7 +171,7 @@ def live_processes():
     return rows
 
 
-def record_manual_run(receipt, dest, captured):
+def record_manual_run(receipt, dest, captured, path=None):
     """Write a FAIL receipt. The manual steps are not a pass yet."""
     dest = Path(dest)
     refuse_if_installed(dest)
@@ -159,9 +190,100 @@ def record_manual_run(receipt, dest, captured):
         executable = dest / "Contents" / "MacOS" / "Zeus"
         if executable.is_file() and not executable.is_symlink() and not dest.is_symlink():
             body["runtime_app_bundle"] = str(dest)
-    out = dest.parent / f"{dest.stem}.qa-receipt.json"
+    out = Path(path) if path is not None else dest.parent / f"{dest.stem}.qa-receipt.json"
+    if out.is_symlink():
+        raise Refused("refusing to write a receipt through a symlink")
     out.write_text(json.dumps(body, indent=2) + "\n")
     return str(out), 2
+
+
+def _ci_build():
+    """True when this process is a CI job. The value is only read, never set."""
+    return bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI"))
+
+
+def _receipt_path(dest, receipt_path, repo):
+    path = Path(receipt_path) if receipt_path else dest.parent / f"{dest.stem}.qa-receipt.json"
+    if path.is_symlink() or path.parent.is_symlink() or not path.parent.is_dir():
+        raise Refused(f"{path.parent} is not a directory")
+    installed = Path(INSTALLED)
+    if path == installed or path.resolve() == installed or installed in path.resolve().parents:
+        raise Refused("refusing to build over /Applications/Zeus.app")
+    resolved = path.resolve()
+    root = Path(repo).resolve()
+    if resolved == root or root in resolved.parents:
+        raise Refused("refusing to write the receipt inside the repository")
+    return path
+
+
+def _write_unproven(head, dest, platform_name, path):
+    receipt = _validate.unproven_receipt(head, str(dest), platform_name)
+    path.write_text(json.dumps(receipt, indent=2) + "\n")
+    return str(path), 2
+
+
+def _fail_receipt(head, dest, log, error, path):
+    receipt = _validate.blank_receipt(head, str(dest))
+    receipt["platform"] = "Darwin"
+    text = "".join(log)
+    if not text:
+        text = f"{error}\n"
+    if not text.endswith("\n"):
+        text += "\n"
+    receipt["log"] = text
+    return record_manual_run(receipt, dest, None, path)
+
+
+def execute(repo, home, head, platform_name, receipt_path=None, usage=None, run=None, assemble=None, processes=None):
+    """Build on macOS, or write an unproven receipt on any other host.
+
+    The return is (receipt path, exit code). Exit code 0 is never used: the
+    harness does not perform the hands-on steps, so it cannot pass them.
+    """
+    repo = Path(repo)
+    home = Path(home)
+    if not head:
+        head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+    dest = _validate.desktop_app(home, head)
+    path = _receipt_path(dest, receipt_path, repo)
+    if platform_name != "Darwin":
+        return _write_unproven(head, dest, platform_name, path)
+    if _ci_build():
+        raise Refused("refusing to build in CI")
+    log = []
+
+    def logging_run(command, cwd=None):
+        runner = run or _run
+        try:
+            completed = runner(command, cwd=cwd)
+        except subprocess.CalledProcessError as error:
+            log.append(_command_log(command, error))
+            raise
+        if completed is None:
+            completed = subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        log.append(_command_log(command, completed))
+        return completed
+
+    def logging_assemble(repo_path, dest_path):
+        real_assemble(repo_path, dest_path, log=log)
+
+    try:
+        receipt = prepare(
+            head, home, repo,
+            usage if usage is not None else shutil.disk_usage,
+            logging_run, platform_name,
+            assemble if assemble is not None else logging_assemble,
+        )
+    except (subprocess.CalledProcessError, OSError) as error:
+        return _fail_receipt(head, dest, log, error, path)
+    receipt["platform"] = "Darwin"
+    text = "".join(log)
+    if not text.endswith("\n"):
+        text = text + "\n" if text else "swift build -c release\n"
+    receipt["log"] = text
+    listing = live_processes() if processes is None else processes
+    captured = capture_runtime(dest, listing)
+    return record_manual_run(receipt, dest, captured, path)
 
 
 def main(argv=None):
@@ -171,27 +293,23 @@ def main(argv=None):
     parser.add_argument("--repo", required=True)
     parser.add_argument("--home", default=str(Path.home()))
     parser.add_argument("--head", help="40 lowercase hex characters; default is git rev-parse HEAD")
+    parser.add_argument("--receipt", help="receipt JSON path; default sits beside the Desktop build")
     args = parser.parse_args(argv)
     repo = Path(args.repo)
     head = args.head
     if not head:
         head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
     try:
-        receipt = prepare(
-            head, Path(args.home), repo, shutil.disk_usage, _run, platform.system(), real_assemble
-        )
-        dest = Path(receipt["app"])
-        refuse_if_installed(dest)
-        if str(dest) == INSTALLED:
-            raise Refused("refusing to build over /Applications/Zeus.app")
-        captured = capture_runtime(dest, live_processes())
-        out, code = record_manual_run(receipt, dest, captured)
+        out, code = execute(repo, Path(args.home), head, platform.system(), receipt_path=args.receipt)
     except Refused as error:
         print(f"qa-native-run: {error}", file=sys.stderr)
         return 2
     print(out)
-    print("manual-run harness: Zeus was not opened. Open the Desktop build yourself.")
-    print("/Applications/Zeus.app is never launched. This receipt is marked FAIL.")
+    if platform.system() == "Darwin":
+        print("manual-run harness: Zeus was not opened. Open the Desktop build yourself.")
+        print("/Applications/Zeus.app is never launched. This receipt is marked FAIL.")
+    else:
+        print("unproven: macOS hands-on journeys were not run.")
     return code
 
 

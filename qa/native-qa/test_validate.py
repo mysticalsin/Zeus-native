@@ -3,14 +3,17 @@
 A pass needs every public step, a real PNG screenshot, and result PASS.
 MANUAL, FAIL, and a stand-in image are not a pass. The harness does not open Zeus.
 """
+import io
 import json
 from pathlib import Path
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
 import zlib
+from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "qa" / "closed-loop"))
@@ -227,6 +230,25 @@ class ReceiptSlots(unittest.TestCase):
         self.assertEqual(verdict, "fail")
         self.assertTrue(any("truncat" in reason.lower() and "log" in reason.lower() for reason in reasons), reasons)
 
+    def test_an_unproven_receipt_is_not_a_pass(self):
+        receipt = self.filled()
+        receipt["verdict"] = "unproven"
+        receipt["platform"] = "Linux"
+        receipt["journeys"] = [{"id": "launch", "status": "unproven", "reason": "macOS only"}]
+        verdict, reasons = self.v.judge(receipt, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any(reason == "receipt is unproven" for reason in reasons), reasons)
+        self.assertTrue(any(reason == "launch: unproven" for reason in reasons), reasons)
+        step_only = self.filled(**{"launch.process": {"result": "unproven"}})
+        verdict, reasons = self.v.judge(step_only, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("launch.process" in reason and "unproven" in reason for reason in reasons), reasons)
+        hosted = self.filled()
+        hosted["platform"] = "Linux"
+        verdict, reasons = self.v.judge(hosted, self.dir)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any("Linux" in reason and "unproven" in reason for reason in reasons), reasons)
+
     def test_opening_zeus_or_a_fail_mark_is_not_a_pass(self):
         opened = self.filled()
         opened["opened_by_harness"] = True
@@ -403,6 +425,117 @@ class HarnessGuards(unittest.TestCase):
             self.v.prepare(HEAD, self.home, self.repo, self.usage(self.v.MIN_FREE_BYTES), self.calls.append)
         self.assertEqual(self.calls, [])
 
+    def test_linux_labels_every_journey_unproven_and_does_not_build(self):
+        import harness
+        calls = []
+
+        def usage(_path):
+            raise AssertionError("disk must not be checked off macOS")
+
+        out, code = harness.execute(
+            self.repo, self.home, HEAD, "Linux", usage=usage, run=lambda *_args, **_kwargs: calls.append(_args)
+        )
+        self.assertEqual(calls, [])
+        self.assertNotEqual(code, 0)
+        self.assertEqual(list(self.home.rglob("*.app")), [])
+        body = json.loads(Path(out).read_text())
+        self.assertEqual(body["verdict"], "unproven")
+        self.assertEqual(body["platform"], "Linux")
+        self.assertEqual([journey["id"] for journey in body["journeys"]], list(human_qa.JOURNEYS))
+        for journey in body["journeys"]:
+            self.assertEqual(journey["status"], "unproven")
+            self.assertEqual(journey["reason"], "macOS only")
+        self.assertEqual([step["result"] for step in body["steps"]], ["unproven"] * len(body["steps"]))
+        self.assertEqual([step["id"] for step in body["steps"]], human_qa.expected_ids())
+        verdict, reasons = self.v.judge(body, self.home)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any(reason == "receipt is unproven" for reason in reasons), reasons)
+        self.assertTrue(all(f"{name}: unproven" in reasons for name in human_qa.JOURNEYS), reasons)
+
+    def test_main_on_linux_records_unproven_journeys(self):
+        import harness
+        original = harness.platform.system
+        harness.platform.system = lambda: "Linux"
+        buffer = io.StringIO()
+        try:
+            with redirect_stdout(buffer):
+                code = harness.main(["--repo", str(self.repo), "--home", str(self.home), "--head", HEAD])
+        finally:
+            harness.platform.system = original
+        self.assertEqual(code, 2)
+        text = buffer.getvalue()
+        self.assertIn("unproven", text)
+        receipt = self.home / "Desktop" / "Zeus-latest-2722dcb7.qa-receipt.json"
+        body = json.loads(receipt.read_text())
+        self.assertEqual(body["verdict"], "unproven")
+        self.assertFalse((self.home / "Desktop" / "Zeus-latest-2722dcb7.app").exists())
+
+    def test_ci_on_mac_refuses_before_a_build(self):
+        import harness
+        import os
+        previous = os.environ.get("CI")
+        os.environ["CI"] = "true"
+        try:
+            with self.assertRaises(harness.Refused) as caught:
+                harness.execute(
+                    self.repo, self.home, HEAD, "Darwin",
+                    usage=self.usage(self.v.MIN_FREE_BYTES), run=self.calls.append,
+                )
+        finally:
+            if previous is None:
+                os.environ.pop("CI", None)
+            else:
+                os.environ["CI"] = previous
+        self.assertIn("CI", str(caught.exception))
+        self.assertEqual(self.calls, [])
+
+    def test_a_failed_build_writes_a_fail_receipt_with_a_log(self):
+        import harness
+
+        def run(command, cwd=None):
+            raise subprocess.CalledProcessError(1, command, output="out", stderr="swift failed\n")
+
+        out, code = harness.execute(
+            self.repo, self.home, HEAD, "Darwin",
+            usage=self.usage(self.v.MIN_FREE_BYTES), run=run,
+            assemble=lambda *_args, **_kwargs: self.fail("assemble must not run"),
+        )
+        self.assertNotEqual(code, 0)
+        self.assertEqual(list(self.home.rglob("*.app")), [])
+        body = json.loads(Path(out).read_text())
+        self.assertEqual(body["verdict"], "FAIL")
+        self.assertEqual(body["platform"], "Darwin")
+        self.assertIn("swift failed", body["log"])
+        self.assertTrue(body["log"].endswith("\n"))
+        verdict, reasons = self.v.judge(body, self.home)
+        self.assertEqual(verdict, "fail")
+        self.assertTrue(any(reason.startswith("receipt is marked FAIL") for reason in reasons))
+
+    def test_a_finished_build_records_the_log_and_stays_fail(self):
+        import harness
+
+        def run(command, cwd=None):
+            return subprocess.CompletedProcess(command, 0, stdout="built\n", stderr="")
+
+        def assemble(_repo, dest):
+            macos = Path(dest) / "Contents" / "MacOS"
+            macos.mkdir(parents=True)
+            (macos / "Zeus").write_text("binary\n")
+
+        out, code = harness.execute(
+            self.repo, self.home, HEAD, "Darwin",
+            usage=self.usage(self.v.MIN_FREE_BYTES), run=run, assemble=assemble, processes=[],
+        )
+        self.assertNotEqual(code, 0)
+        body = json.loads(Path(out).read_text())
+        self.assertEqual(body["verdict"], "FAIL")
+        self.assertIn("swift build -c release", body["log"])
+        self.assertIn("built", body["log"])
+        self.assertTrue(body["log"].endswith("\n"))
+        self.assertTrue(all(step["result"] == "" for step in body["steps"]))
+        verdict, _reasons = self.v.judge(body, self.home)
+        self.assertEqual(verdict, "fail")
+
 
 class SourceRules(unittest.TestCase):
     def test_production_files_exist_and_avoid_forbidden_actions(self):
@@ -427,6 +560,7 @@ class SourceRules(unittest.TestCase):
         self.assertIn("refuse_if_installed", harness)
         self.assertIn("/Applications/Zeus.app", harness)
         self.assertIn("manual-run", harness)
+        self.assertIn("unproven", harness)
         self.assertNotIn("shell=True", harness)
         self.assertNotIn("open -n", harness)
         self.assertNotIn("open -a", harness)

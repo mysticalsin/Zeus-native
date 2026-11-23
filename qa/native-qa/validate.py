@@ -4,11 +4,13 @@ A later manual Mac run fills one screenshot slot and one result slot per step.
 Results use the hands-on statuses PASS, FAIL, and MANUAL. Only PASS can pass.
 A screenshot must be a real PNG, at least 200 by 100, and not one colour.
 The receipt must show an app pid or a Desktop bundle path captured at runtime.
-A receipt marked FAIL does not pass.
+A receipt marked FAIL does not pass. A Linux run marks every Mac journey
+unproven, and an unproven receipt does not pass.
 
     python3 -I qa/native-qa/validate.py RECEIPT.json
 """
 import argparse
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -19,6 +21,7 @@ import zlib
 MIN_FREE_BYTES = 6 * 1024 ** 3
 SCHEMA = "zeus-native-qa-receipt/1"
 PASS_RESULT = "PASS"
+UNPROVEN = "unproven"
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
 INSTALLED_APP = Path("/Applications/Zeus.app")
 HEAD_RE = re.compile(r"[0-9a-f]{40}\Z")
@@ -33,10 +36,29 @@ class Refused(Exception):
     pass
 
 
+def _load_human_qa():
+    """Load the public journey list by path. Isolated Python does not import the package."""
+    path = Path(__file__).resolve().parents[1] / "closed-loop" / "human_qa.py"
+    spec = importlib.util.spec_from_file_location("zeus_human_qa_journeys", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_human_qa = _load_human_qa()
+
+
 def catalog():
     """Scripted steps in the public hands-on order."""
     document = json.loads(STEPS_PATH.read_text())
     return document["steps"]
+
+
+def journey_catalog():
+    """Public hands-on journeys in the same order as qa/closed-loop/human_qa.py."""
+    return [(name, list(step_ids)) for name, step_ids in _human_qa.JOURNEYS.items()]
 
 
 def blank_receipt(head, app):
@@ -57,6 +79,38 @@ def blank_receipt(head, app):
         "verdict": "not-run",
         "steps": steps,
     }
+
+
+def unproven_receipt(head, app, platform_name):
+    """A receipt for a host that did not run the Mac journeys. It cannot pass."""
+    if platform_name == "Darwin":
+        raise Refused("a Mac run is not labeled unproven")
+    if not isinstance(platform_name, str) or not platform_name.strip():
+        raise Refused("platform is missing")
+    receipt = blank_receipt(head, app)
+    receipt["verdict"] = UNPROVEN
+    receipt["platform"] = platform_name
+    receipt["manual_run"] = True
+    receipt["opened_by_harness"] = False
+    receipt["runtime_app_pid"] = None
+    receipt["runtime_app_bundle"] = None
+    journeys = []
+    for name, step_ids in journey_catalog():
+        journeys.append({
+            "id": name,
+            "status": UNPROVEN,
+            "reason": "macOS only",
+            "steps": step_ids,
+        })
+    receipt["journeys"] = journeys
+    for step in receipt["steps"]:
+        step["result"] = UNPROVEN
+    names = ", ".join(journey["id"] for journey in journeys)
+    receipt["log"] = (
+        f"unproven: {platform_name} did not build or open Zeus. "
+        f"Mac-only journeys: {names}.\n"
+    )
+    return receipt
 
 
 def desktop_app(home, head):
@@ -228,8 +282,30 @@ def _log_problem(receipt):
     return None
 
 
+def _journey_problems(receipt):
+    """Unproven journeys stay unproven. A missing list is not a pass by itself."""
+    journeys = receipt.get("journeys")
+    if journeys is None:
+        return []
+    if not isinstance(journeys, list):
+        return ["journeys must be a list"]
+    problems = []
+    for journey in journeys:
+        if not isinstance(journey, dict):
+            problems.append("journey is not an object")
+            continue
+        if journey.get("status") == UNPROVEN:
+            problems.append(f"{journey.get('id', '?')}: unproven")
+    return problems
+
+
 def _runtime_problem(receipt):
-    """FAIL, a harness launch, or no captured pid or bundle path."""
+    """FAIL, an unproven host, a harness launch, or no captured pid or bundle path."""
+    if receipt.get("verdict") == "unproven":
+        return "receipt is unproven"
+    host = receipt.get("platform")
+    if isinstance(host, str) and host != "Darwin":
+        return f"{host} is unproven"
     if receipt.get("verdict") == "FAIL":
         return "receipt is marked FAIL"
     if receipt.get("manual_run") is not True:
@@ -314,6 +390,7 @@ def judge(receipt, base_dir):
     runtime = _runtime_problem(receipt)
     if runtime:
         reasons.append(runtime)
+    reasons.extend(_journey_problems(receipt))
     log_problem = _log_problem(receipt)
     if log_problem:
         reasons.append(log_problem)
