@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "A clean EOF left an already accepted bridge frame blocked on a full stdout pipe. When the enqueue deadline passed before the peer read, the write threw timedOut and the host exited 2, so the accepted frame was dropped.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-bridge-transport",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+        "function": "earlyEOFFlushesAnAcceptedFramePastItsOriginalDeadline"
+      }
     }
-]
+  ]
 }

@@ -437,11 +437,7 @@ struct PeerVerificationWiringTests {
     }
 
     private var ownName: String {
-        #if canImport(Darwin)
-        return (PeerCheck.executablePath(pid: getpid()).map { ($0 as NSString).lastPathComponent }) ?? "unknown"
-        #else
-        return "unknown"
-        #endif
+        (PeerCheck.executablePath(pid: getpid()).map { ($0 as NSString).lastPathComponent }) ?? "unknown"
     }
 
     @Test func aNamedProgramPolicyAlsoNeedsTheSignatureVerifierToAgree() async throws {
@@ -461,7 +457,11 @@ struct PeerVerificationWiringTests {
         #expect(reply == nil)
         #expect(handled.value == 0, "the handler never sees a refused peer's bytes")
         #expect(asked.value == 1)
+        #if canImport(Darwin)
         #expect(asked.tokenSizes == [32], "the verifier gets the kernel's audit token, not a pid")
+        #else
+        #expect(asked.tokenSizes == [nil], "this platform has no audit token; the verifier is still asked")
+        #endif
     }
 
     @Test func aNamedProgramPolicyAdmitsAPeerTheVerifierAccepts() async throws {
