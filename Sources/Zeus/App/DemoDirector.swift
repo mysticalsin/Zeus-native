@@ -1,13 +1,16 @@
 import AppKit
+import ZeusCore
 
-/// Plays the ZEUS experience end to end with scripted data, so the look can be judged before
-/// voice and agent hooks are wired: listen → think → fly + strike → agent peek → approval
-/// (click Approve or Deny) → done → panel.
+/// Plays the ZEUS experience end to end with scripted data: listen, think, fly and strike,
+/// agent peek, approval (click Approve or Deny), done, then the panel. The menu-bar point
+/// speaks through the existing voice.
 @MainActor
 final class DemoDirector {
     private let buddy: BuddyController
     private let notch: NotchController
     private let statusItemFrame: () -> CGRect?
+    /// The existing voice (`VoiceTurnController.say`). Nil keeps this run visual.
+    var say: ((String) -> Void)?
     private var task: Task<Void, Never>?
 
     init(buddy: BuddyController, notch: NotchController, statusItemFrame: @escaping () -> CGRect?) {
@@ -39,11 +42,13 @@ final class DemoDirector {
         buddy.think()
         guard await pause(1.2) else { return }
 
-        // 2. The answer points at something real on screen: ZEUS's own menu-bar icon.
+        // 2. The answer points at Zeus's menu-bar icon and speaks that line.
         let mainFrame = (NSScreen.main ?? NSScreen.screens[0]).frame
         let iconTarget = statusItemFrame().map { CGPoint(x: $0.midX, y: $0.minY - 6) }
             ?? CGPoint(x: mainFrame.midX, y: mainFrame.midY)
-        buddy.point(to: iconTarget, label: "that's me up here, click the bolt anytime")
+        let line = DemoSpeech.speak(.menuBarPoint) { self.say?($0) }
+            ?? "that's me up here, click the bolt anytime"
+        buddy.point(to: iconTarget, label: line)
         guard await pause(7.5) else { return }
 
         // 3. A coding agent starts work; the notch peeks.
