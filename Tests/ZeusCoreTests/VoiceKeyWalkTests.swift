@@ -1628,6 +1628,10 @@ private func expand(_ sim: Sim, _ run: WalkRun, memo: RestMemo) -> WalkExpansion
     return WalkExpansion(rest: rest, children: children)
 }
 
+/// Below the bridge's user-initiated stdio and the other suites. Idle, these threads still take
+/// the cores, which is what finishes the search inside the Core process's hour.
+private let walkExpandQueue = DispatchQueue(label: "zeus.walk.expand", qos: .utility, attributes: .concurrent)
+
 private final class ExpansionBatch: @unchecked Sendable {
     private let lock = NSLock()
     private var slots: [WalkExpansion?]
@@ -1707,10 +1711,19 @@ private func explore(_ run: WalkRun, stopAtFirst: Bool, until: String?) -> Repor
             return sim
         }
         let batch = ExpansionBatch(width)
-        DispatchQueue.concurrentPerform(iterations: width) { offset in
-            guard let sim = seeds[offset] else { return }
-            batch.put(offset, expand(sim, run, memo: memo))
+        // Utility, not the test thread's priority. concurrentPerform ran at that priority and
+        // kept the host's user-initiated stdout writer from delivering a byte inside 2s.
+        let group = DispatchGroup()
+        for offset in 0..<width {
+            let sim = seeds[offset]
+            group.enter()
+            walkExpandQueue.async {
+                defer { group.leave() }
+                guard let sim else { return }
+                batch.put(offset, expand(sim, run, memo: memo))
+            }
         }
+        group.wait()
         var stop = false
         for offset in 0..<width {
             let index = cursor + offset
@@ -1789,9 +1802,9 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     return (out + restCheck(sim, run), effects)
 }
 
-// The walks are exhaustive and CPU bound. One run at a time, each run expanded in batches, so the suite finishes
-// inside the Core process's hour. The bridge's stdio and deadline queues are user-initiated: a utility queue on the
-// 3-core hosted runner missed the 2s Chrome write budget and the host exited before the first stdout byte.
+// The walks are exhaustive and CPU bound. One run at a time, each run expanded in utility-queue
+// batches, so the suite finishes inside the Core process's hour without taking the bridge's
+// user-initiated stdout writer or the other suites off the cores.
 @Suite(.serialized) struct VoiceKeyWalkTests {
     @Test(.serialized, arguments: WalkRun.all.filter { run in
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""

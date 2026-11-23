@@ -80,12 +80,12 @@ public final class NativeMessageOutput: @unchecked Sendable {
 
     private func performWrite(_ frame: Data,
                               completion: @escaping @Sendable (Result<Void, Failure>) -> Void) {
-        // The budget starts when a write is actually attempted. Time spent waiting to be scheduled
-        // is not Chrome failing to read; counting it made a busy host exit before the first byte.
-        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
+        // The budget is time the pipe itself refused another byte. A worker that was preempted
+        // before that refusal is not Chrome failing to read; a wall clock that included the pause
+        // made a busy host exit before the first byte reached stdout.
         let result: Result<Void, Failure>
         do {
-            try write(frame, deadline: deadline)
+            try write(frame, budget: writeTimeout)
             result = .success(())
         } catch {
             let failure = error as? Failure ?? .unavailable
@@ -130,7 +130,9 @@ public final class NativeMessageOutput: @unchecked Sendable {
         }
     }
 
-    private func write(_ data: Data, deadline: TimeInterval) throws {
+    /// `budget` is how long the peer may leave the pipe unwritable. Time spent before the first
+    /// refusal, and time the worker is not inside `poll`, does not count.
+    private func write(_ data: Data, budget: TimeInterval) throws {
         #if !canImport(Darwin)
         // Linux has no F_SETNOSIGPIPE for pipes. Mask only this worker, and consume only
         // a newly generated SIGPIPE before restoring its previous signal mask.
@@ -153,14 +155,20 @@ public final class NativeMessageOutput: @unchecked Sendable {
         try data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
             var offset = 0
+            var refused: TimeInterval = 0
             while offset < raw.count {
                 if let failure = lock.withLock({ terminal }) { throw failure }
-                guard ProcessInfo.processInfo.systemUptime < deadline else { throw Failure.timedOut }
                 var pollFD = pollfd(fd: descriptor.fd, events: Int16(POLLOUT), revents: 0)
+                let waited = ProcessInfo.processInfo.systemUptime
                 let ready = poll(&pollFD, 1, 25)
                 if ready < 0 && errno == EINTR { continue }
                 guard ready >= 0 else { throw Failure.unavailable }
-                if ready == 0 { continue }
+                if ready == 0 {
+                    // At least one poll slice. A clock that did not move during the wait must still reach the budget.
+                    refused += max(0.025, ProcessInfo.processInfo.systemUptime - waited)
+                    guard refused < budget else { throw Failure.timedOut }
+                    continue
+                }
                 guard pollFD.revents & Int16(POLLERR | POLLHUP | POLLNVAL) == 0 else { throw Failure.unavailable }
                 #if canImport(Darwin)
                 let written = Darwin.write(descriptor.fd, base.advanced(by: offset), min(16_384, raw.count - offset))
@@ -168,7 +176,12 @@ public final class NativeMessageOutput: @unchecked Sendable {
                 let written = Glibc.write(descriptor.fd, base.advanced(by: offset), min(16_384, raw.count - offset))
                 #endif
                 if written > 0 { offset += written; continue }
-                if written < 0 && (errno == EINTR || errno == EAGAIN) { continue }
+                if written < 0 && errno == EINTR { continue }
+                if written < 0 && errno == EAGAIN {
+                    refused += 0.025
+                    guard refused < budget else { throw Failure.timedOut }
+                    continue
+                }
                 throw Failure.unavailable
             }
         }
