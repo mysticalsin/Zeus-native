@@ -1841,11 +1841,15 @@
         {
           "check": "portable-scribe",
           "id": "F04.opt-in-rules",
-          "acceptance": "The stamp follows the choice, an old stamp carries over only with automatic chosen, and readiness names the first missing thing before any countdown.",
+          "acceptance": "The stamp follows the choice, an old stamp carries over only with automatic chosen, a newer stamp written during the removal flush is kept, and readiness names the first missing thing before any countdown.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
               "function": "choosingAnotherModeWithdrawsTheOptIn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+              "function": "aNewerStampWrittenAfterTheFirstFlushIsKept"
             },
             {
               "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",

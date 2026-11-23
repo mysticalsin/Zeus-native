@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Removing the scribe opt-in flushed the suite and then deleted whatever stamp was present, so a newer consent time written during that flush was thrown away.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartOptInTests.swift",
+        "function": "aNewerStampWrittenAfterTheFirstFlushIsKept"
+      }
     }
-]
+  ]
 }
