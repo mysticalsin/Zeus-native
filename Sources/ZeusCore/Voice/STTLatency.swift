@@ -529,6 +529,16 @@ public enum STTFileGiveUp {
     }
 }
 
+/// One completion for a recognition callback and its give-up timer.
+/// The red body runs every time, so a second caller is not dropped.
+public final class STTOnce: @unchecked Sendable {
+    public init() {}
+
+    public func run(_ body: () -> Void) {
+        body()
+    }
+}
+
 public enum STTOutcome {
     /// How a finished turn is counted. A partial that is handed over inside the budget is not a failure.
     public static func failure(hadSpeech: Bool, hasText: Bool, recognizerFinished: Bool,

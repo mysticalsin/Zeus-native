@@ -483,6 +483,14 @@ struct STTLatencyTests {
         #expect(!STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: 1_999))
     }
 
+    @Test func aCallbackAndItsGiveUpCompleteOnce() {
+        let gate = STTOnce()
+        var hits = 0
+        gate.run { hits += 1 }
+        gate.run { hits += 1 }
+        #expect(hits == 1)
+    }
+
     @Test func aDeniedMicOrMissingEngineRetriesInsteadOfHanging() {
         for fault in [STTFault.micDenied, .engineUnavailable] {
             let answer = STTFaultGate.answer(fault)
