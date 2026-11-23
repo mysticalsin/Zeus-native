@@ -493,6 +493,38 @@ struct TilingKeyTapStandInTests {
         group.wait()
         #expect(gone.all == [true, true], "a second caller does not return while the thread may still be consuming keys")
     }
+
+    /// The callback copies the key code and modifier flags into `TileKeyEvent` and returns the system event for
+    /// anything that is not a bound tiling chord. It does not read characters, and it does not log or store the key.
+    @Test func theTapCallbackKeepsOnlyTheShortcutMatch() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zeus/Tiling/TilingKeyTap.swift"), encoding: .utf8)
+        let handleStart = try #require(source.range(of: "private nonisolated func handleKey"))
+        let handleEnd = try #require(source.range(of: "nonisolated func decide"))
+        let callbackStart = try #require(source.range(of: "private func tilingTapCallback"))
+        let handle = source[handleStart.lowerBound..<handleEnd.lowerBound]
+        let callback = source[callbackStart.lowerBound...]
+        for banned in ["NSLog", "print(", "os_log", "Logger(", "keyboardEventKeyboardType", "unicode", "characters"] {
+            #expect(!handle.contains(banned), "handleKey mentions \(banned)")
+            #expect(!callback.contains(banned), "the callback mentions \(banned)")
+        }
+        let letter = TileKeyEvent(phase: .down, keyCode: 0, modifiers: [])
+        let fields = Set(Mirror(reflecting: letter).children.compactMap(\.label))
+        #expect(fields == ["phase", "keyCode", "modifiers", "isRepeat", "isOwnInput"])
+
+        var map = TileKeymap()
+        try map.bind(Shortcut(keyCode: 0, modifiers: [.control, .option]), to: .togglePause)
+        let tap = TilingKeyTap(sink: { _, _ in }, onFailure: {})
+        tap.update(keymap: map, enabled: true, paused: false)
+        let plain = tap.decide(letter, secure: false)
+        #expect(plain == .passThrough)
+        #expect(plain.monitorEvent(for: letter) == nil)
+        let chord = TileKeyEvent(phase: .down, keyCode: 0, modifiers: [.control, .option])
+        let taken = tap.decide(chord, secure: false)
+        #expect(taken == .consume(.togglePause))
+        #expect(taken.monitorEvent(for: chord) == .keyDown(keyCode: 0, modifiers: [.control, .option]))
+    }
 }
 
 private final class TapFlag: @unchecked Sendable {

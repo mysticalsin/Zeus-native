@@ -93,12 +93,9 @@ final class AirDropScreenshotWatcher: @unchecked Sendable {
         }
     }
 
-    /// Dot files, and anything Fling wrote into its own folder, are never an AirDrop or a screenshot.
+    /// Dot files are never an AirDrop or a screenshot.
     static func isIgnored(_ url: URL) -> Bool {
-        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")
-        let roots = [downloads.appendingPathComponent("Fling"), FlingService.supportDirectory.appendingPathComponent("Fling/Inbox")]
-        return url.lastPathComponent.hasPrefix(".") || FlingSaveRules.isInsideFlingFolder(url, roots: roots)
+        url.lastPathComponent.hasPrefix(".")
     }
 
     private func handleEvents(_ events: [(path: String, flags: UInt32)]) {

@@ -196,6 +196,14 @@ public enum UnixSocket {
 /// tasks or approvals. Calling a reply is always nonblocking, including from MainActor. Only
 /// the first call can write, and every connection descriptor closes exactly once.
 public final class UnixSocketServer: @unchecked Sendable {
+    /// A support-directory override never skips the signature verifier, including in a debug build. The unsigned
+    /// same-user policy still applies to the ordinary socket when nothing has relocated it.
+    public static func mustVerifySignature(policy: PeerPolicy, supportOverride: String?) -> Bool {
+        if policy.requiresSignedApp { return true }
+        if let supportOverride, !supportOverride.isEmpty { return true }
+        return false
+    }
+
     public typealias Reply = @Sendable (Data?) -> Void
     public typealias Handler = @Sendable (Data, @escaping Reply) -> Void
     /// Like `Handler`, plus what the handler may ask about the peer that sent the line.
@@ -213,6 +221,8 @@ public final class UnixSocketServer: @unchecked Sendable {
     private var connections: [UUID: Connection] = [:]
 
     var activeConnectionCount: Int { lock.withLock { connections.count } }
+    /// `umask` is process-wide. One bind at a time, and the previous mask is restored before the lock is released.
+    private static let bindLock = NSLock()
 
     public init(path: String, peerPolicy: PeerPolicy = .sameUser, peerVerifier: @escaping PeerVerifier = PeerSigning.defaultVerifier,
                 handler: @escaping Handler) {
@@ -236,7 +246,30 @@ public final class UnixSocketServer: @unchecked Sendable {
         try lock.withLock {
             guard listener == nil else { throw POSIXError(.EALREADY) }
             guard var address = UnixSocket.address(for: path) else { throw POSIXError(.ENAMETOOLONG) }
-            try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            let directory = (path as NSString).deletingLastPathComponent
+            try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            // Open the directory itself. O_NOFOLLOW refuses a symlink planted in place of the support folder.
+            let directoryFD = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+            guard directoryFD >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            defer { close(directoryFD) }
+            var opened = stat()
+            guard fstat(directoryFD, &opened) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            // macOS returns EINVAL from fchmod on a directory descriptor. Tighten the mode, then accept
+            // the directory only when lstat still names this opened inode, owned by us, at 0700.
+            func directoryIsPrivate() -> Bool {
+                var info = stat()
+                guard lstat(directory, &info) == 0 else { return false }
+                let kind = info.st_mode & mode_t(S_IFMT)
+                return kind == mode_t(S_IFDIR) && info.st_uid == geteuid()
+                    && (info.st_mode & mode_t(0o777)) == mode_t(0o700)
+                    && info.st_ino == opened.st_ino && info.st_dev == opened.st_dev
+            }
+            if !directoryIsPrivate() { _ = fchmod(directoryFD, 0o700) }
+            if !directoryIsPrivate() { _ = fchmodat(directoryFD, ".", 0o700, 0) }
+            if !directoryIsPrivate() {
+                try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory)
+            }
+            guard directoryIsPrivate() else { throw POSIXError(.EPERM) }
             var existing = stat()
             if lstat(path, &existing) == 0 {
                 guard (existing.st_mode & mode_t(S_IFMT)) == mode_t(S_IFSOCK), existing.st_uid == geteuid() else { throw POSIXError(.EEXIST) }
@@ -247,11 +280,28 @@ public final class UnixSocketServer: @unchecked Sendable {
             var started = false
             defer { if !started { close(fd) } }
             guard UnixSocket.prepare(fd) else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            // The listener mode is the umask at bind. macOS returns EINVAL from fchmod on a socket descriptor,
+            // so a 0600 result from fstat is the mode check. The path is never chmod'd after bind.
+            Self.bindLock.lock()
+            let previousMask = umask(0o177)
             let bound = withUnsafePointer(to: &address) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
             }
-            guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-            guard chmod(path, 0o600) == 0, listen(fd, 16) == 0 else {
+            let bindError = errno
+            _ = umask(previousMask)
+            Self.bindLock.unlock()
+            guard bound == 0 else { throw POSIXError(POSIXErrorCode(rawValue: bindError) ?? .EIO) }
+            if fchmod(fd, 0o600) != 0 {
+                var modeInfo = stat()
+                let descriptorMode = fstat(fd, &modeInfo) == 0 ? modeInfo.st_mode & mode_t(0o777) : nil
+                var pathInfo = stat()
+                let pathMode = lstat(path, &pathInfo) == 0 ? pathInfo.st_mode & mode_t(0o777) : nil
+                guard descriptorMode == mode_t(0o600) || pathMode == mode_t(0o600) else {
+                    unlink(path)
+                    throw POSIXError(.EPERM)
+                }
+            }
+            guard listen(fd, 16) == 0 else {
                 unlink(path)
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
@@ -307,7 +357,11 @@ public final class UnixSocketServer: @unchecked Sendable {
                 return true
             }
             guard admitted else { connection.cancel(); continue }
-            guard peerPolicy.requiresSignedApp else { connection.receive(handler); continue }
+            let relocated = ProcessInfo.processInfo.environment["ZEUS_SUPPORT_DIR"]
+            guard Self.mustVerifySignature(policy: peerPolicy, supportOverride: relocated) else {
+                connection.receive(handler)
+                continue
+            }
             // A program that must be this app's own is judged by its signature too, since a file name proves nothing.
             // The check reads the peer's code and can be slow, so it runs per connection off the accept queue: one slow
             // check never holds up another accept. The connection is already counted against the limit and reads

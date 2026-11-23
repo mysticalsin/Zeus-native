@@ -29,6 +29,7 @@ struct NativeHostProcessTests {
             }
             root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-nh-\(UUID().uuidString.prefix(8))")
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
             process.executableURL = executable
             process.environment = ["ZEUS_SUPPORT_DIR": root.path]
             process.standardInput = input; process.standardOutput = output; process.standardError = errors
@@ -105,17 +106,14 @@ struct NativeHostProcessTests {
         try await fixture.waitForSocket()
         let request = try JSONEncoder().encode(BridgeRequest(id: "pending-before-invalid-header", type: "fixture.no-browser"))
         let reply = Task.detached { UnixSocket.request(path: fixture.path, payload: request, expectReply: true, timeout: 4) }
-        #expect(try await fixture.waitForForwardedBytes())
+        // The relocated support directory no longer skips the signature check, so this unsigned test
+        // process is refused and never becomes a pending request.
+        #expect(await reply.value == nil)
         // The entire malformed input is four bytes, not a multi-gigabyte allocation.
         try fixture.input.fileHandleForWriting.write(contentsOf: Data([0xff, 0xff, 0xff, 0xff]))
         let exited = try await fixture.waitForExit(seconds: 2)
         #expect(exited)
-        guard exited else { fixture.stop(); _ = await reply.value; return }
-        let result = await reply.value
-        if let result {
-            let response = try JSONDecoder().decode(BridgeResponse.self, from: result)
-            #expect(!response.ok && response.error?.code == BridgeError.notConnected)
-        }
+        guard exited else { fixture.stop(); return }
         #expect(fixture.process.terminationReason == .exit && fixture.process.terminationStatus == 2)
         #expect(!FileManager.default.fileExists(atPath: fixture.path))
     }
@@ -126,21 +124,18 @@ struct NativeHostProcessTests {
         try await fixture.waitForSocket()
         let large = try JSONEncoder().encode(BridgeRequest(id: "blocked-output", type: "fixture.no-browser",
             params: ["synthetic": .string(String(repeating: "x", count: 512 * 1024))]))
-        let first = Task.detached { UnixSocket.request(path: fixture.path, payload: large, expectReply: true, timeout: 5) }
-        #expect(try await fixture.waitForForwardedBytes())
+        let first = Task.detached { UnixSocket.request(path: fixture.path, payload: large, expectReply: true, timeout: 2) }
         let secondRequest = try JSONEncoder().encode(BridgeRequest(id: "queued-output", type: "fixture.no-browser"))
-        let second = Task.detached { UnixSocket.request(path: fixture.path, payload: secondRequest, expectReply: true, timeout: 5) }
-        // Stdout is deliberately unread and stdin deliberately remains open throughout this wait.
-        let exited = try await fixture.waitForExit(seconds: 3.5)
+        let second = Task.detached { UnixSocket.request(path: fixture.path, payload: secondRequest, expectReply: true, timeout: 2) }
+        // An unsigned peer is refused, so it cannot reserve a reply or fill Chrome's unread stdout.
+        #expect(await first.value == nil)
+        #expect(await second.value == nil)
+        #expect(fixture.process.isRunning)
+        try fixture.input.fileHandleForWriting.close()
+        let exited = try await fixture.waitForExit(seconds: 2)
         #expect(exited)
-        guard exited else { fixture.stop(); _ = await first.value; _ = await second.value; return }
-        for result in [await first.value, await second.value] {
-            if let result {
-                let response = try JSONDecoder().decode(BridgeResponse.self, from: result)
-                #expect(!response.ok && response.error?.code == BridgeError.notConnected)
-            }
-        }
-        #expect(fixture.process.terminationReason == .exit && fixture.process.terminationStatus == 2)
+        guard exited else { fixture.stop(); return }
+        #expect(fixture.process.terminationReason == .exit && fixture.process.terminationStatus == 0)
         #expect(!FileManager.default.fileExists(atPath: fixture.path))
     }
 

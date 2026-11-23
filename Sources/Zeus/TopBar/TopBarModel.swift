@@ -36,13 +36,6 @@ final class TopBarModel {
     struct ShelfItem: Identifiable, Equatable {
         let id = UUID()
         var url: URL
-        /// Where it came from. Only Fling items are persisted across a relaunch.
-        var origin: ShelfOrigin = .local
-        /// The Fling stack it arrived in, so a stack can be shown and moved as one.
-        var stackID: UUID? = nil
-        /// True once its SHA-256 matched what the sender offered.
-        var verified = false
-        var addedAt = Date()
         var name: String { url.lastPathComponent }
         var isMedia: Bool {
             ["m4a", "mp3", "wav", "aiff", "aif", "caf", "mp4", "mov", "m4v", "flac", "ogg"].contains(url.pathExtension.lowercased())
@@ -162,10 +155,6 @@ final class TopBarModel {
     var battery: Battery?
     var clipboard = ClipboardHistory()
     var shelf: [ShelfItem] = []
-    /// Where Fling items are saved (`shelf.json`). Nil in tests and snapshots that do not persist.
-    @ObservationIgnored var shelfPersistence: FlingShelfPersistence?
-    /// Fling, once the app built it. The Shelf reads it for Nearby Macs and sends through it.
-    var fling: (any FlingSending)?
     var focus = FocusTimer()
     var note: String {
         didSet { defaults.set(note, forKey: "topBar.note") }
@@ -433,7 +422,6 @@ final class TopBarModel {
         case .volume: SystemHUDSettings.settingID(for: .volume)
         case .charging, .lowBattery: "lights.battery"
         case .shelfAdded: "lights.shelf"
-        case .flingArrived: "lights.fling"
         case .brightness: SystemHUDSettings.settingID(for: .brightness)
         case .keyboardBacklight: SystemHUDSettings.settingID(for: .keyboardBacklight)
         case .shortcut: "lights.shortcutPeeks"
@@ -574,7 +562,6 @@ final class TopBarModel {
         case .capsLock, .shiftCrest: "lights.capsLock"
         case .battery: "lights.battery"
         case .landed(let airDrop): airDrop ? "lights.airDrop" : "lights.shelf"
-        case .flingLanded: "lights.fling"
         case .reminderPinned: "lights.reminderGlow"
         case .eventRibbon: "lights.eventGlow"
         case .shortcut: "lights.shortcutPeeks"
@@ -592,55 +579,15 @@ final class TopBarModel {
     // MARK: Shelf
 
     func addToShelf(_ urls: [URL], isAirDrop: Bool = false) {
-        addToShelf(urls, origin: isAirDrop ? .airDrop : .local, stack: nil)
-    }
-
-    /// Puts files on the Shelf. Fling arrivals are verified by construction: they get here only after their hash matched.
-    func addToShelf(_ urls: [URL], origin: ShelfOrigin, stack: UUID? = nil) {
         let fresh = urls.filter { url in !shelf.contains { $0.url == url } }
         guard !fresh.isEmpty else { return }
-        let isFling: Bool = { if case .fling = origin { return true } else { return false } }()
-        shelf.insert(contentsOf: fresh.map { ShelfItem(url: $0, origin: origin, stackID: stack, verified: isFling) }, at: 0)
-        switch origin {
-        case .fling(let peer):
-            persistShelf()
-            show(.flingArrived(count: fresh.count, from: peer))
-            flash(.flingLanded)
-        case .airDrop, .local:
-            show(.shelfAdded(fresh.count))
-            flash(.landed(airDrop: origin == .airDrop))
-        }
+        shelf.insert(contentsOf: fresh.map { ShelfItem(url: $0) }, at: 0)
+        show(.shelfAdded(fresh.count))
+        flash(.landed(airDrop: isAirDrop))
     }
 
     func removeFromShelf(_ id: UUID) {
-        var wasFling = false
-        if let item = shelf.first(where: { $0.id == id }), case .fling = item.origin { wasFling = true }
         shelf.removeAll { $0.id == id }
-        if wasFling { persistShelf() }
-    }
-
-    /// Saves the Fling items. A `shelf.json` this build cannot read is left alone.
-    func persistShelf() {
-        guard let shelfPersistence else { return }
-        let records = shelf.compactMap { item -> FlingShelfRecord? in
-            guard case .fling = item.origin else { return nil }
-            return FlingShelfRecord(path: item.url.path, origin: item.origin, stackID: item.stackID, verified: item.verified, addedAt: item.addedAt, link: nil)
-        }
-        _ = shelfPersistence.save(records)
-    }
-
-    /// Puts the saved Fling items back on the Shelf, newest first, skipping files that are gone.
-    func loadPersistedShelf() {
-        guard let shelfPersistence else { return }
-        let loaded = shelfPersistence.load()
-        let present = loaded.records.filter { FileManager.default.fileExists(atPath: $0.path) }
-        let items = present.sorted { $0.addedAt > $1.addedAt }.compactMap { record -> ShelfItem? in
-            let url = URL(fileURLWithPath: record.path)
-            guard !shelf.contains(where: { $0.url == url }) else { return nil }
-            return ShelfItem(url: url, origin: record.origin, stackID: record.stackID, verified: record.verified, addedAt: record.addedAt)
-        }
-        shelf.append(contentsOf: items)
-        if present.count != loaded.records.count { persistShelf() }
     }
 
     // MARK: Home customise
