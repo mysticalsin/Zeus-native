@@ -24,6 +24,13 @@
       "group": "scribe"
     },
     {
+      "id": "portable-shortcut-listening",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "The recorder count pauses hot keys on the first listener and resumes them on the last. No AppKit monitor.",
+      "group": "shortcut-listening"
+    },
+    {
       "id": "portable-presentation",
       "kind": "portable",
       "tier": "contract",
@@ -1274,6 +1281,21 @@
             {
               "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
               "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
+            }
+          ]
+        },
+        {
+          "id": "F01.shortcut-listening",
+          "check": "portable-shortcut-listening",
+          "acceptance": "The first shortcut recorder pauses hot keys, a second one does not resume them, and the last end resumes them.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutListeningTests.swift",
+              "function": "theFirstBeginPausesAndASecondBeginDoesNotResume"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutListeningTests.swift",
+              "function": "theLastEndResumesAndAnExtraEndStaysIdle"
             }
           ]
         }
