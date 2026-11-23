@@ -11,17 +11,3 @@ enum STTSignpost {
         #endif
     }
 }
-
-/// Lets a recognition callback and its give-up timer complete a caller exactly once.
-final class STTOnce: @unchecked Sendable {
-    private let lock = NSLock()
-    private var done = false
-
-    func run(_ body: () -> Void) {
-        lock.lock()
-        if done { lock.unlock(); return }
-        done = true
-        lock.unlock()
-        body()
-    }
-}

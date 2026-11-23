@@ -530,11 +530,21 @@ public enum STTFileGiveUp {
 }
 
 /// One completion for a recognition callback and its give-up timer.
-/// The red body runs every time, so a second caller is not dropped.
+/// Foundation's lock, so the app file that only imports `os` does not name `NSLock`.
 public final class STTOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
     public init() {}
 
     public func run(_ body: () -> Void) {
+        lock.lock()
+        if done {
+            lock.unlock()
+            return
+        }
+        done = true
+        lock.unlock()
         body()
     }
 }

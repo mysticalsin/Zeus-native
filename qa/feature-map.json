@@ -1284,6 +1284,10 @@
             },
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aCallbackAndItsGiveUpCompleteOnce"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "aDeniedMicOrMissingEngineRetriesInsteadOfHanging"
             }
           ],
