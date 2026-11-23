@@ -6623,6 +6623,25 @@
           ]
         },
         {
+          "id": "F12.connection-control-speech",
+          "check": "portable-regressions",
+          "acceptance": "Integrations controls speak the provider with the action, a busy check names that provider, and the offer toggle's Reduce Motion duration is zero. This does not prove VoiceOver on a Mac.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ConnectionControlSpeechTests.swift",
+              "function": "connectionPrimaryNamesTheProviderAndTheAction"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ConnectionControlSpeechTests.swift",
+              "function": "aBusyCheckNamesTheProvider"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ConnectionControlSpeechTests.swift",
+              "function": "reducedMotionToggleDurationIsZero"
+            }
+          ]
+        },
+        {
           "id": "F12.provider-connection-truth",
           "check": "native-ZeusCoreTests",
           "acceptance": "Injected provider policy respects each implemented launcher toggle, keeps all-disabled choices empty, distinguishes unverified authentication from signed-in state, and describes unsupported handoff and endpoint capabilities honestly. No installed-provider authentication or actual chat launch is proved.",
