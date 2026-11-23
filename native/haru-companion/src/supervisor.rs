@@ -114,6 +114,12 @@ fn directory(path: &Option<PathBuf>) -> Option<PathBuf> {
     })
 }
 
+/// Flat path. The app-support layout (a 0700 directory beside `zeus.sock`)
+/// is not applied yet.
+pub fn haru_socket_path(application_support: &Path) -> PathBuf {
+    application_support.join("zeus.sock")
+}
+
 pub fn private_socket(public: &Path) -> PathBuf {
     let mut name = public.file_name().unwrap_or_default().to_os_string();
     name.push(".child");
