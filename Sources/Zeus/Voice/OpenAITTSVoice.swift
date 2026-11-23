@@ -33,7 +33,7 @@ enum OpenAITTSVoice {
     }
 
     /// Writes a WAV file and returns its URL, or nil on failure.
-    static func render(_ text: String, session: URLSession = .shared) async -> URL? {
+    static func render(_ text: String, session: URLSession = CredentialRedirect.session) async -> URL? {
         guard let config = config(), let request = OpenAITTSRequest.makeRequest(text: text, config: config) else { return nil }
         do {
             let (data, response) = try await session.data(for: request)

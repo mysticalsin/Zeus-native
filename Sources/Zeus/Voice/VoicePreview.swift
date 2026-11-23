@@ -98,7 +98,7 @@ final class VoicePreviewModel {
             config.voice = voice
             guard let request = OpenAITTSRequest.makeRequest(text: sentence, config: config) else { return nil }
             do {
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await CredentialRedirect.session.data(for: request)
                 guard let http = response as? HTTPURLResponse, http.statusCode == 200, !data.isEmpty else { return nil }
                 let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-preview-\(UUID().uuidString).wav")
                 try data.write(to: url)

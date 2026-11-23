@@ -152,10 +152,12 @@ enum VoiceDesigner {
         try parseVoiceID(await send(createRequest(apiKey: apiKey, generatedVoiceID: generatedVoiceID, playedNotSelected: playedNotSelected)))
     }
 
+    private static let session = CredentialRedirect.makeSession()
+
     private static func send(_ request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
-        do { (data, response) = try await URLSession.shared.data(for: request) } catch { throw Failure.network }
+        do { (data, response) = try await session.data(for: request) } catch { throw Failure.network }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw failure(status: status, body: data) }
         return data
