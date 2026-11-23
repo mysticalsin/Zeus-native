@@ -245,6 +245,35 @@ struct ScribeAutoStartTests {
         #expect(machine.card(now: 3) == .offer(asTeams, blocked: .notChosen))
     }
 
+    @Test func popupLastsTenSecondsAndAReadyAutomaticChoiceStillWaitsForATap() {
+        var ask = ScribeAutoStartMachine()
+        ask.handle(asEvidence(0, mic: [.teams]))
+        ask.handle(asEvidence(3, mic: [.teams]))
+        #expect(ask.state == .prompting(meeting: asTeams, deadline: 13, blocked: .notChosen))
+        let gone = ask.handle(asTick(13))
+        #expect(gone.isEmpty)
+        #expect(!asStarts(gone))
+        #expect(ask.state == .idle)
+
+        var automatic = ScribeAutoStartMachine()
+        automatic.handle(asEvidence(0, mic: [.teams], mode: .automatic, ready: .ready))
+        automatic.handle(asEvidence(3, mic: [.teams], mode: .automatic, ready: .ready))
+        #expect(automatic.state == .prompting(meeting: asTeams, deadline: 13, blocked: nil))
+        let late = automatic.handle(asTick(13))
+        #expect(late.isEmpty)
+        #expect(!asStarts(late))
+        #expect(automatic.state == .idle)
+
+        var heads = ScribeAutoStartMachine()
+        let slot = asSlot(start: 120)
+        heads.handle(asEvidence(0, slots: [slot]))
+        #expect(heads.state == .upcoming(meeting: asHeadsUp(slot), deadline: 10))
+        let left = heads.handle(asTick(10))
+        #expect(left.isEmpty)
+        #expect(!asStarts(left))
+        #expect(heads.state == .idle)
+    }
+
     @Test func aSignalThatVanishesBeforeTheDebounceStartsOver() {
         var machine = ScribeAutoStartMachine()
         machine.handle(asEvidence(0, mic: [.teams]))
