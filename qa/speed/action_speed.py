@@ -4,7 +4,7 @@
 Drives the six reference prompts through `Zeus --ask` (a Debug build) and
 prints p50 and p95 per stage per prompt type against the recorded reference
 frame baseline. The reference app is not launched. A missing sample is
-unmeasured, not faster.
+unmeasured. It is not faster, and it fails the budget score.
 
 The app writes the trace only when ZEUS_ACTION_SPEED_TRACE=1. This script sets
 that flag for the child process. The trace file holds a turn id, a stage name,
@@ -212,6 +212,17 @@ def _ceiling_status(p50_ms, p95_ms, ceiling_ms, both):
     return "inside" if p50_ms <= ceiling_ms else "over"
 
 
+def stage_applies(kind, stage):
+    """First audio is a budget on every prompt.
+
+    Pointer and first visual are budgets only where the reference baseline
+    records that stage. A capital question does not fail for a missing pointer.
+    """
+    if stage == "firstTtsAudio":
+        return True
+    return stage in BASELINE_S.get(kind, {})
+
+
 def target_verdicts(rows):
     """Score measured percentiles against the action-speed ceilings.
 
@@ -237,6 +248,7 @@ def target_verdicts(rows):
                 "ms": value,
                 "ceiling_ms": ceiling_ms,
                 "status": status,
+                "applicable": stage_applies(kind, "firstTtsAudio"),
             })
         for stage, target_key in (("pointerArrival", "pointerArrival"), ("firstOverlayPaint", "firstOverlayPaint")):
             row = by_key[(kind, stage)]
@@ -249,8 +261,28 @@ def target_verdicts(rows):
                 "p95_ms": row["p95_ms"],
                 "ceiling_ms": ceiling_ms,
                 "status": _ceiling_status(row["p50_ms"], row["p95_ms"], ceiling_ms, True),
+                "applicable": stage_applies(kind, stage),
             })
     return verdicts
+
+
+def score_budgets(verdicts):
+    """The run passes only when every applicable row is inside its ceiling.
+
+    Unmeasured fails the score. Over fails the score. Zero applicable rows
+    fail the score. A missing live sample is not a pass.
+    """
+    checks = [verdict for verdict in verdicts if verdict.get("applicable")]
+    inside = sum(verdict["status"] == "inside" for verdict in checks)
+    over = sum(verdict["status"] == "over" for verdict in checks)
+    unmeasured = sum(verdict["status"] == "unmeasured" for verdict in checks)
+    return {
+        "passed": bool(checks) and inside == len(checks),
+        "checks": len(checks),
+        "inside": inside,
+        "over": over,
+        "unmeasured": unmeasured,
+    }
 
 
 def _cell(value, width, signed=False):
@@ -279,19 +311,25 @@ def format_table(rows):
     return "\n".join(lines)
 
 
-def format_report(rows, notes, verdicts):
+def format_report(rows, notes, verdicts, score):
     lines = [format_table(rows), "", "reference-only marks (not Zeus stages)"]
     for note in notes:
         lines.append(f"{note['kind']:<12} {note['mark']:<20} {note['reference_ms']:>8} ms")
     lines.extend(["", "targets"])
     for verdict in verdicts:
         shown = verdict.get("ms", verdict.get("p50_ms"))
+        mark = "budget" if verdict.get("applicable") else "not-applicable"
         lines.append(
             f"{verdict['kind']:<12} {verdict['stage']:<20} {verdict['stat']:<12} "
-            f"{_cell(shown, 8)}  ceiling {verdict['ceiling_ms']:>6}  {verdict['status']}"
+            f"{_cell(shown, 8)}  ceiling {verdict['ceiling_ms']:>6}  {verdict['status']:<10} {mark}"
         )
+    standing = "pass" if score["passed"] else "fail"
     lines.extend([
         "",
+        (
+            f"score: {standing}  inside {score['inside']}  "
+            f"over {score['over']}  unmeasured {score['unmeasured']}"
+        ),
         "reference app: not launched; comparison uses the recorded frame baseline",
     ])
     return "\n".join(lines)
@@ -301,12 +339,14 @@ def report(samples):
     rows = summarize(samples)
     notes = reference_only()
     verdicts = target_verdicts(rows)
+    score = score_budgets(verdicts)
     payload = {
         "rows": rows,
         "baseline_s": BASELINE_S,
         "targets_s": TARGETS_S,
         "reference_only": notes,
         "target_verdicts": verdicts,
+        "score": score,
         "measurement": {
             "reference_app_launched": False,
             "zeus_launched": False,
@@ -314,12 +354,19 @@ def report(samples):
         },
         "prompts": [{"kind": kind, "text": text} for kind, text in PROMPTS],
     }
-    return format_report(rows, notes, verdicts), payload
+    return format_report(rows, notes, verdicts, score), payload
 
 
-def measurement_exit(missed):
-    """A Zeus run that lost a prompt is an incomplete measurement, not a clean result."""
-    return 3 if missed else 0
+def measurement_exit(missed, passed=True):
+    """A lost prompt is an incomplete measurement.
+
+    A finished run whose applicable budgets are unmeasured or over fails the score.
+    """
+    if missed:
+        return 3
+    if not passed:
+        return 4
+    return 0
 
 
 def load_fixture(path):
@@ -437,7 +484,9 @@ def main(argv=None):
         payload["missed"] = missed
     print(table)
     print(json.dumps(payload, indent=2, sort_keys=True))
-    return measurement_exit(missed) if launched else 0
+    if not launched:
+        return 0
+    return measurement_exit(missed, payload["score"]["passed"])
 
 
 def open_path(text):

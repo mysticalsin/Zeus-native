@@ -78,6 +78,21 @@ Run that from the repository root on a Mac, with a Debug `Zeus` binary. `--n` de
 
 Each stage row also carries the reference frame time in milliseconds, `delta_p50_ms` (Zeus p50 minus that reference), and `versus_reference`: `faster`, `slower`, `same`, `unmeasured`, or `no_baseline`. A stage with no Zeus sample is `unmeasured`. It is not treated as faster than the reference and it is not inside a target ceiling. Reference marks that are not Zeus stages (`filler`, `answerDone`, `pointerBox`, `drawingEnd`) are printed beside the table so they stay in the comparison.
 
+## Score
+
+`score.passed` is true only when every applicable budget row is `inside`. `unmeasured` fails the score. `over` fails the score. An empty trace fails the score. A missing live sample is not a pass.
+
+| Budget | Ceiling | Applies to |
+|---|---|---|
+| First audio p50 | 2000 ms | every prompt |
+| First audio p95 | 3000 ms | every prompt |
+| Pointer p50 and p95 | 3000 ms | wallpaper (the baseline records `pointerArrival`) |
+| First card or drawing, p50 and p95 | 4000 ms | capital and router (the baseline records `firstOverlayPaint`) |
+
+A prompt that does not point is not required to record `pointerArrival`. A prompt that does not show a card or a drawing is not required to record `firstOverlayPaint`. 2000 ms, 3000 ms, and 4000 ms are inside. 2001 ms of first-audio p50, 3001 ms of pointer, and 4001 ms of first visual are over.
+
+A `--zeus` run whose score fails exits 4. A missed prompt still exits 3. A missing binary exits 2. `--fixture` exits 0 and prints the score; that exit means the fixture was read. It does not mean the budgets passed. `TalkLatencyBudget.firstAudioTargetMs` stays 1200. `sttFinalCapMs` stays 450. This score does not retune either constant.
+
 The reference app is not launched. `baseline_s` is the owner's frame table above. There is no reference-app binary in this harness.
 
 The script does not launch Zeus when `--zeus` is omitted or the path is not a file (exit 2), or when `--fixture` is set. A `--zeus` run that loses a prompt (timeout, the process cannot start, a trace without `keyRelease`, or any count other than one turn) still prints the rows it has and exits 3. The miss record is the prompt kind and the reason. It does not store the prompt. `qa/speed/test_action_speed.py` uses synthetic fixtures only. A trace line that carries `transcript` or `prompt`, or any key besides the three above, is refused.
