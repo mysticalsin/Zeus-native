@@ -1268,6 +1268,20 @@ final class VoiceTurnController {
         if history.count > 10 { history.removeFirst(history.count - 10) }
     }
 
+    /// Speaks one premium line with the same voice as a talk reply. The caller already applied the setting.
+    func speakPremium(_ text: String) {
+        let spoken = Self.voiced(text)
+        guard !spoken.isEmpty else { return }
+        VoiceLog.logContent("spoken", spoken)
+        seams.duckBegin()
+        speaker.speak(spoken)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            while self.speaker.isSpeaking { try? await Task.sleep(for: .milliseconds(80)) }
+            self.seams.duckEnd()
+        }
+    }
+
     /// Speaks and captions a short message of ZEUS's own (errors, "Approved.").
     func say(_ text: String) {
         VoiceLog.logContent("spoken", text)

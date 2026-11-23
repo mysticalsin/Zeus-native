@@ -6539,6 +6539,29 @@
           ]
         },
         {
+          "id": "F11.premium-spoken-moments",
+          "check": "portable-regressions",
+          "acceptance": "A fresh recording countdown stays silent until its voice setting is on, then the line is Three, Two, One, or Recording. Notes ready and a saved recording speak unless their own settings are off. Each moment has a visible voice setting title. No audio is played.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PremiumSpokenMomentTests.swift",
+              "function": "aFreshCountdownStaysSilentUntilTheSettingIsOn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PremiumSpokenMomentTests.swift",
+              "function": "notesReadyAndASavedRecordingSpeakUntilTheSettingIsOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PremiumSpokenMomentTests.swift",
+              "function": "eachMomentHasAVisibleVoiceSetting"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PremiumSpokenMomentTests.swift",
+              "function": "turningOneSettingOffSilencesOnlyThatMoment"
+            }
+          ]
+        },
+        {
           "id": "F11.route-text-effect",
           "check": "native-SpeakerRouteTextTests",
           "acceptance": "The voice route line names the Ultron effect only when the effect is on.",
