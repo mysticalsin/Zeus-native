@@ -119,6 +119,41 @@ struct NativeMessageIOTests {
         #expect(!output.isOpen && output.queuedFrameCount == 0 && output.queuedByteCount == 0)
     }
 
+    @Test func earlyEOFFlushesAnAcceptedFramePastItsOriginalDeadline() async throws {
+        let pipe = Pipe()
+        let output = try NativeMessageOutput(handle: pipe.fileHandleForWriting, writeTimeout: 0.05)
+        try pipe.fileHandleForWriting.close()
+        defer { output.stop(); try? pipe.fileHandleForReading.close() }
+        let frame = try largeFrame()
+        let writes = Box<[Result<Void, NativeMessageOutput.Failure>]>([])
+        let finishes = Box<[Result<Void, NativeMessageOutput.Failure>]>([])
+        #expect(output.enqueue(frame) { result in writes.change { $0.append(result) } } == .accepted)
+        #expect(output.finish { result in finishes.change { $0.append(result) } })
+        // The enqueue deadline has passed. The reader has not drained the pipe.
+        let limit = ContinuousClock.now.advanced(by: .milliseconds(200))
+        while ContinuousClock.now < limit {}
+        let fd = pipe.fileHandleForReading.fileDescriptor
+        let flags = fcntl(fd, F_GETFL)
+        try #require(flags >= 0 && fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0)
+        var delivered = Data()
+        let drainUntil = ContinuousClock.now.advanced(by: .seconds(2))
+        while delivered.count < frame.count, ContinuousClock.now < drainUntil {
+            var buffer = [UInt8](repeating: 0, count: 16_384)
+            #if canImport(Darwin)
+            let count = Darwin.read(fd, &buffer, buffer.count)
+            #else
+            let count = Glibc.read(fd, &buffer, buffer.count)
+            #endif
+            if count > 0 { delivered.append(contentsOf: buffer.prefix(count)); continue }
+            if count == 0 { break }
+            if errno != EINTR && errno != EAGAIN { break }
+        }
+        try await eventually { writes.read().count == 1 && finishes.read().count == 1 }
+        #expect(writes.read().first.map { (try? $0.get()) != nil } == true)
+        #expect(finishes.read().first.map { (try? $0.get()) != nil } == true)
+        #expect(delivered == frame)
+    }
+
     @Test func stopSettlesQueuedWritesWithoutWaitingForTheirLongDeadline() async throws {
         let pipe = Pipe()
         let output = try NativeMessageOutput(handle: pipe.fileHandleForWriting, writeTimeout: 20)

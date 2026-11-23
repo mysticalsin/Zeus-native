@@ -93,7 +93,8 @@ public final class NativeMessageOutput: @unchecked Sendable {
     }
 
     /// Clean stdin EOF preserves already accepted responses. Reject new admission, then flush
-    /// existing frames under their original deadlines before closing the output descriptor.
+    /// those frames even if the deadline captured at enqueue has passed. A peer that still has
+    /// stdin open keeps that deadline, so an unread pipe cannot wait forever.
     @discardableResult
     public func finish(completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Bool {
         lock.withLock {
@@ -150,8 +151,14 @@ public final class NativeMessageOutput: @unchecked Sendable {
             guard let base = raw.baseAddress else { return }
             var offset = 0
             while offset < raw.count {
-                if let failure = lock.withLock({ terminal }) { throw failure }
-                guard ProcessInfo.processInfo.systemUptime < deadline else { throw Failure.timedOut }
+                let decision: Failure? = lock.withLock {
+                    if let failure = terminal { return failure }
+                    // Stdin has already closed. Keep delivering the accepted frame while this
+                    // pipe can still take bytes. The enqueue deadline stays in force until then.
+                    if !finishing, ProcessInfo.processInfo.systemUptime >= deadline { return .timedOut }
+                    return nil
+                }
+                if let decision { throw decision }
                 var pollFD = pollfd(fd: descriptor.fd, events: Int16(POLLOUT), revents: 0)
                 let ready = poll(&pollFD, 1, 25)
                 if ready < 0 && errno == EINTR { continue }

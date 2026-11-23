@@ -6978,7 +6978,7 @@
         {
           "id": "F13.bridge-reply-ownership",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Actual platform Core fixtures exercise bounded bridge framing and pipe lifecycle, clean EOF delivery and token-bound pending replies; duplicate IDs retain the original owner. Only disposable local peers and the built bridge helper are used, never a production Chrome session.",
+          "acceptance": "Actual platform Core fixtures exercise bounded bridge framing and pipe lifecycle, clean EOF delivery and token-bound pending replies; duplicate IDs retain the original owner. A frame accepted before clean EOF is still delivered after its original enqueue deadline, and an open stdin still times out. Only disposable local peers and the built bridge helper are used, never a production Chrome session.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
@@ -7027,6 +7027,10 @@
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
               "function": "nonReadingPeerHitsAnAbsoluteWriteDeadlineAndClosesTheStream"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "earlyEOFFlushesAnAcceptedFramePastItsOriginalDeadline"
             },
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
@@ -7097,7 +7101,7 @@
         {
           "id": "F13.bridge-wire-contract",
           "check": "portable-bridge-transport",
-          "acceptance": "Bounded native-message framing, serialized output/backpressure, cancellation, duplicate IDs and clean EOF are exercised with owned local peers and the actual bridge executable. This is not browser integration or device acceptance.",
+          "acceptance": "Bounded native-message framing, serialized output/backpressure, cancellation, duplicate IDs and clean EOF are exercised with owned local peers and the actual bridge executable. A frame accepted before clean EOF is still delivered after its original enqueue deadline, and an open stdin still times out. This is not browser integration or device acceptance.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/NativeMessagingFrameTests.swift",
@@ -7146,6 +7150,10 @@
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
               "function": "nonReadingPeerHitsAnAbsoluteWriteDeadlineAndClosesTheStream"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",
+              "function": "earlyEOFFlushesAnAcceptedFramePastItsOriginalDeadline"
             },
             {
               "file": "Tests/ZeusCoreTests/NativeMessageIOTests.swift",

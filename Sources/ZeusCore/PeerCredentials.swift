@@ -110,9 +110,36 @@ public enum PeerCheck {
         identity.auditToken = auditToken(fd: fd)
         return identity
         #else
-        return nil
+        // SO_PEERCRED is the kernel's uid and pid for this socket. Nil when it will not say.
+        var credentials = LinuxPeerCredentials(pid: 0, uid: 0, gid: 0)
+        var size = socklen_t(MemoryLayout<LinuxPeerCredentials>.size)
+        guard getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &credentials, &size) == 0,
+              size == socklen_t(MemoryLayout<LinuxPeerCredentials>.size) else { return nil }
+        var identity = PeerIdentity(uid: credentials.uid)
+        if credentials.pid > 0 {
+            identity.pid = credentials.pid
+            identity.executablePath = executablePath(pid: pid_t(credentials.pid))
+        }
+        return identity
         #endif
     }
+
+    #if !canImport(Darwin)
+    /// `struct ucred` from the Linux socket ABI: pid, uid, then gid, with no padding between them.
+    private struct LinuxPeerCredentials {
+        var pid: Int32
+        var uid: UInt32
+        var gid: UInt32
+    }
+
+    /// The path the kernel records for `pid`. A truncated read is refused.
+    static func executablePath(pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let length = readlink("/proc/\(pid)/exe", &buffer, buffer.count)
+        guard length > 0, length < buffer.count else { return nil }
+        return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+    #endif
 
     #if canImport(Darwin)
     /// `LOCAL_PEERTOKEN` (sys/un.h): the connected peer's `audit_token_t`, eight 32-bit words.
