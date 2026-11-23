@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "An answer on one approval surface left the other surface pending.",
+      "features": [
+        "F12"
+      ],
+      "check": "portable-approval-sync",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ApprovalSyncTests.swift",
+        "function": "aSecondAnswerDoesNotLeaveACardBehind"
+      }
     }
-]
+  ]
 }
