@@ -289,9 +289,11 @@ import Testing
     }
 
     @Test func playbackStaysOffWhenDisabledOrFocusIsActive() {
-        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false) == true)
+        // Focus was not named, so it is unknown and the chime stays quiet.
+        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false) == false)
         #expect(ChimePlaybackGate.allows(enabled: false, focusActive: false) == false)
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: true) == false)
+        #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, soundFeedback: true, meeting: false, focusKnown: true) == true)
     }
 
     @Test func playbackObeysSoundFeedbackMeetingModeAndUnknownFocus() {
