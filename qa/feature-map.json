@@ -419,6 +419,14 @@
       "scope": "Actual ScribeController with fake capture/notes, synthetic temp persistence and clock; no real capture, permission, end windows or device proof."
     },
     {
+      "id": "native-ScribeConnectingDeadlineTests",
+      "kind": "native-fixture",
+      "tier": "native-integration",
+      "suite": "ScribeConnectingDeadlineTests",
+      "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+      "scope": "Actual ScribeController with an inert capture provider and an injected clock. Connecting fails at the session deadline and that stop is the only capture command. No microphone, permission prompt, synthetic audio playback, or device proof."
+    },
+    {
       "id": "native-SettingsCatalogTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -1312,6 +1320,56 @@
             }
           ],
           "id": "F02.1"
+        },
+        {
+          "id": "F02.connecting-deadline",
+          "check": "portable-scribe",
+          "acceptance": "A connecting session has a finite deadline on the session machine. An injected instant at that deadline moves the phase to a failure, the presentation follows that phase, and a new start can retry. An earlier instant stays on connecting. No microphone and no sleep.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeConnectingClockTests.swift",
+              "function": "controllerClockFiresTheConnectingDeadlineWithoutSleeping"
+            }
+          ]
+        },
+        {
+          "id": "F02.connecting-controller",
+          "check": "native-ScribeConnectingDeadlineTests",
+          "acceptance": "The page clock feeds the session machine while Scribe is connecting. At the deadline the controller fails that session, stops the inert capture provider, and a later tap can retry. Acknowledgement before the deadline still records. No microphone, permission prompt, or device proof.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "aClockAtTheDeadlineFailsConnectingAndANewStartCanRetry"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "presentationStaysConnectingUntilTheControllerClockFails"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "acknowledgementBeforeTheDeadlineStillStartsRecording"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "aLateAcknowledgementAfterTheDeadlineDoesNotStartRecording"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "aNewTapAfterCancelGetsItsOwnDeadline"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "aNonFiniteClockDoesNotLeaveConnecting"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "cancelDuringConnectingDoesNotBecomeTheDeadlineFailure"
+            },
+            {
+              "file": "Tests/ZeusAppTests/ScribeConnectingDeadlineTests.swift",
+              "function": "endingCountdownTickStillDoesNotEndCapture"
+            }
+          ]
         },
         {
           "check": "missing-F02-native",

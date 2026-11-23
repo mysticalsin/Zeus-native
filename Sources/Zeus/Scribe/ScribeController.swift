@@ -1934,12 +1934,16 @@ final class ScribeController {
     }
 
     /// The bounded timer reached its instant. Hands that instant to the session machine, then stops.
+    /// An applied failure also stops the capture that `start` opened. The clock does not start another session.
     private func fireConnectingDeadline() {
         let deadline = connectingDeadline
         let instant = deadline.map { max(nowSeconds(), $0) } ?? nowSeconds()
         stopConnectingClock()
-        guard case .starting = machine.phase else { return }
-        run { ScribeConnectingClock.tick(&$0, now: instant, deadline: deadline) }
+        guard case .starting(let id) = machine.phase else { return }
+        let transition = run { ScribeConnectingClock.tick(&$0, now: instant, deadline: deadline) }
+        if transition.isApplied {
+            provider.stop(session: id)
+        }
     }
 
     /// True while a session timer is scheduled. Connecting uses the bounded clock. Recording uses the elapsed clock.
@@ -1950,11 +1954,14 @@ final class ScribeController {
     /// Elapsed text after acknowledgement is still display only.
     func tickClock() {
         let now = nowSeconds()
-        if case .starting = machine.phase {
+        if case .starting(let id) = machine.phase {
             let deadline = connectingDeadline ?? machine.startedAt.flatMap(ScribeConnectingClock.begin(now:))
-            run { ScribeConnectingClock.tick(&$0, now: now, deadline: deadline) }
+            let transition = run { ScribeConnectingClock.tick(&$0, now: now, deadline: deadline) }
             if ScribeConnectingClock.stops(after: machine.phase) {
                 stopConnectingClock()
+            }
+            if transition.isApplied {
+                provider.stop(session: id)
             }
         }
         guard let since = recordingSince else { return }

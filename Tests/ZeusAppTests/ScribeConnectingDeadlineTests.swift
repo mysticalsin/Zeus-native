@@ -22,7 +22,9 @@ struct ScribeConnectingDeadlineTests {
                    events: @escaping @Sendable (ScribeCaptureEvent) -> Void) {
             lock.withLock { callback = events }
         }
-        func stop(session: ScribeSessionID) {}
+        private var stopped: [ScribeSessionID] = []
+        func stop(session: ScribeSessionID) { lock.withLock { stopped.append(session) } }
+        var stoppedSessions: [ScribeSessionID] { lock.withLock { stopped } }
         func send(_ event: ScribeCaptureEvent) { lock.withLock { callback }?(event) }
     }
 
@@ -90,6 +92,7 @@ struct ScribeConnectingDeadlineTests {
         #expect(session.controller.phase == .failed(id, reason: reason))
         #expect(!session.controller.phase.isActive)
         #expect(!session.controller.isSessionClockRunning)
+        #expect(session.capture.stoppedSessions == [id])
         #expect(session.controller.presentation(at: Date(), reduceMotion: false) == .failed(reason))
 
         // The deadline does not tap again. Retry is the person's button.
@@ -151,6 +154,7 @@ struct ScribeConnectingDeadlineTests {
         session.clock.time = limit
         session.controller.tickClock()
         #expect(session.controller.phase == .failed(id, reason: reason))
+        #expect(session.capture.stoppedSessions == [id])
 
         session.capture.send(.captureAcknowledged(id))
         try await Task.sleep(for: .milliseconds(80))

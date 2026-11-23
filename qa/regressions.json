@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Scribe stayed on Connecting after the session deadline. The session machine now fails that phase when an injected instant reaches the deadline, and the controller stops the capture it opened.",
+      "features": [
+        "F02"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeConnectingClockTests.swift",
+        "function": "controllerClockFiresTheConnectingDeadlineWithoutSleeping"
+      }
     }
-]
+  ]
 }

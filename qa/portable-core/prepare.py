@@ -92,7 +92,7 @@ GROUPS = {
              "Scribe/ScribeMeetingSignals.swift", "Scribe/ScribeMeetingLedger.swift", "Scribe/ScribeMeetingContext.swift",
              "Scribe/ScribeAutoStartOptIn.swift", "Scribe/ScribeDetectorPlan.swift", "Scribe/ScribeJoinApps.swift",
              "Alerts/AppBrandCatalog.swift"),
-        tests("ScribeCoreTests", "ScribePresentationTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
+        tests("ScribeCoreTests", "ScribePresentationTests", "ScribeConnectingClockTests", "W7ScribeTests", "W8ScribeLookTests", "RecordingMotionTests", "ScribeCompletionTests",
               "ScribeMicrophoneIngressTests", "ScribeEndWorkflowTests", "RecordingFeedbackTests",
               "ScribeMuteReadSchedulerTests", "ScribeIncomingWordLayoutTests", "MicInputOwnershipTests",
               "ScribeMeetingCardTests", "ScribeAutoStartTests", "ScribeMeetingLedgerTests",
