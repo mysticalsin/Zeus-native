@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-996",
+      "failure": "A Right Option tap, a modifier, a click, or Esc could be treated as an explain hold, and a later tap could start a new turn instead of advancing a walk already running.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-explain-hold",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplainToggleTests.swift",
+        "function": "aTapDoesNotStartATurnAndOnlyAdvancesARunningWalk"
+      }
     }
-]
+  ]
 }
