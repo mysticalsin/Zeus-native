@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -13,6 +14,9 @@ import (
 
 	hp "echo.local/harupipe/harupipe"
 )
+
+// errPathEscape is a manifest path whose symlink chain leaves the base.
+var errPathEscape = errors.New("manifest path escapes")
 
 type manifest struct {
 	Files  []struct{ File string } `json:"files"`
@@ -26,8 +30,64 @@ func must(err error) {
 	}
 }
 
+func pathInside(root, path string) bool {
+	path = filepath.Clean(path)
+	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
+}
+
+// place follows path from the canonical root. A symlink is resolved even when
+// its target does not exist yet, and any target outside root is refused. The
+// returned path has no symlink left in it.
+func place(root, path string, seen map[string]struct{}) (string, error) {
+	cleaned := filepath.Clean(path)
+	if !pathInside(root, cleaned) {
+		return "", errPathEscape
+	}
+	if cleaned == root {
+		return root, nil
+	}
+	info, err := os.Lstat(cleaned)
+	if err != nil {
+		if os.IsNotExist(err) {
+			parent, err := place(root, filepath.Dir(cleaned), seen)
+			if err != nil {
+				return "", err
+			}
+			full := filepath.Join(parent, filepath.Base(cleaned))
+			if !pathInside(root, full) {
+				return "", errPathEscape
+			}
+			return full, nil
+		}
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		if _, ok := seen[cleaned]; ok {
+			return "", errPathEscape
+		}
+		seen[cleaned] = struct{}{}
+		target, err := os.Readlink(cleaned)
+		if err != nil {
+			return "", err
+		}
+		dest := target
+		if !filepath.IsAbs(dest) {
+			dest = filepath.Join(filepath.Dir(cleaned), dest)
+		}
+		return place(root, dest, seen)
+	}
+	real, err := filepath.EvalSymlinks(cleaned)
+	if err != nil {
+		return "", err
+	}
+	if !pathInside(root, real) {
+		return "", errPathEscape
+	}
+	return filepath.Clean(real), nil
+}
+
 // manifestPath rejects absolute names, empty names, and any ".." element, then
-// checks the cleaned path is still inside base.
+// checks the resolved path is still inside base.
 func manifestPath(base, name string) (string, error) {
 	if name == "" || !filepath.IsLocal(name) {
 		return "", fmt.Errorf("refusing manifest path %q", name)
@@ -36,13 +96,25 @@ func manifestPath(base, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	absBase = filepath.Clean(absBase)
-	full := filepath.Clean(filepath.Join(absBase, name))
-	prefix := absBase + string(filepath.Separator)
-	if full != absBase && !strings.HasPrefix(full, prefix) {
+	realBase, err := filepath.EvalSymlinks(absBase)
+	if err != nil {
+		return "", err
+	}
+	realBase = filepath.Clean(realBase)
+	full := filepath.Clean(filepath.Join(realBase, name))
+	if !pathInside(realBase, full) {
 		return "", fmt.Errorf("refusing manifest path %q", name)
 	}
-	return full, nil
+	// A symlink under the base can still leave it. EvalSymlinks fails for a
+	// broken link, and creating through that link would write the target.
+	resolved, err := place(realBase, full, map[string]struct{}{})
+	if errors.Is(err, errPathEscape) {
+		return "", fmt.Errorf("refusing manifest path %q", name)
+	}
+	if err != nil {
+		return "", err
+	}
+	return resolved, nil
 }
 
 func fileOne(src, dst string) (map[string]any, []int64, float64) {

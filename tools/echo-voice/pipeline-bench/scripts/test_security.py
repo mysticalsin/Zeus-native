@@ -58,6 +58,54 @@ class ManifestPathTests(unittest.TestCase):
             run_case(str(abs_wav))
             run_case("")
 
+    def test_symlink_out_is_refused(self):
+        wav = wav_pcm()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wl = root / "a" / "b" / "c" / "wl"
+            out = root / "a" / "b" / "out"
+            (wl / "subdir").mkdir(parents=True)
+            (out / "reply_subdir").mkdir(parents=True)
+            (root / "keep").mkdir()
+            sentinel = root / "keep" / "SENTINEL"
+            sentinel.write_bytes(b"stay")
+            (wl / "subdir" / "ok.wav").write_bytes(wav)
+
+            def run_case(file: str) -> None:
+                man = {"files": [{"file": file}], "stream": {"file": "unused.f32"}}
+                (wl / "manifest.json").write_text(json.dumps(man))
+                proc = subprocess.run(
+                    [sys.executable, str(PIPE), "bench", "--workload", str(wl), "--out", str(out), "--mode", "file"],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(proc.returncode, 2, proc.stderr + proc.stdout)
+                self.assertIn("refusing manifest path", proc.stderr)
+                self.assertEqual(sentinel.read_bytes(), b"stay")
+
+            (wl / "subdir" / "escape.wav").symlink_to(sentinel)
+            run_case("subdir/escape.wav")
+            (wl / "subdir" / "broken.wav").symlink_to(root / "keep" / "missing.wav")
+            run_case("subdir/broken.wav")
+            created = root / "keep" / "CREATED.wav"
+            (out / "reply_subdir" / "ok.wav").symlink_to(created)
+            run_case("subdir/ok.wav")
+            self.assertFalse(created.exists())
+            (wl / "linked").symlink_to(root / "keep")
+            (root / "keep" / "clip.wav").write_bytes(wav)
+            run_case("linked/clip.wav")
+            evil = root / "a" / "b" / "c" / "wl-evil"
+            evil.mkdir()
+            (evil / "x.wav").write_bytes(wav)
+            (wl / "subdir" / "prefix.wav").symlink_to(evil / "x.wav")
+            run_case("subdir/prefix.wav")
+            (wl / "subdir" / "rel.wav").symlink_to("../../../../../keep/SENTINEL")
+            run_case("subdir/rel.wav")
+            (wl / "via").mkdir()
+            (wl / "via" / "fresh.wav").write_bytes(wav)
+            (out / "reply_via").symlink_to(root / "keep")
+            run_case("via/fresh.wav")
+            self.assertFalse((root / "keep" / "fresh.wav").exists())
+
 
 class RunBenchShellTests(unittest.TestCase):
     def test_sh_uses_an_argv_list(self):
