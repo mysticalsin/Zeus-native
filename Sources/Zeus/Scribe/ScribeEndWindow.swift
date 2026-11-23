@@ -131,6 +131,15 @@ private struct ScribeEndWindowView: View {
                 Text(recap.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                 Text(recap.notes.summary.isEmpty ? "Your transcript and notes are ready." : recap.notes.summary)
                     .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(3)
+                Button("Save to Brain…") {
+                    BrainCaptureWindow.shared.show(
+                        title: recap.title,
+                        body: MeetingVaultNote.body(notes: recap.notes),
+                        source: "meeting",
+                        record: recap.id.rawValue.uuidString)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("scribe.endWindow.saveToBrain")
             }
             Button("Open notes") {
                 guard let panel = NotchControllerBridge.controller, let topBar = panel.topBar,
