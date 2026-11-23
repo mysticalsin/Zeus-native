@@ -86,6 +86,8 @@ final class VoiceTurnController {
     private var turnRun = LatestRun()
     /// When the recogniser last changed its live transcript (hands-free turns end on silence).
     private var lastPartialAt: ContinuousClock.Instant?
+    /// The speech-trace generation opened by the current press. A late deliver from an older turn ignores it.
+    private var speechGeneration = 0
     private var liveWords = LiveWordsHUD()
     private var heardSomething = false
     private var handsFreeTask: Task<Void, Never>?
@@ -203,7 +205,8 @@ final class VoiceTurnController {
     }
 
     @discardableResult
-    func press() -> Bool {
+    func press(builtinCue: Bool = true) -> Bool {
+        speechGeneration = speech.noteKeyDown(path: .talkHold)
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -244,6 +247,7 @@ final class VoiceTurnController {
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
             if !listening { speech.onCaptureFailure = nil }
+            speech.noteDelivered(generation: speechGeneration)
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -255,7 +259,7 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
-        ZeusSound.play(.listenStart)
+        if builtinCue { ZeusSound.play(.listenStart) }
         seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
@@ -271,7 +275,7 @@ final class VoiceTurnController {
         return true
     }
 
-    func release() {
+    func release(builtinCue: Bool = true) {
         guard listening else { return }
         // Capture already gave up for this turn: end it as a failure and do not read or send the partial.
         if let session = talkSession, let failure = captureFailures.failure(for: session) {
@@ -284,7 +288,7 @@ final class VoiceTurnController {
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
-        ZeusSound.play(.listenStop)
+        if builtinCue { ZeusSound.play(.listenStop) }
         seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil
@@ -393,12 +397,18 @@ final class VoiceTurnController {
         }
     }
 
+    /// Milliseconds in a `Duration`, for the wake and idle quiet checks.
+    private static func milliseconds(_ duration: Duration) -> Int {
+        let parts = duration.components
+        return Int((parts.seconds * 1_000) + (parts.attoseconds / 1_000_000_000_000_000))
+    }
+
     /// A voice turn without the key: starts listening and stops after quiet once you have spoken.
     func handsFree() {
         guard press() else { return }
         handsFreeTask?.cancel()
         let opened = ContinuousClock.now
-        let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(1000)
+        let wakeSilenceMs = Self.milliseconds(.seconds(WakeConversationTiming.silenceAfterSpeech))
         let idleLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceWhenEmpty) : .seconds(4)
         let hardLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.hardLimit) : .seconds(12)
         handsFreeTask = Task { @MainActor [weak self] in
@@ -406,7 +416,16 @@ final class VoiceTurnController {
                 try? await Task.sleep(for: .milliseconds(100))
                 let now = ContinuousClock.now
                 let quietFor = self.lastPartialAt.map { now - $0 } ?? (now - opened)
-                if self.heardSomething ? quietFor > silenceLimit : quietFor > idleLimit { break }
+                let quietMs = Self.milliseconds(quietFor)
+                let stop: Bool
+                if self.heardSomething, self.wakeConversationActive {
+                    stop = STTQuiet.reached(quietForMs: quietMs, thresholdMs: wakeSilenceMs)
+                } else if self.heardSomething {
+                    stop = STTHandsFree.quietEnded(quietForMs: quietMs)
+                } else {
+                    stop = STTQuiet.reached(quietForMs: quietMs, thresholdMs: Self.milliseconds(idleLimit))
+                }
+                if stop { break }
                 if now - opened > hardLimit { break }
             }
             guard let self, !Task.isCancelled, self.listening else { return }
@@ -450,6 +469,7 @@ final class VoiceTurnController {
     }
 
     private func finishTurn() async -> TurnResult {
+        let generation = speechGeneration
         var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
@@ -458,6 +478,7 @@ final class VoiceTurnController {
         }
         turnEngine = nil
         buddy.model.audioLevel = nil
+        speech.noteDelivered(generation: generation)
         return await complete(transcript: transcript, finalAt: .now)
     }
 

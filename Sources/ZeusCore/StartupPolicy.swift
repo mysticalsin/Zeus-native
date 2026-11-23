@@ -11,7 +11,7 @@ public enum StartupService: String, CaseIterable, Sendable {
     case insomniaLaunch, insomniaShutdown, chatBrain, chatHotkey
     case usage, proactive, stickiesRestore, routines, helperRefresh, voiceTurn
     case appIndex, projectScanner, macControl, avatarFeed, shortcuts, todo
-    case sleepWatch, notificationPeeker, settingsCatalog, updates, agentServer
+    case sleepWatch, lockChimes, notificationPeeker, settingsCatalog, updates, agentServer
     case cliInstall, assistantKeyImport, talkHotkey, polyglotHotkey, wakeWord, pointingHotkey
     case connectionsRefresh, autoOnboarding, demoArg, motionOpenArg, deepLinks
     case settingsWindow, onboardingWindow, chatWindow, demoPlayback, facePresence
