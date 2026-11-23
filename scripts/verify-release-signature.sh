@@ -3,7 +3,7 @@
 set -euo pipefail
 APP="${1:?Usage: scripts/verify-release-signature.sh path/to/Zeus.app}"
 codesign --verify --deep --strict "$APP"
-for binary in "$APP" "$APP"/Contents/Helpers/*; do
+for binary in "$APP" "$APP"/Contents/Helpers/* "$APP"/Contents/Resources/zeus-now-playing; do
   [ -e "$binary" ] || continue
   details="$(codesign --display --verbose=4 "$binary" 2>&1)"
   if ! grep -q '^Authority=Developer ID Application:' <<<"$details" \
