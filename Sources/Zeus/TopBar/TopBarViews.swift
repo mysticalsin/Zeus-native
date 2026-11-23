@@ -14,7 +14,7 @@ enum TopBarStyle {
     static let pageHeight: CGFloat = 236
     /// Glance-feel motion, from the token table: open has a touch of overshoot, close has none.
     @MainActor static var openSpring: Animation? { Motion.live(MotionTokens.panelOpen) }
-    @MainActor static var closeMotion: Animation? { Motion.reducible(Motion.panelClose) }
+    @MainActor static var closeMotion: Animation? { Motion.reducible(.linear(duration: MotionTokens.closeDuration)) }
     /// The selected tab's label: Glance draws it in a geometric sans; Plus Jakarta Sans (OFL, bundled).
     static var tabLabel: Font {
         GlassFonts.registered ? .custom(GlassFonts.family, size: 12.5).weight(.semibold) : .system(size: 12.5, weight: .semibold)
@@ -1142,7 +1142,7 @@ struct ShelfPage: View {
             .frame(maxHeight: .infinity)
             .background(RoundedRectangle(cornerRadius: CardFinish.radius, style: .continuous)
                 .strokeBorder(topBar.shelfTargeted ? Theme.bolt : TopBarStyle.tileStroke, style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])))
-            .animation(Motion.live(MotionTokens.panelResize), value: topBar.shelfTargeted)
+            .animation(Motion.live(MotionTokens.shelfTarget), value: topBar.shelfTargeted)
 
             VStack(alignment: .leading, spacing: 4) {
                 if let fling = topBar.fling { FlingNearbyStrip(fling: fling, topBar: topBar) }

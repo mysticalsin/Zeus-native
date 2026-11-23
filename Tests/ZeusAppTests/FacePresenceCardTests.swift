@@ -28,7 +28,8 @@ struct FacePresenceCardTests {
         let states: [(String, Machine, Bool)] = [
             ("off", Machine(), false),
             ("needs camera", Self.machine([.switchOn(camera: .notDetermined, enabledFaces: 1, canLock: true, vaultReadable: true, uptime: 1)]), false),
-            ("enrolling", Self.machine([.switchOn(camera: .authorized, enabledFaces: 0, canLock: true, vaultReadable: true, uptime: 1)]), false),
+            ("confirm enroll", Self.machine([.switchOn(camera: .authorized, enabledFaces: 0, canLock: true, vaultReadable: true, uptime: 1)]), true),
+            ("enrolling", Self.machine([.switchOn(camera: .authorized, enabledFaces: 0, canLock: true, vaultReadable: true, uptime: 1), .enroll]), false),
             ("watching", Self.machine([Self.on]), true),
             ("present", Self.machine([Self.on, .observed(.owner, uptime: 101)]), true),
             ("away", Self.machine([Self.on, .observed(.notOwner, uptime: 101)]), true),

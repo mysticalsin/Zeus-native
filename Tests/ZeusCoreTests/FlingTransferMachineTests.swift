@@ -149,6 +149,15 @@ struct FlingReceiveMachineTests {
         effects.compactMap { if case .send(.decline(let d)) = $0 { return d.reason } else { return nil } }
     }
 
+    @Test func autoAcceptStillPromptsWhenTheOfferShouldWarn() {
+        let huge = offer(sizes: [FlingLimits.warnTotalBytes + 1, 0, 0])
+        var m = FlingReceiveMachine(context: context(auto: true, free: FlingLimits.warnTotalBytes + (2 << 30)))
+        let out = m.handle(.received(.offer(huge), now: t0))
+        #expect(m.state != .receiving(index: 0, got: 0))
+        #expect(out.contains { if case .prompt = $0 { return true } else { return false } })
+        #expect(!out.contains { if case .send(.accept) = $0 { return true } else { return false } })
+    }
+
     @Test func aPairedPeerWithAutoAcceptIsAcceptedAtOnce() {
         var m = FlingReceiveMachine(context: context())
         let out = m.handle(.received(.offer(offer()), now: t0))

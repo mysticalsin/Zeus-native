@@ -492,16 +492,24 @@ enum ScreenLock {
         return function() == 0
     }
 
+    /// A non-zero `SACLockScreenImmediate` result is an error. It does not fall through to the shortcut,
+    /// which would report success while the Mac stayed unlocked.
+    static func lock(using function: Lock?, postShortcut: () -> Bool) -> Bool {
+        if let function { return function() == 0 }
+        return postShortcut()
+    }
+
     static func lock() -> Bool {
-        if let lockFunction { return lockFunction() == 0 }
-        guard AXIsProcessTrusted() else { return false }
-        let source = CGEventSource(stateID: .hidSystemState)
-        let q: CGKeyCode = 12
-        for down in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: q, keyDown: down)
-            event?.flags = [.maskControl, .maskCommand]
-            event?.post(tap: .cghidEventTap)
+        lock(using: lockFunction) {
+            guard AXIsProcessTrusted() else { return false }
+            let source = CGEventSource(stateID: .hidSystemState)
+            let q: CGKeyCode = 12
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: q, keyDown: down)
+                event?.flags = [.maskControl, .maskCommand]
+                event?.post(tap: .cghidEventTap)
+            }
+            return true
         }
-        return true
     }
 }

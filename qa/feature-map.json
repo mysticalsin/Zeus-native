@@ -8648,7 +8648,7 @@
             },
             {
               "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
-              "function": "switchOnWithNoFacesStartsEnrolling"
+              "function": "switchOnWithNoFacesWaitsUntilEnrollIsPressed"
             },
             {
               "file": "Tests/ZeusAppTests/FacePresenceControllerTests.swift",
