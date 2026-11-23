@@ -174,16 +174,16 @@ private enum MarkJSON {
     }
 }
 
-/// A drawing mark in unit space and the box it occupies. Numbered screen marks stay `PlacedMark`.
-public struct PlacedDrawing: Equatable, Sendable {
+/// A drawing mark in unit space and the box it occupies. Numbered screen marks are `ScreenPlacedMark`.
+public struct PlacedMark: Equatable, Sendable {
     public var mark: DrawingMark
     public var box: CGRect
 }
 
 /// Places marks in unit space and nudges labels off arrows and lines.
 public enum DrawingLayout {
-    public static func place(_ marks: [DrawingMark]) -> [PlacedDrawing] {
-        var placed: [PlacedDrawing] = []
+    public static func place(_ marks: [DrawingMark]) -> [PlacedMark] {
+        var placed: [PlacedMark] = []
         var strokes: [DrawingMark] = []
         for mark in marks {
             var box = bounds(of: mark)
@@ -196,13 +196,13 @@ public enum DrawingLayout {
             } else if isStroke(mark) {
                 strokes.append(mark)
             }
-            placed.append(PlacedDrawing(mark: mark, box: box))
+            placed.append(PlacedMark(mark: mark, box: box))
         }
         return placed
     }
 
     /// True when a label box comes within 0.02 of an arrow, line, or path. Uses the stroke, not its bounding box.
-    public static func labelsOverlapStrokes(_ placed: [PlacedDrawing]) -> Bool {
+    public static func labelsOverlapStrokes(_ placed: [PlacedMark]) -> Bool {
         let labels = placed.filter { isLabel($0.mark) }
         let strokes = placed.filter { isStroke($0.mark) }
         return labels.contains { label in strokes.contains { overlaps(label.box, $0.mark) } }

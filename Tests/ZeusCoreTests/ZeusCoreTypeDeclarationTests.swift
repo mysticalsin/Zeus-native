@@ -132,7 +132,7 @@ struct ZeusCoreTypeDeclarationScan {
         }
     }
 
-    static func repositoryDuplicates(sources: URL = zeusCoreSources) throws -> [String] {
+    static func repositorySites(sources: URL = zeusCoreSources) throws -> [String] {
         var sites: [String] = []
         let paths = try FileManager.default.subpathsOfDirectory(atPath: sources.path)
             .filter { $0.hasSuffix(".swift") }
@@ -142,7 +142,11 @@ struct ZeusCoreTypeDeclarationScan {
             let text = try String(contentsOf: url, encoding: .utf8)
             sites.append(contentsOf: declarationSites(in: text, label: "Sources/ZeusCore/" + relative))
         }
-        return duplicateReports(sites)
+        return sites
+    }
+
+    static func repositoryDuplicates(sources: URL = zeusCoreSources) throws -> [String] {
+        try duplicateReports(repositorySites(sources: sources))
     }
 
     static let zeusCoreSources = URL(fileURLWithPath: #filePath)
@@ -172,6 +176,16 @@ struct ZeusCoreTypeDeclarationScan {
         #expect(ZeusCoreTypeDeclarationScan.duplicateReports(
             ZeusCoreTypeDeclarationScan.declarationSites(in: text)
         ) == ["PlacedMark at sample:1, sample:7"])
+    }
+
+    @Test func drawingKeepsTheOnlyPlacedMark() throws {
+        let sites = try ZeusCoreTypeDeclarationScan.repositorySites()
+        let placed = sites.filter { $0.hasSuffix(" PlacedMark") }
+        let screen = sites.filter { $0.hasSuffix(" ScreenPlacedMark") }
+        #expect(placed.count == 1)
+        #expect(placed.first?.hasPrefix("Sources/ZeusCore/Present/DrawingScene.swift:") == true)
+        #expect(screen.count == 1)
+        #expect(screen.first?.hasPrefix("Sources/ZeusCore/Pointing/MarkLayout.swift:") == true)
     }
 
     @Test func aCommentThatSpansLinesIsNotADeclaration() {

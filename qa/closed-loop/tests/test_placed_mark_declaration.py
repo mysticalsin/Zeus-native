@@ -115,11 +115,19 @@ def duplicate_reports(sites):
     return reports
 
 
-def repository_duplicates(root=SOURCES):
+def repository_sites(root=SOURCES):
     sites = []
     for path in sorted(root.rglob("*.swift")):
         sites.extend(declaration_sites(path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))))
-    return duplicate_reports(sites)
+    return sites
+
+
+def repository_duplicates(root=SOURCES):
+    return duplicate_reports(repository_sites(root))
+
+
+def sites_named(name, root=SOURCES):
+    return [site for site in repository_sites(root) if site.rsplit(" ", 1)[1] == name]
 
 
 class ZeusCoreTypeDeclarations(unittest.TestCase):
@@ -142,6 +150,14 @@ class ZeusCoreTypeDeclarations(unittest.TestCase):
             duplicate_reports(declaration_sites(text)),
             ["PlacedMark at sample:1, sample:7"],
         )
+
+    def test_drawing_keeps_the_only_placed_mark(self):
+        placed = sites_named("PlacedMark")
+        screen = sites_named("ScreenPlacedMark")
+        self.assertEqual(len(placed), 1, placed)
+        self.assertTrue(placed[0].startswith("Sources/ZeusCore/Present/DrawingScene.swift:"), placed)
+        self.assertEqual(len(screen), 1, screen)
+        self.assertTrue(screen[0].startswith("Sources/ZeusCore/Pointing/MarkLayout.swift:"), screen)
 
     def test_a_comment_that_spans_lines_is_not_a_declaration(self):
         text = "/*\npublic struct PlacedMark {}\n*/\npublic struct OnlyOnce {}\n"
