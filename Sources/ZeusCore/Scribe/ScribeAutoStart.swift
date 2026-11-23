@@ -470,19 +470,9 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
     private mutating func primary(_ card: ScribeMeetingCard, now: TimeInterval, context: ScribeStartContext) -> [Effect] {
         switch card {
         case .offer(let seen, _):
-            // X5 red: restore the 347fef29 start-on-expired path so the named test fails first.
-            switch state {
-            case .prompting(let meeting, _, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .upcoming(let meeting, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .armed(let meeting, _, _) where meeting.key == seen.key:
-                return startRequest(meeting, origin: .tap, now: now, context: context)
-            case .idle, .upcoming, .armed, .prompting:
-                return startRequest(seen, origin: .tap, now: now, context: context)
-            case .countingDown, .held, .starting, .recording, .failed:
-                return []
-            }
+            // X5: a tap starts only when this offer is still the one on screen and its time has not run out.
+            guard let meeting = liveOffer(matching: seen.key, now: now) else { return [] }
+            return startRequest(meeting, origin: .tap, now: now, context: context)
         case .failed(let seen, _):
             guard case .failed(let attempt, let failure, _) = state, attempt.meeting.key == seen.key else { return [] }
             if failure == .microphoneOff, context.microphone == .denied { return [.openMicrophoneSettings] }
