@@ -8,6 +8,7 @@ struct ReportSettingsPage: View {
         GSPageHeading(section: .report, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         IssueReportCard()
+        CrashRecoveryNotice()
     }
 }
 

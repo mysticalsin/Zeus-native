@@ -95,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        CrashRecoveryLaunch.end()
         // Quitting while Zeus listens or speaks must not leave the Mac's output at the lowered volume.
         SystemAudioDucker.end()
         explanation?.stop()
@@ -116,6 +117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A crash log stays in the outbox. One restart may leave this process before any capture starts.
+        if CrashRecoveryLaunch.begin(policy: policy) { return }
         // Load the Keychain cache off the main thread early; every later read is a dictionary lookup.
         Task.detached(priority: .userInitiated) { Keychain.store.load() }
         // The Ultron stock lines come from the bundled dialogue file; a missing file keeps the compiled lines.
