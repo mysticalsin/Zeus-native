@@ -85,14 +85,18 @@ codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" --entitlements Resourc
 codesign --verify --deep --strict "$APP"
 if [ "${RELEASE:-0}" = 1 ]; then scripts/verify-release-signature.sh "$APP"; fi
 
-# Local identity only: macOS pins Keychain items made by a binary without a Team ID to its cdhash.
-# Add this build's cdhashes (app and helpers) to the partition list of every com.zeus.app item in
-# the zeus-dev keychain, using that keychain's own password: silent, and the login keychain is
-# never touched. The last 16 builds stay trusted so worktrees can share the items.
-if [ "$LOCAL_IDENTITY" = 1 ]; then
-  HASHES="$HOME/.zeus-dev/codesign/cdhashes"
-  touch "$HASHES"
-  for bin in "$APP/Contents/MacOS/Zeus" "$APP/Contents/Helpers/"* "$APP/Contents/Resources/zeus-now-playing"; do
+	# Local identity only: macOS pins Keychain items made by a binary without a Team ID to its cdhash.
+	# Add this build's cdhashes for the app and the helpers that read com.zeus.app to the partition
+	# list of every com.zeus.app item in the zeus-dev keychain, using that keychain's own password:
+	# silent, and the login keychain is never touched. The last 16 builds stay trusted so worktrees
+	# can share the items.
+	# zeus-now-playing is signed above and is not added here. It only asks MediaRemote for the current
+	# track and prints that text. It never reads or writes the Keychain, so its cdhash is not required
+	# on the partition list. Adding it would allow that helper to read the assistant items.
+	if [ "$LOCAL_IDENTITY" = 1 ]; then
+	  HASHES="$HOME/.zeus-dev/codesign/cdhashes"
+	  touch "$HASHES"
+	  for bin in "$APP/Contents/MacOS/Zeus" "$APP/Contents/Helpers/"*; do
     [ -e "$bin" ] || continue
     codesign -dvvv "$bin" 2>&1 | awk -F= '/^CDHash=/{print "cdhash:"$2}' >> "$HASHES"
   done
