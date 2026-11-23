@@ -13,7 +13,7 @@ public enum DemoSpeech {
     public static func line(for step: DemoStep) -> String? {
         switch step {
         case .menuBarPoint:
-            return nil
+            "that's me up here, click the bolt anytime"
         }
     }
 

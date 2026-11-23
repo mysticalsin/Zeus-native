@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Play Demo pointed at the menu bar and showed a label, and never handed that line to the voice, so the showcase stayed silent.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-presentation",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DemoSpeechTests.swift",
+        "function": "theMenuBarPointStepSpeaksALine"
+      }
     }
-]
+  ]
 }

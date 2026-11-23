@@ -4980,6 +4980,17 @@
           "id": "F11.1"
         },
         {
+          "id": "F11.demo-speech",
+          "check": "portable-presentation",
+          "acceptance": "Play Demo's menu-bar point hands one non-empty line to the existing voice. The fixture does not play audio or prove a Mac heard it.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/DemoSpeechTests.swift",
+              "function": "theMenuBarPointStepSpeaksALine"
+            }
+          ]
+        },
+        {
           "check": "native-UltronVoiceEffectTests",
           "acceptance": "Actual native Ultron audio chain (pitch, EQ, distortion, comb, room) rendered offline on synthetic buffers: speech is processed, silence stays silent, neutral settings pass through.",
           "cases": [
