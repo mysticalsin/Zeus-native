@@ -8691,7 +8691,7 @@
     },
     {
       "id": "REG-992",
-      "failure": "portable-wiki-export died with signal 11 while one thread compiled a scanner regular expression and another opened an ICU calendar for the export stamp. Patterns are compiled once under a lock shared with that stamp.",
+      "failure": "portable-wiki-export died with signal 11 while one thread compiled a scanner regular expression and another opened an ICU calendar for the export stamp. A later parallel run crashed in ICU MatchChunkAt while two scans matched one compiled expression. Compilation and matching share one lock, which is not held across the export stamp's calendar.",
       "features": [
         "F10"
       ],
