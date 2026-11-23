@@ -8495,6 +8495,41 @@
           "id": "S06.1"
         },
         {
+          "check": "release-mocks",
+          "acceptance": "The release check refuses the ZEUSTEAMID placeholder, an empty team, and any team that is not 10 characters from A-Z and 0-9. The app identifier must be app.zeus.mac. codesign --verify receives an anchored requirement with a quoted team. A missing zeus-now-playing fails even when another helper is present, and the dev partition list does not name that helper. These mocks do not prove a Developer ID signature.",
+          "cases": [
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_missing_now_playing_helper_fails_closed"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_placeholder_team_id_refuses_the_release"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_release_signature_checks_the_resource_helper"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_release_signature_pins_team_bundle_and_verifies_the_helper"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_team_id_must_be_ten_uppercase_characters"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_cdhash_loop_does_not_name_the_resource_helper"
+            },
+            {
+              "file": "qa/release-scripts/test_release_scripts.py",
+              "function": "test_dev_partition_list_omits_the_resource_helper_cdhash"
+            }
+          ],
+          "id": "S06.4"
+        },
+        {
           "check": "missing-S06-native",
           "acceptance": "Build and bundle exact source; verify executable/resources/entitlements and upgrade/rollback against disposable app destination.",
           "cases": [],
