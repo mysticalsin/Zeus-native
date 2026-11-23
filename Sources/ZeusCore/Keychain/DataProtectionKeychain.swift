@@ -318,13 +318,14 @@ public enum CredentialKeychainMigration {
         return importEligible(service: service, account: account, teamIdentifier: teamIdentifier, keychain: keychain)
     }
 
-    /// User removal. Deletes the protected item and every legacy match. Does not write a copy back.
+    /// User removal. Deletes every legacy match first, then the protected item. Does not write a copy back.
+    /// A failed legacy delete leaves the protected item in place, so the login item is not left on its own.
     public static func removeEverywhere(service: String, account: String, teamIdentifier: String, keychain: any CredentialKeychain) -> MigrationAttempt {
         guard CredentialKeychainPolicy.writeRequest(service: service, account: account, teamIdentifier: teamIdentifier) != nil else {
             return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
         }
-        guard keychain.deleteProtected(service: service, account: account),
-              keychain.deleteLegacy(service: service, account: account) else {
+        guard keychain.deleteLegacy(service: service, account: account),
+              keychain.deleteProtected(service: service, account: account) else {
             return MigrationAttempt(outcome: .needsReentry, markMigrated: false)
         }
         return MigrationAttempt(outcome: .absent, markMigrated: true)

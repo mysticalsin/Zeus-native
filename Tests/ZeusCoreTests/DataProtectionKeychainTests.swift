@@ -451,6 +451,18 @@ private final class RecordingCredentialKeychain: CredentialKeychain, @unchecked 
         #expect(store.legacy == .absent)
     }
 
+    @Test func aFailedDeleteKeepsNoStrayLoginCopy() {
+        let store = RecordingCredentialKeychain(legacy: .value(secret), protected: .value(secret))
+        store.failDelete = true
+        let result = CredentialKeychainMigration.removeEverywhere(
+            service: service, account: "elevenlabs.api-key", teamIdentifier: team, keychain: store)
+        #expect(result.outcome == .needsReentry)
+        #expect(!result.markMigrated)
+        #expect(store.kinds == ["deleteLegacy"])
+        #expect(store.protected == .value(secret))
+        #expect(store.legacy == .value(secret))
+    }
+
     @Test func cliOffLeavesNoOne() {
         let on = Data("1".utf8)
         let store = RecordingCredentialKeychain(legacy: .value(on), protected: .value(on))
