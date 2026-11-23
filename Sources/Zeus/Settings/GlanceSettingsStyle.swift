@@ -317,8 +317,11 @@ struct GSDeactivateLicenseControl: View {
 
 /// Glance's switch: 44 x 20, grey off, blue on.
 struct GSToggleStyle: ToggleStyle {
+    @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
-        Button { configuration.isOn.toggle() } label: {
+        Button {
+            if isEnabled { configuration.isOn.toggle() }
+        } label: {
             ZStack(alignment: configuration.isOn ? .trailing : .leading) {
                 Capsule().fill(configuration.isOn ? OB.toggleOn : GS.toggleOff).frame(width: 44, height: 20)
                 Capsule().fill(configuration.isOn ? Color(rgb: 225, 235, 254) : GS.knob).frame(width: 27, height: 16).padding(.horizontal, 2)
@@ -326,6 +329,7 @@ struct GSToggleStyle: ToggleStyle {
             .animation(.spring(response: 0.28, dampingFraction: 0.85), value: configuration.isOn)
         }
         .buttonStyle(.plain)
+        .disabled(!isEnabled)
         .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
     }
 }

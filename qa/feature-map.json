@@ -8218,6 +8218,10 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ChimeTests.swift",
+              "function": "theLockWakeCardIsInactiveWhenSoundFeedbackIsOff"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ChimeTests.swift",
               "function": "importRejectsAReadableChimePath"
             },
             {

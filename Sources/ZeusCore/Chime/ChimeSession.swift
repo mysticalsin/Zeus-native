@@ -106,9 +106,22 @@ public struct ChimeDebouncer: Sendable {
 /// Whether a chime may start. Focus is a separate input so this stays free of system frameworks.
 public enum ChimePlaybackGate {
     /// Sound feedback off, a meeting, or an unknown Focus state keeps the chime quiet.
-    /// Focus suppresses only when it is known to be on. The caller must not ask for Focus permission.
-    public static func allows(enabled: Bool, focusActive: Bool, soundFeedback: Bool = true, meeting: Bool = false, focusKnown: Bool = true) -> Bool {
+    /// Omitting Focus means it is unknown. Focus suppresses only when it is known to be on.
+    /// The caller must not ask for Focus permission.
+    public static func allows(enabled: Bool, focusActive: Bool, soundFeedback: Bool = true, meeting: Bool = false, focusKnown: Bool = false) -> Bool {
         guard enabled, soundFeedback, !meeting, focusKnown else { return false }
         return !focusActive
+    }
+}
+
+/// Whether the lock and wake settings card accepts input.
+/// Sound feedback off leaves the whole card inactive. Play also follows the chime toggle.
+public enum ChimeCardGate {
+    public static func interactive(soundFeedback: Bool) -> Bool {
+        soundFeedback
+    }
+
+    public static func playEnabled(soundFeedback: Bool, chimeEnabled: Bool) -> Bool {
+        interactive(soundFeedback: soundFeedback) && chimeEnabled
     }
 }
