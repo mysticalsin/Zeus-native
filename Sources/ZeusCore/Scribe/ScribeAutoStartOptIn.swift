@@ -19,7 +19,7 @@ public enum ScribeAutoStartOptIn {
             if mode == .automatic, let stamp = legacy as? Double, defaults.object(forKey: key) == nil {
                 defaults.set(stamp, forKey: key)
             }
-            defaults.removeObject(forKey: legacyKey)
+            discard(legacyKey, from: defaults)
         }
         if hasSavedMeetings, defaults.object(forKey: firstRecordingKey) == nil {
             defaults.set(Date().timeIntervalSince1970, forKey: firstRecordingKey)
@@ -32,13 +32,23 @@ public enum ScribeAutoStartOptIn {
         if mode == .automatic {
             defaults.set(now.timeIntervalSince1970, forKey: key)
         } else {
-            defaults.removeObject(forKey: key)
+            discard(key, from: defaults)
         }
     }
 
     /// A stamp found while the choice is not "Start automatically" is stale: remove it.
     public static func reconcile(mode: ScribeAutoStartMode, defaults: UserDefaults = .standard) {
-        if mode != .automatic { defaults.removeObject(forKey: key) }
+        if mode != .automatic { discard(key, from: defaults) }
+    }
+
+    /// Removes a stamp and flushes the suite. A CFPreferences write in another suite can put the
+    /// removed value back before the next read unless this suite is synchronized afterwards.
+    private static func discard(_ key: String, from defaults: UserDefaults) {
+        defaults.removeObject(forKey: key)
+        _ = defaults.synchronize()
+        guard defaults.object(forKey: key) != nil else { return }
+        defaults.removeObject(forKey: key)
+        _ = defaults.synchronize()
     }
 
     /// Written the first time a recording begins on this Mac, and never again.
