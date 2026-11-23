@@ -25,4 +25,14 @@ struct CredentialRedirectTests {
         let plain = URL(string: "http://api.example.test/v1/models")!
         #expect(CredentialRedirect.forwarded(proposed: plain, from: original, headers: headers) == nil)
     }
+
+    @Test func aSameOriginRedirectDropsTheGeminiKey() {
+        let from = URL(string: "https://generativelanguage.googleapis.com/v1beta/models")!
+        let same = URL(string: "https://generativelanguage.googleapis.com/v1beta/interactions")!
+        let gemini = ["x-goog-api-key": "example-secret", "Content-Type": "application/json"]
+        let forwarded = CredentialRedirect.forwarded(proposed: same, from: from, headers: gemini)
+        #expect(forwarded?.url == same)
+        #expect(forwarded?.headers["x-goog-api-key"] == nil)
+        #expect(forwarded?.headers["Content-Type"] == "application/json")
+    }
 }
