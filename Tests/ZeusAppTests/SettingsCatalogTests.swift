@@ -383,7 +383,7 @@ struct SettingsCatalogTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-export-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let keychain = KeychainStore(backend: MemoryKeychain(), defaults: defaults)
-        let vault = FaceVaultStore(directory: directory, keychain: keychain)
+        let vault = FaceVaultStore(directory: directory, keychain: keychain, templates: MemoryFaceTemplateKeychain())
         let face = FaceRecord(id: "face-secret-id", name: "Face 1", isEnabled: true, revision: 2,
                               samples: [[0.123456, 0.654321, 0.111111], [0.222222, 0.333333, 0.444444]], threshold: 0.3)
         #expect(vault.save([face]) == .saved)

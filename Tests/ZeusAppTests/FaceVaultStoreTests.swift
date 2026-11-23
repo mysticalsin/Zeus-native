@@ -5,23 +5,35 @@ import ZeusCore
 
 @Suite("Face vault store")
 struct FaceVaultStoreTests {
-    /// A store in a fresh temp folder with an in-memory Keychain. Never touches the real Keychain or Zeus's folder.
+    /// A store in a fresh temp folder with an in-memory keychain. Never touches the real keychain or Zeus's folder.
     struct Fixture {
         let directory: URL
         let backend: MemoryKeychain
         let keychain: KeychainStore
+        let templates: MemoryFaceTemplateKeychain
         let store: FaceVaultStore
 
         init() {
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("face-vault-\(UUID().uuidString)", isDirectory: true)
             backend = MemoryKeychain()
             keychain = KeychainStore(backend: backend, defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.facevault.tests.\(UUID().uuidString)")!)
-            store = FaceVaultStore(directory: directory, keychain: keychain)
+            templates = MemoryFaceTemplateKeychain()
+            store = FaceVaultStore(directory: directory, keychain: keychain, templates: templates)
         }
 
         var keyItem: String? { backend.items["\(KeychainStore.service)|\(FaceVaultStore.keyAccount)"] }
+        var template: FaceTemplateRecord? { templates.item(account: FaceVaultStore.templateAccount) }
         var fileExists: Bool { FileManager.default.fileExists(atPath: store.url.path) }
+        var metaExists: Bool { FileManager.default.fileExists(atPath: store.metaURL.path) }
         func cleanUp() { try? FileManager.default.removeItem(at: directory) }
+
+        func plantOld(_ faces: [FaceRecord], keyText: String? = nil) throws {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let key = FaceVault.makeKey()
+            let sealed = try FaceVault.seal(FaceVaultContents(faces: faces), key: key)
+            try sealed.write(to: store.url)
+            #expect(keychain.set(keyText ?? key.base64EncodedString(), for: FaceVaultStore.keyAccount))
+        }
     }
 
     static func record(_ id: String, enabled: Bool = true) -> FaceRecord {
@@ -33,96 +45,100 @@ struct FaceVaultStoreTests {
         let fixture = Fixture(); defer { fixture.cleanUp() }
         #expect(fixture.store.load() == .empty)
         #expect(!fixture.fileExists)
+        #expect(!fixture.metaExists)
         #expect(fixture.keyItem == nil)
+        #expect(fixture.template == nil)
     }
 
-    @Test func savedFacesComeBackAndTheFileIsPrivate() throws {
+    @Test func savedFacesComeBackAndTheTemplateIsProtected() throws {
         let fixture = Fixture(); defer { fixture.cleanUp() }
         let faces = [Self.record("1"), Self.record("2", enabled: false)]
         #expect(fixture.store.save(faces) == .saved)
-        #expect(fixture.store.load() == .faces(faces))
-        let attributes = try FileManager.default.attributesOfItem(atPath: fixture.store.url.path)
+        #expect(fixture.store.load() == .faces(faces.map { $0.withoutSamples() }))
+        var read: [FaceRecord] = []
+        #expect(fixture.store.withTemplates { read = $0 } == .success(()))
+        #expect(read == faces)
+        #expect(fixture.template?.protection == .biometryCurrentSetOrDevicePasscode)
+        #expect(!fixture.fileExists)
+        #expect(fixture.keyItem == nil)
+        let attributes = try FileManager.default.attributesOfItem(atPath: fixture.store.metaURL.path)
         #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
         let folder = try FileManager.default.attributesOfItem(atPath: fixture.directory.path)
         #expect((folder[.posixPermissions] as? NSNumber)?.intValue == 0o700)
-        // The key is 32 bytes in the Keychain and never in the file.
-        let key = try #require(fixture.keyItem.flatMap { FaceVault.key(fromBase64: $0) })
-        let bytes = try Data(contentsOf: fixture.store.url)
-        #expect(bytes.range(of: key) == nil)
-        #expect(bytes.range(of: Data("samples".utf8)) == nil)
-        // A second save keeps the same key.
-        let before = fixture.keyItem
+        let meta = try Data(contentsOf: fixture.store.metaURL)
+        #expect(meta.range(of: Data("0.5".utf8)) == nil)
+        #expect(meta.range(of: Data("-0.25".utf8)) == nil)
         #expect(fixture.store.save([Self.record("1")]) == .saved)
-        #expect(fixture.keyItem == before)
-        #expect(fixture.store.load() == .faces([Self.record("1")]))
+        #expect(fixture.store.load() == .faces([Self.record("1").withoutSamples()]))
     }
 
     @Test func anUnreadableVaultIsNeverOverwritten() throws {
         let fixture = Fixture(); defer { fixture.cleanUp() }
-        #expect(fixture.store.save([Self.record("1")]) == .saved)
-        let original = try Data(contentsOf: fixture.store.url)
-
-        // A damaged file: load says unreadable, save refuses and leaves the bytes and the key as they were.
-        var damaged = original
-        damaged[damaged.count / 2] ^= 0xFF
+        try FileManager.default.createDirectory(at: fixture.directory, withIntermediateDirectories: true)
+        let damaged = Data("not a vault".utf8)
         try damaged.write(to: fixture.store.url)
-        let keyBefore = fixture.keyItem
         #expect(fixture.store.load() == .unreadable)
         #expect(fixture.store.save([Self.record("9")]) == .refusedUnreadable)
         #expect(fixture.store.save([]) == .refusedUnreadable)
         #expect(try Data(contentsOf: fixture.store.url) == damaged)
-        #expect(fixture.keyItem == keyBefore)
+        #expect(fixture.template == nil)
     }
 
     @Test func aMissingKeyWithAFileIsUnreadableNotEmpty() throws {
         let fixture = Fixture(); defer { fixture.cleanUp() }
-        #expect(fixture.store.save([Self.record("1")]) == .saved)
+        try fixture.plantOld([Self.record("1")])
         let original = try Data(contentsOf: fixture.store.url)
-        // The Keychain item is gone (a new Mac, a reset keychain): the file is not an empty vault.
         _ = fixture.keychain.remove(FaceVaultStore.keyAccount)
-        #expect(fixture.keyItem == nil)
         #expect(fixture.store.load() == .unreadable)
         #expect(fixture.store.save([Self.record("2")]) == .refusedUnreadable)
         #expect(try Data(contentsOf: fixture.store.url) == original)
-        // And no new key was invented for the refused save.
+        #expect(fixture.template == nil)
         #expect(fixture.keyItem == nil)
     }
 
     @Test func aKeyThatIsNotThirtyTwoBytesIsUnreadable() throws {
         let fixture = Fixture(); defer { fixture.cleanUp() }
-        #expect(fixture.store.save([Self.record("1")]) == .saved)
-        #expect(fixture.keychain.set("short", for: FaceVaultStore.keyAccount))
+        try fixture.plantOld([Self.record("1")], keyText: "short")
         #expect(fixture.store.load() == .unreadable)
+        #expect(fixture.template == nil)
     }
 
     @Test func deletingTheLastFaceRemovesFileAndKey() {
         let fixture = Fixture(); defer { fixture.cleanUp() }
         #expect(fixture.store.save([Self.record("1"), Self.record("2")]) == .saved)
         #expect(fixture.store.save([Self.record("2")]) == .saved)
-        #expect(fixture.fileExists)
-        #expect(fixture.keyItem != nil)
+        #expect(fixture.metaExists)
+        #expect(fixture.template != nil)
         #expect(fixture.store.save([]) == .saved)
         #expect(!fixture.fileExists)
+        #expect(!fixture.metaExists)
+        #expect(fixture.template == nil)
         #expect(fixture.keyItem == nil)
         #expect(fixture.store.load() == .empty)
-        // Saving again after that starts with a new key.
         #expect(fixture.store.save([Self.record("3")]) == .saved)
-        #expect(fixture.keyItem != nil)
-        #expect(fixture.store.load() == .faces([Self.record("3")]))
+        #expect(fixture.store.load() == .faces([Self.record("3").withoutSamples()]))
     }
 
     @Test func aKeychainThatRefusesTheKeyWritesNoFile() {
         let fixture = Fixture(); defer { fixture.cleanUp() }
-        // A store whose Keychain cannot save the new key must not leave a file nobody can open.
-        let refusing = FaceVaultStore(directory: fixture.directory, keychain: KeychainStore(backend: RefusingKeychain(),
-            defaults: UserDefaults(suiteName: NSTemporaryDirectory() + "zeus.facevault.tests.\(UUID().uuidString)")!))
-        #expect(refusing.save([Self.record("1")]) == .failed)
-        #expect(!FileManager.default.fileExists(atPath: refusing.url.path))
+        fixture.templates.failWrites = .unavailable
+        #expect(fixture.store.save([Self.record("1")]) == .failed)
+        #expect(!fixture.fileExists)
+        #expect(!fixture.metaExists)
+        #expect(fixture.template == nil)
+    }
+
+    @Test func aCancelledSaveStoresNothing() {
+        let fixture = Fixture(); defer { fixture.cleanUp() }
+        fixture.templates.failWrites = .cancelled
+        #expect(fixture.store.save([Self.record("1")]) == .failed)
+        #expect(fixture.template == nil)
+        #expect(fixture.store.load() == .empty)
     }
 
     @Test func eraseRemovesAnUnreadableVaultOnlyWhenAsked() throws {
         let fixture = Fixture(); defer { fixture.cleanUp() }
-        #expect(fixture.store.save([Self.record("1")]) == .saved)
+        try FileManager.default.createDirectory(at: fixture.directory, withIntermediateDirectories: true)
         try Data("garbage".utf8).write(to: fixture.store.url)
         #expect(fixture.store.load() == .unreadable)
         #expect(fixture.store.erase())
@@ -131,11 +147,31 @@ struct FaceVaultStoreTests {
         #expect(fixture.store.load() == .empty)
         #expect(fixture.store.save([Self.record("2")]) == .saved)
     }
-}
 
-private final class RefusingKeychain: KeychainBackend, @unchecked Sendable {
-    func accounts(service: String) -> [String] { [] }
-    func read(service: String, account: String) -> String? { nil }
-    func write(_ value: String, service: String, account: String) -> Bool { false }
-    func delete(service: String, account: String) -> Bool { true }
+    @Test func anOldVaultMovesIntoTheProtectedItemOnlyAfterTheCopyMatches() throws {
+        let fixture = Fixture(); defer { fixture.cleanUp() }
+        let face = Self.record("1")
+        try fixture.plantOld([face])
+        #expect(fixture.fileExists)
+        #expect(fixture.store.load() == .faces([face.withoutSamples()]))
+        #expect(!fixture.fileExists)
+        #expect(fixture.keyItem == nil)
+        #expect(fixture.template?.protection == FaceVaultStore.protection)
+        var read: [FaceRecord] = []
+        #expect(fixture.store.withTemplates { read = $0 } == .success(()))
+        #expect(read == [face])
+    }
+
+    @Test func aCancelledMigrationKeepsTheOldCopy() throws {
+        let fixture = Fixture(); defer { fixture.cleanUp() }
+        try fixture.plantOld([Self.record("1")])
+        let original = try Data(contentsOf: fixture.store.url)
+        let key = fixture.keyItem
+        fixture.templates.failWrites = .cancelled
+        #expect(fixture.store.load() == .unreadable)
+        #expect(try Data(contentsOf: fixture.store.url) == original)
+        #expect(fixture.keyItem == key)
+        #expect(fixture.template == nil)
+        #expect(!fixture.metaExists)
+    }
 }

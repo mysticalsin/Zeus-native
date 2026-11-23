@@ -501,7 +501,7 @@
       "id": "portable-keychain",
       "kind": "portable",
       "tier": "contract",
-      "scope": "Exact KeychainStore policy with an in-memory backend and isolated fixture defaults. No macOS Keychain API, secrets, permission prompt or credential UI interaction.",
+      "scope": "Exact KeychainStore policy and face-template access rules with an in-memory backend. No macOS Keychain API, secrets, permission prompt or credential UI interaction.",
       "group": "keychain"
     },
     {
@@ -8811,6 +8811,137 @@
             {
               "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
               "function": "unknownLockAfterFallsBackToTwoMinutes"
+            }
+          ]
+        },
+        {
+          "id": "F14.template-presence",
+          "check": "portable-keychain",
+          "acceptance": "A face template is written and read only with WhenUnlockedThisDeviceOnly. The default flags are biometryCurrentSet, or, and devicePasscode. The other accepted protection is userPresence. A read presents that access control through an LAContext or kSecUseOperationPrompt. An existing item is updated in place, so a failed save leaves the stored template. Cancel and failure store nothing and return nothing. The decrypted bytes are not cached past a match. A fingerprint change drops the template. An older copy is deleted only after the new copy matches. Logs omit template bytes and any size tied to an identity.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "saveAndReadRequireTheSamePresenceProtection"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "userPresenceAndBiometryCurrentSetAreBothRefusedWithoutThatProtection"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "cancelledOrFailedSaveStoresNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "cancelledReadFailsClosedAndSkipsTheMatch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "aMatchIsNotCachedAndTheNextMatchReadsAgain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "biometryChangeReturnsNoTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "migrationDeletesTheOldCopyOnlyAfterTheNewCopyMatches"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "migrationKeepsTheOldCopyWhenVerificationFails"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "migrationKeepsTheOldCopyWhenTheWriteOrReadIsCancelled"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "logsNeverIncludeTemplateBytesOrASizeTiedToAnIdentity"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "wordingMatchesTouchIDPasscodeAndReenrol"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "saveAddsANewTemplateWithoutDeletingFirst"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "failedReplaceKeepsTheStoredTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "readPresentsTheItemsAccessControl"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "unprotectedTemplateIsNotReturned"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "promptsMatchUserPresenceOrBiometryCurrentSetAndDevicePasscode"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "evaluationFailureDeniesTheFaceTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "nilDomainStateDeniesTheFaceTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "changedDomainStateDeniesTheFaceTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "emptyDomainStateIsUnavailableAndIsNeverStored"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "unavailableCurrentStateDeniesWithoutDeleting"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "failedEpochAddKeepsThePreviousRecord"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "faceTemplateQueryUsesTheSharedAccessGroup"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "epochReadErrorOrFailedFirstWriteKeepsTheTemplate"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "reenrolmentAfterFingerprintChangeClearsTheEpoch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "writeFailsWhenTheEpochWriteFails"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "failedEpochDeleteDoesNotLeaveAStaleEpoch"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyReplyWaitStopsAtTheExistingPromptTimeout"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyTimeoutInvalidatesAndIgnoresALateReply"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyReplySettlesOnceWithoutInvalidating"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/FaceTemplateAccessTests.swift",
+              "function": "policyWaitDeadlineIsDispatchTime"
             }
           ]
         }

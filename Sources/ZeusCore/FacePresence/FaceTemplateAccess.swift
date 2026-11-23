@@ -1,0 +1,473 @@
+import Foundation
+
+/// How a face template is protected in the data-protection keychain. Both choices use
+/// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. The keychain item itself carries the access
+/// control, so a check that only runs in the app is not enough.
+public enum FaceTemplateProtection: Equatable, Sendable {
+    /// `SecAccessControlCreateFlags.userPresence` with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
+    case userPresence
+    /// Flags `.biometryCurrentSet`, `.or`, and `.devicePasscode`, with
+    /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. A change of fingerprints still requires enrolling again.
+    case biometryCurrentSetOrDevicePasscode
+}
+
+/// Names of the flags the keychain item must carry. The macOS keychain creates the access
+/// control from this set; tests assert the set without calling Security.
+public enum FaceTemplateAccessControl {
+    public static func flags(for protection: FaceTemplateProtection) -> Set<String> {
+        switch protection {
+        case .userPresence:
+            ["WhenUnlockedThisDeviceOnly", "userPresence"]
+        case .biometryCurrentSetOrDevicePasscode:
+            ["WhenUnlockedThisDeviceOnly", "biometryCurrentSet", "devicePasscode"]
+        }
+    }
+}
+
+extension Result: Equatable where Success == Void, Failure: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.success, .success): true
+        case (.failure(let left), .failure(let right)): left == right
+        default: false
+        }
+    }
+}
+
+public enum FaceTemplateFailure: Equatable, Sendable, Error {
+    /// The person cancelled the system prompt, or the prompt failed. Nothing is returned.
+    case cancelled
+    /// Fingerprints changed. The template is gone and has to be enrolled again.
+    case biometryChanged
+    /// The keychain refused the item, or the item is not protected as requested.
+    case unavailable
+    /// The new copy did not match the old one. The old copy is still there.
+    case notVerified
+    /// No template is stored.
+    case missing
+}
+
+public struct FaceTemplateRecord: Equatable, Sendable {
+    public var account: String
+    public var protection: FaceTemplateProtection
+    public var payload: Data
+
+    public init(account: String, protection: FaceTemplateProtection, payload: Data) {
+        self.account = account
+        self.protection = protection
+        self.payload = payload
+    }
+}
+
+/// The keychain the face vault talks to. A save and a read both name the protection, and the
+/// implementation must put that protection on the item. Tests pass `MemoryFaceTemplateKeychain`.
+public protocol FaceTemplateKeychain: Sendable {
+    func write(_ record: FaceTemplateRecord) -> Result<Void, FaceTemplateFailure>
+    func read(account: String, requiring protection: FaceTemplateProtection) -> Result<Data, FaceTemplateFailure>
+    @discardableResult func remove(account: String) -> Result<Void, FaceTemplateFailure>
+    func protection(of account: String) -> FaceTemplateProtection?
+}
+
+/// Lines a face-template log may contain. A line that carries the template, or a size next to
+/// whose face it is, is refused.
+public enum FaceTemplateLog {
+    public static func line(_ event: String) -> String { "face-template.\(event)" }
+
+    public static func exposesPrivateMaterial(_ line: String, identity: String, payload: Data) -> Bool {
+        if let text = String(data: payload, encoding: .utf8), !text.isEmpty, line.contains(text) { return true }
+        if line.contains(identity), line.contains(String(payload.count)) { return true }
+        return false
+    }
+}
+
+/// What the Enroll row and the fingerprint-change line say. The card draws these words and no others.
+public enum FaceTemplateCopy {
+    public static let enroll = "Saving a face asks for Touch ID or the device passcode. Zeus does not keep the face print after it checks a match."
+    public static let reenrol = "Fingerprints on this Mac changed. Enroll this face again."
+}
+
+/// Holds no template bytes. `cachedPayload` stays nil: a match reads the keychain and drops the copy.
+public final class FaceTemplateStore: @unchecked Sendable {
+    public static let protection = FaceTemplateProtection.biometryCurrentSetOrDevicePasscode
+
+    private let keychain: any FaceTemplateKeychain
+    private let account: String
+    private let protection: FaceTemplateProtection
+    private let log: @Sendable (String) -> Void
+
+    public init(keychain: any FaceTemplateKeychain, account: String, protection: FaceTemplateProtection,
+                log: @escaping @Sendable (String) -> Void = { _ in }) {
+        self.keychain = keychain
+        self.account = account
+        self.protection = protection
+        self.log = log
+    }
+
+    /// Always nil. The decrypted template is not kept on this store.
+    public var cachedPayload: Data? { nil }
+
+    public func save(_ payload: Data, identity: String) -> Result<Void, FaceTemplateFailure> {
+        _ = identity
+        log(FaceTemplateLog.line("save"))
+        let record = FaceTemplateRecord(account: account, protection: protection, payload: payload)
+        switch keychain.write(record) {
+        case .success:
+            return .success(())
+        case .failure(let error):
+            if error == .biometryChanged { keychain.remove(account: account) }
+            return .failure(error)
+        }
+    }
+
+    /// Reads once, hands the bytes to `body`, then zeroes that copy. A cancel, a failure, or a
+    /// fingerprint change does not call `body`.
+    public func withTemplate(identity: String, _ body: (inout Data) -> Void) -> Result<Void, FaceTemplateFailure> {
+        _ = identity
+        log(FaceTemplateLog.line("read"))
+        switch keychain.read(account: account, requiring: protection) {
+        case .failure(let error):
+            if error == .biometryChanged { keychain.remove(account: account) }
+            return .failure(error)
+        case .success(var payload):
+            body(&payload)
+            if !payload.isEmpty { payload.resetBytes(in: 0..<payload.count) }
+            return .success(())
+        }
+    }
+}
+
+/// Read the old template, write the new protected item, read it back, and only then delete the
+/// old copy. Any miss deletes the new item when one was written and leaves the old copy in place.
+public enum FaceTemplateMigration {
+    public static func run(
+        readOld: () -> Result<Data, FaceTemplateFailure>,
+        writeNew: (Data) -> Result<Void, FaceTemplateFailure>,
+        readNew: () -> Result<Data, FaceTemplateFailure>,
+        deleteNew: () -> Result<Void, FaceTemplateFailure>,
+        deleteOld: () -> Result<Void, FaceTemplateFailure>
+    ) -> Result<Void, FaceTemplateFailure> {
+        let old: Data
+        switch readOld() {
+        case .success(let data): old = data
+        case .failure(let error): return .failure(error)
+        }
+        switch writeNew(old) {
+        case .success: break
+        case .failure(let error):
+            _ = deleteNew()
+            return .failure(error)
+        }
+        switch readNew() {
+        case .success(let copy) where copy == old: break
+        case .success:
+            _ = deleteNew()
+            return .failure(.notVerified)
+        case .failure(let error):
+            _ = deleteNew()
+            return .failure(error)
+        }
+        switch deleteOld() {
+        case .success: return .success(())
+        case .failure(let error): return .failure(error)
+        }
+    }
+}
+
+/// In-memory stand-in. An item planted without protection cannot be read as a template.
+public final class MemoryFaceTemplateKeychain: FaceTemplateKeychain, @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String: FaceTemplateRecord] = [:]
+    private var unprotected: [String: Data] = [:]
+    public var failWrites: FaceTemplateFailure?
+    public var failReads: FaceTemplateFailure?
+    public private(set) var reads = 0
+    public private(set) var writes = 0
+
+    public init() {}
+
+    public func plantUnprotected(account: String, payload: Data) {
+        lock.lock(); defer { lock.unlock() }
+        unprotected[account] = payload
+        items[account] = nil
+    }
+
+    public func item(account: String) -> FaceTemplateRecord? {
+        lock.lock(); defer { lock.unlock() }
+        return items[account]
+    }
+
+    public func write(_ record: FaceTemplateRecord) -> Result<Void, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        writes += 1
+        if let failWrites { return .failure(failWrites) }
+        items[record.account] = record
+        unprotected[record.account] = nil
+        return .success(())
+    }
+
+    public func read(account: String, requiring protection: FaceTemplateProtection) -> Result<Data, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        if let failReads { return .failure(failReads) }
+        if let item = items[account] {
+            guard item.protection == protection else { return .failure(.unavailable) }
+            reads += 1
+            return .success(item.payload)
+        }
+        if unprotected[account] != nil { return .failure(.unavailable) }
+        return .failure(.missing)
+    }
+
+    @discardableResult
+    public func remove(account: String) -> Result<Void, FaceTemplateFailure> {
+        lock.lock(); defer { lock.unlock() }
+        items[account] = nil
+        unprotected[account] = nil
+        return .success(())
+    }
+
+    public func protection(of account: String) -> FaceTemplateProtection? {
+        lock.lock(); defer { lock.unlock() }
+        return items[account]?.protection
+    }
+}
+
+/// Result of asking the system who is present. A nil or empty domain state is not a success.
+public enum FaceTemplateEvaluation: Equatable, Sendable {
+    case failed
+    case succeeded(Data?)
+}
+
+/// What to do with the stored face after that answer. Unavailable keeps the template.
+public enum FaceTemplateDomainEffect: Equatable, Sendable {
+    case allow(Data)
+    case denyKeep
+    case changedDelete
+}
+
+/// Empty and nil domain states are unavailable. They are not compared and they do not delete.
+public enum FaceTemplateDomainGate {
+    public static func effect(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false, epochUnreadable: Bool = false) -> FaceTemplateDomainEffect {
+        if epochUnreadable { return .denyKeep }
+        switch evaluation {
+        case .failed, .succeeded(nil):
+            return .denyKeep
+        case .succeeded(let current?):
+            if current.isEmpty { return .denyKeep }
+            if let stored, !stored.isEmpty {
+                return stored == current ? .allow(current) : .changedDelete
+            }
+            // A missing epoch after enrollment is not a first enrollment, and it does not delete the face.
+            return enrolled ? .denyKeep : .allow(current)
+        }
+    }
+
+    public static func denies(stored: Data?, evaluation: FaceTemplateEvaluation, enrolled: Bool = false, epochUnreadable: Bool = false) -> Bool {
+        if case .allow = effect(stored: stored, evaluation: evaluation, enrolled: enrolled, epochUnreadable: epochUnreadable) { return false }
+        return true
+    }
+}
+
+/// Replace an epoch in place. A failed write leaves the previous bytes, and an empty value is never stored.
+public enum FaceTemplateEpochPlan: Equatable, Sendable {
+    case update
+    case add
+}
+
+public enum FaceTemplateEpochWrite {
+    public static func plan(existing: Data?) -> FaceTemplateEpochPlan {
+        if let existing, !existing.isEmpty { return .update }
+        return .add
+    }
+
+    public static func kept(existing: Data?, next: Data, succeeded: Bool) -> Data? {
+        let prior = existing.flatMap { $0.isEmpty ? nil : Optional($0) }
+        guard succeeded, !next.isEmpty else { return prior }
+        return next
+    }
+
+    /// The epoch does not outlive the template, so the next enrollment is not stuck on the old fingerprints.
+    public static func afterTemplateDeleted(epoch: Data?) -> Data? {
+        _ = epoch
+        return nil
+    }
+
+    /// A saved template is not a successful write unless the epoch was stored too.
+    public static func reported(template: Result<Void, FaceTemplateFailure>, epochSaved: Bool) -> Result<Void, FaceTemplateFailure> {
+        switch template {
+        case .failure(let error):
+            return .failure(error)
+        case .success:
+            return epochSaved ? .success(()) : .failure(.unavailable)
+        }
+    }
+}
+
+/// A failed epoch delete is retried once. If it is still there and no template is enrolled, a read ignores it.
+public enum FaceTemplateEpochDelete {
+    public static let attempts = 2
+
+    public static func cleared(_ results: [Bool]) -> Bool {
+        results.contains(true)
+    }
+
+    public static func binding(epoch: Data?, enrolled: Bool) -> Data? {
+        guard enrolled, let epoch, !epoch.isEmpty else { return nil }
+        return epoch
+    }
+}
+
+/// The reply form of `evaluatePolicy` has no deadline. The wait reuses the existing prompt timeout.
+public enum FaceTemplatePolicyWait {
+    public static var promptTimeout: TimeInterval { FlingLimits.promptTimeout }
+    public static var limit: TimeInterval { promptTimeout }
+
+    public static func evaluation(replied: Bool, waited: TimeInterval, state: Data?) -> FaceTemplateEvaluation {
+        guard replied, waited < limit else { return .failed }
+        return .succeeded(state)
+    }
+
+    /// `DispatchSemaphore.wait` takes a `DispatchTime`. A `Date` does not compile.
+    public static func dispatchDeadline(after seconds: TimeInterval) -> DispatchTime {
+        .now() + seconds
+    }
+}
+
+/// One policy reply. The first finish or timeout wins, and a later write is ignored.
+public final class FaceTemplatePolicyReply: @unchecked Sendable {
+    public enum Claim: Equatable, Sendable {
+        case reply(FaceTemplateEvaluation)
+        case timedOut
+    }
+
+    private let lock = NSLock()
+    private var settled = false
+    private var stored: FaceTemplateEvaluation = .failed
+    private var invalidated = false
+
+    public init() {}
+
+    /// Stores the reply unless a timeout or an earlier reply already won.
+    @discardableResult
+    public func finish(_ evaluation: FaceTemplateEvaluation) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !settled else { return false }
+        stored = evaluation
+        settled = true
+        return true
+    }
+
+    /// Marks a timeout only when no reply has been stored. The winner is the value already stored.
+    public func claimTimeout() -> Claim {
+        lock.lock()
+        defer { lock.unlock() }
+        if settled { return .reply(stored) }
+        settled = true
+        stored = .failed
+        invalidated = true
+        return .timedOut
+    }
+
+    public var evaluation: FaceTemplateEvaluation {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    /// True only when the timeout won, so the caller dismisses the prompt.
+    public var shouldInvalidate: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return invalidated
+    }
+}
+
+/// Query fields for the face-template item. The group is `CredentialKeychainPolicy.accessGroup`.
+public enum FaceTemplateKeychainAttributes {
+    public static let service = "com.zeus.app"
+
+    public static func query(account: String, teamIdentifier: String) -> [String: String]? {
+        guard let group = CredentialKeychainPolicy.accessGroup(teamIdentifier: teamIdentifier) else { return nil }
+        return ["service": service, "account": account, "accessGroup": group]
+    }
+}
+
+/// What a read or save must present so the item's `SecAccessControl` is evaluated.
+/// `presentsAccessControl` is true only for an `LAContext` (`kSecUseAuthenticationContext`) or
+/// `kSecUseOperationPrompt` path. An empty prompt does not count.
+public struct FaceTemplateAuthentication: Equatable, Sendable {
+    public var protection: FaceTemplateProtection
+    public var operationPrompt: String
+    public var presentsAccessControl: Bool
+
+    public init(protection: FaceTemplateProtection, operationPrompt: String, presentsAccessControl: Bool) {
+        self.protection = protection
+        self.operationPrompt = operationPrompt
+        self.presentsAccessControl = presentsAccessControl
+    }
+}
+
+/// A UI-fail probe. Unprotected bytes must be discarded by the caller.
+public enum FaceTemplateProbe: Equatable, Sendable {
+    case missing
+    case unprotected(Data)
+    case protected
+}
+
+/// The secure-item operations behind `SystemFaceTemplateKeychain`. Tests use a fake.
+public protocol FaceTemplateSecureItems: Sendable {
+    func probe(account: String) -> FaceTemplateProbe
+    func add(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure>
+    func replace(_ record: FaceTemplateRecord, authentication: FaceTemplateAuthentication) -> Result<Void, FaceTemplateFailure>
+    func read(account: String, authentication: FaceTemplateAuthentication) -> Result<Data, FaceTemplateFailure>
+    func delete(account: String) -> Result<Void, FaceTemplateFailure>
+}
+
+/// Save and read sequencing for a face template. An existing item is updated in place.
+/// A read presents that protection's access control. Bytes that arrive with the prompt refused are discarded.
+public enum FaceTemplateSecureSession {
+    public static let userPresencePrompt = "Authenticate to read the face template."
+    public static let biometryOrPasscodePrompt = "Authenticate with Touch ID or the device passcode to read the face template."
+
+    public static func authentication(for protection: FaceTemplateProtection) -> FaceTemplateAuthentication {
+        switch protection {
+        case .userPresence:
+            FaceTemplateAuthentication(protection: protection, operationPrompt: userPresencePrompt, presentsAccessControl: true)
+        case .biometryCurrentSetOrDevicePasscode:
+            FaceTemplateAuthentication(protection: protection, operationPrompt: biometryOrPasscodePrompt, presentsAccessControl: true)
+        }
+    }
+
+    public static func write(_ record: FaceTemplateRecord, items: any FaceTemplateSecureItems) -> Result<Void, FaceTemplateFailure> {
+        let authentication = authentication(for: record.protection)
+        switch items.probe(account: record.account) {
+        case .missing:
+            return items.add(record, authentication: authentication)
+        case .protected, .unprotected:
+            switch items.replace(record, authentication: authentication) {
+            case .success:
+                return .success(())
+            case .failure(let error) where error == .missing:
+                return items.add(record, authentication: authentication)
+            case .failure(let error):
+                return .failure(error)
+            }
+        }
+    }
+
+    public static func read(account: String, requiring protection: FaceTemplateProtection, items: any FaceTemplateSecureItems) -> Result<Data, FaceTemplateFailure> {
+        let authentication = authentication(for: protection)
+        guard authentication.presentsAccessControl, !authentication.operationPrompt.isEmpty else {
+            return .failure(.unavailable)
+        }
+        switch items.probe(account: account) {
+        case .missing:
+            return .failure(.missing)
+        case .unprotected(var data):
+            if !data.isEmpty { data.resetBytes(in: 0..<data.count) }
+            return .failure(.unavailable)
+        case .protected:
+            return items.read(account: account, authentication: authentication)
+        }
+    }
+}

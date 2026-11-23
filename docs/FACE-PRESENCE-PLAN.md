@@ -83,7 +83,7 @@ data, never built, no script run. Every adapted file starts with one line:
 | `FaceAligner.swift` | `FaceVision.swift` | 5-point to template warp, 2-point fallback, padded crop fallback | Nothing |
 | `Liveness/LivenessCues.swift`, `LivenessFeatures.swift`, `GlareCue.swift`, `GlareCueExtractor.swift`, `DeviceBezelDetector.swift` | `ZeusCore/FacePresence/SpoofCues.swift` (pure), extractors in `FaceVision.swift` | The two deny cues (gloss glare, device bezel), `CueReading` with confidence 0 as abstention, frame counting | Confirm cues (blink, depth and pose, flat vs 3D), heavy mode, `GeometryLiveness.swift`, `LivenessScoring.swift`, `LivenessAnalyzer.swift`: presence must never need the owner to move or blink |
 | `FaceEmbedder.swift` (Vision feature print and vector math), `FaceLabController.swift` (identity idea, calibration) | `ZeusCore/FacePresence/FaceMatch.swift`; feature print call in `FaceVision.swift` | Feature print as `[Float]`, normalize, average, both-measures match (centroid and nearest sample), threshold from genuine samples | Cosine on ArcFace, debug UI, manual calibration |
-| `FaceEnrollmentStore.swift`, `SecureFaceStore.swift` | `ZeusCore/FacePresence/FaceVault.swift` (pure seal and records), `Zeus/FacePresence/FaceVaultStore.swift` (file and key) | Identity with samples and `isEnabled`, decode tolerant of a missing flag, never overwrite an unreadable store, delete the file when empty | Session key shared with the password, Touch ID gate, pose names |
+| `FaceEnrollmentStore.swift`, `SecureFaceStore.swift` | `ZeusCore/FacePresence/FaceVault.swift` (pure seal and records), `Zeus/FacePresence/FaceVaultStore.swift` (protected keychain item) | Identity with samples and `isEnabled`, decode tolerant of a missing flag, never overwrite an unreadable store, delete the item when empty, Touch ID or device passcode on save and on read | Session key shared with the password, pose names |
 | `CameraManager.swift`, `CameraDeviceCatalog.swift` | `Zeus/FacePresence/FaceCamera.swift` | Session on its own queue, BGRA output, late frames dropped, downscale before Vision, built-in front camera first | Highest resolution format, preview layer, per-display camera choice, error prose |
 | `LockMonitor.swift` | `FacePresenceController.swift` observers | The signal set, notifications treated as hints, the session dictionary read as the authority | Event counters for unlock timing |
 | `SessionAutoLocker.swift` | `FacePresenceMachine` (pure) | Compare timestamps, never count ticks; evaluate again on wake | Idle limit on a password session |
@@ -227,10 +227,14 @@ TCC, the real Keychain or the network.
 
 ### FP-5. Face vault
 - Files: new `Sources/ZeusCore/FacePresence/FaceVault.swift` (records, `seal(_:key:)`, `open(_:key:)` with CryptoKit
-  `AES.GCM`), `Sources/Zeus/FacePresence/FaceVaultStore.swift` (file `~/Library/Application Support/Zeus/face-presence.enc`,
-  mode 600; key: 32 random bytes, base64, `KeychainStore` account `face.presence.vaultKey`); tests
-  `Tests/ZeusCoreTests/FaceVaultTests.swift`, `Tests/ZeusAppTests/FaceVaultStoreTests.swift` (temp directory,
-  `MemoryKeychain`).
+  `AES.GCM`), `Sources/Zeus/FacePresence/FaceVaultStore.swift`. The face print is a data-protection keychain item,
+  account `face.presence.templates`, `WhenUnlockedThisDeviceOnly`, with `.biometryCurrentSet` or `.devicePasscode`.
+  The system asks on save and on read. The bytes are not cached after a match. A fingerprint change deletes the
+  item and the card asks to enroll again. Names for the card are in `face-presence.meta` with the samples removed.
+  An older `face-presence.enc` plus `face.presence.vaultKey` is read, written into the new item, checked, and only
+  then deleted. A miss leaves the older copy. Tests: `Tests/ZeusCoreTests/FaceVaultTests.swift`,
+  `Tests/ZeusCoreTests/FaceTemplateAccessTests.swift`, `Tests/ZeusAppTests/FaceVaultStoreTests.swift` (temp directory,
+  `MemoryKeychain`, `MemoryFaceTemplateKeychain`).
 - Tests first: `sealOpenRoundTrip`, `sealedFileHoldsNoPlaintextEmbedding`, `aWrongKeyFailsToOpen`,
   `aMissingEnabledFlagDecodesAsEnabled`, `anUnreadableVaultIsNeverOverwritten`, `deletingTheLastFaceRemovesFileAndKey`,
   `aMissingKeyWithAFileIsUnreadableNotEmpty`, `recordsHoldNoImageField`.

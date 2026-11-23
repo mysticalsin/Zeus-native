@@ -20,8 +20,16 @@ struct FacePresenceCardTests {
         FaceRecord(id: id, name: "Face \(id)", isEnabled: enabled, revision: 2, samples: [[1, 0, 0], [0, 1, 0]], threshold: 0.3)
     }
 
-    static func model(_ machine: Machine, faces: [FaceRecord] = [], label: String = "2 minutes", uptime: Double = 100) -> FacePresenceCardModel {
-        FacePresenceCardModel.make(machine: machine, faces: faces, lockAfterLabel: label, uptime: uptime)
+    static func model(_ machine: Machine, faces: [FaceRecord] = [], label: String = "2 minutes", uptime: Double = 100,
+                      needsReenrol: Bool = false) -> FacePresenceCardModel {
+        FacePresenceCardModel.make(machine: machine, faces: faces, lockAfterLabel: label, uptime: uptime, needsReenrol: needsReenrol)
+    }
+
+    @Test func enrollNoteMatchesTheKeychainRule() {
+        #expect(FacePresenceCardModel.enrollNote == FaceTemplateCopy.enroll)
+        #expect(FacePresenceCardModel.reenrolNote == FaceTemplateCopy.reenrol)
+        #expect(Self.model(Machine(), needsReenrol: true).needsReenrol)
+        #expect(!Self.model(Machine()).needsReenrol)
     }
 
     @Test func enrollIsDisabledOutsideWatchingPresentAndAway() {
