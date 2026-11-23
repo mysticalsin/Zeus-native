@@ -6623,6 +6623,44 @@
           ]
         },
         {
+          "id": "F12.connection-fallback",
+          "check": "portable-regressions",
+          "acceptance": "An empty offer list does not invent a provider. A saved choice leads when it is offered, and otherwise the first offered connection leads. The spoken sentence names the fallback. No credential, vault, or live provider call.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ConnectionFallbackTests.swift",
+              "function": "anEmptyOfferDoesNotInventAProvider"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ConnectionFallbackTests.swift",
+              "function": "aSavedChoiceLeadsWhenItIsOffered"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ConnectionFallbackTests.swift",
+              "function": "aMissingChoiceFallsBackToTheFirstOfferedConnection"
+            }
+          ]
+        },
+        {
+          "id": "F12.voice-fallback-speech",
+          "check": "portable-presentation",
+          "acceptance": "The spoken voice order names the Mac voice last after a cloud voice, and a chosen Mac voice does not invent a cloud fallback. This does not play audio.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/UltronRouteSpeechTests.swift",
+              "function": "theMacVoiceIsNamedLastWhenACloudVoiceLeads"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronRouteSpeechTests.swift",
+              "function": "theMacVoiceAloneDoesNotInventACloudFallback"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/UltronRouteSpeechTests.swift",
+              "function": "anEmptyRouteSaysNoVoiceIsReady"
+            }
+          ]
+        },
+        {
           "id": "F12.thinking-orb-speech",
           "check": "portable-regressions",
           "acceptance": "The Murmure thinking orb has a distinct VoiceOver name for listening and working, and its Reduce Motion disc does not change with time. This does not prove the Canvas on a Mac.",

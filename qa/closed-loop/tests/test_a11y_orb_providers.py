@@ -41,3 +41,12 @@ class ConnectionControlSourceTests(unittest.TestCase):
         self.assertIn("state.accessibilityLabel", ring)
         self.assertIn("VoiceRingAccessibility.value", ring)
         self.assertIn("focusable(VoiceRingAccessibility.takesKeyboardFocus)", ring)
+
+    def test_provider_fallback_is_spoken(self):
+        page = source("Sources/Zeus/Settings/GSAIConnectionsPage.swift")
+        voice = source("Sources/Zeus/Settings/GSVoiceCards.swift")
+        chat = source("Sources/ZeusCore/NewChat.swift")
+        self.assertIn("ConnectionFallback.spokenChain", page)
+        self.assertIn("UltronEngineRouter.spokenOrder", voice)
+        self.assertIn("-> CodingTool?", chat)
+        self.assertNotIn("offered.first ?? .claude", chat)

@@ -40,8 +40,10 @@ public enum NewChatAgents {
     }
 
     /// The `general.defaultAgent` label ("Claude Code", "Codex") if it is offered, else the first offered.
-    public static func defaultTool(label: String, offered: [CodingTool]) -> CodingTool {
-        if let tool = CodingTool.named(label), offered.contains(tool) { return tool }
-        return offered.first ?? .claude
+    /// Nothing offered stays unset. A turned-off agent is not put back.
+    public static func defaultTool(label: String, offered: [CodingTool]) -> CodingTool? {
+        let saved = CodingTool.named(label).flatMap { offered.contains($0) ? $0.title : nil }
+        guard let name = ConnectionFallback.selection(saved: saved, offered: offered.map(\.title)) else { return nil }
+        return offered.first { $0.title == name }
     }
 }

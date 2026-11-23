@@ -19,6 +19,7 @@ struct AIConnectionsPage: View {
                 connection(provider)
             }
             if let message = services.connectMessage { GSInfo(text: message) }
+            GSInfo(text: connectionOrder)
         }
         GSCard("Apps") {
             connection(.chatgpt)
@@ -52,6 +53,26 @@ struct AIConnectionsPage: View {
             }
         }
         .task { await model.refresh(); await model.checkAllSignIns() }
+    }
+
+    /// Offered agents, in the same order New chat uses, skipping a tool that is not installed.
+    /// VoiceOver reads who leads and who is tried when that connection is not ready.
+    private var connectionOrder: String {
+        let providers = [AIProvider.claudeCode, .codex, .gemini, .cursor].filter { provider in
+            model.offers(provider) && model.step(provider, services: services) != .install
+        }
+        let saved = SettingsStore.shared.string("general.defaultAgent")
+        return ConnectionFallback.spokenChain(chosen: saved.isEmpty ? nil : saved, offered: providers.map(Self.chatTitle))
+    }
+
+    private static func chatTitle(_ provider: AIProvider) -> String {
+        switch provider {
+        case .claudeCode: CodingTool.claude.title
+        case .codex: CodingTool.codex.title
+        case .gemini: CodingTool.gemini.title
+        case .cursor: CodingTool.cursorAgent.title
+        default: provider.title
+        }
     }
 
     /// The row's sentence must agree with its status pill and button. The two are computed separately

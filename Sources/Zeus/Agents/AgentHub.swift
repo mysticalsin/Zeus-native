@@ -97,7 +97,9 @@ final class AgentHub {
 
     func beginNewChat() {
         let offered = offeredTools
-        newTool = NewChatAgents.defaultTool(label: SettingsStore.shared.string("general.defaultAgent"), offered: offered)
+        if let tool = NewChatAgents.defaultTool(label: SettingsStore.shared.string("general.defaultAgent"), offered: offered) {
+            newTool = tool
+        }
         if newDirectory.isEmpty { newDirectory = projects.first?.path ?? FileManager.default.homeDirectoryForCurrentUser.path }
         newInstruction = ""
         launchMessage = nil

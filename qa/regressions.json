@@ -8700,6 +8700,18 @@
         "file": "qa/closed-loop/tests/test_a11y_orb_providers.py",
         "function": "test_voice_orb_reduce_motion_is_immediate_and_named"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "Turning every agent offer off still selected Claude, and the voice settings did not say that the Mac voice is the last fallback.",
+      "features": [
+        "F12"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_a11y_orb_providers.py",
+        "function": "test_provider_fallback_is_spoken"
+      }
     }
   ]
 }
