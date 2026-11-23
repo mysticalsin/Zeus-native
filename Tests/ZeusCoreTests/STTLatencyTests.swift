@@ -391,4 +391,105 @@ struct STTLatencyTests {
         #expect(live.applyLoudness)
         #expect(live.publishLevel)
     }
+
+    @Test func warmMedianOfFiveStaysInsideThePartialAndFinalCeilings() {
+        let samples = [
+            STTTimingSample(utteranceMs: 3_000, firstPartialMs: 100, finalAfterUtteranceMs: 200),
+            STTTimingSample(utteranceMs: 3_500, firstPartialMs: 200, finalAfterUtteranceMs: 400),
+            STTTimingSample(utteranceMs: 4_000, firstPartialMs: 400, finalAfterUtteranceMs: 450),
+            STTTimingSample(utteranceMs: 4_500, firstPartialMs: 900, finalAfterUtteranceMs: 800),
+            STTTimingSample(utteranceMs: 5_000, firstPartialMs: 1_400, finalAfterUtteranceMs: 2_900),
+        ]
+        #expect(samples.count >= STTAcceptance.minimumRuns)
+        #expect(STTTimingScore.median(samples.map(\.firstPartialMs)) == 400)
+        #expect(STTTimingScore.median(samples.map(\.finalAfterUtteranceMs)) == 450)
+        #expect(STTTimingScore.warmPasses(samples))
+        #expect(!STTTimingScore.warmPasses(Array(samples.prefix(4))))
+        let slowPartial = samples.map { sample -> STTTimingSample in
+            var copy = sample
+            copy.firstPartialMs = 1_600
+            return copy
+        }
+        #expect(!STTTimingScore.warmPasses(slowPartial))
+        let slowFinal = samples.map { sample -> STTTimingSample in
+            var copy = sample
+            copy.finalAfterUtteranceMs = 3_100
+            return copy
+        }
+        #expect(!STTTimingScore.warmPasses(slowFinal))
+        var short = samples
+        short[0].utteranceMs = 2_000
+        #expect(!STTTimingScore.warmPasses(short))
+        var cold = samples
+        cold[0].cold = true
+        #expect(!STTTimingScore.warmPasses(cold))
+    }
+
+    @Test func aFourSecondUtteranceOnTheProductionClockStaysInsideTheCeilings() {
+        let events: [STTEvent] = [
+            .keyDown(0),
+            .capture(15),
+            .modelReady(0),
+            .audio(at: 40, rms: 0.05, partialToken: 1),
+            .audio(at: 4_000, rms: 0.05, partialToken: 2),
+            .keyUp(4_000),
+        ]
+        let turn = STTLiveTurn.replay(path: .talkHold, policy: .production, events: events, endOnSilence: false)
+        let partial = turn.trace.offset(.firstPartial)!
+        let endpoint = turn.trace.offset(.endpointFired)!
+        let final = turn.trace.offset(.finalTranscript)!
+        let afterUtterance = final - 4_000
+        #expect(STTAcceptance.utteranceInRange(4_000))
+        #expect(partial <= STTAcceptance.warmFirstPartialMs)
+        #expect(afterUtterance <= STTAcceptance.warmFinalMs)
+        #expect(final - endpoint == STTSessionPolicy.production.endpointToFinalMs)
+        #expect(STTTimingScore.warmPasses([
+            STTTimingSample(utteranceMs: 4_000, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 3_000, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 3_500, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 4_500, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 5_000, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+        ]))
+    }
+
+    @Test func coldFirstFinalStaysInsideEightSeconds() {
+        let coldCap = STTSessionPolicy.production.batchGiveUpMs(audioMs: 5_000)
+        #expect(STTAcceptance.coldFirstFinalMs == 8_000)
+        #expect(coldCap <= STTAcceptance.coldFirstFinalMs)
+        #expect(coldCap != STTAcceptance.coldFirstFinalMs)
+        #expect(STTTimingScore.coldFirstFinalPasses(ms: coldCap))
+        #expect(STTTimingScore.coldFirstFinalPasses(ms: 8_000))
+        #expect(!STTTimingScore.coldFirstFinalPasses(ms: 8_001))
+        #expect(!STTSessionPolicy.production.allowsServerRoundTrip)
+    }
+
+    @Test func aMidStreamAbortFinishesInsideTheAbortCeiling() {
+        var clock = STTClock(nowMs: 0)
+        var turn = STTLiveTurn(path: .murmurTap, policy: .production, endOnSilence: false)
+        turn.keyDown(clock: clock)
+        clock.advance(to: 40)
+        turn.feed(clock: clock, rms: 0.05, partialToken: 1)
+        clock.advance(to: 2_000)
+        turn.abort(clock: clock)
+        let finished = turn.abortedAtMs!
+        #expect(turn.taskCancelled)
+        #expect(turn.failure == .aborted)
+        #expect(turn.failure != .hang)
+        #expect(finished == 2_000)
+        #expect(STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: finished))
+        #expect(STTSessionPolicy.production.hangGiveUpMs <= STTAcceptance.abortMs)
+        #expect(STTAcceptance.abortMs == 1_400)
+        #expect(!STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: 2_000 + 1_401))
+        #expect(!STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: 1_999))
+    }
+
+    @Test func aDeniedMicOrMissingEngineRetriesInsteadOfHanging() {
+        for fault in [STTFault.micDenied, .engineUnavailable] {
+            let answer = STTFaultGate.answer(fault)
+            #expect(answer.fault == fault)
+            #expect(answer.recoverable)
+            #expect(answer.retry)
+            #expect(!answer.hangs)
+        }
+    }
 }
