@@ -98,12 +98,37 @@ public struct VoiceKeyMachine: Sendable, Equatable {
 
     // MARK: Timing
 
+    /// The windows the walk's age fold is derived from. These are fixed. A test injects its own copy into the harness.
+    enum Timing {
+        static let step: TimeInterval = 0.05
+        static let checkEvery: TimeInterval = 0.25
+        static let holdTapMax: TimeInterval = 0.30
+        static let sharedTapMax: TimeInterval = 0.25
+        static let holdGap: TimeInterval = 0.40
+        static let sharedGap: TimeInterval = 0.35
+        static let pointingWatchdog: TimeInterval = PointingKeyGesture.watchdog
+        static let sharedDictationDelay: TimeInterval = 0.25
+        /// One step past the longest gap, so the cap is past every window.
+        static var cap: TimeInterval { holdGap + step }
+
+        static func steps(_ seconds: TimeInterval) -> Int { Int((seconds / step).rounded()) }
+
+        /// Step counts of the windows, including `confirm` and the cap. Sorted, with duplicates removed.
+        static func cuts(confirm: TimeInterval) -> [Int] {
+            let seconds = [0, confirm, checkEvery, holdTapMax, sharedTapMax, holdGap, sharedGap,
+                           pointingWatchdog, sharedDictationDelay, cap]
+            return Array(Set(seconds.map { Int(($0 / step).rounded()) })).sorted()
+        }
+    }
+
     /// How long a first press may last and still be a tap, and how long after a tap the next one still counts as its
     /// second. A hold key keeps the old talk latch's values, the shared key the old gesture's.
-    private static func tapMax(_ config: Config) -> TimeInterval { config.mode == .hold ? 0.3 : 0.25 }
-    private static func gap(_ config: Config) -> TimeInterval { config.mode == .hold ? 0.4 : 0.35 }
+    private static func tapMax(_ config: Config) -> TimeInterval {
+        config.mode == .hold ? Timing.holdTapMax : Timing.sharedTapMax
+    }
+    private static func gap(_ config: Config) -> TimeInterval { config.mode == .hold ? Timing.holdGap : Timing.sharedGap }
     /// How often a running hold looks at the live modifiers, to find a release no event reported.
-    private static let checkEvery: TimeInterval = 0.25
+    private static var checkEvery: TimeInterval { Timing.checkEvery }
     /// A wake may arrive this much early: the clock that schedules it and the clock that stamps events differ.
     private static let slack: TimeInterval = 0.001
 
@@ -113,7 +138,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
     private static func delay(_ config: Config, _ press: Press) -> TimeInterval? {
         switch config.mode {
         case .hold: config.confirm
-        case .shared where config.role == .dictation: 0.25
+        case .shared where config.role == .dictation: Timing.sharedDictationDelay
         case .shared: press == .ending && config.confirm > 0 ? config.confirm : nil
         case .shared, .toggle: nil
         }
@@ -440,7 +465,7 @@ public struct VoiceKeyMachine: Sendable, Equatable {
             out.append(.wake(after: config.confirm))
         case .shared:
             phase = .armed(since: t, press: .first)
-            if config.role == .dictation { out.append(.wake(after: 0.25)) }
+            if config.role == .dictation { out.append(.wake(after: Timing.sharedDictationDelay)) }
         }
     }
 

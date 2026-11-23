@@ -25,6 +25,8 @@ public struct PointingKeyGesture: Sendable, Equatable {
         case holdTimedOut
     }
 
+    /// How often an active hold is checked for a missed release.
+    public static let watchdog: TimeInterval = 0.25
     public static let tapMaximum: TimeInterval = 0.30
     public static let doubleTapWindow: TimeInterval = 0.40
     /// A hold longer than this is a stuck modifier (the microphone stops at 90 s anyway).

@@ -103,7 +103,7 @@ final class PointingHotkeyMonitor {
     /// While a hold is active, a few times a second, compare the tracked keys with the live ones.
     private func startWatchdog() {
         stopWatchdog()
-        watchdog = PointingTimers.repeating(every: 0.25) { [weak self] in self?.watchdogTick() }
+        watchdog = PointingTimers.repeating(every: PointingKeyGesture.watchdog) { [weak self] in self?.watchdogTick() }
     }
 
     private func stopWatchdog() { watchdog?.invalidate(); watchdog = nil }

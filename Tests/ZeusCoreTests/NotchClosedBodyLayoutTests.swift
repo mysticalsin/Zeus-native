@@ -50,6 +50,70 @@ import ZeusCore
         }
     }
 
+    /// The frames `ClosedWingsRow` lays out, from the art and bars widths the view passes in. Art is 14 pt wider.
+    @Test func theMusicWingFramesStayInsideTheSymmetricContentBox() {
+        let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset
+        for scale in [CGFloat(1), 2, 3] {
+            let (art, bars) = NotchClosedBodyLayout.musicContent(scale: scale)
+            #expect(art - bars == NotchClosedBodyLayout.contentInset * scale)
+            let music = NotchClosedBodyLayout.rowLayout(
+                notchWidth: 220, extra: 0, leftProposal: art, rightProposal: bars, clipsMusic: true)
+            #expect(music.leftWidth == music.rightWidth)
+            #expect(music.leftWidth == box)
+            #expect(music.clipWidth == box)
+            #expect(music.gapWidth == 220)
+            #expect(music.outwardInset == 0)
+        }
+    }
+
+    /// The call the closed wings make: art is the 62 pt wing, bars are the box, and the clipped row is box by box.
+    /// Varied proposals are not box by box, so dropping the proposal arguments would fail this test.
+    @Test func theShippedMusicCallIsBoxByBoxAndVariedProposalsAreNot() {
+        let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset
+        let (art, bars) = NotchClosedBodyLayout.musicContent()
+        #expect(art == NotchClosedBodyLayout.wingWidth)
+        #expect(bars == box)
+        let shipped = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 220, extra: 0, leftProposal: art, rightProposal: bars, clipsMusic: true)
+        #expect(shipped.leftWidth == box)
+        #expect(shipped.rightWidth == box)
+        let varied = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 220, extra: 0, leftProposal: 10, rightProposal: 70, clipsMusic: false)
+        #expect(varied.leftWidth == varied.rightWidth)
+        #expect(varied.leftWidth == box + NotchClosedBodyLayout.contentInset)
+        #expect(varied.leftWidth != box)
+    }
+
+    /// Art and bars wider than the box stay inside it. The wings stay matched, so the test cannot pass by clipping one side only.
+    @Test func wideArtAndBarsStayInsideTheBoxWithoutSkewingTheWings() {
+        let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset
+        let wide = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 220, extra: 0, leftProposal: 80, rightProposal: 64, clipsMusic: true)
+        #expect(wide.leftWidth == box)
+        #expect(wide.rightWidth == box)
+        #expect(wide.leftWidth == wide.rightWidth)
+        let glow = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 220, extra: 0, leftProposal: 80, rightProposal: 18, clipsMusic: false)
+        #expect(glow.leftWidth == glow.rightWidth)
+        #expect(glow.outwardInset == NotchClosedBodyLayout.contentInset)
+        #expect(glow.leftWidth == box + NotchClosedBodyLayout.contentInset)
+        #expect(glow.leftWidth < 80)
+    }
+
+    /// A Mac with no hardware notch keeps the 40 pt gap. An external display keeps its own notch width, still mirrored.
+    @Test func aBarWithoutANotchAndAnExternalDisplayKeepMirroredWings() {
+        let box = NotchClosedBodyLayout.wingWidth - NotchClosedBodyLayout.contentInset
+        let plain = NotchClosedBodyLayout.rowLayout(
+            notchWidth: NotchClosedBodyLayout.noNotchGap, extra: 0, leftProposal: 80, rightProposal: 30, clipsMusic: false)
+        #expect(plain.gapWidth == 40)
+        #expect(plain.leftWidth == plain.rightWidth)
+        let external = NotchClosedBodyLayout.rowLayout(
+            notchWidth: 300, extra: 0, leftProposal: 90, rightProposal: 20, clipsMusic: true)
+        #expect(external.gapWidth == 300)
+        #expect(external.leftWidth == box)
+        #expect(external.rightWidth == box)
+    }
+
     @Test func theWingsFillTheContentBoxInsideTheBodyPadding() {
         for notch in Self.notchWidths {
             for extra in Self.everyExtra {
