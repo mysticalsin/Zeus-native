@@ -153,9 +153,9 @@ public final class NativeMessageOutput: @unchecked Sendable {
             while offset < raw.count {
                 let decision: Failure? = lock.withLock {
                     if let failure = terminal { return failure }
-                    // Stdin has already closed. Keep delivering the accepted frame while this
-                    // pipe can still take bytes. The enqueue deadline stays in force until then.
-                    if !finishing, ProcessInfo.processInfo.systemUptime >= deadline { return .timedOut }
+                    // Finish still flushes an accepted frame, and the enqueue deadline still
+                    // bounds a pipe that has stopped reading.
+                    if ProcessInfo.processInfo.systemUptime >= deadline { return .timedOut }
                     return nil
                 }
                 if let decision { throw decision }
