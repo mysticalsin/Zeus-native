@@ -8676,6 +8676,30 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "The release signature check trusted codesign --display and accepted any well-formed team. codesign --verify did not receive an anchored requirement with a quoted team, so a binary from another team or an unsigned display could pass.",
+      "features": [
+        "S06"
+      ],
+      "check": "release-mocks",
+      "guard": {
+        "file": "qa/release-scripts/test_release_scripts.py",
+        "function": "test_release_signature_pins_team_bundle_and_verifies_the_helper"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The release signature check passed when Contents/Resources/zeus-now-playing was absent, including when another helper was present.",
+      "features": [
+        "S06"
+      ],
+      "check": "release-mocks",
+      "guard": {
+        "file": "qa/release-scripts/test_release_scripts.py",
+        "function": "test_missing_now_playing_helper_fails_closed"
+      }
     }
-]
+  ]
 }
