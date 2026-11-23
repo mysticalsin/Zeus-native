@@ -240,6 +240,9 @@ final class ScribeController {
     static let shared = ScribeController.makeProduction()
 
     /// The machine is the single source of truth. Everything the page shows derives from `machine.phase`.
+    /// Ordered checklist for one manual `start`. The controller still performs each step.
+    private var manualStart = ScribeManualStart()
+
     private(set) var machine = ScribeSessionMachine() {
         // Both writers (`run` and the reset to idle) pass through here, so the meeting-start controller hears every
         // phase change in the same turn.
@@ -566,9 +569,12 @@ final class ScribeController {
 
     /// Starts a recording. `context` is the meeting it is for, if any; a refused start keeps nothing of it.
     func start(context: ScribeMeetingContext? = nil) {
-        guard !machine.phase.isActive else {
-            NSLog("[ZEUS] scribe: start refused, already %@", machine.phase.logName)
-            FlightRecorder.shared.record("scribe", "start refused", machine.phase.logName)
+        let began = manualStart.request(active: machine.phase.isActive)
+        guard began == [.yieldCapture, .clearFields, .openStreams] else {
+            if began.contains(.refuse) {
+                NSLog("[ZEUS] scribe: start refused, already %@", machine.phase.logName)
+                FlightRecorder.shared.record("scribe", "start refused", machine.phase.logName)
+            }
             return
         }
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -615,6 +621,7 @@ final class ScribeController {
         lastNamingEvaluation = -.infinity
         let readout = ScribeLiveReadout()
         self.readout = readout
+        _ = manualStart.fieldsCleared()
         // One ordered stream for everything the capture side says (see `ScribeCaptureInput`).
         cancelCaptureInputs()
         let (inputs, inputContinuation) = AsyncStream<ScribeCaptureInput>.makeStream()
@@ -656,11 +663,14 @@ final class ScribeController {
             transcriber: transcriber
         )
         self.router = router
+        guard manualStart.wired() == [.applyStart] else { return }
         guard run({ $0.start(id, now: nowSeconds()) }).isApplied else {
+            _ = manualStart.machineApplied(false)
             NSLog("[ZEUS] scribe: start not applied")
             FlightRecorder.shared.record("scribe", "start not applied")
             return
         }
+        guard manualStart.machineApplied(true) == [.startProvider] else { return }
         NSLog("[ZEUS] scribe: start session")
         FlightRecorder.shared.record("scribe", "start session")
         let frames: @Sendable (ScribeAudioFrame) -> Void = { [weak self] frame in
