@@ -8678,6 +8678,18 @@
       }
     },
     {
+      "id": "REG-994",
+      "failure": "An answer on one approval surface left the other surface pending.",
+      "features": [
+        "F12"
+      ],
+      "check": "portable-approval-sync",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ApprovalSyncTests.swift",
+        "function": "aSecondAnswerDoesNotLeaveACardBehind"
+      }
+    },
+    {
       "id": "REG-995",
       "failure": "A second shortcut recorder resumed the global hot keys while the first was still listening.",
       "features": [

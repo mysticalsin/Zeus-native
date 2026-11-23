@@ -140,6 +140,10 @@ GROUPS = {
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
+    "approval-sync": (
+        core("ApprovalPair.swift"),
+        tests("ApprovalSyncTests"),
+    ),
     "shortcut-listening": (
         core("ShortcutListening.swift"),
         tests("ShortcutListeningTests"),
