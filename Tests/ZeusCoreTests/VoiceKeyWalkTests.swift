@@ -674,6 +674,10 @@ private struct Sim {
     var arrivalLag = 0
     var wakes: Set<Int> = []
     var timing = WalkTiming()
+    /// Set by `timerJump` so the measured jump is the soonest real timer, not the next merged age cut.
+    var deadlinesIgnoreCuts = false
+    /// Set by `jumpTrace` so one shifted window is not hidden by another window on the same step.
+    var traceCuts: [Int]?
     /// The Control/Option mirror for this node. A differential turns it off. Copied with the node, not a static.
     var mergeControlOption = true
     var step = 0
@@ -859,7 +863,7 @@ private struct Sim {
 
     /// Steps from here to the next window the machine names. One, when the clock is already at the cap.
     func stepsUntilNextCut(_ run: WalkRun) -> Int {
-        let cuts = timing.cuts(confirm: confirm(of: run))
+        let cuts = traceCuts ?? timing.cuts(confirm: confirm(of: run))
         let age: Int
         switch machine.phase {
         case .armed(let since, _): age = max(0, timing.steps(now - since))
@@ -873,7 +877,9 @@ private struct Sim {
     }
 
     /// The soonest step strictly ahead of now, across every timer the machine or the gesture can owe.
-    mutating func stepsUntilNextDeadline(_ run: WalkRun) -> Int {
+    /// `limitToCut` keeps a search jump on the next age cut. A probe turns it off so one window can move
+    /// without another window that shares its step holding the landing still.
+    mutating func stepsUntilNextDeadline(_ run: WalkRun, limitToCut: Bool = true) -> Int {
         var soonest = Int.max
         func note(step when: Int) {
             if when > step { soonest = min(soonest, when - step) }
@@ -898,11 +904,14 @@ private struct Sim {
                     note(time: since + due)
                     note(time: since + due + timing.checkEvery)
                 }
-                note(time: since + tapMax)
+                // A probe isolates one window. The tap max shares a step with the dictation delay, so it stays out of that jump.
+                if limitToCut { note(time: since + tapMax) }
             case .holding(let since, _, let check, _):
-                note(time: check)
-                note(time: check + timing.checkEvery)
-                note(time: since + tapMax)
+                // The machine stored its check with the production interval. The harness copy is what a probe shifts.
+                let harnessCheck = check - VoiceKeyMachine.Timing.checkEvery + timing.checkEvery
+                note(time: harnessCheck)
+                note(time: harnessCheck + timing.checkEvery)
+                if limitToCut { note(time: since + tapMax) }
             case .tapped(let at, true):
                 note(time: at + gap)
             default:
@@ -924,8 +933,29 @@ private struct Sim {
             select(0)
         }
         let cut = stepsUntilNextCut(run)
-        if soonest == Int.max { return cut }
+        if soonest == Int.max || !limitToCut { return soonest == Int.max ? cut : max(1, soonest) }
         return max(1, min(soonest, cut))
+    }
+
+    /// A wake the machine asked for, measured on the harness clock. Equal windows stay on the production
+    /// numbers, so an unshifted search schedules the same step it did before a probe can move one of them.
+    func scheduledSteps(after: TimeInterval, config: VoiceKeyMachine.Config) -> Int {
+        func same(_ value: TimeInterval, _ other: TimeInterval) -> Bool { abs(value - other) < 0.000_000_1 }
+        let interval: TimeInterval
+        if config.mode == .shared, config.role == .dictation, same(after, VoiceKeyMachine.Timing.sharedDictationDelay) {
+            interval = timing.sharedDictationDelay
+        } else if same(after, VoiceKeyMachine.Timing.checkEvery) {
+            interval = timing.checkEvery
+        } else if same(after, VoiceKeyMachine.Timing.holdGap) {
+            interval = timing.holdGap
+        } else if same(after, VoiceKeyMachine.Timing.sharedGap) {
+            interval = timing.sharedGap
+        } else if same(after, VoiceKeyMachine.Timing.pointingWatchdog) {
+            interval = timing.pointingWatchdog
+        } else {
+            interval = after
+        }
+        return timing.steps(interval)
     }
 
     /// The moves of the plain walk: the keys, a short and a long wait, and an abandon.
@@ -942,7 +972,7 @@ private struct Sim {
         case .swallowed(let index): swallow(index, run)
         case .wait: advance(run)
         case .waitToCut:
-            let jumps = stepsUntilNextDeadline(run)
+            let jumps = stepsUntilNextDeadline(run, limitToCut: !deadlinesIgnoreCuts)
             for _ in 0..<jumps { advance(run) }
         case .waitHalfSecond: for _ in 0..<max(1, timing.steps(0.5)) { advance(run) }
         case .deliver: flushHeld(run)
@@ -1123,7 +1153,7 @@ private struct Sim {
         // phase that forgets to ask for its own wake is caught, not covered by a stale one.
         if stage != before { wakes.removeAll() }
         for effect in effects {
-            if case .wake(let after) = effect { wakes.insert(step + timing.steps(after)) }
+            if case .wake(let after) = effect { wakes.insert(step + scheduledSteps(after: after, config: config)) }
         }
         if owed.isEmpty {
             noteKey(key, run)
@@ -1219,7 +1249,7 @@ private struct Sim {
             // A wake belongs to the phase of the slot that asked for it.
             if stage != p.stage { wakes.removeAll() }
             for entry in raw where entry.emitted {
-                if case .wake(let after) = entry.effect { wakes.insert(step + timing.steps(after)) }
+                if case .wake(let after) = entry.effect { wakes.insert(step + scheduledSteps(after: after, config: config)) }
             }
             if owed.isEmpty {
                 noteKey(key, slotRun)
@@ -1535,19 +1565,19 @@ private struct Sim {
         let effects: [VoiceKeyMachine.Effect]
         switch event {
         case .key(let key, let time):
-            effects = Self.effects(of: gesture.feed(key, at: time), gesture)
+            effects = Self.effects(of: gesture.feed(key, at: time), gesture, watchdog: timing.pointingWatchdog)
         case .tick(let time, let live):
             // The calls the monitor makes when a wake arrives: the confirm of an armed hold, the watchdog of an active one.
             if gesture.isArmed {
-                effects = Self.effects(of: gesture.confirmElapsed(at: time, liveModifiers: live), gesture)
+                effects = Self.effects(of: gesture.confirmElapsed(at: time, liveModifiers: live), gesture, watchdog: timing.pointingWatchdog)
             } else if gesture.isActive {
                 let output = gesture.tick(at: time, liveModifiers: live)
-                effects = output == nil ? [.wake(after: timing.pointingWatchdog)] : Self.effects(of: output, gesture)
+                effects = output == nil ? [.wake(after: timing.pointingWatchdog)] : Self.effects(of: output, gesture, watchdog: timing.pointingWatchdog)
             } else {
                 effects = []
             }
         case .interrupt(let live):
-            effects = Self.effects(of: gesture.interrupt(liveModifiers: live), gesture)
+            effects = Self.effects(of: gesture.interrupt(liveModifiers: live), gesture, watchdog: timing.pointingWatchdog)
         case .abandon:
             effects = []
         case .sweep(let live):
@@ -1558,10 +1588,10 @@ private struct Sim {
         return effects
     }
 
-    private static func effects(of output: PointingKeyGesture.Output?, _ gesture: PointingKeyGesture) -> [VoiceKeyMachine.Effect] {
+    private static func effects(of output: PointingKeyGesture.Output?, _ gesture: PointingKeyGesture, watchdog: TimeInterval) -> [VoiceKeyMachine.Effect] {
         switch output {
         case .armed?: [.wake(after: gesture.confirm)]
-        case .began?: [.start, .wake(after: VoiceKeyMachine.Timing.pointingWatchdog)]
+        case .began?: [.start, .wake(after: watchdog)]
         case .ended?, .holdTimedOut?: [.send]
         case .cancelled?: [.cancel]
         case .escape?, .doubleTapControl?, nil: []
@@ -2010,7 +2040,9 @@ private func agreementMoves(_ sim: Sim, _ run: WalkRun, fold: Bool) -> [Move] {
 
 private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool, notPast: Int? = nil, agreement: Bool = false) -> AgeSample {
     var sample = AgeSample()
-    var seen: Set<StateKey> = []
+    // The first path to a state may have used up the depth budget. A shorter path still has to be expanded,
+    // or a one-step wait never reaches a phase the folded jump reaches inside the same budget.
+    var bestDepth: [StateKey: Int] = [:]
     func outcome(_ sim: Sim) -> String {
         let phase: String
         switch sim.machine.phase {
@@ -2025,7 +2057,9 @@ private func ageSample(_ run: WalkRun, depth limit: Int, fold: Bool, merge: Bool
     }
     func walk(_ sim: Sim, depth: Int) {
         if let notPast, sim.step > notPast { return }
-        guard seen.insert(sim.key(run, foldAges: fold)).inserted else { return }
+        let key = sim.key(run, foldAges: fold)
+        if let known = bestDepth[key], known <= depth { return }
+        bestDepth[key] = depth
         sample.steps.insert(sim.step)
         sample.furthest = max(sample.furthest, sim.step)
         sample.outcomes.insert(outcome(sim))
@@ -2055,6 +2089,7 @@ private func timerJump(_ run: WalkRun, timing: WalkTiming = WalkTiming(), prepar
     sim.timing = timing
     prepare(&sim)
     sim.timing = timing
+    sim.deadlinesIgnoreCuts = true
     let start = sim.step
     sim.apply(.waitToCut, run)
     return sim.step - start
@@ -2106,10 +2141,28 @@ private func shifted(_ timing: WalkTiming, _ change: (inout WalkTiming) -> Void)
     return copy
 }
 
+/// Cuts for one key, so a window that shares a step with another mode's window can still move the trace.
+private func traceCuts(_ timing: WalkTiming, _ run: WalkRun) -> [Int] {
+    let config = run.configs[0]
+    var seconds: [TimeInterval] = [0, config.confirm, timing.holdGap + timing.step]
+    switch config.mode {
+    case .hold:
+        seconds += [timing.checkEvery, timing.holdTapMax, timing.holdGap]
+    case .shared where config.role == .dictation:
+        seconds += [timing.sharedDictationDelay, timing.sharedGap]
+    case .shared:
+        seconds += [timing.sharedTapMax, timing.sharedGap]
+    case .toggle:
+        break
+    }
+    return Array(Set(seconds.map { timing.steps($0) })).sorted()
+}
+
 /// Where a held Control-Option pair lands after each jump, under the harness timings.
 private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
     var sim = Sim(run)
     sim.timing = timing
+    sim.traceCuts = traceCuts(timing, run)
     sim.apply(.toggle(0), run)
     sim.apply(.toggle(1), run)
     var steps = [sim.step]
@@ -2161,7 +2214,8 @@ private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
         let gap = VoiceKeyMachine.Timing.steps(VoiceKeyMachine.Timing.holdGap)
         for run in WalkRun.all {
             let cut = firstAgeCut(confirm: run.configs[0].confirm)
-            let depth = run.configs[0].confirm == 0.15 ? gap + 1 : cut + 1
+            // Confirm 0 has no cut until the 0.25 s check. Both own keys have to be down before those one-step waits.
+            let depth = run.configs[0].confirm == 0.15 ? gap + 1 : cut + 2
             let exact = ageSample(run, depth: depth, fold: false, merge: true, agreement: true)
             #expect(exact.furthest > cut, "\(run.name) stopped at step \(exact.furthest), short of the cut at \(cut)")
             if run.configs[0].confirm == 0.15 {
@@ -2216,8 +2270,10 @@ private func jumpTrace(_ run: WalkRun, timing: WalkTiming) -> [Int] {
         let pointing = WalkRun.all.first { $0.pointing }!
         #expect(timerJump(pointing, timing: shipped) { sim in
             sim.apply(.toggle(0), pointing); sim.apply(.toggle(1), pointing)
+            sim.apply(.waitToCut, pointing)
         } != timerJump(pointing, timing: shifted(shipped) { $0.pointingWatchdog += $0.step }) { sim in
             sim.apply(.toggle(0), pointing); sim.apply(.toggle(1), pointing)
+            sim.apply(.waitToCut, pointing)
         })
     }
 
