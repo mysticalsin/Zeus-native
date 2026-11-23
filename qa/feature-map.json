@@ -17,6 +17,13 @@
       "group": "regressions"
     },
     {
+      "id": "portable-permissions",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "Synthetic Allow all click plans for the permissions the sweep already names. No microphone, screen, or audio capture and no OS dialog.",
+      "group": "permissions"
+    },
+    {
       "id": "portable-scribe",
       "kind": "portable",
       "tier": "contract",
@@ -6713,6 +6720,17 @@
           "acceptance": "Automated disposable-account onboarding, denied/revoked permissions, every tab/settings route, daily workflow, crash/relaunch, offline/provider/storage failure and accessibility acceptance on exact binary.",
           "cases": [],
           "id": "F13.4"
+        },
+        {
+          "id": "F13.one-click-permissions",
+          "check": "portable-permissions",
+          "acceptance": "One click requests only the named access that is still missing. A second click retries only what is still denied. A granted set needs no second click. No new permission type and no OS dialog is raised.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+              "function": "oneClickRequestsOnlyWhatIsMissingAndAGrantedSetNeedsNoSecondClick"
+            }
+          ]
         },
         {
           "id": "F13.component-isolation",

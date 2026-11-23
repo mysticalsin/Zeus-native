@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "One click did not request the missing permission set, or it asked again for an access that was already allowed. A granted set still looked like it needed another click.",
+      "features": [
+        "F13"
+      ],
+      "check": "portable-permissions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PermissionSweepTests.swift",
+        "function": "oneClickRequestsOnlyWhatIsMissingAndAGrantedSetNeedsNoSecondClick"
+      }
     }
-]
+  ]
 }

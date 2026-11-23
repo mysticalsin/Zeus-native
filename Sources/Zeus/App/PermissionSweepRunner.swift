@@ -9,8 +9,9 @@ import ZeusCore
 
 /// "Allow all" in Settings > Permissions: runs `PermissionSweep` against the same request code the
 /// single Allow buttons use. Nothing here grants access: macOS still asks, and switches in System
-/// Settings are still turned on by the person. The sweep only removes the hunting: it asks for each
-/// one in turn, opens the exact pane, shows a small guide and moves on as soon as the switch is on.
+/// Settings are still turned on by the person. One press starts that request path for every named
+/// access that is still missing and the card shows what remains. A second press retries only what
+/// is still denied. The sweep still walks a saved run one step at a time when macOS reopens Zeus.
 @MainActor
 @Observable
 final class PermissionSweepRunner {
@@ -20,6 +21,9 @@ final class PermissionSweepRunner {
     private(set) var state = PermissionSweep.State()
     /// The last read of every access, for "N of M allowed".
     private(set) var access: [Item: Access] = [:]
+    /// 0 before Allow all, 1 after that press. The next press is the denied-only retry.
+    private(set) var clicks = 0
+    private(set) var requesting = false
 
     @ObservationIgnored private let services: OnboardingServices
     @ObservationIgnored private let location = CLLocationManager()
@@ -37,12 +41,30 @@ final class PermissionSweepRunner {
 
     var isRunning: Bool { state.isRunning }
     var progressLine: String { PermissionSweep.progressLine(access) }
+    var missingLine: String { PermissionSweep.missingLine(access) }
     var allAllowed: Bool { PermissionSweep.allowedCount(access) == Item.allCases.count }
     var needsRestart: Bool { state.phase == .finished(needsRestart: true) }
+    /// A press has already asked for the missing set, and something denied is left to retry.
+    var needsRetry: Bool { clicks > 0 && !PermissionSweep.secondClick(access).requests.isEmpty }
 
     // MARK: Actions
 
-    /// The "Allow all" button.
+    /// The "Allow all" button. The first press asks for what is missing. The next retries only what is denied.
+    func click() {
+        guard !requesting, !isRunning else { return }
+        requesting = true
+        Task {
+            defer { requesting = false }
+            let current = await read()
+            access = current
+            let plan = clicks == 0 ? PermissionSweep.oneClick(current) : PermissionSweep.secondClick(current)
+            if clicks == 0 { clicks = 1 }
+            await run(plan)
+            access = await read()
+        }
+    }
+
+    /// A saved sweep that macOS interrupted. The button uses `click` instead.
     func start() {
         Task { await send { .start(access: $0, resumed: nil, now: Self.now) } }
     }
@@ -152,7 +174,25 @@ final class PermissionSweepRunner {
 
     // MARK: Requests (the same calls as each row's Allow button)
 
-    private func ask(_ item: Item) async {
+    /// Starts the existing request calls for one click. One voice request covers Microphone and Speech.
+    /// A settings step still opens its pane. Nothing here answers the dialog or turns a switch on.
+    private func run(_ plan: PermissionSweep.Click) async {
+        var voiced = false
+        for step in plan.requests {
+            switch step.route {
+            case .prompt:
+                if step.item == .microphone || step.item == .speech {
+                    if voiced { continue }
+                    voiced = true
+                }
+                await ask(step.item, reporting: false)
+            case .settings:
+                openSettings(step.item, request: step.item.hasRequestCall)
+            }
+        }
+    }
+
+    private func ask(_ item: Item, reporting: Bool = true) async {
         switch item {
         case .microphone, .speech:
             // One "voice" request asks for both; the second step joins it instead of asking again.
@@ -177,7 +217,9 @@ final class PermissionSweepRunner {
         case .accessibility, .inputMonitoring, .fullDiskAccess, .screenRecording:
             return
         }
-        await send { .promptAnswered(item, access: $0, now: Self.now) }
+        if reporting {
+            await send { .promptAnswered(item, access: $0, now: Self.now) }
+        }
     }
 
     private func openSettings(_ item: Item, request: Bool) {

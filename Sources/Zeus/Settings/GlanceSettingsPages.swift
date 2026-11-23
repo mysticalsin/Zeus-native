@@ -1223,17 +1223,22 @@ private struct PermissionsPage: View {
         GSTrustedChatsCard()
     }
 
-    /// One button for everything: macOS still asks for each, but Zeus asks in turn, opens the right pane
-    /// and moves on by itself (PermissionSweep).
+    /// One button for the named set. The first press starts the existing requests for what is missing.
+    /// The next press retries only what is still denied. macOS still asks; Zeus does not answer for you.
     private func allowAll(_ sweep: PermissionSweepRunner) -> some View {
+        let missing = sweep.missingLine
         let text: String = if sweep.needsRestart {
             "Screen Recording starts working after Zeus reopens."
         } else if sweep.isRunning {
             "Follow the guide at the top of the screen. Skip anything you do not want."
         } else if sweep.allAllowed {
             "Everything Zeus can use is allowed."
+        } else if sweep.needsRetry {
+            missing + ". Try again only for what is still denied."
+        } else if sweep.clicks > 0 {
+            missing + "."
         } else {
-            "Asks for everything at once, one after another. Click Allow in each macOS prompt or turn on the switch Zeus opens, and it moves on by itself."
+            (missing.isEmpty ? "" : missing + ". ") + "One click asks for what is still missing. A second click only tries again for what is still denied."
         }
         return GSCard {
             GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text) {
@@ -1241,9 +1246,14 @@ private struct PermissionsPage: View {
                     Button("Restart Zeus now") { sweep.restartZeus() }.buttonStyle(GSButtonStyle(prominent: true))
                 } else if sweep.isRunning {
                     Button("Stop") { sweep.cancel() }.buttonStyle(GSButtonStyle()).accessibilityLabel("Stop allowing")
-                } else if !sweep.allAllowed {
-                    Button("Allow all") { sweep.start() }.buttonStyle(GSButtonStyle(prominent: true))
-                        .accessibilityHint("Asks macOS for each access in turn and opens System Settings where a switch is needed.")
+                } else if sweep.needsRetry {
+                    Button("Try again") { sweep.click() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .disabled(sweep.requesting)
+                        .accessibilityHint("Asks again only for access that is still denied.")
+                } else if sweep.clicks == 0, !sweep.allAllowed {
+                    Button("Allow all") { sweep.click() }.buttonStyle(GSButtonStyle(prominent: true))
+                        .disabled(sweep.requesting)
+                        .accessibilityHint("Asks for each access that is still missing.")
                 }
             }
         }
