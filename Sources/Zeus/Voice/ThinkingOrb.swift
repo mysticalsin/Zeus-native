@@ -4,9 +4,8 @@ import ZeusCore
 /// The Murmure pill's orb, replacing the plain red record dot (P0 item F, QA7 -- Tony: "maybe an
 /// orb animation instead of the red dot"). Geometry is `ThinkingOrbMath` (loosely ported from
 /// thinking-orbs 0.3.2, MIT, Jakub Antalik -- see `Resources/NOTICES.txt`); this view only paints
-/// it. `Canvas` driven by `TickingView`, never `TimelineView` -- the perf rule in PLAN-QA7.md
-/// section 0.5 wins even for a small, non-notch panel like this one. Under Reduce Motion it falls
-/// back to a soft, slow opacity pulse instead of the dotted sphere.
+/// it. `Canvas` driven by `DisplaySynchronizedView`, never `TimelineView`. Under Reduce Motion
+/// the dotted sphere is a still disc with a VoiceOver name, not a pulse.
 struct ThinkingOrbView: View {
     enum Mode: Equatable {
         /// `level` is the live mic level, 0 (silence) ... 1 (loud).
@@ -23,7 +22,7 @@ struct ThinkingOrbView: View {
     var body: some View {
         Group {
             if reduceMotion {
-                SoftPulse(tint: tint)
+                Circle().fill(tint.opacity(ThinkingOrbSpeech.reducedDiscOpacity))
             } else {
                 DisplaySynchronizedView(preferredFramesPerSecond: Motion.ambientFPS) { context in
                     Canvas { context2D, size in
@@ -33,7 +32,16 @@ struct ThinkingOrbView: View {
             }
         }
         .frame(width: diameter, height: diameter)
-        .accessibilityHidden(true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ThinkingOrbSpeech.label(mode: orbMode))
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private var orbMode: ThinkingOrbMath.Mode {
+        switch mode {
+        case .listening(let level): .listening(level: level)
+        case .working: .working
+        }
     }
 
     private static func paint(mode: Mode, time: TimeInterval, size: CGSize, tint: Color, into ctx: inout GraphicsContext) {
@@ -55,16 +63,4 @@ struct ThinkingOrbView: View {
         }
     }
 
-    /// Reduce Motion fallback: a slow, gentle opacity breathe -- not the dotted sphere, not a
-    /// `TimelineView` either (a ticking view at well under 1 Hz costs nothing).
-    private struct SoftPulse: View {
-        let tint: Color
-        var body: some View {
-            TickingView(interval: 1.0 / 8) { context in
-                let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4) / 4
-                let opacity = 0.35 + 0.35 * (0.5 + 0.5 * sin(phase * 2 * .pi))
-                Circle().fill(tint.opacity(opacity))
-            }
-        }
-    }
 }

@@ -181,4 +181,18 @@ import Testing
         }
         #expect(VoiceRingModel.proceduralLevel(time: 1, state: .idle) == 0)
     }
+
+    @Test func everyVoiceStateHasADistinctLabel() {
+        let labels = VoiceRingState.allCases.map(\.accessibilityLabel)
+        #expect(Set(labels).count == VoiceRingState.allCases.count)
+        #expect(labels.allSatisfy { $0.hasPrefix("Zeus voice, ") })
+    }
+
+    @Test func reduceMotionCrossfadeIsImmediateAndTheOrbIsNotAKeyboardStop() {
+        #expect(VoiceRingAccessibility.crossfadeSeconds(reduceMotion: true) == 0)
+        #expect(VoiceRingAccessibility.crossfadeSeconds(reduceMotion: false) == 0.3)
+        #expect(VoiceRingAccessibility.takesKeyboardFocus == false)
+        #expect(VoiceRingAccessibility.value(type: .ring, reduceMotion: true) == "Ring. Motion reduced.")
+        #expect(VoiceRingAccessibility.value(type: .mono, reduceMotion: false) == "Mono ring")
+    }
 }

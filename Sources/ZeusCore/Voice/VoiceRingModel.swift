@@ -27,6 +27,32 @@ public enum VoiceRingType: String, CaseIterable, Sendable {
 
 public enum VoiceRingState: String, CaseIterable, Sendable {
     case idle, listening, speaking, processing
+
+    /// One name for VoiceOver. The words stay when motion is reduced.
+    public var accessibilityLabel: String {
+        switch self {
+        case .idle: "Zeus voice, ready"
+        case .listening: "Zeus voice, listening"
+        case .speaking: "Zeus voice, speaking"
+        case .processing: "Zeus voice, thinking"
+        }
+    }
+}
+
+/// How the voice orb is announced, and how quickly a state change may move under Reduce Motion.
+public enum VoiceRingAccessibility {
+    /// The orb is a status, not a control, so keyboard focus stays on the surrounding buttons.
+    public static let takesKeyboardFocus = false
+
+    /// Seconds of crossfade. Reduce Motion changes the held shape immediately.
+    public static func crossfadeSeconds(reduceMotion: Bool) -> Double {
+        reduceMotion ? 0 : 0.3
+    }
+
+    public static func value(type: VoiceRingType, reduceMotion: Bool) -> String {
+        let name = type == .mono ? "Mono ring" : "Ring"
+        return reduceMotion ? "\(name). Motion reduced." : name
+    }
 }
 
 /// Tints the spectrum. nil (no emotion) is Zeus's own purple, blue, teal and pink.
