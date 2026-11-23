@@ -243,3 +243,28 @@ struct HaloArmsCanvas: View {
         .frame(width: body_.width + 2 * (arm + pad), height: body_.height + pad)
     }
 }
+
+/// Gold mark along the bottom of the black bar. It stays at the last volume; it does not fade with the HUD.
+struct VolumeSteadyLightMark: View {
+    let light: VolumeSteadyLight
+
+    var body: some View {
+        let frame = VolumeSteadyLightMath.frame(level: light.level, muted: light.muted, elapsed: 0)
+        GeometryReader { geo in
+            let span = max(0, geo.size.width - 16)
+            let lit = VolumeSteadyLightMath.litWidth(span: Double(span), level: light.level, muted: light.muted)
+            Capsule()
+                .fill(Theme.bolt.opacity(frame.opacity))
+                .frame(width: max(CGFloat(VolumeSteadyLightMath.lineWidth * 2), CGFloat(lit)), height: CGFloat(VolumeSteadyLightMath.lineWidth))
+                .shadow(color: Theme.bolt.opacity(frame.opacity * 0.9), radius: 6)
+                .shadow(color: Theme.bolt.opacity(frame.opacity * 0.45), radius: 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.leading, 8)
+                .padding(.bottom, 2)
+        }
+        .animation(Motion.reducible(Motion.cueGrow), value: light)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(VolumeSteadyLightMath.spoken(level: light.level, muted: light.muted))
+    }
+}
