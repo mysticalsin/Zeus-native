@@ -6,7 +6,7 @@ import SwiftUI
 import UserNotifications
 import ZeusCore
 
-/// Proactive settings. Both start off: turning one on is when ZEUS asks for permission.
+/// Proactive settings. Both start off. The morning brief does not raise the calendar prompt. Due nudges still ask for reminders.
 @MainActor
 @Observable
 final class ProactiveSettings {
@@ -50,7 +50,7 @@ final class ProactiveController {
         rescheduleNudges()
     }
 
-    // MARK: Settings actions (permission is asked here, never before)
+    // MARK: Settings actions. Calendar full access is not asked here. Reminders still are, for due nudges.
 
     func setMorningBrief(_ on: Bool) {
         settings.problem = nil
@@ -137,8 +137,10 @@ final class ProactiveController {
     // MARK: EventKit
 
     private func requestCalendar() async -> Bool {
-        if EKEventStore.authorizationStatus(for: .event) == .fullAccess { return true }
-        return (try? await store.requestFullAccessToEvents()) ?? false
+        let granted = EKEventStore.authorizationStatus(for: .event) == .fullAccess
+        return await CalendarAccessPolicy.requestFullAccess(from: .proactiveBrief, alreadyGranted: granted) {
+            (try? await store.requestFullAccessToEvents()) ?? false
+        }
     }
 
     private func todayEvents(now: Date) -> [BriefEvent] {

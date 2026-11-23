@@ -11,21 +11,20 @@ public enum CalendarAccessCaller: String, Sendable, CaseIterable {
 /// Full calendar access is read access on this Mac. It is asked only when the agenda is turned on.
 public enum CalendarAccessPolicy {
     public static func mayRequestFullAccess(_ caller: CalendarAccessCaller) -> Bool {
-        _ = caller
-        return true
+        caller == .agendaToggle
     }
 
     /// Asks only when this caller may, and never when access is already granted.
     public static func requestFullAccess(
         from caller: CalendarAccessCaller,
         alreadyGranted: Bool,
-        ask: @Sendable () async -> Bool
+        ask: () async -> Bool
     ) async -> Bool {
         if alreadyGranted { return true }
-        _ = caller
+        guard mayRequestFullAccess(caller) else { return false }
         return await ask()
     }
 
     public static let permissionsNote =
-        "Full calendar access is still asked by the permissions desk, the morning brief, and the top bar."
+        "Agenda from the calendars on this Mac. Read only. Asked only when you turn the agenda on."
 }

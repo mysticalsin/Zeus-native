@@ -67,6 +67,8 @@ final class VoiceTurnController {
     var seams = Seams()
     /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
     private var talkSession: Int?
+    /// Card on screen when this listen started. A spoken yes uses this id, not whichever card is up at the transcript.
+    private var spokenApprovalCardID: String?
     /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
     private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
@@ -233,6 +235,7 @@ final class VoiceTurnController {
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
         Self.applyChosenMicrophone(to: speech)
         captureFailures.reset()
+        spokenApprovalCardID = nil
         let failures = captureFailures
         speech.onCaptureFailure = { [weak self] session, origin, failure in
             // Recorded on the calling thread, so a release before the main-actor hop below still sees it.
@@ -241,6 +244,7 @@ final class VoiceTurnController {
         }
         do {
             talkSession = try seams.speechStart(speech)
+            spokenApprovalCardID = SpokenApprovalCapture.atSpeechStart(displayedCardID: notch.model.approval?.id)
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
             if !listening { speech.onCaptureFailure = nil }
@@ -341,6 +345,7 @@ final class VoiceTurnController {
         listening = false
         speech.onCaptureFailure = nil
         talkSession = nil
+        spokenApprovalCardID = nil
         handsFreeTask?.cancel()
         handsFreeTask = nil
         ahead.cancel()
@@ -382,6 +387,7 @@ final class VoiceTurnController {
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
+        spokenApprovalCardID = SpokenApprovalCapture.atSpeechStart(displayedCardID: notch.model.approval?.id)
         let run = turnRun.begin()
         turnTask = Task {
             let result = await complete(transcript: request, finalAt: heardAt)
@@ -463,8 +469,12 @@ final class VoiceTurnController {
 
     /// A finished transcript: approval answers, walkthrough steering, the fast path, then the LLM.
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
-        guard !Task.isCancelled else { return TurnResult(cancelled: true) }
+        guard !Task.isCancelled else {
+            spokenApprovalCardID = nil
+            return TurnResult(cancelled: true)
+        }
         guard !transcript.isEmpty else {
+            spokenApprovalCardID = nil
             VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")
             buddy.idle()
             return .nothingHeard
@@ -475,9 +485,15 @@ final class VoiceTurnController {
         VoiceLatency.shared.mark(.transcriptFinal)
 
         let options = SettingsStore.shared
+        let capturedCardID = spokenApprovalCardID
+        spokenApprovalCardID = nil
         if let approval = notch.model.approval, options.bool("voice.answers"),
            let verdict = ApprovalPhrases.verdict(for: transcript, approve: options.words("voice.approveWords"),
                                                  deny: options.words("voice.denyWords"), open: options.words("voice.openWords")) {
+            guard SpokenApprovalCapture.applies(capturedCardID: capturedCardID, displayedCardID: approval.id) else {
+                buddy.idle()
+                return TurnResult(spoken: "")
+            }
             approval.resolve(verdict)
             buddy.idle()
             let answer = verdict == .allow ? "Approved." : verdict == .ask ? "Over to the app." : "Denied."
