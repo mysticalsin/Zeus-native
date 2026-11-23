@@ -7,7 +7,7 @@ import ZeusCore
 enum GSSection: String, CaseIterable, Identifiable, Sendable {
     case general, appearance, sounds, notifications, shortcuts, insomnia
     case integrations, murmure, polyglot, dictation, voice, engine, iPhone
-    case license, permissions, privacy, diagnostics, about
+    case license, permissions, privacy, diagnostics, report, about
     case features, beamer, tiling, shelf
 
     var id: String { rawValue }
@@ -18,7 +18,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .general, .appearance, .sounds, .notifications, .shortcuts, .insomnia: .settings
         case .integrations, .murmure, .polyglot, .dictation, .voice, .engine, .iPhone, .features, .beamer, .tiling, .shelf: .tools
-        case .license, .permissions, .privacy, .diagnostics, .about: .app
+        case .license, .permissions, .privacy, .diagnostics, .report, .about: .app
         }
     }
 
@@ -80,6 +80,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .permissions: "Permissions"
         case .privacy: "Privacy"
         case .diagnostics: "Diagnostics"
+        case .report: "Report"
         case .about: "About"
         }
     }
@@ -118,6 +119,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .permissions: "checkmark.shield"
         case .privacy: "lock.shield"
         case .diagnostics: "waveform.path.ecg.rectangle"
+        case .report: "square.and.pencil"
         case .about: "info.circle"
         }
     }
