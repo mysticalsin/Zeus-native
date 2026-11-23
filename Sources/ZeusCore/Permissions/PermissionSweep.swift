@@ -188,6 +188,43 @@ public enum PermissionSweep {
         return prompts.map { Step(item: $0, route: .prompt) } + settings.map { Step(item: $0, route: .settings) }
     }
 
+    /// What one press asks for, and which named access is still not allowed.
+    /// The press only chooses the existing prompt or System Settings route. It does not grant access.
+    public struct Click: Equatable, Sendable {
+        public var requests: [Step]
+        public var stillMissing: [Item]
+        /// True when another press would retry access that is still denied.
+        /// False when every named access is already allowed.
+        public var needsSecondClick: Bool
+        public init(requests: [Step], stillMissing: [Item], needsSecondClick: Bool) {
+            self.requests = requests
+            self.stillMissing = stillMissing
+            self.needsSecondClick = needsSecondClick
+        }
+    }
+
+    public static func missingItems(_ access: [Item: Access]) -> [Item] {
+        Item.allCases.filter { Self.access($0, in: access) != .allowed }
+    }
+
+    /// Names still not allowed, for the card under the button. Empty when the set is granted.
+    public static func missingLine(_ access: [Item: Access]) -> String {
+        let missing = missingItems(access)
+        if missing.isEmpty { return "" }
+        return "Still missing: " + missing.map(\.title).joined(separator: ", ")
+    }
+
+    /// The first press. Today's Allow all only starts the first missing step, so the needed set stays unasked.
+    public static func oneClick(_ access: [Item: Access]) -> Click {
+        let missing = missingItems(access)
+        return Click(requests: Array(plan(access).prefix(1)), stillMissing: missing, needsSecondClick: !missing.isEmpty)
+    }
+
+    /// A later press plans the sweep again from the top, so it does not limit itself to what is still denied.
+    public static func secondClick(_ access: [Item: Access]) -> Click {
+        oneClick(access)
+    }
+
     /// Whether saved progress is recent enough to pick up again.
     public static func shouldResume(_ progress: Progress?, now: Double) -> Bool {
         guard let progress else { return false }
