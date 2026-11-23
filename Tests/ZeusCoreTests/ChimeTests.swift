@@ -296,6 +296,14 @@ import Testing
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, soundFeedback: true, meeting: false, focusKnown: true) == true)
     }
 
+    @Test func theLockWakeCardIsInactiveWhenSoundFeedbackIsOff() {
+        #expect(ChimeCardGate.interactive(soundFeedback: false) == false)
+        #expect(ChimeCardGate.interactive(soundFeedback: true) == true)
+        #expect(ChimeCardGate.playEnabled(soundFeedback: false, chimeEnabled: true) == false)
+        #expect(ChimeCardGate.playEnabled(soundFeedback: true, chimeEnabled: false) == false)
+        #expect(ChimeCardGate.playEnabled(soundFeedback: true, chimeEnabled: true) == true)
+    }
+
     @Test func playbackObeysSoundFeedbackMeetingModeAndUnknownFocus() {
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, soundFeedback: false) == false)
         #expect(ChimePlaybackGate.allows(enabled: true, focusActive: false, meeting: true) == false)
