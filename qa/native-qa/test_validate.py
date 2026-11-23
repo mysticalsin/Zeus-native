@@ -475,13 +475,20 @@ class HarnessGuards(unittest.TestCase):
         import os
         previous = os.environ.get("CI")
         os.environ["CI"] = "true"
+        original = harness.subprocess.run
+
+        def forbidden(*_args, **_kwargs):
+            self.fail("CI must not start swift build")
+
+        harness.subprocess.run = forbidden
         try:
             with self.assertRaises(harness.Refused) as caught:
                 harness.execute(
                     self.repo, self.home, HEAD, "Darwin",
-                    usage=self.usage(self.v.MIN_FREE_BYTES), run=self.calls.append,
+                    usage=self.usage(self.v.MIN_FREE_BYTES),
                 )
         finally:
+            harness.subprocess.run = original
             if previous is None:
                 os.environ.pop("CI", None)
             else:
@@ -491,15 +498,24 @@ class HarnessGuards(unittest.TestCase):
 
     def test_a_failed_build_writes_a_fail_receipt_with_a_log(self):
         import harness
+        import os
+        previous = os.environ.get("CI")
+        os.environ["CI"] = "true"
 
         def run(command, cwd=None):
             raise subprocess.CalledProcessError(1, command, output="out", stderr="swift failed\n")
 
-        out, code = harness.execute(
-            self.repo, self.home, HEAD, "Darwin",
-            usage=self.usage(self.v.MIN_FREE_BYTES), run=run,
-            assemble=lambda *_args, **_kwargs: self.fail("assemble must not run"),
-        )
+        try:
+            out, code = harness.execute(
+                self.repo, self.home, HEAD, "Darwin",
+                usage=self.usage(self.v.MIN_FREE_BYTES), run=run,
+                assemble=lambda *_args, **_kwargs: self.fail("assemble must not run"),
+            )
+        finally:
+            if previous is None:
+                os.environ.pop("CI", None)
+            else:
+                os.environ["CI"] = previous
         self.assertNotEqual(code, 0)
         self.assertEqual(list(self.home.rglob("*.app")), [])
         body = json.loads(Path(out).read_text())
@@ -513,6 +529,9 @@ class HarnessGuards(unittest.TestCase):
 
     def test_a_finished_build_records_the_log_and_stays_fail(self):
         import harness
+        import os
+        previous = os.environ.get("CI")
+        os.environ["CI"] = "true"
 
         def run(command, cwd=None):
             return subprocess.CompletedProcess(command, 0, stdout="built\n", stderr="")
@@ -522,10 +541,16 @@ class HarnessGuards(unittest.TestCase):
             macos.mkdir(parents=True)
             (macos / "Zeus").write_text("binary\n")
 
-        out, code = harness.execute(
-            self.repo, self.home, HEAD, "Darwin",
-            usage=self.usage(self.v.MIN_FREE_BYTES), run=run, assemble=assemble, processes=[],
-        )
+        try:
+            out, code = harness.execute(
+                self.repo, self.home, HEAD, "Darwin",
+                usage=self.usage(self.v.MIN_FREE_BYTES), run=run, assemble=assemble, processes=[],
+            )
+        finally:
+            if previous is None:
+                os.environ.pop("CI", None)
+            else:
+                os.environ["CI"] = previous
         self.assertNotEqual(code, 0)
         body = json.loads(Path(out).read_text())
         self.assertEqual(body["verdict"], "FAIL")
