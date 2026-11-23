@@ -5,12 +5,37 @@ import Testing
 private let optIn1 = Date(timeIntervalSince1970: 1_000)
 private let optIn2 = Date(timeIntervalSince1970: 2_000)
 
+/// Values stay in this object. A file-backed suite is shared by parallel tests on Linux, and a
+/// bundle-id suite is written into the owner's preferences.
+final class IsolatedDefaults: UserDefaults, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: Any] = [:]
+
+    override func object(forKey defaultName: String) -> Any? {
+        lock.lock(); defer { lock.unlock() }
+        return storage[defaultName]
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        lock.lock(); defer { lock.unlock() }
+        if let value { storage[defaultName] = value } else { storage.removeValue(forKey: defaultName) }
+    }
+
+    override func set(_ value: Double, forKey defaultName: String) {
+        lock.lock(); defer { lock.unlock() }
+        storage[defaultName] = value
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        lock.lock(); defer { lock.unlock() }
+        storage.removeValue(forKey: defaultName)
+    }
+}
+
 @Suite("Scribe automatic start opt-in")
 struct ScribeAutoStartOptInTests {
     private func fresh() throws -> (UserDefaults, () -> Void) {
-        let name = NSTemporaryDirectory() + "ScribeAutoStartOptIn.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        return (defaults, { defaults.removePersistentDomain(forName: name) })
+        (IsolatedDefaults(), {})
     }
 
     // MARK: The stamp follows the choice
@@ -60,6 +85,26 @@ struct ScribeAutoStartOptInTests {
         defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
         ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: false, defaults: defaults)
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
+    }
+
+    /// The same steps as `aStaleStampWithAskMeIsRemovedAtLaunch`, on many suites at once.
+    /// A shared defaults domain lets one task's stamp survive another's removal.
+    @Test func parallelFreshSuitesDoNotKeepAStaleStamp() async {
+        let missed = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<48 {
+                group.addTask {
+                    guard let (defaults, cleanup) = try? fresh() else { return false }
+                    defer { cleanup() }
+                    defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
+                    ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: false, defaults: defaults)
+                    return ScribeAutoStartOptIn.date(defaults: defaults) == nil
+                }
+            }
+            var failures = 0
+            for await removed in group where !removed { failures += 1 }
+            return failures
+        }
+        #expect(missed == 0)
     }
 
     @Test func anOldStampWithAutomaticCarriesOver() throws {

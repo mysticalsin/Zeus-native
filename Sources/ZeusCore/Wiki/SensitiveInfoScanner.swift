@@ -151,18 +151,41 @@ public enum SensitiveInfoScanner {
         return remainder == 1
     }
 
-    // MARK: Patterns (built per use: NSRegularExpression is not Sendable-annotated everywhere)
+    // MARK: Patterns
+    //
+    // Each pattern is compiled once. On Linux, uregex_clone of one shared expression is not safe
+    // while another thread clones or matches it: MatchChunkAt has crashed with signal 11 during
+    // a parallel export. Compilation and matching therefore share one lock. The lock is not held
+    // across ISO8601DateFormatter. Holding it there deadlocks the Mac test runner, because that
+    // formatter can wait for the main thread while a scan on the main thread waits for the lock.
+
+    private struct PatternKey: Hashable {
+        var pattern: String
+        var caseInsensitive: Bool
+    }
+
+    private static let icuLock = NSLock()
+    nonisolated(unsafe) private static var compiledPatterns: [PatternKey: NSRegularExpression] = [:]
 
     private static func regex(_ pattern: String, caseInsensitive: Bool = false) -> NSRegularExpression {
+        let key = PatternKey(pattern: pattern, caseInsensitive: caseInsensitive)
+        icuLock.lock()
+        defer { icuLock.unlock() }
+        if let existing = compiledPatterns[key] { return existing }
+        let expression: NSRegularExpression
         do {
-            return try NSRegularExpression(pattern: pattern, options: caseInsensitive ? [.caseInsensitive] : [])
+            expression = try NSRegularExpression(pattern: pattern, options: caseInsensitive ? [.caseInsensitive] : [])
         } catch {
             preconditionFailure("Invalid sensitive-info pattern \(pattern): \(error)")
         }
+        compiledPatterns[key] = expression
+        return expression
     }
 
     private static func matches(_ expression: NSRegularExpression, in ns: NSString) -> [NSRange] {
-        expression
+        icuLock.lock()
+        defer { icuLock.unlock() }
+        return expression
             .matches(in: ns as String, options: [], range: NSRange(location: 0, length: ns.length))
             .map(\.range)
     }
@@ -265,7 +288,8 @@ public enum SensitiveInfoScanner {
         let inRange = (10...15).contains(digitCount) || (hasPlus && (8...15).contains(digitCount))
         guard inRange else { return false }
         // A date and a decimal number are not phone numbers.
-        if candidate.range(of: #"^\d{4}-\d{2}-\d{2}"#, options: .regularExpression) != nil { return false }
+        let whole = candidate as NSString
+        if !matches(regex(#"^\d{4}-\d{2}-\d{2}"#), in: whole).isEmpty { return false }
         let separators = candidate.filter { !$0.isNumber }
         if separators.count == 1, separators.first == "." { return false }
         return true

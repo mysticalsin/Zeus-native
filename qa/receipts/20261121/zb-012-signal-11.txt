@@ -1,0 +1,34 @@
+ZB-012 crash evidence, before the pattern cache.
+
+Swift 6.2.1, Linux x86_64. portable-wiki-export built from codex/integration-20261111 at 2722dcb7497d5415fbc1fcb1f65c49629966a281.
+
+Command that crashed: swift test --skip-build --parallel --num-workers 8 --jobs 4
+Full log sha256:
+  parallel run 1: 1c0099d5a3fd5f92fc86e279e2299b9cc35b55c1cb96f491d92fee1e155c443d
+  parallel run 4: 77903e373af6d4983bc4e77134f7085f4c18a85b5e7564cbcda1638dbd8a90c5
+
+Both processes exited with "Exited with unexpected signal code 11".
+The faulting thread in both is _dispatch_event_loop_drain in libdispatch.so.
+
+Run 1, thread compiling a scanner expression (SensitiveInfoScanner.swift:268 isPhone, :84 scan, WikiExportModels.swift:131):
+
+  swift::threading_impl::once_slow
+  _createRegexForPattern
+  NSString.range(of:options:range:locale:)
+  StringProtocol.range(of:options:range:locale:)
+  SensitiveInfoScanner.isPhone
+  SensitiveInfoScanner.scan
+  WikiExportDraft.make
+
+Run 1, thread opening an ICU calendar for the export stamp (WikiExportModels.swift:105):
+
+  uprv_sortArray
+  uloc_getName
+  icu::Locale::init
+  ucal_open
+  CFCalendarCreateWithIdentifier
+  CFDateFormatterCreateISO8601Formatter
+  ISO8601DateFormatter.string(from:)
+  WikiExportDraft.make
+
+The ledger names NSRegularExpression.init via wordList. This capture is the sibling path: String.range(of:options:.regularExpression) inside isPhone, racing the stamp's first ucal_open. wordList uses the same NSRegularExpression initializer.

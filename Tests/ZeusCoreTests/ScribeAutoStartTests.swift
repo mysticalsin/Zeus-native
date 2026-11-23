@@ -106,9 +106,7 @@ struct ScribeAutoStartTests {
     }
 
     @Test func settingReadsTheStoredChoiceAndFreshDefaultsAreAskMe() throws {
-        let name = NSTemporaryDirectory() + "ScribeAutoStartTests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
+        let defaults = IsolatedDefaults()
         #expect(ScribeAutoStartMode.current(defaults: defaults) == .ask)
         defaults.set("Start automatically", forKey: FeatureSettings.key(ScribeAutoStartMode.settingID))
         #expect(ScribeAutoStartMode.current(defaults: defaults) == .automatic)
