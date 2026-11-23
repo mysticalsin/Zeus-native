@@ -8,9 +8,9 @@ This file is the author's plan and the questions for the challenger. The challen
 
 A Record tap after the offer has left, or after a newer offer replaced it, does not start Scribe. A tap on the offer that is still up does start it.
 
-Failing test: `aLateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording` in `Tests/ZeusCoreTests/ScribeAutoStartTests.swift`. On `347fef29` the tap starts recording. The no-tick cases are `aTapPastThePromptingDeadlineWithoutATickDoesNotStart`, `aTapPastTheUpcomingDeadlineWithoutATickDoesNotStart`, and `aTapPastTheHeadsUpOfferUntilWithoutATickDoesNotStart`.
+Failing test: `x5ALateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording` (marker X5) in `Tests/ZeusCoreTests/ScribeAutoStartTests.swift`. On `347fef29` the tap starts recording. The no-tick cases are `aTapPastThePromptingDeadlineWithoutATickDoesNotStart`, `aTapPastTheUpcomingDeadlineWithoutATickDoesNotStart`, and `aTapPastTheHeadsUpOfferUntilWithoutATickDoesNotStart`.
 
-TEST COMMAND: `swift test --filter aLateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording`
+TEST COMMAND: `swift test --filter x5ALateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording`
 
 `liveOffer(matching:now:)` in `Sources/ZeusCore/Scribe/ScribeAutoStart.swift` returns the meeting only when the key matches and the pointer is inside, or `now` is still before the deadline or `offerUntil`.
 

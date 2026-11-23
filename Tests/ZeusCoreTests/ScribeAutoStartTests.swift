@@ -1086,9 +1086,9 @@ struct ScribeAutoStartTests {
         #expect(machine.state == .idle)
     }
 
-    /// The offer leaves on its own after 10 s. A tap that names that offer, or an offer a newer one has replaced,
+    /// X5: The offer leaves on its own after 10 s. A tap that names that offer, or an offer a newer one has replaced,
     /// must not start a recording. A tap on the offer that is still up does.
-    @Test func aLateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording() {
+    @Test func x5ALateTapOnAnExpiredOrReplacedOfferDoesNotStartRecording() {
         var timing = ScribeAutoStartTiming()
         timing.askTimeout = 10
         let zoom = ScribeMeeting(key: "call:Zoom", title: "Call", callApp: .zoom, isLive: true)
