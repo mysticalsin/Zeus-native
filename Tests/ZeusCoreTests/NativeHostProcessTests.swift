@@ -90,12 +90,31 @@ struct NativeHostProcessTests {
 
         func waitForForwardedBytes() async throws -> Bool {
             let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            let fd = output.fileHandleForReading.fileDescriptor
             repeat {
-                var ready = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
-                if poll(&ready, 1, 0) > 0, ready.revents & Int16(POLLIN) != 0 { return true }
+                // poll does not report POLLIN on a macOS pipe while the writer still holds its end,
+                // so an unread Chrome pipe looked empty until the host had already exited.
+                if Self.bufferedBytes(fd) > 0 { return true }
                 try await Task.sleep(for: .milliseconds(5))
             } while process.isRunning && ContinuousClock.now < deadline
-            return false
+            return Self.bufferedBytes(fd) > 0
+        }
+
+        /// Bytes sitting in the kernel pipe, without consuming them. The stall tests need the
+        /// pipe to stay full so the host's write budget can still fire.
+        private static func bufferedBytes(_ fd: Int32) -> Int {
+            #if canImport(Darwin)
+            var available = Int32(0)
+            let result = withUnsafeMutablePointer(to: &available) {
+                ioctl(fd, UInt(FIONREAD), UnsafeMutableRawPointer($0))
+            }
+            guard result == 0 else { return 0 }
+            return Int(max(0, available))
+            #else
+            var ready = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            guard poll(&ready, 1, 0) > 0, ready.revents & Int16(POLLIN) != 0 else { return 0 }
+            return 1
+            #endif
         }
     }
 
