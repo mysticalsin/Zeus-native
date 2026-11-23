@@ -43,10 +43,18 @@ public enum ScribeAutoStartOptIn {
 
     /// Removes a stamp and flushes the suite. A CFPreferences write in another suite can put the
     /// removed value back before the next read unless this suite is synchronized afterwards.
+    /// A later opt-in time that lands during that flush is a new choice and stays.
     private static func discard(_ key: String, from defaults: UserDefaults) {
+        let removed = defaults.object(forKey: key) as? Double
         defaults.removeObject(forKey: key)
         _ = defaults.synchronize()
         guard defaults.object(forKey: key) != nil else { return }
+        // A greater opt-in time is a newer choice and stays. The time just removed, an older one,
+        // or anything that is not an opt-in time, is removed again.
+        if key == Self.key, let stamp = defaults.object(forKey: key) as? Double,
+           stamp > (removed ?? -Double.greatestFiniteMagnitude) {
+            return
+        }
         defaults.removeObject(forKey: key)
         _ = defaults.synchronize()
     }
