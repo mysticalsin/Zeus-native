@@ -4844,7 +4844,7 @@
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
-        "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+        "function": "leavingAutomaticWhileTheCardIsUpKeepsAsking"
       }
     },
     {
@@ -4873,14 +4873,14 @@
     },
     {
       "id": "REG-420",
-      "failure": "A Cancel that arrived after the countdown timer fired was dropped, so an automatic start could not be taken back.",
+      "failure": "The meeting card's deadline started capture on its own, and a Cancel at that instant could not stop it.",
       "features": [
         "F04"
       ],
       "check": "portable-scribe",
       "guard": {
         "file": "Tests/ZeusCoreTests/ScribeMeetingStartOutcomeTests.swift",
-        "function": "cancelAfterExpiryAbandonsTheAutomaticStart"
+        "function": "theDeadlineLeavesWithoutRecording"
       }
     },
     {
@@ -8700,6 +8700,18 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/MeetingVaultNoteTests.swift",
         "function": "aSavedRecapKeepsTheMeetingIdentifierAndLeavesPrivateNotesOut"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A ready Start automatically choice counted down and began capture when the meeting card expired.",
+      "features": [
+        "F04"
+      ],
+      "check": "portable-scribe",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+        "function": "popupLastsTenSecondsAndAReadyAutomaticChoiceStillWaitsForATap"
       }
     }
   ]

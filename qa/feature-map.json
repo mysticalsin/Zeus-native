@@ -1809,8 +1809,12 @@
       "obligations": [
         {
           "check": "portable-scribe",
-          "acceptance": "The heads-up window, a dismissal that holds at the start time and a recording started by hand suppress prompts.",
+          "acceptance": "The heads-up lasts ten seconds and leaves without starting. A dismissal that holds at the start time and a recording started by hand suppress prompts. A ready automatic choice waits for a tap.",
           "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
+              "function": "popupLastsTenSecondsAndAReadyAutomaticChoiceStillWaitsForATap"
+            },
             {
               "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
               "function": "headsUpWindowEdges"
@@ -1864,7 +1868,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ScribeAutoStartTests.swift",
-              "function": "leavingAutomaticDuringTheCountdownAsksInstead"
+              "function": "leavingAutomaticWhileTheCardIsUpKeepsAsking"
             }
           ]
         },
@@ -1920,7 +1924,7 @@
         },
         {
           "check": "native-ScribeMeetingCardJourneyTests",
-          "acceptance": "The real Record button starts exactly one session, the card sits at its placement origin and its time text refreshes when the clock crosses the minute. The real Cancel ends a countdown or a start with no session and no saved meeting, a countdown that ends reaches Starting then Recording, a failing provider shows its reason and the dismiss glyph quiets the meeting. Synthetic evidence and an owned panel only; not device proof.",
+          "acceptance": "The real Record button starts exactly one session, the card sits at its placement origin and its time text refreshes when the clock crosses the minute. A ready automatic choice shows the same offer. The real dismiss ends that offer with no session, and the ten-second deadline leaves without starting or saving a meeting. A failing provider shows its reason and the dismiss glyph quiets the meeting. Synthetic evidence and an owned panel only; not device proof.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/ScribeMeetingCardJourneyTests.swift",

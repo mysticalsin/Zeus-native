@@ -39,7 +39,7 @@ public enum ScribeAutoStartMode: String, CaseIterable, Sendable {
 public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// The same meeting must be seen again this long after it first appeared before anything is shown.
     public var debounce: TimeInterval
-    /// "Ask me" leaves on its own after this long and counts as "Not now".
+    /// The meeting card leaves on its own after this long. Leaving is not a start.
     public var askTimeout: TimeInterval
     /// "Start automatically" waits this long, with a Cancel button, before it starts.
     public var countdown: TimeInterval
@@ -59,7 +59,7 @@ public struct ScribeAutoStartTiming: Equatable, Sendable {
     /// How long a failure stays when the pointer is not over it.
     public var failureLifetime: TimeInterval
 
-    public init(debounce: TimeInterval = 3, askTimeout: TimeInterval = 20, countdown: TimeInterval = 5,
+    public init(debounce: TimeInterval = 3, askTimeout: TimeInterval = 10, countdown: TimeInterval = 5,
                 callEndedAfter: TimeInterval = 8, rearmAfterAbsence: TimeInterval = 30, hoverGrace: TimeInterval = 4,
                 startTimeout: TimeInterval = 5, slowStartTimeout: TimeInterval = 45, confirmFor: TimeInterval = 1.5,
                 failureLifetime: TimeInterval = 60) {
@@ -647,11 +647,8 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
             state = .idle
             return []
         case .countingDown(let meeting, let deadline) where now >= deadline:
-            guard context.automatic.isReady else {
-                // Something the countdown needs went missing: ask instead.
-                return ask(meeting, now: now, blocked: context.automatic.block)
-            }
-            return startRequest(meeting, origin: .automatic, now: now, context: context)
+            // A countdown never starts capture. The card asks, and only a tap records.
+            return ask(meeting, now: now, blocked: context.automatic.block)
         case .held:
             return advanceHeld(now: now, context: context, evidence: nil)
         case .starting(let attempt):
@@ -882,10 +879,6 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
                 guard let candidate = evidence.candidate, candidate.key == meeting.key else { state = .idle; return [] }
                 current = candidate
             }
-            if current.isLive, context.automatic.isReady {
-                state = .countingDown(meeting: current, deadline: now + timing.countdown)
-                return []
-            }
             return ask(current, now: now, blocked: context.automatic.block)
         }
     }
@@ -925,10 +918,10 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         return ask(meeting, now: now, blocked: evidence.context.automatic.block)
     }
 
-    /// Automatic start counts down only for a live call, with "Start automatically" chosen and every part of
-    /// its readiness in place.
-    private func countsDown(_ meeting: ScribeMeeting, _ evidence: ScribeMeetingEvidence) -> Bool {
-        meeting.isLive && holdsCountdown(evidence)
+    /// A meeting card never starts capture by itself, even when Start automatically is chosen and ready.
+    /// Recording begins only from a tap.
+    private func countsDown(_: ScribeMeeting, _: ScribeMeetingEvidence) -> Bool {
+        false
     }
 
     /// What must still be true on every evidence while the countdown runs, and at its end.
@@ -950,8 +943,7 @@ public struct ScribeAutoStartMachine: Equatable, Sendable {
         ledger.note(meeting, mark, date: clock?.date ?? .distantPast)
     }
 
-    /// "Ask me", or "Start automatically" while anything it needs is missing: Zeus never starts capture from the
-    /// detector on its own unless every part of the readiness holds, so it asks.
+    /// The meeting card. Start automatically asks too: capture begins only when the person taps.
     private mutating func ask(_ meeting: ScribeMeeting, now: TimeInterval, blocked: ScribeAutoStartBlock?) -> [Effect] {
         state = .prompting(meeting: meeting, deadline: now + timing.askTimeout, blocked: blocked)
         return []
