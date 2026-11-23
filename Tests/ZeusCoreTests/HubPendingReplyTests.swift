@@ -217,7 +217,6 @@ struct HubPendingReplyTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .deletingLastPathComponent()
         let source = (try? String(contentsOf: root.appendingPathComponent(relative), encoding: .utf8)) ?? ""
         return source.isEmpty ? nil : source
     }

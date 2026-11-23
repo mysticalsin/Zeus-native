@@ -335,7 +335,6 @@ struct HubReplyGateTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .deletingLastPathComponent()
             .appendingPathComponent("Sources/ZeusCore/AgentHub/HubReplyDispatch.swift")
         let source = try String(contentsOf: url, encoding: .utf8)
         #expect(!source.contains("if trusted"))
