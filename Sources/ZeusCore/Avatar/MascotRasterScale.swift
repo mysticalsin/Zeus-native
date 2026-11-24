@@ -16,6 +16,6 @@ public extension EnvironmentValues {
 
 public enum MascotRasterScale {
     public static func resolve(_ environment: CGFloat) -> CGFloat {
-        environment > 0 ? environment : 2
+        CGFloat(MascotRasterChoice.resolve(Double(environment)))
     }
 }
