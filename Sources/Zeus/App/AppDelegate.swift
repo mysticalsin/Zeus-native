@@ -96,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         // Quitting while Zeus listens or speaks must not leave the Mac's output at the lowered volume.
-        SystemAudioDucker.end()
+        SystemAudioDucker.endAll()
         explanation?.stop()
         pointing?.stop()
         // Every shaping tap is destroyed and the claim released, so no app is left muted.
