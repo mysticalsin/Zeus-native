@@ -8,7 +8,7 @@ extension LicenseSectionSlot: GlassSlotPage {
 
 /// The license card hosted on the existing License page.
 struct LicenseSettingsSection: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var reduceMotion: Bool { Motion.reduced }
     @State private var machine = LicenseActivationState(phase: .unlicensed, facts: LicenseCardFacts(status: .trialEnded))
     @FocusState private var keyFocused: Bool
     private var license: LicenseManager { .shared }
