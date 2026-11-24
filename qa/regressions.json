@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
         "function": "aPathOrBlankIdentifierIsOmitted"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "A finished chat was not written into the selected vault inbox, or a foreign note at the chat filename was overwritten.",
+      "features": [
+        "F10"
+      ],
+      "check": "portable-brain-capture",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/BrainChatVaultTests.swift",
+        "function": "aForeignFileAndASymlinkAreLeftAlone"
+      }
     }
   ]
 }

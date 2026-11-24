@@ -35,7 +35,7 @@ final class BrainCaptureModel {
         target = selected.flatMap { BrainCapture.plannedURL(connection: $0, title: title, created: created) }
     }
 
-    private static func selectedConnection() -> BrainConnection? {
+    static func selectedConnection() -> BrainConnection? {
         // Do not even inspect the legacy choice when Memory already has a selected destination.
         if let configured = TodoController.shared.connection { return configured }
         return BrainCapture.connection(configured: nil, legacyVault: AboutYouModel.savedVault())

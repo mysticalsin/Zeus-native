@@ -68,8 +68,8 @@ GROUPS = {
         tests("WikiExportTests"),
     ),
     "brain-capture": (
-        core("BrainCaptureNote.swift"),
-        tests("BrainCaptureNoteTests"),
+        core("BrainCaptureNote.swift", "BrainChatVault.swift", "SecondBrain/VaultPathBoundary.swift"),
+        tests("BrainCaptureNoteTests", "BrainChatVaultTests"),
     ),
     "dictation-insertion": (
         core("Dictation/TextInsertionReceipt.swift"),
