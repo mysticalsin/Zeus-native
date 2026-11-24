@@ -121,7 +121,7 @@ final class TopBarModel {
     var cuesEnabled: Bool {
         didSet { defaults.set(cuesEnabled, forKey: "topBar.cues") }
     }
-    /// Music artwork and bars beside the closed notch while something plays.
+    /// Music artwork and the play and pause control beside the closed notch while a track is shown.
     var liveMusicWings: Bool {
         didSet { defaults.set(liveMusicWings, forKey: "topBar.musicWings") }
     }
@@ -374,7 +374,7 @@ final class TopBarModel {
 
     /// Something worth showing beside the closed notch.
     var hasLiveActivity: Bool {
-        isDictating || RecordlyController.shared.isRecording || cue != nil || (focus.phase != .idle && SettingsStore.shared.bool("lights.timer")) || (liveMusicWings && nowPlaying?.isPlaying == true)
+        isDictating || RecordlyController.shared.isRecording || cue != nil || (focus.phase != .idle && SettingsStore.shared.bool("lights.timer")) || TopBarWidgetClicks.closedWingsShowTransport(liveWings: liveMusicWings, hasTrack: nowPlaying != nil)
     }
 
     var nextEvent: CalendarItem? {

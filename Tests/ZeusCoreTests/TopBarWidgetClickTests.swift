@@ -147,6 +147,22 @@ import Testing
         #expect(playing.tick(at: now.addingTimeInterval(0.35)).effects == [.play])
     }
 
+    @Test func theTransportPausesWhilePlayingAndPlaysWhilePaused() {
+        #expect(TopBarWidgetClicks.transportTarget(isPlaying: true) == .pause)
+        #expect(TopBarWidgetClicks.transportTarget(isPlaying: false) == .play)
+        #expect(TopBarWidgetClicks.closedWingsShowTransport(liveWings: true, hasTrack: true))
+        #expect(TopBarWidgetClicks.closedWingsShowTransport(liveWings: true, hasTrack: false) == false)
+        #expect(TopBarWidgetClicks.closedWingsShowTransport(liveWings: false, hasTrack: true) == false)
+
+        var playing = TopBarWidgetClicks()
+        _ = playing.click(TopBarWidgetClicks.transportTarget(isPlaying: true), at: now)
+        #expect(playing.tick(at: now.addingTimeInterval(0.35)).effects == [.pause])
+
+        var paused = TopBarWidgetClicks()
+        _ = paused.click(TopBarWidgetClicks.transportTarget(isPlaying: false), at: now)
+        #expect(paused.tick(at: now.addingTimeInterval(0.35)).effects == [.play])
+    }
+
     @Test func aSecondClickOnTheBoundaryIsANewSingleClick() {
         var clicks = TopBarWidgetClicks()
         _ = clicks.click(.calendar, at: now)

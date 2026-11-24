@@ -92,7 +92,7 @@ struct HomeWidgetCard: View {
     }
 
     private func playbackTarget(_ playing: NowPlaying?) -> TopBarWidgetTarget {
-        playing?.isPlaying == true ? .pause : .play
+        TopBarWidgetClicks.transportTarget(isPlaying: playing?.isPlaying == true)
     }
 
     private func playControl(_ playing: NowPlaying?, size: CGFloat) -> some View {

@@ -363,6 +363,22 @@ import Testing
                                                 topOffset: 0, wings: nil))
     }
 
+    @Test func aWingKindTakesTheMouseOnAHardwareNotchAndAPill() {
+        let onLaptop = CGPoint(x: 756, y: 975)
+        let music = wings(none: false)
+        let lightsOnly = wings(none: true, lights: true)
+        #expect(NotchFootprintRules.takesMouse(.hardware(hardware), closed: true, point: onLaptop, screenFrame: laptop,
+                                                topOffset: 0, wings: music))
+        #expect(NotchFootprintRules.takesMouse(.pill, closed: true, point: onLaptop, screenFrame: laptop,
+                                                topOffset: 0, wings: music))
+        #expect(!NotchFootprintRules.takesMouse(.hardware(hardware), closed: true, point: onLaptop, screenFrame: laptop,
+                                                 topOffset: 0, wings: lightsOnly))
+        #expect(!NotchFootprintRules.takesMouse(.hardware(hardware), closed: false, point: onLaptop, screenFrame: laptop,
+                                                 topOffset: 0, wings: music))
+        #expect(!NotchFootprintRules.takesMouse(.hardware(hardware), closed: true, point: CGPoint(x: 40, y: 975),
+                                                 screenFrame: laptop, topOffset: 0, wings: music))
+    }
+
     @Test func aLoweredDrawnBodyDoesNotTakeTheMouseAboveItself() {
         #expect(!NotchFootprintRules.takesMouse(drawn, closed: true, point: CGPoint(x: 960, y: 1070), screenFrame: external,
                                                 topOffset: 24, wings: nil))

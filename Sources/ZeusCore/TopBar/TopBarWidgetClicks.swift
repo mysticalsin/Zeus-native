@@ -185,6 +185,16 @@ public struct TopBarWidgetClicks: Equatable, Sendable {
         }
     }
 
+    /// Home, the media row, and the closed wings share this. Playing pauses. Anything else plays.
+    public static func transportTarget(isPlaying: Bool) -> TopBarWidgetTarget {
+        isPlaying ? .pause : .play
+    }
+
+    /// The closed wings keep that control while a track is shown, including while it is paused.
+    public static func closedWingsShowTransport(liveWings: Bool, hasTrack: Bool) -> Bool {
+        liveWings && hasTrack
+    }
+
     private static func single(_ target: TopBarWidgetTarget) -> [TopBarWidgetEffect] {
         switch target {
         case .play, .music, .nowPlaying: [.play]

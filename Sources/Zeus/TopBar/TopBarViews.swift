@@ -561,7 +561,7 @@ struct MusicControls: View {
                 GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
             }
             if shown.contains(.playPause) {
-                let target: TopBarWidgetTarget = topBar.nowPlaying?.isPlaying == true ? .pause : .play
+                let target = TopBarWidgetClicks.transportTarget(isPlaying: topBar.nowPlaying?.isPlaying == true)
                 GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3,
                             label: topBar.nowPlaying?.isPlaying == true ? "Pause" : "Play") {
                     topBar.receiveWidgetTap(target)
@@ -1473,7 +1473,9 @@ struct ClosedWings: View {
         let avatar = AvatarStatus.shared
         if avatar.posePreview != nil || avatar.current != .idle { return .avatar(avatar.current) }
         if topBar.focus.phase != .idle, SettingsStore.shared.bool("lights.timer") { return .focus }
-        if topBar.liveMusicWings, topBar.nowPlaying?.isPlaying == true { return .music }
+        if TopBarWidgetClicks.closedWingsShowTransport(liveWings: topBar.liveMusicWings, hasTrack: topBar.nowPlaying != nil) {
+            return .music
+        }
         if avatar.alwaysInNotch { return .avatar(.idle) }
         return .none
     }
@@ -1560,14 +1562,25 @@ struct ClosedWings: View {
                 }
             }
         case .music:
+            let target = TopBarWidgetClicks.transportTarget(isPlaying: topBar.nowPlaying?.isPlaying == true)
+            let playing = topBar.nowPlaying?.isPlaying == true
             wings {
                 AlbumTile(playing: topBar.nowPlaying, size: 18)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
-                    .topBarWidgetTap(.nowPlaying, model: topBar)
+                    .topBarWidgetTap(target, model: topBar)
             } right: {
-                LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
-                    .topBarWidgetTap(.nowPlaying, model: topBar)
+                HStack(spacing: 6) {
+                    Image(systemName: playing ? "pause.fill" : "play.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.cloudPrimary)
+                        .accessibilityHidden(true)
+                    LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1),
+                              active: playing, height: 12)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(Rectangle())
+                .topBarWidgetTap(target, model: topBar)
             }
         case .none:
             EmptyView()
