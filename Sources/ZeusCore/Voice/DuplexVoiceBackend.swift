@@ -9,7 +9,8 @@ public struct VoiceFrame: Equatable, Sendable {
 
     public var samples: [Float]
     /// Counts `init` so a test can see a validation copy. Copies of an existing frame do not increment it.
-    public static var constructions = 0
+    /// The frame-copy harness reads and resets this on one thread.
+    nonisolated(unsafe) public static var constructions = 0
 
     public init(samples: [Float]) throws {
         Self.constructions += 1
