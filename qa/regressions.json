@@ -8686,7 +8686,7 @@
       "check": "native-ZeusCoreTests",
       "guard": {
         "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
-        "function": "aPlayClickIssuesPlayAndNotDetails"
+        "function": "playSkipAgendaWeatherAndReducedMotionUseThePassedClock"
       }
     }
 ]

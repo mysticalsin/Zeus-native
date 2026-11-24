@@ -1,49 +1,6 @@
 import SwiftUI
 import ZeusCore
 
-/// Holds the click window for every top-bar summary. The decision is `TopBarWidgetClicks`. This only sleeps
-/// until the date that decision returned, the same way a notch click waits out its own delay.
-@MainActor
-final class TopBarWidgetClickSession {
-    private var clicks = TopBarWidgetClicks()
-    private var wake: Task<Void, Never>?
-    var now: () -> Date = { Date() }
-
-    func tap(_ target: TopBarWidgetTarget, apply: @escaping (TopBarWidgetEffect) -> Void) {
-        let step = clicks.click(target, at: now())
-        for effect in step.effects { apply(effect) }
-        arm(step.arm, apply: apply)
-    }
-
-    func activate(_ target: TopBarWidgetTarget, apply: (TopBarWidgetEffect) -> Void) {
-        wake?.cancel()
-        wake = nil
-        let step = clicks.activate(target)
-        for effect in step.effects { apply(effect) }
-    }
-
-    func showDetails(_ target: TopBarWidgetTarget) -> TopBarWidgetEffect? {
-        wake?.cancel()
-        wake = nil
-        return clicks.showDetails(target)
-    }
-
-    private func arm(_ until: Date?, apply: @escaping (TopBarWidgetEffect) -> Void) {
-        wake?.cancel()
-        wake = nil
-        guard let until else { return }
-        let delay = until.timeIntervalSince(now())
-        wake = Task { @MainActor [weak self] in
-            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
-            guard let self, !Task.isCancelled else { return }
-            self.wake = nil
-            let settled = self.clicks.tick(at: self.now())
-            for effect in settled.effects { apply(effect) }
-            self.arm(settled.arm, apply: apply)
-        }
-    }
-}
-
 extension TopBarModel {
     func receiveWidgetTap(_ target: TopBarWidgetTarget) {
         widgetClicks.tap(target) { [weak self] effect in
