@@ -146,7 +146,8 @@ GROUPS = {
              "Audio/EqualiserCardRules.swift", "Audio/EqualiserPolicy.swift", "Audio/EqualiserLifecycle.swift", "Audio/Spectrum.swift",
              "MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift",
-             "Scribe/ScribeLiveLogic.swift", "Intent/WakePhrase.swift",
+             "Scribe/ScribeLiveLogic.swift", "ShownFailure.swift", "PrivateLogText.swift",
+             "Intent/WakePhrase.swift",
              "Intent/Utterance.swift", "Dictation/TranscriptionEngine.swift", "ZeusPaths.swift"),
         tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
               "EqualiserPolicyTests", "EqualiserLifecycleTests", "EqualiserConsentTests"),
@@ -243,6 +244,14 @@ def write_excerpts(root, group, manifest):
     elif group == "recordly-geometry":
         text, evidence = section(CORE + "Present/CompanionMotion.swift", "public struct CompanionSpring:",
                                  "/// One frame of a flight.")
+        pieces.append(text)
+        manifest["excerpts"].append(evidence)
+    elif group == "equaliser":
+        # ShownFailure classifies this error. The request builders in the same file use URLRequest,
+        # which a Linux Foundation does not export, so the slice keeps the declaration only.
+        text, evidence = section(CORE + "Dictation/CloudTranscription.swift",
+                                 "public enum CloudTranscriptionError:",
+                                 "/// OpenAI's file transcription")
         pieces.append(text)
         manifest["excerpts"].append(evidence)
     if pieces:
