@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct PremiumSpokenMomentTests {
     private func isolated() -> UserDefaults {
-        let name = "zeus.premium-spoken.\(UUID().uuidString)"
+        let name = NSTemporaryDirectory() + "zeus.premium-spoken.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
         return defaults
