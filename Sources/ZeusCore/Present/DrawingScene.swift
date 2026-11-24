@@ -174,6 +174,7 @@ private enum MarkJSON {
     }
 }
 
+/// A drawing mark in unit space and the box it occupies. Numbered screen marks are `ScreenPlacedMark`.
 public struct PlacedMark: Equatable, Sendable {
     public var mark: DrawingMark
     public var box: CGRect
