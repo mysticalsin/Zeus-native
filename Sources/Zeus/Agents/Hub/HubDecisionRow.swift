@@ -555,6 +555,7 @@ struct HubDecisionRow: View {
             if hold {
                 label
                     .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { action() }
                     .onLongPressGesture(minimumDuration: HubDecisionContract.destructiveHoldSeconds, perform: action)
             } else {
                 Button(action: action) { label }
