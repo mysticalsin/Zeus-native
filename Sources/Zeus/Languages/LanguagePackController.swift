@@ -12,6 +12,8 @@ final class LanguagePackController {
     static let wantedKey = "zeus.languagePacks.wanted"
 
     private(set) var state: LanguagePackState
+    /// The pack selected by the stored `general.language` pin. English ignores the Mac.
+    private(set) var pinnedPack: LanguagePackID
     /// The ticks on the onboarding step. All four start ticked.
     var onboardingChoice: Set<LanguagePackID> = LanguagePackID.defaults
 
@@ -22,6 +24,7 @@ final class LanguagePackController {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        pinnedPack = Self.resolvePin(defaults)
         state = LanguagePackState(analyzerSupported: LanguageAssets.isSupportedOS,
                                   lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
     }
@@ -31,6 +34,7 @@ final class LanguagePackController {
     /// Called once after startup. Reads the saved consent, asks macOS what is already installed and
     /// continues what an earlier quit interrupted. Returns immediately; the work runs off the main actor.
     func resumeOnLaunch() {
+        pinnedPack = Self.resolvePin(defaults)
         let wanted = LanguagePackConsent.decode(defaults.stringArray(forKey: Self.wantedKey))
         send(.launched(wanted: wanted, analyzerSupported: LanguageAssets.isSupportedOS,
                        lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled))
@@ -125,6 +129,12 @@ final class LanguagePackController {
         { fraction in
             Task { @MainActor in controller.send(.progress(token: token, fraction: fraction)) }
         }
+    }
+
+    /// Reads `opt.general.language`. Only the catalog choice English pins the pack.
+    private static func resolvePin(_ defaults: UserDefaults) -> LanguagePackID {
+        AppLanguagePin.resolve(stored: defaults.string(forKey: FeatureSettings.key(AppLanguagePin.settingID)),
+                               systemLanguages: Locale.preferredLanguages)
     }
 
     private func watchPower() {
