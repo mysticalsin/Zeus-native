@@ -171,7 +171,7 @@ final class BuddyController: NSObject {
         case .flying, .pointing, .returning:
             visibility.begin(.pointing)
         }
-        applyVisibility(animated: mode != .listening)
+        applyVisibility()
     }
 
     private func applyVisibility(animated: Bool = true) {
