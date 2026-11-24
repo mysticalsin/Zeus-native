@@ -319,6 +319,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.assistantKeyImport) { AssistantKeyImporter.importDefaultIfNeeded() }
         if on(.talkHotkey) {
             hotkey.onPress = { [weak self] in self?.talkKeyPressed() ?? false }
+            // Right Option shows the bar at the key-down. The microphone still opens in talkKeyPressed, when the hold
+            // has stayed alone through the typing window.
+            hotkey.onHoldAppear = { [weak self] in self?.buddy.call() }
+            hotkey.onHoldHide = { [weak self] in self?.buddy.releaseUnansweredCall() }
             hotkey.onRelease = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.release()

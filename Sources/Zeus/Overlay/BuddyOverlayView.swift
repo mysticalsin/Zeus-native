@@ -1,4 +1,5 @@
 import SwiftUI
+import ZeusCore
 
 /// One screen's layer of the buddy overlay. Everything is placed from the top-left corner with
 /// offsets, converted from the model's global AppKit coordinates.
@@ -40,8 +41,8 @@ struct BuddyOverlayView: View {
                 .scaleEffect(model.scale)
                 .shadow(color: Theme.bolt.opacity(0.55), radius: model.glow)
                 .opacity(model.sparkVisible && model.hasAppeared ? 1 : 0)
-                .animation(.easeIn(duration: model.hasAppeared ? 0.25 : 2), value: model.sparkVisible)
-                .animation(.easeIn(duration: 2), value: model.hasAppeared)
+                .animation(Motion.reduced ? nil : .easeIn(duration: MotionTokens.windowFadeInDuration), value: model.sparkVisible)
+                .animation(Motion.reduced ? nil : .easeIn(duration: MotionTokens.windowFadeInDuration), value: model.hasAppeared)
                 .offset(x: spark.x - SparkView.avatarSize / 2, y: spark.y - SparkView.avatarSize / 2)
 
             WaveformView(level: model.audioLevel, active: model.mode == .listening)

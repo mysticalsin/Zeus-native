@@ -390,6 +390,13 @@
       "scope": "Actual companion pointing, flight and coordinate math; Linux Foundation geometry shim, no native display or renderer proof."
     },
     {
+      "id": "portable-right-option-hold",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "right-option-hold",
+      "scope": "Right Option hold: the bar is requested at the key-down and listening starts once the hold is still alone. No microphone, no AppKit, no notch window."
+    },
+    {
       "id": "portable-equaliser",
       "kind": "portable",
       "tier": "contract",
@@ -5694,7 +5701,7 @@
         {
           "id": "F11.second-talk-key",
           "check": "native-ZeusCoreTests",
-          "acceptance": "Holding Right Option alone starts the same talk turn, with one turn at a time across both keys. Left Option and quick Right Option typing never start it. The other key never ends an open turn. The default writes nothing and yields to a key chosen elsewhere.",
+          "acceptance": "Holding Right Option alone shows the bar at the key-down and listens once that hold is still alone. Left Option and a letter inside the typing window never listen. The other key never ends an open turn. The default writes nothing and yields to a key chosen elsewhere.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/TalkKeyPairTests.swift",
@@ -5739,6 +5746,45 @@
             {
               "file": "Tests/ZeusCoreTests/VoiceKeyWalkTests.swift",
               "function": "theSecondKeyOrdersKeepTheRules"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "holdingRightOptionShowsTheBarAtTheKeyDown"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "aHeldRightOptionListensAfterTheBarIsAlreadyUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "aLetterInsideTheTypingWindowHidesTheBarAndDoesNotListen"
+            }
+          ]
+        },
+        {
+          "id": "F11.right-option-hold",
+          "check": "portable-right-option-hold",
+          "acceptance": "Right Option alone shows the bar at the key-down. The same hold listens once it is still alone after the typing window. A letter or a release inside that window hides the bar and does not listen. Left Option does nothing.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "holdingRightOptionShowsTheBarAtTheKeyDown"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "aHeldRightOptionListensAfterTheBarIsAlreadyUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "aLetterInsideTheTypingWindowHidesTheBarAndDoesNotListen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "releasingInsideTheTypingWindowHidesTheBarAndDoesNotListen"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+              "function": "leftOptionShowsNothingAndDoesNotListen"
             }
           ]
         },

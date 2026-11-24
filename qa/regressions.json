@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "A Right Option hold waited out the typing window before the bar appeared, and a hold that stayed alone never moved from shown to listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+        "function": "aHeldRightOptionListensAfterTheBarIsAlreadyUp"
+      }
     }
-]
+  ]
 }

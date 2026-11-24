@@ -130,6 +130,10 @@ GROUPS = {
               "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
               "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests", "ShowMeKeyTests"),
     ),
+    "right-option-hold": (
+        core("Shortcut.swift", "ChatHotkey.swift", "VoiceKey.swift", "Voice/RightOptionHold.swift"),
+        tests("RightOptionHoldTests"),
+    ),
     "buddy": (
         core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
