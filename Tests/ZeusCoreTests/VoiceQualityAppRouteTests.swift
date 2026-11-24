@@ -117,7 +117,7 @@ struct VoiceQualityAppRouteTests {
     }
 
     private func defaults(_ name: String) -> UserDefaults {
-        let suite = "voice-quality-app-\(name)-\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "voice-quality-app-\(name)-\(UUID().uuidString)"
         let box = UserDefaults(suiteName: suite)!
         box.removePersistentDomain(forName: suite)
         return box

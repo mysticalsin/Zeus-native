@@ -161,13 +161,13 @@ private struct SecurityKeychainClient: KeychainClient {
             query[kSecReturnData as String] = true
             query[kSecReturnAttributes as String] = true
             query[kSecMatchLimit as String] = kSecMatchLimitOne
-            var result: CFTypeRef?
-            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            let matched = ProviderKeychainMatch.copyItem(query)
+            let status = matched.status
             guard status == errSecSuccess else {
                 return KeychainCopy(status: status, value: nil, accessible: nil)
             }
-            guard let dict = result as? [String: Any] else {
-                let data = result as? Data
+            guard let dict = matched.result as? [String: Any] else {
+                let data = matched.result as? Data
                 return KeychainCopy(status: status, value: data.flatMap { String(data: $0, encoding: .utf8) }, accessible: nil)
             }
             let data = dict[kSecValueData as String] as? Data

@@ -3,7 +3,8 @@ import ZeusCore
 
 /// The voice choice inside Settings. Native controls, glass material, no extra window.
 struct VoiceProvidersCard: View {
-    var body: some View { VoiceProviderPicker() }
+    var embedded = false
+    var body: some View { VoiceProviderPicker(embedded: embedded) }
 }
 
 /// Pick a provider, paste a key, validate, then Test. Three interactions when the first voice is kept.

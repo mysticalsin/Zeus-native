@@ -64,7 +64,7 @@ struct ZeusVoiceCards: View {
                     .accessibilityValue(String(format: "%.0f percent", UltronVoiceEffect.intensity * 100))
             }
             GSDivider()
-            VoiceProviderPicker(embedded: true)
+            VoiceProvidersCard(embedded: true)
             if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
                                                                  effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
                 GSInfo(text: line)
