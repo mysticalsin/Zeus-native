@@ -7814,14 +7814,14 @@
     },
     {
       "id": "REG-881",
-      "failure": "Seeing the screen could be off by default or tied to drawing, so a fresh install did not see the screen.",
+      "failure": "Seeing the screen could come on by default or be tied to drawing, so a fresh install saw the screen.",
       "features": [
         "F11"
       ],
       "check": "native-SettingsCatalogTests",
       "guard": {
         "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
-        "function": "seeScreenIsAnOnByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
+        "function": "seeScreenIsAnOffByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
       }
     },
     {
