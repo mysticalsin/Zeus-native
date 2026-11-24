@@ -556,6 +556,9 @@ private struct Sim {
     // Not part of the key: what the last move did.
     var edge = Edge()
     var log: [VoiceKeyMachine.Effect] = []
+    /// The search drops the log: it is not part of the state, and appending it on every edge copied a growing
+    /// array into every child. Replay and the rest-check press still record, because they read the effects.
+    var recordLog = true
     var found: [String] = []
 
     var now: TimeInterval { Double(step) * 0.05 }
@@ -661,9 +664,11 @@ private struct Sim {
 
     func moves(_ run: WalkRun) -> [Move] {
         var out: [Move] = []
+        // The modifiers do not change while the list is built, so the restricted keys share one read.
+        let live = liveModifiers(run)
         for index in run.keys.indices {
             // A restricted key is offered while its modifiers are down, or while it is down itself and can come up.
-            if let only = run.keys[index].onlyWith, down & (UInt16(1) << UInt16(index)) == 0, !liveModifiers(run).isSuperset(of: only) {
+            if let only = run.keys[index].onlyWith, down & (UInt16(1) << UInt16(index)) == 0, !live.isSuperset(of: only) {
                 continue
             }
             if run.carbon, run.chordMask == UInt16(1) << UInt16(index) {
@@ -852,12 +857,22 @@ private struct Sim {
         }
     }
 
+    /// The earliest wake at or before `step`, without allocating the filtered set.
+    private func earliestDue(_ wakes: Set<Int>) -> Int? {
+        var due: Int?
+        for wake in wakes where wake <= step {
+            if let found = due, wake >= found { continue }
+            due = wake
+        }
+        return due
+    }
+
     /// Delivers every tick that is due, as the adapter would: each with the modifiers that are really down.
     private mutating func drainWakes(_ run: WalkRun) {
         var guardCount = 0
         while guardCount < 100 {
-            let mine = wakes.filter { $0 <= step }.min()
-            let theirs = other.wakes.filter { $0 <= step }.min()
+            let mine = earliestDue(wakes)
+            let theirs = earliestDue(other.wakes)
             guard let due = [mine, theirs].compactMap({ $0 }).min() else { break }
             guardCount += 1
             if mine == due { wakes.remove(due) } else { other.wakes.remove(due) }
@@ -894,7 +909,7 @@ private struct Sim {
         let owed = due?.effects ?? []
         let effects = handle(event, config: config)
         forgetDroppedSpace(after: event, run)
-        log += effects
+        if recordLog { log += effects }
         // A wake belongs to the phase that asked for it. Once the phase has changed the old ones are dropped, so a
         // phase that forgets to ask for its own wake is caught, not covered by a stale one.
         if stage != before { wakes.removeAll() }
@@ -982,7 +997,7 @@ private struct Sim {
         let tagged = (mouse ? pair?.mouseDownTagged(at: time, primary: configs[0], second: configs[1])
                             : pair?.handleTagged(event, primary: configs[0], second: configs[1])) ?? []
         let trace = pair?.trace ?? []
-        log += tagged.map(\.effect)
+        if recordLog { log += tagged.map(\.effect) }
         for slot in 0..<2 {
             select(slot)
             let config = configs[slot], slotRun = views[slot], p = pre[slot]
@@ -1535,6 +1550,7 @@ private func restCheck(_ sim: Sim, _ run: WalkRun, memo: RestMemo? = nil) -> [St
     for (slot, order) in orders {
         var sim = base
         sim.log = []
+        sim.recordLog = true
         let wasLatched = sim.isLatchedNow
         let owner = base.pair?.owner.map { $0 == .primary ? 0 : 1 }
         let secondView = run.secondViews.first
@@ -1585,7 +1601,9 @@ private func search(_ run: WalkRun, stopAtFirst: Bool = false, until: String? = 
     var seen: [Int: Int] = [:]
     var parents = [0], via: [Move] = [.wait]
     var frontier: [Sim?] = []
-    let root = Sim(run)
+    var root = Sim(run)
+    root.recordLog = false
+    root.log.removeAll(keepingCapacity: false)
     seen[root.key(run).hashValue] = 0
     frontier.append(root)
     var seenRules: Set<String> = []

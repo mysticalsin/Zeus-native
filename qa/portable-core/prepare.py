@@ -140,6 +140,14 @@ GROUPS = {
              "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
+    "approval-sync": (
+        core("ApprovalPair.swift"),
+        tests("ApprovalSyncTests"),
+    ),
+    "shortcut-listening": (
+        core("ShortcutListening.swift"),
+        tests("ShortcutListeningTests"),
+    ),
     # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
     "equaliser": (
         core("Audio/EqualiserTypes.swift", "Audio/EqualiserModel.swift", "Audio/EqualiserDSP.swift",

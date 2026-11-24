@@ -12,7 +12,7 @@ final class ShortcutRecorderModel: ObservableObject {
     static var pauseGlobalHotkeys: (Bool) -> Void = { _ in }
     /// How many recorders listen now. The hot keys are let go when the first starts and given back when the last stops, so
     /// two recorders, or one that begins again, cannot hand them back while another still listens.
-    private static var listening = 0
+    private static var listening = ShortcutListening()
 
     @Published var recording = false
     @Published var preview = ""
@@ -24,8 +24,7 @@ final class ShortcutRecorderModel: ObservableObject {
     func begin(onCapture: @escaping (Shortcut) -> Void) {
         if let monitor { NSEvent.removeMonitor(monitor) }
         if !recording {
-            Self.listening += 1
-            if Self.listening == 1 { Self.pauseGlobalHotkeys(true) }
+            if Self.listening.begin().contains(.pauseHotkeys) { Self.pauseGlobalHotkeys(true) }
         }
         self.onCapture = onCapture
         state = ShortcutRecorderState()
@@ -54,8 +53,7 @@ final class ShortcutRecorderModel: ObservableObject {
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
         if recording {
-            Self.listening -= 1
-            if Self.listening == 0 { Self.pauseGlobalHotkeys(false) }
+            if Self.listening.end().contains(.resumeHotkeys) { Self.pauseGlobalHotkeys(false) }
         }
         recording = false
         preview = ""

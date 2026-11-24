@@ -24,6 +24,20 @@
       "group": "scribe"
     },
     {
+      "id": "portable-approval-sync",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "One injected-clock answer clears the terminal and the card together. No window and no live approval.",
+      "group": "approval-sync"
+    },
+    {
+      "id": "portable-shortcut-listening",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "The recorder count pauses hot keys on the first listener and resumes them on the last. No AppKit monitor.",
+      "group": "shortcut-listening"
+    },
+    {
       "id": "portable-presentation",
       "kind": "portable",
       "tier": "contract",
@@ -1274,6 +1288,21 @@
             {
               "file": "Tests/ZeusAppTests/AudioSamplesConversionTests.swift",
               "function": "contestedConversionRejectsWithoutWaitingAndThenRecovers"
+            }
+          ]
+        },
+        {
+          "id": "F01.shortcut-listening",
+          "check": "portable-shortcut-listening",
+          "acceptance": "The first shortcut recorder pauses hot keys, a second one does not resume them, and the last end resumes them.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutListeningTests.swift",
+              "function": "theFirstBeginPausesAndASecondBeginDoesNotResume"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ShortcutListeningTests.swift",
+              "function": "theLastEndResumesAndAnExtraEndStaysIdle"
             }
           ]
         }
@@ -6654,6 +6683,25 @@
             {
               "file": "Tests/ZeusCoreTests/AgentHubTests.swift",
               "function": "offeredAgentsFollowTheIntegrationToggles"
+            }
+          ]
+        },
+        {
+          "id": "F12.approval-sync",
+          "check": "portable-approval-sync",
+          "acceptance": "One injected-clock answer clears the terminal and the card together, and a second answer leaves no card.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ApprovalSyncTests.swift",
+              "function": "answeringTheTerminalClearsTheCardWithinTheBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ApprovalSyncTests.swift",
+              "function": "answeringTheCardClearsTheTerminalWithinTheBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ApprovalSyncTests.swift",
+              "function": "aSecondAnswerDoesNotLeaveACardBehind"
             }
           ]
         }
