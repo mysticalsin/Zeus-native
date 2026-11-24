@@ -485,6 +485,15 @@ final class VoiceTurnController {
             return TurnResult(spoken: answer)
         }
 
+        // Optional. Off leaves "stop" for the browser agent and a walkthrough.
+        if NotchStopAll.matchesVoice(transcript, enabled: AgentSettings.shared.voiceStop) {
+            let stopped = notch.stopAllSupervised()
+            buddy.idle()
+            let answer = stopped.isEmpty ? "Nothing is running." : "Stopped."
+            say(answer)
+            return TurnResult(spoken: answer)
+        }
+
         // "stop" ends a running browser agent, no model call.
         if BrowserAgentRunner.shared.handle(transcript: transcript) {
             buddy.idle()
