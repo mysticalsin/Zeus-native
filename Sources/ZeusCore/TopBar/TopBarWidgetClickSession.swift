@@ -12,11 +12,21 @@ public final class TopBarWidgetClickSession {
     private var wake: Task<Void, Never>?
     public var now: @MainActor () -> Date = { Date() }
     public var sleep: Sleeper = { _ = try? await Task.sleep(for: $0) }
+    /// The page a right swipe embedded. Nil until that swipe, and cleared when more information opens.
+    public var embedded: TopBarWidgetDetails?
 
     public init() {}
 
-    public func tap(_ target: TopBarWidgetTarget, apply: @escaping (TopBarWidgetEffect) -> Void) {
-        let step = clicks.click(target, at: now())
+    public func tap(_ target: TopBarWidgetTarget, count: Int = 1, apply: @escaping (TopBarWidgetEffect) -> Void) {
+        let step = clicks.click(target, count: count, at: now())
+        for effect in step.effects { apply(effect) }
+        arm(step.arm, apply: apply)
+    }
+
+    /// A right swipe embeds details at once. A drag that is not a right swipe leaves the waiting click alone.
+    public func rightSwipe(_ target: TopBarWidgetTarget, distance: Double, apply: @escaping (TopBarWidgetEffect) -> Void) {
+        let step = clicks.rightSwipe(target, distance: distance)
+        guard !step.effects.isEmpty || step.arm == nil else { return }
         for effect in step.effects { apply(effect) }
         arm(step.arm, apply: apply)
     }

@@ -369,9 +369,7 @@ struct HomeWidgetCard: View {
     private func calendarMonth(compact: Bool) -> some View {
         let target: TopBarWidgetTarget = kind == .month ? .month : .calendar
         return MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar },
-                  onBody: { topBar.receiveWidgetTap(target) },
-                  onActivate: { topBar.activateWidget(target) },
-                  onDetails: { topBar.showWidgetDetails(target) })
+                  widgetTarget: target, widgetModel: topBar)
     }
 
     private var calendarWeek: some View {
@@ -411,9 +409,7 @@ struct HomeWidgetCard: View {
     private var calendarAgenda: some View {
         let target: TopBarWidgetTarget = kind == .agenda ? .agenda : .calendar
         return AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar },
-                   onBody: { topBar.receiveWidgetTap(target) },
-                   onActivate: { topBar.activateWidget(target) },
-                   onDetails: { topBar.showWidgetDetails(target) })
+                   widgetTarget: target, widgetModel: topBar)
     }
 
     // MARK: Clock (analog, digital, elastic, blue halo)
@@ -863,6 +859,8 @@ struct MiniMonth: View {
     var onBody: () -> Void = {}
     var onActivate: () -> Void = {}
     var onDetails: () -> Void = {}
+    var widgetTarget: TopBarWidgetTarget? = nil
+    var widgetModel: TopBarModel? = nil
 
     var body: some View {
         let calendar = ZeusDates.calendar()
@@ -872,10 +870,7 @@ struct MiniMonth: View {
         let initials = CalendarGrid.weekdayInitials(calendar: calendar)
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(ZeusDates.string(now, template: "MMMM")).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Color.white.opacity(0.78))
-                    .onTapGesture { onBody() }
-                    .accessibilityAction { onActivate() }
-                    .accessibilityAction(named: "Show details") { onDetails() }
+                clicks(Text(ZeusDates.string(now, template: "MMMM")).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Color.white.opacity(0.78)))
                 Spacer()
                 Button(action: open) {
                     Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.white.opacity(0.6))
@@ -906,10 +901,12 @@ struct MiniMonth: View {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture { onBody() }
-            .accessibilityAction { onActivate() }
-            .accessibilityAction(named: "Show details") { onDetails() }
+            .modifier(WidgetClickWire(target: widgetTarget, model: widgetModel, onBody: onBody, onActivate: onActivate, onDetails: onDetails))
         }
+    }
+
+    private func clicks<V: View>(_ view: V) -> some View {
+        view.modifier(WidgetClickWire(target: widgetTarget, model: widgetModel, onBody: onBody, onActivate: onActivate, onDetails: onDetails))
     }
 }
 
@@ -920,6 +917,8 @@ struct AgendaList: View {
     var onBody: () -> Void = {}
     var onActivate: () -> Void = {}
     var onDetails: () -> Void = {}
+    var widgetTarget: TopBarWidgetTarget? = nil
+    var widgetModel: TopBarModel? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -929,9 +928,7 @@ struct AgendaList: View {
                     Text(events.isEmpty ? "Nothing coming up" : "\(events.count) coming up").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { onBody() }
-                .accessibilityAction { onActivate() }
-                .accessibilityAction(named: "Show details") { onDetails() }
+                .modifier(WidgetClickWire(target: widgetTarget, model: widgetModel, onBody: onBody, onActivate: onActivate, onDetails: onDetails))
                 Spacer()
                 GlanceRoundButton(symbol: "arrow.up.right", size: 24, filled: true, label: "Open Calendar", action: open)
             }
@@ -944,11 +941,30 @@ struct AgendaList: View {
                         .font(.system(size: 10.5).monospacedDigit()).foregroundStyle(Color.white.opacity(0.55))
                 }
                 .contentShape(Rectangle())
+                .modifier(WidgetClickWire(target: widgetTarget, model: widgetModel, onBody: onBody, onActivate: onActivate, onDetails: onDetails))
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// The month and the agenda use the same click contract as the other summaries. Without a target, the
+/// older single tap and the details action stay.
+private struct WidgetClickWire: ViewModifier {
+    let target: TopBarWidgetTarget?
+    let model: TopBarModel?
+    let onBody: () -> Void
+    let onActivate: () -> Void
+    let onDetails: () -> Void
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let target, let model {
+            content.topBarWidgetTap(target, model: model)
+        } else {
+            content
                 .onTapGesture { onBody() }
                 .accessibilityAction { onActivate() }
                 .accessibilityAction(named: "Show details") { onDetails() }
-            }
-            Spacer(minLength: 0)
         }
     }
 }

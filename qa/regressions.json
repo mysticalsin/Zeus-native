@@ -8679,7 +8679,7 @@
     },
     {
       "id": "REG-991",
-      "failure": "A play click on the top bar did not issue play, a skip click did not issue next, and a double click on the agenda or the weather did not open details. One click also has to stay a single click. The clock is passed in. Reduced Motion snaps the details change.",
+      "failure": "A play click on the top bar did not issue play, a skip click did not issue next, and a double click on the agenda or the weather did not open more information after the window. A click count of 2 is that double click. A click count of 3 is a triple click and does not open more information. A right swipe embeds the details and is not a double click. Hold is not a route. One click also has to stay a single click. The clock is passed in. Reduced Motion snaps the details change.",
       "features": [
         "F13"
       ],

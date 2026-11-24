@@ -25,16 +25,45 @@ import Testing
 
         var agenda = TopBarWidgetClicks()
         _ = agenda.click(.agenda, at: now)
-        let agendaDetails = agenda.click(.agenda, at: now.addingTimeInterval(0.2))
+        let agendaSecond = agenda.click(.agenda, at: now.addingTimeInterval(0.2))
+        #expect(agendaSecond.effects.isEmpty)
+        let agendaDetails = agenda.tick(at: now.addingTimeInterval(0.2 + TopBarWidgetClicks.doubleClickWindow))
         #expect(agendaDetails.effects == [.openDetails(.calendar)])
         #expect(agendaDetails.effects.contains(.selectNextEvent) == false)
         #expect(agendaDetails.arm == nil)
 
         var weather = TopBarWidgetClicks()
         _ = weather.click(.weather, at: now)
-        let weatherDetails = weather.click(.weather, at: now.addingTimeInterval(0.34))
+        let weatherSecond = weather.click(.weather, count: 2, at: now.addingTimeInterval(0.34))
+        #expect(weatherSecond.effects.isEmpty)
+        let weatherDetails = weather.tick(at: now.addingTimeInterval(0.34 + TopBarWidgetClicks.doubleClickWindow))
         #expect(weatherDetails.effects == [.openDetails(.weather)])
         #expect(weatherDetails.effects.contains(.refreshWeather) == false)
+
+        var counted = TopBarWidgetClicks()
+        _ = counted.click(.agenda, count: 2, at: now)
+        #expect(counted.tick(at: now.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow)).effects == [.openDetails(.calendar)])
+
+        var triple = TopBarWidgetClicks()
+        _ = triple.click(.weather, count: 1, at: now)
+        _ = triple.click(.weather, count: 2, at: now.addingTimeInterval(0.05))
+        _ = triple.click(.weather, count: 3, at: now.addingTimeInterval(0.1))
+        let tripled = triple.tick(at: now.addingTimeInterval(0.1 + TopBarWidgetClicks.doubleClickWindow))
+        #expect(tripled.effects == [.tripleClick(.weather)])
+        #expect(tripled.effects.contains(.openDetails(.weather)) == false)
+        #expect(tripled.effects.contains(.refreshWeather) == false)
+
+        var swipe = TopBarWidgetClicks()
+        _ = swipe.click(.calendar, at: now)
+        let embedded = swipe.rightSwipe(.calendar, distance: TopBarWidgetClicks.rightSwipeDistance)
+        #expect(embedded.effects == [.embeddedDetails(.calendar)])
+        #expect(embedded.arm == nil)
+        #expect(swipe.tick(at: now.addingTimeInterval(1)).effects.isEmpty)
+        #expect(TopBarWidgetClicks.route(.hold) == nil)
+        #expect(TopBarWidgetClicks.route(.click(count: 2)) == .doubleClick)
+        #expect(TopBarWidgetClicks.route(.click(count: 3)) == .tripleClick)
+        #expect(TopBarWidgetClicks.route(.rightSwipe(dx: 36, dy: 0)) == .rightSwipe)
+        #expect(TopBarWidgetClicks.route(.rightSwipe(dx: 40, dy: 30)) == nil)
 
         var single = TopBarWidgetClicks()
         _ = single.click(.weather, at: now)
@@ -57,18 +86,46 @@ import Testing
         var clicks = TopBarWidgetClicks()
         _ = clicks.click(.agenda, at: now)
         let second = clicks.click(.agenda, at: now.addingTimeInterval(0.2))
-        #expect(second.effects == [.openDetails(.calendar)])
-        #expect(second.effects.contains(.selectNextEvent) == false)
-        #expect(second.arm == nil)
+        #expect(second.effects.isEmpty)
+        let opened = clicks.tick(at: now.addingTimeInterval(0.2 + TopBarWidgetClicks.doubleClickWindow))
+        #expect(opened.effects == [.openDetails(.calendar)])
+        #expect(opened.effects.contains(.selectNextEvent) == false)
+        #expect(opened.arm == nil)
         #expect(clicks.tick(at: now.addingTimeInterval(1)).effects.isEmpty)
     }
 
     @Test func aDoubleClickOnTheWeatherOpensDetails() {
         var clicks = TopBarWidgetClicks()
-        _ = clicks.click(.weather, at: now)
-        let second = clicks.click(.weather, at: now.addingTimeInterval(0.34))
-        #expect(second.effects == [.openDetails(.weather)])
-        #expect(second.effects.contains(.refreshWeather) == false)
+        _ = clicks.click(.weather, count: 2, at: now)
+        #expect(clicks.click(.weather, count: 1, at: now.addingTimeInterval(0.05)).effects.isEmpty)
+        let opened = clicks.tick(at: now.addingTimeInterval(0.05 + TopBarWidgetClicks.doubleClickWindow))
+        #expect(opened.effects == [.openDetails(.weather)])
+        #expect(opened.effects.contains(.refreshWeather) == false)
+    }
+
+    @Test func aTripleClickStaysATripleClick() {
+        var clicks = TopBarWidgetClicks()
+        _ = clicks.click(.focus, count: 3, at: now)
+        let settled = clicks.tick(at: now.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow))
+        #expect(settled.effects == [.tripleClick(.focus)])
+        #expect(settled.effects.contains(.openDetails(.focus)) == false)
+        #expect(settled.effects.contains(.toggleFocus) == false)
+    }
+
+    @Test func aRightSwipeEmbedsDetailsAndCancelsTheClick() {
+        var clicks = TopBarWidgetClicks()
+        _ = clicks.click(.music, at: now)
+        let short = clicks.rightSwipe(.music, distance: TopBarWidgetClicks.rightSwipeDistance - 0.01)
+        #expect(short.effects.isEmpty)
+        #expect(short.arm == now.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow))
+        let swiped = clicks.rightSwipe(.music, distance: TopBarWidgetClicks.rightSwipeDistance)
+        #expect(swiped.effects == [.embeddedDetails(.music)])
+        #expect(swiped.effects.contains(.openDetails(.music)) == false)
+        #expect(clicks.tick(at: now.addingTimeInterval(1)).effects.isEmpty)
+        #expect(TopBarWidgetClicks.isRightSwipe(dx: -40, dy: 0) == false)
+        #expect(TopBarWidgetClicks.isRightSwipe(dx: 40, dy: 10))
+        #expect(TopBarWidgetClicks.route(.hold) == nil)
+        #expect(TopBarWidgetClicks.route(.click(count: 1)) == .click)
     }
 
     @Test func aSingleClickDoesNotAlsoOpenDetails() {
@@ -125,7 +182,9 @@ import Testing
             var clicks = TopBarWidgetClicks()
             _ = clicks.click(target, at: now)
             let second = clicks.click(target, at: now.addingTimeInterval(0.1))
-            #expect(second.effects == [.openDetails(details)])
+            #expect(second.effects.isEmpty)
+            let opened = clicks.tick(at: now.addingTimeInterval(0.1 + TopBarWidgetClicks.doubleClickWindow))
+            #expect(opened.effects == [.openDetails(details)])
         }
         var agents = TopBarWidgetClicks()
         _ = agents.click(.agents, at: now)
@@ -215,6 +274,30 @@ import Testing
         await applied.wait(for: 1)
         #expect(gate.durations.isEmpty)
         #expect(effects == [.next])
+    }
+
+    /// A click count of 2 waits out the same armed delay, then opens more information and does not play.
+    @Test @MainActor func theSessionSleepsTheArmedDelayThenOpensMoreInformation() async {
+        let session = TopBarWidgetClickSession()
+        let start = Date(timeIntervalSince1970: 1_000)
+        var clock = start
+        session.now = { clock }
+        let gate = ClickSleepGate()
+        session.sleep = { duration in
+            await gate.sleep(duration)
+            clock = start.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow)
+        }
+        let opened = ClickBeacon()
+        var effects: [TopBarWidgetEffect] = []
+        session.tap(.agenda, count: 2) { effect in
+            effects.append(effect)
+            opened.hit()
+        }
+        await gate.armed.wait(for: 1)
+        #expect(effects.isEmpty)
+        gate.release()
+        await opened.wait(for: 1)
+        #expect(effects == [.openDetails(.calendar)])
     }
 }
 
