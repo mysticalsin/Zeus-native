@@ -40,7 +40,9 @@ public final class NativeMessageOutput: @unchecked Sendable {
     public static let maximumQueuedBytes = 8 * 1024 * 1024
 
     private let descriptor: NativeMessageDescriptor
-    private let queue = DispatchQueue(label: "zeus.bridge.output", qos: .utility)
+    // User-initiated, not utility: a 2s write budget is part of the Chrome stall contract, and a
+    // utility queue can sit unscheduled for that long while other cores are busy.
+    private let queue = DispatchQueue(label: "zeus.bridge.output", qos: .userInitiated)
     private let lock = NSLock()
     private let writeTimeout: TimeInterval
     private var terminal: Failure?
@@ -65,23 +67,25 @@ public final class NativeMessageOutput: @unchecked Sendable {
     @discardableResult
     public func enqueue(_ frame: Data, completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Admission {
         guard frame.count >= 4, frame.count <= NativeMessagingFrame.maxHostToChromeBytes + 4 else { return .tooLarge }
-        let deadline = ProcessInfo.processInfo.systemUptime + writeTimeout
         return lock.withLock {
             guard terminal == nil, !finishing else { return .closed }
             guard frames < Self.maximumQueuedFrames, frame.count <= Self.maximumQueuedBytes - bytes else { return .full }
             frames += 1
             bytes += frame.count
             // Queue submission shares the admission lock, so finish cannot overtake accepted work.
-            queue.async { [self] in performWrite(frame, deadline: deadline, completion: completion) }
+            queue.async { [self] in performWrite(frame, completion: completion) }
             return .accepted
         }
     }
 
-    private func performWrite(_ frame: Data, deadline: TimeInterval,
+    private func performWrite(_ frame: Data,
                               completion: @escaping @Sendable (Result<Void, Failure>) -> Void) {
+        // The budget is time the pipe itself refused another byte. A worker that was preempted
+        // before that refusal is not Chrome failing to read; a wall clock that included the pause
+        // made a busy host exit before the first byte reached stdout.
         let result: Result<Void, Failure>
         do {
-            try write(frame, deadline: deadline)
+            try write(frame, budget: writeTimeout)
             result = .success(())
         } catch {
             let failure = error as? Failure ?? .unavailable
@@ -93,7 +97,7 @@ public final class NativeMessageOutput: @unchecked Sendable {
     }
 
     /// Clean stdin EOF preserves already accepted responses. Reject new admission, then flush
-    /// existing frames under their original deadlines before closing the output descriptor.
+    /// existing frames under each write's own deadline before closing the output descriptor.
     @discardableResult
     public func finish(completion: @escaping @Sendable (Result<Void, Failure>) -> Void) -> Bool {
         lock.withLock {
@@ -126,7 +130,9 @@ public final class NativeMessageOutput: @unchecked Sendable {
         }
     }
 
-    private func write(_ data: Data, deadline: TimeInterval) throws {
+    /// `budget` is how long the peer may leave the pipe unwritable. Time spent before the first
+    /// refusal, and time the worker is not inside `poll`, does not count.
+    private func write(_ data: Data, budget: TimeInterval) throws {
         #if !canImport(Darwin)
         // Linux has no F_SETNOSIGPIPE for pipes. Mask only this worker, and consume only
         // a newly generated SIGPIPE before restoring its previous signal mask.
@@ -149,14 +155,20 @@ public final class NativeMessageOutput: @unchecked Sendable {
         try data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
             var offset = 0
+            var refused: TimeInterval = 0
             while offset < raw.count {
                 if let failure = lock.withLock({ terminal }) { throw failure }
-                guard ProcessInfo.processInfo.systemUptime < deadline else { throw Failure.timedOut }
                 var pollFD = pollfd(fd: descriptor.fd, events: Int16(POLLOUT), revents: 0)
+                let waited = ProcessInfo.processInfo.systemUptime
                 let ready = poll(&pollFD, 1, 25)
                 if ready < 0 && errno == EINTR { continue }
                 guard ready >= 0 else { throw Failure.unavailable }
-                if ready == 0 { continue }
+                if ready == 0 {
+                    // At least one poll slice. A clock that did not move during the wait must still reach the budget.
+                    refused += max(0.025, ProcessInfo.processInfo.systemUptime - waited)
+                    guard refused < budget else { throw Failure.timedOut }
+                    continue
+                }
                 guard pollFD.revents & Int16(POLLERR | POLLHUP | POLLNVAL) == 0 else { throw Failure.unavailable }
                 #if canImport(Darwin)
                 let written = Darwin.write(descriptor.fd, base.advanced(by: offset), min(16_384, raw.count - offset))
@@ -164,7 +176,12 @@ public final class NativeMessageOutput: @unchecked Sendable {
                 let written = Glibc.write(descriptor.fd, base.advanced(by: offset), min(16_384, raw.count - offset))
                 #endif
                 if written > 0 { offset += written; continue }
-                if written < 0 && (errno == EINTR || errno == EAGAIN) { continue }
+                if written < 0 && errno == EINTR { continue }
+                if written < 0 && errno == EAGAIN {
+                    refused += 0.025
+                    guard refused < budget else { throw Failure.timedOut }
+                    continue
+                }
                 throw Failure.unavailable
             }
         }
@@ -186,7 +203,7 @@ public final class NativeMessageInput: @unchecked Sendable {
     }
     private let state = State()
     private let descriptor: NativeMessageDescriptor
-    private let queue = DispatchQueue(label: "zeus.bridge.input", qos: .utility)
+    private let queue = DispatchQueue(label: "zeus.bridge.input", qos: .userInitiated)
 
     public init(handle: FileHandle) throws { descriptor = try NativeMessageDescriptor(handle) }
     deinit { stop() }

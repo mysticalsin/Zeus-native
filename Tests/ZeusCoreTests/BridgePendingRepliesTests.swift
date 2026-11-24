@@ -32,7 +32,9 @@ struct BridgePendingRepliesTests {
         try server.start()
         defer { server.stop() }
         let request = try JSONEncoder().encode(BridgeRequest(id: "same-id", type: "page.read"))
-        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }
+        // The original stays open across the duplicate round trip. That trip shares the machine
+        // with the rest of the Core suite, and a 3s client budget expired before complete().
+        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 45) }
         try await eventually { pending.count == 1 && forwarded.read() == 1 }
         let duplicateBytes = await Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }.value
         let duplicate = try JSONDecoder().decode(BridgeResponse.self, from: #require(duplicateBytes))

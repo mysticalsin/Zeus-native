@@ -9,7 +9,8 @@ public final class BridgePendingReplies: @unchecked Sendable {
         var timer: DispatchSourceTimer?
     }
     private let lock = NSLock()
-    private let timerQueue = DispatchQueue(label: "zeus.bridge.deadlines", qos: .utility)
+    // Same reason as the host's stdio queues: a utility timer can miss a short deadline while the machine is busy.
+    private let timerQueue = DispatchQueue(label: "zeus.bridge.deadlines", qos: .userInitiated)
     private var entries: [String: Entry] = [:]
 
     public init() {}
