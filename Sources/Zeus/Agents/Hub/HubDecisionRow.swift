@@ -6,18 +6,28 @@ import Carbon.HIToolbox
 import SwiftUI
 #endif
 
-/// Red line for the inline decision row. The host fails until that row's accessibility label
-/// matches the focus order in the experience contract: group header, row, Deny, Approve,
-/// transcript, reply, Send, Open. Reduce Motion must request zero offset and scale 1.
-/// Deny is never the default action.
+/// Revision 3 of the inline decision row. VoiceOver walks Allow once, Allow for this session,
+/// Deny, and Deny with note. Reduce Motion is zero offset and scale 1, and the countdown text stays.
+/// Deny is never the default action. Command is not a shortcut.
 enum HubDecisionRowTestHost {
-    static let contract = "group header, row, Deny, Approve, transcript, reply, Send, Open"
+    static let contract = "group header, row, Allow once, Allow for this session, Deny, Deny with note, transcript, reply, Send, Open"
 
     static func verify() {
         let label = HubDecisionRow.accessibilityContractLabel
-        precondition(label == contract, "accessibility label \(label) does not match the PR 7 contract")
-        precondition(HubDecisionRow.ownedAccessibilityLabels(showingApproval: true) == ["Deny", "Approve", "Reply", "Send"])
+        precondition(label == contract, "accessibility label \(label) does not match the revision 3 contract")
+        precondition(HubDecisionRow.ownedAccessibilityLabels(showingApproval: true) == [
+            "Allow once", "Allow for this session", "Deny", "Deny with note", "Reply", "Send",
+        ])
         precondition(HubDecisionRow.ownedAccessibilityLabels(showingApproval: false) == ["Reply", "Send"])
+        precondition(HubDecisionContract.destructiveHoldSeconds == 1.2)
+        precondition(HubDecisionContract.undoSeconds == 2)
+        precondition(HubDecisionContract.noteCharacterLimit == 280)
+        precondition(HubDecisionContract.commandKeyIsShortcut == false)
+        precondition(HubDecisionContract.keysActive(decisionShowing: false) == false)
+        precondition(HubDecisionContract.keysActive(decisionShowing: true))
+        precondition(HubDecisionContract.countdownAnimates(reduceMotion: true) == false)
+        precondition(HubDecisionContract.countdownTextRemainsWhenReduced)
+        precondition(HubDecisionContract.usesGradient == false)
         let still = HubDecisionRow.reduceMotionRequest
         precondition(still.offset == 0 && still.scale == 1, "Reduce Motion must request zero offset and scale 1")
         let moving = HubDecisionRow.motion(reduceMotion: false)
@@ -98,25 +108,61 @@ enum HubDecisionFocus {
 
 /// Words and motion the row draws and the host checks. One source, so a label cannot drift from the contract.
 enum HubDecisionContract {
+    static let allowOnceTitle = "Allow once"
+    static let allowForSessionTitle = "Allow for this session"
     static let denyTitle = "Deny"
-    static let approveTitle = "Approve"
+    static let denyWithNoteTitle = "Deny with note"
+    static let undoTitle = "Undo"
+    /// ZB-UIUX-DECISION-001. The row itself had no identifier.
+    static let rowIdentifier = "hub.decision.row"
+    /// ZB-UIUX-A11Y-030 Accept and ZB-UIUX-A11Y-034 Approve are Allow once.
+    static let allowOnceIdentifier = "hub.decision.allow-once"
+    /// ZB-UIUX-A11Y-034. Allow for this session is the other approval.
+    static let allowSessionIdentifier = "hub.decision.allow-session"
+    /// ZB-UIUX-A11Y-033. Deny on the approval card.
+    static let denyIdentifier = "hub.decision.deny"
+    /// ZB-UIUX-A11Y-032. Deny when the details are hidden.
+    static let denyHiddenIdentifier = "hub.decision.deny.hidden"
+    /// Deny with note. Same finding family as the unlabeled Deny control, ZB-UIUX-A11Y-033.
+    static let denyNoteIdentifier = "hub.decision.deny-note"
+    static let undoIdentifier = "hub.decision.undo"
+    static let noteIdentifier = "hub.decision.note"
+    static let queueIdentifier = "hub.decision.queue"
+    static let countdownIdentifier = "hub.decision.countdown"
     static let replyLabel = "Reply"
     static let sendTitle = "Send"
-    static let highRiskWord = "High risk"
     static let hiddenDetails = "Details hidden (Settings > Privacy)"
+    /// Destructive approval is a press of this many seconds. 1.199 does not approve.
+    static let destructiveHoldSeconds = 1.2
+    static let undoSeconds = 2
+    static let noteCharacterLimit = 280
+    /// Command is never a shortcut.
+    static let commandKeyIsShortcut = false
+    /// The decision row is monochrome. It does not paint a gradient.
+    static let usesGradient = false
 
-    static var accessibilityContractLabel: String { HubDecisionFocus.accessibilityLabel }
+    static let revision3ContractLabel = "group header, row, Allow once, Allow for this session, Deny, Deny with note, transcript, reply, Send, Open"
+
+    static var accessibilityContractLabel: String { revision3ContractLabel }
 
     static func ownedAccessibilityLabels(showingApproval: Bool) -> [String] {
         var labels: [String] = []
         if showingApproval {
+            labels.append(allowOnceTitle)
+            labels.append(allowForSessionTitle)
             labels.append(denyTitle)
-            labels.append(approveTitle)
+            labels.append(denyWithNoteTitle)
         }
         labels.append(replyLabel)
         labels.append(sendTitle)
         return labels
     }
+
+    static func keysActive(decisionShowing: Bool) -> Bool { decisionShowing }
+
+    /// The countdown text stays. Reduce Motion does not animate it.
+    static func countdownAnimates(reduceMotion: Bool) -> Bool { !reduceMotion }
+    static let countdownTextRemainsWhenReduced = true
 
     static var reduceMotionRequest: HubDecisionMotion { motion(reduceMotion: true) }
 
@@ -127,7 +173,7 @@ enum HubDecisionContract {
     /// Reduce Motion changes in one frame. The height spring runs only when this is true.
     static func animates(reduceMotion: Bool) -> Bool { !reduceMotion }
 
-    /// Deny is never the default action. Approve and Send are not either: Return stays in the reply field.
+    /// Deny is never the default action. Allow once is not either: Return is handled only while a decision is showing.
     static let denyIsDefaultAction = false
     static let approveIsDefaultAction = false
     static let sendIsDefaultAction = false
@@ -136,7 +182,12 @@ enum HubDecisionContract {
     static let askIsButton = false
 
     static func countdown(_ seconds: Int) -> String {
-        "\(max(seconds, 0)) s left, then it's denied."
+        countdown(seconds, paused: false)
+    }
+
+    static func countdown(_ seconds: Int, paused: Bool) -> String {
+        let body = "\(max(seconds, 0)) s left, then it's denied."
+        return paused ? "Countdown paused. \(body)" : body
     }
 
     /// Visible queued-count hint. A row that is itself waiting uses the sentence from the mock.
@@ -161,20 +212,34 @@ enum HubDecisionContract {
     }
 
     static func denyHint(answerKeysOn: Bool) -> String {
-        answerKeysOn ? "Stops this once. Control-Option-N denies." : "Stops this once."
+        answerKeysOn ? "Stops this once. Escape or 3." : "Stops this once."
     }
 
-    static func approveHint(answerKeysOn: Bool, allowsAsk: Bool) -> String {
-        var hint = answerKeysOn ? "Lets this run once. Control-Option-Y approves." : "Lets this run once."
-        if answerKeysOn, allowsAsk { hint += " Control-Option-O asks." }
-        return hint
+    static func approveHint(answerKeysOn: Bool, allowsAsk _: Bool) -> String {
+        answerKeysOn ? "Lets this run once. Return." : "Lets this run once."
+    }
+
+    static func sessionHint(answerKeysOn: Bool) -> String {
+        answerKeysOn ? "Lets this run until the session ends. 2." : "Lets this run until the session ends."
+    }
+
+    static func denyWithNoteHint(answerKeysOn: Bool) -> String {
+        answerKeysOn ? "Stops this once and keeps a note. 4." : "Stops this once and keeps a note."
+    }
+
+    static func denyAllHint(answerKeysOn: Bool) -> String {
+        answerKeysOn ? "Denies every decision in the queue. Shift-Escape." : "Denies every decision in the queue."
+    }
+
+    static func undoHint(answerKeysOn: Bool) -> String {
+        answerKeysOn ? "Takes the decision back. U." : "Takes the decision back."
     }
 }
 
 #if canImport(SwiftUI) && canImport(AppKit)
 
-/// Inline approval on a session row: Deny and Approve, Ask from the keyboard, the queued-count hint,
-/// and the quick-reply field with Send. Reuses `CardButton` and `DiffPreview`. No card above the page.
+/// Inline approval on a session row. Allow once, Allow for this session, Deny, and Deny with note.
+/// Monochrome glass, the page spring, and no gradient. Ask is not a button.
 struct HubDecisionRow: View {
     var request: HubDecisionRequest?
     var queue: HubDecisionQueue
@@ -185,8 +250,11 @@ struct HubDecisionRow: View {
     var detailsHidden: Bool
     /// Nil follows the system Reduce Motion setting.
     var reduceMotion: Bool?
-    var onVerdict: (HubApprovalVerdict) -> Void
+    var countdownPaused: Bool
+    var undoAvailable: Bool
+    var onAction: (HubDecisionRowAction) -> Void
     var onSend: () -> Void
+    @State private var note = ""
 
     static var accessibilityContractLabel: String { HubDecisionContract.accessibilityContractLabel }
     static func ownedAccessibilityLabels(showingApproval: Bool) -> [String] {
@@ -213,7 +281,9 @@ struct HubDecisionRow: View {
         answerKeysOn: Bool = false,
         detailsHidden: Bool = false,
         reduceMotion: Bool? = nil,
-        onVerdict: @escaping (HubApprovalVerdict) -> Void = { _ in },
+        countdownPaused: Bool = false,
+        undoAvailable: Bool = false,
+        onAction: @escaping (HubDecisionRowAction) -> Void = { _ in },
         onSend: @escaping () -> Void = {}
     ) {
         #if DEBUG
@@ -227,7 +297,9 @@ struct HubDecisionRow: View {
         self.answerKeysOn = answerKeysOn
         self.detailsHidden = detailsHidden
         self.reduceMotion = reduceMotion
-        self.onVerdict = onVerdict
+        self.countdownPaused = countdownPaused
+        self.undoAvailable = undoAvailable
+        self.onAction = onAction
         self.onSend = onSend
     }
 
@@ -243,15 +315,23 @@ struct HubDecisionRow: View {
             }
         }
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("hub.decision.row") // ZB-UIUX-DECISION-001
+        .accessibilityLabel(HubDecisionContract.revision3ContractLabel)
         .animation(rowAnimation, value: phase)
         .animation(rowAnimation, value: receipt)
         .transaction { transaction in
             if !animating { transaction.disablesAnimations = true }
         }
         .background {
-            HubDecisionKeyMonitor(active: keysActive, allowsAsk: request?.allowsAsk == true, onVerdict: onVerdict)
-                .frame(width: 0, height: 0)
-                .accessibilityHidden(true)
+            HubDecisionKeyMonitor(
+                active: keysActive,
+                destructive: request?.tier == "Destructive",
+                undoAvailable: undoAvailable,
+                note: cappedNote,
+                onAction: onAction
+            )
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
         }
     }
 
@@ -264,7 +344,12 @@ struct HubDecisionRow: View {
         return Motion.page(reduceMotion: false)
     }
 
-    private var keysActive: Bool { phase == .showing && answerKeysOn }
+    /// ZB-UIUX-ESCAPE-001. Keys, including Escape, are live only while a decision is showing.
+    private var keysActive: Bool { (phase == .showing || undoAvailable) && HubDecisionContract.keysActive(decisionShowing: phase == .showing || undoAvailable) }
+
+    private var cappedNote: String {
+        String(note.prefix(HubDecisionContract.noteCharacterLimit))
+    }
 
     private enum Phase: Equatable { case hidden, queued, showing }
 
@@ -293,7 +378,7 @@ struct HubDecisionRow: View {
         if phase != .hidden {
             VStack(alignment: .leading, spacing: 8) {
                 Rectangle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(Glass.hairline)
                     .frame(height: 1)
                     .accessibilityHidden(true)
                 if let request {
@@ -304,20 +389,32 @@ struct HubDecisionRow: View {
                     buttonRow(request)
                     if let seconds = request.secondsLeft {
                         Text(Self.countdown(seconds))
-                            .font(.system(size: 10.5, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.cloudQuiet)
-                            .accessibilityLabel(Self.countdown(seconds))
+                            .font(Glass.numeral(18))
+                            .foregroundStyle(Glass.secondary)
+                            .contentTransition(Self.countdownAnimates(reduceMotion: reduced) ? .numericText() : .identity)
+                            .animation(Self.countdownAnimates(reduceMotion: reduced) ? .linear(duration: 0.2) : nil, value: seconds)
+                            .accessibilityLabel(HubDecisionContract.countdown(seconds, paused: countdownPaused))
+                            .accessibilityIdentifier("hub.decision.countdown")
                             .accessibilitySortPriority(HubDecisionFocus.countdownPriority)
+                    }
+                    if undoAvailable {
+                    glassButton(
+                        title: HubDecisionContract.undoTitle,
+                        hint: HubDecisionContract.undoHint(answerKeysOn: true),
+                        filled: false,
+                        hold: false
+                    ) { onAction(.undo) }
+                        .accessibilityIdentifier("hub.decision.undo")
                     }
                 }
                 if let hint = Self.queuedHint(thisRowIsQueued: queue.thisRowIsQueued, count: queue.count),
                    let spoken = HubDecisionContract.queuedAccessibilityLabel(thisRowIsQueued: queue.thisRowIsQueued, count: queue.count) {
                     Text(hint)
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(Theme.cloudQuiet)
+                        .font(Glass.caption)
+                        .foregroundStyle(Glass.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel(spoken)
+                        .accessibilityIdentifier("hub.decision.queue")
                         .accessibilitySortPriority(HubDecisionFocus.queuePriority)
                 }
             }
@@ -327,20 +424,16 @@ struct HubDecisionRow: View {
     }
 
     private func toolLine(_ request: HubDecisionRequest) -> some View {
-        HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(request.tier.uppercased())
+                .font(Glass.eyebrow)
+                .foregroundStyle(Glass.tertiary)
             Text(request.tool)
-                .foregroundStyle(Theme.ember)
-            if request.highRisk {
-                Text("·")
-                    .foregroundStyle(Theme.ember)
-                    .accessibilityHidden(true)
-                Text(HubDecisionContract.highRiskWord)
-                    .foregroundStyle(Theme.danger)
-            }
+                .font(Glass.title)
+                .foregroundStyle(Glass.text)
         }
-        .font(.system(size: 12, weight: .semibold, design: .rounded))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(request.highRisk ? "\(request.tool), \(HubDecisionContract.highRiskWord)" : request.tool)
+        .accessibilityLabel("\(request.tier). \(request.tool)")
         .accessibilitySortPriority(HubDecisionFocus.toolPriority)
     }
 
@@ -348,8 +441,8 @@ struct HubDecisionRow: View {
     private func decisionBody(_ request: HubDecisionRequest) -> some View {
         if detailsHidden {
             Text(HubDecisionContract.hiddenDetails)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(Theme.cloudSecondary)
+                .font(Glass.body)
+                .foregroundStyle(Glass.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Details hidden")
                 .accessibilitySortPriority(HubDecisionFocus.bodyPriority)
@@ -360,17 +453,18 @@ struct HubDecisionRow: View {
             Text(CommandDisplay.plain(command))
                 .accessibilityLabel(command)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(Theme.cloudPrimary)
+                .foregroundStyle(Glass.text)
                 .lineLimit(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Glass.fill, in: RoundedRectangle(cornerRadius: Glass.rowRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Glass.rowRadius, style: .continuous).strokeBorder(Glass.hairline, lineWidth: 1))
                 .accessibilitySortPriority(HubDecisionFocus.bodyPriority)
         } else if let question = request.question, !question.isEmpty {
             Text(question)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(Theme.cloudPrimary)
+                .font(Glass.body)
+                .foregroundStyle(Glass.text)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel(question)
@@ -379,31 +473,97 @@ struct HubDecisionRow: View {
     }
 
     private func buttonRow(_ request: HubDecisionRequest) -> some View {
-        HStack(spacing: 8) {
-            verdictButton(.deny, tint: Theme.cloudSecondary, filled: false) { onVerdict(.deny) }
-            verdictButton(.approve, tint: Theme.ember, filled: true) { onVerdict(.allow) }
-            if Self.askIsButton {
-                verdictButton(.ask, tint: Theme.cloudSecondary, filled: false) { onVerdict(.ask) }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                glassButton(
+                    title: HubDecisionContract.allowOnceTitle,
+                    hint: HubDecisionContract.approveHint(answerKeysOn: answerKeysOn, allowsAsk: false),
+                    filled: true,
+                    hold: request.tier == "Destructive"
+                ) { onAction(.allowOnce) }
+                    .accessibilityIdentifier("hub.decision.allow-once") // ZB-UIUX-A11Y-030 ZB-UIUX-A11Y-034
+                glassButton(
+                    title: HubDecisionContract.allowForSessionTitle,
+                    hint: HubDecisionContract.sessionHint(answerKeysOn: answerKeysOn),
+                    filled: false,
+                    hold: request.tier == "Destructive"
+                ) { onAction(.allowForThisSession) }
+                    .accessibilityIdentifier("hub.decision.allow-session") // ZB-UIUX-A11Y-034
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                if detailsHidden {
+                    glassButton(
+                        title: HubDecisionContract.denyTitle,
+                        hint: HubDecisionContract.denyHint(answerKeysOn: answerKeysOn),
+                        filled: false,
+                        hold: false
+                    ) { onAction(.deny) }
+                        .accessibilityIdentifier("hub.decision.deny.hidden") // ZB-UIUX-A11Y-032
+                } else {
+                    glassButton(
+                        title: HubDecisionContract.denyTitle,
+                        hint: HubDecisionContract.denyHint(answerKeysOn: answerKeysOn),
+                        filled: false,
+                        hold: false
+                    ) { onAction(.deny) }
+                        .accessibilityIdentifier("hub.decision.deny") // ZB-UIUX-A11Y-033
+                }
+                glassButton(
+                    title: HubDecisionContract.denyWithNoteTitle,
+                    hint: HubDecisionContract.denyWithNoteHint(answerKeysOn: answerKeysOn),
+                    filled: false,
+                    hold: false
+                ) { onAction(.denyWithNote(cappedNote)) }
+                    .accessibilityIdentifier("hub.decision.deny-note") // ZB-UIUX-A11Y-033
+                Spacer(minLength: 0)
+            }
+            NotchTextField(text: $note, placeholder: "Note", onSubmit: { onAction(.denyWithNote(cappedNote)) })
+                .onChange(of: note) { _, new in
+                    if new.count > HubDecisionContract.noteCharacterLimit {
+                        note = String(new.prefix(HubDecisionContract.noteCharacterLimit))
+                    }
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Glass.fill, in: Capsule())
+                .overlay(Capsule().strokeBorder(Glass.hairline, lineWidth: 1))
+                .accessibilityLabel(HubDecisionContract.denyWithNoteTitle)
+                .accessibilityIdentifier("hub.decision.note")
+                .accessibilityValue("\(cappedNote.count) of \(HubDecisionContract.noteCharacterLimit) characters")
         }
     }
 
+    /// A monochrome glass control. Filled is white on the canvas. Nothing here is a gradient.
+    /// Destructive approval holds for 1.2 seconds. A shorter press does not fire.
     @ViewBuilder
-    private func verdictButton(_ role: VerdictRole, tint: Color, filled: Bool, action: @escaping () -> Void) -> some View {
-        applyingDefault(CardButton(title: role.title, tint: tint, filled: filled, action: action)
-            .accessibilityLabel(role.title)
-            .accessibilityHint(hint(for: role))
-            .accessibilitySortPriority(role.priority),
-            isDefault: role.isDefaultAction)
-    }
-
-    private func hint(for role: VerdictRole) -> String {
-        switch role {
-        case .deny: HubDecisionContract.denyHint(answerKeysOn: answerKeysOn)
-        case .approve: HubDecisionContract.approveHint(answerKeysOn: answerKeysOn, allowsAsk: request?.allowsAsk == true)
-        case .ask: "Asks from the keyboard."
+    private func glassButton(
+        title: String,
+        hint: String,
+        filled: Bool,
+        hold: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let label = Text(title)
+            .font(Glass.font(12, .medium))
+            .foregroundStyle(filled ? Glass.canvas : Glass.text)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 28)
+            .background(Capsule().fill(filled ? Glass.text : Glass.fillRaised))
+            .overlay(Capsule().strokeBorder(Glass.hairline, lineWidth: 1))
+        Group {
+            if hold {
+                label
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { action() }
+                    .onLongPressGesture(minimumDuration: HubDecisionContract.destructiveHoldSeconds, perform: action)
+            } else {
+                Button(action: action) { label }
+                    .buttonStyle(.plain)
+            }
         }
+        .accessibilityLabel(title)
+        .accessibilityHint(hint)
     }
 
     private var replyBlock: some View {
@@ -416,18 +576,27 @@ struct HubDecisionRow: View {
                     .accessibilityLabel(HubDecisionContract.replyLabel)
                     .accessibilitySortPriority(HubDecisionFocus.priority(.reply))
                 applyingDefault(
-                    CardButton(title: HubDecisionContract.sendTitle, tint: Theme.accent, filled: true, action: onSend)
-                        .opacity(replyHasText ? 1 : 0.4)
-                        .animation(animating ? .easeOut(duration: Motion.feedbackDuration) : nil, value: replyHasText)
-                        .accessibilityLabel(HubDecisionContract.sendTitle)
-                        .accessibilityHint(replyHasText ? "Sends the reply. Approval comes first." : "Type something first.")
-                        .accessibilitySortPriority(HubDecisionFocus.priority(.send)),
+                    Button(action: onSend) {
+                        Text(HubDecisionContract.sendTitle)
+                            .font(Glass.font(12, .medium))
+                            .foregroundStyle(Glass.canvas)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 28)
+                            .background(Capsule().fill(Glass.text))
+                            .overlay(Capsule().strokeBorder(Glass.hairline, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(replyHasText ? 1 : 0.4)
+                    .animation(animating ? .easeOut(duration: Motion.feedbackDuration) : nil, value: replyHasText)
+                    .accessibilityLabel(HubDecisionContract.sendTitle)
+                    .accessibilityHint(replyHasText ? "Sends the reply. Approval comes first." : "Type something first.")
+                    .accessibilitySortPriority(HubDecisionFocus.priority(.send)),
                     isDefault: Self.sendIsDefaultAction)
             }
             if let receipt, !receipt.isEmpty {
                 Text(receipt)
-                    .font(.system(size: 10.5, design: .rounded))
-                    .foregroundStyle(Theme.cloudQuiet)
+                    .font(Glass.caption)
+                    .foregroundStyle(Glass.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(receipt)
                     .accessibilitySortPriority(HubDecisionFocus.receiptPriority)
@@ -464,18 +633,18 @@ struct HubDecisionQueue: Equatable {
 /// Plain values for one inline decision. The machines that change state stay outside this view.
 struct HubDecisionRequest: Equatable {
     var tool: String
-    var highRisk: Bool
+    /// Low, High, or Destructive. Destructive approval is a 1.2 second hold.
+    var tier: String
     var command: String?
     var question: String?
     var diff: FileDiff?
     var secondsLeft: Int?
-    /// Control-Option-O asks only when this is true. There is still no Ask button.
     var allowsAsk: Bool
 
-    init(tool: String, highRisk: Bool = false, command: String? = nil, question: String? = nil,
-         diff: FileDiff? = nil, secondsLeft: Int? = nil, allowsAsk: Bool = true) {
+    init(tool: String, tier: String = "Low", command: String? = nil, question: String? = nil,
+         diff: FileDiff? = nil, secondsLeft: Int? = nil, allowsAsk: Bool = false) {
         self.tool = tool
-        self.highRisk = highRisk
+        self.tier = tier
         self.command = command
         self.question = question
         self.diff = diff
@@ -484,52 +653,36 @@ struct HubDecisionRequest: Equatable {
     }
 }
 
-/// Deny, Approve, and the keyboard-only Ask verdict. Ask is drawn only if the contract grows a button.
-private enum VerdictRole {
-    case deny, approve, ask
-
-    var title: String {
-        switch self {
-        case .deny: HubDecisionContract.denyTitle
-        case .approve: HubDecisionContract.approveTitle
-        case .ask: "Ask"
-        }
-    }
-
-    var isDefaultAction: Bool {
-        switch self {
-        case .deny: HubDecisionRow.denyIsDefaultAction
-        case .approve: HubDecisionRow.approveIsDefaultAction
-        case .ask: false
-        }
-    }
-
-    var priority: Double {
-        switch self {
-        case .deny: HubDecisionFocus.priority(.deny)
-        case .approve: HubDecisionFocus.priority(.approve)
-        case .ask: HubDecisionFocus.priority(.approve) - 1
-        }
-    }
+/// What the row reports. The machine decides whether it runs.
+enum HubDecisionRowAction: Equatable {
+    case allowOnce
+    case allowForThisSession
+    case deny
+    case denyWithNote(String)
+    case denyAllQueued
+    case undo
 }
 
-/// Control-Option-Y, N, and O answer the showing approval. The monitor is installed only while it is showing
-/// and the keyboard setting is on, so the same keys do nothing the rest of the time.
+/// ZB-UIUX-ESCAPE-001. Escape and 3 deny. The monitor is installed only while a decision is showing.
+/// Return allows once. 2 allows for this session. 4 denies with a note. Shift-Escape denies the queue. U undoes.
+/// Command is not a shortcut. A repeat is swallowed.
 private struct HubDecisionKeyMonitor: NSViewRepresentable {
     var active: Bool
-    var allowsAsk: Bool
-    var onVerdict: (HubApprovalVerdict) -> Void
+    var destructive: Bool
+    var undoAvailable: Bool
+    var note: String
+    var onAction: (HubDecisionRowAction) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        context.coordinator.sync(active: active, allowsAsk: allowsAsk, onVerdict: onVerdict)
+        context.coordinator.sync(active: active, destructive: destructive, undoAvailable: undoAvailable, note: note, onAction: onAction)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.sync(active: active, allowsAsk: allowsAsk, onVerdict: onVerdict)
+        context.coordinator.sync(active: active, destructive: destructive, undoAvailable: undoAvailable, note: note, onAction: onAction)
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -539,12 +692,22 @@ private struct HubDecisionKeyMonitor: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         private var monitor: Any?
-        private var allowsAsk = false
-        private var onVerdict: (HubApprovalVerdict) -> Void = { _ in }
+        private var destructive = false
+        private var undoAvailable = false
+        private var note = ""
+        private var onAction: (HubDecisionRowAction) -> Void = { _ in }
 
-        func sync(active: Bool, allowsAsk: Bool, onVerdict: @escaping (HubApprovalVerdict) -> Void) {
-            self.allowsAsk = allowsAsk
-            self.onVerdict = onVerdict
+        func sync(
+            active: Bool,
+            destructive: Bool,
+            undoAvailable: Bool,
+            note: String,
+            onAction: @escaping (HubDecisionRowAction) -> Void
+        ) {
+            self.destructive = destructive
+            self.undoAvailable = undoAvailable
+            self.note = note
+            self.onAction = onAction
             if active { start() } else { stop() }
         }
 
@@ -556,22 +719,37 @@ private struct HubDecisionKeyMonitor: NSViewRepresentable {
             }
         }
 
-        /// Y approves, N denies, O asks. Repeats are swallowed so a held key cannot answer twice.
+        /// ZB-UIUX-ESCAPE-001. Escape denies. 3 denies too.
         private func handle(_ event: NSEvent) -> NSEvent? {
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock)
-            guard flags == [.control, .option] else { return event }
-            let verdict: HubApprovalVerdict
+            if flags.contains(.command) { return event }
+            let shift = flags.contains(.shift)
+            guard flags.subtracting(.shift).isEmpty else { return event }
+            if event.isARepeat { return nil }
+            if shift {
+                guard event.keyCode == UInt16(kVK_Escape), undoAvailable == false else { return event }
+                onAction(.denyAllQueued)
+                return nil
+            }
             switch event.keyCode {
-            case UInt16(kVK_ANSI_Y): verdict = .allow
-            case UInt16(kVK_ANSI_N): verdict = .deny
-            case UInt16(kVK_ANSI_O):
-                guard allowsAsk else { return event }
-                verdict = .ask
+            case UInt16(kVK_Escape), UInt16(kVK_ANSI_3):
+                guard undoAvailable == false else { return event }
+                onAction(.deny)
+            case UInt16(kVK_Return):
+                guard destructive == false, undoAvailable == false else { return event }
+                onAction(.allowOnce)
+            case UInt16(kVK_ANSI_2):
+                guard destructive == false, undoAvailable == false else { return event }
+                onAction(.allowForThisSession)
+            case UInt16(kVK_ANSI_4):
+                guard undoAvailable == false else { return event }
+                onAction(.denyWithNote(note))
+            case UInt16(kVK_ANSI_U):
+                guard undoAvailable else { return event }
+                onAction(.undo)
             default:
                 return event
             }
-            if event.isARepeat { return nil }
-            onVerdict(verdict)
             return nil
         }
 
@@ -610,7 +788,7 @@ private struct HubDecisionPreview: View {
         HubDecisionRow(
             request: HubDecisionRequest(
                 tool: kind == .reduced ? "Edit file" : "Run command",
-                highRisk: kind == .showing,
+                tier: kind == .showing ? "Destructive" : "Low",
                 command: kind == .reduced ? nil : "./migrate.sh --apply",
                 diff: kind == .reduced ? Self.sampleDiff : nil,
                 secondsLeft: kind == .queued ? nil : 12,
