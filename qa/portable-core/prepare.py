@@ -118,7 +118,7 @@ GROUPS = {
              "Explanation/ExplanationModelMotion.swift",
              "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
              "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
-             "Explanation/ExplanationChartMath.swift", "Pointing/PointingCardAnchors.swift", "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
+             "Explanation/ExplanationChartMath.swift", "Pointing/PointingCardAnchors.swift", "Shortcut.swift", "Present/SpatialTrail.swift", "Present/PresentTolerance.swift", "Present/CoordinateMapper.swift",
              "KeyFacts.swift", "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
              "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
              "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
@@ -131,7 +131,7 @@ GROUPS = {
               "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests", "ShowMeKeyTests"),
     ),
     "buddy": (
-        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
+        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/PresentTolerance.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "wiki-relationships": (
