@@ -12,6 +12,10 @@ import Glibc
 @Suite("Native host process boundaries", .serialized)
 struct NativeHostProcessTests {
     private final class Fixture: @unchecked Sendable {
+        /// Darwin's `FIONREAD` is `_IOR('f', 127, int)` (`IOC_OUT | (sizeof(int) << 16) | ('f' << 8) | 127`).
+        /// Swift will not import that macro (`structure not supported`), so `swift build --build-tests` stopped
+        /// before ZeusCoreTests could run. The request is the same bits.
+        private static let bytesWaiting = UInt(0x4000_0000 | ((UInt(MemoryLayout<Int32>.size) & 0x1fff) << 16) | (UInt(Unicode.Scalar("f").value) << 8) | 127)
         let root: URL
         let process = Process()
         let input = Pipe(), output = Pipe(), errors = Pipe()
@@ -106,7 +110,7 @@ struct NativeHostProcessTests {
             #if canImport(Darwin)
             var available = Int32(0)
             let result = withUnsafeMutablePointer(to: &available) {
-                ioctl(fd, UInt(FIONREAD), UnsafeMutableRawPointer($0))
+                ioctl(fd, bytesWaiting, UnsafeMutableRawPointer($0))
             }
             guard result == 0 else { return 0 }
             return Int(max(0, available))
