@@ -8,8 +8,12 @@ public struct VoiceFrame: Equatable, Sendable {
     public static let sampleRateHertz = 24_000
 
     public var samples: [Float]
+    /// Counts `init` so a test can see a validation copy. Copies of an existing frame do not increment it.
+    /// The frame-copy harness reads and resets this on one thread.
+    nonisolated(unsafe) public static var constructions = 0
 
     public init(samples: [Float]) throws {
+        Self.constructions += 1
         guard samples.count == Self.sampleCount else {
             throw VoiceSessionError.badFrameSize(expected: Self.sampleCount, got: samples.count)
         }
@@ -56,7 +60,9 @@ public actor FakeDuplexVoiceBackend: DuplexVoiceBackend {
 
     public func push(userFrame: [Float]) async throws -> VoiceFrame {
         let advanced = try session.next(on: .push)
-        _ = try VoiceFrame(samples: userFrame)
+        guard userFrame.count == VoiceFrame.sampleCount else {
+            throw VoiceSessionError.badFrameSize(expected: VoiceFrame.sampleCount, got: userFrame.count)
+        }
         session = advanced
         let reply = nextReply < frames.count ? frames[nextReply] : frames[frames.count - 1]
         if nextReply < frames.count { nextReply += 1 }
