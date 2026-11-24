@@ -1,5 +1,6 @@
 import ApplicationServices
 import AppKit
+import ZeusCore
 
 /// Writes dictated words into a focused field, including one that already holds text.
 /// Does not touch the clipboard. A secure field is left alone.

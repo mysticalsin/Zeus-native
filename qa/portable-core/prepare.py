@@ -68,12 +68,8 @@ GROUPS = {
         tests("WikiExportTests"),
     ),
     "dictation-insertion": (
-        core("Dictation/TextInsertionReceipt.swift"),
-        tests("TextInsertionReceiptTests"),
-    ),
-    "warm-field-insert": (
-        core("Dictation/WarmFieldInsert.swift"),
-        tests("WarmFieldInsertTests"),
+        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift"),
+        tests("TextInsertionReceiptTests", "WarmFieldInsertTests"),
     ),
     "polyglot": (
         core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
