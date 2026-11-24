@@ -1508,7 +1508,7 @@ struct ClosedWings: View {
         case .recordingFeedback:
             wings {
                 Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 16)).foregroundStyle(Theme.glow)
+                    .font(.system(size: 16)).foregroundStyle(Color(middleBar: MiddleBarTone.bar))
                     .accessibilityHidden(true)
             } right: {
                 HStack(spacing: 5) {
