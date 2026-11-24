@@ -71,6 +71,7 @@ struct ZeusVoiceCards: View {
                     else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
                 }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
             }
+            GSInfo(text: UltronEngineRouter.spokenOrder(voice.routeDecisions()))
             if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
                                                                  effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
                 GSInfo(text: line)

@@ -152,10 +152,14 @@ struct NewChatTests {
     }
 
     @Test func defaultAgentMustBeOffered() {
-        #expect(NewChatAgents.defaultTool(label: "Codex", offered: [.claude, .codex]) == .codex)
-        #expect(NewChatAgents.defaultTool(label: "Codex", offered: [.claude]) == .claude)
-        #expect(NewChatAgents.defaultTool(label: "Claude Code", offered: [.codex, .gemini]) == .codex)
-        #expect(NewChatAgents.defaultTool(label: "", offered: [.gemini]) == .gemini)
+        let codex: CodingTool? = .codex
+        let claude: CodingTool? = .claude
+        let gemini: CodingTool? = .gemini
+        #expect(NewChatAgents.defaultTool(label: "Codex", offered: [.claude, .codex]) == codex)
+        #expect(NewChatAgents.defaultTool(label: "Codex", offered: [.claude]) == claude)
+        #expect(NewChatAgents.defaultTool(label: "Claude Code", offered: [.codex, .gemini]) == codex)
+        #expect(NewChatAgents.defaultTool(label: "", offered: [.gemini]) == gemini)
+        #expect(NewChatAgents.defaultTool(label: "Claude Code", offered: []) == nil)
     }
 }
 

@@ -124,4 +124,13 @@ public enum UltronEngineRouter {
         add(.system, why)
         return decisions
     }
+
+    /// The order a reply will try, in words. The Mac voice stays last unless it was chosen alone.
+    public static func spokenOrder(_ decisions: [UltronRouteDecision]) -> String {
+        let names = decisions.map(\.engine.label)
+        guard let first = names.first else { return "No voice is ready." }
+        if names.count == 1 { return "Zeus speaks with \(first)." }
+        let rest = names.dropFirst().joined(separator: ", then ")
+        return "Zeus speaks with \(first). If that fails, \(rest)."
+    }
 }

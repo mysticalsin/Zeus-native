@@ -79,10 +79,10 @@ GROUPS = {
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
              "Dictation/SpokenDictationMarkup.swift", "Dictation/TranscriptionEngine.swift", "Dictation/WhisperPromptRecovery.swift",
              "Dictation/ThinkingOrbMath.swift", "Voice/UltronVoiceSignal.swift", "Recordly/RecordlyCaptureTimeline.swift", "Mac/DriveTypingFlow.swift",
-             "Connections/ConnectionControlSpeech.swift"),
+             "Connections/ConnectionControlSpeech.swift", "Connections/ConnectionFallback.swift"),
         tests("DictationExplicitCorrectionTests", "DictationQAFixTests", "SpeechEngineCatalogTests",
               "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests", "ThinkingOrbMathTests",
-              "ConnectionControlSpeechTests"),
+              "ConnectionControlSpeechTests", "ConnectionFallbackTests"),
     ),
     "scribe": (
         core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift",
@@ -103,11 +103,11 @@ GROUPS = {
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Voice/VoiceRingModel.swift",
+             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Voice/VoiceRingModel.swift", "Voice/UltronEngineRouter.swift",
              "Performance/DisplayAnimationPolicy.swift",
              "TopBar/RecordingFeedback.swift"),
         tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests",
-              "VoiceRingModelTests"),
+              "VoiceRingModelTests", "UltronRouteSpeechTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
