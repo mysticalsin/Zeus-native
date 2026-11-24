@@ -5,6 +5,11 @@ import Testing
 /// Right Option is strict push-to-talk. Hold starts listening, release stops it, and nothing latches.
 @Suite("Right Option strict push-to-talk")
 struct RightOptionPushToTalkTests {
+    @Test func theListenCuePlaysOnlyAfterCaptureHasStarted() {
+        #expect(RightOptionPushToTalk.ListenCue.mayPlay(captureStarted: false) == false)
+        #expect(RightOptionPushToTalk.ListenCue.mayPlay(captureStarted: true))
+    }
+
     @Test func holdingRightOptionStartsListeningAndARepeatDoesNotToggle() {
         var machine = RightOptionPushToTalk()
         #expect(machine.send(.rightOption(down: true, at: 0, otherTurnOpen: false)) == [.start])

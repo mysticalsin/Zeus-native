@@ -15,6 +15,13 @@ public struct RightOptionPushToTalk: Equatable, Sendable {
     /// The same 45 s window a talk turn already uses. Not a new timeout.
     public static var holdCap: TimeInterval { FastTier.conversationWindowSeconds }
 
+    /// The listen chime is playback. It may play only after capture has started.
+    /// Playing it first pulls a Bluetooth headset into its speaker profile, so the
+    /// microphone opens later and the words said during that switch are gone.
+    public enum ListenCue {
+        public static func mayPlay(captureStarted: Bool) -> Bool { captureStarted }
+    }
+
     public enum Phase: Equatable, Sendable {
         case idle
         case listening

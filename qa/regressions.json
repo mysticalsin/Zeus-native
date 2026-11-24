@@ -8820,6 +8820,18 @@
         "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
         "function": "aScreenLockStopsTheHold"
       }
+    },
+    {
+      "id": "REG-1003",
+      "failure": "The listen chime played before capture started, so a Bluetooth headset left its listening profile and the words were gone.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+        "function": "theListenCuePlaysOnlyAfterCaptureHasStarted"
+      }
     }
   ]
 }

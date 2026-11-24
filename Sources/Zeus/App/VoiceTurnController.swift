@@ -239,9 +239,10 @@ final class VoiceTurnController {
             failures.record(session: session, failure: failure)
             Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
         }
-        // The figure appears on the key-down, before the microphone finishes starting.
+        // The figure can show before the microphone is up. The listen chime cannot:
+        // playback before capture pulls a Bluetooth headset into its speaker profile,
+        // so the microphone opens later and the words said during that switch are gone.
         buddy.listen()
-        ZeusSound.play(.listenStart)
         do {
             talkSession = try seams.speechStart(speech)
         } catch {
@@ -259,6 +260,9 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
+        if RightOptionPushToTalk.ListenCue.mayPlay(captureStarted: true) {
+            ZeusSound.play(.listenStart)
+        }
         seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
