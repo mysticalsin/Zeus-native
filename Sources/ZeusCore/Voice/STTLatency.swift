@@ -235,7 +235,7 @@ public struct STTFailureLedger: Equatable, Sendable {
     public func line(_ path: STTPath) -> String {
         let count = attempts[path] ?? 0
         let bad = failed[path] ?? 0
-        return "failure_rate path=\(path.rawValue) attempts=\(count) failures=\(bad) rate=\(String(format: "%.3f", rate(path)))"
+        return "failure_rate path=\(path.rawValue) attempts=\(count) failed_turns=\(bad) rate=\(String(format: "%.3f", rate(path)))"
     }
 }
 

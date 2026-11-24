@@ -1288,6 +1288,10 @@
             },
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "theFailureRateLineIsNotASwiftFailureDiagnostic"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "aDeniedMicOrMissingEngineRetriesInsteadOfHanging"
             }
           ],
