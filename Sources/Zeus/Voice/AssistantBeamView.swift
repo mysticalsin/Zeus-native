@@ -16,6 +16,8 @@ struct AssistantBeamView: View {
     var cornerRadius: CGFloat = 24
     var colors: [Color] = []
 
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         let palette = colors.isEmpty
             ? MiddleBarTone.shades.map { Color(middleBar: $0) }
