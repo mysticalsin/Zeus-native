@@ -8642,6 +8642,18 @@
       }
     },
     {
+      "id": "REG-991",
+      "failure": "The recording countdown, the moment notes are ready, and a saved screen recording stayed silent, and none of them had a voice setting that turned a spoken line on.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PremiumSpokenMomentTests.swift",
+        "function": "aFreshCountdownStaysSilentUntilTheSettingIsOn"
+      }
+    },
+    {
       "id": "REG-990",
       "failure": "A testcase placed directly under testsuites, or under any element other than testsuite, was still accepted when some other suite's own tests count matched. Every testcase must have a testsuite parent, and the suite totals must add up to the testcase count.",
       "features": [

@@ -253,6 +253,7 @@ final class RecordlyController {
         clearCompletionNotice()
         let notice = RecordingFeedback.Completion(sessionKey: project.rawMediaPath, label: label)
         completedNotice = notice
+        PremiumMomentVoice.speak(.recordingSaved)
         completionExpiry = Task { @MainActor [weak self] in
             do { try await Task.sleep(for: .seconds(RecordingFeedback.completionDuration)) } catch { return }
             guard self?.completedNotice?.id == notice.id else { return }
@@ -477,10 +478,14 @@ final class RecordlyController {
             switch effect {
             case .scheduleTick(let token):
                 scheduleCountdownTick(token)
+                if let remaining = countdown.remaining {
+                    PremiumMomentVoice.speak(.recordingCountdown, countdown: remaining)
+                }
             case .cancelTick:
                 stopCountdownTimer()
             case .startCapture:
                 stopCountdownTimer()
+                PremiumMomentVoice.speak(.recordingCountdown, countdown: 0)
                 Task { await self.start(topBar: self.countdownTopBar) }
             case .notice(let text):
                 actionNotice = text

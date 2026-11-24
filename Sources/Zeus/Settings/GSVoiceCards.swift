@@ -42,6 +42,12 @@ struct ZeusVoiceCards: View {
             GSDivider()
             GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", text: "Zeus reads its answers aloud instead of only showing them.", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
             GSDivider()
+            GSToggleRow(symbol: "timer", title: PremiumSpokenMoment.recordingCountdown.settingTitle, text: PremiumSpokenMoment.recordingCountdown.settingDetail, isOn: momentBinding(.recordingCountdown))
+            GSDivider()
+            GSToggleRow(symbol: "note.text", title: PremiumSpokenMoment.notesReady.settingTitle, text: PremiumSpokenMoment.notesReady.settingDetail, isOn: momentBinding(.notesReady))
+            GSDivider()
+            GSToggleRow(symbol: "checkmark.circle", title: PremiumSpokenMoment.recordingSaved.settingTitle, text: PremiumSpokenMoment.recordingSaved.settingDetail, isOn: momentBinding(.recordingSaved))
+            GSDivider()
             GSRow(symbol: "theatermasks", title: "Personality") {
                 GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
                     if let choice = ZeusPersonality.allCases.first(where: { $0.title == title }) { voice.personality = choice }
@@ -328,5 +334,9 @@ struct ZeusVoiceCards: View {
         if let message = voice.kokoroMessage { return message }
         if voice.kokoroReady { return "Runs on this Mac. Nothing is sent anywhere." }
         return LocalPython.systemPython == nil ? "Needs Python 3 on this Mac." : "Sets up the voice on this Mac and downloads it once."
+    }
+
+    private func momentBinding(_ moment: PremiumSpokenMoment) -> Binding<Bool> {
+        Binding(get: { PremiumSpokenMoment.isEnabled(moment) }, set: { PremiumSpokenMoment.setEnabled(moment, $0) })
     }
 }

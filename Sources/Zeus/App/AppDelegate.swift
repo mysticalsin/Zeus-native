@@ -250,6 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.voiceTurn) {
             voice = VoiceTurnController(buddy: buddy, notch: notch, brain: ClaudeCLIProvider())
             commands = CommandCenter(voice: voice)
+            PremiumMomentVoice.play = { [weak voice] line in voice?.speakPremium(line) }
         }
         // The fast path: instant app, media, volume, to-do, timer, link and lock commands.
         if on(.voiceTurn) { FastActions.shared.topBar = topBar }

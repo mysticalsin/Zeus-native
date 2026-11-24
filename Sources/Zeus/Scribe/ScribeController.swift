@@ -1216,6 +1216,7 @@ final class ScribeController {
         for event in transition.events { react(to: event) }
         if machine.phase != before {
             if let line = announcement(for: machine.phase) { announce(line) }
+            if case .complete = machine.phase { PremiumMomentVoice.speak(.notesReady) }
             focusToken &+= 1
         }
         return transition
