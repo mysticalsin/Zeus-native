@@ -8712,6 +8712,18 @@
         "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
         "function": "latencyRegressionBothPathsStayInsideTheBudget"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "Command dictation left the words on the clipboard (ERROR nothing inserted). A talk or Command press with no Accessibility or Input Monitoring never armed, and a microphone prompt that later became ready did not start the held turn. dictate-file left speechTraceGeneration unset, so the stt-latency and stt-failure lines never flushed.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+        "function": "aWritableFocusedFieldIsInsertedInsteadOfLeftOnTheClipboard"
+      }
     }
   ]
 }

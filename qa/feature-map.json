@@ -1293,6 +1293,34 @@
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "aDeniedMicOrMissingEngineRetriesInsteadOfHanging"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aWritableFocusedFieldIsInsertedInsteadOfLeftOnTheClipboard"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aClipboardChoiceIsNotInserted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aMissingKeyGrantAnnouncesAndALaterGrantArmsTheHotkey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aPromptThatBecomesReadyWhileHeldStartsTheTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aDeniedVoiceGrantDoesNotStartTheTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "anUnsetDictateFileGenerationDoesNotFlushTheTrace"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aDictateFileGenerationFlushesTheMurmurTrace"
             }
           ],
           "id": "F01.stt-latency"

@@ -140,6 +140,14 @@ final class HotkeyMonitor {
     private var rightCommandHoldOwned = false
     /// The keys the right Command tap saw, applied before the talk machine handles the same event.
     private var rightCommandState = ShortcutState()
+    private var listenRecovery = KeyListenRecovery()
+    private var waitingForKeys = false
+    private var globalArmed = false
+    private var started = false
+    private var activeObserver: NSObjectProtocol?
+    /// A talk hold opened after the permission prompt, outside the key machine. Release still stops it.
+    private var recoveredHold = false
+    private var recoveredPoll = false
 
     /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
     /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
@@ -161,7 +169,17 @@ final class HotkeyMonitor {
         }
         observeConsumedKeys()
         observeSleep()
-        KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
+        observeActivation()
+        started = true
+        performListen(listenRecovery.send(.start(granted: KeyListenAccess.granted)))
+        if !listenRecovery.armed, !waitingForKeys {
+            waitingForKeys = true
+            KeyListenAccess.whenGranted { [weak self] in
+                guard let self else { return }
+                self.waitingForKeys = false
+                self.performListen(self.listenRecovery.send(.granted))
+            }
+        }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
             let time = event.timestamp
@@ -178,6 +196,8 @@ final class HotkeyMonitor {
 
     /// Global monitors only once access is on, so macOS never prompts mid-use.
     private func startGlobal() {
+        guard !globalArmed else { return }
+        globalArmed = true
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
             let time = event.timestamp
@@ -225,7 +245,23 @@ final class HotkeyMonitor {
             send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         send(.key(event, at: at))
+        finishRecoveredHoldIfReleased()
     }
+
+    /// True when this monitor's shortcut is still physically down. A recovered prompt uses it.
+    func shortcutIsDown() -> Bool {
+        guard let key = keyProvider(), let live = liveModifiers() else { return false }
+        return live.isSuperset(of: key.modifiers)
+    }
+
+    /// The permission prompt returned ready while the key was still held. The machine already
+    /// abandoned that press, so this hold owns the matching release.
+    func noteRecoveredHold() {
+        recoveredHold = true
+        finishRecoveredHoldIfReleased()
+    }
+
+    func cancelRecoveredHold() { recoveredHold = false }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
     /// names the last turn the owner was given. When the machine has ended that turn itself (the echo of its own `send`
@@ -235,9 +271,12 @@ final class HotkeyMonitor {
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
     /// A Right Command press whose key-up was lost is cleared, so the next tap is a new press.
     func interrupt() {
+        let wasRecovered = recoveredHold
+        recoveredHold = false
         rightCommandDown = false
         _ = rightCommand.hardwareRightCommandUp(at: now())
         send(.interrupt(live: liveModifiers()))
+        if wasRecovered { onRelease?() }
     }
 
     /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
@@ -278,6 +317,55 @@ final class HotkeyMonitor {
         recoverMissedModifierUps()
         lookForALauncherSpace()
         send(.tick(at: now(), live: liveModifiers()))
+        finishRecoveredHoldIfReleased()
+    }
+
+    /// Coming forward from System Settings is when a grant usually appears. Arm then, not only on the 3 s poll.
+    private func observeActivation() {
+        guard activeObserver == nil else { return }
+        activeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.recoverKeyAccessIfGranted() }
+        }
+    }
+
+    /// Accessibility or Input Monitoring is on. Arm the global monitors once and drop a stuck press.
+    func recoverKeyAccessIfGranted() {
+        guard started, KeyListenAccess.granted else { return }
+        waitingForKeys = false
+        performListen(listenRecovery.send(.granted))
+    }
+
+    private func performListen(_ effects: [KeyListenRecovery.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .armMonitors:
+                startGlobal()
+            case .announceMissing:
+                onListenAccessMissing?()
+            case .clearStuckPress:
+                interrupt()
+            }
+        }
+    }
+
+    private func finishRecoveredHoldIfReleased() {
+        guard recoveredHold else { recoveredPoll = false; return }
+        guard let key = keyProvider(), let live = liveModifiers() else { return }
+        if live.isSuperset(of: key.modifiers) {
+            guard !recoveredPoll else { return }
+            recoveredPoll = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.recoveredPoll = false
+                    self?.finishRecoveredHoldIfReleased()
+                }
+            }
+            return
+        }
+        recoveredPoll = false
+        recoveredHold = false
+        onRelease?()
     }
 
     /// A flags repeat while both sides are down and the hardware still holds this side. Dropping it
