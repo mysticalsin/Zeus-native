@@ -239,10 +239,14 @@ final class VoiceTurnController {
             failures.record(session: session, failure: failure)
             Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
         }
+        // The figure appears on the key-down, before the microphone finishes starting.
+        buddy.listen()
+        ZeusSound.play(.listenStart)
         do {
             talkSession = try seams.speechStart(speech)
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
+            buddy.idle()
             if !listening { speech.onCaptureFailure = nil }
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
@@ -255,7 +259,6 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
-        ZeusSound.play(.listenStart)
         seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false

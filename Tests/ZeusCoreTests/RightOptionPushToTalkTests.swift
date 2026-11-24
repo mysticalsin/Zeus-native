@@ -106,6 +106,15 @@ struct RightOptionPushToTalkTests {
         #expect(machine.phase == .listening)
     }
 
+    @Test func aFlagSampleFromTheKeyDownKeepsTheHoldListening() {
+        var machine = RightOptionPushToTalk()
+        #expect(machine.send(.rightOption(down: true, at: 4, otherTurnOpen: false)) == [.start])
+        #expect(machine.send(.liveFlags(ShortcutModifiers(), at: 4)).isEmpty)
+        #expect(machine.phase == .listening)
+        #expect(machine.send(.liveFlags(ShortcutModifiers(), at: 4.01)) == [.stop])
+        #expect(machine.phase != .listening)
+    }
+
     @Test func aLostKeyUpOnTheLiveFlagsStopsListening() {
         var machine = RightOptionPushToTalk()
         #expect(machine.send(.rightOption(down: true, at: 1, otherTurnOpen: false)) == [.start])

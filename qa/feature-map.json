@@ -5781,6 +5781,10 @@
             },
             {
               "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aFlagSampleFromTheKeyDownKeepsTheHoldListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
               "function": "theThreeSecondLookStopsWhenRightOptionIsUp"
             },
             {

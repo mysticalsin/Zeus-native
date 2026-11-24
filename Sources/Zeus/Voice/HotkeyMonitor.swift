@@ -212,9 +212,13 @@ final class HotkeyMonitor {
             send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         reconcileRightOption(at: at)
+        let listeningBefore = rightOptionTalk.phase == .listening
         send(.key(event, at: at))
         driveRightOption(event, at: at)
-        reconcileRightOption(at: at)
+        // A flags sample from the key-down that just opened the hold is not a missed key-up.
+        if listeningBefore || rightOptionTalk.startedAt < at {
+            reconcileRightOption(at: at)
+        }
     }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It

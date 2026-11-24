@@ -142,6 +142,9 @@ public struct RightOptionPushToTalk: Equatable, Sendable {
     private mutating func judge(at time: TimeInterval, flags: ShortcutModifiers?) -> [Effect] {
         guard phase == .listening else { return [] }
         if time - startedAt >= Self.holdCap { return stopIfListening() }
+        // The sample taken with the key-down is not a missed key-up. A later sample with Option
+        // absent is. This is what keeps a press-and-hold listening when the global flags lag the event.
+        guard time > startedAt else { return [] }
         if let flags, !flags.contains(.option) { return stopIfListening() }
         return []
     }

@@ -658,7 +658,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ExplanationAudioArbitration.yieldToNewCapture()
         // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
-        buddy.call()
+        buddy.call(immediate: true)
         VoiceLog.log("key", "talk shortcut pressed (access \(VoicePermissions.access))")
         NotificationCenter.default.post(name: Speaker.talkKeyPressed, object: nil)
         // First use asks once (macOS shows its prompt the first time only); a refusal gets the
