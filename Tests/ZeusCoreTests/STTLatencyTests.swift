@@ -483,6 +483,18 @@ struct STTLatencyTests {
         #expect(!STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: 1_999))
     }
 
+    @Test func theFailureRateLineIsNotASwiftFailureDiagnostic() {
+        var ledger = STTFailureLedger()
+        for _ in 0..<4 { ledger.record(path: .talkHold, failure: .noText) }
+        let line = ledger.line(.talkHold)
+        let looksLikeASuiteFailure = line.range(
+            of: #"(?:✘|Test run .* failed|[1-9]\d* failures?)"#,
+            options: .regularExpression) != nil
+        #expect(line.contains("attempts=4"))
+        #expect(line.contains("rate=1.000"))
+        #expect(!looksLikeASuiteFailure)
+    }
+
     @Test func aCallbackAndItsGiveUpCompleteOnce() {
         let gate = STTOnce()
         var hits = 0
