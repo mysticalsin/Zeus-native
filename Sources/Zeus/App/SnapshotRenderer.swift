@@ -580,7 +580,7 @@ enum SnapshotRenderer {
 
         let murmurCardState = DictationPreviewCard.State()
         murmurCardState.text = "Send the draft by Friday."
-        murmurCardState.modeName = "Murmure"
+        murmurCardState.modeName = "Murmur"
         saveSurface(DictationPreviewView(state: murmurCardState, insert: {}, cancel: {}).padding(20).background(Color(hex: 0x1B2030)), size: CGSize(width: 520, height: 180), name: "murmur-overlay")
 
         // Face presence card: every status word, from fixed values (no controller, camera, vault or Keychain).

@@ -62,7 +62,7 @@ enum GSSection: String, CaseIterable, Identifiable, Sendable {
         case .shortcuts: "Shortcuts"
         case .insomnia: "Insomnia"
         case .integrations: "Integrations"
-        case .murmure: "Murmure"
+        case .murmure: "Murmur"
         case .polyglot: "Polyglot"
         case .dictation: "Dictation"
         case .voice: "Voice"

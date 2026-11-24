@@ -144,7 +144,7 @@ struct OnboardingView: View {
             .buttonStyle(GlassButtonStyle(kind: .primary))
             .accessibilityHint("Zeus waves back when you press this.")
             HStack(alignment: .top, spacing: 28) {
-                welcomePill(symbol: "waveform", title: "Murmure", text: "Dictate anywhere.")
+                welcomePill(symbol: "waveform", title: "Murmur", text: "Dictate anywhere.")
                 welcomePill(symbol: "bolt.fill", title: "Your agents", text: "Follow runs from the notch.")
                 welcomePill(symbol: "sun.max.fill", title: "Your day", text: "Calendar, weather, focus.")
             }
@@ -260,7 +260,7 @@ struct OnboardingView: View {
     }
 
     private var murmureStep: some View {
-        OnboardStep(title: "Try Murmure",
+        OnboardStep(title: "Try Murmur",
                     text: "Hold \(preferences.pushToTalk.title) and say anything. Zeus listens live. Speech stays on this Mac unless you pick a cloud engine later.") {
             ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
             PermissionLine(name: "Microphone", granted: permissions.granted[.microphone] == true)

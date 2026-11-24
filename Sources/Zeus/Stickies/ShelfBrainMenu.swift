@@ -12,7 +12,7 @@ struct ShelfBrainMenu: View {
 
     var body: some View {
         if let item, let fling, fling.isEnabled {
-            Menu("Fling to") {
+            Menu("Send to a nearby Mac") {
                 ForEach(fling.nearby.filter(\.paired)) { peer in
                     Button(peer.name) { fling.send([item], to: .peer(id: peer.id), gesture: .menu) }
                 }

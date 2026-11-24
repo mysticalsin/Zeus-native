@@ -502,7 +502,7 @@ struct SettingsView: View {
                     .font(Glass.body).foregroundStyle(Glass.text).fixedSize(horizontal: false, vertical: true)
             }
             GlassCard(title: "What stays on your Mac") {
-                Text("Speech is turned into text on this Mac unless you pick a cloud speech engine for dictation. Dictation history (words and audio) and typed chats are kept on this Mac only; Settings \u{203A} Murmure sets how long and lets you clear it. ZEUS sends no analytics.")
+                Text("Speech is turned into text on this Mac unless you pick a cloud speech engine for dictation. Dictation history (words and audio) and typed chats are kept on this Mac only; Settings \u{203A} Murmur sets how long and lets you clear it. ZEUS sends no analytics.")
                     .font(Glass.body).foregroundStyle(Glass.text).fixedSize(horizontal: false, vertical: true)
             }
             GlassCard(title: "What ZEUS changes") {

@@ -10,6 +10,7 @@ struct SpeakerRecognitionCard: View {
     private var live: StreamingDiarizerModelController { .shared }
     private var voices: SavedVoicesModel { .shared }
     @State private var confirmingDeleteAll = false
+    @State private var confirmingVoice: String?
 
     var body: some View {
         GSCard("Speaker recognition") {
@@ -26,9 +27,18 @@ struct SpeakerRecognitionCard: View {
                 ForEach(voices.voices) { voice in
                     GSDivider()
                     GSRow(symbol: "person.wave.2", title: voice.name, text: "Saved \(voice.updatedAt.formatted(date: .abbreviated, time: .omitted))") {
-                        Button("Delete") { voices.delete(voice.id) }
-                            .buttonStyle(GSButtonStyle())
-                            .accessibilityLabel("Delete the saved voice of \(voice.name)")
+                        if confirmingVoice == voice.id {
+                            HStack(spacing: 8) {
+                                Button("Delete") { voices.delete(voice.id); confirmingVoice = nil }
+                                    .buttonStyle(GSButtonStyle(prominent: true))
+                                Button("Keep") { confirmingVoice = nil }
+                                    .buttonStyle(GSButtonStyle())
+                            }
+                        } else {
+                            Button("Delete") { confirmingVoice = voice.id }
+                                .buttonStyle(GSButtonStyle())
+                                .accessibilityLabel("Delete the saved voice of \(voice.name)")
+                        }
                     }
                 }
             }

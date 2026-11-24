@@ -6032,7 +6032,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
-              "function": "seeScreenDefaultsOnAndIsSeparateFromDrawOnScreen"
+              "function": "seeScreenDefaultsOffAndIsSeparateFromDrawOnScreen"
             },
             {
               "file": "Tests/ZeusCoreTests/TalkSightPolicyTests.swift",
@@ -6150,11 +6150,11 @@
         {
           "id": "F11.talk-see-screen-setting",
           "check": "native-SettingsCatalogTests",
-          "acceptance": "Let Zeus see my screen is a live Voice toggle, on by default and read as on from an empty store, while drawing stays off. Does not prove the toggle's page rendering.",
+          "acceptance": "Let Zeus see my screen is a live Voice toggle, off by default and read as off from an empty store, while drawing stays off. Does not prove the toggle's page rendering.",
           "cases": [
             {
               "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
-              "function": "seeScreenIsAnOnByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
+              "function": "seeScreenIsAnOffByDefaultLiveToggleOnTheVoicePageSeparateFromDrawing"
             }
           ]
         },

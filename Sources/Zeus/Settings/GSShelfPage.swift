@@ -7,11 +7,12 @@ import ZeusCore
 struct ShelfSettingsPage: View {
     private var store: SettingsStore { .shared }
     private var fling: FlingService? { FlingService.current }
+    @State private var confirmingMac: String?
 
     var body: some View {
         GSPageHeading(section: .shelf, subtitle: "Send files to nearby Macs from the Shelf.")
             .padding(.bottom, -GS.cardGap)
-        GSCard("Fling") {
+        GSCard("Nearby Macs") {
             GSToggleRow(symbol: "paperplane", title: "Send and receive with nearby Macs",
                         text: "Drag files from the Shelf onto a nearby Mac running Zeus. Off until you turn it on. Turning it on makes macOS ask once for Local Network access.",
                         isOn: store.boolBinding("fling.enabled"))
@@ -74,9 +75,17 @@ struct ShelfSettingsPage: View {
                 ForEach(Array(paired.enumerated()), id: \.element.id) { index, mac in
                     if index > 0 { GSDivider() }
                     GSRow(symbol: "laptopcomputer", title: mac.name, text: "Paired. Last seen \(Self.lastSeen(mac.lastSeen)).") {
-                        Button("Remove") { _ = fling?.removePairedMac(id: mac.id) }
-                            .buttonStyle(GSButtonStyle())
-                            .accessibilityLabel("Remove \(mac.name)")
+                        if confirmingMac == mac.id {
+                            HStack(spacing: 8) {
+                                Button("Remove") { _ = fling?.removePairedMac(id: mac.id); confirmingMac = nil }
+                                    .buttonStyle(GSButtonStyle(prominent: true))
+                                Button("Keep") { confirmingMac = nil }.buttonStyle(GSButtonStyle())
+                            }
+                        } else {
+                            Button("Remove") { confirmingMac = mac.id }
+                                .buttonStyle(GSButtonStyle())
+                                .accessibilityLabel("Remove \(mac.name)")
+                        }
                     }
                 }
                 GSInfo(text: "Remove deletes the key from the Keychain. That Mac must pair again before it can send.")

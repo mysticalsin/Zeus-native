@@ -97,7 +97,7 @@ struct PanelView: View {
 
             // P0 item I ("Zeus next to the cursor"): a quick toggle here, in Settings and
             // `zeus debug presence on|off`, since all three write the same `presence.nearCursor`.
-            Toggle("Show Zeus next to cursor", isOn: SettingsStore.shared.boolBinding(CursorPresenceController.settingID))
+            Toggle("Dictation pill follows the pointer", isOn: SettingsStore.shared.boolBinding(CursorPresenceController.settingID))
                 .toggleStyle(.switch)
                 .font(Glass.body)
                 .foregroundStyle(Theme.cloudPrimary)

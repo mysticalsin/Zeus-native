@@ -9,6 +9,7 @@ final class InsomniaPageState {
     var passwordDraft = ""
     var pickerOpen = false
     var running: [InsomniaController.AppChoice] = []
+    var confirmingRemove = false
 }
 
 /// Settings > Insomnia: the lid-closed admin rule, what happens when the lid closes, the hotspot
@@ -27,7 +28,15 @@ struct InsomniaSettingsPage: View {
                 HStack(spacing: 10) {
                     GSStatus(ok: insomnia.setup.isReady, text: insomnia.setup.isReady ? "Set up" : "Not set up")
                     if insomnia.setup.isReady {
-                        Button("Remove", action: insomnia.uninstallRule).buttonStyle(GSButtonStyle()).disabled(insomnia.setupBusy)
+                        if page.confirmingRemove {
+                            HStack(spacing: 8) {
+                                Button("Remove") { page.confirmingRemove = false; insomnia.uninstallRule() }
+                                    .buttonStyle(GSButtonStyle(prominent: true)).disabled(insomnia.setupBusy)
+                                Button("Keep") { page.confirmingRemove = false }.buttonStyle(GSButtonStyle())
+                            }
+                        } else {
+                            Button("Remove") { page.confirmingRemove = true }.buttonStyle(GSButtonStyle()).disabled(insomnia.setupBusy)
+                        }
                     } else {
                         Button(insomnia.setupBusy ? "Waiting…" : "Set up", action: insomnia.installRule)
                             .buttonStyle(GSButtonStyle(prominent: true)).disabled(insomnia.setupBusy)
@@ -36,7 +45,7 @@ struct InsomniaSettingsPage: View {
             }
             if let message = insomnia.setupMessage { GSInfo(text: message) }
             GSInfo(text: "Setup asks macOS for your password once. Zeus never sees it. The rule lets only your account turn lid-closed sleep and Low Power Mode on and off, and sleep comes back on its own if Zeus quits mid-session.")
-            GSDetails(text: "Adds \(InsomniaSudoers.path), which lets only your account run exactly four commands: pmset disablesleep 1 and 0, and lowpowermode 1 and 0. It also adds a small launchd agent that puts sleep back within a minute if Zeus quits or crashes mid-session.")
+            GSDetails(text: "Setup adds one rule for your account only, and puts sleep back within a minute if Zeus quits or crashes mid-session. The exact commands stay in Diagnostics.")
             GSDivider()
             // The next two switches need the admin rule. Without it they wait, read as off and say why.
             GSToggleRow(symbol: "laptopcomputer", title: "Keep working with the lid closed",
@@ -74,7 +83,7 @@ struct InsomniaSettingsPage: View {
             if page.pickerOpen {
                 ForEach(page.running.filter { !insomnia.freezeBundleIDs.contains($0.bundleID) }) { app in
                     HStack {
-                        Text(app.name).font(GS.rowText).foregroundStyle(GS.text).help(app.bundleID)
+                        Text(app.name).font(GS.rowText).foregroundStyle(GS.text).help(app.name)
                         Spacer()
                         Button("Add") { insomnia.toggleFreeze(app.bundleID) }.buttonStyle(GSButtonStyle())
                     }

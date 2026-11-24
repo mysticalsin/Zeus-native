@@ -171,7 +171,7 @@ private struct MurmureStep: View {
     @Environment(\.ob) private var ob
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StepHeading(title: "Murmure", subtitle: "")
+            StepHeading(title: "Murmur", subtitle: "")
                 .frame(width: 520, alignment: .leading)
             VStack(spacing: 0) {
                 OBPermissionRow(symbol: "mic", title: "Microphone", reason: "For dictation and voice commands.", capability: .microphone, services: services)
@@ -180,7 +180,7 @@ private struct MurmureStep: View {
                 OBPermissionRow(symbol: "accessibility", title: "Accessibility", reason: "Use shortcuts and insert dictated text.", capability: .accessibility, services: services)
                 .frame(height: 62)
                 OBDivider()
-                OBRow(symbol: "arrow.down.circle", title: "Murmure model", text: "On-device dictation. Download when ready.", textWidth: 230) {
+                OBRow(symbol: "arrow.down.circle", title: "Murmur model", text: "On-device dictation. Download when ready.", textWidth: 230) {
                     modelControl
                 }
                 .padding(.top, 14)
@@ -189,7 +189,7 @@ private struct MurmureStep: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(width: 430, alignment: .leading)
                         .padding(.top, 8)
-                        .accessibilityLabel("Murmure model download failed. \(problem)")
+                        .accessibilityLabel("Murmur model download failed. \(problem)")
                 }
             }
             .padding(.top, 24)
@@ -198,14 +198,14 @@ private struct MurmureStep: View {
 
     @ViewBuilder private var modelControl: some View {
         if services.modelReady {
-            OBAllowButton(granted: true, name: "Murmure model") {}
+            OBAllowButton(granted: true, name: "Murmur model") {}
         } else if let progress = services.modelProgress {
             HStack(spacing: 8) {
                 ProgressView(value: progress).progressViewStyle(.linear).frame(width: 70).tint(OB.blueLight)
                 Text("\(Int(progress * 100)) %").font(OB.font(13, .semibold)).foregroundStyle(ob.secondary).monospacedDigit()
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Downloading the Murmure model, \(Int(progress * 100)) percent")
+            .accessibilityLabel("Downloading the Murmur model, \(Int(progress * 100)) percent")
         } else {
             Button("Download") { services.downloadModel() }
                 .accessibilityIdentifier("onboarding.model.download")

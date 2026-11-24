@@ -18,7 +18,7 @@ import ZeusCore
         let slots = [GlassSectionSlot(id: "glass.synthetic", title: "Synthetic", filled: true, keys: [])]
         let after = SettingsSectionRegistry.sections(slots: slots)
         #expect(Array(after.prefix(before.count)).map(\.title) == before)
-        #expect(before == ["General", "Appearance", "Sounds", "Notifications", "Shortcuts", "Insomnia", "Integrations", "Murmure", "Polyglot", "Dictation", "Voice", "Engine", "Features", "Beamer", "Tiling", "Shelf", "License", "Permissions", "Privacy", "Diagnostics", "About"])
+        #expect(before == ["General", "Appearance", "Sounds", "Notifications", "Shortcuts", "Insomnia", "Integrations", "Murmur", "Polyglot", "Dictation", "Voice", "Engine", "Features", "Beamer", "Tiling", "Shelf", "License", "Permissions", "Privacy", "Diagnostics", "About"])
     }
 
     @Test func aFilledSlotAppearsWithoutEditingTheRegistry() {

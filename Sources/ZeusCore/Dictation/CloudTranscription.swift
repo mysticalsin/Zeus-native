@@ -66,7 +66,7 @@ public enum CloudTranscriptionError: LocalizedError, Equatable, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .missingKey(let provider): "\(provider) needs your API key. Add it in Settings \u{203A} Murmure."
+        case .missingKey(let provider): "\(provider) needs your API key. Add it in Settings \u{203A} Murmur."
         case .rejectedKey(let provider): "\(provider) did not accept the API key. Check it in Settings."
         case .quota(let provider): "\(provider) quota or rate limit reached. Try again later or pick another engine."
         case .server(let provider, let message): "\(provider): \(message)"

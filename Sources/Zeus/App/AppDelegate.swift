@@ -942,7 +942,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.informativeText = """
         Apple's on-device speech recognition is part of macOS: no third-party model.
 
-        Murmure's optional engines download only when you ask. Parakeet runs through the FluidAudio package (github.com/FluidInference/FluidAudio) and Whisper through WhisperKit (github.com/argmaxinc/argmax-oss-swift, MIT). Each project's license text is in its repository.
+        Murmur's optional engines download only when you ask. Parakeet runs through the FluidAudio package (github.com/FluidInference/FluidAudio) and Whisper through WhisperKit (github.com/argmaxinc/argmax-oss-swift, MIT). Each project's license text is in its repository.
 
         Type: Plus Jakarta Sans, SIL Open Font License.
         """
