@@ -137,10 +137,9 @@ final class ProactiveController {
     // MARK: EventKit
 
     private func requestCalendar() async -> Bool {
-        let granted = EKEventStore.authorizationStatus(for: .event) == .fullAccess
-        return await CalendarAccessPolicy.requestFullAccess(from: .proactiveBrief, alreadyGranted: granted) {
-            (try? await store.requestFullAccessToEvents()) ?? false
-        }
+        if EKEventStore.authorizationStatus(for: .event) == .fullAccess { return true }
+        guard CalendarAccessPolicy.mayRequestFullAccess(.proactiveBrief) else { return false }
+        return (try? await store.requestFullAccessToEvents()) ?? false
     }
 
     private func todayEvents(now: Date) -> [BriefEvent] {

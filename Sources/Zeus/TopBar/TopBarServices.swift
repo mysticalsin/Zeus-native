@@ -298,8 +298,11 @@ final class TopBarServices {
     private func requestCalendar() {
         Task { @MainActor in
             let already = EKEventStore.authorizationStatus(for: .event) == .fullAccess
-            let events = await CalendarAccessPolicy.requestFullAccess(from: .topBar, alreadyGranted: already) {
-                (try? await eventStore.requestFullAccessToEvents()) ?? false
+            let events: Bool
+            if already || !CalendarAccessPolicy.mayRequestFullAccess(.topBar) {
+                events = already
+            } else {
+                events = (try? await eventStore.requestFullAccessToEvents()) ?? false
             }
             _ = try? await eventStore.requestFullAccessToReminders()
             model.calendarAccess = events ? .granted : .denied
@@ -335,9 +338,11 @@ final class TopBarServices {
         case .fullAccess:
             break
         case .notDetermined:
-            let granted = await CalendarAccessPolicy.requestFullAccess(from: .topBar, alreadyGranted: false) {
-                (try? await eventStore.requestFullAccessToEvents()) ?? false
+            guard CalendarAccessPolicy.mayRequestFullAccess(.topBar) else {
+                model.calendarAccess = .denied
+                return .needsAccess
             }
+            let granted = (try? await eventStore.requestFullAccessToEvents()) ?? false
             guard granted else { model.calendarAccess = .denied; return .needsAccess }
             model.calendarAccess = .granted
         default:

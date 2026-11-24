@@ -88,10 +88,9 @@ final class PermissionsModel {
             Self(
                 request: { kind in
                     if kind == .calendar {
-                        let granted = EKEventStore.authorizationStatus(for: .event) == .fullAccess
-                        return await CalendarAccessPolicy.requestFullAccess(from: .permissionsDesk, alreadyGranted: granted) {
-                            (try? await EKEventStore().requestFullAccessToEvents()) ?? false
-                        }
+                        if EKEventStore.authorizationStatus(for: .event) == .fullAccess { return true }
+                        guard CalendarAccessPolicy.mayRequestFullAccess(.permissionsDesk) else { return false }
+                        return (try? await EKEventStore().requestFullAccessToEvents()) ?? false
                     }
                     let store = EKEventStore()
                     return (try? await store.requestFullAccessToReminders()) ?? false
