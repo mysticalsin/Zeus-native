@@ -40,6 +40,6 @@ public enum PresentPointMapping {
         let scale = shot.displayFrame.width > 0
             ? Double(shot.pixelWidth) / shot.displayFrame.width
             : 1
-        return PresentTolerance.ringPoints(scale: scale, pixelWidth: shot.pixelWidth)
+        return PresentTolerance.decide(scale: scale, pixelWidth: shot.pixelWidth).points
     }
 }

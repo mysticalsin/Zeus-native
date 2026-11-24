@@ -25,24 +25,6 @@ public enum CoordinateSpace: String, Codable, Sendable, Equatable, CaseIterable 
     case overlay
 }
 
-/// How close a ring or trail must land, in physical pixels.
-/// 24 px at 1080p (scale 1). 48 px at 4K: scale 2, or a panel at least 3840 px wide.
-public enum PresentTolerance {
-    public static let ringPixels1080p: Double = 24
-    public static let ringPixels4K: Double = 48
-
-    public static func ringPixels(scale: Double, pixelWidth: Int) -> Double {
-        if scale >= 2 || pixelWidth >= 3840 { return ringPixels4K }
-        return ringPixels1080p
-    }
-
-    /// The same budget in points. 24 pt on 1080p and on 2x Retina. 48 pt on a 4K panel at scale 1.
-    public static func ringPoints(scale: Double, pixelWidth: Int) -> Double {
-        let safe = scale > 0 ? scale : 1
-        return ringPixels(scale: safe, pixelWidth: pixelWidth) / safe
-    }
-}
-
 /// One display the mapper can convert against. Frames are AppKit global points.
 public struct DisplayMap: Equatable, Sendable {
     public var id: Int
@@ -163,12 +145,12 @@ public struct ScreenCoordinateMapper: CoordinateMapping {
 
     public func ringPixelTolerance(displayID: Int) -> Double? {
         guard let display = display(id: displayID) else { return nil }
-        return PresentTolerance.ringPixels(scale: display.scale, pixelWidth: display.pixelWidth)
+        return PresentTolerance.decide(scale: display.scale, pixelWidth: display.pixelWidth).pixels
     }
 
     public func ringPointTolerance(displayID: Int) -> Double? {
         guard let display = display(id: displayID) else { return nil }
-        return PresentTolerance.ringPoints(scale: display.scale, pixelWidth: display.pixelWidth)
+        return PresentTolerance.decide(scale: display.scale, pixelWidth: display.pixelWidth).points
     }
 
     public func withinRing(_ point: CGPoint, of target: CGPoint, displayID: Int) -> Bool? {
