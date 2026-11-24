@@ -1,0 +1,16 @@
+haru-pipe
+Copyright 2026 the Haru voice-pipeline authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Vendored into Zeus unchanged in behavior from the haru-pipe 0.1.0 package
+(pipeline-bench/package/haru-pipe). It is the host-side audio path for
+Haru-4B: WAV I/O, int16/f32 conversion, polyphase resampling to 24 kHz,
+3200-sample framing, and the haru_mlx.native 48 kHz socket framing.
+
+This crate contains no model weights and opens no network connection.
+Synthetic fixtures under tests/fixtures are generated tones, not recordings.
