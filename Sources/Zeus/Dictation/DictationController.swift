@@ -365,6 +365,7 @@ final class DictationController {
     init(topBar: TopBarModel, store: DictationStore) {
         self.topBar = topBar
         self.store = store
+        speech.sttPathName = STTFlushLines.murmurTap
     }
 
     func start() {

@@ -1207,6 +1207,29 @@
           "id": "F01.1"
         },
         {
+          "id": "F01.stt-flush",
+          "check": "portable-regressions",
+          "acceptance": "A packaged speech flush writes tip-exact stt-latency and stt-failure lines for a generation above zero, including when that open was cancelled. Generation zero writes nothing. This is not a warm-wall measurement.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/STTFlushLinesTests.swift",
+              "function": "aCancelledOpenStillFlushesBothTipLines"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTFlushLinesTests.swift",
+              "function": "generationZeroWritesNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTFlushLinesTests.swift",
+              "function": "aWarmTalkLineUsesTheTipFields"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTFlushLinesTests.swift",
+              "function": "anEmptyAppleTurnIsNoTextAndACancelIsAborted"
+            }
+          ]
+        },
+        {
           "check": "native-DictationOwnershipIntegrationTests",
           "acceptance": "Queued stale turns and focus drift cannot deliver into a new target.",
           "cases": [

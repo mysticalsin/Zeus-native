@@ -110,6 +110,7 @@ final class VoiceTurnController {
         self.brain = brain
         chrome = ChromeActions(notch: notch)
         speech = SpeechInput()
+        speech.sttPathName = STTFlushLines.talkHold
         self.speaker = speaker ?? Speaker(languageCode: speech.localeIdentifier)
         self.presenter = presenter ?? TalkVisualPresenter()
         speech.onLevel = { [weak buddy] level in

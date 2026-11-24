@@ -66,28 +66,42 @@ enum VoiceLog {
         FlightRecorder.shared.record(record.stage == "error" ? "error" : "voice", record.stage, record.detail)
         if mirror { NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail) }
         if echo { print(line) }
-        queue.async {
-            let fm = FileManager.default
-            let directory = url.deletingLastPathComponent()
-            try? fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-            let old = url.deletingPathExtension().appendingPathExtension("old.log")
-            if let size = (try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 1_000_000 {
-                try? fm.removeItem(at: old)
-                try? fm.moveItem(at: url, to: old)
-            }
-            guard let data = (line + "\n").data(using: .utf8) else { return }
-            if !fm.fileExists(atPath: url.path) {
-                _ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
-            }
-            // Repairs a file an older build created with the default umask (also the rotated copy).
-            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-            if fm.fileExists(atPath: old.path) { try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: old.path) }
-            if let handle = try? FileHandle(forWritingTo: url) {
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: data)
-                try? handle.close()
-            }
+        queue.async { append(line) }
+    }
+
+    /// Same voice.log line as `log`, written before this call returns.
+    /// The speech flush uses this so a packaged turn's `stt-latency` and `stt-failure`
+    /// lines are in the file when the turn ends, including when the process then quits.
+    static func flush(_ stage: String, _ detail: String = "") {
+        let record = VoiceLogRecord(stage: stage, detail: detail)
+        let line = record.line(at: Date())
+        FlightRecorder.shared.record(record.stage == "error" ? "error" : "voice", record.stage, record.detail)
+        NSLog("[ZEUS] voice: %@ %@", record.stage, record.detail)
+        if echo { print(line) }
+        queue.sync { append(line) }
+    }
+
+    private static func append(_ line: String) {
+        let fm = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        try? fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        let old = url.deletingPathExtension().appendingPathExtension("old.log")
+        if let size = (try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 1_000_000 {
+            try? fm.removeItem(at: old)
+            try? fm.moveItem(at: url, to: old)
+        }
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+        if !fm.fileExists(atPath: url.path) {
+            _ = fm.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
+        // Repairs a file an older build created with the default umask (also the rotated copy).
+        try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        if fm.fileExists(atPath: old.path) { try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: old.path) }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+            try? handle.close()
         }
     }
 }
