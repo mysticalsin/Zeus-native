@@ -64,7 +64,7 @@ GROUPS = {
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
              "SecondBrain/SecondBrain.swift", "SecondBrain/VaultPathBoundary.swift", "JSONValue.swift",
-             "BrowserAgent/BrowserUseProtocol.swift"),
+             "BrowserAgent/BrowserUseProtocol.swift", "Browser/ReplyLedger.swift"),
         tests("WikiExportTests"),
     ),
     "dictation-insertion": (
