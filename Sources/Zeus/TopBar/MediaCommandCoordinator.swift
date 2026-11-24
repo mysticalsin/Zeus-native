@@ -13,7 +13,7 @@ private final class LaunchGate: @unchecked Sendable {
     private var continuation: CheckedContinuation<Bool, Never>?
     private var value: Bool?
 
-    func wait() async -> Bool {
+    func firstValue() async -> Bool {
         await withCheckedContinuation { continuation in
             lock.lock()
             if let value {
@@ -318,7 +318,7 @@ final class MediaCommandDriver {
 
     private func finishLaunch(gate: LaunchGate, token: Int, bundleID: String,
                               startedInstant: ContinuousClock.Instant, started: Double) async {
-        let opened = await gate.wait()
+        let opened = await gate.firstValue()
         guard token == generation, !Task.isCancelled else { return }
         let elapsed = MediaClockMath.seconds(from: clock.now - startedInstant)
         let ready: Bool
