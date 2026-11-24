@@ -73,34 +73,57 @@ struct AIConnectionsPage: View {
                 BrandMark(provider: provider, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
                 GSRow(title: provider.title, text: detail(provider, step: step)) {
                     HStack(spacing: 10) {
-                        if connected { GSStatus(ok: true, text: provider.kind == .app ? "Available" : "Connected") }
-                        else if step == .install { GSStatus(ok: false, text: "Not found") }
+                        if connected {
+                            let word = provider.kind == .app ? "Available" : "Connected"
+                            GSStatus(ok: true, text: word, spoken: ConnectionControlSpeech.status(provider: provider.title, text: word))
+                        } else if step == .install {
+                            GSStatus(ok: false, text: "Not found", spoken: ConnectionControlSpeech.status(provider: provider.title, text: "Not found"))
+                        }
                         if model.busy.contains(provider) {
+                            let speech = ConnectionControlSpeech.primary(provider: provider.title, action: step.buttonTitle, detail: detail(provider, step: step), busy: true)
                             ProgressView().controlSize(.small)
+                                .accessibilityLabel(speech.label)
+                                .accessibilityValue(speech.value)
+                                .accessibilityHint(speech.hint)
                         } else if !connected {
                             // One button that does the next thing: Install, Sign in, Connect, Open or Start.
+                            let speech = ConnectionControlSpeech.primary(provider: provider.title, action: step.buttonTitle, detail: detail(provider, step: step), busy: false)
                             Button(step.buttonTitle) { model.primary(provider, services: services) }
                                 .buttonStyle(GSButtonStyle(prominent: true))
-                                .accessibilityLabel("\(step.buttonTitle) \(provider.title)")
+                                .accessibilityLabel(speech.label)
+                                .accessibilityValue(speech.value)
+                                .accessibilityHint(speech.hint)
                         } else if provider.kind == .app {
+                            let speech = ConnectionControlSpeech.primary(provider: provider.title, action: "Open", detail: detail(provider, step: step), busy: false)
                             Button("Open") { model.openApp(provider, services: services) }
                                 .buttonStyle(GSButtonStyle())
-                                .accessibilityLabel("Open \(provider.title)")
+                                .accessibilityLabel(speech.label)
+                                .accessibilityValue(speech.value)
+                                .accessibilityHint(speech.hint)
                         } else if provider.kind == .hooked {
+                            let speech = ConnectionControlSpeech.primary(provider: provider.title, action: "Repair", detail: detail(provider, step: step), busy: false)
                             Button("Repair") { Task { await model.connectAndCheck(provider, services: services) } }
                                 .buttonStyle(GSButtonStyle())
-                                .accessibilityLabel("Repair \(provider.title)")
+                                .accessibilityLabel(speech.label)
+                                .accessibilityValue(speech.value)
+                                .accessibilityHint(speech.hint)
                         } else if model.canDisconnect(provider) {
+                            let speech = ConnectionControlSpeech.primary(provider: provider.title, action: "Disconnect", detail: detail(provider, step: step), busy: false)
                             Button("Disconnect") { model.disconnect(provider, services: services) }
                                 .buttonStyle(GSButtonStyle())
-                                .accessibilityLabel("Disconnect \(provider.title)")
+                                .accessibilityLabel(speech.label)
+                                .accessibilityValue(speech.value)
+                                .accessibilityHint(speech.hint)
                         }
+                        let check = ConnectionControlSpeech.primary(provider: provider.title, action: "Check again", detail: detail(provider, step: step), busy: false)
                         Button("Check again") {
                             context.refresh()
                             Task { await model.refresh(); if provider.kind == .hooked { await model.checkSignIn(provider) } }
                         }
                         .buttonStyle(GSButtonStyle())
-                        .accessibilityLabel("Check \(provider.title) again")
+                        .accessibilityLabel(check.label)
+                        .accessibilityValue(check.value)
+                        .accessibilityHint(check.hint)
                     }
                 }
             }
@@ -176,11 +199,13 @@ private struct AnyLLMCard: View {
                         .padding(.horizontal, 10).frame(width: 220, height: 30)
                         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                        .accessibilityLabel("API key")
+                        .accessibilityLabel(ConnectionControlSpeech.field(provider: "Any LLM", field: "API key"))
                         .onSubmit(save)
                     Button("Save key", action: save).buttonStyle(GSButtonStyle()).disabled(key.isEmpty)
+                        .accessibilityLabel(ConnectionControlSpeech.field(provider: "Any LLM", field: "Save key"))
                     if model.anyLLMKeySaved {
                         Button("Remove") { model.saveAnyLLMKey("") }.buttonStyle(GSButtonStyle())
+                            .accessibilityLabel(ConnectionControlSpeech.field(provider: "Any LLM", field: "Remove key"))
                     }
                 }
             }
@@ -189,6 +214,7 @@ private struct AnyLLMCard: View {
                 HStack(spacing: 10) {
                     Button("Test") { Task { await model.testEndpoint() } }
                         .buttonStyle(GSButtonStyle(prominent: true)).disabled(!model.anyLLM.isComplete)
+                        .accessibilityLabel(ConnectionControlSpeech.field(provider: "Any LLM", field: "Test"))
                 }
             }
             if model.anyLLM.isInsecureRemote { GSInfo(text: "Plain http is only allowed for a server on this Mac. Use https.") }
@@ -227,7 +253,7 @@ private struct AnyLLMCard: View {
                 .padding(.horizontal, 10).frame(width: 320, height: 30)
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(GS.window))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(GS.buttonStroke, lineWidth: 1))
-                .accessibilityLabel(title)
+                .accessibilityLabel(ConnectionControlSpeech.field(provider: "Any LLM", field: title))
         }
     }
 }

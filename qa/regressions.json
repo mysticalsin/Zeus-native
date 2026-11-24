@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "Integrations buttons and the busy check did not speak the provider name, and the settings toggle kept sliding under Reduce Motion.",
+      "features": [
+        "F12"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_a11y_orb_providers.py",
+        "function": "test_connection_buttons_name_the_provider"
+      }
     }
-]
+  ]
 }

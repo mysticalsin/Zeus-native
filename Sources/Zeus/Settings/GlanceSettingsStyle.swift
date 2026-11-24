@@ -218,6 +218,8 @@ struct GSDetails: View {
 struct GSButtonStyle: ButtonStyle {
     var prominent = false
     @Environment(\.isEnabled) private var isEnabled
+    /// Keyboard focus. A custom button style does not draw the system ring, so the rim is drawn here.
+    @Environment(\.isFocused) private var isFocused
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(OB.font(14, .semibold))
@@ -229,6 +231,8 @@ struct GSButtonStyle: ButtonStyle {
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(prominent ? OB.controlAccentFill : GS.controlFill).opacity(configuration.isPressed ? 0.75 : 1))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(prominent ? .clear : GS.controlStroke, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(isFocused ? GS.selectedText : Color.clear, lineWidth: isFocused ? 2 : 0))
             .opacity(isEnabled ? 1 : 0.5)
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
@@ -323,9 +327,10 @@ struct GSToggleStyle: ToggleStyle {
                 Capsule().fill(configuration.isOn ? OB.toggleOn : GS.toggleOff).frame(width: 44, height: 20)
                 Capsule().fill(configuration.isOn ? Color(rgb: 225, 235, 254) : GS.knob).frame(width: 27, height: 16).padding(.horizontal, 2)
             }
-            .animation(.spring(response: 0.28, dampingFraction: 0.85), value: configuration.isOn)
         }
         .buttonStyle(.plain)
+        // The knob moves with the shared page curve, and not at all under Reduce Motion.
+        .modifier(MotionEffect(active: configuration.isOn, curve: .page))
         .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
     }
 }
@@ -415,11 +420,16 @@ struct GSPictureChoice<Art: View>: View {
 struct GSStatus: View {
     let ok: Bool
     let text: String
+    /// VoiceOver name when the visible word is not enough, for example "Codex, Connected".
+    var spoken: String? = nil
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.circle").font(.system(size: 13))
+                .accessibilityHidden(true)
             Text(text).font(OB.font(13.5, .semibold))
         }
         .foregroundStyle(ok ? OB.allowed : GS.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken ?? text)
     }
 }
