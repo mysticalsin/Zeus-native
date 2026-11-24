@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-996",
+      "failure": "The hub decision row could take Allow once before the files, deletes, hosts, installs, force-push, and secret paths were shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/HubApprovalImpactTests.swift",
+        "function": "thePreviewNamesFilesDeletesHostsInstallsForcePushAndSecretPathsBeforeAllow"
+      }
     }
-]
+  ]
 }
