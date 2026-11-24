@@ -6623,6 +6623,36 @@
           ]
         },
         {
+          "id": "F12.thinking-orb-speech",
+          "check": "portable-regressions",
+          "acceptance": "The Murmure thinking orb has a distinct VoiceOver name for listening and working, and its Reduce Motion disc does not change with time. This does not prove the Canvas on a Mac.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ThinkingOrbMathTests.swift",
+              "function": "listeningAndWorkingHaveDistinctVoiceOverLabels"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ThinkingOrbMathTests.swift",
+              "function": "reducedMotionDiscStaysStill"
+            }
+          ]
+        },
+        {
+          "id": "F12.voice-orb-speech",
+          "check": "portable-presentation",
+          "acceptance": "Each voice-orb state has its own VoiceOver name, Reduce Motion crossfade duration is zero, and the orb is not a keyboard stop. This does not prove a rendered orb or a device pass.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/VoiceRingModelTests.swift",
+              "function": "everyVoiceStateHasADistinctLabel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/VoiceRingModelTests.swift",
+              "function": "reduceMotionCrossfadeIsImmediateAndTheOrbIsNotAKeyboardStop"
+            }
+          ]
+        },
+        {
           "id": "F12.connection-control-speech",
           "check": "portable-regressions",
           "acceptance": "Integrations controls speak the provider with the action, a busy check names that provider, and the offer toggle's Reduce Motion duration is zero. This does not prove VoiceOver on a Mac.",

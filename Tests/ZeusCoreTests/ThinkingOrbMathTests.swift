@@ -63,4 +63,16 @@ struct ThinkingOrbMathTests {
     @Test func workingAndListeningAreVisiblyDifferentPatterns() {
         #expect(ThinkingOrbMath.dots(mode: .working, time: 0).count != ThinkingOrbMath.dots(mode: .listening(level: 0.5), time: 0).count)
     }
+
+    @Test func listeningAndWorkingHaveDistinctVoiceOverLabels() {
+        #expect(ThinkingOrbSpeech.label(mode: .listening(level: 0)) == "Zeus, listening")
+        #expect(ThinkingOrbSpeech.label(mode: .working) == "Zeus, working")
+        #expect(ThinkingOrbSpeech.label(mode: .listening(level: 1)) != ThinkingOrbSpeech.label(mode: .working))
+    }
+
+    @Test func reducedMotionDiscStaysStill() {
+        #expect(ThinkingOrbSpeech.reducedDiscOpacity(at: 0) == ThinkingOrbSpeech.reducedDiscOpacity(at: 4.25))
+        #expect(ThinkingOrbSpeech.reducedDiscOpacity(at: 0) == ThinkingOrbSpeech.reducedDiscOpacity)
+        #expect((0.7...1).contains(ThinkingOrbSpeech.reducedDiscOpacity))
+    }
 }

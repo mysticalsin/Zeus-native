@@ -29,3 +29,15 @@ class ConnectionControlSourceTests(unittest.TestCase):
         self.assertNotIn("Motion.reduced", button)
         self.assertIn("isFocused", button)
         self.assertIn("accessibilityHint", page)
+
+    def test_voice_orb_reduce_motion_is_immediate_and_named(self):
+        orb = source("Sources/Zeus/Voice/ThinkingOrb.swift")
+        ring = source("Sources/Zeus/Voice/VoiceRingView.swift")
+        self.assertIn("ThinkingOrbSpeech.reducedDiscOpacity", orb)
+        self.assertIn("ThinkingOrbSpeech.label", orb)
+        self.assertNotIn("accessibilityHidden(true)", orb)
+        self.assertNotIn("TickingView", orb)
+        self.assertNotIn(".easeInOut", ring)
+        self.assertIn("state.accessibilityLabel", ring)
+        self.assertIn("VoiceRingAccessibility.value", ring)
+        self.assertIn("focusable(VoiceRingAccessibility.takesKeyboardFocus)", ring)

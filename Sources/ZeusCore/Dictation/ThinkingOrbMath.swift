@@ -7,6 +7,25 @@ import Foundation
 /// `Resources/NOTICES.txt`. Pure math over `(mode, time)`, no rendering surface, mirroring the
 /// reference engine's own `ModeFrame` contract, so this is unit-testable without a `Canvas` and
 /// the drawing code (`Sources/Zeus/Voice/ThinkingOrb.swift`) just paints whatever comes out.
+
+/// VoiceOver name for the Murmure pill's orb, and the still disc used when motion is reduced.
+/// The disc opacity does not depend on time: Reduce Motion is a state, not a slower animation.
+public enum ThinkingOrbSpeech {
+    public static let reducedDiscOpacity = 0.85
+
+    public static func label(mode: ThinkingOrbMath.Mode) -> String {
+        switch mode {
+        case .listening: "Zeus, listening"
+        case .working: "Zeus, working"
+        }
+    }
+
+    public static func reducedDiscOpacity(at time: Double) -> Double {
+        precondition(time.isFinite)
+        return reducedDiscOpacity
+    }
+}
+
 public enum ThinkingOrbMath {
     public struct Dot: Equatable {
         /// Projected position, both in roughly -1...1 (not yet scaled to a view size).

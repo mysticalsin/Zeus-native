@@ -72,7 +72,7 @@ final class VoiceRingRunner: @unchecked Sendable {
 
 /// A voice-reactive ring of light for voice mode: a glassy spectrum ribbon (`.ring`) or two loops of
 /// grey tube a voice opens into a globe (`.mono`). Original Zeus drawing: `Canvas` under a
-/// `TimelineView` capped at 30 fps. Reduce Motion draws the held state and crossfades between states.
+/// `TimelineView` capped at 30 fps. Reduce Motion draws the held state immediately and names it.
 ///
 /// - `level`: live 0...1 voice level, read once per frame (listening and speaking only).
 /// - `direction`: -1...1 lean toward left or right.
@@ -98,12 +98,8 @@ struct VoiceRingView: View {
         let runner = VoiceRingRunner.runner(runnerID)
         Group {
             if reduceMotion {
-                ZStack {
-                    canvas(runner: runner, now: 0, live: false)
-                        .id(state)
-                        .transition(.opacity)
-                }
-                .animation(.easeInOut(duration: 0.3), value: state)
+                // Held shape, no crossfade. `crossfadeSeconds` is zero in this branch.
+                canvas(runner: runner, now: 0, live: false)
             } else {
                 // Display-synchronized (every refresh, 120 Hz on ProMotion): a 30 fps cap made the ring step.
                 DisplaySynchronizedView(paused: paused) { timeline in
@@ -122,17 +118,11 @@ struct VoiceRingView: View {
                 runner.setPointer(nil)
             }
         }
+        .focusable(VoiceRingAccessibility.takesKeyboardFocus)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.label(for: state))
-    }
-
-    static func label(for state: VoiceRingState) -> String {
-        switch state {
-        case .idle: "Zeus voice, ready"
-        case .listening: "Zeus voice, listening"
-        case .speaking: "Zeus voice, speaking"
-        case .processing: "Zeus voice, thinking"
-        }
+        .accessibilityLabel(state.accessibilityLabel)
+        .accessibilityValue(VoiceRingAccessibility.value(type: type, reduceMotion: reduceMotion))
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     private func canvas(runner: VoiceRingRunner, now: TimeInterval, live: Bool) -> some View {
