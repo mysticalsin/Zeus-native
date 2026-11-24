@@ -325,6 +325,7 @@ struct SessionListView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(SessionListLabels.group(group))
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onToggleGroup(group.id) }
         .accessibilityAddTraits(.isHeader)
         .accessibilitySortPriority(sortPriority(group: groupIndex, slot: 0))
     }
@@ -344,6 +345,7 @@ struct SessionListView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(SessionListLabels.row(row, hidesDetails: hidesDetails))
             .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onSelectRow(row.id) }
             .accessibilityAddTraits(selected ? AccessibilityTraits.isSelected : AccessibilityTraits())
             .accessibilitySortPriority(sortPriority(group: groupIndex, slot: 1 + rowIndex * 2))
             .onKeyPress(.upArrow) { moved(from: row.id, by: -1) ? .handled : .ignored }
