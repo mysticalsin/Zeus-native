@@ -21,7 +21,7 @@ struct VoiceProviderSessionTests {
             return
         }
         #expect(id == ElevenLabsTTSAdapter.id)
-        #expect(voice == "voice-1")
+        #expect(voice == VoiceSpeakAllowlist.syntheticID)
         #expect(outcome.audio == VoiceProviderFakeAudio.wavSilence())
         #expect(outcome.signpostName == ProviderSignpostName.firstAudio)
         #expect(outcome.firstAudioMs >= 0)
@@ -247,9 +247,9 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
         if path.hasSuffix("/voices") || path.hasSuffix("/v1/voices") {
             let body: [String: Any]
             if request.url.host?.contains("googleapis") == true {
-                body = ["voices": [["name": "en-US-Neural2-C", "languageCodes": ["en-US"]]]]
+                body = ["voices": [["name": "zeus.synthetic", "languageCodes": ["en-US"]]]]
             } else {
-                body = ["voices": [["voice_id": "voice-1", "name": "One"]]]
+                body = ["voices": [["voice_id": "zeus.synthetic", "name": "Zeus"]]]
             }
             return ProviderHTTPResponse(status: 200, body: try JSONSerialization.data(withJSONObject: body))
         }

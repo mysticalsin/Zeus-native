@@ -54,7 +54,8 @@ struct VoiceProviderAdapterTests {
         #expect(voiceBody["name"] as? String == "en-US-Neural2-C")
         #expect(voiceBody["languageCode"] as? String == "en-US")
         let audio = try #require(body["audioConfig"] as? [String: Any])
-        #expect(audio["audioEncoding"] as? String == "MP3")
+        #expect(audio["audioEncoding"] as? String == "LINEAR16")
+        #expect(audio["sampleRateHertz"] as? Int == 24_000)
 
         let voices = try #require(GoogleCloudTTSAdapter.voicesRequest(credential: credential))
         #expect(voices.method == "GET")
@@ -80,10 +81,10 @@ struct VoiceProviderAdapterTests {
         #expect(pieces > 0)
         #expect(audio == expected)
         let request = try #require(ProviderURLStub.requests.first)
-        #expect(request.url?.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/voice-1/stream")
+        #expect(request.url?.absoluteString == "https://api.elevenlabs.io/v1/text-to-speech/voice-1/stream?output_format=pcm_24000")
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "xi-api-key") == elevenKey)
-        #expect(request.value(forHTTPHeaderField: "Accept") == "audio/mpeg")
+        #expect(request.value(forHTTPHeaderField: "Accept") == "audio/pcm")
     }
 
     @Test func urlProtocolMaps401429ServerAndTimeout() async {
