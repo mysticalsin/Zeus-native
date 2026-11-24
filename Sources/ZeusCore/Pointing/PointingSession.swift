@@ -6,7 +6,7 @@ import Foundation
 public struct PointingSession: Equatable, Sendable {
     public enum State: Equatable, Sendable {
         case idle, listening, drawing, processing, speaking
-        /// Guided-click wait. Stubbed in Phase 1: nothing sends `guidanceAdmitted` yet.
+        /// Guided-click wait. `clickInTarget` moves the admitted plan to its next step.
         case guiding
         case interrupted, cancelled
         case failed(String)
@@ -41,6 +41,8 @@ public struct PointingSession: Equatable, Sendable {
         case stopListening     // mic.finish(): build the request
         case discardCapture    // cancel the mic, discard audio, send nothing
         case hideInk
+        /// Draw the admitted plan's current bolt, ring and caption. Local to this session.
+        case showGuideStep
     }
 
     public struct Transition: Equatable, Sendable {
@@ -53,10 +55,31 @@ public struct PointingSession: Equatable, Sendable {
 
     public private(set) var state: State = .idle
     public private(set) var generation = 0
+    /// The one plan admitted for this guiding wait. Empty until `admitGuide`.
+    public private(set) var guide: PointerGuidePlan?
 
     public init() {}
 
     public func isCurrent(_ token: Int) -> Bool { token == generation }
+
+    /// Admit the model plan once, while speaking, and wait on its first step.
+    @discardableResult
+    public mutating func admitGuide(_ plan: PointerGuidePlan) -> Transition {
+        guard state == .speaking else {
+            return Transition(from: state, to: state, generation: generation, effects: [])
+        }
+        guide = plan
+        return send(.guidanceAdmitted)
+    }
+
+    /// A click on the current ring. A miss leaves the step where it is.
+    @discardableResult
+    public mutating func guideClick(at point: PointerGuidePoint) -> Transition {
+        guard state == .guiding, let step = guide?.current, step.ring.contains(point) else {
+            return Transition(from: state, to: state, generation: generation, effects: [])
+        }
+        return send(.clickInTarget)
+    }
 
     /// `generation`: the token the sender captured; a mismatch drops the event.
     @discardableResult
@@ -89,7 +112,18 @@ public struct PointingSession: Equatable, Sendable {
         case (.processing, .firstPlaybackStart): next = .speaking
         case (.speaking, .buffering): next = .processing
         case (.speaking, .guidanceAdmitted): next = .guiding
-        case (.guiding, .clickInTarget): next = .processing; generation += 1
+        case (.guiding, .clickInTarget):
+            // The model already returned the whole plan. Move to the next bolt, ring and caption here.
+            guard var plan = guide else { break }
+            switch plan.confirmCurrentStep() {
+            case .step:
+                guide = plan
+                effects = [.showGuideStep]
+            case .finished:
+                next = .idle
+            case .waiting:
+                guide = plan
+            }
         case (.processing, .turnCompleted), (.speaking, .turnCompleted), (.guiding, .turnCompleted):
             next = .idle
         case (.processing, .escape), (.speaking, .escape), (.guiding, .escape):
@@ -108,6 +142,7 @@ public struct PointingSession: Equatable, Sendable {
             break
         }
         state = next
+        if next != .guiding { guide = nil }
         return Transition(from: from, to: next, generation: generation, effects: effects)
     }
 }
