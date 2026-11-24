@@ -5743,6 +5743,73 @@
           ]
         },
         {
+          "id": "F11.right-option-strict-ptt",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "Right Option is strict push-to-talk. Key-down starts listening and key-up stops it. A tap never latches. Option together with another key does not cancel or toggle. Left Option does nothing. Chat, pointing, dictation, Polyglot, and VoiceOver yields keep it quiet. A missed key-up is the global flags, on a later event and on the 3 s look. The hold ends at the 45 s talk limit, on a screen lock, and when secure input is on or unknown. The listen chime plays only after capture has started.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theListenCuePlaysOnlyAfterCaptureHasStarted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "holdingRightOptionStartsListeningAndARepeatDoesNotToggle"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "releasingRightOptionStopsListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aQuickTapStartsAndStopsAndNeverLatches"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "optionWithAnotherKeyDoesNotCancelOrToggle"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "leftOptionDoesNothing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "eachYieldKeepsRightOptionQuiet"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aLostKeyUpOnFocusChangeStopsListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aLostKeyUpOnTheLiveFlagsStopsListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aFlagSampleFromTheKeyDownKeepsTheHoldListening"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theThreeSecondLookStopsWhenRightOptionIsUp"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theHoldStopsAtTheTalkLimit"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "secureInputStopsAndFailsClosed"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "aScreenLockStopsTheHold"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/RightOptionPushToTalkTests.swift",
+              "function": "theRightOptionHintSaysHoldToTalkReleaseToStop"
+            }
+          ]
+        },
+        {
           "id": "F11.speech-input-recovery",
           "check": "native-SpeechInputRecoveryTests",
           "acceptance": "A stop that lands during capture recovery never reopens the microphone, an input with no format is retried a bounded number of times and ends the turn, a turn that is already over schedules no retry, and a changed format with no converter ends the turn. A fake capture engine: no audio hardware or speech recognition.",

@@ -239,10 +239,15 @@ final class VoiceTurnController {
             failures.record(session: session, failure: failure)
             Task { @MainActor in self?.handleCaptureFailure(session: session, origin: origin, failure: failure) }
         }
+        // The figure can show before the microphone is up. The listen chime cannot:
+        // playback before capture pulls a Bluetooth headset into its speaker profile,
+        // so the microphone opens later and the words said during that switch are gone.
+        buddy.listen()
         do {
             talkSession = try seams.speechStart(speech)
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
+            buddy.idle()
             if !listening { speech.onCaptureFailure = nil }
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
@@ -255,7 +260,9 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
-        ZeusSound.play(.listenStart)
+        if RightOptionPushToTalk.ListenCue.mayPlay(captureStarted: true) {
+            ZeusSound.play(.listenStart)
+        }
         seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false

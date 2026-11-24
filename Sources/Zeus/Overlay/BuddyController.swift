@@ -145,10 +145,10 @@ final class BuddyController: NSObject {
 
     /// Something called Zeus (the talk shortcut, "Hey Zeus"): he appears now, before the turn starts.
     /// If no turn follows, he leaves again after a few seconds.
-    func call() {
+    func call(immediate: Bool = false) {
         wake()
         visibility.begin(.call)
-        applyVisibility()
+        applyVisibility(animated: !immediate)
         callExpiry?.cancel()
         callExpiry = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(6))
