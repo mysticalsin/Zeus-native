@@ -439,9 +439,10 @@ struct NotchView: View {
         switch model.presentation {
         case .closed:
             if let topBar {
-                // Nothing drawn in the closed wings is pressed: a click on the notch only opens it.
+                // Recordly, cues and the other wings stay click-through. The music wings are the pause
+                // and play control, so they take the pointer.
                 ClosedWings(topBar: topBar, notchGap: footprint.wingBase).frame(height: barHeight)
-                    .allowsHitTesting(false)
+                    .allowsHitTesting(NotchFootprintRules.closedWingsAcceptHits(music: ClosedWings.kind(of: topBar) == .music))
                     // Transparent: no body behind the white wing text, so a soft shadow keeps it readable.
                     .shadow(color: .black.opacity(layers.fill ? 0 : 0.7), radius: 2, y: 0.5)
             }

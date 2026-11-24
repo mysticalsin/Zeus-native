@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
         "function": "playSkipAgendaWeatherAndReducedMotionUseThePassedClock"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A click on the closed music wings did nothing. The wings were drawn with hit testing off, so the pause glyph never received the pointer. The music wings now take the pointer. One click waits 0.35 s, then pauses while playing and plays while paused. A double click opens the music page and does not also send the command.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
+        "function": "aPauseClickSettlesAtTheWindowAndADoubleClickDoesNotSendTransport"
+      }
     }
 ]
 }

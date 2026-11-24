@@ -185,6 +185,7 @@ import Testing
             #expect(clicks.tick(at: now.addingTimeInterval(0.35)).effects == [effect])
         }
         let doubles: [(TopBarWidgetTarget, TopBarWidgetDetails)] = [
+            (.pause, .music),
             (.play, .music),
             (.skip, .music),
             (.music, .music),
@@ -314,6 +315,75 @@ import Testing
         gate.release()
         await opened.wait(for: 1)
         #expect(effects == [.openDetails(.calendar)])
+    }
+
+    /// Pause while playing, play while paused, both after the same 0.35 s window. A counted double click
+    /// opens the music page and does not also send play or pause.
+    @Test @MainActor func aPauseClickSettlesAtTheWindowAndADoubleClickDoesNotSendTransport() async {
+        let playing = TopBarWidgetClickSession()
+        let start = Date(timeIntervalSince1970: 1_000)
+        var clock = start
+        playing.now = { clock }
+        let pauseGate = ClickSleepGate()
+        playing.sleep = { duration in
+            await pauseGate.sleep(duration)
+            clock = start.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow)
+        }
+        let paused = ClickBeacon()
+        var pauseEffects: [TopBarWidgetEffect] = []
+        playing.tap(TopBarWidgetClicks.transportTarget(isPlaying: true)) { effect in
+            pauseEffects.append(effect)
+            paused.hit()
+        }
+        await pauseGate.armed.wait(for: 1)
+        #expect(pauseEffects.isEmpty)
+        #expect(abs(seconds(of: pauseGate.durations[0]) - 0.35) < 0.000_001)
+        pauseGate.release()
+        await paused.wait(for: 1)
+        #expect(pauseEffects == [.pause])
+        #expect(pauseEffects.contains(.openDetails(.music)) == false)
+
+        clock = start
+        let resting = TopBarWidgetClickSession()
+        resting.now = { clock }
+        let playGate = ClickSleepGate()
+        resting.sleep = { duration in
+            await playGate.sleep(duration)
+            clock = start.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow)
+        }
+        let played = ClickBeacon()
+        var playEffects: [TopBarWidgetEffect] = []
+        resting.tap(TopBarWidgetClicks.transportTarget(isPlaying: false)) { effect in
+            playEffects.append(effect)
+            played.hit()
+        }
+        await playGate.armed.wait(for: 1)
+        playGate.release()
+        await played.wait(for: 1)
+        #expect(playEffects == [.play])
+        #expect(playEffects.contains(.openDetails(.music)) == false)
+
+        clock = start
+        let doubled = TopBarWidgetClickSession()
+        doubled.now = { clock }
+        let detailsGate = ClickSleepGate()
+        doubled.sleep = { duration in
+            await detailsGate.sleep(duration)
+            clock = start.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow)
+        }
+        let opened = ClickBeacon()
+        var detailEffects: [TopBarWidgetEffect] = []
+        doubled.tap(.pause, count: 2) { effect in
+            detailEffects.append(effect)
+            opened.hit()
+        }
+        await detailsGate.armed.wait(for: 1)
+        #expect(detailEffects.isEmpty)
+        detailsGate.release()
+        await opened.wait(for: 1)
+        #expect(detailEffects == [.openDetails(.music)])
+        #expect(detailEffects.contains(.pause) == false)
+        #expect(detailEffects.contains(.play) == false)
     }
 }
 

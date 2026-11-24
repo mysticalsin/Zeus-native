@@ -363,6 +363,11 @@ import Testing
                                                 topOffset: 0, wings: nil))
     }
 
+    @Test func theClosedMusicWingsTakeThePointerAndTheOthersDoNot() {
+        #expect(NotchFootprintRules.closedWingsAcceptHits(music: true))
+        #expect(NotchFootprintRules.closedWingsAcceptHits(music: false) == false)
+    }
+
     @Test func aWingKindTakesTheMouseOnAHardwareNotchAndAPill() {
         let onLaptop = CGPoint(x: 756, y: 975)
         let music = wings(none: false)

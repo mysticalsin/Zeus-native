@@ -1904,11 +1904,16 @@ struct ClosedWingsRow<L: View, R: View>: View {
         // Each wing is a fixed-width clear box with its content overlaid: a wing with nothing in it (the resting
         // mascot's right side) still takes its width, so the gap cannot slide off the notch.
         HStack(spacing: 0) {
+            // The clear box is only the wing's width. Hit testing stays on the overlaid control, so the
+            // spacer cannot cover the pause glyph.
             Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .allowsHitTesting(false)
                 .overlay(alignment: .leading) { left.ownedJourneyControl("closed-wings.left.content") }
                 .ownedJourneyControl("closed-wings.left")
             Color.clear.frame(width: geometry.gapWidth)
+                .allowsHitTesting(false)
             Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .allowsHitTesting(false)
                 .overlay(alignment: .trailing) { right.ownedJourneyControl("closed-wings.right.content") }
                 .ownedJourneyControl("closed-wings.right")
         }

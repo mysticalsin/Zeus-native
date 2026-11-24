@@ -202,6 +202,12 @@ public enum NotchFootprintRules {
         return NotchOpenRules.clickZone(screenFrame: screenFrame, notchSize: size, topOffset: topOffset)
     }
 
+    /// The closed wings refuse hits, so a click on the notch does not stop a recording or open a tab.
+    /// The music wings are the pause and play control, so they take the pointer.
+    public static func closedWingsAcceptHits(music: Bool) -> Bool {
+        music
+    }
+
     /// Whether the window takes the mouse at a point. A closed drawn notch takes it on its body. A hardware
     /// notch and the pill stay click-through until a wing kind is showing, so the play and pause control on
     /// those wings can receive the pointer. The top edge counts and the bottom does not, as in
