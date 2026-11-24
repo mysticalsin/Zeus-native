@@ -1,0 +1,22 @@
+[package]
+name = "haru-pipe"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Host-side audio pipeline for Haru-4B (WAV I/O, int16<->f32, scipy-equivalent polyphase resampling to 24 kHz, 3200-sample framing, ring/jitter buffers, haru-mlx-native socket framing). No model code."
+rust-version = "1.77"
+
+[lib]
+name = "haru_pipe"
+path = "src/lib.rs"
+
+[[bin]]
+name = "haru-pipe"
+path = "src/bin/haru-pipe.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
