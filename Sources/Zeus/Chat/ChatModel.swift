@@ -107,7 +107,7 @@ final class ChatModel {
         }
         if isCurrent { currentID = conversationID }
         do {
-            try store.save(conversation)
+            try saveAndSend(conversation)
             failedVisualLinkIDs.remove(conversationID)
             visualLinkProblem = nil
             return true
@@ -125,7 +125,7 @@ final class ChatModel {
                 failedVisualLinkIDs.remove(id)
                 continue
             }
-            do { try store.save(conversation); failedVisualLinkIDs.remove(id) }
+            do { try saveAndSend(conversation); failedVisualLinkIDs.remove(id) }
             catch { /* Keep this exact unsaved link visible and eligible for a later retry. */ }
         }
     }
@@ -254,7 +254,7 @@ final class ChatModel {
             ChatMessage(role: .assistant, text: assistant, date: now, engine: nil, engineReason: engine.map { "Answered by \($0)" }),
         ])
         conversations.insert(conversation, at: 0)
-        try? store.save(conversation)
+        try? saveAndSend(conversation)
     }
 
     // MARK: Storage
@@ -266,13 +266,36 @@ final class ChatModel {
             conversations.insert(conversation, at: 0)
         }
         currentID = conversation.id
-        try? store.save(conversation)
+        try? saveAndSend(conversation)
     }
 
     private func mutate(_ id: UUID, save: Bool = true, _ change: (inout ChatConversation) -> Void) {
         guard let index = conversations.firstIndex(where: { $0.id == id }) else { return }
         change(&conversations[index])
-        if save { try? store.save(conversations[index]) }
+        if save { try? saveAndSend(conversations[index]) }
+    }
+
+    /// The local chat file is the record of the conversation. After it lands, finished lines
+    /// are copied into the selected vault. A missing destination does not fail the local save.
+    private func saveAndSend(_ conversation: ChatConversation) throws {
+        try store.save(conversation)
+        sendFinishedChats(conversation)
+    }
+
+    /// Finished, non-empty lines go into the selected read-write inbox. Nothing is sent when
+    /// Memory has no writable file vault. A failed write stays local and is tried on the next save.
+    private func sendFinishedChats(_ conversation: ChatConversation) {
+        guard let connection = BrainCaptureModel.selectedConnection(),
+              connection.access == .readWrite,
+              connection.source.kind.isFileBased,
+              let inbox = BrainConnection.inside(connection.source.url, connection.inboxFolder) else { return }
+        let lines = conversation.messages.map {
+            BrainChatLine(record: $0.id.uuidString, role: $0.role.rawValue, text: $0.text,
+                          failed: $0.failed, created: $0.date)
+        }
+        _ = AboutYouModel.withAccess(to: connection.source.url) {
+            BrainChatVault.send(title: conversation.displayTitle, lines: lines, inbox: inbox)
+        }
     }
 }
 

@@ -411,6 +411,13 @@
       "scope": "Actual selected export transaction, MCP protocol and confined filesystem with synthetic temporary vault and injected transport. Independent process checks included only when their named test executes; no personal vault."
     },
     {
+      "id": "portable-brain-capture",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "brain-capture",
+      "scope": "Save to Brain Markdown with a stable record id, and finished chat lines written into a caller-supplied inbox. Tests use a temporary directory. No network, credential, or personal vault."
+    },
+    {
       "id": "native-ScribeLifecycleScenarioTests",
       "kind": "native-fixture",
       "tier": "native-integration",
@@ -4877,6 +4884,48 @@
             }
           ],
           "id": "F10.2"
+        },
+        {
+          "id": "F10.capture-record",
+          "check": "portable-brain-capture",
+          "acceptance": "An explicit capture keeps a safe Zeus record id on one front-matter line and omits a path, a blank id or any token that would break the note. Explicit save still writes only after the person confirms it.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+              "function": "theNoteWithoutARecordMatchesTheCaptureShape"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+              "function": "aMessageIdentifierStaysOnOneFrontMatterLine"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainCaptureNoteTests.swift",
+              "function": "aPathOrBlankIdentifierIsOmitted"
+            }
+          ]
+        },
+        {
+          "id": "F10.chat-vault",
+          "check": "portable-brain-capture",
+          "acceptance": "A finished chat line is written into the inbox as zeus-chat-<record>.md with that record on one front-matter line. An empty line, a failed line, an unsafe id, a symlink, and a file that is not already that record are left unwritten. The same bytes are not written twice.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/BrainChatVaultTests.swift",
+              "function": "aFinishedChatLandsInTheInbox"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainChatVaultTests.swift",
+              "function": "aSecondSendLeavesTheSameBytesAndAChangeRefreshesOnlyThatNote"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainChatVaultTests.swift",
+              "function": "anEmptyFailedOrUnsafeLineIsNotSent"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/BrainChatVaultTests.swift",
+              "function": "aForeignFileAndASymlinkAreLeftAlone"
+            }
+          ]
         },
         {
           "check": "missing-F10-device",

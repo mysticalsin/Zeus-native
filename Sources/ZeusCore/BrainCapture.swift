@@ -77,25 +77,11 @@ public enum BrainCapture {
         return target
     }
 
-    /// The note: front matter (type, source, created), a title and the body as written.
-    public static func note(title: String, body: String, source: String, created: Date, timeZone: TimeZone = .current) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.timeZone = timeZone
-        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " ")
-        let safeSource = source.filter { $0.isLetter || $0.isNumber || $0 == "-" }
-        return [
-            "---",
-            "type: capture",
-            "source: zeus-\(safeSource.isEmpty ? "app" : safeSource)",
-            "created: \(formatter.string(from: created))",
-            "tags: [zeus, inbox]",
-            "---",
-            "",
-            "# \(cleanTitle.isEmpty ? "Note from ZEUS" : cleanTitle)",
-            "",
-            body.trimmingCharacters(in: .whitespacesAndNewlines),
-            "",
-        ].joined(separator: "\n")
+    /// The note: front matter (type, source, optional record, created), a title and the body as written.
+    /// `record` is a stable Zeus id. A path or any other unsafe token is omitted, never written.
+    public static func note(title: String, body: String, source: String, created: Date, timeZone: TimeZone = .current,
+                             record: String? = nil) -> String {
+        BrainCaptureNote.document(title: title, body: body, source: source, created: created, timeZone: timeZone, record: record)
     }
 
     /// The explicitly chosen legacy vault only. Kept for older callers; an unavailable choice

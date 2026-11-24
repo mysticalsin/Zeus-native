@@ -12,6 +12,8 @@ final class BrainCaptureModel {
     }
     var body: String
     let source: String
+    /// Stable Zeus id for this capture, when the caller has one. Omitted from the note when it is not a safe token.
+    let record: String?
     let connection: BrainConnection?
     let created: Date
     private let currentConnection: () -> BrainConnection?
@@ -20,11 +22,12 @@ final class BrainCaptureModel {
     var saved: URL?
     var problem: String?
 
-    init(title: String, body: String, source: String, created: Date = Date(),
+    init(title: String, body: String, source: String, record: String? = nil, created: Date = Date(),
          currentConnection: @escaping () -> BrainConnection? = { BrainCaptureModel.selectedConnection() }) {
         self.title = title
         self.body = body
         self.source = source
+        self.record = record
         self.created = created
         self.currentConnection = currentConnection
         let selected = currentConnection()
@@ -32,13 +35,13 @@ final class BrainCaptureModel {
         target = selected.flatMap { BrainCapture.plannedURL(connection: $0, title: title, created: created) }
     }
 
-    private static func selectedConnection() -> BrainConnection? {
+    static func selectedConnection() -> BrainConnection? {
         // Do not even inspect the legacy choice when Memory already has a selected destination.
         if let configured = TodoController.shared.connection { return configured }
         return BrainCapture.connection(configured: nil, legacyVault: AboutYouModel.savedVault())
     }
 
-    var preview: String { BrainCapture.note(title: title, body: body, source: source, created: created) }
+    var preview: String { BrainCapture.note(title: title, body: body, source: source, created: created, record: record) }
 
     func save() {
         guard currentConnection() == connection else {
@@ -66,8 +69,8 @@ final class BrainCaptureWindow {
     static let shared = BrainCaptureWindow()
     private var window: NSWindow?
 
-    func show(title: String, body: String, source: String) {
-        let model = BrainCaptureModel(title: title, body: body, source: source)
+    func show(title: String, body: String, source: String, record: String? = nil) {
+        let model = BrainCaptureModel(title: title, body: body, source: source, record: record)
         let window = self.window ?? {
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 480, height: 420),
                                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
