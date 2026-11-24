@@ -3955,7 +3955,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
-              "function": "guidanceIsStubbedButTheTransitionsExist"
+              "function": "guidanceClickStaysOnTheGuide"
             },
             {
               "file": "Tests/ZeusCoreTests/PointingSessionTests.swift",
