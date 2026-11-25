@@ -6548,6 +6548,49 @@
               "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
             }
           ]
+        },
+        {
+          "id": "F11.ptt-indicator",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "While push to talk is held, a pure model drives a top-bar light and a round mark inside the existing notch panel. Hold is not a toggle. The held flag is copied in the same call that sets it, so a short hold is not lost waiting for the avatar feed. The level clamps the ring. Reduce Motion is static with no pulse and is never given a default. Release leaves listening inside one frame and is idle after 150 ms with no clock. An error leaves no clock. VoiceOver hears Listening or Stopped listening once per transition. The SwiftUI drawing is Mac-pending.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "holdArmsThenListensAndDoesNotToggle"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "reduceMotionStaysStaticWithNoPulse"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "levelClampsTheRing"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "releaseClearsWithinOneFrameBudget"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "errorLeavesNoLingeringClock"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "announcementsFireOncePerTransition"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "entryIsASpringBetween180And240ms"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "theRoundMarkStaysInsideTheExistingPanel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+              "function": "theHoldReachesTheIndicatorInTheSameSample"
+            }
+          ]
         }
       ]
     },
