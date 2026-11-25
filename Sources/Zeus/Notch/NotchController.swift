@@ -36,6 +36,8 @@ final class NotchController {
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
+    /// Set from the lock and unlock notices. A locked Mac gets an informational notice and no chime.
+    private var screenLocked = false
     /// Where the pointer is; tests replace it.
     var pointer: () -> CGPoint = { NSEvent.mouseLocation }
     /// Tests give the frame the zones centre on, so no window or display is needed. Release builds have no override.
@@ -114,8 +116,13 @@ final class NotchController {
             }
         }
         for name in ["com.apple.screenIsUnlocked", "com.apple.screenIsLocked"] {
-            DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refreshDisplays(force: false) }
+            DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] note in
+                let locked = note.name.rawValue == "com.apple.screenIsLocked"
+                MainActor.assumeIsolated {
+                    self?.screenLocked = locked
+                    self?.model.macLocked = locked
+                    self?.refreshDisplays(force: false)
+                }
             }
         }
         // Stalled agents: a quiet check every 20 seconds, nothing while no session works.
@@ -304,23 +311,51 @@ final class NotchController {
 
     /// Shows an approval card and waits for Approve / Deny (click or voice). One card at a time:
     /// a second request waits for the first. On timeout it returns `onTimeout`.
+    func browseApproval(by delta: Int) {
+        guard var approval = model.approval else { return }
+        approval.queueIndex = ApprovalCard.step(index: approval.queueIndex, count: approval.queueCount, by: delta)
+        model.approval = approval
+    }
+
     func requestApproval(agent: String, project: String, tool: String, command: String, risk: HookEvent.Risk,
                          timeout: Duration = .seconds(120),
                          onTimeout: HookDecision.Verdict = .deny,
                          detail: ApprovalDetail? = nil,
                          trust: (session: String, onTrust: @MainActor () -> Void)? = nil) async -> HookDecision.Verdict {
-        // A cancelled caller (`zeus cancel`, Esc) must not spin here: sleep throws at once when cancelled.
-        while model.approval != nil, !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(200))
-        }
         if Task.isCancelled { return .deny }
+        let id = UUID().uuidString
+        let arrived = Date()
+        let ticket = ApprovalTicket(id: id, arrived: arrived,
+                                    helperDeadline: arrived.addingTimeInterval(ApprovalQueueState.helperDeadline),
+                                    risk: risk)
+        let turn = await ApprovalGate.shared.enqueue(ticket)
+        let position: String
+        switch turn {
+        case .expired, .duplicate:
+            return .deny
+        case .show(let place):
+            position = place
+        case .waiting:
+            await ApprovalGate.shared.waitUntilFront(id)
+            if await ApprovalGate.shared.wasCancelled(id) { return .deny }
+            position = await ApprovalGate.shared.position(of: id) ?? ""
+        }
+        let cancelled = await ApprovalGate.shared.wasCancelled(id)
+        if Task.isCancelled || cancelled {
+            _ = await ApprovalGate.shared.clearFront(id: id)
+            return .deny
+        }
+        if await ApprovalGate.shared.permits(id) == false {
+            _ = await ApprovalGate.shared.clearFront(id: id)
+            return .deny
+        }
         return await withCheckedContinuation { continuation in
-            let id = UUID().uuidString
             var finished = false
             let finish: @MainActor (HookDecision.Verdict) -> Void = { [weak self] verdict in
                 guard !finished else { return }
                 finished = true
                 if self?.model.approval?.id == id { self?.model.approval = nil }
+                Task { await ApprovalGate.shared.clearFront(id: id) }
                 continuation.resume(returning: verdict)
             }
             let seconds = Double(timeout.components.seconds)
@@ -330,16 +365,48 @@ final class NotchController {
             case .deny: "then it's denied"
             }
             var trustChat: (@MainActor () -> Void)?
-            if let onTrust = trust?.onTrust {
-                trustChat = { onTrust(); finish(.allow) }
+            if let onTrust = trust?.onTrust, let session = trust?.session {
+                trustChat = {
+                    guard ApprovalPolicy.canApprove(risk: risk, by: .trustChat) else { return }
+                    let trustedSession = session
+                    let trustedCommand = command
+                    Task { await ApprovalAuditLog.shared.recordTrustedApproval(session: trustedSession, command: trustedCommand) }
+                    onTrust()
+                    finish(.allow)
+                }
             }
+            let deadline = Date().addingTimeInterval(seconds)
+            let count = Int(position.split(separator: " ").last.map(String.init) ?? "") ?? 1
+            let helperDeadline = ticket.helperDeadline
+            let jump: (@MainActor () -> Void)? = trust.map { pair in
+                let session = pair.session
+                return { _ = AgentTerminals.shared.jump(to: session) }
+            }
+            model.macLocked = screenLocked
+            model.screenShared = Self.displayIsShared()
             model.approval = NotchModel.Approval(
                 id: id, agent: agent, project: project, tool: tool, command: command, risk: risk,
-                deadline: Date().addingTimeInterval(seconds), timeoutNote: note, detail: detail,
+                deadline: deadline, timeoutNote: note, detail: detail,
                 sessionID: trust?.session,
+                position: position,
+                appearedAt: Date(),
+                queueCount: max(count, 1),
+                onJump: jump,
+                onDenyAll: { [weak self] in self?.denyEveryApproval() },
+                helperDeadline: helperDeadline,
+                allowGate: ApprovalAllowGate(risk: risk, reduceMotion: Motion.reduced, voiceOver: NSWorkspace.shared.isVoiceOverEnabled),
                 trustChat: trustChat,
+                beginHold: { [weak self] in self?.beginApprovalHold() },
+                endHold: { [weak self] in self?.endApprovalHold() },
+                activateAllow: { [weak self] in self?.activateApproval(kind: .card) },
+                deny: { [weak self] in
+                    self?.noteApproval(.card, verdict: .deny)
+                    self?.model.approval?.resolve(.deny)
+                },
+                denyAll: { [weak self] in self?.denyEveryApproval() },
                 resolve: finish
             )
+            presentApprovalArrival(risk: risk)
             model.completion = nil
             model.recap = nil
             // VoiceOver users hear the request even though the notch never takes focus.
@@ -351,9 +418,110 @@ final class NotchController {
             setIgnoresMouse(ignoresMouse(for: model.presentation))
             Task { @MainActor in
                 try? await Task.sleep(for: timeout)
-                finish(onTimeout)
+                let verdict = ApprovalPolicy.timeoutVerdict(risk: risk, requested: onTimeout)
+                self.recordApproval(.timeout, verdict: verdict, session: trust?.session ?? "", command: command)
+                finish(verdict)
+                // The countdown and the terminal move together. Nothing of this card stays up.
+                if !ApprovalCard.stillShown(now: Date(), deadline: deadline), self.model.approval?.id == id {
+                    self.model.approval = nil
+                }
             }
         }
+    }
+
+    /// Mirrored or captured displays hide the command. A normal desktop does not.
+    private static func displayIsShared() -> Bool {
+        NSScreen.screens.contains { screen in
+            guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else { return false }
+            return CGDisplayIsInMirrorSet(id) != 0 || CGDisplayIsCaptured(id) != 0
+        }
+    }
+
+    /// A click, Control-Option-Y, Return, or VoiceOver. High risk allows only after the gesture completes.
+    func activateApproval(kind: ApprovalAudit.Kind) {
+        guard var card = model.approval else { return }
+        let moment = now()
+        if moment >= card.helperDeadline {
+            recordApproval(.timeout, verdict: .deny, session: card.sessionID ?? "", command: card.command)
+            card.resolve(.deny)
+            return
+        }
+        card.allowGate.reduceMotion = Motion.reduced
+        card.allowGate.voiceOver = NSWorkspace.shared.isVoiceOverEnabled
+        let verdict = card.allowGate.activate(now: moment)
+        if case .hold = card.allowGate.gesture {
+            let released = card.allowGate.releaseHold(now: moment)
+            model.approval = card
+            if released == .allow {
+                recordApproval(kind, verdict: .allow, session: card.sessionID ?? "", command: card.command)
+                card.resolve(.allow)
+            }
+            return
+        }
+        model.approval = card
+        if verdict == .allow {
+            recordApproval(kind, verdict: .allow, session: card.sessionID ?? "", command: card.command)
+            card.resolve(.allow)
+        }
+    }
+
+    func beginApprovalHold() {
+        guard var card = model.approval else { return }
+        card.allowGate.reduceMotion = Motion.reduced
+        card.allowGate.voiceOver = NSWorkspace.shared.isVoiceOverEnabled
+        if case .hold = card.allowGate.gesture, card.allowGate.holdingSince == nil {
+            _ = card.allowGate.activate(now: now())
+        }
+        model.approval = card
+    }
+
+    func endApprovalHold() {
+        guard var card = model.approval else { return }
+        let moment = now()
+        if moment >= card.helperDeadline {
+            recordApproval(.timeout, verdict: .deny, session: card.sessionID ?? "", command: card.command)
+            card.resolve(.deny)
+            return
+        }
+        let verdict = card.allowGate.releaseHold(now: moment)
+        model.approval = card
+        if verdict == .allow {
+            recordApproval(.card, verdict: .allow, session: card.sessionID ?? "", command: card.command)
+            card.resolve(.allow)
+        }
+    }
+
+    func denyEveryApproval() {
+        guard let card = model.approval else { return }
+        recordApproval(.card, verdict: .deny, session: card.sessionID ?? "", command: card.command)
+        Task { await ApprovalGate.shared.denyAll() }
+        card.resolve(.deny)
+    }
+
+    private func presentApprovalArrival(risk: HookEvent.Risk) {
+        let play = ApprovalPolicy.playChime(lockedOrIdle: screenLocked)
+        let notice = ApprovalPolicy.awayNotice(lockedOrIdle: screenLocked, risk: risk)
+        if play { NSSound(named: NSSound.Name("Glass"))?.play() }
+        guard let notice, notice.informational, notice.offersAllow == false else { return }
+        Task {
+            await SystemNotificationService.shared.deliverInformational(
+                title: "Zeus needs you",
+                body: "A request is waiting in Zeus. This notice cannot approve it.")
+        }
+    }
+
+    func noteApproval(_ kind: ApprovalAudit.Kind, verdict: HookDecision.Verdict) {
+        guard let card = model.approval else { return }
+        recordApproval(kind, verdict: verdict, session: card.sessionID ?? "", command: card.command)
+    }
+
+    private func recordApproval(_ kind: ApprovalAudit.Kind, verdict: HookDecision.Verdict, session: String, command: String) {
+        let word = switch verdict {
+        case .allow: "allow"
+        case .deny: "deny"
+        case .ask: "ask"
+        }
+        Task { await ApprovalAuditLog.shared.record(kind: kind, session: session, command: command, verdict: word) }
     }
 
     /// Hover the notch to open the panel; move away to close it. With the top bar the panel

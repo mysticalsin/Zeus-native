@@ -194,6 +194,7 @@ enum SnapshotRenderer {
         // Home customisation: widgets, variants and backdrops (settings are global, so each state sets them as it renders).
         renderHomeStates(into: directory, notch: notch)
         renderParityStates(into: directory, notch: notch)
+        renderLayoutBounds(into: directory, notch: notch)
         renderSourceStates(into: directory, notch: notch)
         // The agent hub: sessions with a reply field, then the New chat form.
         let hub = AgentHub.shared
@@ -858,6 +859,32 @@ enum SnapshotRenderer {
     }
 
     /// Parity round: card styles, lyrics, the clipboard with pictures, reminders filters, the focus dial, the quit peek.
+    static func renderApprovalCards(into directory: URL) {
+        let notch = CGSize(width: 180, height: 32)
+        func approval(_ tool: String, _ command: String, risk: HookEvent.Risk = .low, _ configure: (inout NotchModel.Approval) -> Void = { _ in }) -> NotchModel.Approval {
+            var card = NotchModel.Approval(id: "card", agent: "Zeus", project: "repo", tool: tool, command: command, risk: risk, sessionTitle: "Ship the card", resolve: { _ in })
+            configure(&card)
+            return card
+        }
+        func saveCard(_ name: String, _ card: NotchModel.Approval, scheme: ColorScheme) {
+            let model = NotchModel()
+            model.presentation = .panel
+            model.approval = card
+            let stage = NotchStage(model: model, topBar: TopBarModel(), notch: notch)
+                .environment(\.colorScheme, scheme)
+            save(stage, size: CGSize(width: 960, height: 420), scale: 2, to: directory.appendingPathComponent(name))
+        }
+        let run = approval("Bash", "git status --short")
+        saveCard("approval-run-dark.png", run, scheme: .dark)
+        saveCard("approval-run-light.png", run, scheme: .light)
+        saveCard("approval-edit-dark.png", approval("Edit", "View.swift") { $0.changedFile = "View.swift"; $0.addedLines = 4; $0.removedLines = 1 }, scheme: .dark)
+        saveCard("approval-high-hold-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.reasons = ["deletes files"]; $0.holdElapsed = 0.4 }, scheme: .dark)
+        saveCard("approval-queue-dark.png", approval("Bash", "git status") { $0.queueCount = 3; $0.queueIndex = 0; $0.position = "1 of 3" }, scheme: .dark)
+        saveCard("approval-allowed-dark.png", approval("Bash", "git status") { $0.phase = .allowed }, scheme: .dark)
+        saveCard("approval-timeout-dark.png", approval("Bash", "git status") { $0.phase = .timedOut }, scheme: .dark)
+        saveCard("approval-high-confirm-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.allowStep = .confirm; $0.reasons = ["deletes files"] }, scheme: .dark)
+    }
+
     private static func renderParityStates(into directory: URL, notch: CGSize) {
         let store = SettingsStore.shared
         let savedStyle = store.string("appearance.cardStyle"), savedLyrics = store.string("privacy.lyrics"), savedMusic = store.string("home.variant.music")
@@ -958,6 +985,34 @@ enum SnapshotRenderer {
             model.presentation = .closed
             save(NotchStage(model: model, topBar: topBar, footprint: .hardware(notch)), size: CGSize(width: 960, height: 400),
                  to: directory.appendingPathComponent("parity-quit-peek.png"))
+        }
+    }
+
+    /// Hover opens at the normal size even when a long agent notification is already up.
+    private static func renderLayoutBounds(into directory: URL, notch: CGSize) {
+        func stage(_ name: String, scheme: ColorScheme, _ configure: (NotchModel, TopBarModel) -> Void) {
+            let model = NotchModel()
+            let topBar = TopBarModel()
+            model.presentation = .panel
+            topBar.selectedTab = .home
+            configure(model, topBar)
+            let view = NotchStage(model: model, topBar: topBar, footprint: .hardware(notch))
+                .environment(\.colorScheme, scheme)
+            save(view, size: CGSize(width: 1000, height: 420), to: directory.appendingPathComponent(name))
+        }
+        let long = (1...24).map { "step \($0) of a long agent note" }.joined(separator: "\n")
+        let approval = NotchModel.Approval(id: "bounds", agent: "Harbor", project: "Desk", tool: "Run",
+                                           command: long, risk: .high, resolve: { _ in })
+        stage("notch-bounds-hover-home-dark.png", scheme: .dark) { _, _ in }
+        stage("notch-bounds-hover-home-light.png", scheme: .light) { _, _ in }
+        stage("notch-bounds-notification-dark.png", scheme: .dark) { model, _ in model.approval = approval }
+        stage("notch-bounds-notification-light.png", scheme: .light) { model, _ in model.approval = approval }
+        stage("notch-bounds-scribe-dark.png", scheme: .dark) { _, topBar in topBar.selectedTab = .scribe }
+        stage("notch-bounds-now-playing-dark.png", scheme: .dark) { model, topBar in
+            topBar.selectedTab = .music
+            topBar.nowPlaying = NowPlaying(player: .music, title: "Night Drive", artist: "Ada", album: "Coast",
+                                           isPlaying: true, duration: 180, position: 12, positionAt: Date())
+            model.approval = approval
         }
     }
 

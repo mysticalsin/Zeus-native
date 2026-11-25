@@ -358,6 +358,15 @@ final class SystemNotificationService {
     /// A banner for a finished, failed or stalled agent when its Settings > Notifications switch is on
     /// and macOS already allows ZEUS notifications. Never asks for permission. The same agent and kind
     /// is not delivered again within two minutes, and details stay out of the banner while hidden.
+    /// A banner with no actions. Used when the Mac is locked: the person is told a request is waiting,
+    /// and nothing in the notice can approve it.
+    func deliverInformational(title: String, body: String) async {
+        guard !TopBarStyle.isSnapshot else { return }
+        authorization = await client.authorizationStatus()
+        guard authorization == .authorized else { return }
+        await client.deliver(SystemNotificationPayload(title: title, body: body))
+    }
+
     func deliverAgentAlert(_ alert: AgentAlert) async {
         guard SettingsStore.shared.bool(alert.settingKey), !TopBarStyle.isSnapshot else { return }
         authorization = await client.authorizationStatus()
