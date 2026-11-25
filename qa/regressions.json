@@ -8700,6 +8700,18 @@
         "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
         "function": "aPauseClickSettlesAtTheWindowAndADoubleClickDoesNotSendTransport"
       }
+    },
+    {
+      "id": "REG-994",
+      "failure": "A double click that opened music details changed the tab and left the panel closed, so the music page did not appear. Opening details now asks the panel to show. Play, pause, skip, an embedded line, and a triple click do not.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
+        "function": "openDetailsAsksThePanelToShow"
+      }
     }
 ]
 }

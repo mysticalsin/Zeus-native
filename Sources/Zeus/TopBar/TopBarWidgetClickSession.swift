@@ -89,12 +89,18 @@ extension TopBarModel {
         case .focus: tab = .focus
         case .agents: tab = .agents
         }
+        let reveal = {
+            self.selectedTab = tab
+            if TopBarWidgetClicks.revealsPanel(.openDetails(page)) {
+                self.onOpenTab(tab)
+            }
+        }
         if TopBarWidgetClicks.detailsDuration(reduceMotion: Motion.reduced) == 0 {
             var transaction = Transaction()
             transaction.disablesAnimations = true
-            withTransaction(transaction) { self.selectedTab = tab }
+            withTransaction(transaction) { reveal() }
         } else {
-            selectedTab = tab
+            reveal()
         }
     }
 }

@@ -385,6 +385,25 @@ import Testing
         #expect(detailEffects.contains(.pause) == false)
         #expect(detailEffects.contains(.play) == false)
     }
+
+    /// Opening the page asks the panel to show. Pause, play, skip, an embedded line, and a triple click do not.
+    @Test func openDetailsAsksThePanelToShow() {
+        #expect(TopBarWidgetClicks.revealsPanel(.openDetails(.music)))
+        #expect(TopBarWidgetClicks.revealsPanel(.openDetails(.calendar)))
+        #expect(TopBarWidgetClicks.revealsPanel(.pause) == false)
+        #expect(TopBarWidgetClicks.revealsPanel(.play) == false)
+        #expect(TopBarWidgetClicks.revealsPanel(.next) == false)
+        #expect(TopBarWidgetClicks.revealsPanel(.embeddedDetails(.music)) == false)
+        #expect(TopBarWidgetClicks.revealsPanel(.tripleClick(.music)) == false)
+
+        var clicks = TopBarWidgetClicks()
+        _ = clicks.click(.pause, count: 2, at: now)
+        let opened = clicks.tick(at: now.addingTimeInterval(TopBarWidgetClicks.doubleClickWindow))
+        #expect(opened.effects == [.openDetails(.music)])
+        #expect(opened.effects.allSatisfy(TopBarWidgetClicks.revealsPanel))
+        #expect(opened.effects.contains(.pause) == false)
+        #expect(opened.effects.contains(.play) == false)
+    }
 }
 
 private func seconds(of duration: Duration) -> Double {

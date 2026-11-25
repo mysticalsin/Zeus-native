@@ -195,6 +195,13 @@ public struct TopBarWidgetClicks: Equatable, Sendable {
         liveWings && hasTrack
     }
 
+    /// A double click that opens a page also asks the panel to show. Play, pause, skip, an embedded line,
+    /// and a triple click stay where they are.
+    public static func revealsPanel(_ effect: TopBarWidgetEffect) -> Bool {
+        if case .openDetails = effect { return true }
+        return false
+    }
+
     private static func single(_ target: TopBarWidgetTarget) -> [TopBarWidgetEffect] {
         switch target {
         case .play, .music, .nowPlaying: [.play]
