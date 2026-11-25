@@ -230,10 +230,9 @@ final class ApprovalDetail {
         questions.allSatisfy { !(choices[$0.question] ?? []).isEmpty }
     }
 
-    func answer(_ resolve: (HookDecision.Verdict) -> Void) {
+    func answer() {
         updatedInput = AgentQuestion.answeredInput(input, answers: choices)
         answered = true
-        resolve(.allow)
     }
 }
 
@@ -242,6 +241,9 @@ struct ApprovalDetailView: View {
     let detail: ApprovalDetail
     let agent: String
     let resolve: (HookDecision.Verdict) -> Void
+    var beginHold: () -> Void = {}
+    var endHold: () -> Void = {}
+    var plainAllow: () -> Void = {}
 
     var body: some View {
         switch detail.kind {
@@ -269,7 +271,13 @@ struct ApprovalDetailView: View {
                     resolve(.deny)
                 }
                 .accessibilityHint("Sends the plan back to \(agent) to keep working on it.")
-                CardButton(title: "Approve Plan", tint: Theme.leaf, filled: true) { resolve(.allow) }
+                ApprovalAllowButton(title: "Approve Plan", tint: Theme.leaf, fraction: 0) {
+                    beginHold()
+                } release: {
+                    endHold()
+                } accessibility: {
+                    plainAllow()
+                }
                     .accessibilityHint("Lets \(agent) start on this plan.")
             }
         }
@@ -297,7 +305,7 @@ struct ApprovalDetailView: View {
                 terminalButton(title: "Answer in Terminal")
                 Spacer()
                 if questions.count > 1 || questions.contains(where: \.multiSelect) {
-                    CardButton(title: "Send Answers", tint: Theme.accent, filled: true) { detail.answer(resolve) }
+                    CardButton(title: "Send Answers", tint: Theme.accent, filled: true) { detail.answer(); plainAllow() }
                         .disabled(!detail.isComplete(questions))
                         .opacity(detail.isComplete(questions) ? 1 : 0.5)
                 }
@@ -310,7 +318,7 @@ struct ApprovalDetailView: View {
         return Button {
             detail.toggle(option.label, in: question)
             // One question, one choice: picking it is the answer.
-            if single { detail.answer(resolve) }
+            if single { detail.answer(); plainAllow() }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: question.multiSelect ? (picked ? "checkmark.square.fill" : "square") : (picked ? "largecircle.fill.circle" : "circle"))

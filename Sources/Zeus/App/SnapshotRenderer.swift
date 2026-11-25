@@ -858,6 +858,32 @@ enum SnapshotRenderer {
     }
 
     /// Parity round: card styles, lyrics, the clipboard with pictures, reminders filters, the focus dial, the quit peek.
+    static func renderApprovalCards(into directory: URL) {
+        let notch = CGSize(width: 180, height: 32)
+        func approval(_ tool: String, _ command: String, risk: HookEvent.Risk = .low, _ configure: (inout NotchModel.Approval) -> Void = { _ in }) -> NotchModel.Approval {
+            var card = NotchModel.Approval(id: "card", agent: "Zeus", project: "repo", tool: tool, command: command, risk: risk, sessionTitle: "Ship the card", resolve: { _ in })
+            configure(&card)
+            return card
+        }
+        func saveCard(_ name: String, _ card: NotchModel.Approval, scheme: ColorScheme) {
+            let model = NotchModel()
+            model.presentation = .panel
+            model.approval = card
+            let stage = NotchStage(model: model, topBar: TopBarModel(), notch: notch)
+                .environment(\.colorScheme, scheme)
+            save(stage, size: CGSize(width: 960, height: 420), scale: 2, to: directory.appendingPathComponent(name))
+        }
+        let run = approval("Bash", "git status --short")
+        saveCard("approval-run-dark.png", run, scheme: .dark)
+        saveCard("approval-run-light.png", run, scheme: .light)
+        saveCard("approval-edit-dark.png", approval("Edit", "View.swift") { $0.changedFile = "View.swift"; $0.addedLines = 4; $0.removedLines = 1 }, scheme: .dark)
+        saveCard("approval-high-hold-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.reasons = ["deletes files"]; $0.holdElapsed = 0.4 }, scheme: .dark)
+        saveCard("approval-queue-dark.png", approval("Bash", "git status") { $0.queueCount = 3; $0.queueIndex = 0; $0.position = "1 of 3" }, scheme: .dark)
+        saveCard("approval-allowed-dark.png", approval("Bash", "git status") { $0.phase = .allowed }, scheme: .dark)
+        saveCard("approval-timeout-dark.png", approval("Bash", "git status") { $0.phase = .timedOut }, scheme: .dark)
+        saveCard("approval-high-confirm-dark.png", approval("Bash", "rm -rf build", risk: .high) { $0.allowStep = .confirm; $0.reasons = ["deletes files"] }, scheme: .dark)
+    }
+
     private static func renderParityStates(into directory: URL, notch: CGSize) {
         let store = SettingsStore.shared
         let savedStyle = store.string("appearance.cardStyle"), savedLyrics = store.string("privacy.lyrics"), savedMusic = store.string("home.variant.music")
