@@ -8179,6 +8179,17 @@
               "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
             }
           ]
+        },
+        {
+          "id": "F13.widget-details-reveal",
+          "check": "native-ZeusCoreTests",
+          "acceptance": "A double click that opens details asks the panel to show that page. Play, pause, skip, an embedded line, and a triple click do not. The music page is the existing tab. Linux does not open a window.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
+              "function": "openDetailsAsksThePanelToShow"
+            }
+          ]
         }
       ]
     },

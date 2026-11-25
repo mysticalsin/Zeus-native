@@ -121,7 +121,7 @@ final class TopBarModel {
     var cuesEnabled: Bool {
         didSet { defaults.set(cuesEnabled, forKey: "topBar.cues") }
     }
-    /// Music artwork and bars beside the closed notch while something plays.
+    /// Music artwork and the play and pause control beside the closed notch while a track is shown.
     var liveMusicWings: Bool {
         didSet { defaults.set(liveMusicWings, forKey: "topBar.musicWings") }
     }
@@ -232,6 +232,8 @@ final class TopBarModel {
 
     // Actions the views call; wired by the services so views stay free of system calls.
     var musicCommand: (MusicCommand) -> Void = { _ in }
+    /// Shared click window for the summary chips. The views send taps here.
+    @ObservationIgnored var widgetClicks = TopBarWidgetClickSession()
     /// Pauses the shown source if it plays and returns it; dictation resumes that same source afterwards.
     var pauseForDictation: () -> NowPlayingSource? = { nil }
     var resumeAfterDictation: (NowPlayingSource) -> Void = { _ in }
@@ -265,7 +267,7 @@ final class TopBarModel {
     /// The notch's dictation button: click to start, click again to stop and type it where you were.
     var toggleDictation: () -> Void = {}
 
-    enum MusicCommand { case playPause, next, previous, open, toggleShuffle, cycleRepeat }
+    enum MusicCommand { case play, pause, playPause, next, previous, open, toggleShuffle, cycleRepeat }
 
     /// Jumps the current track to this many seconds (the progress line's drag).
     var seek: (Double) -> Void = { _ in }
@@ -372,7 +374,7 @@ final class TopBarModel {
 
     /// Something worth showing beside the closed notch.
     var hasLiveActivity: Bool {
-        isDictating || RecordlyController.shared.isRecording || cue != nil || (focus.phase != .idle && SettingsStore.shared.bool("lights.timer")) || (liveMusicWings && nowPlaying?.isPlaying == true)
+        isDictating || RecordlyController.shared.isRecording || cue != nil || (focus.phase != .idle && SettingsStore.shared.bool("lights.timer")) || TopBarWidgetClicks.closedWingsShowTransport(liveWings: liveMusicWings, hasTrack: nowPlaying != nil)
     }
 
     var nextEvent: CalendarItem? {

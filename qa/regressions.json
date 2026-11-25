@@ -8676,6 +8676,42 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "A play click on the top bar did not issue play, a skip click did not issue next, and a double click on the agenda or the weather did not open more information after the window. A click count of 2 is that double click. A click count of 3 is a triple click and does not open more information. A right swipe embeds the details and is not a double click. Hold is not a route. One click also has to stay a single click. The clock is passed in. Reduced Motion snaps the details change.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
+        "function": "playSkipAgendaWeatherAndReducedMotionUseThePassedClock"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "A click on the closed music wings did nothing. The wings were drawn with hit testing off, so the pause glyph never received the pointer. The music wings now take the pointer. One click waits 0.35 s, then pauses while playing and plays while paused. A double click opens the music page and does not also send the command.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
+        "function": "aPauseClickSettlesAtTheWindowAndADoubleClickDoesNotSendTransport"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "A double click that opened music details changed the tab and left the panel closed, so the music page did not appear. Opening details now asks the panel to show. Play, pause, skip, an embedded line, and a triple click do not.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/TopBarWidgetClickTests.swift",
+        "function": "openDetailsAsksThePanelToShow"
+      }
     }
 ]
 }

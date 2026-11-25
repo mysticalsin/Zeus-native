@@ -561,12 +561,18 @@ struct MusicControls: View {
                 GlyphButton(symbol: "backward.fill", size: size, label: "Previous") { topBar.musicCommand(.previous) }
             }
             if shown.contains(.playPause) {
-                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3, label: "Play or pause") {
-                    topBar.musicCommand(.playPause)
+                let target = TopBarWidgetClicks.transportTarget(isPlaying: topBar.nowPlaying?.isPlaying == true)
+                GlyphButton(symbol: topBar.nowPlaying?.isPlaying == true ? "pause.fill" : "play.fill", size: size + 3,
+                            label: topBar.nowPlaying?.isPlaying == true ? "Pause" : "Play") {
+                    topBar.receiveWidgetTap(target)
                 }
+                .accessibilityAction { topBar.activateWidget(target) }
+                .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(target) }
             }
             if shown.contains(.next) {
-                GlyphButton(symbol: "forward.fill", size: size, label: "Next") { topBar.musicCommand(.next) }
+                GlyphButton(symbol: "forward.fill", size: size, label: "Skip") { topBar.receiveWidgetTap(.skip) }
+                    .accessibilityAction { topBar.activateWidget(.skip) }
+                    .accessibilityAction(named: "Show details") { topBar.showWidgetDetails(.skip) }
             }
             if shown.contains(.repeatMode) {
                 GlyphButton(symbol: modes.repeatMode == .one ? "repeat.1" : "repeat", size: size,
@@ -1467,7 +1473,9 @@ struct ClosedWings: View {
         let avatar = AvatarStatus.shared
         if avatar.posePreview != nil || avatar.current != .idle { return .avatar(avatar.current) }
         if topBar.focus.phase != .idle, SettingsStore.shared.bool("lights.timer") { return .focus }
-        if topBar.liveMusicWings, topBar.nowPlaying?.isPlaying == true { return .music }
+        if TopBarWidgetClicks.closedWingsShowTransport(liveWings: topBar.liveMusicWings, hasTrack: topBar.nowPlaying != nil) {
+            return .music
+        }
         if avatar.alwaysInNotch { return .avatar(.idle) }
         return .none
     }
@@ -1554,12 +1562,25 @@ struct ClosedWings: View {
                 }
             }
         case .music:
+            let target = TopBarWidgetClicks.transportTarget(isPlaying: topBar.nowPlaying?.isPlaying == true)
+            let playing = topBar.nowPlaying?.isPlaying == true
             wings {
                 AlbumTile(playing: topBar.nowPlaying, size: 18)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(topBar.nowPlaying.map(NowPlayingDisplay.accessibilityLabel(for:)) ?? "Nothing playing")
+                    .topBarWidgetTap(target, model: topBar)
             } right: {
-                LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1), active: true, height: 12)
+                HStack(spacing: 6) {
+                    Image(systemName: playing ? "pause.fill" : "play.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.cloudPrimary)
+                        .accessibilityHidden(true)
+                    LevelBars(color: ArtworkStore.shared.tint(for: topBar.nowPlaying, saturation: 0.55, brightness: 1),
+                              active: playing, height: 12)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(Rectangle())
+                .topBarWidgetTap(target, model: topBar)
             }
         case .none:
             EmptyView()
@@ -1883,11 +1904,16 @@ struct ClosedWingsRow<L: View, R: View>: View {
         // Each wing is a fixed-width clear box with its content overlaid: a wing with nothing in it (the resting
         // mascot's right side) still takes its width, so the gap cannot slide off the notch.
         HStack(spacing: 0) {
+            // The clear box is only the wing's width. Hit testing stays on the overlaid control, so the
+            // spacer cannot cover the pause glyph.
             Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .allowsHitTesting(false)
                 .overlay(alignment: .leading) { left.ownedJourneyControl("closed-wings.left.content") }
                 .ownedJourneyControl("closed-wings.left")
             Color.clear.frame(width: geometry.gapWidth)
+                .allowsHitTesting(false)
             Color.clear.frame(width: geometry.wingContentWidth).frame(maxHeight: .infinity)
+                .allowsHitTesting(false)
                 .overlay(alignment: .trailing) { right.ownedJourneyControl("closed-wings.right.content") }
                 .ownedJourneyControl("closed-wings.right")
         }

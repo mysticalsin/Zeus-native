@@ -202,11 +202,27 @@ public enum NotchFootprintRules {
         return NotchOpenRules.clickZone(screenFrame: screenFrame, notchSize: size, topOffset: topOffset)
     }
 
-    /// Whether the window takes the mouse at a point: only for a closed drawn notch, on its body. The top edge
-    /// counts and the bottom does not, as in `GlanceTopBar.inHoverZone`.
+    /// The closed wings refuse hits, so a click on the notch does not stop a recording or open a tab.
+    /// The music wings are the pause and play control, so they take the pointer.
+    public static func closedWingsAcceptHits(music: Bool) -> Bool {
+        music
+    }
+
+    /// Whether the window takes the mouse at a point. A closed drawn notch takes it on its body. A hardware
+    /// notch and the pill stay click-through until a wing kind is showing, so the play and pause control on
+    /// those wings can receive the pointer. The top edge counts and the bottom does not, as in
+    /// `GlanceTopBar.inHoverZone`.
     public static func takesMouse(_ footprint: NotchFootprint, closed: Bool, point: CGPoint, screenFrame: CGRect,
                                   topOffset: CGFloat, wings: ClosedWingsFacts?) -> Bool {
-        guard closed, case .drawn = footprint else { return false }
+        guard closed else { return false }
+        let onBody = pointIsOnClosedBody(footprint, point: point, screenFrame: screenFrame, topOffset: topOffset, wings: wings)
+        if case .drawn = footprint { return onBody }
+        guard let wings, !wings.kindIsNone else { return false }
+        return onBody
+    }
+
+    private static func pointIsOnClosedBody(_ footprint: NotchFootprint, point: CGPoint, screenFrame: CGRect,
+                                            topOffset: CGFloat, wings: ClosedWingsFacts?) -> Bool {
         let body = bodyRect(footprint, screenFrame: screenFrame, topOffset: topOffset, wings: wings)
         return abs(point.x - body.midX) <= body.width / 2 && point.y > body.minY && point.y <= body.maxY
     }

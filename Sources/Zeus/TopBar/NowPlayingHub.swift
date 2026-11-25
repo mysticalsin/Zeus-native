@@ -6,6 +6,8 @@ extension TopBarModel.MusicCommand {
     /// The command as the pure rules name it.
     var kind: MusicCommandKind {
         switch self {
+        case .play: .play
+        case .pause: .pause
         case .playPause: .playPause
         case .next: .next
         case .previous: .previous

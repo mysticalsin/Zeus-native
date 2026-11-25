@@ -126,8 +126,21 @@ def build_reports_displays(text):
     return "displaysChanged(" in function_body(text, "private func build()")
 
 
+# The music wings are the only closed content that takes the pointer. A literal false still refuses every wing.
+MUSIC_WING_HITS = (
+    ".allowsHitTesting(NotchFootprintRules.closedWingsAcceptHits(music: ClosedWings.kind(of: topBar) == .music))"
+)
+
+
 def closed_wings_ignore_hits(text):
-    return re.search(r"ClosedWings\(topBar: topBar(?:, [^)]*)?\)[^\n]*\n?[^\n]*\.allowsHitTesting\(false\)", text) is not None
+    """True when the closed wings refuse hits, or only the music wings accept them."""
+    window = re.search(r"ClosedWings\(topBar: topBar(?:, [^)]*)?\)(?:[^\n]*\n){0,3}[^\n]*\.allowsHitTesting\([^\n]*", text)
+    if window is None:
+        return False
+    block = window.group(0)
+    if ".allowsHitTesting(false)" in block:
+        return True
+    return MUSIC_WING_HITS in block
 
 
 def closed_width_key_free_of_footprint(text):
@@ -202,7 +215,7 @@ class DrawnNotchWiring(unittest.TestCase):
     def test_build_reports_the_displays_to_the_model(self):
         self.assertTrue(build_reports_displays(self.CONTROLLER_TEXT))
 
-    def test_the_closed_wings_are_drawn_with_hit_testing_off(self):
+    def test_the_closed_wings_refuse_hits_except_the_music_control(self):
         self.assertTrue(closed_wings_ignore_hits(self.VIEW_TEXT))
 
     def test_the_closed_width_key_does_not_read_the_footprint(self):
@@ -275,6 +288,11 @@ class DrawnNotchLintFailsOnItsFailureShapes(unittest.TestCase):
     def test_closed_wings_without_the_modifier_are_caught(self):
         self.assertFalse(closed_wings_ignore_hits("ClosedWings(topBar: topBar).frame(height: barHeight)\n"))
         self.assertTrue(closed_wings_ignore_hits("ClosedWings(topBar: topBar).frame(height: barHeight)\n    .allowsHitTesting(false)"))
+        self.assertFalse(closed_wings_ignore_hits("ClosedWings(topBar: topBar).frame(height: barHeight)\n    .allowsHitTesting(true)"))
+        self.assertFalse(closed_wings_ignore_hits(
+            "ClosedWings(topBar: topBar).frame(height: barHeight)\n    .allowsHitTesting(NotchFootprintRules.closedWingsAcceptHits(music: true))"))
+        self.assertTrue(closed_wings_ignore_hits(
+            "ClosedWings(topBar: topBar, notchGap: footprint.wingBase).frame(height: barHeight)\n    " + MUSIC_WING_HITS))
 
     def test_a_width_key_that_reads_the_footprint_is_caught(self):
         sample = "var closedWidthKey: ClosedWingsFacts.MotionKey? {\n model.presentation == .closed ? size(for: .closed) : nil\n }"
