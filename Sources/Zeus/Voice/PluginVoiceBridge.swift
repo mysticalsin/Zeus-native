@@ -108,7 +108,7 @@ private final class WavFinish: @unchecked Sendable {
 
 @MainActor
 private final class ProviderPlayerDelegate: NSObject, AVAudioPlayerDelegate {
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         ProviderPlaybackGate.shared.endPlayer(ObjectIdentifier(player))
     }
 }
