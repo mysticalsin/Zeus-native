@@ -926,11 +926,16 @@ def mic_body(text, start, end):
 class MicReleaseTests(unittest.TestCase):
     def test_quitting_restores_the_ducked_output_device(self):
         terminate = mic_body(mic_read("App/AppDelegate.swift"), "func applicationWillTerminate", "func applicationDidFinishLaunching")
-        self.assertIn("SystemAudioDucker.end()", terminate)
+        self.assertIn("SystemAudioDucker.endAll()", terminate)
         ducker = mic_read("Voice/SystemAudioDucker.swift")
-        end = mic_body(ducker, "static func end()", "private static func isMuted")
-        self.assertIn("duckedDevice", end)
+        end = mic_body(ducker, "static func end(_ token: Int)", "private static func currentDevice()")
+        self.assertIn("lease.end(token: token)", end)
+        self.assertIn("lease.endAll()", end)
         self.assertNotIn("defaultOutput()", end)
+        lease = (ROOT / "Sources/ZeusCore/Voice/DuckLease.swift").read_text()
+        release = mic_body(lease, "private mutating func release() -> [DuckVolumeCommand]", "public enum SpeechSessionStop")
+        self.assertIn("let id = deviceID", release)
+        self.assertNotIn("defaultOutput()", release)
 
     def test_a_spoken_todo_releases_the_microphone_when_its_page_closes_or_after_a_minute(self):
         self.assertIn(".onDisappear { todo.endVoice() }", mic_read("TopBar/TodoPage.swift"))

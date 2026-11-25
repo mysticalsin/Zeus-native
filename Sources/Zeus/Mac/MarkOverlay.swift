@@ -141,7 +141,7 @@ final class MarkOverlay {
         }
     }
 
-    private func announce(_ placed: [PlacedMark]) {
+    private func announce(_ placed: [PlacedScreenMark]) {
         let labels = placed.map(\.accessibilityLabel)
         guard labels != announcedLabels, !labels.isEmpty else {
             if labels.isEmpty { announcedLabels = [] }
