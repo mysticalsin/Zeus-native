@@ -1,5 +1,10 @@
 import CryptoKit
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 /// A meeting brief built on this Mac. Nothing here is sent away.
 public enum MeetingBrief {
@@ -198,7 +203,11 @@ public final class MeetingBriefStore {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 4096)
         while true {
-            let count = read(fd, &buffer, buffer.count)
+            #if canImport(Darwin)
+            let count = Darwin.read(fd, &buffer, buffer.count)
+            #else
+            let count = Glibc.read(fd, &buffer, buffer.count)
+            #endif
             if count < 0 && errno == EINTR { continue }
             if count == 0 { break }
             guard count > 0 else { throw CocoaError(.fileReadUnknown) }
