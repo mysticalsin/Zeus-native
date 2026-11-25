@@ -32,6 +32,7 @@ struct AIConnectionsPage: View {
             GSInfo(text: "Local models never send a word off this Mac.")
         }
         AnyLLMCard(services: services)
+        DirectConnectionsCard()
         GSCard("Available apps") {
             let shown = AIProvider.allCases.filter { provider in
                 guard provider.supportsNewChats else { return false }

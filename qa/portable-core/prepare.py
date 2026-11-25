@@ -55,8 +55,9 @@ GROUPS = {
         tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
     ),
     "keychain": (
-        core("Keychain/KeychainStore.swift"),
-        tests("KeychainStoreTests"),
+        core("Keychain/KeychainStore.swift", "Connections/AIConnectionRegistry.swift",
+             "Voice/VoiceTTSProvider.swift", "Voice/VoiceProviderKeychain.swift"),
+        tests("KeychainStoreTests", "AIConnectionRegistryTests"),
     ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
