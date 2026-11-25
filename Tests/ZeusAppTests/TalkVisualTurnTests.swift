@@ -316,9 +316,13 @@ struct TalkVisualTurnTests {
         defer { drawing.clear() }
         let old = UUID(), new = UUID()
         drawing.begin(Self.draw, shot: Self.shots[0], token: old)
+        #expect(drawing.isShowing, "the earliest sentence paints when the draw arrives")
         drawing.begin(Self.draw, shot: Self.shots[0], token: new)
+        let shown = drawing.sceneIdentity
+        #expect(drawing.isShowing)
         drawing.reveal(sentence: 0, token: old)
-        #expect(!drawing.isShowing, "a stale turn's reveal is ignored")
+        #expect(drawing.sceneIdentity?.scene == shown?.scene, "a stale turn's reveal is ignored")
+        #expect(drawing.isShowing)
         drawing.answerFinished(token: old)
         #expect(!drawing.hideIsArmed, "a stale turn cannot arm the hide")
         drawing.reveal(sentence: 0, token: new)
