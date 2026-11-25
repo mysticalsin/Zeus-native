@@ -696,10 +696,11 @@ final class VoiceTurnController {
         return TurnResult(spoken: question)
     }
 
-    /// Speaks the local explanation and, on the existing talk drawing surface, reveals each
-    /// sentence's marks when that line starts. No capture and no model request: the shot is only
-    /// the display frame the presenter already matches. `talk.drawOnScreen` still gates a
-    /// screenshot sent to an engine. This path does not send one.
+    /// Speaks the local explanation and puts the drawing on the existing talk surface now.
+    /// Each beat is revealed before this returns, so a missing voice engine cannot leave the
+    /// request spoken-only. Sentence start reveals again; a beat already shown is left as it is.
+    /// No capture and no model request: the shot is only the display frame the presenter matches.
+    /// `talk.drawOnScreen` still gates a screenshot sent to an engine. This path does not send one.
     private func presentExplain(_ plan: ExplainShowcase, transcript: String, speak: Bool) -> TurnResult {
         VoiceLog.log("route", "explain-showcase")
         VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
@@ -718,12 +719,11 @@ final class VoiceTurnController {
         VoiceLog.log("draw", "explain marks=\(draw.marks.count)")
         buddy.idle()
         for (index, sentence) in plan.sentences.enumerated() {
+            surface.reveal(sentence: index, token: token)
             if speak {
                 speaker.speak(Self.voiced(sentence), onStart: {
                     surface.reveal(sentence: index, token: token)
                 })
-            } else {
-                surface.reveal(sentence: index, token: token)
             }
         }
         if speak {

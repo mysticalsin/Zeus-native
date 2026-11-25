@@ -2,11 +2,10 @@ import Foundation
 
 /// A spoken explanation plus the marks the existing talk drawing surface already shows.
 ///
-/// `TalkVisualPresenter` takes a `TalkDraw`, then `reveal(sentence:)` shows the marks for that
-/// sentence when the line starts. This value is that plan, built on the Mac with no model call,
-/// no screenshot, and no provider key. The canonical canvas is 1280 by 720 screenshot pixels,
-/// top-left origin, the same space as `[DRAW]`. `scaled(toWidth:toHeight:)` fits the display
-/// the presenter is about to use.
+/// An explain request is demonstrated in three beats. Beat 0 draws a closed figure and rings it.
+/// Beat 1 draws the arrow that leaves that figure. Beat 2 names the asked end. `TalkVisualPresenter`
+/// reveals the marks for a beat when that sentence starts. The canvas is 1280 by 720 screenshot
+/// pixels, top-left origin, the same space as `[DRAW]`. No model call, no screenshot, and no provider key.
 public struct ExplainShowcase: Equatable, Sendable {
     public static let canvasWidth = 1280.0
     public static let canvasHeight = 720.0
@@ -21,22 +20,32 @@ public struct ExplainShowcase: Equatable, Sendable {
 
     public var explanation: String { sentences.joined(separator: " ") }
 
-    /// An explain request becomes words and a drawing plan. A command, or "explain" with no
-    /// subject, stays nil so the rest of the turn can decide. The words quote the question.
-    /// They do not assert that the subject happens.
+    /// Nil for a command, or for "explain" with no subject. The words name the start and the asked
+    /// end. They do not assert that the asked end happens.
     public static func plan(for request: String) -> ExplainShowcase? {
         guard let subject = subject(in: request) else { return nil }
-        let label = String(subject.prefix(TalkDraw.maxTextCharacters))
+        let pieces = parts(of: subject)
+        let start = clip(pieces.start)
+        let asked = clip(pieces.asked)
+        guard !start.isEmpty, !asked.isEmpty else { return nil }
         let sentences = [
-            "I'll draw this as an illustration.",
-            "The ring marks the question and the arrow points at it.",
-            "You asked: \(label). This sketch is not a sourced claim.",
+            "\(leading(start)) is the start, drawn as a closed box and ringed.",
+            "The arrow leaves that box. It is the change you asked about.",
+            endSentence(asked),
+        ]
+        let box = [
+            TalkDraw.Point(x: 180, y: 220),
+            TalkDraw.Point(x: 460, y: 220),
+            TalkDraw.Point(x: 460, y: 420),
+            TalkDraw.Point(x: 180, y: 420),
+            TalkDraw.Point(x: 180, y: 220),
         ]
         let marks = [
-            TalkDraw.Mark(shape: .card(origin: .init(x: 96, y: 72), text: "Illustration"), at: 0),
-            TalkDraw.Mark(shape: .ring(center: .init(x: 640, y: 360), radius: 28), at: 1),
-            TalkDraw.Mark(shape: .arrow(from: .init(x: 220, y: 520), to: .init(x: 600, y: 380)), at: 1),
-            TalkDraw.Mark(shape: .card(origin: .init(x: 96, y: 150), text: label), at: 2),
+            TalkDraw.Mark(shape: .ink(box), at: 0),
+            TalkDraw.Mark(shape: .ring(center: .init(x: 320, y: 320), radius: 36), at: 0),
+            TalkDraw.Mark(shape: .card(origin: .init(x: 180, y: 160), text: start), at: 0),
+            TalkDraw.Mark(shape: .arrow(from: .init(x: 480, y: 320), to: .init(x: 900, y: 320)), at: 1),
+            TalkDraw.Mark(shape: .card(origin: .init(x: 920, y: 280), text: askedCard(asked)), at: 2),
         ]
         guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
         return ExplainShowcase(sentences: sentences, draw: draw)
@@ -98,6 +107,46 @@ public struct ExplainShowcase: Equatable, Sendable {
             return subject
         }
         return nil
+    }
+
+    /// "the tesla car can fly" -> start "tesla car", asked "fly". With no change word, the asked end stays "question".
+    private static func parts(of subject: String) -> (start: String, asked: String) {
+        for separator in [" can ", " could ", " to ", " will "] {
+            guard let range = subject.range(of: separator) else { continue }
+            let start = bare(String(subject[..<range.lowerBound]))
+            let asked = bare(String(subject[range.upperBound...]))
+            if !start.isEmpty, !asked.isEmpty { return (start, asked) }
+        }
+        let start = bare(subject)
+        return (start.isEmpty ? subject : start, "question")
+    }
+
+    private static func bare(_ text: String) -> String {
+        var words = text.split(separator: " ").map(String.init)
+        while let first = words.first, ["the", "a", "an"].contains(first) { words.removeFirst() }
+        return words.joined(separator: " ")
+    }
+
+    private static func clip(_ text: String) -> String {
+        String(text.prefix(TalkDraw.maxTextCharacters))
+    }
+
+    private static func askedCard(_ asked: String) -> String {
+        if asked == "question" { return "question" }
+        let marked = asked.hasSuffix("?") ? asked : asked + "?"
+        return String(marked.prefix(TalkDraw.maxTextCharacters))
+    }
+
+    private static func leading(_ label: String) -> String {
+        guard let first = label.first else { return label }
+        return first.uppercased() + label.dropFirst()
+    }
+
+    private static func endSentence(_ asked: String) -> String {
+        if asked == "question" {
+            return "The arrow's far end is still only a question. The drawing does not show that it happens."
+        }
+        return "The asked end is \(asked). The drawing does not show that it happens."
     }
 
     private static func normalized(_ request: String) -> String {
