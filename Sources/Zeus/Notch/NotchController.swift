@@ -36,6 +36,14 @@ final class NotchController {
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
+    /// The choice card that is up, so a select in the peer app can clear that card and no other.
+    private var openChoice: OpenChoice?
+
+    private struct OpenChoice {
+        var id: String
+        var session: String
+        var tool: String
+    }
     /// Where the pointer is; tests replace it.
     var pointer: () -> CGPoint = { NSEvent.mouseLocation }
     /// Tests give the frame the zones centre on, so no window or display is needed. Release builds have no override.
@@ -308,7 +316,10 @@ final class NotchController {
                          timeout: Duration = .seconds(120),
                          onTimeout: HookDecision.Verdict = .deny,
                          detail: ApprovalDetail? = nil,
-                         trust: (session: String, onTrust: @MainActor () -> Void)? = nil) async -> HookDecision.Verdict {
+                         trust: (session: String, onTrust: @MainActor () -> Void)? = nil,
+                         choiceSession: String? = nil,
+                         sourceTool: String? = nil,
+                         peer: PeerContext? = nil) async -> HookDecision.Verdict {
         // A cancelled caller (`zeus cancel`, Esc) must not spin here: sleep throws at once when cancelled.
         while model.approval != nil, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(200))
@@ -321,6 +332,7 @@ final class NotchController {
                 guard !finished else { return }
                 finished = true
                 if self?.model.approval?.id == id { self?.model.approval = nil }
+                if self?.openChoice?.id == id { self?.openChoice = nil }
                 continuation.resume(returning: verdict)
             }
             let seconds = Double(timeout.components.seconds)
@@ -340,6 +352,12 @@ final class NotchController {
                 trustChat: trustChat,
                 resolve: finish
             )
+            openChoice = OpenChoice(id: id, session: choiceSession ?? "", tool: sourceTool ?? tool)
+            // The peer app closed its side of this decision (it took the choice there). Clear this card.
+            // Hop off the watch thread before resolving, so the reply is not written from that thread.
+            peer?.whenPeerCloses { [weak self] in
+                Task { @MainActor in self?.dismissBecausePeerClosed(id) }
+            }
             model.completion = nil
             model.recap = nil
             // VoiceOver users hear the request even though the notch never takes focus.
@@ -354,6 +372,22 @@ final class NotchController {
                 finish(onTimeout)
             }
         }
+    }
+
+    /// A select in the peer app, for this session and tool, clears the open choice. Another session does not.
+    func dismissPeerSelection(session: String, tool: String) {
+        guard let approval = model.approval, let open = openChoice, open.id == approval.id else { return }
+        var card = AgentChoiceDismiss.shown(session: open.session, tool: open.tool)
+        guard card.select(on: .peer, session: session, tool: tool) else { return }
+        approval.resolve(.ask)
+    }
+
+    /// The decision hook went away because the peer app finished the choice on its own.
+    private func dismissBecausePeerClosed(_ id: String) {
+        guard model.approval?.id == id else { return }
+        var card = AgentChoiceDismiss.shown(session: openChoice?.session ?? "", tool: openChoice?.tool ?? "")
+        _ = card.select(on: .peer)
+        model.approval?.resolve(.ask)
     }
 
     /// Hover the notch to open the panel; move away to close it. With the top bar the panel

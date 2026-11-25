@@ -24,6 +24,13 @@
       "group": "scribe"
     },
     {
+      "id": "portable-agent-choice-dismiss",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "One select on Zeus or in the peer app clears that choice. No window and no live approval.",
+      "group": "agent-choice-dismiss"
+    },
+    {
       "id": "portable-presentation",
       "kind": "portable",
       "tier": "contract",
@@ -6654,6 +6661,25 @@
             {
               "file": "Tests/ZeusCoreTests/AgentHubTests.swift",
               "function": "offeredAgentsFollowTheIntegrationToggles"
+            }
+          ]
+        },
+        {
+          "id": "F12.agent-choice-dismiss",
+          "check": "portable-agent-choice-dismiss",
+          "acceptance": "A select on Zeus or in the peer app clears that choice, and a select for another session leaves it up.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/AgentChoiceDismissTests.swift",
+              "function": "aZeusSelectClearsThePopup"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AgentChoiceDismissTests.swift",
+              "function": "aPeerSelectClearsTheSameChoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AgentChoiceDismissTests.swift",
+              "function": "anotherSessionsChoiceLeavesThisPopupUp"
             }
           ]
         }

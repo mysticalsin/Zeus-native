@@ -46,6 +46,40 @@ public enum PeerPolicy: Equatable, Sendable {
 /// need no real signed programs; the default is `PeerSigning.verifyApp`.
 public typealias PeerVerifier = @Sendable (_ auditToken: Data?) -> PeerVerdict
 
+/// Fires once when the peer drops the connection before the handler replies.
+final class PeerLife: @unchecked Sendable {
+    private let lock = NSLock()
+    private var closed = false
+    private var bodies: [@Sendable () -> Void] = []
+
+    func whenCloses(_ body: @escaping @Sendable () -> Void) {
+        let runNow: Bool
+        lock.lock()
+        if closed {
+            runNow = true
+        } else {
+            bodies.append(body)
+            runNow = false
+        }
+        lock.unlock()
+        if runNow { body() }
+    }
+
+    func markClosed() {
+        let pending: [@Sendable () -> Void]
+        lock.lock()
+        if closed {
+            lock.unlock()
+            return
+        }
+        closed = true
+        pending = bodies
+        bodies = []
+        lock.unlock()
+        for body in pending { body() }
+    }
+}
+
 /// What a handler may ask about the peer that sent it a line. The signature is read on the first
 /// question and remembered, so a connection that never asks costs nothing.
 public struct PeerContext: Sendable {
@@ -64,11 +98,19 @@ public struct PeerContext: Sendable {
     }
 
     private let memo: Memo
+    let life: PeerLife
 
-    public init(verify: @escaping @Sendable () -> PeerVerdict) { memo = Memo(verify) }
+    public init(verify: @escaping @Sendable () -> PeerVerdict) {
+        memo = Memo(verify)
+        life = PeerLife()
+    }
 
     /// Allowed only when the peer is this app's own signed program (for example the bundled `zeus` command).
     public func verifiedApp() -> PeerVerdict { memo.value() }
+
+    /// The peer closed this connection before a reply. One call, including when the close already happened.
+    /// A selection in the peer app ends the hook this way. The body must not reply on the calling thread.
+    public func whenPeerCloses(_ body: @escaping @Sendable () -> Void) { life.whenCloses(body) }
 }
 
 public enum PeerVerdict: Equatable, Sendable {
@@ -110,7 +152,14 @@ public enum PeerCheck {
         identity.auditToken = auditToken(fd: fd)
         return identity
         #else
-        return nil
+        // SO_PEERCRED is the Linux equivalent of getpeereid for a connected Unix socket.
+        // The portable suite admits a same-user peer with it. There is no audit token here.
+        struct LinuxPeerCred { var pid: Int32; var uid: UInt32; var gid: UInt32 }
+        var cred = LinuxPeerCred(pid: 0, uid: 0, gid: 0)
+        var size = socklen_t(MemoryLayout<LinuxPeerCred>.size)
+        guard getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &size) == 0, size == MemoryLayout<LinuxPeerCred>.size else { return nil }
+        let pid: Int32? = cred.pid > 0 ? cred.pid : nil
+        return PeerIdentity(uid: cred.uid, pid: pid)
         #endif
     }
 

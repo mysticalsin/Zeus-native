@@ -225,6 +225,29 @@ struct UnixSocketSafetyTests {
         #expect(!FileManager.default.fileExists(atPath: path))
     }
 
+    @Test func aPeerThatClosesWhileTheReplyWaitsIsReportedOnce() async throws {
+        let root = try location()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let closed = Box(0)
+        let retained = Box<UnixSocketServer.Reply?>(nil)
+        let path = root.appendingPathComponent("s.sock").path
+        let server = UnixSocketServer(path: path, contextHandler: { _, peer, reply in
+            peer.whenPeerCloses { closed.change { $0 += 1 } }
+            retained.set(reply)
+        })
+        try server.start()
+        defer { server.stop() }
+        let client = try connectClient(path)
+        #expect(UnixSocket.writeAll(client, Data("hold\n".utf8)))
+        try await eventually { retained.read() != nil }
+        #expect(closed.read() == 0)
+        close(client)
+        try await eventually { closed.read() == 1 }
+        retained.read()?(nil)
+        try await eventually { server.activeConnectionCount == 0 }
+        #expect(closed.read() == 1)
+    }
+
     @Test func disconnectedPeerCannotSignalTheProcessDuringReply() async throws {
         let root = try location()
         defer { try? FileManager.default.removeItem(at: root) }

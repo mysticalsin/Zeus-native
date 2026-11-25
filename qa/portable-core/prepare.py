@@ -134,6 +134,10 @@ GROUPS = {
         core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
+    "agent-choice-dismiss": (
+        core("AgentChoiceDismiss.swift", "JSONValue.swift"),
+        tests("AgentChoiceDismissTests"),
+    ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
