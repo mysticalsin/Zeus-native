@@ -390,6 +390,13 @@
       "scope": "Actual companion pointing, flight and coordinate math; Linux Foundation geometry shim, no native display or renderer proof."
     },
     {
+      "id": "portable-duck-lease",
+      "kind": "portable",
+      "tier": "contract",
+      "group": "duck-lease",
+      "scope": "Output duck lease: an unknown end, an idle follow, and a muted or silent output issue no volume command. The last holder, or ending every holder, restores the snapshot once. No audio device and no microphone."
+    },
+    {
       "id": "portable-equaliser",
       "kind": "portable",
       "tier": "contract",
@@ -6546,6 +6553,25 @@
             {
               "file": "Tests/ZeusAppTests/SpeakerRouteTextTests.swift",
               "function": "theRouteLineNamesTheUltronEffectOnlyWhenItIsOn"
+            }
+          ]
+        },
+        {
+          "id": "F11.duck-lease-empty",
+          "check": "portable-duck-lease",
+          "acceptance": "An idle lease and an unknown holder end with no volume command. Following the device that is already ducked does nothing. A muted or silent output begins with no volume command and ends without raising it. Ending every open holder restores the snapshot once, and a later end stays empty.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/DuckLeaseTests.swift",
+              "function": "anUnknownEndAndAnIdleLeaseStayEmpty"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DuckLeaseTests.swift",
+              "function": "aMutedOrSilentOutputBeginsWithNoVolumeCommand"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/DuckLeaseTests.swift",
+              "function": "endingEveryHolderRestoresTheOutputOnce"
             }
           ]
         }

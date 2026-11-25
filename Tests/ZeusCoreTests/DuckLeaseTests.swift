@@ -42,4 +42,49 @@ import Testing
         #expect(SpeechSessionStop.affectsCurrent(stopSession: 4, current: 4))
         #expect(!SpeechSessionStop.affectsCurrent(stopSession: 4, current: 5))
     }
+
+    @Test func anUnknownEndAndAnIdleLeaseStayEmpty() {
+        var idle = DuckLease()
+        #expect(idle.end(token: 1).isEmpty)
+        #expect(idle.endAll().isEmpty)
+        #expect(idle.follow(device("speakers")).isEmpty)
+        #expect(idle.isHolding == false)
+
+        var lease = DuckLease()
+        let held = lease.begin(device("speakers", volume: 0.8))
+        #expect(lease.end(token: held.token + 50).isEmpty)
+        #expect(lease.isHolding)
+        #expect(lease.deviceID == "speakers")
+        #expect(lease.follow(device("speakers")).isEmpty)
+        let restored = lease.end(token: held.token)
+        #expect(restored == [DuckVolumeCommand(device: "speakers", volume: 0.8)])
+    }
+
+    @Test func aMutedOrSilentOutputBeginsWithNoVolumeCommand() {
+        var muted = DuckLease()
+        let muteBegin = muted.begin(device("speakers", volume: 0.8, muted: true))
+        #expect(muteBegin.commands.isEmpty)
+        #expect(muted.isHolding)
+        #expect(muted.end(token: muteBegin.token).isEmpty)
+        #expect(muted.isHolding == false)
+
+        var silent = DuckLease()
+        let silentBegin = silent.begin(device("speakers", volume: 0))
+        #expect(silentBegin.commands.isEmpty)
+        #expect(silent.isHolding)
+        #expect(silent.endAll().isEmpty)
+        #expect(silent.isHolding == false)
+    }
+
+    @Test func endingEveryHolderRestoresTheOutputOnce() {
+        var lease = DuckLease()
+        #expect(lease.endAll().isEmpty)
+        let first = lease.begin(device("speakers", volume: 0.8))
+        _ = lease.begin(device("speakers"))
+        let restored = lease.endAll()
+        #expect(restored == [DuckVolumeCommand(device: "speakers", volume: 0.8)])
+        #expect(lease.isHolding == false)
+        #expect(lease.end(token: first.token).isEmpty)
+        #expect(lease.endAll().isEmpty)
+    }
 }

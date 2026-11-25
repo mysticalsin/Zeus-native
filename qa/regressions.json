@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-975",
+      "failure": "An unknown duck holder, an idle lease, or a muted output still issued a volume command, so the previous output could move while Zeus was not holding it.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-duck-lease",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/DuckLeaseTests.swift",
+        "function": "anUnknownEndAndAnIdleLeaseStayEmpty"
+      }
     }
-]
+  ]
 }
