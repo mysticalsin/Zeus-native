@@ -1,49 +1,41 @@
 import Foundation
 
-/// A solo tap of the right Command key toggles listening.
+/// A solo tap of the right Command key asks for Murmur and nothing else.
 ///
-/// A tap is a right Command press that comes up within `maximumTap` without any other key
-/// joining it. The left Command key, a chord, and a longer hold produce nothing.
-///
-/// Together with the Control+Option hold: while that hold is in progress a right Command tap
-/// is discarded, so it cannot start or stop a second session. When the hold begins it takes
-/// the one listening session (a tap that had already started stays "on"). When the hold ends
-/// or aborts, the session is off, and the next right Command tap starts it again.
-/// The cues are the same Superwhisper files as the hold, read at runtime, with the neutral
-/// Mac sound when a file is missing. Reduce Motion does not silence them.
+/// A tap comes up within `maximumTap` with no other key. Left Command, a chord, and a
+/// longer hold produce nothing. Talk is not this key. While a talk hold owns the
+/// keyboard the tap is discarded, so one press cannot open a second session.
 public struct RightCommandTap: Equatable, Sendable {
     /// Longer than this is a hold, not a tap.
-    public static let maximumTap: TimeInterval = 0.30
+    public static let maximumTap: TimeInterval = KeyActionRouter.commandTapMax
     public static let rightKeyCode: UInt16 = 54
     public static let leftKeyCode: UInt16 = 55
 
     public enum Signal: Equatable, Sendable {
-        case toggle(listening: Bool, cue: TalkCuePlay)
+        /// The dictation path is the only owner of this signal.
+        case murmur
     }
 
+    /// True only when a talk hold has told this tap that talk is listening. A Right Command tap never sets it.
     public private(set) var listening = false
-    private var downSince: TimeInterval?
-    private var spoiled = false
-    /// Control+Option currently owns the keyboard. Right Command cannot toggle until it lets go.
+    private var router = KeyActionRouter()
+    /// A talk hold is in progress. Right Command cannot start Murmur until it lets go.
     private var holdOwned = false
 
     public init() {}
 
-    /// Audio is not motion. The flag is part of the signature so a caller cannot gate the cue on it.
+    /// Audio is not motion. The flag is part of the signature so a caller cannot gate a cue on it.
     public static func playsAudio(reduceMotion: Bool) -> Bool {
         _ = reduceMotion
         return true
     }
 
     public mutating func rightDown(at time: TimeInterval, otherKeyDown: Bool) -> [Signal] {
-        if holdOwned || otherKeyDown {
-            spoiled = true
-            downSince = nil
+        guard !holdOwned else {
+            _ = router.send(.cancel)
             return []
         }
-        spoiled = false
-        downSince = time
-        return []
+        return map(router.send(.rightCommand(down: true, at: time, otherKeyDown: otherKeyDown)))
     }
 
     public mutating func rightUp(
@@ -53,60 +45,66 @@ public struct RightCommandTap: Equatable, Sendable {
         fileIsReadable: @Sendable (String) -> Bool = { _ in true }
     ) -> [Signal] {
         _ = reduceMotion
-        if downSince == nil, let down, !spoiled, !holdOwned {
-            downSince = down
+        _ = fileIsReadable
+        if holdOwned {
+            _ = router.send(.hardwareRightCommandUp(at: time))
+            return []
         }
-        defer {
-            downSince = nil
-            spoiled = false
+        if case .idle = router.phase, let down {
+            _ = router.send(.rightCommand(down: true, at: down, otherKeyDown: false))
         }
-        guard !holdOwned, let since = downSince, !spoiled else { return [] }
-        guard time >= since, time - since <= Self.maximumTap else { return [] }
-        listening.toggle()
-        let kind: TalkCueKind = listening ? .start : .end
-        let cue = TalkCuePlay(kind: kind, source: TalkCueFiles.resolve(kind, readable: fileIsReadable))
-        return [.toggle(listening: listening, cue: cue)]
+        return map(router.send(.rightCommand(down: false, at: time, otherKeyDown: false)))
     }
 
-    /// Another key went down while right Command was down. This press is a modifier, not a tap.
+    /// Another key went down while right Command was down. This press is not a tap.
     public mutating func otherKey() -> [Signal] {
-        guard downSince != nil else { return [] }
-        spoiled = true
-        return []
+        map(router.send(.otherKey(at: 0)))
     }
 
     public mutating func leftDown(at time: TimeInterval) -> [Signal] {
-        _ = time
-        return []
+        map(router.send(.leftCommand(down: true, at: time)))
     }
 
     public mutating func leftUp(at time: TimeInterval) -> [Signal] {
-        _ = time
-        return []
+        map(router.send(.leftCommand(down: false, at: time)))
     }
 
-    /// The Control+Option hold is pending or talking. Drop a half-finished tap and do not toggle.
+    /// The key-up never arrived. The next down is a new press, and this one does not start Murmur.
+    public mutating func hardwareRightCommandUp(at time: TimeInterval) -> [Signal] {
+        map(router.send(.hardwareRightCommandUp(at: time)))
+    }
+
+    /// Talk owns the keyboard. Drop a half-finished tap.
     public mutating func holdOwnsKeyboard() -> [Signal] {
         holdOwned = true
-        downSince = nil
-        spoiled = true
-        return []
+        return map(router.send(.cancel))
     }
 
-    /// The hold returned to idle. A later solo tap can toggle again.
+    /// Talk returned to idle. A later solo tap can ask for Murmur again.
     public mutating func holdReleasedKeyboard() {
         holdOwned = false
-        spoiled = false
-        downSince = nil
     }
 
-    /// The hold began or ended the one shared listening session.
+    /// Talk began or ended. Recorded so a caller can read it. A tap does not change it.
     public mutating func noteSession(listening isListening: Bool) {
         listening = isListening
     }
 
-    /// Permission or the voice path refused the start. The next tap starts, it does not stop.
+    /// A refused start must not look like talk is on.
     public mutating func noteStartRejected() {
         if listening { listening = false }
+    }
+
+    private func map(_ actions: [KeyActionRouter.Action]) -> [Signal] {
+        var signals: [Signal] = []
+        for action in actions {
+            switch action {
+            case .murmur:
+                signals.append(.murmur)
+            case .talk:
+                break
+            }
+        }
+        return signals
     }
 }

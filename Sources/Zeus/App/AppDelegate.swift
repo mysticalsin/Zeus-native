@@ -324,10 +324,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 WakeWordController.shared.talkKeyHeld = false
                 self?.voice?.release(builtinCue: false)
             }
-            // Same listening path and the same installed cues as the hold. The monitor plays the cues.
-            hotkey.onRightCommandStart = { [weak self] in
-                self?.talkKeyPressed(builtinCue: false) ?? false
-            }
+            // Right Command is Murmur, owned by the dictation monitor. This talk monitor must not start a second session.
             hotkey.onListenAccessMissing = { [weak self] in
                 if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
