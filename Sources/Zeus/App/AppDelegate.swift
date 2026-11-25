@@ -1146,9 +1146,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard SettingsStore.shared.bool("shortcut.answerKeys"), notch.model.approval != nil else { return [] }
         let mods = UInt32(controlKey | optionKey)
         func answer(_ verdict: HookDecision.Verdict) -> () -> Void {
-            { [weak self] in self?.notch.model.approval?.resolve(verdict) }
+            { [weak self] in
+                guard let approval = self?.notch.model.approval else { return }
+                guard ApprovalCard.inputOpen(now: Date(), appearedAt: approval.appearedAt) else { return }
+                if verdict == .allow {
+                    self?.notch.activateApproval(kind: .shortcut)
+                    return
+                }
+                self?.notch.noteApproval(.shortcut, verdict: verdict)
+                approval.resolve(verdict)
+            }
         }
-        return [(UInt32(kVK_ANSI_Y), mods, answer(.allow)), (UInt32(kVK_ANSI_N), mods, answer(.deny)), (UInt32(kVK_ANSI_O), mods, answer(.ask))]
+        func run(_ key: ApprovalCardKey, _ work: @escaping (NotchModel.Approval) -> Void) -> () -> Void {
+            { [weak self] in
+                guard let approval = self?.notch.model.approval else { return }
+                guard ApprovalCard.inputOpen(now: Date(), appearedAt: approval.appearedAt) else { return }
+                guard ApprovalCard.key(letter: ApprovalCard.keycap(key, risk: approval.risk, modifiersHeld: true) ?? "", risk: approval.risk) != nil || key == .previous || key == .next else { return }
+                work(approval)
+            }
+        }
+        return [
+            (UInt32(kVK_ANSI_Y), mods, answer(.allow)),
+            (UInt32(kVK_ANSI_N), mods, answer(.deny)),
+            (UInt32(kVK_ANSI_O), mods, answer(.ask)),
+            (UInt32(kVK_ANSI_J), mods, run(.jump) { $0.onJump?() }),
+            (UInt32(kVK_ANSI_A), mods, run(.allowChat) { approval in
+                guard ApprovalCard.key(letter: "A", risk: approval.risk) == .allowChat else { return }
+                approval.trustChat?()
+            }),
+            (UInt32(kVK_LeftArrow), mods, run(.previous) { [weak self] _ in self?.notch.browseApproval(by: -1) }),
+            (UInt32(kVK_RightArrow), mods, run(.next) { [weak self] _ in self?.notch.browseApproval(by: 1) }),
+        ]
     }
 
     private func openQuickTodo() {

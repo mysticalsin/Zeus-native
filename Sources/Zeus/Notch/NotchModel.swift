@@ -23,6 +23,8 @@ final class NotchModel {
         var lastEventAt = Date()
         /// Why it failed or stalled, for the card.
         var reason: String?
+        /// Steps, tool calls, and the inline approval. Nil until a timeline is supplied.
+        var supervision: AgentSupervision.Run?
     }
 
     /// The red card in the peek after an agent's turn ends in an error.
@@ -55,8 +57,37 @@ final class NotchModel {
         var detail: ApprovalDetail?
         /// The agent session, for "Allow this whole chat". Nil hides that button.
         var sessionID: String?
+        /// "1 of N" while other requests wait behind this card.
+        var position: String = ""
+        var appearedAt = Date()
+        var changedFile: String? = nil
+        var addedLines: Int? = nil
+        var removedLines: Int? = nil
+        var fetchHost: String? = nil
+        var why: String? = nil
+        var reasons: [String] = []
+        var sessionTitle: String = ""
+        var queueCount: Int = 1
+        var queueIndex: Int = 0
+        var expandedCommand = false
+        var modifiersHeld = false
+        var holdElapsed: Double = 0
+        var allowStep: ApprovalAllowStep = .idle
+        var phase: ApprovalCardPhase = .asking
+        var onJump: (@MainActor () -> Void)? = nil
+        var onDenyAll: (@MainActor () -> Void)? = nil
+        var onBrowse: (@MainActor (Int) -> Void)? = nil
+        /// When the helper gives up. An allow after this is a denial.
+        var helperDeadline = Date.distantFuture
+        /// The only allow path: a tap, a finished hold, or the second confirm.
+        var allowGate = ApprovalAllowGate(risk: .low)
         /// Trusts the session, then approves (set only when the request is safe enough to offer it).
         var trustChat: (@MainActor () -> Void)?
+        var beginHold: @MainActor () -> Void = {}
+        var endHold: @MainActor () -> Void = {}
+        var activateAllow: @MainActor () -> Void = {}
+        var deny: @MainActor () -> Void = {}
+        var denyAll: @MainActor () -> Void = {}
         var resolve: @MainActor (HookDecision.Verdict) -> Void
 
         /// True for a Send/Trash/Buy/Change preview, shown as a multi-line block above the buttons.
@@ -90,6 +121,10 @@ final class NotchModel {
     var openedAt: Date?
     var sessions: [Session] = [] { didSet { onCardChange() } }
     var approval: Approval? { didSet { onCardChange() } }
+    /// The Mac is locked. The approval command stays hidden and the card says why.
+    var macLocked = false
+    /// The display is mirrored or captured. The approval command stays hidden and the card says why.
+    var screenShared = false
     /// Covered window frames while Zeus works behind. Nil when nothing is streaming.
     var workBehind: WorkBehindPreview? { didSet { onCardChange() } }
     /// Before/after for a selection edit. Return accepts it.
