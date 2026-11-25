@@ -184,4 +184,28 @@ struct PTTIndicatorTests {
         #expect(idle.accessibilityLabel.isEmpty)
         #expect(idle.opensWindow == false)
     }
+
+    @Test func theHoldReachesTheIndicatorInTheSameSample() {
+        let idle = PTTHoldPublish.sample(previous: false, published: false)
+        #expect(idle.changed == false)
+        #expect(idle.held == false)
+
+        let down = PTTHoldPublish.sample(previous: false, published: true)
+        #expect(down.changed)
+        #expect(down.held)
+
+        let still = PTTHoldPublish.sample(previous: true, published: true)
+        #expect(still.changed == false)
+        #expect(still.held)
+
+        let up = PTTHoldPublish.sample(previous: true, published: false)
+        #expect(up.changed)
+        #expect(up.held == false)
+
+        var model = PTTIndicatorModel()
+        #expect(model.advance(sample(held: down.held), now: 0, reduceMotion: false) == nil)
+        #expect(model.state == .armed)
+        #expect(model.advance(sample(held: up.held), now: 0.05, reduceMotion: true) == nil)
+        #expect(model.state == .idle)
+    }
 }

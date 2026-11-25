@@ -139,6 +139,24 @@ public enum PTTIndicatorContrast {
     }
 }
 
+/// One copy of the held flag. `changed` is false when a later feed tick repeats the same flag.
+public struct PTTHoldSample: Equatable, Sendable {
+    public var held: Bool
+    public var changed: Bool
+
+    public init(held: Bool, changed: Bool) {
+        self.held = held
+        self.changed = changed
+    }
+}
+
+/// The indicator reads the flag the hotkey already set, in that same call. It does not wait for the avatar feed.
+public enum PTTHoldPublish {
+    public static func sample(previous: Bool, published: Bool) -> PTTHoldSample {
+        PTTHoldSample(held: published, changed: previous != published)
+    }
+}
+
 /// The capture-failure sentences the notch already shows. Matching them is how a failure is observed.
 public enum PTTIndicatorFailure {
     public static let microphoneKeptChanging = "The microphone kept changing, so Zeus stopped listening. Try again."

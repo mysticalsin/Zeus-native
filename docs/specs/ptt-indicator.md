@@ -13,7 +13,7 @@ No new window is opened. The explain overlay is left alone: the notch panel alre
 
 ## Hold
 
-Push to talk is a strict hold. Hold to talk, release to stop. It is never a toggle. Key handling belongs to other work and is not changed here. The indicator only reads state the app already publishes:
+Push to talk is a strict hold. Hold to talk, release to stop. It is never a toggle. Key handling belongs to other work and is not changed here. The indicator only reads state the app already publishes. The held flag is copied in the same call that sets it, so a short hold is not lost waiting for the avatar feed. A later tick that repeats the same flag changes nothing. The indicator reads:
 
 - whether the talk key is held
 - whether the microphone is listening

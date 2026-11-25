@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
         "function": "releaseClearsWithinOneFrameBudget"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "The push-to-talk hold waited for the next avatar-feed tick, so a short hold could end before the top-bar light and the round mark appeared. The held flag is now copied in the same call that sets it. A later tick that repeats the same flag changes nothing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+        "function": "theHoldReachesTheIndicatorInTheSameSample"
+      }
     }
   ]
 }
