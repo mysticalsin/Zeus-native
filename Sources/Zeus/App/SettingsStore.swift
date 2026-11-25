@@ -298,6 +298,8 @@ final class SettingsStore {
         "voice.answers", "privacy.lyrics", "music.browserMedia", "lights.liveSpectrum", "lights.shortcutPeeks", "present.physicalPointer",
         "notify.system", "notify.replaceBanners", "general.showInScreenSharing", "lights.airDrop", "lights.screenshot", "about.autoUpdate",
         "face.presence",
+        // Playback switches that start a helper, a local-network search, Bluetooth, a Focus-file read, or a lock-screen window.
+        "music.systemNowPlaying", "music.receiverNames", "music.earbudOverlay", "music.focusName", "music.lockScreenPlayer",
         // It asks for System Audio Recording and taps other apps' sound.
         "audio.equaliser",
         // It reads other apps' window frames and moves their windows.

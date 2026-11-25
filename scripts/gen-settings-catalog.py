@@ -90,11 +90,11 @@ o(S,'Everyday lights','Glow when AirDrop arrives','toggle','off','Blue intake gl
 o(S,'Everyday lights','Screenshot cue','toggle','off','Camera cue and shelf drop for new screenshots.','missing','lights.screenshot','toggle',[],'false','live','Gated by Desktop folder access.')
 o(S,'Music','Show music from','menu','-','Any player shows what started playing last.','missing','music.follow','choice',['Any player','Music','Spotify'],'Any player','live','A1. Any player shows the source that started playing last. Music or Spotify shows only that player, or nothing; commands go to it too. An unknown stored value counts as Any player.')
 o(S,'Music','Collapse when paused','toggle','off','The player folds to one line while nothing is playing.','missing','music.collapseOnPause','toggle',[],'false','live','Zeus addition. Off by default. Uses the existing page motion, and Reduce Motion changes the layout at once.')
-o(S,'Music','Show what this Mac is playing','toggle','off','Reads the current audio through a local helper. It stays behind a player that is already playing.','missing','music.systemNowPlaying','toggle',[],'false','live','Zeus addition. Off by default. The helper is killed when this is turned off or Zeus quits.')
-o(S,'Music','Show receiver names','toggle','off','Lists receivers found on the local network in the output menu.','missing','music.receiverNames','toggle',[],'false','live','Zeus addition. Off by default. The search stops when this is turned off.')
-o(S,'Music','Earbud overlay','toggle','off','Shows a connected audio device inside the notch, then dismisses it.','missing','music.earbudOverlay','toggle',[],'false','live','Zeus addition. Off by default. Needs Bluetooth. The public device API does not expose battery, so a percentage appears only when one was supplied.')
-o(S,'Music','Show the Focus name','toggle','off','Shows the active Focus on the Focus page.','missing','music.focusName','toggle',[],'false','live','Zeus addition. Off by default. Needs Full Disk Access. If it is not granted, the page says so and nothing is read.')
-o(S,'Music','Lock screen player','toggle','off','Shows the player on the lock screen.','missing','music.lockScreenPlayer','toggle',[],'false','live','Zeus addition. Off by default. A private window-server space holds a panel that does not activate and ignores input. A missing symbol or a failed call reports unavailable.')
+o(S,'Music','Show what this Mac is playing','toggle','off','Reads the current audio through a local helper. It stays behind a player that is already playing.','missing','music.systemNowPlaying','toggle',[],'false','live','Zeus addition. Off by default. The helper is killed when this is turned off or Zeus quits. An import never turns it on.')
+o(S,'Music','Show receiver names','toggle','off','Lists receivers found on the local network in the output menu.','missing','music.receiverNames','toggle',[],'false','live','Zeus addition. Off by default. The search stops when this is turned off. An import never turns it on.')
+o(S,'Music','Earbud overlay','toggle','off','Shows a connected audio device inside the notch, then dismisses it.','missing','music.earbudOverlay','toggle',[],'false','live','Zeus addition. Off by default. Needs Bluetooth. The public device API does not expose battery, so a percentage appears only when one was supplied. An import never turns it on.')
+o(S,'Music','Show the Focus name','toggle','off','Shows the active Focus on the Focus page.','missing','music.focusName','toggle',[],'false','live','Zeus addition. Off by default. Needs Full Disk Access. If it is not granted, the page says so and nothing is read. An import never turns it on.')
+o(S,'Music','Lock screen player','toggle','off','Shows the player on the lock screen.','missing','music.lockScreenPlayer','toggle',[],'false','live','Zeus addition. Off by default. A private window-server space holds a panel that does not activate and ignores input. A missing symbol or a failed call reports unavailable. An import never turns it on.')
 o(S,'Screen','Round the bottom screen corners','toggle','off','Rounds the two bottom corners of a notched display to match the top. Click-through.','missing','screen.roundBottomCorners','toggle',[],'false','live','Zeus addition. Two small black click-through windows per notched display, on every Space, left out of captures; rebuilt when the screen changes.')
 o(S,'Screen','Corner size','segmented','Medium','How large the rounded corners are.','missing','screen.cornerRadius','choice',['Small','Medium','Large'],'Medium','live','Zeus addition. Small is 8 pt, Medium 12 pt, Large 18 pt.')
 
@@ -278,7 +278,9 @@ def validate_table():
               'lights.liveSpectrum', 'audio.equaliser', 'general.showInScreenSharing',
               'present.physicalPointer', 'explanation.enabled',
               'pointing.sendScreenshot', 'pointing.textEntry', 'pointing.dictationFnControl', 'talk.drawOnScreen',
-              'face.presence', 'tiling.enabled')
+              'face.presence', 'tiling.enabled',
+              'music.systemNowPlaying', 'music.receiverNames', 'music.earbudOverlay',
+              'music.focusName', 'music.lockScreenPlayer')
     for key in opt_in:
         row = by_id.get(key)
         if row is None or row[8] != 'toggle' or row[10] != 'false':
