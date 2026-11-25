@@ -61,7 +61,7 @@ public struct ExplainShowcase: Equatable, Sendable {
         var marks: [TalkDraw.Mark] = [
             .init(shape: .ink(shown), at: 0),
             .init(shape: .ring(center: shown[shown.count - 1], radius: 18), at: 0),
-            .init(shape: .card(origin: .init(x: 200, y: 140), text: "weight"), at: 0),
+            .init(shape: .card(origin: .init(x: 200, y: 140), text: "force"), at: 0),
         ]
         if beat >= 2 {
             marks.append(.init(shape: .card(origin: .init(x: 200, y: 80), text: "fly?"), at: 2))
@@ -194,11 +194,12 @@ public struct ExplainShowcase: Equatable, Sendable {
         return first.uppercased() + label.dropFirst()
     }
 
-    /// Weight versus lift, then the pen, then an explicit limit. The end is not claimed.
+    /// The mechanism is an upward force the sketch does not contain. No registry source is invented.
+    /// The last sentence still refuses to treat the drawing as proof.
     private static func motionSentences(start: String, asked: String) -> [String] {
         [
-            "Weight holds \(start) on the ground. Lift would have to exceed that weight before the body could leave it.",
-            "The pen travels from that ground toward the rise you asked about. The line is a trace, not a measurement.",
+            "To leave the ground, \(start) would need an upward force greater than its weight, from a wing or a rotor this sketch does not draw.",
+            "No source is on file for that force. The pen only traces the question.",
             "The asked end is \(asked). The drawing does not prove that the end happens.",
         ]
     }
@@ -222,7 +223,7 @@ public struct ExplainShowcase: Equatable, Sendable {
         return [
             .init(shape: .ink(stroke), at: 0),
             .init(shape: .ring(center: tip, radius: 18), at: 0),
-            .init(shape: .card(origin: .init(x: 200, y: 140), text: "weight"), at: 0),
+            .init(shape: .card(origin: .init(x: 200, y: 140), text: "force"), at: 0),
             .init(shape: .card(origin: .init(x: 200, y: 80), text: askedCard(asked)), at: 2),
         ]
     }
