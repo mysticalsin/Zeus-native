@@ -317,11 +317,11 @@ struct NotchView: View {
             // the same curve as the body. A separate easing made the bar slide on its own after every open
             // and close.
             .animation(Motion.reduced ? nil : (open ? TopBarStyle.openSpring : TopBarStyle.closeMotion), value: topOffset)
-            // The alert spring applies only inside this closure. On the body it also interpolated the
+            // The alert spring sits on this group, not on the body. On the body it also interpolated the
             // animatable width and height (their environment default is 0), so a notification arriving
             // during a hover open blanked or stuck the island.
-            .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty) { content in
-                content.overlay(alignment: .top) {
+            .overlay(alignment: .top) {
+                Group {
                     if NotchHoverNotify.mountAlert(surface: .init(model.presentation), hoverArmed: model.hoverExpandArmed,
                                                    hasAlert: !model.alerts.isEmpty) {
                         AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
@@ -330,6 +330,7 @@ struct NotchView: View {
                             .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
                     }
                 }
+                .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
             }
             // The place of a drawn shape, applied last so the alerts move with the body. It moves the drawing and not
             // the layout, which is why it cannot sit under the alert overlay. It has no animation of its own.
