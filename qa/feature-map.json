@@ -8295,6 +8295,17 @@
           ]
         },
         {
+          "id": "F13.playback-import-guard",
+          "check": "native-SettingsCatalogTests",
+          "acceptance": "An imported settings file never turns on the playback switches that start a helper, a local-network search, Bluetooth, a Focus-file read, or a lock-screen window. Collapse when paused still imports.",
+          "cases": [
+            {
+              "file": "Tests/ZeusAppTests/SettingsCatalogTests.swift",
+              "function": "playbackSwitchesAreNeverTurnedOnByImport"
+            }
+          ]
+        },
+        {
           "id": "F13.keychain-import-voice",
           "check": "native-KeychainImportTests",
           "acceptance": "Scripts can hand Zeus the saved ElevenLabs voice ID through --keychain-import, so the Keychain item is owned by Zeus and readable without a dialog.",

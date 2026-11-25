@@ -31,7 +31,8 @@ class SettingsGenerationTests(unittest.TestCase):
     def test_capture_and_input_default_regressions_fail_before_any_output(self):
         for key in ('voice.answers', 'voice.heyZeus', 'wake.ignoreMicConflicts', 'lights.liveSpectrum',
                     'general.showInScreenSharing', 'present.physicalPointer', 'explanation.enabled',
-                    'tiling.enabled'):
+                    'tiling.enabled', 'music.systemNowPlaying', 'music.receiverNames', 'music.earbudOverlay',
+                    'music.focusName', 'music.lockScreenPlayer'):
             with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
                 module = generator()
                 index = next(i for i, row in enumerate(module.R) if row[7] == key)

@@ -346,6 +346,36 @@ struct SettingsCatalogTests {
         #expect(!store.bool("face.presence"))
     }
 
+    @MainActor @Test func playbackSwitchesAreNeverTurnedOnByImport() throws {
+        let (store, defaults, suiteName) = try Self.isolatedStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let held = ["music.systemNowPlaying", "music.receiverNames", "music.earbudOverlay", "music.focusName", "music.lockScreenPlayer"]
+        for id in held {
+            #expect(SettingsStore.neverEnabledByImport.contains(id))
+            #expect(!store.bool(id))
+        }
+        #expect(!SettingsStore.neverEnabledByImport.contains("music.collapseOnPause"))
+
+        func file(_ options: [String: String]) throws -> Data {
+            try JSONSerialization.data(withJSONObject: ["format": "zeus.settings", "version": 1, "options": options, "app": [String: String]()])
+        }
+        var turnedOn = Dictionary(uniqueKeysWithValues: held.map { ($0, "true") })
+        turnedOn["music.collapseOnPause"] = "true"
+        let applied = try store.importJSON(file(turnedOn))
+        for id in held {
+            #expect(!store.bool(id))
+            #expect(defaults.string(forKey: SettingsStore.key(id)) == nil)
+        }
+        #expect(store.bool("music.collapseOnPause"))
+        #expect(applied == 1)
+
+        store.set("music.lockScreenPlayer", "true")
+        try store.importJSON(file(["music.lockScreenPlayer": "false"]))
+        #expect(!store.bool("music.lockScreenPlayer"))
+        try store.importJSON(file(["music.lockScreenPlayer": "true"]))
+        #expect(!store.bool("music.lockScreenPlayer"))
+    }
+
     @MainActor @Test func perAppSoundIsNeverTurnedOnByImport() throws {
         let (store, defaults, suiteName) = try Self.isolatedStore()
         defer { defaults.removePersistentDomain(forName: suiteName) }
