@@ -115,6 +115,80 @@ def descriptor(payload, repo, recorded_root, *, require_cases=True):
             "parameterized": parameterized, "parameter_cases": sorted(ids)}
 
 
+_LISTING = re.compile(r"^(Zeus(?:Core|App)Tests)\.(.+)/([A-Za-z_][A-Za-z_0-9]*)(\([^)]*\))?$")
+_SWIFT_TEST = re.compile(r"(?m)^[ \t]*(?:@MainActor[ \t]+)?@Test\b(?:(?!\bfunc\b)[\s\S])*?\bfunc\s+([A-Za-z_][A-Za-z_0-9]*)\s*\(")
+_XCTEST_FUNC = re.compile(r"(?m)^[ \t]*func\s+([A-Za-z_][A-Za-z_0-9]*)\s*\(")
+
+
+def _location(source, match, token):
+    offset = match.start() + match.group().index(token) + 1
+    return source.count("\n", 0, offset) + 1, offset - source.rfind("\n", 0, offset)
+
+
+def _suite_in(source, suite):
+    parts = [part for part in suite.split("/") if part]
+    return bool(parts) and all(re.search(r"\b(?:struct|class|enum|extension|actor)\s+" + re.escape(part) + r"\b", source)
+                               for part in parts)
+
+
+def listing_declarations(listing, functions, definitions, repo, recorded_root):
+    """Bind specifier lines from `swift test list` that the event stream no longer holds.
+
+    `swift test list` gives every test product the same `--event-stream-output-path`, so the
+    product that finishes last replaces the earlier declarations. The stdout listing still names
+    every suite. A line that is not one of ours is ignored. A line that names one of ours and
+    does not bind to the current source fails closed.
+    """
+    seen = {(row["file"], row["function"]) for row in functions.values()}
+    for raw in Path(listing).read_text().splitlines():
+        line = raw.strip()
+        if not line or " " in line or ".swift" in line:
+            continue
+        match = _LISTING.fullmatch(line)
+        if match is None:
+            continue
+        module, suite, function, signature = match.groups()
+        signature = signature or ""
+        directory = repo / "Tests" / module
+        require(directory.is_dir(), "listing names a test module that is not in this checkout")
+        candidates = []
+        for source_path in sorted(directory.glob("*.swift")):
+            source = source_path.read_text()
+            if not _suite_in(source, suite):
+                continue
+            if signature:
+                found = [item for item in _SWIFT_TEST.finditer(source) if item.group(1) == function]
+            else:
+                found = [item for item in _XCTEST_FUNC.finditer(source) if item.group(1) == function]
+            for item in found:
+                candidates.append((source_path, source, item))
+        if len(candidates) != 1:
+            if not selected(line, definitions) and not signature:
+                continue
+            require(False, "listing test does not bind to one current declaration: " + line)
+        source_path, source, item = candidates[0]
+        file = str(source_path.relative_to(repo))
+        if (file, function) in seen:
+            continue
+        if signature:
+            line_no, column = _location(source, item, "@Test")
+            parameterized = "arguments" in item.group().split("func", 1)[0]
+            name = function + signature
+            ident = f"{module}.{suite}/{name}/{source_path.name}:{line_no}:{column}"
+            payload = {"kind": "function", "id": ident, "name": name, "isParameterized": parameterized,
+                       "sourceLocation": {"_filePath": str(Path(recorded_root) / file),
+                                          "fileID": f"{module}/{source_path.name}", "line": line_no, "column": column}}
+            require(ident not in functions, "duplicate compiled test ID")
+            functions[ident] = descriptor(payload, repo, recorded_root, require_cases=False)
+        else:
+            line_no, column = _location(source, item, "func")
+            ident = f"{module}.{suite}/{function}/{source_path.name}:{line_no}:{column}"
+            require(ident not in functions, "duplicate compiled test ID")
+            functions[ident] = {"id": ident, "file": file, "function": function, "line": line_no, "column": column,
+                                "parameterized": False, "parameter_cases": []}
+        seen.add((file, function))
+
+
 def discovery(path, definitions, repo=ROOT, recorded_root=None):
     recorded_root = str(repo) if recorded_root is None else recorded_root
     require(Path(recorded_root).is_absolute(), "discovery checkout must be absolute")
@@ -132,6 +206,9 @@ def discovery(path, definitions, repo=ROOT, recorded_root=None):
             if selected(ident, definitions):
                 require(ident not in functions, "duplicate compiled test ID")
                 functions[ident] = descriptor(payload, repo, recorded_root, require_cases=False)
+    listing = path.parent / "test.log"
+    if listing.is_file() and not listing.is_symlink():
+        listing_declarations(listing, functions, definitions, repo, recorded_root)
     require(functions, "selection has no compiled tests")
     for definition in definitions:
         require(any(selected(ident, [definition]) for ident in functions), "mapped native selection has no compiled tests")
@@ -153,6 +230,34 @@ def discovery(path, definitions, repo=ROOT, recorded_root=None):
     return {"functions": functions, "suites": suites}
 
 
+def drop_leading_empty_run(rows):
+    """Drop one opening run that started and ended with zero tests, before any declaration.
+
+    A later Testing library emits that empty run, then the declarations, then the real run.
+    Anything else stays in the stream so the one-run rules reject it.
+    """
+    if len(rows) < 2:
+        return rows
+    first, second = rows[0], rows[1]
+    if first.get("kind") != "event" or second.get("kind") != "event":
+        return rows
+    started, ended = first.get("payload"), second.get("payload")
+    if type(started) is not dict or type(ended) is not dict:
+        return rows
+    if started.get("kind") != "runStarted" or ended.get("kind") != "runEnded":
+        return rows
+    messages = ended.get("messages", [])
+    if type(messages) is not list or any(type(message) is not dict for message in messages):
+        return rows
+    symbols = {message.get("symbol") for message in messages}
+    texts = [message.get("text") for message in messages if type(message.get("text")) is str]
+    if "pass" not in symbols or symbols.intersection({"fail", "skip", "knownIssue", "issue"}):
+        return rows
+    if not any(re.search(r"\b0 tests\b", text) for text in texts):
+        return rows
+    return rows[2:]
+
+
 def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
     recorded_root = str(repo) if recorded_root is None else recorded_root
     expected = {ident: row for ident, row in compiled["functions"].items() if selected(ident, definitions)}
@@ -163,7 +268,7 @@ def execution(path, compiled, definitions, repo=ROOT, recorded_root=None):
     case_started, case_ended = set(), set()
     suite_started, suite_ended = set(), set()
     runs_started = runs_ended = 0
-    for row in stream(path):
+    for row in drop_leading_empty_run(stream(path)):
         payload = row["payload"]
         if row["kind"] == "test":
             require(runs_started == 0, "runtime declarations must precede runStarted")
