@@ -6,10 +6,12 @@ import ZeusCore
 /// reads anything back, so a fake stands in for the screen in tests.
 @MainActor
 protocol TalkVisualPresenting: AnyObject {
-    /// A draw tag arrived for this capture. Nothing is shown yet.
-    /// `token` names the turn; later calls with another token (a late callback of an earlier turn) are ignored.
+    /// A draw tag arrived for this capture. The earliest sentence paints now.
+    /// Later sentences wait for `reveal`. `token` names the turn; later calls with
+    /// another token (a late callback of an earlier turn) are ignored.
     func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID)
     /// The line for this sentence index has started to play: show its marks.
+    /// The earliest sentence may already be showing.
     func reveal(sentence: Int, token: UUID)
     /// The last sentence has finished playing: hide the marks soon.
     func answerFinished(token: UUID)
@@ -17,9 +19,10 @@ protocol TalkVisualPresenting: AnyObject {
     func clear()
 }
 
-/// Draws the marks of one talk answer on the display it was captured from. The marks of a sentence appear
-/// when that sentence starts to play, and go a few seconds after the last one, or at once when the screen
-/// layout or the frontmost app changes (the marks would then sit on the wrong thing).
+/// Draws the marks of one talk answer on the display it was captured from. The earliest sentence
+/// paints when the draw arrives. Later sentences appear when that sentence starts to play, and the
+/// marks go a few seconds after the last one, or at once when the screen layout or the frontmost app
+/// changes (the marks would then sit on the wrong thing).
 @MainActor
 final class TalkVisualPresenter: TalkVisualPresenting {
     struct Screen { var id: UInt32; var frame: CGRect; var scale: Double }
@@ -70,6 +73,9 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         identity = (UUID(), UUID(), 0)
         pending = TalkDrawScene.objects(draw, shot: shot, captureID: geometry.captureID)
         watchForStaleScreen()
+        if let first = DrawingPaintLead.sentenceDueOnArrival(pending.keys) {
+            reveal(sentence: first, token: token)
+        }
     }
 
     func reveal(sentence: Int, token: UUID) {
@@ -85,6 +91,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
                                      objects: Dictionary(shown.map { ($0.id, $0) }, uniquingKeysWith: { $1 }))
         if !overlay.present(scene: scene, capture: capture, reduceMotion: reduceMotion()) {
             VoiceLog.log("draw", "marks could not be drawn")
+        } else {
+            ActionSpeedLog.shared.mark(.firstOverlayPaint)
         }
     }
 

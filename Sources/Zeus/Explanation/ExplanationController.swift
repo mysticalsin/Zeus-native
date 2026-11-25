@@ -111,6 +111,10 @@ final class ExplanationController {
     private var diagnostics: ExplanationDiagnostics
     private var diagnosticTurn: ExplanationDiagnostics.TurnToken?
     private var visualSubmissionPending = false
+    /// Capture-space rings shown before narration. Cleared once playback's scene includes them,
+    /// or when the turn stops. The narration flight stays on `onReveal`.
+    private var leadBoxIDs: Set<String> = []
+    private var leadBoxScene: ExplanationScene?
     /// Turns ended because a 3D edit named a missing part or a stale scene revision.
     private(set) var rejectedModelEdits = 0
     private let processSample: () -> (cpuSeconds: Double?, physicalFootprintBytes: UInt64?)
@@ -198,6 +202,11 @@ final class ExplanationController {
             guard generation == token else { return }
             phase = .idle; problem = "Saved explanation could not be opened. Your saved file was left untouched."
         }
+    }
+
+    /// A new question. The card from the previous answer goes, and a late callback cannot restore it.
+    func clearStaleCard() {
+        desktopCard.end()
     }
 
     /// A desktop turn has no open Chat conversation, so it owns a session-scoped, in-memory history
@@ -303,6 +312,7 @@ final class ExplanationController {
         if !isReplaying { replayEvents.append(event) }
         let enqueued = try playback!.enqueue(event)
         try process(enqueued)
+        paintTargetBox(future)
         if !muted {
             if !ownsAudio { try acquireAudio(); ownsAudio = true }
             if phase != .speaking { phase = .preparingSpeech }
@@ -394,9 +404,46 @@ final class ExplanationController {
             }
         }
         if let scene, screenContext.annotationContext != nil {
-            _ = overlay.present(scene: scene, context: screenContext, reduceMotion: reduceMotion)
+            let shown = sceneWithLead(scene)
+            _ = overlay.present(scene: shown, context: screenContext, reduceMotion: reduceMotion)
+            if !isReplaying, !leadBoxIDs.isEmpty, leadBoxIDs.allSatisfy({ scene.objects[$0] != nil }) {
+                leadBoxIDs = []
+                leadBoxScene = nil
+            }
         }
         updateDesktopCard()
+    }
+
+    /// Rings from the resolved scene paint before speech is ready. Playback samples that
+    /// do not yet include those rings keep them. `onReveal` is not called here.
+    private func paintTargetBox(_ scene: ExplanationScene) {
+        guard !isReplaying, activePointing != nil,
+              let capture = screenContext.annotationContext else { return }
+        let marks = scene.objects.values.map { object in
+            PointerBoxLead.Mark(id: object.id, isRing: object.geometry.kind == .ring,
+                                inCaptureSpace: object.space == .capture, captureID: object.captureID)
+        }
+        let ids = PointerBoxLead.boxIDs(marks, captureID: capture.geometry.captureID)
+        guard !ids.isEmpty else { return }
+        leadBoxIDs = Set(ids)
+        leadBoxScene = scene
+        var box = scene
+        var rings: [String: ExplanationObject] = [:]
+        for (id, object) in scene.objects where leadBoxIDs.contains(id) {
+            rings[id] = object
+        }
+        box.objects = rings
+        box.captureID = capture.geometry.captureID
+        _ = overlay.present(scene: box, context: screenContext, reduceMotion: reduceMotion)
+    }
+
+    private func sceneWithLead(_ scene: ExplanationScene) -> ExplanationScene {
+        guard !isReplaying, !leadBoxIDs.isEmpty, let lead = leadBoxScene else { return scene }
+        var shown = scene
+        for id in leadBoxIDs where shown.objects[id] == nil {
+            if let object = lead.objects[id] { shown.objects[id] = object }
+        }
+        return shown
     }
 
     /// Non-capture objects a beat creates: the beat's own share of the card.
@@ -475,6 +522,8 @@ final class ExplanationController {
         }
         if playback != nil { _ = playback!.cancel() }
         playback = nil; presentation = nil; replayPresentation = nil; projected = nil
+        leadBoxIDs = []
+        leadBoxScene = nil
         activePointing = nil
         isReceiving = false; isReplaying = false; phase = .idle; scene = history?.canonicalScene
         if ownsAudio { ownsAudio = false; releaseAudio() }

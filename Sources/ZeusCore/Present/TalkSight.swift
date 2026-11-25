@@ -132,20 +132,6 @@ extension TalkSightPolicy {
     }
 }
 
-/// Lets one filler line through per turn, however many races the turn runs.
-public struct TurnFillerGate: Sendable {
-    private var taken = false
-
-    public init() {}
-
-    /// True the first time only.
-    public mutating func take() -> Bool {
-        guard !taken else { return false }
-        taken = true
-        return true
-    }
-}
-
 /// Tells the owner once per launch that Zeus cannot see the screen.
 public struct ScreenSightNotice: Sendable {
     public static let message = "I can't see your screen yet. Turn on Screen Recording for Zeus in System Settings, under Privacy and Security."
