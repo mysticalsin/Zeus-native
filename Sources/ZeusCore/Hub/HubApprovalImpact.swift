@@ -241,22 +241,37 @@ private struct Found {
 
     mutating func file(_ path: String) {
         guard let cleaned = clean(path), cleaned != "/dev/null" else { return }
-        add(cleaned, to: &files)
+        let current = files
+        files = Self.stored(cleaned, in: current)
         if Self.isSecret(cleaned) { secret(cleaned) }
     }
 
     private mutating func delete(_ path: String) {
         guard let cleaned = clean(path) else { return }
-        add(cleaned, to: &deletes)
+        let current = deletes
+        deletes = Self.stored(cleaned, in: current)
         if Self.isSecret(cleaned) { secret(cleaned) }
     }
 
-    private mutating func host(_ name: String) { add(name, to: &hosts) }
-    private mutating func install(_ name: String) { add(name, to: &installs) }
-    private mutating func force(_ name: String) { add(name, to: &forcePush) }
+    private mutating func host(_ name: String) {
+        let current = hosts
+        hosts = Self.stored(name, in: current)
+    }
+
+    private mutating func install(_ name: String) {
+        let current = installs
+        installs = Self.stored(name, in: current)
+    }
+
+    private mutating func force(_ name: String) {
+        let current = forcePush
+        forcePush = Self.stored(name, in: current)
+    }
+
     private mutating func secret(_ path: String) {
         guard let cleaned = clean(path) else { return }
-        add(cleaned, to: &secretPaths)
+        let current = secretPaths
+        secretPaths = Self.stored(cleaned, in: current)
     }
 
     private func clean(_ text: String) -> String? {
@@ -265,9 +280,12 @@ private struct Found {
         return trimmed
     }
 
-    private mutating func add(_ item: String, to list: inout [String]) {
-        guard !list.contains(item), list.count < 32 else { return }
-        list.append(item)
+    /// A copy, then a write. Passing `&files` into a method on self is an overlapping access.
+    private static func stored(_ item: String, in list: [String]) -> [String] {
+        guard !list.contains(item), list.count < 32 else { return list }
+        var next = list
+        next.append(item)
+        return next
     }
 
     private func split(_ words: [String]) -> (name: String, args: [String])? {
