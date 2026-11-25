@@ -189,8 +189,13 @@ final class GlanceSettingsWindowController: NSObject, NSWindowDelegate {
 struct GlanceSettingsRoot: View {
     let navigation: GSNavigation
     let context: GSContext
+    @Environment(\.colorScheme) private var systemScheme
+    @State private var storedTheme = UserDefaults.standard.string(forKey: WindowGlassPalette.storageKey)
+
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        let resolved = WindowGlassPalette.resolve(stored: storedTheme, systemIsLight: systemScheme == .light)
+        WindowGlassAppearance.install(resolved)
+        return ZStack(alignment: .topLeading) {
             GS.window
             GSSidebar(navigation: navigation)
             GSPanelHost(navigation: navigation, context: context)
@@ -199,7 +204,10 @@ struct GlanceSettingsRoot: View {
         }
         .frame(width: GS.size.width, height: GS.size.height)
         .ignoresSafeArea()
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(resolved == .light ? .light : .dark)
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            storedTheme = UserDefaults.standard.string(forKey: WindowGlassPalette.storageKey)
+        }
     }
 }
 
