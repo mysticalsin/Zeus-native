@@ -317,15 +317,20 @@ struct NotchView: View {
             // the same curve as the body. A separate easing made the bar slide on its own after every open
             // and close.
             .animation(Motion.reduced ? nil : (open ? TopBarStyle.openSpring : TopBarStyle.closeMotion), value: topOffset)
-            .overlay(alignment: .top) {
-                if !model.alerts.isEmpty, model.presentation == .closed {
-                    AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
-                                   onHover: { NotchControllerBridge.alertHover($0) })
-                        .padding(.top, closedBodyHeight + 6 + topOffset)
-                        .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
+            // The alert spring applies only inside this closure. On the body it also interpolated the
+            // animatable width and height (their environment default is 0), so a notification arriving
+            // during a hover open blanked or stuck the island.
+            .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty) { content in
+                content.overlay(alignment: .top) {
+                    if NotchHoverNotify.mountAlert(surface: .init(model.presentation), hoverArmed: model.hoverExpandArmed,
+                                                   hasAlert: !model.alerts.isEmpty) {
+                        AlertStackView(stack: model.alerts, settled: TopBarStyle.isSnapshot, actions: NotchControllerBridge.alertActions(),
+                                       onHover: { NotchControllerBridge.alertHover($0) })
+                            .padding(.top, closedBodyHeight + 6 + topOffset)
+                            .transition(AlertStyle.transition(reduceMotion: Motion.reduced))
+                    }
                 }
             }
-            .animation(Motion.reduced ? AlertStyle.crossfade(true) : AlertStyle.stretch, value: model.alerts.isEmpty)
             // The place of a drawn shape, applied last so the alerts move with the body. It moves the drawing and not
             // the layout, which is why it cannot sit under the alert overlay. It has no animation of its own.
             .offset(x: NotchAnchor.offset(footprint))
@@ -478,7 +483,14 @@ struct NotchView: View {
                         .transition(.opacity.combined(with: .offset(y: -4)).animation(Motion.reducible(Motion.peekContent)))
                 }
             }
-            .transition(.opacity.animation(.easeOut(duration: 0.2).delay(0.1)))
+            // Fixed at the peek's own size. Removal is instant: a fade kept the card in the tree and
+            // laid it out at the panel's frame, which stretched it across the growing outline.
+            // Reduce Motion inserts it with no fade either.
+            .frame(width: Self.peekSize(model: model, footprint: footprint).width,
+                   height: Self.peekSize(model: model, footprint: footprint).height, alignment: .top)
+            .transition(.asymmetric(
+                insertion: Motion.reduced ? .identity : .opacity.animation(.easeOut(duration: 0.2).delay(0.1)),
+                removal: .identity))
         case .panel:
             Group {
                 if let topBar {

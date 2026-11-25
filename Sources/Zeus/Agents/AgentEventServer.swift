@@ -201,8 +201,7 @@ final class AgentEventServer {
         collapseTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled, notch.model.approval == nil, notch.model.presentation == .peek else { return }
-            notch.model.completion = nil
-            notch.show(.closed)
+            notch.foldPeek(clearCompletion: true)
         }
     }
 

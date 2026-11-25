@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "A Claude notification showing or arriving while the pointer opened the notch restarted the island's size springs. The alert animation wrapped the animatable width and height, a peek fold closed the island under an armed dwell, and the pointer on the capsule did not cancel that dwell.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/NotchHoverNotifyTests.swift",
+        "function": "hoverExpandDefersAnAgentNoticeAndDoesNotOpenWhileThePointerIsOnIt"
+      }
     }
-]
+  ]
 }

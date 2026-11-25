@@ -40,7 +40,7 @@ final class WelcomeBackCoordinator {
         collapseTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(25))
             guard !Task.isCancelled, notch.model.recap != nil, notch.model.presentation == .peek else { return }
-            notch.show(.closed)
+            notch.foldPeek()
         }
         if SettingsStore.shared.bool("voice.answers"), !MeetingState.active {
             speak(ZeusVoiceLines.line(for: .welcomeBack, context: ["summary": summary]))
