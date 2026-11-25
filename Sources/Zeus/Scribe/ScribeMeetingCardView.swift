@@ -133,23 +133,23 @@ private struct ScribeMeetingCardBody: View {
     // MARK: The slab
 
     private var slab: some View {
-        HStack(spacing: 0) {
-            leftColumn.frame(width: M.leftColumnWidth)
-            rightColumn.frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 8) {
+            orb
+            VStack(alignment: .leading, spacing: M.titleGap) {
+                titleRow.frame(height: M.titleRowHeight)
+                status
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .id(card.stateID)
+            .transition(.opacity)
+            .animation(ScribeMeetingCardMotion.crossfade, value: card.stateID)
+            if let meeting = card.meeting { thirdLine(meeting) }
+            tiles
+            capsule.fixedSize(horizontal: true, vertical: false)
         }
-        .padding(M.padding)
+        .padding(.horizontal, M.padding)
         .frame(width: M.width, height: M.height)
         .scribeCardGlass(surface, snapshot: TopBarStyle.isSnapshot)
-    }
-
-    // MARK: Left column
-
-    private var leftColumn: some View {
-        VStack(spacing: M.orbTileGap) {
-            orb
-            tiles
-        }
-        .frame(maxHeight: .infinity)
     }
 
     /// The glass orb with its calendar symbol; the countdown ring is a circle around it.
@@ -216,19 +216,6 @@ private struct ScribeMeetingCardBody: View {
     }
 
     // MARK: Right column
-
-    private var rightColumn: some View {
-        // Three rows: the title with the close button, the status, and the third line beside the action.
-        VStack(alignment: .leading, spacing: 0) {
-            titleRow.frame(height: M.titleRowHeight)
-            status.padding(.top, M.titleGap)
-            Spacer(minLength: M.bottomGap)
-            bottomRow.frame(height: M.capsuleHeight)
-        }
-        .id(card.stateID)
-        .transition(.opacity)
-        .animation(ScribeMeetingCardMotion.crossfade, value: card.stateID)
-    }
 
     /// The title, which is the one element for the words, "<title>, <status>"; the close button stays an element
     /// of its own, and the status and the third line are drawn for the eye and hidden from VoiceOver because the
@@ -314,14 +301,6 @@ private struct ScribeMeetingCardBody: View {
 
     /// The third line, a reason or a wait where the state has one, else the participants where the calendar gave
     /// any, at the leading edge; the one action at the trailing edge. The action never gives way, the line does.
-    private var bottomRow: some View {
-        HStack(spacing: 8) {
-            if let meeting = card.meeting { thirdLine(meeting) }
-            Spacer(minLength: 0)
-            capsule.fixedSize(horizontal: true, vertical: false).layoutPriority(1)
-        }
-    }
-
     @ViewBuilder private func thirdLine(_ meeting: ScribeMeeting) -> some View {
         let detail = ScribeMeetingCardText.detail(card)
         if let text = detail ?? ScribeMeetingCardText.participants(meeting) {

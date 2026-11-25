@@ -478,7 +478,18 @@ final class VoiceTurnController {
         if let approval = notch.model.approval, options.bool("voice.answers"),
            let verdict = ApprovalPhrases.verdict(for: transcript, approve: options.words("voice.approveWords"),
                                                  deny: options.words("voice.denyWords"), open: options.words("voice.openWords")) {
-            approval.resolve(verdict)
+            if verdict == .allow {
+                let before = approval.id
+                notch.activateApproval(kind: .voice)
+                if notch.model.approval?.id == before {
+                    buddy.idle()
+                    say("That one needs the button.")
+                    return TurnResult(spoken: "That one needs the button.")
+                }
+            } else {
+                notch.noteApproval(.voice, verdict: verdict)
+                approval.resolve(verdict)
+            }
             buddy.idle()
             let answer = verdict == .allow ? "Approved." : verdict == .ask ? "Over to the app." : "Denied."
             say(answer)
