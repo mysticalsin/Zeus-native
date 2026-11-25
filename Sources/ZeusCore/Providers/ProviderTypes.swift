@@ -8,12 +8,12 @@ public enum ProviderKind: String, Sendable, CaseIterable, Equatable, Hashable {
     case llm
 }
 
-public struct ProviderCapabilities: OptionSet, Sendable, Equatable, Hashable {
+public struct VoiceProviderCapabilities: OptionSet, Sendable, Equatable, Hashable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
-    public static let listVoices = ProviderCapabilities(rawValue: 1 << 0)
-    public static let streamingSynthesis = ProviderCapabilities(rawValue: 1 << 1)
-    public static let validateCredential = ProviderCapabilities(rawValue: 1 << 2)
+    public static let listVoices = VoiceProviderCapabilities(rawValue: 1 << 0)
+    public static let streamingSynthesis = VoiceProviderCapabilities(rawValue: 1 << 1)
+    public static let validateCredential = VoiceProviderCapabilities(rawValue: 1 << 2)
 }
 
 public struct CredentialField: Equatable, Sendable, Identifiable, Hashable {
@@ -33,8 +33,8 @@ public struct ProviderDescriptor: Equatable, Sendable, Identifiable, Hashable {
     public var kind: ProviderKind
     public var credentialFields: [CredentialField]
     public var docsURL: URL
-    public var capabilities: ProviderCapabilities
-    public init(id: String, displayName: String, kind: ProviderKind, credentialFields: [CredentialField], docsURL: URL, capabilities: ProviderCapabilities) {
+    public var capabilities: VoiceProviderCapabilities
+    public init(id: String, displayName: String, kind: ProviderKind, credentialFields: [CredentialField], docsURL: URL, capabilities: VoiceProviderCapabilities) {
         self.id = id
         self.displayName = displayName
         self.kind = kind

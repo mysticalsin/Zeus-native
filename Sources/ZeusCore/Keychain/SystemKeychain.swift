@@ -93,6 +93,23 @@ public struct SystemKeychain: KeychainBackend {
         }
     }
 
+    /// Voice-provider items are written without `kSecUseKeychain`, so they live on the default
+    /// search list. `read` pins `com.zeus.app` to the local-build dev keychain and would miss them.
+    public func readFromDefaultSearchList(service: String, account: String) -> String? {
+        quietly {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            var result: CFTypeRef?
+            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+    }
+
     public func write(_ value: String, service: String, account: String) -> Bool {
         quietly {
             let data = Data(value.utf8)

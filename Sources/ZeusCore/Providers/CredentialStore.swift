@@ -50,14 +50,7 @@ public struct KeychainCredentialStore: CredentialStore, Sendable {
     public init() {}
 
     public func read(service: String, account: String) -> String? {
-        quietly {
-            var query = base(service, account)
-            query[kSecReturnData as String] = true
-            query[kSecMatchLimit as String] = kSecMatchLimitOne
-            var result: CFTypeRef?
-            guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
-            return String(data: data, encoding: .utf8)
-        }
+        SystemKeychain().readFromDefaultSearchList(service: service, account: account)
     }
 
     public func write(_ value: String, service: String, account: String) -> Bool {
