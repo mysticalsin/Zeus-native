@@ -408,6 +408,41 @@ private struct AppearancePage: View {
                 GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
                         options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
             }
+            canopyPlaybackToggles
+        }
+    }
+
+    /// The playback rows the catalog already stores. Each id is read by the player, the notch, or the app delegate.
+    private var canopyPlaybackToggles: some View {
+        Group {
+            Group {
+                GSDivider()
+                GSToggleRow(symbol: "pause.fill", title: "Collapse when paused",
+                            text: "The player folds to one line while nothing is playing.",
+                            isOn: bool(PlaybackCollapse.settingID))
+                GSDivider()
+                GSToggleRow(symbol: "music.note", title: "Show what this Mac is playing",
+                            text: "Reads the current audio through a local helper. It stays behind a player that is already playing.",
+                            isOn: bool(SystemNowPlayingLaunch.settingID))
+                GSDivider()
+                GSToggleRow(symbol: "hifispeaker.and.homepod.fill", title: "Show receiver names",
+                            text: "Lists receivers found on the local network in the output menu.",
+                            isOn: bool(ReceiverCatalog.settingID))
+                GSDivider()
+                GSToggleRow(symbol: "headphones", title: "Earbud overlay",
+                            text: "Shows a connected audio device inside the notch, then dismisses it.",
+                            isOn: bool(EarbudOverlayRule.settingID))
+            }
+            Group {
+                GSDivider()
+                GSToggleRow(symbol: "moon.fill", title: "Show the Focus name",
+                            text: "Shows the active Focus on the Focus page.",
+                            isOn: bool(FocusNameStore.settingID))
+                GSDivider()
+                GSToggleRow(symbol: "lock.fill", title: "Lock screen player",
+                            text: "Shows the player on the lock screen.",
+                            isOn: bool(LockScreenPlayerGate.settingID))
+            }
         }
     }
 
