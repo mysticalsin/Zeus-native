@@ -155,8 +155,8 @@ final class OrbMetalRenderer: NSObject, MTKViewDelegate {
 
     /// Draws one already-stepped simulation into `texture`. The caller owns the clock.
     func draw(snapshot: OrbSimulation, into texture: MTLTexture) throws {
-        guard let command = queue.makeCommandBuffer(),
-              let pass = MTLRenderPassDescriptor() else { throw OrbMetalError.noCommand }
+        guard let command = queue.makeCommandBuffer() else { throw OrbMetalError.noCommand }
+        let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0]?.texture = texture
         pass.colorAttachments[0]?.loadAction = .clear
         pass.colorAttachments[0]?.storeAction = .store
