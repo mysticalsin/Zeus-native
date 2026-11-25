@@ -198,7 +198,7 @@ private struct Harness {
     var log: ProviderLog { ProviderLog(sink: { [logBox] line in logBox.record(line, secrets: []) }) }
 
     init() throws {
-        let suite = "zeus.test.voice-providers.\(UUID().uuidString)"
+        let suite = NSTemporaryDirectory() + "zeus.test.voice-providers.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         self.defaults = defaults
