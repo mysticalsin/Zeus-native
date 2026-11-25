@@ -7,6 +7,8 @@ struct MeetingAlertTests {
     @Test func theBannerIsAShortRowAndDismissesItself() {
         #expect(MeetingAlert.height <= 48)
         #expect(MeetingAlert.width <= 440)
+        #expect(MeetingAlert.height == ScribeMeetingCardMetrics.height)
+        #expect(MeetingAlert.width == ScribeMeetingCardMetrics.width)
         #expect(MeetingAlert.dismissAfter == 10)
         #expect(MeetingAlert.recordsOnlyWhenTapped)
     }

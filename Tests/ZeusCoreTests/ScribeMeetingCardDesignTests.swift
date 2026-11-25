@@ -25,9 +25,7 @@ struct ScribeMeetingCardDesignTests {
 
     /// Tony, 19 Nov 2026: the live card is the compact row, 44 pt tall.
     @Test func theLiveCardIsTheCompactRow() {
-        #expect(ScribeMeetingCardMetrics.height == MeetingAlert.height)
         #expect(ScribeMeetingCardMetrics.height == 44)
-        #expect(ScribeMeetingCardMetrics.width == MeetingAlert.width)
     }
 
     @Test func theSlabIsACompactGlassCardOfThreeHundredAndFortyByNinetySix() {
