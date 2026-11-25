@@ -332,13 +332,14 @@ public final class UnixSocketServer: @unchecked Sendable {
         private let lock = NSLock()
         private let onClose: @Sendable () -> Void
         private let watchKey = DispatchSpecificKey<Int>()
-        private let watchDone = DispatchSemaphore(value: 0)
         private var watchQueue: DispatchQueue?
         private var state = State.waiting
         private var cancelled = false
         /// Set before this side shuts the socket down, so that close is not read as a peer selection.
         private var leaving = false
         private var watching = false
+        /// The descriptor is closed once, by the watch queue after it has left `poll`, or immediately when no watch exists.
+        private var descriptorClosed = false
 
         init(fd: Int32, context: PeerContext, life: PeerLife, onClose: @escaping @Sendable () -> Void) {
             self.fd = fd
@@ -356,27 +357,19 @@ public final class UnixSocketServer: @unchecked Sendable {
             guard start else { return }
             DispatchQueue.global(qos: .userInitiated).async { [self] in
                 guard let line = UnixSocket.readLine(fd), UnixSocket.boundedMessage(line) else { finish(); return }
-                let deliver = lock.withLock { () -> Bool in
-                    guard !cancelled, state == .reading else { return false }
+                let queue = lock.withLock { () -> DispatchQueue? in
+                    guard !cancelled, state == .reading else { return nil }
                     state = .waiting
-                    // Mark the watch before any other thread can finish this connection.
+                    // The queue exists before `watching` is visible, so a finish on another thread can hand it the close.
+                    let queue = DispatchQueue(label: "zeus.socket.peer")
+                    queue.setSpecific(key: watchKey, value: 1)
+                    watchQueue = queue
                     watching = true
-                    return true
+                    return queue
                 }
-                guard deliver else { finish(); return }
-                beginWatch()
+                guard let queue else { finish(); return }
+                queue.async { [self] in watchLoop() }
                 handler(line, context) { [self] in reply($0) }
-            }
-        }
-
-        /// While the handler is holding the reply, a peer that hangs up has finished its own choice.
-        private func beginWatch() {
-            let queue = DispatchQueue(label: "zeus.socket.peer")
-            queue.setSpecific(key: watchKey, value: 1)
-            watchQueue = queue
-            queue.async { [self] in
-                defer { watchDone.signal() }
-                watchLoop()
             }
         }
 
@@ -408,15 +401,25 @@ public final class UnixSocketServer: @unchecked Sendable {
             }
         }
 
-        /// Wake the watch and wait until it has left the descriptor, unless this is the watch thread.
+        /// Wake the watch. The watch queue closes the descriptor after `poll` returns, so this thread does not wait.
         private func endWatch() {
-            guard watching else { return }
-            _ = watchQueue
+            guard watching, let queue = watchQueue else { return }
             lock.withLock { leaving = true }
             _ = shutdown(fd, Int32(SHUT_RDWR))
+            // On the watch thread, `poll` has already returned. Closing here is the caller's job.
             if DispatchQueue.getSpecific(key: watchKey) == nil {
-                watchDone.wait()
+                queue.async { [self] in releaseDescriptor() }
             }
+        }
+
+        private func releaseDescriptor() {
+            let should = lock.withLock { () -> Bool in
+                guard !descriptorClosed else { return false }
+                descriptorClosed = true
+                return true
+            }
+            guard should else { return }
+            close(fd)
         }
 
         func reply(_ data: Data?) {
@@ -452,8 +455,12 @@ public final class UnixSocketServer: @unchecked Sendable {
                 return true
             }
             guard shouldClose else { return }
+            let watched = watching
             endWatch()
-            close(fd)
+            // No watch, or this is the watch thread (it has left `poll`): close now. Otherwise the watch queue closes.
+            if !watched || DispatchQueue.getSpecific(key: watchKey) != nil {
+                releaseDescriptor()
+            }
             onClose()
         }
     }
