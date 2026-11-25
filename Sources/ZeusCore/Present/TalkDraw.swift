@@ -109,12 +109,12 @@ public enum TalkDrawParser {
     }
 
     private static func number(_ value: Any?) -> Double? {
-        // Darwin JSON booleans are CFBooleans, distinct from the number 1. Linux's boolean
-        // type-id check also rejects 1, and 1 is a real sentence index, so that check stays on Darwin.
-        #if canImport(Darwin)
-        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
-        #else
         guard let number = value as? NSNumber else { return nil }
+        // A JSON boolean must not become a coordinate. On Darwin that boolean is a CFBoolean.
+        // The same type-id test on Linux also rejects the number 1, and 1 is a real sentence
+        // index, so the boolean test stays on Darwin and 1 survives everywhere else.
+        #if canImport(Darwin)
+        if CFGetTypeID(number) == CFBooleanGetTypeID() { return nil }
         #endif
         let double = number.doubleValue
         return double.isFinite ? double : nil

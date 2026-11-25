@@ -5701,19 +5701,27 @@
         {
           "id": "F11.explain-showcase",
           "check": "portable-explain-showcase",
-          "acceptance": "The sentence explain how the Tesla car can fly produces three spoken beats and a talk-draw plan: a closed ink box and ring, then an arrow, then a card for the asked end. The words name the start and the asked end and do not claim that end happens. A command and a bare explain produce no plan. The plan scales into the pixel canvas the talk presenter already uses. No model call, no screenshot, and no AppKit drawing in this contract.",
+          "acceptance": "The sentence explain how the Tesla car can fly keeps sentence index 1, speaks weight versus lift, and says the drawing does not prove the end happens. A motion ask draws an open pen stroke in three beats that stay hidden until their time. The plan scales to a display pixel size. A command and a bare explain produce no plan. No model call, no screenshot, and no AppKit drawing in this contract.",
           "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+              "function": "sentenceIndexOneIsNotDroppedAsABoolean"
+            },
             {
               "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
               "function": "anExplainRequestProducesWordsAndAShowcasePlan"
             },
             {
               "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
-              "function": "theTeslaLineDrawsTheFigureBeforeTheArrow"
+              "function": "theTeslaLineTravelsAnOpenStroke"
             },
             {
               "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
-              "function": "theTeslaRequestNamesTheAskAndDoesNotClaimFlight"
+              "function": "beatsStayOnEarlierMarksUntilTheirTime"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+              "function": "theTeslaRequestNamesTheMechanismAndDoesNotClaimFlight"
             },
             {
               "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
@@ -5721,7 +5729,7 @@
             },
             {
               "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
-              "function": "thePlanScalesOntoTheCanvasThePresenterAlreadyUses"
+              "function": "thePlanScalesOntoTheDisplayThePresenterUses"
             }
           ]
         },

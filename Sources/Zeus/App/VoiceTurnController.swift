@@ -31,6 +31,8 @@ final class VoiceTurnController {
     private var sightNotice = ScreenSightNotice()
     /// A drawing from this controller's last answer may still be on screen.
     private var drawActive = false
+    /// Later explain beats. Cancelled when the next turn clears the drawing.
+    private var explainReveal: Task<Void, Never>?
 
     /// What one turn really sent, for the tests: the brain request, the route it asked for, and every capture the
     /// turn kept for POINT tags and the drive and walkthrough actions.
@@ -171,6 +173,8 @@ final class VoiceTurnController {
 
     /// Hides the marks of the last answer. A turn that never drew makes no presenter call.
     func clearDrawingForNewTurn() {
+        explainReveal?.cancel()
+        explainReveal = nil
         guard drawActive else { return }
         drawActive = false
         presenter.clear()
@@ -696,40 +700,40 @@ final class VoiceTurnController {
         return TurnResult(spoken: question)
     }
 
-    /// Speaks the local explanation and puts the drawing on the existing talk surface now.
-    /// Each beat is revealed before this returns, so a missing voice engine cannot leave the
-    /// request spoken-only. Sentence start reveals again; a beat already shown is left as it is.
-    /// No capture and no model request: the shot is only the display frame the presenter matches.
-    /// `talk.drawOnScreen` still gates a screenshot sent to an engine. This path does not send one.
+    /// Speaks the explanation and draws it on the display under the pointer.
+    /// Beat 0 is shown immediately. Later beats follow `ExplainBeatSchedule` even when no voice
+    /// engine starts, so the sequence is not spoken-only and not painted all at once.
+    /// No capture and no model request. `talk.drawOnScreen` still gates a screenshot sent to an
+    /// engine. This path does not send one.
     private func presentExplain(_ plan: ExplainShowcase, transcript: String, speak: Bool) -> TurnResult {
         VoiceLog.log("route", "explain-showcase")
         VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
         clearDrawingForNewTurn()
-        let screen = NSScreen.main
-        let frame = screen?.frame ?? CGRect(x: 0, y: 0, width: CGFloat(ExplainShowcase.canvasWidth), height: CGFloat(ExplainShowcase.canvasHeight))
-        let scale = CGFloat(screen.map { Double($0.backingScaleFactor) } ?? 1)
-        let width = max(1, Int((frame.width * max(scale, 1)).rounded()))
-        let height = max(1, Int((frame.height * max(scale, 1)).rounded()))
-        let shot = ScreenShot(jpegData: Data(), label: "illustration canvas", pixelWidth: width, pixelHeight: height, displayFrame: frame)
-        let draw = plan.scaled(toWidth: width, height: height)
+        let shot = illustrationShot()
+        let draw = plan.scaled(toWidth: shot.pixelWidth, height: shot.pixelHeight)
         let token = UUID()
         let surface = presenter
         surface.begin(draw, shot: shot, token: token)
         drawActive = true
-        VoiceLog.log("draw", "explain marks=\(draw.marks.count)")
-        buddy.idle()
-        for (index, sentence) in plan.sentences.enumerated() {
-            surface.reveal(sentence: index, token: token)
-            if speak {
-                speaker.speak(Self.voiced(sentence), onStart: {
-                    surface.reveal(sentence: index, token: token)
-                })
-            }
+        let beats = plan.schedule.indexes
+        if let first = beats.first {
+            surface.reveal(sentence: first, token: token)
         }
+        VoiceLog.log("draw", "explain marks=\(draw.marks.count) beats=\(beats.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
+        explainReveal = Task { @MainActor [weak self] in
+            for beat in beats.dropFirst() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard !Task.isCancelled else { return }
+                self?.presenter.reveal(sentence: beat, token: token)
+            }
+            guard !Task.isCancelled else { return }
+            self?.presenter.answerFinished(token: token)
+        }
+        buddy.idle()
         if speak {
-            hideDrawingWhenAnswerEnds(token: token)
-        } else {
-            surface.answerFinished(token: token)
+            for sentence in plan.sentences {
+                speaker.speak(Self.voiced(sentence), onStart: nil)
+            }
         }
         let spoken = plan.explanation
         buddy.showCaption(Self.captionTail(spoken))
@@ -737,6 +741,18 @@ final class VoiceTurnController {
         remember(transcript, spoken)
         ZeusSound.play(.voiceDone)
         return TurnResult(spoken: spoken)
+    }
+
+    /// The display under the pointer, else the main display. The frame is the one
+    /// `TalkVisualPresenter` matches, so the marks land on that screen. JPEG bytes stay empty.
+    private func illustrationShot() -> ScreenShot {
+        let screens = NSScreen.screens
+        let pointer = NSEvent.mouseLocation
+        let chosen = screens.first { $0.frame.contains(pointer) } ?? NSScreen.main ?? screens.first
+        let frame = chosen?.frame ?? CGRect(x: 0, y: 0, width: CGFloat(ExplainShowcase.canvasWidth), height: CGFloat(ExplainShowcase.canvasHeight))
+        let scale = Double(chosen?.backingScaleFactor ?? 1)
+        let pixels = ExplainShowcase.pixelSize(width: Double(frame.width), height: Double(frame.height), scale: scale)
+        return ScreenShot(jpegData: Data(), label: "illustration canvas", pixelWidth: pixels.width, pixelHeight: pixels.height, displayFrame: frame)
     }
 
     private func remember(_ user: String, _ assistant: String) {
