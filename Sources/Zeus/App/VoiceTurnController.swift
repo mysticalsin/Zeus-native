@@ -536,6 +536,10 @@ final class VoiceTurnController {
             return await runTurn(transcript: told, screenshots: [], activeTab: activeTab, turn: turn,
                                  deep: deep, speak: speak, awaitActions: awaitActions, pageText: true)
         }
+        // An explain request is words plus a drawing plan. Drop any speculative model run first.
+        if ExplainShowcase.blocksModelRace(transcript) {
+            ahead.cancel()
+        }
         if let replay = ahead.take(matching: transcript) {
             return await runTurn(transcript: transcript, screenshots: [], activeTab: activeTab, turn: turn,
                                  deep: deep, speak: speak, awaitActions: awaitActions, replay: replay,
@@ -617,6 +621,9 @@ final class VoiceTurnController {
         if let local = await LocalTurns.handle(transcript, topBar: notch.topBar) {
             return speakInstant(local, transcript: transcript, speak: speak)
         }
+        if let showcase = ExplainShowcase.plan(for: transcript) {
+            return presentExplain(showcase, transcript: transcript, speak: speak)
+        }
         // "Ask Scout to ..." goes to that agent, not to command understanding.
         if AgentRouter.route(transcript, agents: AgentStore().profiles()) != nil { return nil }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
@@ -687,6 +694,49 @@ final class VoiceTurnController {
         if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
         remember(transcript, question)
         return TurnResult(spoken: question)
+    }
+
+    /// Speaks the local explanation and, on the existing talk drawing surface, reveals each
+    /// sentence's marks when that line starts. No capture and no model request: the shot is only
+    /// the display frame the presenter already matches. `talk.drawOnScreen` still gates a
+    /// screenshot sent to an engine. This path does not send one.
+    private func presentExplain(_ plan: ExplainShowcase, transcript: String, speak: Bool) -> TurnResult {
+        VoiceLog.log("route", "explain-showcase")
+        VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
+        clearDrawingForNewTurn()
+        let screen = NSScreen.main
+        let frame = screen?.frame ?? CGRect(x: 0, y: 0, width: CGFloat(ExplainShowcase.canvasWidth), height: CGFloat(ExplainShowcase.canvasHeight))
+        let scale = CGFloat(screen.map { Double($0.backingScaleFactor) } ?? 1)
+        let width = max(1, Int((frame.width * max(scale, 1)).rounded()))
+        let height = max(1, Int((frame.height * max(scale, 1)).rounded()))
+        let shot = ScreenShot(jpegData: Data(), label: "illustration canvas", pixelWidth: width, pixelHeight: height, displayFrame: frame)
+        let draw = plan.scaled(toWidth: width, height: height)
+        let token = UUID()
+        let surface = presenter
+        surface.begin(draw, shot: shot, token: token)
+        drawActive = true
+        VoiceLog.log("draw", "explain marks=\(draw.marks.count)")
+        buddy.idle()
+        for (index, sentence) in plan.sentences.enumerated() {
+            if speak {
+                speaker.speak(Self.voiced(sentence), onStart: {
+                    surface.reveal(sentence: index, token: token)
+                })
+            } else {
+                surface.reveal(sentence: index, token: token)
+            }
+        }
+        if speak {
+            hideDrawingWhenAnswerEnds(token: token)
+        } else {
+            surface.answerFinished(token: token)
+        }
+        let spoken = plan.explanation
+        buddy.showCaption(Self.captionTail(spoken))
+        buddy.hideCaption()
+        remember(transcript, spoken)
+        ZeusSound.play(.voiceDone)
+        return TurnResult(spoken: spoken)
     }
 
     private func remember(_ user: String, _ assistant: String) {

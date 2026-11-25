@@ -142,7 +142,9 @@ public struct AheadBrain: Equatable, Sendable {
     }
 
     /// Questions can start early. Commands, page reads, and "on screen" stay put so a dropped run cannot act or answer the wrong picture.
+    /// An explain request is answered locally, so a speculative model run must not start.
     public static func canStart(_ text: String) -> Bool {
+        if ExplainShowcase.blocksModelRace(text) { return false }
         switch InstantTable.route(text) {
         case .brain, .web:
             let key = FastIntent.key(text)

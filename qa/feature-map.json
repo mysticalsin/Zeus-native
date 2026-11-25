@@ -31,6 +31,13 @@
       "group": "presentation"
     },
     {
+      "id": "portable-explain-showcase",
+      "kind": "portable",
+      "tier": "contract",
+      "scope": "An explain request produces spoken sentences and a talk-draw plan on the existing drawing schema. No model, no capture, no AppKit renderer.",
+      "group": "explain-showcase"
+    },
+    {
       "id": "portable-recordly-geometry",
       "kind": "portable",
       "tier": "contract",
@@ -5688,6 +5695,29 @@
             {
               "file": "Tests/ZeusCoreTests/ZeusTagDrawLeakTests.swift",
               "function": "theWholeReplyParserAndTheSanitizerAlsoStripEveryShape"
+            }
+          ]
+        },
+        {
+          "id": "F11.explain-showcase",
+          "check": "portable-explain-showcase",
+          "acceptance": "The sentence explain how the Tesla car can fly produces an explanation and a talk-draw plan with a ring, an arrow and a question card. The words quote the question and do not claim the subject happens. A command and a bare explain produce no plan. The plan scales into the pixel canvas the talk presenter already uses. No model call, no screenshot, and no AppKit drawing in this contract.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+              "function": "anExplainRequestProducesWordsAndAShowcasePlan"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+              "function": "theTeslaRequestIsQuotedAndNotClaimedAsFlight"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+              "function": "aCommandOrABareExplainProducesNoShowcase"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+              "function": "thePlanScalesOntoTheCanvasThePresenterAlreadyUses"
             }
           ]
         },

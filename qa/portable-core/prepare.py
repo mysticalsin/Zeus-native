@@ -105,6 +105,10 @@ GROUPS = {
              "TopBar/RecordingFeedback.swift"),
         tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
     ),
+    "explain-showcase": (
+        core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift"),
+        tests("ExplainShowcaseTests"),
+    ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
              "Recordly/RecordlyCursorLog.swift", "Recordly/RecordlyZoomRegions.swift", "Recordly/RecordlyExportPlan.swift",
