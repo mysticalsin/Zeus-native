@@ -33,6 +33,9 @@ final class VoiceTurnController {
     private var drawActive = false
     /// Later explain beats. Cancelled when the next turn clears the drawing.
     private var explainReveal: Task<Void, Never>?
+    /// Sentence start times for the explain pen. Nil until that sentence's audio starts.
+    private var explainAudioStarts: [TimeInterval?] = [nil, nil, nil]
+    private var explainBegan = Date()
 
     /// What one turn really sent, for the tests: the brain request, the route it asked for, and every capture the
     /// turn kept for POINT tags and the drive and walkthrough actions.
@@ -175,6 +178,7 @@ final class VoiceTurnController {
     func clearDrawingForNewTurn() {
         explainReveal?.cancel()
         explainReveal = nil
+        explainAudioStarts = [nil, nil, nil]
         guard drawActive else { return }
         drawActive = false
         presenter.clear()
@@ -715,24 +719,46 @@ final class VoiceTurnController {
         let surface = presenter
         surface.begin(draw, shot: shot, token: token)
         drawActive = true
-        let beats = plan.schedule.indexes
-        if let first = beats.first {
-            surface.reveal(sentence: first, token: token)
-        }
-        VoiceLog.log("draw", "explain marks=\(draw.marks.count) beats=\(beats.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
-        explainReveal = Task { @MainActor [weak self] in
-            for beat in beats.dropFirst() {
-                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+        explainBegan = Date()
+        VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
+        if plan.travels {
+            showPen(plan.penFrame(at: 0), shot: shot, token: token)
+            explainReveal = Task { @MainActor [weak self] in
+                var shown = 0
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let elapsed = Date().timeIntervalSince(self.explainBegan)
+                    guard let frame = plan.penFrame(at: elapsed, audioStarts: self.explainAudioStarts) else { return }
+                    if frame.pointCount != shown {
+                        shown = frame.pointCount
+                        self.showPen(frame, shot: shot, token: token)
+                    }
+                    if frame.finished { break }
+                    try? await Task.sleep(for: .milliseconds(40))
+                }
                 guard !Task.isCancelled else { return }
-                self?.presenter.reveal(sentence: beat, token: token)
+                self?.presenter.answerFinished(token: token)
             }
-            guard !Task.isCancelled else { return }
-            self?.presenter.answerFinished(token: token)
+        } else {
+            let beats = plan.schedule.indexes
+            if let first = beats.first { surface.reveal(sentence: first, token: token) }
+            explainReveal = Task { @MainActor [weak self] in
+                for beat in beats.dropFirst() {
+                    try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                    guard !Task.isCancelled else { return }
+                    self?.presenter.reveal(sentence: beat, token: token)
+                }
+                guard !Task.isCancelled else { return }
+                self?.presenter.answerFinished(token: token)
+            }
         }
         buddy.idle()
         if speak {
-            for sentence in plan.sentences {
-                speaker.speak(Self.voiced(sentence), onStart: nil)
+            for (index, sentence) in plan.sentences.enumerated() {
+                speaker.speak(Self.voiced(sentence), onStart: { [weak self] in
+                    guard let self, index < self.explainAudioStarts.count else { return }
+                    self.explainAudioStarts[index] = Date().timeIntervalSince(self.explainBegan)
+                })
             }
         }
         let spoken = plan.explanation
@@ -741,6 +767,23 @@ final class VoiceTurnController {
         remember(transcript, spoken)
         ZeusSound.play(.voiceDone)
         return TurnResult(spoken: spoken)
+    }
+
+    private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID) {
+        guard let frame else { return }
+        let scaled = ExplainShowcase.scaled(frame.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        presenter.showFrame(scaled, token: token)
+        let bolt = boltScreen(frame.bolt, shot: shot)
+        buddy.flight(to: bolt, label: "trace")
+    }
+
+    /// Canvas point to AppKit global point on the shot's display. Y flips to the bottom-left origin.
+    private func boltScreen(_ point: TalkDraw.Point, shot: ScreenShot) -> CGPoint {
+        let px = point.x * Double(shot.pixelWidth) / ExplainShowcase.canvasWidth
+        let py = point.y * Double(shot.pixelHeight) / ExplainShowcase.canvasHeight
+        let scaleX = max(Double(shot.pixelWidth) / Double(shot.displayFrame.width), 0.001)
+        let scaleY = max(Double(shot.pixelHeight) / Double(shot.displayFrame.height), 0.001)
+        return CGPoint(x: shot.displayFrame.minX + px / scaleX, y: shot.displayFrame.maxY - py / scaleY)
     }
 
     /// The display under the pointer, else the main display. The frame is the one

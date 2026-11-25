@@ -16,12 +16,17 @@ public struct ExplainShowcase: Equatable, Sendable {
     /// True when the mechanism beat is an open traveling stroke rather than a closed box.
     public var travels: Bool
     public var schedule: ExplainBeatSchedule
+    /// Open stroke in canvas pixels. Empty when the ask is not about motion. The pen shows a
+    /// prefix of this, one new point at a time.
+    public var stroke: [TalkDraw.Point]
 
-    public init(sentences: [String], draw: TalkDraw, travels: Bool, schedule: ExplainBeatSchedule) {
+    public init(sentences: [String], draw: TalkDraw, travels: Bool, schedule: ExplainBeatSchedule,
+                stroke: [TalkDraw.Point] = []) {
         self.sentences = sentences
         self.draw = draw
         self.travels = travels
         self.schedule = schedule
+        self.stroke = stroke
     }
 
     public var explanation: String { sentences.joined(separator: " ") }
@@ -35,11 +40,47 @@ public struct ExplainShowcase: Equatable, Sendable {
         guard !start.isEmpty, !asked.isEmpty else { return nil }
         let motion = asksMotion(subject)
         let sentences = motion ? motionSentences(start: start, asked: asked) : stillSentences(start: start)
-        let marks = motion ? motionMarks(asked: asked) : stillMarks(start: start, asked: asked)
+        let stroke = motion ? motionStroke : []
+        let marks = motion ? motionMarks(asked: asked, stroke: stroke) : stillMarks(start: start, asked: asked)
         guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
         let indexes = Array(Set(draw.marks.map(\.at))).sorted()
         return ExplainShowcase(sentences: sentences, draw: draw, travels: motion,
-                               schedule: ExplainBeatSchedule(indexes: indexes))
+                               schedule: ExplainBeatSchedule(indexes: indexes), stroke: stroke)
+    }
+
+    /// The ink visible at `elapsed`. Without audio, one new point every `ExplainBeatSchedule.gap`.
+    /// With sentence start times, points stay inside the sentence that is actually playing.
+    public func penFrame(at elapsed: TimeInterval, audioStarts: [TimeInterval?] = []) -> ExplainPenFrame? {
+        guard travels, stroke.count >= 2 else { return nil }
+        let steps = stroke.count - 1
+        let due = (0..<steps).filter { stepTime($0, steps: steps, audioStarts: audioStarts) <= max(0, elapsed) }
+        let step = due.max() ?? 0
+        let count = min(stroke.count, step + 2)
+        let shown = Array(stroke.prefix(count))
+        let beat = min(2, step * 3 / steps)
+        var marks: [TalkDraw.Mark] = [
+            .init(shape: .ink(shown), at: 0),
+            .init(shape: .ring(center: shown[shown.count - 1], radius: 18), at: 0),
+            .init(shape: .card(origin: .init(x: 200, y: 140), text: "weight"), at: 0),
+        ]
+        if beat >= 2 {
+            marks.append(.init(shape: .card(origin: .init(x: 200, y: 80), text: "fly?"), at: 2))
+        }
+        guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
+        return ExplainPenFrame(draw: draw, bolt: shown[shown.count - 1], pointCount: count, beat: beat,
+                               finished: count == stroke.count)
+    }
+
+    private func stepTime(_ step: Int, steps: Int, audioStarts: [TimeInterval?]) -> TimeInterval {
+        let beat = min(2, step * 3 / steps)
+        let inBeat = (0..<steps).filter { min(2, $0 * 3 / steps) == beat }
+        let local = inBeat.firstIndex(of: step) ?? 0
+        if audioStarts.contains(where: { $0 != nil }), beat < audioStarts.count, let start = audioStarts[beat] {
+            let next = beat + 1 < audioStarts.count ? audioStarts[beat + 1] : nil
+            let window = next.map { max($0 - start, 0.05) } ?? ExplainBeatSchedule.gap * Double(max(inBeat.count, 1))
+            return start + window * Double(local) / Double(max(inBeat.count, 1))
+        }
+        return Double(step) * ExplainBeatSchedule.gap
     }
 
     /// True while the words are an explain request, including before the subject is long enough
@@ -54,8 +95,12 @@ public struct ExplainShowcase: Equatable, Sendable {
     /// The same marks in the pixel size of one real display. The presenter matches `displayFrame`
     /// to that display; these pixels are the shot size for that frame.
     public func scaled(toWidth width: Int, toHeight height: Int) -> TalkDraw {
-        let sx = Double(max(width, 1)) / Self.canvasWidth
-        let sy = Double(max(height, 1)) / Self.canvasHeight
+        Self.scaled(draw, toWidth: width, toHeight: height)
+    }
+
+    public static func scaled(_ draw: TalkDraw, toWidth width: Int, toHeight height: Int) -> TalkDraw {
+        let sx = Double(max(width, 1)) / canvasWidth
+        let sy = Double(max(height, 1)) / canvasHeight
         let sr = min(sx, sy)
         func point(_ value: TalkDraw.Point) -> TalkDraw.Point {
             .init(x: value.x * sx, y: value.y * sy)
@@ -166,19 +211,18 @@ public struct ExplainShowcase: Equatable, Sendable {
         ]
     }
 
-    /// Three open ink segments. Each later segment starts where the previous one ended, so the
-    /// pen travels when the beats are revealed in order. Not a closed box.
-    private static func motionMarks(asked: String) -> [TalkDraw.Mark] {
-        let ground = TalkDraw.Point(x: 200, y: 500)
-        let bend = TalkDraw.Point(x: 480, y: 500)
-        let rise = TalkDraw.Point(x: 760, y: 360)
-        let end = TalkDraw.Point(x: 1040, y: 200)
+    /// One open stroke. The live pen shows a prefix, one new point at a time. Not a closed box.
+    private static let motionStroke: [TalkDraw.Point] = [
+        .init(x: 200, y: 500), .init(x: 480, y: 500), .init(x: 640, y: 440),
+        .init(x: 760, y: 360), .init(x: 900, y: 280), .init(x: 1040, y: 200),
+    ]
+
+    private static func motionMarks(asked: String, stroke: [TalkDraw.Point]) -> [TalkDraw.Mark] {
+        let tip = stroke.last ?? .init(x: 200, y: 500)
         return [
-            .init(shape: .ink([ground, bend]), at: 0),
-            .init(shape: .ring(center: ground, radius: 18), at: 0),
+            .init(shape: .ink(stroke), at: 0),
+            .init(shape: .ring(center: tip, radius: 18), at: 0),
             .init(shape: .card(origin: .init(x: 200, y: 140), text: "weight"), at: 0),
-            .init(shape: .ink([bend, TalkDraw.Point(x: 640, y: 440), rise]), at: 1),
-            .init(shape: .ink([rise, TalkDraw.Point(x: 900, y: 280), end]), at: 2),
             .init(shape: .card(origin: .init(x: 200, y: 80), text: askedCard(asked)), at: 2),
         ]
     }
@@ -206,6 +250,23 @@ public struct ExplainShowcase: Equatable, Sendable {
             CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " "
         }
         return String(spaced).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+}
+
+/// One moment of the pen: the ink drawn so far and where the bolt sits.
+public struct ExplainPenFrame: Equatable, Sendable {
+    public var draw: TalkDraw
+    public var bolt: TalkDraw.Point
+    public var pointCount: Int
+    public var beat: Int
+    public var finished: Bool
+
+    public init(draw: TalkDraw, bolt: TalkDraw.Point, pointCount: Int, beat: Int, finished: Bool) {
+        self.draw = draw
+        self.bolt = bolt
+        self.pointCount = pointCount
+        self.beat = beat
+        self.finished = finished
     }
 }
 

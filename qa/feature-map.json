@@ -5701,7 +5701,7 @@
         {
           "id": "F11.explain-showcase",
           "check": "portable-explain-showcase",
-          "acceptance": "The sentence explain how the Tesla car can fly keeps sentence index 1, speaks weight versus lift, and says the drawing does not prove the end happens. A motion ask draws an open pen stroke in three beats that stay hidden until their time. The plan scales to a display pixel size. A command and a bare explain produce no plan. No model call, no screenshot, and no AppKit drawing in this contract.",
+          "acceptance": "The sentence explain how the Tesla car can fly keeps sentence index 1 and rejects a JSON boolean. A motion ask grows an open pen one point at a time. With no audio the next point waits 0.7 seconds. With sentence start times the pen stays on the sentence that is playing. The words name weight and lift and say the drawing does not prove the end happens. No model call, no screenshot, and no AppKit drawing in this contract.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",

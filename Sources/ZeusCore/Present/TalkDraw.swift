@@ -115,6 +115,10 @@ public enum TalkDrawParser {
         // index, so the boolean test stays on Darwin and 1 survives everywhere else.
         #if canImport(Darwin)
         if CFGetTypeID(number) == CFBooleanGetTypeID() { return nil }
+        #else
+        // JSON true/false use objCType "c". The integer 1 uses "i", so sentence index 1 stays.
+        let code = String(cString: number.objCType)
+        if code == "c" || code == "B" { return nil }
         #endif
         let double = number.doubleValue
         return double.isFinite ? double : nil

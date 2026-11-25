@@ -15,6 +15,8 @@ import Testing
             return
         }
         #expect(radius == 8)
+        #expect(TalkDrawParser.parse(#"{"m":[{"k":"ring","x":true,"y":2,"r":8,"at":1}]}"#) == nil)
+        #expect(TalkDrawParser.parse(#"{"m":[{"k":"ring","x":false,"y":2,"r":8}]}"#) == nil)
     }
 
     @Test func anExplainRequestProducesWordsAndAShowcasePlan() throws {
@@ -24,35 +26,41 @@ import Testing
         #expect(showcase.explanation.contains("Weight holds"))
         #expect(showcase.explanation.contains("Lift would have to exceed"))
         #expect(showcase.explanation.contains("does not prove that the end happens"))
-        #expect(showcase.draw.marks.count == 6)
+        #expect(showcase.stroke.count >= 4)
+        #expect(showcase.draw.marks.count == 4)
         #expect(TalkDrawParser.parse(showcase.draw.json) == showcase.draw)
-        #expect(showcase.schedule.indexes == [0, 1, 2])
-        #expect(Set(showcase.draw.marks.map(\.at)) == [0, 1, 2])
+        let first = try #require(showcase.penFrame(at: 0))
+        #expect(first.pointCount == 2)
+        #expect(first.bolt == showcase.stroke[1])
+        #expect(first.finished == false)
     }
 
     @Test func theTeslaLineTravelsAnOpenStroke() throws {
         let showcase = try #require(ExplainShowcase.plan(for: Self.tesla))
-        let strokes: [(at: Int, points: [TalkDraw.Point])] = showcase.draw.marks.compactMap { mark in
-            if case .ink(let points) = mark.shape { return (mark.at, points) }
-            return nil
-        }.sorted { $0.at < $1.at }
-        #expect(strokes.map(\.at) == [0, 1, 2])
-        #expect(strokes.allSatisfy { $0.points.first != $0.points.last })
-        #expect(strokes[0].points.last == strokes[1].points.first)
-        #expect(strokes[1].points.last == strokes[2].points.first)
-        let all = strokes.flatMap(\.points)
-        #expect(all.first != all.last)
+        #expect(showcase.stroke.first != showcase.stroke.last)
+        let start = try #require(showcase.penFrame(at: 0))
+        let next = try #require(showcase.penFrame(at: ExplainBeatSchedule.gap))
+        guard case .ink(let early) = start.draw.marks.first(where: { if case .ink = $0.shape { return true }; return false })?.shape,
+              case .ink(let later) = next.draw.marks.first(where: { if case .ink = $0.shape { return true }; return false })?.shape else {
+            Issue.record("pen frames have no ink")
+            return
+        }
+        #expect(early.count == 2)
+        #expect(later.count == early.count + 1)
+        #expect(later.starts(with: early))
+        #expect(start.bolt == early.last)
+        #expect(next.bolt == later.last)
     }
 
     @Test func beatsStayOnEarlierMarksUntilTheirTime() throws {
         let showcase = try #require(ExplainShowcase.plan(for: Self.tesla))
-        let schedule = showcase.schedule
         #expect(ExplainBeatSchedule.gap == 0.7)
-        #expect(schedule.revealed(at: 0) == [0])
-        #expect(schedule.revealed(at: 0.2) == [0])
-        #expect(schedule.revealed(at: 0.85) == [0, 1])
-        #expect(schedule.revealed(at: 1.6) == [0, 1, 2])
-        #expect(schedule.revealed(at: 0) != schedule.indexes)
+        let quiet = try #require(showcase.penFrame(at: 0.8))
+        let voiced = try #require(showcase.penFrame(at: 0.8, audioStarts: [0, 2, 4]))
+        #expect(quiet.pointCount == 3)
+        #expect(voiced.pointCount == 2)
+        #expect(voiced.pointCount < quiet.pointCount)
+        #expect(showcase.penFrame(at: 0)?.finished == false)
     }
 
     @Test func theTeslaRequestNamesTheMechanismAndDoesNotClaimFlight() throws {
@@ -108,8 +116,8 @@ import Testing
             Issue.record("scaled plan lost the ring")
             return
         }
-        #expect(abs(center.x - 100) < 0.001)
-        #expect(abs(center.y - 250) < 0.001)
+        #expect(abs(center.x - 520) < 0.001)
+        #expect(abs(center.y - 100) < 0.001)
         #expect(radius <= TalkDraw.maxRingRadius)
         #expect(radius >= TalkDraw.minRingRadius)
         for mark in fitted.marks {
