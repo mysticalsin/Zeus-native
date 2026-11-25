@@ -1226,17 +1226,23 @@ private struct PermissionsPage: View {
     /// One button for everything: macOS still asks for each, but Zeus asks in turn, opens the right pane
     /// and moves on by itself (PermissionSweep).
     private func allowAll(_ sweep: PermissionSweepRunner) -> some View {
-        let text: String = if sweep.needsRestart {
-            "Screen Recording starts working after Zeus reopens."
+        let text: String
+        let detail: String?
+        if sweep.needsRestart {
+            text = "Screen Recording starts working after Zeus reopens."
+            detail = nil
         } else if sweep.isRunning {
-            "Follow the guide at the top of the screen.", detail: "Skip anything you do not want."
+            text = "Follow the guide at the top of the screen."
+            detail = "Skip anything you do not want."
         } else if sweep.allAllowed {
-            "Everything Zeus can use is allowed."
+            text = "Everything Zeus can use is allowed."
+            detail = nil
         } else {
-            "Asks for everything at once, one prompt after another.", detail: "Click Allow in each prompt, or turn on the switch Zeus opens."
+            text = "Asks for everything at once, one prompt after another."
+            detail = "Click Allow in each prompt, or turn on the switch Zeus opens."
         }
         return GSCard {
-            GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text) {
+            GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text, detail: detail) {
                 if sweep.needsRestart {
                     Button("Restart Zeus now") { sweep.restartZeus() }.buttonStyle(GSButtonStyle(prominent: true))
                 } else if sweep.isRunning {

@@ -106,7 +106,7 @@ struct GSRow<Trailing: View>: View {
         .padding(.vertical, 16.5)
         .frame(minHeight: 64)
         .accessibilityElement(children: .contain)
-        .modifier(GSRowDetail(detail))
+        .modifier(GSRowDetail(detail: detail))
     }
 }
 
