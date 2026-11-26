@@ -70,11 +70,11 @@ final class LivingMascotModel: ObservableObject {
         guard !Motion.reduced else { return }
         hopToken += 1
         let token = hopToken
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.55)) { hop = -6 }
+        withAnimation(Motion.reducible(.spring(response: 0.28, dampingFraction: 0.55))) { hop = -6 }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(0.22))
             guard self.hopToken == token else { return }
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.7)) { self.hop = 0 }
+            withAnimation(Motion.reducible(.spring(response: 0.32, dampingFraction: 0.7))) { self.hop = 0 }
         }
     }
 
@@ -82,11 +82,11 @@ final class LivingMascotModel: ObservableObject {
         guard !Motion.reduced else { return }
         hopToken += 1
         let token = hopToken
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.45)) { hop = -14 }
+        withAnimation(Motion.reducible(.spring(response: 0.28, dampingFraction: 0.45))) { hop = -14 }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(0.28))
             guard self.hopToken == token else { return }
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.62)) { self.hop = 0 }
+            withAnimation(Motion.reducible(.spring(response: 0.36, dampingFraction: 0.62))) { self.hop = 0 }
         }
     }
 }
@@ -111,8 +111,8 @@ struct LivingMascot: View {
                 .scaleEffect(breathScale * (celebrate && !Motion.reduced ? 1.06 : 1) * (model.hovering ? 1.03 : 1))
                 .offset(x: model.pointer.width * 0.04, y: bob + model.hop + model.pointer.height * 0.03)
                 .scaleEffect(x: 1, y: blinkFactor, anchor: .center)
-                .animation(Motion.reduced ? nil : .spring(response: 0.34, dampingFraction: 0.72), value: pose)
-                .animation(Motion.reduced ? nil : .easeInOut(duration: 0.18), value: celebrate)
+                .animation(Motion.reducible(.spring(response: 0.34, dampingFraction: 0.72)), value: pose)
+                .animation(Motion.reducible(.easeInOut(duration: 0.18)), value: celebrate)
         }
         .frame(width: size, height: size)
         .onHover { hovering in
