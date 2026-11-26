@@ -91,10 +91,11 @@ public enum ExplanationElevenLabsAlignment {
         marks(from: objects.compactMap { fragment(from: $0) }, duration: duration)
     }
 
-    /// A token is a break when every character is whitespace. An empty token is a
-    /// break. U+200B is not whitespace, so it stays inside the word.
+    /// A token is a break when every scalar is a named blank. An empty token is a
+    /// break. U+200B is not a blank, so it stays inside the word. The answer is
+    /// read from `ExplanationElevenLabsAlignmentBox`.
     private static func isBreak(_ token: String) -> Bool {
-        token.allSatisfy(\.isWhitespace)
+        ExplanationElevenLabsAlignmentBox.isBreak(token)
     }
 
     private struct Payload: Decodable {
