@@ -71,6 +71,34 @@ struct AgentStatusTests {
         #expect(!store.autoApproves(session: "s", tool: "Bash", input: input, risk: .low) && store.summary == "None")
     }
 
+    @Test func stopAllHaltsStartedAndHookedRunsAndLeavesTheApproval() {
+        let controller = NotchController()
+        controller.startSession(id: "started", agent: "Browser agent", project: "web", task: "click")
+        controller.upsertSession(id: "hooked", agent: "Claude Code", project: "zeus", task: "edit", status: .working)
+        controller.upsertSession(id: "idle", agent: "Codex", project: "zeus", task: "ready", status: .idle)
+        var stopped: [String] = []
+        controller.model.stopHandlers["started"] = { stopped.append("handler") }
+        var interrupted: [String] = []
+        controller.interruptHookedRun = { interrupted.append($0) }
+        controller.model.approval = .init(id: "card", agent: "Claude Code", project: "zeus", tool: "Bash",
+                                           command: "ls", risk: .low, resolve: { _ in })
+        let ids = controller.stopAllSupervised()
+        #expect(ids == ["started", "hooked"])
+        #expect(stopped == ["handler"])
+        #expect(interrupted == ["hooked"])
+        #expect(controller.model.approval?.id == "card")
+        #expect(controller.model.approval?.command == "ls")
+        #expect(controller.model.sessions.first { $0.id == "started" }?.origin == .started)
+        #expect(controller.model.sessions.first { $0.id == "started" }?.task == "Stopped")
+        #expect(controller.model.sessions.first { $0.id == "hooked" }?.origin == .hooked)
+        #expect(controller.model.sessions.first { $0.id == "hooked" }?.status == .idle)
+        #expect(controller.model.sessions.first { $0.id == "idle" }?.task == "ready")
+        controller.upsertSession(id: "hooked", agent: "Claude Code", project: "zeus", task: "again", status: .working)
+        #expect(controller.model.sessions.first { $0.id == "hooked" }?.task == "Stopped")
+        #expect(controller.isHalted("hooked"))
+        #expect(controller.model.approval != nil)
+    }
+
     @Test func agentAlertTextHidesTheProjectWhenDetailsAreHidden() {
         let alert = AgentAlert.failed(agent: "Codex", project: "secret-app", reason: "Rate limit reached")
         // The project name rides in the title (and thread) when details are shown, never in the body.

@@ -511,6 +511,12 @@ struct NotchView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Color.clear.frame(width: hasNotch ? notch.width + 8 : 12, height: 1)
             HStack(spacing: 7) {
+                if model.canStopAll {
+                    GlyphButton(symbol: "stop.fill", size: 11, tint: Theme.cloudSecondary, label: "Stop all agents") {
+                        NotchControllerBridge.stopAll()
+                    }
+                    .accessibilityHint("Halts runs Zeus started or hooked. A pending approval stays up.")
+                }
                 if !peekStatusText.isEmpty {
                     Text(peekStatusText)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -732,6 +738,15 @@ private struct ApprovalBody: View {
     }
 }
 
+private struct StopAllButton: View {
+    var body: some View {
+        NotchButton(title: "Stop all", tint: Theme.cloudSecondary, filled: false) {
+            NotchControllerBridge.stopAll()
+        }
+        .accessibilityHint("Halts runs Zeus started or hooked. A pending approval stays up.")
+    }
+}
+
 private struct NotchButton: View {
     let title: String
     let tint: Color
@@ -778,6 +793,13 @@ private struct PanelBody: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .frame(height: barHeight)
+
+            if model.canStopAll {
+                HStack {
+                    Spacer(minLength: 0)
+                    StopAllButton()
+                }
+            }
 
             if let approval = model.approval {
                 ApprovalBody(approval: approval, compact: false)
@@ -838,6 +860,12 @@ private struct TopBarPanelBody: View {
     private var agents: some View {
         PageScroll(.vertical) {
             VStack(spacing: 8) {
+                if model.canStopAll {
+                    HStack {
+                        Spacer(minLength: 0)
+                        StopAllButton()
+                    }
+                }
                 if model.sessions.isEmpty {
                     VStack(spacing: 6) {
                         Image(systemName: "bolt.horizontal.circle").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.cloudQuiet)

@@ -36,6 +36,10 @@ final class NotchController {
     private var stallTimer: Timer?
     /// Tests and previews replace the clock.
     var now: () -> Date = { Date() }
+    /// Sessions a stop-all has halted. Later hook events do not bring them back.
+    private(set) var halted: Set<String> = []
+    /// Writes one interrupt byte to a hooked run's terminal. Tests replace it.
+    var interruptHookedRun: (String) -> Void = { _ = AgentTerminals.shared.interrupt($0) }
     /// Where the pointer is; tests replace it.
     var pointer: () -> CGPoint = { NSEvent.mouseLocation }
     /// Tests give the frame the zones centre on, so no window or display is needed. Release builds have no override.
@@ -203,7 +207,9 @@ final class NotchController {
     var onPresentationChange: (NotchModel.Presentation) -> Void = { _ in }
 
     func startSession(id: String, agent: String, project: String, task: String) {
-        let session = NotchModel.Session(id: id, agent: agent, project: project, task: task, status: .working, startedAt: Date())
+        halted.remove(id)
+        var session = NotchModel.Session(id: id, agent: agent, project: project, task: task, status: .working, startedAt: Date())
+        session.origin = .started
         if let index = model.sessions.firstIndex(where: { $0.id == id }) {
             model.sessions[index] = session
         } else {
@@ -216,6 +222,7 @@ final class NotchController {
     /// Creates or updates a session from a hook event without changing what is shown.
     func upsertSession(id: String, agent: String, project: String, task: String, status: NotchModel.Status,
                        restartClock: Bool = false) {
+        guard !halted.contains(id) else { return }
         let moment = now()
         if let index = model.sessions.firstIndex(where: { $0.id == id }) {
             model.sessions[index].task = task
@@ -234,6 +241,7 @@ final class NotchController {
 
     /// Any hook event counts as a sign of life, even one that changes nothing visible.
     func touch(sessionID: String) {
+        guard !halted.contains(sessionID) else { return }
         guard let index = model.sessions.firstIndex(where: { $0.id == sessionID }) else { return }
         model.sessions[index].lastEventAt = now()
         if model.sessions[index].status == .stalled {
@@ -245,6 +253,7 @@ final class NotchController {
     /// The agent's turn ended in an error: red halo, a card with the reason, and a macOS notification
     /// when Settings > Notifications > Errors is on.
     func failSession(id: String, agent: String, project: String, reason: String) {
+        guard !halted.contains(id) else { return }
         upsertSession(id: id, agent: agent, project: project, task: reason, status: .failed)
         if let index = model.sessions.firstIndex(where: { $0.id == id }) { model.sessions[index].reason = reason }
         guard SettingsStore.shared.bool("notify.errors") else { return }
@@ -285,6 +294,7 @@ final class NotchController {
     }
 
     func removeSession(id: String) {
+        halted.remove(id)
         model.sessions.removeAll { $0.id == id }
         model.picker?.resize(model.sessions.count)
         if model.failure?.sessionID == id { model.failure = nil }
@@ -294,12 +304,35 @@ final class NotchController {
     }
 
     func update(sessionID: String, status: NotchModel.Status, task: String? = nil) {
+        guard !halted.contains(sessionID) else { return }
         guard let index = model.sessions.firstIndex(where: { $0.id == sessionID }) else { return }
         model.sessions[index].status = status
         model.sessions[index].lastEventAt = now()
         if status != .failed, status != .stalled { model.sessions[index].reason = nil }
         if let task { model.sessions[index].task = task }
         model.peekSessionID = sessionID
+    }
+
+    func isHalted(_ id: String) -> Bool { halted.contains(id) }
+
+    func clearHalt(_ id: String) { halted.remove(id) }
+
+    /// Halts every active run Zeus started or hooked. Does not answer or hide a pending approval.
+    @discardableResult
+    func stopAllSupervised() -> [String] {
+        let runs = model.sessions.map { SupervisedRun(id: $0.id, origin: $0.origin, status: $0.status) }
+        let plan = NotchStopAll.plan(runs, handlers: Set(model.stopHandlers.keys))
+        for id in plan.halted {
+            halted.insert(id)
+            if plan.callHandlers.contains(id) { model.stopHandlers[id]?() }
+            if plan.interrupt.contains(id) { interruptHookedRun(id) }
+            if let index = model.sessions.firstIndex(where: { $0.id == id }) {
+                model.sessions[index].status = .idle
+                model.sessions[index].task = NotchStopAll.stoppedTask
+                model.sessions[index].reason = nil
+            }
+        }
+        return plan.halted
     }
 
     /// Shows an approval card and waits for Approve / Deny (click or voice). One card at a time:

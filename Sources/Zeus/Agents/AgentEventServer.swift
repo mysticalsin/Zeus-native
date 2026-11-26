@@ -61,9 +61,15 @@ final class AgentEventServer {
 
     /// One agent event from a hook or a log watcher. Returns the reply for decision events.
     func process(_ event: HookEvent) async -> Data? {
+        let sessionID = event.session ?? "unknown"
+        // A stop-all already halted this run. Leave any approval card alone and refuse the next ask.
+        if notch.isHalted(sessionID), event.event != "SessionEnd" {
+            guard event.needsDecision else { return nil }
+            let decision = HookDecision(id: event.id, decision: .deny, reason: "Stopped in Zeus")
+            return try? JSONEncoder().encode(decision)
+        }
         // The client's risk label is never trusted below what the app computes from the input.
         let risk = HookClientInput.effectiveRisk(claimed: event.risk, tool: event.tool, input: event.input)
-        let sessionID = event.session ?? "unknown"
         let agent = Self.agentName(event.source)
         let project = event.cwd.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "No project"
         FlightRecorder.shared.record("agent", event.event, "\(agent) \(project) session \(sessionID.prefix(8))\(event.tool.map { " tool \($0)" } ?? "")")
