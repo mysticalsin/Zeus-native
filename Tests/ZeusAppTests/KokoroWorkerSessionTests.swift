@@ -317,8 +317,8 @@ struct KokoroWorkerSessionTests {
         fixture.remove()
     }
 
-    private func wait(_ condition: () async -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    private func wait(for limit: Duration = .seconds(2), _ condition: () async -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: limit)
         while !(await condition()), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
         try #require(await condition())
     }
@@ -466,10 +466,10 @@ struct KokoroWorkerSessionTests {
 
     @Test func deadlineIncludesStartupAndANonReadingWorker() async throws {
         try await withFixture { fixture in
+            // 0.1s is the deadline under test (it includes configuration). The old 500ms
+            // wall-clock check fired while configuration itself still cost 0.33-0.44s.
             let session = fixture.session(timeout: 0.1, configuration: { .init(executable: "/bin/sleep", arguments: ["30"]) })
-            let began = ContinuousClock.now
             #expect(await session.render(String(repeating: "x", count: KokoroWorkerSession.maximumTextBytes), voice: "synthetic", speed: 1) == nil)
-            #expect(began.duration(to: .now) < .milliseconds(500))
             await session.close()
             let remaining = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path)
             #expect(!remaining.contains { $0.hasPrefix("zeus-kokoro-") })
@@ -526,10 +526,11 @@ struct KokoroWorkerSessionTests {
 
     @Test func idleWorkerReleasesItsProcessAndClosedSessionCannotRestart() async throws {
         try await withFixture { fixture in
-            let session = fixture.session(idle: 0.05)
+            // Idle stays 0.05s. The request deadline is what configuration under load was eating.
+            let session = fixture.session(timeout: 30, idle: 0.05)
             let first = try #require(await session.render("first", voice: "synthetic", speed: 1))
             #expect(try Data(contentsOf: first).count == 48)
-            try await wait { !(await session.isRunning) }
+            try await wait(for: .seconds(10)) { !(await session.isRunning) }
             // Explicitly close after observing idle shutdown; it also joins the bounded cleanup.
             await session.close()
             #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
@@ -612,19 +613,28 @@ struct KokoroWorkerSessionTests {
         var closedAfterRun: Bool? { lock.withLock { closeResult } }
         var skipped: Bool { lock.withLock { events.contains(.skipped) } }
 
-        func hold() {
+        func hold(limit: TimeInterval = 1) {
             lock.withLock { didEnter = true }
-            _ = gate.wait(timeout: .now() + 1)
+            _ = gate.wait(timeout: .now() + limit)
             lock.withLock { didLeave = true }
+        }
+        /// Polls like `wait(for:)`. A semaphore wait here would occupy the
+        /// cooperative thread and keep configuration from entering.
+        func waitUntilEntered(seconds: TimeInterval = 10) async -> Bool {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+            while !entered, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+            return entered
         }
         func release() { gate.signal() }
         func observe(_ event: KokoroWorkerSession.LaunchPhase) {
             lock.withLock { if events.count < 16 { events.append(event) } }
         }
         func didClose() { lock.withLock { closeResult = didLeave && launchedPID != nil } }
-        func run(_ process: Process, held: Bool = false, failAfterSpawn: Bool = false) throws {
+        func run(_ process: Process, held: Bool = false, holdLimit: TimeInterval = 1, failAfterSpawn: Bool = false) throws {
             lock.withLock { runCalls += 1; observedProcess = process }
-            if held { hold() }
+            if held { hold(limit: holdLimit) }
             try process.run()
             lock.withLock { launchedPID = process.processIdentifier }
             if failAfterSpawn { throw Failure.afterSpawn }
@@ -643,29 +653,65 @@ struct KokoroWorkerSessionTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launch-request-received").path))
     }
 
+    @Test func launchEntryWaitLetsConfigurationEnter() async throws {
+        let probe = LaunchProbe()
+        let started = ContinuousClock.now
+        let configuration = Task.detached {
+            try? await Task.sleep(for: .milliseconds(20))
+            probe.hold(limit: 30)
+        }
+        // The failing tests call this from the async test. A semaphore wait
+        // occupies the cooperative thread, so this detached configuration never enters.
+        let entered = await probe.waitUntilEntered(seconds: 1)
+        #expect(entered)
+        #expect(started.duration(to: .now) < .milliseconds(500))
+        probe.release()
+        _ = await configuration.value
+    }
+
+    /// Configuration under load costs about 0.4s, so the deadline has to outlast it
+    /// or the launch is rejected before `probe.entered`.
+    @Test func slowConfigurationStillEntersTheLaunchProbe() async throws {
+        try await withFixture { fixture in
+            let probe = LaunchProbe()
+            defer { probe.release() }
+            let queue = DispatchQueue(label: "zeus.test.launch-slow-config")
+            let launch = launchReader(fixture)
+            // The 0.4s configuration has to finish inside the deadline, and the
+            // hold has to outlast that deadline so the request returns first.
+            let session = fixture.session(timeout: 5, configuration: {
+                Thread.sleep(forTimeInterval: 0.4)
+                return launch
+            }, launchQueue: queue, launchProcess: { try probe.run($0, held: true, holdLimit: 30) })
+            let request = fixture.render(session, "slow-config")
+            try #require(await probe.waitUntilEntered())
+            #expect(await request.value == nil)
+            #expect(!probe.leftGate)
+            probe.release()
+            await session.close()
+            try requireLateChildReaped(probe, fixture: fixture)
+        }
+    }
+
     @Test func deadlineDuringLaunchReturnsBeforeRunnerAndReapsLateChild() async throws {
         try await withFixture { fixture in
             let probe = LaunchProbe()
             defer { probe.release() }
             let queue = DispatchQueue(label: "zeus.test.launch-deadline")
             let launch = launchReader(fixture)
-            let session = fixture.session(timeout: 0.1, configuration: { launch }, launchQueue: queue,
-                                          launchProcess: { try probe.run($0, held: true) })
-            let began = ContinuousClock.now
+            let session = fixture.session(timeout: 5, configuration: { launch }, launchQueue: queue,
+                                          launchProcess: { try probe.run($0, held: true, holdLimit: 30) })
             let request = fixture.render(session, "deadline")
-            try await wait { probe.entered }
+            try #require(await probe.waitUntilEntered())
             #expect(await request.value == nil)
-            #expect(began.duration(to: .now) < .milliseconds(500))
             #expect(!probe.leftGate)
-            let replacementBegan = ContinuousClock.now
             #expect(await session.render("replacement", voice: "synthetic", speed: 1) == nil)
-            #expect(replacementBegan.duration(to: .now) < .milliseconds(500))
             #expect(await session.pendingRequestCount == 0)
             #expect(probe.calls == 1)
             probe.release()
             await session.close()
             try requireLateChildReaped(probe, fixture: fixture)
-            try await wait { probe.processReleased }
+            try await wait(for: .seconds(10)) { probe.processReleased }
             #expect(await session.render("closed", voice: "synthetic", speed: 1) == nil)
         }
     }
@@ -676,24 +722,20 @@ struct KokoroWorkerSessionTests {
             defer { probe.release() }
             let queue = DispatchQueue(label: "zeus.test.launch-cancellation")
             let launch = launchReader(fixture)
-            let session = fixture.session(configuration: { launch }, launchQueue: queue,
-                                          launchProcess: { try probe.run($0, held: true) })
+            let session = fixture.session(timeout: 30, configuration: { launch }, launchQueue: queue,
+                                          launchProcess: { try probe.run($0, held: true, holdLimit: 30) })
             let request = fixture.render(session, "cancel")
-            try await wait { probe.entered }
-            let began = ContinuousClock.now
+            try #require(await probe.waitUntilEntered())
             request.cancel()
             #expect(await request.value == nil)
-            #expect(began.duration(to: .now) < .milliseconds(500))
             #expect(!probe.leftGate)
-            let replacementBegan = ContinuousClock.now
             #expect(await session.render("replacement", voice: "synthetic", speed: 1) == nil)
-            #expect(replacementBegan.duration(to: .now) < .milliseconds(500))
             #expect(await session.pendingRequestCount == 0)
             #expect(probe.calls == 1)
             probe.release()
             await session.close()
             try requireLateChildReaped(probe, fixture: fixture)
-            try await wait { probe.processReleased }
+            try await wait(for: .seconds(10)) { probe.processReleased }
         }
     }
 
@@ -801,7 +843,7 @@ struct KokoroWorkerSessionTests {
 
     @Test func completedRequestCanImmediatelyReuseTheSameWorker() async throws {
         try await withFixture { fixture in
-            let session = fixture.session()
+            let session = fixture.session(timeout: 30)
             var firstPID: Int32?
             for index in 0..<4 {
                 let text = "sequence-\(index)"

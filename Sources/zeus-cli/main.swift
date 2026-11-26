@@ -9,6 +9,11 @@ func fail(_ message: String, code: Int32) -> Never {
     exit(code)
 }
 
+if CommandLine.arguments.dropFirst().first == "stt-latency" {
+    print(STTLatencyHarness.measurementReport())
+    exit(0)
+}
+
 if CommandLine.arguments.dropFirst().first == "memory-mcp" {
     exit(WikiExportMCPCommand.run(Array(CommandLine.arguments.dropFirst(2))))
 }

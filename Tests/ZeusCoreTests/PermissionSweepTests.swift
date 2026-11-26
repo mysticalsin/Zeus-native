@@ -32,7 +32,7 @@ struct PermissionSweepTests {
         #expect(effects.contains(.ask(.microphone)))
         #expect(effects.contains(.showGuide(.microphone)))
         #expect(effects.contains(.startPolling))
-        #expect(effects.contains(.save(S.Progress(visited: [.microphone], needsRestart: false, savedAt: 100))))
+        #expect(effects.contains(.save(S.Progress(visited: [], needsRestart: false, savedAt: 100))))
     }
 
     @Test func alreadyAllowedItemsAreSkipped() {
@@ -183,6 +183,57 @@ struct PermissionSweepTests {
         #expect(S.reduce(state, .skip(access: access, now: 101)).0.phase == .finished(needsRestart: false))
         access[.screenRecording] = .allowed
         #expect(S.reduce(state, .done(access: access, now: 101)).0.phase == .finished(needsRestart: false))
+    }
+
+    private func savedProgress(_ effects: [S.Effect]) -> S.Progress? {
+        effects.compactMap { effect in
+            if case .save(let progress) = effect { return progress }
+            return nil
+        }.last
+    }
+
+    @Test func resumeContinuesTheStepThatWasOpen() {
+        var access = all(.allowed)
+        access[.accessibility] = .notAsked
+        access[.inputMonitoring] = .notAsked
+        access[.screenRecording] = .notAsked
+        let (state, effects) = start(access)
+        #expect(state.phase == .guiding(.accessibility))
+        let saved = savedProgress(effects)!
+        let (resumed, resumedEffects) = start(access, resumed: saved)
+        #expect(resumed.phase == .guiding(.accessibility))
+        #expect(resumedEffects.contains(.openSettings(.accessibility, request: true)))
+        #expect(!resumedEffects.contains(.openSettings(.inputMonitoring, request: true)))
+    }
+
+    @Test func resumeDoesNotReopenAStepThatAlreadyFinished() {
+        let (state, _) = start(fresh)
+        var access = fresh
+        access[.microphone] = .allowed
+        access[.speech] = .allowed
+        let (next, effects) = S.reduce(state, .promptAnswered(.microphone, access: access, now: 101))
+        #expect(next.phase == .prompting(.camera))
+        let saved = savedProgress(effects)!
+        let (resumed, effectsOnResume) = start(access, resumed: saved)
+        #expect(resumed.phase == .prompting(.camera))
+        #expect(!effectsOnResume.contains(.ask(.microphone)))
+        #expect(!effectsOnResume.contains(.ask(.speech)))
+    }
+
+    @Test func skipAndDoneAreKeyboardActionsInFocusOrderWithVoiceOverLabels() {
+        let screen = S.guideButtons(.guiding(.screenRecording))
+        #expect(screen.map(\.role) == [.done, .skip, .stop])
+        #expect(screen.map(\.keyAction) == [.defaultAction, .cancelAction, nil])
+        #expect(screen.map(\.focusOrder) == [0, 1, 2])
+        #expect(screen.map(\.voiceOverLabel) == [
+            "Done, Screen Recording is on", "Skip this one", "Stop allowing"])
+        let prompt = S.guideButtons(.prompting(.microphone))
+        #expect(prompt.map(\.role) == [.skip, .stop])
+        #expect(prompt.map(\.keyAction) == [.cancelAction, nil])
+        #expect(prompt.map(\.focusOrder) == [0, 1])
+        #expect(prompt.map(\.voiceOverLabel) == ["Skip this one", "Stop allowing"])
+        let spoken = (screen + prompt).flatMap { [$0.title, $0.voiceOverLabel] }.joined()
+        #expect(!spoken.contains("\u{2014}"))
     }
 
     @Test func afterARelaunchTheSweepResumesWithoutAskingVisitedItemsAgain() {

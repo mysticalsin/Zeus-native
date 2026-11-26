@@ -2339,7 +2339,7 @@
     },
     {
       "id": "REG-194",
-      "failure": "A rejected Chat switch could leave another conversation\u2019s private history active for submission under the newly selected Chat.",
+      "failure": "A rejected Chat switch could leave another conversation’s private history active for submission under the newly selected Chat.",
       "features": [
         "F09"
       ],
@@ -4297,7 +4297,7 @@
     },
     {
       "id": "REG-404",
-      "failure": "The meeting card timed out under the pointer of the person about to tap it.",
+      "failure": "A hover used to hold the meeting card forever, which was the bug. The hover now pauses dismissal for at most 30 s, then the card dismisses. The card lifetime stays 45 s.",
       "features": [
         "F04"
       ],
@@ -8747,6 +8747,42 @@
       "guard": {
         "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
         "function": "theHoldReachesTheIndicatorInTheSameSample"
+      }
+    },
+    {
+      "id": "REG-997",
+      "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_shipped_plist_is_an_agent_app"
+      }
+    },
+    {
+      "id": "REG-998",
+      "failure": "A guide click test hard-coded the accessory policy instead of the function the shipped app uses, so it could pass while main.swift set a different policy. The test now calls ZeusActivation.configure and still checks that the click does not change activation.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_main_and_the_guide_test_use_the_shared_activation_function"
+      }
+    },
+    {
+      "id": "REG-999",
+      "failure": "Command dictation left the words on the clipboard (ERROR nothing inserted). A talk or Command press with no Accessibility or Input Monitoring never armed, and a microphone prompt that later became ready did not start the held turn. dictate-file left speechTraceGeneration unset, so the stt-latency and stt-failure lines never flushed.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+        "function": "aWritableFocusedFieldIsInsertedInsteadOfLeftOnTheClipboard"
       }
     }
   ]

@@ -191,16 +191,40 @@ enum TextInserter {
 
     /// Value of the focused accessibility element (dictation E2E paste verification).
     static func focusedFieldText() -> String? {
+        guard let ax = focusedElement() else { return nil }
+        if let value = axString(ax, attribute: kAXValueAttribute), !value.isEmpty { return value }
+        if let value = axString(ax, attribute: kAXSelectedTextAttribute), !value.isEmpty { return value }
+        return nil
+    }
+
+    /// True when the focused element can take dictated text. A secure field cannot.
+    static func focusedFieldCanTakeText() -> Bool {
+        guard let ax = focusedElement(), !AXFinder.isSecure(ax) else { return false }
+        return AXFinder.isSettable(ax, kAXValueAttribute)
+    }
+
+    /// Writes `text` into the focused field and reads it back. False leaves the clipboard path
+    /// to the caller. This does not put the words on the clipboard.
+    static func writeFocusedField(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let ax = focusedElement(), !AXFinder.isSecure(ax) else { return false }
+        guard AXFinder.isSettable(ax, kAXValueAttribute) else { return false }
+        let current = AXFinder.string(ax, kAXValueAttribute) ?? ""
+        if !current.isEmpty, current.hasSuffix(trimmed) { return true }
+        let next = current.isEmpty ? trimmed : current + trimmed
+        guard AXUIElementSetAttributeValue(ax, kAXValueAttribute as CFString, next as CFString) == .success else { return false }
+        let after = AXFinder.string(ax, kAXValueAttribute) ?? ""
+        return after.contains(trimmed)
+    }
+
+    private static func focusedElement() -> AXUIElement? {
         guard AXIsProcessTrusted() else { return nil }
         let system = AXUIElementCreateSystemWide()
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
               let element = focused else { return nil }
         // swiftlint:disable:next force_cast
-        let ax = element as! AXUIElement
-        if let value = axString(ax, attribute: kAXValueAttribute), !value.isEmpty { return value }
-        if let value = axString(ax, attribute: kAXSelectedTextAttribute), !value.isEmpty { return value }
-        return nil
+        return element as! AXUIElement
     }
 
     private static func axString(_ element: AXUIElement, attribute: String) -> String? {

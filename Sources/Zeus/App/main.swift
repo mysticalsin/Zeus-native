@@ -102,5 +102,5 @@ if !startupPolicy.isQA {
 let delegate = AppDelegate(policy: startupPolicy)
 app.delegate = delegate
 // Menu-bar only: no Dock icon, no main menu (LSUIElement is also set in Info.plist).
-app.setActivationPolicy(.accessory)
+ZeusActivation.configure(app)
 app.run()

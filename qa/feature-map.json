@@ -1222,8 +1222,7 @@
         },
         {
           "check": "portable-regressions",
-          "acceptance": "On an injected clock, both the talk hold and the Murmur tap endpoint after silence, reuse one on-device model, and deliver the final within budget of the endpoint. No transcript text is recorded.",
-          "cases": [
+          "acceptance": "On an injected clock, both the talk hold and the Murmur tap endpoint after silence, reuse one on-device model, and deliver the final within budget of the endpoint. A warm 3 to 5 second utterance stays inside a 1.5 s first partial and a 3 s final. A cold first final stays inside 8 s. A mid-stream abort finishes inside 1.4 s. A denied microphone or a missing engine returns a recoverable retry. No transcript text is recorded. Physical desktop timing is not this check.",          "cases": [
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "latencyRegressionBothPathsStayInsideTheBudget"
@@ -1283,6 +1282,62 @@
             {
               "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
               "function": "aLongSilenceEndpointsAtTheBudgetNotAtTheLateSample"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "warmMedianOfFiveStaysInsideThePartialAndFinalCeilings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aFourSecondUtteranceOnTheProductionClockStaysInsideTheCeilings"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "coldFirstFinalStaysInsideEightSeconds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aMidStreamAbortFinishesInsideTheAbortCeiling"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aCallbackAndItsGiveUpCompleteOnce"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "theFailureRateLineIsNotASwiftFailureDiagnostic"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+              "function": "aDeniedMicOrMissingEngineRetriesInsteadOfHanging"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aWritableFocusedFieldIsInsertedInsteadOfLeftOnTheClipboard"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aClipboardChoiceIsNotInserted"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aMissingKeyGrantAnnouncesAndALaterGrantArmsTheHotkey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aPromptThatBecomesReadyWhileHeldStartsTheTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aDeniedVoiceGrantDoesNotStartTheTurn"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "anUnsetDictateFileGenerationDoesNotFlushTheTrace"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/CommandDictatePathTests.swift",
+              "function": "aDictateFileGenerationFlushesTheMurmurTrace"
             }
           ],
           "id": "F01.stt-latency"

@@ -685,6 +685,8 @@ final class DictationController {
         selection = mode.useSelectedText ? TextInserter.selectedText() : nil
         speech.contextualStrings = hints
         let turnGeneration = ownership.beginTurn()
+        // The file path must keep this generation. Zero never flushes stt-latency or stt-failure.
+        speechTraceGeneration = DictateFileTrace.keep(speech.noteKeyDown(path: .murmurTap))
         let context = DictationTurnContext(generation: turnGeneration, mode: mode, targetApp: targetApp,
                                            selection: selection, useLocal: false, engine: nil, insertionField: insertionField)
         let sessionID: Int
@@ -693,6 +695,7 @@ final class DictationController {
             ownership.bind(speechSessionID: sessionID, generation: turnGeneration)
             turnContext = context
         } catch {
+            flushSpeechTrace()
             ownership.invalidate()
             insertionTracker.invalidate()
             _ = speech.configure(localeIdentifier: savedLocale)
@@ -705,6 +708,7 @@ final class DictationController {
         topBar.dictationPartial = ""
         apply(.micOpened(turn: turnGeneration))
         guard flow.isListening else {
+            flushSpeechTrace()
             _ = speech.configure(localeIdentifier: savedLocale)
             return "ERROR not listening (hold the dictation key first)"
         }
@@ -719,7 +723,10 @@ final class DictationController {
                 feed: { [speech] in try await speech.injectFile(url: url, expectedSession: sessionID) },
                 activate: { context.targetApp?.activate() },
                 finish: { [weak self] in self?.finish() })
-            guard try await completion.run() else { return "ERROR dictate-file superseded" }
+            guard try await completion.run() else {
+                flushSpeechTrace()
+                return "ERROR dictate-file superseded"
+            }
             loop: for _ in 0..<240 {
                 guard ownership.owns(generation: context.generation) else { break loop }
                 switch flow {
@@ -756,9 +763,19 @@ final class DictationController {
             }
             return reply
         } catch {
-            if ownership.owns(generation: context.generation) { _ = speech.configure(localeIdentifier: savedLocale) }
+            if ownership.owns(generation: context.generation) {
+                flushSpeechTrace()
+                _ = speech.configure(localeIdentifier: savedLocale)
+            }
             return "ERROR \(error.localizedDescription)"
         }
+    }
+
+    /// Flushes stt-latency and stt-failure for the open dictate-file turn. A second call is a no-op.
+    private func flushSpeechTrace() {
+        let generation = speechTraceGeneration
+        guard generation > 0 else { return }
+        speech.noteDelivered(generation: generation)
     }
 
     func cancel() {
@@ -1074,12 +1091,14 @@ final class DictationController {
             }
         }
         // Only a target that is still alive, frontmost and focused gets an automatic paste.
-        // A warm run often misses that gate after the first ok. The field that already
-        // holds text is still written. Clipboard-only stays `inserted: false`.
+        // When that gate refuses, a writable focused field still receives the words.
+        // A warm field that already holds text is written too. The clipboard is the fallback,
+        // and a clipboard result is not an insertion.
         switch deliveryVerdict(for: context, allowClipboardFallback: allowClipboardFallback) {
         case .paste:
             break
         case .clipboardOnly:
+            if insertFocusedField(text, context: context, onTextReady: onTextReady) { return .pasted }
             if writeWarmField(text, context: context, onTextReady: onTextReady) { return .pasted }
             if allowClipboardFallback {
                 NSPasteboard.general.clearContents()
@@ -1111,10 +1130,23 @@ final class DictationController {
             await insertionTracker.acknowledge(text, before: before, target: context.insertionField,
                                               sendsReturn: pressReturn, isCurrent: { check() == .paste })
         }
+        if outcome != .pasted, insertFocusedField(text, context: context, onTextReady: onTextReady) {
+            return .pasted
+        }
         if outcome != .pasted, writeWarmField(text, context: context, onTextReady: onTextReady) {
             return .pasted
         }
         return outcome
+    }
+
+    /// Writes into the focused field when it can take text. Does not touch the clipboard.
+    private func insertFocusedField(_ text: String, context: DictationTurnContext,
+                                    onTextReady: (@MainActor (String) -> Void)?) -> Bool {
+        let choice = FocusedFieldWrite.choose(turnCurrent: ownership.owns(generation: context.generation),
+                                              fieldWritable: TextInserter.focusedFieldCanTakeText())
+        guard choice == .writeField, TextInserter.writeFocusedField(text) else { return false }
+        onTextReady?("field")
+        return true
     }
 
     /// Puts the words in the focused field, or the field this turn started in.

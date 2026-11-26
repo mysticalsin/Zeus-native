@@ -79,11 +79,12 @@ GROUPS = {
     "regressions": (
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
              "Dictation/SpokenDictationMarkup.swift", "Dictation/TranscriptionEngine.swift", "Dictation/WhisperPromptRecovery.swift",
-             "Dictation/ThinkingOrbMath.swift", "Voice/UltronVoiceSignal.swift", "Voice/STTLatency.swift",
+             "Dictation/ThinkingOrbMath.swift", "Dictation/FocusedFieldWrite.swift",
+             "Voice/UltronVoiceSignal.swift", "Voice/STTLatency.swift", "Voice/CommandHotkeyAccess.swift",
              "Recordly/RecordlyCaptureTimeline.swift", "Mac/DriveTypingFlow.swift"),
         tests("DictationExplicitCorrectionTests", "DictationQAFixTests", "SpeechEngineCatalogTests",
               "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests",
-              "ThinkingOrbMathTests", "STTLatencyTests"),
+              "ThinkingOrbMathTests", "STTLatencyTests", "CommandDictatePathTests"),
     ),
     "scribe": (
         core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift",
