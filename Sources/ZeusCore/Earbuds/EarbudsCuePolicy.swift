@@ -49,28 +49,17 @@ public struct EarbudsCueShow: Equatable, Sendable, CustomStringConvertible, Cust
 /// Whether the Canopy earbud overlay may take the notch slot.
 ///
 /// A connect or a disconnect may replace an ordinary cue. A levels update stays on the connected
-/// cue of the same device id. A refusal is dropped. Nothing is queued.
+/// cue of the same device id. A refusal is dropped. Nothing is queued. Each answer is read from
+/// `EarbudsCuePolicyBox`. A device id keeps a zero-width space.
 public enum EarbudsCuePolicy {
-    public static let connectedDuration: TimeInterval = 4
-    public static let disconnectedDuration: TimeInterval = 3
+    public static let connectedDuration: TimeInterval = EarbudsCuePolicyBox.connectedDuration
+    public static let disconnectedDuration: TimeInterval = EarbudsCuePolicyBox.disconnectedDuration
 
     public static func duration(_ kind: EarbudsCueShow.Kind) -> TimeInterval {
-        switch kind {
-        case .connected, .levels: connectedDuration
-        case .disconnected: disconnectedDuration
-        }
+        EarbudsCuePolicyBox.duration(kind)
     }
 
     public static func mayShow(_ cue: EarbudsCueShow, over current: EarbudsCueOccupant) -> Bool {
-        let id = cue.id.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !id.isEmpty else { return false }
-        if case .protected = current { return false }
-        switch cue.kind {
-        case .levels:
-            guard case .earbuds(let currentID, _, true) = current else { return false }
-            return currentID == id
-        case .connected, .disconnected:
-            return true
-        }
+        EarbudsCuePolicyBox.mayShow(cue, over: current)
     }
 }
