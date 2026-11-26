@@ -32,6 +32,7 @@ public struct SystemSpeechMarkerFact: Equatable, Sendable {
 /// A word with no word fact is left out. No time is invented from a word count.
 /// Sentence and phoneme facts are ignored. Nothing here calls the synthesizer,
 /// reads a clock, or opens a connection. The marks are not applied to playback.
+/// A blank is read from `SystemSpeechMarkerAlignmentBox`.
 public enum SystemSpeechMarkerAlignment {
     public static let maxMarks = 4_096
     public static let maxMarkers = 8_192
@@ -107,18 +108,22 @@ public enum SystemSpeechMarkerAlignment {
         var index = 0
         while index < units.count {
             guard let (first, width) = readScalar(in: units, at: index) else { break }
-            if first.properties.isWhitespace {
+            if isBlank(first) {
                 index += width
                 continue
             }
             let start = index
             index += width
-            while index < units.count, let (next, nextWidth) = readScalar(in: units, at: index), !next.properties.isWhitespace {
+            while index < units.count, let (next, nextWidth) = readScalar(in: units, at: index), !isBlank(next) {
                 index += nextWidth
             }
             spans.append(WordSpan(index: spans.count, key: RangeKey(location: start, length: index - start)))
         }
         return spans
+    }
+
+    private static func isBlank(_ scalar: Unicode.Scalar) -> Bool {
+        SystemSpeechMarkerAlignmentBox.isBlank(String(scalar))
     }
 
     private static func readScalar(in units: [UInt16], at index: Int) -> (Unicode.Scalar, Int)? {
