@@ -10,6 +10,9 @@ import Foundation
 /// A network loss or an unavailable model is a visible failure: the committed
 /// scene stays, and an uncommitted partial is dropped.
 ///
+/// A name is kept only when `PointingFailureRecoveryBox` keeps it. A zero-width
+/// space stays in the name. Named blanks around a name are removed.
+///
 /// The network and model sentences use the same wording as `PointingFailureKind`.
 public struct PointingFailureRecovery: Equatable, Sendable {
     /// Playback resumes here after an output-device change. Never the old elapsed time.
@@ -248,9 +251,9 @@ public struct PointingFailureRecovery: Equatable, Sendable {
         )
     }
 
+    /// A body of only named blanks is empty. A zero-width space is a name.
     private func normalized(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        PointingFailureRecoveryBox.kept(value)
     }
 
     private func normalizedIDs(_ ids: [String], allowEmpty: Bool) -> [String]? {
