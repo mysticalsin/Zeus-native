@@ -98,14 +98,19 @@ public enum RecordlySourceSelection {
         isOnScreen: Bool,
         ownerName: String? = nil
     ) -> CatalogSnapshot.Window? {
-        guard let ownerProcessID, number > 0, ownerProcessID > 0, isOnScreen,
-              frame.origin.x.isFinite, frame.origin.y.isFinite,
-              frame.width.isFinite, frame.height.isFinite,
-              frame.width > 40, frame.height > 40 else { return nil }
-        let token = "\(number):\(ownerProcessID)"
+        guard let ownerProcessID,
+              RecordlySourceSelectionBox.acceptsWindow(
+                number: number,
+                ownerProcessID: ownerProcessID,
+                x: Double(frame.origin.x),
+                y: Double(frame.origin.y),
+                width: Double(frame.width),
+                height: Double(frame.height),
+                isOnScreen: isOnScreen)
+        else { return nil }
         return .init(
             number: number,
-            identityToken: token,
+            identityToken: RecordlySourceSelectionBox.identityToken(number: number, ownerProcessID: ownerProcessID),
             isPresent: true,
             title: title,
             ownerName: ownerName
@@ -127,13 +132,7 @@ public enum RecordlySourceSelection {
     }
 
     public static func hasValidExplicitIdentity(_ intent: SelectionIntent) -> Bool {
-        switch intent {
-        case .display(let id): id != 0
-        case .window(let number, let token):
-            number > 0 && !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .region:
-            false
-        }
+        RecordlySourceSelectionBox.hasValidExplicitIdentity(boxIntent(intent))
     }
 
     public struct ResolvedSource: Equatable, Sendable {
@@ -206,57 +205,53 @@ public enum RecordlySourceSelection {
         in catalog: CatalogSnapshot,
         permission: PermissionState
     ) -> Outcome {
-        switch permission {
-        case .unknown:
-            return .denied(reason: "Screen Recording permission is unknown. Check System Settings before starting capture.")
-        case .denied:
-            return .denied(reason: "Screen Recording is off. Enable Zeus in System Settings → Privacy & Security → Screen Recording.")
-        case .granted:
-            break
+        switch RecordlySourceSelectionBox.resolve(
+            intent: boxIntent(intent),
+            displayIDs: catalog.displays.map(\.id),
+            windows: catalog.windows.map { window in
+                RecordlySourceSelectionBox.Window(
+                    number: window.number,
+                    identityToken: window.identityToken,
+                    isPresent: window.isPresent)
+            },
+            permission: boxPermission(permission)
+        ) {
+        case .ready(let ready):
+            return .ready(readySource(ready))
+        case .denied(let reason):
+            return .denied(reason: reason)
+        case .lostSource(let reason):
+            return .lostSource(reason: reason)
+        case .invalidIntent(let reason):
+            return .invalidIntent(reason: reason)
         }
+    }
 
+    private static func boxPermission(_ permission: PermissionState) -> RecordlySourceSelectionBox.Permission {
+        switch permission {
+        case .unknown: .unknown
+        case .denied: .denied
+        case .granted: .granted
+        }
+    }
+
+    private static func boxIntent(_ intent: SelectionIntent) -> RecordlySourceSelectionBox.Intent {
         switch intent {
         case .display(let id):
-            guard id != 0 else {
-                return .invalidIntent(reason: "Choose a specific display before starting capture.")
-            }
-            let matches = catalog.displays.filter { $0.id == id }
-            guard !matches.isEmpty else {
-                return .lostSource(reason: "The selected display is no longer available. Choose another display explicitly.")
-            }
-            guard matches.count == 1 else {
-                return .invalidIntent(reason: "The display catalog contains an ambiguous identity. Refresh the display choices.")
-            }
-            return .ready(.display(id))
-
+            .display(id: id)
         case .window(let number, let identityToken):
-            guard number > 0, !identityToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return .invalidIntent(reason: "Choose a window with a valid identity before starting capture.")
-            }
-            let bindings = catalog.windows.filter { $0.number == number }
-            guard !bindings.isEmpty else {
-                return .invalidIntent(reason: "The window choice is not bound to a known window identity. Choose a window explicitly.")
-            }
-            guard bindings.count == 1, let binding = bindings.first else {
-                return .invalidIntent(reason: "The window catalog contains an ambiguous identity. Refresh the window choices.")
-            }
-            guard binding.identityToken == identityToken, binding.isPresent else {
-                return .lostSource(reason: "The selected window is no longer available. Choose another window explicitly.")
-            }
-            return .ready(.window(number: number, identityToken: identityToken))
-
+            .window(number: number, identityToken: identityToken)
         case .region(let displayID, let x, let y, let width, let height):
-            guard displayID != 0 else {
-                return .invalidIntent(reason: "Choose a specific host display for the region before starting capture.")
-            }
-            guard x.isFinite, y.isFinite, width.isFinite, height.isFinite,
-                  width > 0, height > 0 else {
-                return .invalidIntent(reason: "Select a region with finite coordinates and positive width and height.")
-            }
-            guard (x + width).isFinite, (y + height).isFinite else {
-                return .invalidIntent(reason: "Select a region with finite bounds.")
-            }
-            return .invalidIntent(reason: "Region coordinates have no verified coordinate-space source yet. Reselect after the region picker is available.")
+            .region(displayID: displayID, x: x, y: y, width: width, height: height)
+        }
+    }
+
+    private static func readySource(_ ready: RecordlySourceSelectionBox.Ready) -> ResolvedSource {
+        switch ready {
+        case .display(let id):
+            .display(id)
+        case .window(let number, let identityToken):
+            .window(number: number, identityToken: identityToken)
         }
     }
 }
