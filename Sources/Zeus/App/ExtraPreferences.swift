@@ -81,6 +81,19 @@ final class ExtraPreferences {
 
     // Interview: keep every ZEUS window out of screen shares and recordings.
     var hideFromScreenShare = bool("interview.hide", false) { didSet { store(hideFromScreenShare, "interview.hide") } }
+    /// Notes for a later interview. Local only. The page does not record a call.
+    var candidateContext = InterviewContext.normalize(UserDefaults.standard.string(forKey: InterviewContext.storageKey)) {
+        didSet { storeCandidateContext() }
+    }
+
+    private func storeCandidateContext() {
+        let next = InterviewContext.normalize(candidateContext)
+        if next != candidateContext {
+            candidateContext = next
+            return
+        }
+        store(next, InterviewContext.storageKey)
+    }
 
     /// Forgets the given keys, then reads every value again (section reset).
     func reset(_ keys: [String]) {
@@ -109,6 +122,7 @@ final class ExtraPreferences {
         openNotch = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.openNotch") ?? "") ?? .optionCommandZ
         quickTodo = ShortcutPreset(rawValue: defaults.string(forKey: "shortcut.quickTodo") ?? "") ?? .controlOptionT
         hideFromScreenShare = Self.bool("interview.hide", false)
+        candidateContext = InterviewContext.normalize(defaults.string(forKey: InterviewContext.storageKey))
     }
 }
 
