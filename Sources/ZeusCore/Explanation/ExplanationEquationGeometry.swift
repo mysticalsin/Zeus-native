@@ -7,6 +7,8 @@ import Foundation
 /// underscore, or slash is a character, not a superscript or a stacked fraction.
 /// An ASCII backslash or an ASCII dollar sign is TeX markup and is refused.
 /// This type does not measure a font, does not draw, and does not run a TeX lexer.
+/// The blank check is read from `ExplanationEquationGeometryBox`. The laid-out
+/// line stays as written, including a zero-width space.
 public enum ExplanationEquationGeometry {
     /// Object text cap in `ExplanationLimits.text`, counted in UTF-8 bytes.
     public static let textByteLimit = 1024
@@ -92,9 +94,10 @@ public enum ExplanationEquationGeometry {
 
     /// The same bounds as `ExplanationReducer` object text: a non-blank string,
     /// at most `textByteLimit` UTF-8 bytes, and no controls other than newline and tab.
+    /// Blank scalars are named in `ExplanationEquationGeometryBox`. A zero-width space counts as text.
     private static func textRefusal(_ text: String) -> Refusal? {
         if text.utf8.count > textByteLimit { return .textBounds }
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .textBounds }
+        if !ExplanationEquationGeometryBox.hasEquationText(text) { return .textBounds }
         let controls = text.unicodeScalars.contains { scalar in
             scalar.value == 127 || (scalar.value < 32 && scalar != "\n" && scalar != "\t")
         }
