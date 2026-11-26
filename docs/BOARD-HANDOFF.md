@@ -1,6 +1,21 @@
 # Board handoff
 
-Recorded 2026-11-26, 14:29 America/Sao_Paulo. `main` is `d6d45ddeae334e63134f11eb36be1d663b2637b3`. Nothing in For Review, In Progress, or Queued is merged. A later agent should continue from the open pull request named here, on that pull request's branch. Do not open a second branch for the same files.
+Updated 2026-11-26, 16:41 America/Sao_Paulo. The drafts whose base was `main` and whose files did not clash were merged. `main` is now `08dce0e9882bfc231ec88c0fb0a0231bd32dc149`.
+
+Still open against `main`, because they edit the same files and Git cannot combine them without a manual resolution:
+
+- #419 notch hover
+- #418 agent choice dismiss
+- #406 approval preview
+- #403 speech-to-text lines
+- #401 Right Option hold
+- #249 Command dictation
+- #19 voice-key walk bound
+- #12 voice-key walk socket tests
+
+Pull requests whose base is `codex/integration-20261111` or another feature branch were not merged into `main`. Merging that older line on top of this `main` would replay a different history.
+
+The note below is the earlier record of cards that had no branch of their own.
 
 ## Already on this remote
 
