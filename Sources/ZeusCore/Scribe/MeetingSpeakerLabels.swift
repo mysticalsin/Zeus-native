@@ -93,8 +93,7 @@ public enum MeetingSpeakerLabelParser {
         var text = raw
         for pattern in suffixes { text = strip(pattern, from: text) }
         text = text.replacingOccurrences(of: "\u{200E}", with: "").replacingOccurrences(of: "\u{200F}", with: "")
-        let edge = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",;:-|()[]\u{2013}\u{2014}\u{2022}\u{00B7}"))
-        text = text.trimmingCharacters(in: edge)
+        text = MeetingSpeakerLabelsBox.trimmed(text)
         text = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         guard !text.isEmpty, text.count <= 60, text.contains(where: \.isLetter) else { return nil }
         let folded = text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
