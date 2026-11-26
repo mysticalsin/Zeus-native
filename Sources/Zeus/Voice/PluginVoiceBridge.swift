@@ -179,17 +179,32 @@ enum PluginVoiceBridge {
         return created
     }
 
+    /// Synchronous. `stop` calls this before the sentence pump resumes, so a cancelled utterance cannot play.
+    static func cancelSpeaking() {
+        session?.utterances.cancelActive()
+        let current = session
+        Task { await current?.cancel() }
+    }
+
     static func speak(_ text: String) async -> Result {
         let choice = VoiceProviderPreferences(defaults: .standard).choice
         guard case .provider = choice else { return .passthrough }
+        let session = sharedSession()
+        let utterance = session.utterances.begin()
         let streamed = StreamedFlag()
-        let outcome = await sharedSession().speak(text) { chunk in
+        let outcome = await session.speak(text, onPlaybackChunk: { chunk in
             streamed.value = true
             await PluginAudioPlay.enqueue(chunk)
+        }, gate: session.utterances, utterance: utterance)
+        guard !session.utterances.isCancelled(utterance), !Task.isCancelled else {
+            return .localFallback(reason: "Speaking cancelled.")
         }
         switch outcome.route {
         case .cloud(let providerID, let voiceID):
             if !streamed.value {
+                guard !session.utterances.isCancelled(utterance), !Task.isCancelled else {
+                    return .localFallback(reason: "Speaking cancelled.")
+                }
                 guard await PluginAudioPlay.play(outcome.audio) else { return .localFallback(reason: outcome.statusLine) }
             }
             let engine: UltronEngine = providerID == ElevenLabsTTSAdapter.id ? .elevenLabs : .system
