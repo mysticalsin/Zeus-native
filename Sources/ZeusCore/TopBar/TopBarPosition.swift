@@ -11,26 +11,24 @@ import Foundation
 /// - The drop moves the closed notch capsule only. The screen-edge glow and edge wave always hug the
 ///   physical screen edge (`ScreenEdgeOutline` has no offset input).
 public enum TopBarPosition {
-    public static let minimum = 0.0
-    public static let maximum = 24.0
-    public static let step = 2.0
+    public static let minimum = TopBarPositionBox.minimum
+    public static let maximum = TopBarPositionBox.maximum
+    public static let step = TopBarPositionBox.step
 
     /// Finite, inside the range and on the step. NaN and infinity fall back to no offset.
     public static func clamped(_ value: Double) -> Double {
-        guard value.isFinite else { return minimum }
-        let snapped = (value / step).rounded() * step
-        return min(max(snapped, minimum), maximum)
+        TopBarPositionBox.clamped(value)
     }
 
     /// What Settings stored, or no drop when the owner never moved the slider.
     public static func resolved(chosen: Double?) -> Double {
-        chosen.map(clamped) ?? minimum
+        TopBarPositionBox.resolved(chosen: chosen)
     }
 
     /// The open panel always sits flush with the top of the screen; only the closed bar and the
     /// peek card drop.
     public static func applied(resolved: Double, panelOpen: Bool) -> Double {
-        panelOpen ? 0 : clamped(resolved)
+        TopBarPositionBox.applied(resolved: resolved, panelOpen: panelOpen)
     }
 }
 
@@ -41,8 +39,8 @@ public enum TopBarPosition {
 /// It always hugs the physical screen edge. The top bar's drop never moves it: a lowered top run left a
 /// dark band above the light and floated the rounded corners off the real screen corners.
 public struct ScreenEdgeOutline: Equatable, Sendable {
-    public static let defaultInset = 2.0
-    public static let defaultRadius = 12.0
+    public static let defaultInset = TopBarPositionBox.edgeInset
+    public static let defaultRadius = TopBarPositionBox.edgeRadius
 
     public let centerX: Double
     public let top: Double
@@ -52,14 +50,11 @@ public struct ScreenEdgeOutline: Equatable, Sendable {
     public let radius: Double
 
     public init(width: Double, height: Double, inset: Double = defaultInset, radius: Double = defaultRadius) {
-        let w = width.isFinite ? max(0, width) : 0
-        let h = height.isFinite ? max(0, height) : 0
-        let i = inset.isFinite ? max(0, inset) : 0
-        centerX = w / 2
-        top = i
-        right = max(centerX, w - i)
-        bottom = max(i, h - i)
-        let room = min(right - centerX, (bottom - top) / 2)
-        self.radius = max(0, min(radius.isFinite ? radius : 0, room))
+        let outline = TopBarPositionBox.outline(width: width, height: height, inset: inset, radius: radius)
+        centerX = outline.centerX
+        top = outline.top
+        right = outline.right
+        bottom = outline.bottom
+        self.radius = outline.radius
     }
 }

@@ -101,6 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointing?.stop()
         // Every shaping tap is destroyed and the claim released, so no app is left muted.
         equaliser?.shutdown()
+        if on(.lockChimes) { LockChimeController.shared.stop() }
         // Tiling removes its key tap, observers and overlays. It never moves a window on the way out. The controller
         // is not even made when the service is denied.
         if on(.tiling) { TilingController.shared.stop() }
@@ -265,6 +266,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             TodoController.shared.onCompleted = { AvatarStatus.shared.flash(.done) }
         }
         if on(.sleepWatch) { AvatarStatus.shared.startSleepWatch() }
+        if on(.lockChimes) { LockChimeController.shared.start() }
         if on(.intelligence) {
             IntelligenceCenter.shared.onDecided = { [weak self] engine, intent in self?.topBar.show(.decided(engine: engine, summary: intent)) }
         }
@@ -900,6 +902,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.autoenablesItems = false
         menu.addItem(.separator())
         menu.addItem(ScreenShareQuickToggle.menuItem(target: self, action: #selector(toggleScreenShareFromMenu)))
+        ScreenShareQuickToggle.installCatcher(on: menu)
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit ZEUS", action: #selector(quitFromMenu), keyEquivalent: "").target = self
@@ -920,7 +923,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc private func stopSpeakingFromMenu() { explanation?.stop(); voice?.stopSpeaking() }
     @objc private func openSettingsFromMenu() { showSettings() }
-    @objc private func toggleScreenShareFromMenu() { ScreenShareQuickToggle.toggle() }
+    @objc private func toggleScreenShareFromMenu() {
+        guard ScreenShareQuickToggle.allowMenuAction() else { return }
+        ScreenShareQuickToggle.toggle()
+    }
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 
     /// The welcome guide (Sources/Zeus/Onboarding), Glance's seven steps.
@@ -1054,6 +1060,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 UpdateCoordinator.shared.refreshBadge()
             case AudioSpectrumService.liveKey: AudioSpectrumService.shared.liveSpectrumChanged(on: store.bool(id))
             case "audio.equaliser": self?.equaliser?.setSwitch(store.bool(id))
+            case ChimeSettingsKey.enabled, ChimeSettingsKey.volume, ChimeSettingsKey.closePath, ChimeSettingsKey.openPath:
+                LockChimeController.shared.reload()
             case AudioSpectrumService.sensitivityKey: AudioSpectrumService.shared.sensitivityChanged()
             case "screen.roundBottomCorners", "screen.cornerRadius": ScreenCornerOverlay.shared.settingsChanged()
             default: break
@@ -1241,13 +1249,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if self.topBar.micListening != listening { self.topBar.micListening = listening }
                 let level = Double(self.buddy.model.audioLevel ?? 0)
                 if self.topBar.micLevel != level { self.topBar.micLevel = level }
+                let held = WakeWordController.shared.talkKeyHeld
+                if self.topBar.talkHeld != held { self.topBar.talkHeld = held }
             }
         }
         feed.tolerance = interval * 0.4
     }
 
     private var feedIsLive: Bool {
-        (voice?.isSpeaking ?? false) || (voice?.isListening ?? false) || topBar.isDictating || notch.model.approval != nil
+        (voice?.isSpeaking ?? false) || (voice?.isListening ?? false) || WakeWordController.shared.talkKeyHeld
+            || topBar.isDictating || notch.model.approval != nil
             || [.countdown, .rolling, .paused].contains(topBar.roll.phase)
     }
 }

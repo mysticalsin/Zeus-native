@@ -332,7 +332,6 @@ public struct STTLiveTurn: Equatable, Sendable {
         abortedAtMs = clock.nowMs
         failure = .aborted
     }
-
     /// Key release, or the second Murmur tap. That is the endpoint when silence has not already ended the turn.
     public mutating func keyUp(clock: STTClock, recognizerFinalMs: Int? = nil) {
         armEndpoint(clock: clock)
@@ -548,6 +547,45 @@ public final class STTOnce: @unchecked Sendable {
         body()
     }
 }
+
+
+/// One file recognition. Non-final partials are kept.
+/// The give-up settles with the latest partial and the caller cancels the task.
+/// A later cancel callback does not replace that text. Empty text is still no speech.
+public final class STTFileRecognition: @unchecked Sendable {
+    private let lock = NSLock()
+    private var partial = ""
+    private var settled = false
+
+    public init() {}
+
+    /// Stores one recognition callback. A non-final partial is kept and not delivered.
+    /// A final or an error settles with the newest partial, which stays empty only when nothing was heard.
+    /// Nil means this recognition is still waiting, or it already settled.
+    public func note(text: String?, isFinal: Bool, failed: Bool) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !settled else { return nil }
+        if let text {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { partial = trimmed }
+        }
+        guard isFinal || failed else { return nil }
+        settled = true
+        return partial
+    }
+
+    /// The file give-up. Returns the latest partial, including one that never became final.
+    /// Nil means a final or an error already settled this recognition.
+    public func giveUp() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !settled else { return nil }
+        settled = true
+        return partial
+    }
+}
+
 
 public enum STTOutcome {
     /// How a finished turn is counted. A partial that is handed over inside the budget is not a failure.

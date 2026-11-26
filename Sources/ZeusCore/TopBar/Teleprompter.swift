@@ -14,40 +14,17 @@ public struct PrompterScript: Equatable, Sendable {
 
     /// The script as display blocks: cue titles and the paragraphs between them. Blank lines split paragraphs.
     public var blocks: [Block] {
-        var result: [Block] = []
-        var paragraph: [String] = []
-        func flush() {
-            let joined = paragraph.joined(separator: " ").trimmingCharacters(in: .whitespaces)
-            if !joined.isEmpty { result.append(Block(id: result.count, isCue: false, text: joined)) }
-            paragraph = []
-        }
-        for raw in text.components(separatedBy: .newlines) {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("#") {
-                flush()
-                let title = line.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces)
-                if !title.isEmpty { result.append(Block(id: result.count, isCue: true, text: title)) }
-            } else if line.isEmpty {
-                flush()
-            } else {
-                paragraph.append(line)
-            }
-        }
-        flush()
-        return result
+        TeleprompterBox.blocks(in: text).map { Block(id: $0.id, isCue: $0.isCue, text: $0.text) }
     }
 
     public var cues: [Block] { blocks.filter(\.isCue) }
 
     /// Spoken words, cue titles left out.
-    public var wordCount: Int {
-        blocks.filter { !$0.isCue }.reduce(0) { $0 + $1.text.split(whereSeparator: \.isWhitespace).count }
-    }
+    public var wordCount: Int { TeleprompterBox.wordCount(in: text) }
 
     /// Reading time at a speaking pace (words per minute), in seconds.
-    public func readingTime(wordsPerMinute: Double = 150) -> TimeInterval {
-        guard wordsPerMinute > 0 else { return 0 }
-        return Double(wordCount) / wordsPerMinute * 60
+    public func readingTime(wordsPerMinute: Double = TeleprompterBox.defaultWordsPerMinute) -> TimeInterval {
+        TeleprompterBox.readingTime(wordCount: wordCount, wordsPerMinute: wordsPerMinute)
     }
 }
 
@@ -55,7 +32,7 @@ public struct PrompterScript: Equatable, Sendable {
 /// Voice follow: the text moves only while you're speaking (with a short grace so
 /// breaths don't stop it) and holds when you pause. Hovering always holds it.
 public struct PrompterRoll: Equatable, Sendable {
-    public enum Phase: Equatable, Sendable { case idle, countdown, rolling, paused, finished }
+    public typealias Phase = TeleprompterBox.Phase
 
     public private(set) var phase: Phase = .idle
     /// Scroll distance in points.
@@ -64,90 +41,110 @@ public struct PrompterRoll: Equatable, Sendable {
     public var speed: Double
     public var voiceFollow: Bool
     /// Mic level (0...1) that counts as speaking.
-    public var voiceThreshold: Double = 0.12
+    public var voiceThreshold: Double = TeleprompterBox.defaultVoiceThreshold
     /// How long the text keeps moving after you stop speaking.
-    public var voiceGrace: TimeInterval = 0.7
+    public var voiceGrace: TimeInterval = TeleprompterBox.defaultVoiceGrace
     public private(set) var countdownEndsAt: Date?
     private var lastVoiceAt: Date?
 
-    public static let countdownLength: TimeInterval = 3
-    public static let speedRange: ClosedRange<Double> = 8...120
+    public static let countdownLength: TimeInterval = TeleprompterBox.countdownLength
+    public static let speedRange: ClosedRange<Double> = TeleprompterBox.speedRange
 
-    public init(speed: Double = 32, voiceFollow: Bool = true) {
-        self.speed = min(max(speed, Self.speedRange.lowerBound), Self.speedRange.upperBound)
+    public init(speed: Double = TeleprompterBox.defaultSpeed, voiceFollow: Bool = true) {
+        self.speed = TeleprompterBox.clampedSpeed(speed)
         self.voiceFollow = voiceFollow
     }
 
-    public mutating func start(at now: Date = Date(), countdown: Bool = true) {
-        offset = 0
-        lastVoiceAt = nil
-        if countdown {
-            phase = .countdown
-            countdownEndsAt = now.addingTimeInterval(Self.countdownLength)
-        } else {
-            phase = .rolling
-            countdownEndsAt = nil
+    private var roll: TeleprompterBox.Roll {
+        get {
+            TeleprompterBox.Roll(
+                phase: phase, offset: offset, speed: speed, voiceFollow: voiceFollow,
+                voiceThreshold: voiceThreshold, voiceGrace: voiceGrace,
+                countdownEndsAt: countdownEndsAt, lastVoiceAt: lastVoiceAt)
         }
+        set {
+            phase = newValue.phase
+            offset = newValue.offset
+            speed = newValue.speed
+            voiceFollow = newValue.voiceFollow
+            voiceThreshold = newValue.voiceThreshold
+            voiceGrace = newValue.voiceGrace
+            countdownEndsAt = newValue.countdownEndsAt
+            lastVoiceAt = newValue.lastVoiceAt
+        }
+    }
+
+    public mutating func start(at now: Date = Date(), countdown: Bool = true) {
+        var state = roll
+        TeleprompterBox.start(&state, at: now, countdown: countdown)
+        roll = state
     }
 
     /// Whole seconds left on the countdown (3, 2, 1), or nil.
     public func countdownRemaining(at now: Date = Date()) -> Int? {
-        guard phase == .countdown, let end = countdownEndsAt else { return nil }
-        return max(1, Int((end.timeIntervalSince(now)).rounded(.up)))
+        TeleprompterBox.countdownRemaining(roll, at: now)
     }
 
-    public mutating func pause() { if phase == .rolling || phase == .countdown { phase = .paused; countdownEndsAt = nil } }
-    public mutating func resume() { if phase == .paused || phase == .finished { phase = .rolling } }
-    public mutating func stop() { phase = .idle; offset = 0; countdownEndsAt = nil }
+    public mutating func pause() {
+        var state = roll
+        TeleprompterBox.pause(&state)
+        roll = state
+    }
+
+    public mutating func resume() {
+        var state = roll
+        TeleprompterBox.resume(&state)
+        roll = state
+    }
+
+    public mutating func stop() {
+        var state = roll
+        TeleprompterBox.stop(&state)
+        roll = state
+    }
 
     public mutating func adjustSpeed(by delta: Double) {
-        speed = min(max(speed + delta, Self.speedRange.lowerBound), Self.speedRange.upperBound)
+        var state = roll
+        TeleprompterBox.adjustSpeed(&state, by: delta)
+        roll = state
     }
 
     /// New text replaced the old (the next slide's notes): back to the top. A roll that was
     /// rolling or had reached the end rolls on at once, with a moment of voice grace; a paused,
     /// idle or counting-down roll keeps its phase.
     public mutating func restartSection(at now: Date = Date()) {
-        offset = 0
-        switch phase {
-        case .rolling, .finished:
-            phase = .rolling
-            lastVoiceAt = now
-        case .idle, .paused, .countdown:
-            break
-        }
+        var state = roll
+        TeleprompterBox.restartSection(&state, at: now)
+        roll = state
     }
 
     /// Jump to a point (a cue's position) and keep going.
     public mutating func jump(to position: Double) {
-        offset = max(0, position)
-        if phase == .finished { phase = .rolling }
+        var state = roll
+        TeleprompterBox.jump(&state, to: position)
+        roll = state
     }
 
     /// Hear the mic level; call this as levels arrive.
     public mutating func hear(level: Double, at now: Date = Date()) {
-        if level >= voiceThreshold { lastVoiceAt = now }
+        var state = roll
+        TeleprompterBox.hear(&state, level: level, at: now)
+        roll = state
     }
 
     public func isSpeaking(at now: Date = Date()) -> Bool {
-        guard let lastVoiceAt else { return false }
-        return now.timeIntervalSince(lastVoiceAt) <= voiceGrace
+        TeleprompterBox.isSpeaking(roll, at: now)
     }
 
     /// Whether the text would move right now.
     public func isMoving(at now: Date = Date(), hovered: Bool) -> Bool {
-        phase == .rolling && !hovered && (!voiceFollow || isSpeaking(at: now))
+        TeleprompterBox.isMoving(roll, at: now, hovered: hovered)
     }
 
     /// Advance by `dt` seconds. `maxOffset` is where the script ends (content minus view height).
     public mutating func tick(_ dt: TimeInterval, at now: Date = Date(), hovered: Bool, maxOffset: Double) {
-        if phase == .countdown, let end = countdownEndsAt, now >= end {
-            phase = .rolling
-            countdownEndsAt = nil
-            lastVoiceAt = now  // a moment of grace so the first words aren't missed
-        }
-        guard isMoving(at: now, hovered: hovered), dt > 0 else { return }
-        offset = min(offset + speed * dt, max(0, maxOffset))
-        if maxOffset > 0, offset >= maxOffset { phase = .finished }
+        var state = roll
+        TeleprompterBox.tick(&state, dt, at: now, hovered: hovered, maxOffset: maxOffset)
+        roll = state
     }
 }

@@ -75,6 +75,8 @@ public enum VoiceLatencyTargets {
     public static let apiCloudVoiceMs = 1_200
     /// Key-up to first audio with only the CLI brains (and any voice).
     public static let cliOnlyMs = 2_500
+    /// Scored first-audio p50. The API route stays at 1.2 s. A CLI log must also clear this ceiling.
+    public static let firstAudioP50Ms = 2_000
 
     public static func targetMs(apiBrain: Bool, cloudVoice: Bool) -> Int {
         apiBrain && cloudVoice ? apiCloudVoiceMs : cliOnlyMs

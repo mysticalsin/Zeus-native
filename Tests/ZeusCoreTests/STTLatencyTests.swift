@@ -512,4 +512,42 @@ struct STTLatencyTests {
             #expect(!answer.hangs)
         }
     }
+
+    @Test func fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled() {
+        let heard = STTFileRecognition()
+        let waiting = heard.note(text: "set a timer", isFinal: false, failed: false)
+        let replaced = heard.note(text: "set a timer for five", isFinal: false, failed: false)
+        let delivered = heard.giveUp()
+        let lateCancel = heard.note(text: nil, isFinal: false, failed: true)
+        #expect(waiting == nil)
+        #expect(replaced == nil)
+        #expect(delivered == "set a timer for five")
+        #expect(lateCancel == nil)
+        #expect(delivered?.isEmpty == false)
+
+        let finished = STTFileRecognition()
+        let final = finished.note(text: "done", isFinal: true, failed: false)
+        let afterFinal = finished.giveUp()
+        #expect(final == "done")
+        #expect(afterFinal == nil)
+
+        let silent = STTFileRecognition()
+        let empty = silent.giveUp()
+        #expect(empty == "")
+
+        let cancelled = STTFileRecognition()
+        let ignored = cancelled.note(text: "hello", isFinal: false, failed: false)
+        let fromError = cancelled.note(text: nil, isFinal: false, failed: true)
+        #expect(ignored == nil)
+        #expect(fromError == "hello")
+
+        let blank = STTFileRecognition()
+        let spaces = blank.note(text: "   ", isFinal: false, failed: false)
+        let noSpeech = blank.giveUp()
+        #expect(spaces == nil)
+        #expect(noSpeech == "")
+
+        #expect(STTFileGiveUp.seconds(audioMs: STTFileGiveUp.standInAudioMs) == 2)
+        #expect(STTSessionPolicy.production.endpointToFinalMs == 450)
+    }
 }

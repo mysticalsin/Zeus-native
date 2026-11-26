@@ -55,8 +55,9 @@ GROUPS = {
         tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
     ),
     "keychain": (
-        core("Keychain/KeychainStore.swift"),
-        tests("KeychainStoreTests"),
+        core("Keychain/KeychainStore.swift", "Connections/AIConnectionRegistry.swift",
+             "Voice/VoiceTTSProvider.swift", "Voice/VoiceProviderKeychain.swift"),
+        tests("KeychainStoreTests", "AIConnectionRegistryTests"),
     ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
@@ -68,8 +69,8 @@ GROUPS = {
         tests("WikiExportTests"),
     ),
     "dictation-insertion": (
-        core("Dictation/TextInsertionReceipt.swift"),
-        tests("TextInsertionReceiptTests"),
+        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift"),
+        tests("TextInsertionReceiptTests", "WarmFieldInsertTests"),
     ),
     "polyglot": (
         core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
@@ -104,9 +105,14 @@ GROUPS = {
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
+             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Voice/MiddleBarTone.swift",
+             "ThemeTokens.swift", "Performance/DisplayAnimationPolicy.swift",
              "TopBar/RecordingFeedback.swift"),
         tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
+    ),
+    "explain-showcase": (
+        core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift"),
+        tests("ExplainShowcaseTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
@@ -153,6 +159,11 @@ GROUPS = {
              "Intent/Utterance.swift", "Dictation/TranscriptionEngine.swift", "ZeusPaths.swift"),
         tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
               "EqualiserPolicyTests", "EqualiserLifecycleTests", "EqualiserConsentTests"),
+    ),
+    "chimes": (
+        core("Chime/ChimeSession.swift", "Chime/ChimeSettings.swift", "Chime/ChimeSoundResolver.swift",
+             "Chime/ChimeTone.swift", "Chime/ChimeFileAccess.swift"),
+        tests("ChimeTests"),
     ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (

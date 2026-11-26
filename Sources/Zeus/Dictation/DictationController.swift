@@ -374,6 +374,7 @@ final class DictationController {
         RecorderPill.shared.attach(topBar)
         // Pruning only follows a clean read: a corrupt history file is set aside, never pruned around.
         if reloadModesAndHistory() { store.prune(olderThanDays: settings.keepDays) }
+        nextAudioPrune = Date().addingTimeInterval(Self.audioPruneInterval)
         hotkey.keyProvider = { [weak self] in
             guard let self, self.settings.enabled, let key = self.settings.key else { return nil }
             return key
@@ -781,6 +782,7 @@ final class DictationController {
         guard flow.isActive else { return }
         apply(.cancelRequested)
         topBar.show(.dictation("Dictation cancelled"))
+        pruneStoredAudioIfDue()
     }
 
     /// The microphone kept changing and capture gave up under a listening turn: end it and say why.
@@ -790,6 +792,7 @@ final class DictationController {
         VoiceLog.log("listen", "dictation capture failed (\(failure)): the turn ended")
         apply(.cancelRequested)
         topBar.show(.hint(CaptureFailureHint.text(for: failure)))
+        pruneStoredAudioIfDue()
     }
 
     /// Test seam: opens a listening turn on `session` without the microphone. Returns the turn.
@@ -871,12 +874,14 @@ final class DictationController {
                 VoiceLog.log("dictation", "transcript empty")
                 apply(.failed(turn: generation, reason: "No speech was heard."))
                 topBar.show(.dictation("No speech heard"))
+                pruneStoredAudioIfDue()
             },
             onDiscarded: { [self] in
                 insertionTracker.invalidate()
                 apply(.dismissed(turn: generation))
                 topBar.show(.dictation(reviewTimedOut ? "No answer in 5 minutes. Text copied, press ⌘V to paste" : "Dictation discarded"))
                 reviewTimedOut = false
+                pruneStoredAudioIfDue()
             },
             onDelivered: { [self] raw, text, outcome, heard in
                 let record = DictationRecord(duration: audioMs, processingTime: Int(Date().timeIntervalSince(released) * 1000),
@@ -900,6 +905,7 @@ final class DictationController {
                 let written = deliveryMessage ?? (outcome == .pasted ? "\(record.wordCount) words written" : "Copied. Press ⌘V to paste.")
                 let base = heard.note.map { "\($0) \(written)." } ?? written
                 topBar.show(.dictation(saveFailed ? "\(base) Couldn't save to history." : base))
+                pruneStoredAudioIfDue()
             })
         Task { @MainActor in _ = await flow.run() }
     }
@@ -910,6 +916,16 @@ final class DictationController {
     /// How long the "Check before writing" card may wait before the turn is discarded, so an
     /// unanswered card can never leave the phase stuck in `.transcribing`.
     private static let reviewTimeoutSeconds = 300
+    /// Old audio is dropped again while the app stays open. A turn end checks this, and the
+    /// gap stops a burst of turns from reading the whole history each time.
+    private static let audioPruneInterval: TimeInterval = 15 * 60
+    private var nextAudioPrune = Date.distantPast
+
+    private func pruneStoredAudioIfDue(now: Date = Date()) {
+        guard now >= nextAudioPrune else { return }
+        nextAudioPrune = now.addingTimeInterval(Self.audioPruneInterval)
+        store.prune(olderThanDays: settings.keepDays)
+    }
     /// Set when the last preview card timed out, so the toast says the text was copied.
     private var reviewTimedOut = false
 
@@ -1075,13 +1091,15 @@ final class DictationController {
             }
         }
         // Only a target that is still alive, frontmost and focused gets an automatic paste.
-        // When that gate refuses, a writable focused field still receives the words. The clipboard
-        // is the fallback, and a clipboard result is not an insertion.
+        // When that gate refuses, a writable focused field still receives the words.
+        // A warm field that already holds text is written too. The clipboard is the fallback,
+        // and a clipboard result is not an insertion.
         switch deliveryVerdict(for: context, allowClipboardFallback: allowClipboardFallback) {
         case .paste:
             break
         case .clipboardOnly:
             if insertFocusedField(text, context: context, onTextReady: onTextReady) { return .pasted }
+            if writeWarmField(text, context: context, onTextReady: onTextReady) { return .pasted }
             if allowClipboardFallback {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
@@ -1115,6 +1133,9 @@ final class DictationController {
         if outcome != .pasted, insertFocusedField(text, context: context, onTextReady: onTextReady) {
             return .pasted
         }
+        if outcome != .pasted, writeWarmField(text, context: context, onTextReady: onTextReady) {
+            return .pasted
+        }
         return outcome
     }
 
@@ -1124,6 +1145,16 @@ final class DictationController {
         let choice = FocusedFieldWrite.choose(turnCurrent: ownership.owns(generation: context.generation),
                                               fieldWritable: TextInserter.focusedFieldCanTakeText())
         guard choice == .writeField, TextInserter.writeFocusedField(text) else { return false }
+        onTextReady?("field")
+        return true
+    }
+
+    /// Puts the words in the focused field, or the field this turn started in.
+    /// A miss leaves the clipboard path to the caller and does not count as inserted.
+    private func writeWarmField(_ text: String, context: DictationTurnContext,
+                                onTextReady: (@MainActor (String) -> Void)?) -> Bool {
+        guard ownership.owns(generation: context.generation) else { return false }
+        guard WarmFieldWriter.write(text, captured: context.insertionField?.element) else { return false }
         onTextReady?("field")
         return true
     }

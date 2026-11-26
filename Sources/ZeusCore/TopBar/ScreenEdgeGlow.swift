@@ -35,45 +35,25 @@ public struct ScreenEdgeGlowFrame: Equatable, Sendable {
 
 public enum ScreenEdgeGlowMath {
     /// Springs in along the edge.
-    public static let fadeIn: TimeInterval = 0.12
+    public static let fadeIn: TimeInterval = ScreenEdgeGlowBox.fadeIn
     /// Shown fully lit after the last change, before the idle fade-out starts.
-    public static let hold: TimeInterval = 1.2
+    public static let hold: TimeInterval = ScreenEdgeGlowBox.hold
     /// Fades out once idle.
-    public static let fadeOut: TimeInterval = 0.25
+    public static let fadeOut: TimeInterval = ScreenEdgeGlowBox.fadeOut
     /// How quickly the drawn level itself tweens toward the new value, independent of the
     /// opacity envelope above (same spring feel as the notch's own H2/H3 arm).
-    public static let levelSpring: TimeInterval = 0.18
+    public static let levelSpring: TimeInterval = ScreenEdgeGlowBox.levelSpring
 
-    public static var totalDuration: TimeInterval { fadeIn + hold + fadeOut }
-
-    static func easeOutCubic(_ x: Double) -> Double {
-        let t = max(0, min(1, x))
-        return 1 - pow(1 - t, 3)
-    }
+    public static var totalDuration: TimeInterval { ScreenEdgeGlowBox.totalDuration }
 
     /// Deterministic, pure: same inputs always give the same frame. `now` may be before
     /// `state.changedAt` (clock skew) -- treated as elapsed 0, never negative.
     public static func frame(_ state: ScreenEdgeGlowState, now: Date, reduceMotion: Bool) -> ScreenEdgeGlowFrame {
         let elapsed = max(0, now.timeIntervalSince(state.changedAt))
-        let opacity: Double
-        if elapsed < fadeIn {
-            opacity = fadeIn > 0 ? elapsed / fadeIn : 1
-        } else if elapsed < fadeIn + hold {
-            opacity = 1
-        } else if elapsed < totalDuration {
-            opacity = fadeOut > 0 ? 1 - (elapsed - fadeIn - hold) / fadeOut : 0
-        } else {
-            opacity = 0
-        }
-        let level: Double
-        if reduceMotion {
-            // No travelling spring under Reduce Motion: a plain fade at the target level.
-            level = state.toLevel
-        } else {
-            let springProgress = easeOutCubic(levelSpring > 0 ? min(1, elapsed / levelSpring) : 1)
-            level = state.fromLevel + (state.toLevel - state.fromLevel) * springProgress
-        }
-        return ScreenEdgeGlowFrame(level: max(0, min(1, level)), opacity: max(0, min(1, opacity)), isActive: elapsed < totalDuration)
+        let sample = ScreenEdgeGlowBox.sample(
+            fromLevel: state.fromLevel, toLevel: state.toLevel, elapsed: elapsed, reduceMotion: reduceMotion
+        )
+        return ScreenEdgeGlowFrame(level: sample.level, opacity: sample.opacity, isActive: sample.isActive)
     }
 
     /// Where a *new* change should spring from: the level already on screen if the previous
@@ -81,7 +61,10 @@ public enum ScreenEdgeGlowMath {
     /// otherwise the plain target value (nothing was lit, so there is nothing to continue from).
     public static func startLevel(previous: ScreenEdgeGlowState?, now: Date, reduceMotion: Bool, fallback: Double) -> Double {
         guard let previous else { return fallback }
-        let previousFrame = frame(previous, now: now, reduceMotion: reduceMotion)
-        return previousFrame.isActive ? previousFrame.level : fallback
+        let elapsed = max(0, now.timeIntervalSince(previous.changedAt))
+        return ScreenEdgeGlowBox.startLevel(
+            fromLevel: previous.fromLevel, toLevel: previous.toLevel, elapsed: elapsed,
+            reduceMotion: reduceMotion, fallback: fallback
+        )
     }
 }

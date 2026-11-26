@@ -18,116 +18,78 @@ public struct MusicModes: Equatable, Sendable {
 }
 
 /// Pure rules for the shuffle and repeat controls: what each player supports, the scripts that read
-/// and set the modes, and how to read an answer. Run the scripts only for a running player Zeus is
-/// already allowed to script.
+/// and set the modes, and how to read an answer. Each answer is read from `MusicModesBox`.
+/// Run the scripts only for a running player Zeus is already allowed to script. This type does not run them.
 public enum MusicModeRules {
     /// Music has repeat off, all and one; Spotify's scripting interface has only repeating on or off.
     public static func supportedRepeatModes(_ player: NowPlaying.Player) -> [RepeatMode] {
-        switch player {
-        case .music: [.off, .all, .one]
-        case .spotify: [.off, .all]
-        }
+        MusicModesBox.supportedRepeatModes(kind(player))
     }
 
     /// The mode a press moves to. Nil counts as off; a mode the player lacks goes to off.
     public static func nextRepeat(after current: RepeatMode?, player: NowPlaying.Player) -> RepeatMode {
-        let modes = supportedRepeatModes(player)
-        guard let index = modes.firstIndex(of: current ?? .off) else { return .off }
-        return modes[(index + 1) % modes.count]
+        MusicModesBox.nextRepeat(after: current, player: kind(player))
     }
 
     /// One AppleScript expression: an empty string when the player is not running, otherwise shuffle and
-    /// repeat joined by `NowPlaying.probeSeparator`. The `is running` check comes first, so a player that
-    /// quit just before the script ran is never launched again by the tell.
+    /// repeat joined by ASCII 31, the same character as `NowPlaying.probeSeparator`. The `is running`
+    /// check comes first, so a player that quit just before the script ran is never launched again by the tell.
     public static func readScript(player: NowPlaying.Player) -> String {
-        let (shuffle, repeating) = properties(player)
-        return "if application id \"\(player.bundleID)\" is not running then return \"\"\n"
-            + "tell application id \"\(player.bundleID)\"\n"
-            + "set sep to (ASCII character 31)\n"
-            + "return (\(shuffle) as string) & sep & (\(repeating) as string)\n"
-            + "end tell"
+        MusicModesBox.readScript(player: kind(player))
     }
 
     /// Reads `readScript`'s answer. Music says `true|false` and `off|one|all`; Spotify says two booleans.
     /// Nil for no answer, an empty or malformed one, or a word the player does not use. Case is ignored.
     public static func parse(_ output: String?, player: NowPlaying.Player) -> MusicModes? {
-        guard let output else { return nil }
-        let fields = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            .components(separatedBy: NowPlaying.probeSeparator)
-            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
-        guard fields.count == 2, let shuffle = bool(fields[0]) else { return nil }
-        let mode: RepeatMode?
-        switch player {
-        case .music: mode = RepeatMode(rawValue: fields[1])
-        case .spotify: mode = bool(fields[1]).map { $0 ? .all : .off }
-        }
-        guard let mode else { return nil }
-        return MusicModes(shuffle: shuffle, repeatMode: mode)
+        MusicModesBox.parse(output, player: kind(player))
     }
 
     /// Set scripts start with the same `is not running` check as the read script: a press can sit behind a
     /// slow read, and a tell that reaches a player that quit meanwhile would launch it again.
     public static func setShuffleScript(player: NowPlaying.Player, on: Bool) -> String {
-        guardedSet(player: player, property: properties(player).shuffle, value: "\(on)")
+        MusicModesBox.setShuffleScript(player: kind(player), on: on)
     }
 
     /// `one` on Spotify turns repeating on: it has nothing finer.
     public static func setRepeatScript(player: NowPlaying.Player, mode: RepeatMode) -> String {
-        let value = switch player {
-        case .music: mode.rawValue
-        case .spotify: mode == .off ? "false" : "true"
-        }
-        return guardedSet(player: player, property: properties(player).repeating, value: value)
+        MusicModesBox.setRepeatScript(player: kind(player), mode: mode)
     }
 
     /// Whether the modes should be read for this update: a new player or track, or modes still unknown
     /// (Automation was not confirmed yet, or was just granted). Play and pause on a known track do not.
     public static func shouldRead(previous: NowPlaying?, current: NowPlaying, modes: MusicModes) -> Bool {
-        guard let previous else { return true }
-        if previous.source != current.source || previous.title != current.title || previous.artist != current.artist {
-            return true
-        }
-        return modes.shuffle == nil || modes.repeatMode == nil
+        let sameTrack = previous.map {
+            $0.source == current.source && $0.title == current.title && $0.artist == current.artist
+        } ?? false
+        return MusicModesBox.shouldRead(
+            hasPrevious: previous != nil,
+            sameTrack: sameTrack,
+            shuffle: modes.shuffle,
+            repeatMode: modes.repeatMode
+        )
     }
 
     /// The modes after a read. An answer replaces them, an unreadable one leaves them unknown. A read that
     /// failed outright changes nothing, except right after a press: the control then holds a guess the player
     /// never confirmed, so it goes back to unknown.
     public static func resolved(output: String?, player: NowPlaying.Player, current: MusicModes, afterPress: Bool) -> MusicModes {
-        guard let output else { return afterPress ? MusicModes() : current }
-        return parse(output, player: player) ?? MusicModes()
+        MusicModesBox.resolved(output: output, player: kind(player), current: current, afterPress: afterPress)
     }
 
     /// What VoiceOver says for the shuffle control: unknown is told apart from off.
     public static func spokenShuffle(_ shuffle: Bool?) -> String {
-        shuffle.map { $0 ? "on" : "off" } ?? "unknown"
+        MusicModesBox.spokenShuffle(shuffle)
     }
 
     /// What VoiceOver says for the repeat control: unknown is told apart from off.
     public static func spokenRepeat(_ mode: RepeatMode?) -> String {
-        mode?.rawValue ?? "unknown"
+        MusicModesBox.spokenRepeat(mode)
     }
 
-    private static func guardedSet(player: NowPlaying.Player, property: String, value: String) -> String {
-        "if application id \"\(player.bundleID)\" is not running then return \"\"\n"
-            + "tell application id \"\(player.bundleID)\"\n"
-            + "set \(property) to \(value)\n"
-            + "end tell"
-    }
-
-    /// The scripting dictionary's names for shuffle and repeat.
-    private static func properties(_ player: NowPlaying.Player) -> (shuffle: String, repeating: String) {
+    private static func kind(_ player: NowPlaying.Player) -> MusicModesBox.Player {
         switch player {
-        case .music: ("shuffle enabled", "song repeat")
-        case .spotify: ("shuffling", "repeating")
-        }
-    }
-
-    private static func bool(_ word: String) -> Bool? {
-        switch word {
-        case "true": true
-        case "false": false
-        default: nil
+        case .music: .music
+        case .spotify: .spotify
         }
     }
 }

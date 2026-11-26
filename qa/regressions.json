@@ -8654,30 +8654,6 @@
       }
     },
     {
-      "id": "REG-991",
-      "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
-      "features": [
-        "F13"
-      ],
-      "check": "closed-loop-selftests",
-      "guard": {
-        "file": "qa/closed-loop/tests/test_source_lint.py",
-        "function": "test_shipped_plist_is_an_agent_app"
-      }
-    },
-    {
-      "id": "REG-992",
-      "failure": "A guide click test hard-coded the accessory policy instead of the function the shipped app uses, so it could pass while main.swift set a different policy. The test now calls ZeusActivation.configure and still checks that the click does not change activation.",
-      "features": [
-        "F13"
-      ],
-      "check": "closed-loop-selftests",
-      "guard": {
-        "file": "qa/closed-loop/tests/test_source_lint.py",
-        "function": "test_main_and_the_guide_test_use_the_shared_activation_function"
-      }
-    },
-    {
       "id": "REG-973",
       "failure": "A stop that ran off the main actor read the speech engine after the next turn had swapped in its own, so it stopped the new turn's engine, removed its tap and dropped its configuration observer while the new turn believed it was recording.",
       "features": [
@@ -8702,6 +8678,30 @@
       }
     },
     {
+      "id": "REG-991",
+      "failure": "An explain request produced neither a spoken explanation nor a talk-draw plan, so the existing drawing surface had nothing local to show.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-explain-showcase",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+        "function": "anExplainRequestProducesWordsAndAShowcasePlan"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The three-dots row Hide Zeus from screen shares flipped once or twice, then a later click did nothing while the pointer stayed on the row. Menu tracking drops that mouse-up, and a second delivery of the same mouse-up must not flip twice. NSWindow.sharingType's getter also sticks at hidden, so a write that skipped when the getter already matched never hid the windows again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
+        "function": "aClickOnTheRowFlipsHideAndShowEvenWhenThePointerStays"
+      }
+    },
+    {
       "id": "REG-993",
       "failure": "Speech to text waited 2.5 s for a final that often never arrived and left the recognition task running, and an unchanged partial reset the silence endpoint. Talk hold and Murmur tap both did this. On-device recognition could also sit for at least 30 s.",
       "features": [
@@ -8715,6 +8715,66 @@
     },
     {
       "id": "REG-994",
+      "failure": "File recognition cancelled at the 2 s stand-in and kept only an isFinal result, so a non-final partial was dropped and the file was reported as no speech.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled"
+      }
+    },
+    {
+      "id": "REG-995",
+      "failure": "Push to talk could leave the listening ring up after a release or an error, pulse under Reduce Motion, and speak on every level change.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+        "function": "releaseClearsWithinOneFrameBudget"
+      }
+    },
+    {
+      "id": "REG-996",
+      "failure": "The push-to-talk hold waited for the next avatar-feed tick, so a short hold could end before the top-bar light and the round mark appeared. The held flag is now copied in the same call that sets it. A later tick that repeats the same flag changes nothing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+        "function": "theHoldReachesTheIndicatorInTheSameSample"
+      }
+    },
+    {
+      "id": "REG-997",
+      "failure": "The shipped app could drift from the menu-bar activation policy the guide test assumed. Info.plist keeps LSUIElement, and both main.swift and the guide test call ZeusActivation.configure instead of a second hard-coded policy.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_shipped_plist_is_an_agent_app"
+      }
+    },
+    {
+      "id": "REG-998",
+      "failure": "A guide click test hard-coded the accessory policy instead of the function the shipped app uses, so it could pass while main.swift set a different policy. The test now calls ZeusActivation.configure and still checks that the click does not change activation.",
+      "features": [
+        "F13"
+      ],
+      "check": "closed-loop-selftests",
+      "guard": {
+        "file": "qa/closed-loop/tests/test_source_lint.py",
+        "function": "test_main_and_the_guide_test_use_the_shared_activation_function"
+      }
+    },
+    {
+      "id": "REG-999",
       "failure": "Command dictation left the words on the clipboard (ERROR nothing inserted). A talk or Command press with no Accessibility or Input Monitoring never armed, and a microphone prompt that later became ready did not start the held turn. dictate-file left speechTraceGeneration unset, so the stt-latency and stt-failure lines never flushed.",
       "features": [
         "F01"
