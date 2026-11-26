@@ -6,7 +6,7 @@ import Foundation
 /// leave web search off. A question that needs a fact from after the model's
 /// knowledge year may turn web search on. The caller passes that year in.
 /// Sorting never opens a connection, and the result is not applied to the
-/// pointing session or the provider list.
+/// pointing session or the provider list. A blank is read from `QuestionSortBox`.
 public struct QuestionSort: Equatable, Sendable {
     public let guides: Bool
     public let webSearch: Bool
@@ -60,11 +60,11 @@ public struct QuestionSort: Equatable, Sendable {
         var rest = Substring(text)
         while let range = rest.range(of: phrase, options: .literal) {
             let beforeOK = range.lowerBound == rest.startIndex
-                || rest[rest.index(before: range.lowerBound)].isWhitespace
+                || isBlank(rest[rest.index(before: range.lowerBound)])
             let after = range.upperBound
-            let afterOK = after == rest.endIndex || rest[after].isWhitespace
+            let afterOK = after == rest.endIndex || isBlank(rest[after])
             if beforeOK && afterOK {
-                let next = rest[after...].drop(while: \.isWhitespace).prefix { !$0.isWhitespace }
+                let next = rest[after...].drop(while: isBlank).prefix { !isBlank($0) }
                 if next.isEmpty || !walkTimeTails.contains(String(next)) { return true }
             }
             guard let step = rest.index(range.lowerBound, offsetBy: 1, limitedBy: rest.endIndex),
@@ -85,9 +85,9 @@ public struct QuestionSort: Equatable, Sendable {
         var rest = Substring(text)
         while let range = rest.range(of: phrase, options: .literal) {
             let beforeOK = range.lowerBound == rest.startIndex
-                || rest[rest.index(before: range.lowerBound)].isWhitespace
+                || isBlank(rest[rest.index(before: range.lowerBound)])
             let after = range.upperBound
-            let afterOK = after == rest.endIndex || rest[after].isWhitespace
+            let afterOK = after == rest.endIndex || isBlank(rest[after])
             if beforeOK && afterOK { return true }
             guard let step = rest.index(range.lowerBound, offsetBy: 1, limitedBy: rest.endIndex),
                   step < rest.endIndex else { return false }
@@ -153,8 +153,12 @@ public struct QuestionSort: Equatable, Sendable {
         }
     }
 
+    private static func isBlank(_ character: Character) -> Bool {
+        QuestionSortBox.isBlank(String(character))
+    }
+
     private static func isSeparator(_ character: Character) -> Bool {
-        if character.isWhitespace { return true }
+        if isBlank(character) { return true }
         if "?!.,;:\"()[]".contains(character) { return true }
         guard let value = singleScalar(character) else { return false }
         switch value {
