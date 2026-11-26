@@ -57,7 +57,10 @@ public struct KeychainCredentialStore: CredentialStore, Sendable {
         guard !value.isEmpty else { return false }
         return quietly {
             let data = Data(value.utf8)
-            let update = [kSecValueData as String: data]
+            let update: [String: Any] = [
+                kSecValueData as String: data,
+                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            ]
             let status = SecItemUpdate(base(service, account) as CFDictionary, update as CFDictionary)
             if status == errSecSuccess { return true }
             guard status == errSecItemNotFound else { return false }

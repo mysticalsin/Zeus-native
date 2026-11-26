@@ -1,4 +1,5 @@
 import SwiftUI
+import ZeusCore
 
 /// One screen's layer of the buddy overlay. Everything is placed from the top-left corner with
 /// offsets, converted from the model's global AppKit coordinates.
@@ -34,15 +35,29 @@ struct BuddyOverlayView: View {
                     .offset(x: strike.x - diameter / 2, y: strike.y - diameter / 2)
             }
 
-            // The avatar art: one coloured bolt per state. It leans into a flight, upright otherwise.
-            AvatarView(state: AvatarStatus.shared.current, size: SparkView.avatarSize, paused: !(model.sparkVisible && model.hasAppeared))
-                .rotationEffect(.degrees(model.mode == .flying ? model.rotation : 0))
-                .scaleEffect(model.scale)
-                .shadow(color: Theme.bolt.opacity(0.55), radius: model.glow)
-                .opacity(model.sparkVisible && model.hasAppeared ? 1 : 0)
-                .animation(Motion.reducible(.easeIn(duration: model.hasAppeared ? 0.25 : 2)), value: model.sparkVisible)
-                .animation(Motion.reducible(.easeIn(duration: 2)), value: model.hasAppeared)
-                .offset(x: spark.x - SparkView.avatarSize / 2, y: spark.y - SparkView.avatarSize / 2)
+            // Classic keeps the bolt. Orb replaces only this avatar; the rest of the overlay is unchanged.
+            // TODO: bind the phase to CompanionTurnPhase once S1 merges. S1 owns CompanionTurnMachine.swift
+            // and CompanionTurnPhase.swift. BuddyMode is the stand-in until then.
+            if PersonaSetting.shared.showsOrb {
+                OrbMascotView(visualState: OrbVisualStateMap.visualState(forPhaseName: buddyOrbPhase(model.mode)),
+                              reduceMotion: Motion.reduced,
+                              paused: !(model.sparkVisible && model.hasAppeared))
+                    .frame(width: 88, height: 88)
+                    .opacity(model.sparkVisible && model.hasAppeared ? 1 : 0)
+                    .animation(Motion.reducible(.easeIn(duration: model.hasAppeared ? 0.25 : 2)), value: model.sparkVisible)
+                    .animation(Motion.reducible(.easeIn(duration: 2)), value: model.hasAppeared)
+                    .offset(x: spark.x - 44, y: spark.y - 44)
+            } else {
+                // The avatar art: one coloured bolt per state. It leans into a flight, upright otherwise.
+                AvatarView(state: AvatarStatus.shared.current, size: SparkView.avatarSize, paused: !(model.sparkVisible && model.hasAppeared))
+                    .rotationEffect(.degrees(model.mode == .flying ? model.rotation : 0))
+                    .scaleEffect(model.scale)
+                    .shadow(color: Theme.bolt.opacity(0.55), radius: model.glow)
+                    .opacity(model.sparkVisible && model.hasAppeared ? 1 : 0)
+                    .animation(Motion.reducible(.easeIn(duration: model.hasAppeared ? 0.25 : 2)), value: model.sparkVisible)
+                    .animation(Motion.reducible(.easeIn(duration: 2)), value: model.hasAppeared)
+                    .offset(x: spark.x - SparkView.avatarSize / 2, y: spark.y - SparkView.avatarSize / 2)
+            }
 
             WaveformView(level: model.audioLevel, active: model.mode == .listening)
                 .opacity(model.mode == .listening ? 1 : 0)
@@ -143,6 +158,16 @@ struct SpinnerView: View {
 }
 
 extension BuddyOverlayView {
+    /// BuddyMode has no speaking case. Flight and pointing stand in for a spoken turn until S1's phase exists.
+    func buddyOrbPhase(_ mode: BuddyModel.Mode) -> String {
+        switch mode {
+        case .listening: "listening"
+        case .thinking: "thinking"
+        case .flying, .pointing: "speaking"
+        case .following, .returning: "idle"
+        }
+    }
+
     /// Keeps the caption on screen near the right edge.
     func captionX(_ sparkX: CGFloat) -> CGFloat {
         min(sparkX + 14, screenFrame.width - CaptionView.maxWidth - 16)
