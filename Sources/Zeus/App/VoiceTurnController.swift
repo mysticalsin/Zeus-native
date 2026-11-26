@@ -31,6 +31,11 @@ final class VoiceTurnController {
     private var sightNotice = ScreenSightNotice()
     /// A drawing from this controller's last answer may still be on screen.
     private var drawActive = false
+    /// Later explain beats. Cancelled when the next turn clears the drawing.
+    private var explainReveal: Task<Void, Never>?
+    /// Sentence start times for the explain pen. Nil until that sentence's audio starts.
+    private var explainAudioStarts: [TimeInterval?] = [nil, nil, nil]
+    private var explainBegan = Date()
 
     /// What one turn really sent, for the tests: the brain request, the route it asked for, and every capture the
     /// turn kept for POINT tags and the drive and walkthrough actions.
@@ -67,6 +72,8 @@ final class VoiceTurnController {
     var seams = Seams()
     /// The speech session of the turn that is listening, so a late capture failure never ends a newer turn.
     private var talkSession: Int?
+    /// Card on screen when this listen started. A spoken yes uses this id, not whichever card is up at the transcript.
+    private var spokenApprovalCardID: String?
     /// Capture failures as the audio thread reports them, readable before their main-actor hop runs.
     private let captureFailures = CaptureFailureLatch()
     private var screenshotsTask: Task<[ScreenShot], Never>?
@@ -86,6 +93,8 @@ final class VoiceTurnController {
     private var turnRun = LatestRun()
     /// When the recogniser last changed its live transcript (hands-free turns end on silence).
     private var lastPartialAt: ContinuousClock.Instant?
+    /// The speech-trace generation opened by the current press. A late deliver from an older turn ignores it.
+    private var speechGeneration = 0
     private var liveWords = LiveWordsHUD()
     private var heardSomething = false
     private var handsFreeTask: Task<Void, Never>?
@@ -171,6 +180,9 @@ final class VoiceTurnController {
 
     /// Hides the marks of the last answer. A turn that never drew makes no presenter call.
     func clearDrawingForNewTurn() {
+        explainReveal?.cancel()
+        explainReveal = nil
+        explainAudioStarts = [nil, nil, nil]
         guard drawActive else { return }
         drawActive = false
         presenter.clear()
@@ -203,7 +215,8 @@ final class VoiceTurnController {
     }
 
     @discardableResult
-    func press() -> Bool {
+    func press(builtinCue: Bool = true) -> Bool {
+        speechGeneration = speech.noteKeyDown(path: .talkHold)
         // A press during a live turn (a hands-free or wake turn) cuts in and restarts the capture.
         clearDrawingForNewTurn()
         ExplanationAudioArbitration.yieldToNewCapture()
@@ -233,6 +246,7 @@ final class VoiceTurnController {
         speech.contextualStrings = DictationVocabularyPrompt.terms(DictationHub.shared.controller?.vocabulary ?? Vocabulary())
         Self.applyChosenMicrophone(to: speech)
         captureFailures.reset()
+        spokenApprovalCardID = nil
         let failures = captureFailures
         speech.onCaptureFailure = { [weak self] session, origin, failure in
             // Recorded on the calling thread, so a release before the main-actor hop below still sees it.
@@ -241,9 +255,11 @@ final class VoiceTurnController {
         }
         do {
             talkSession = try seams.speechStart(speech)
+            spokenApprovalCardID = SpokenApprovalCapture.atSpeechStart(displayedCardID: notch.model.approval?.id)
         } catch {
             // A start throws before it touches a running capture, so a live turn keeps its handler and session.
             if !listening { speech.onCaptureFailure = nil }
+            speech.noteDelivered(generation: speechGeneration)
             VoiceLog.logContent("error", error.localizedDescription, prefix: "can't start listening (mic \(VoicePermissions.mic), speech \(VoicePermissions.speech)): ")
             ZeusSound.play(.voiceError)
             if let cue = VoicePermissions.access.deniedCue, let pane = VoicePermissions.access.deniedPane {
@@ -255,7 +271,7 @@ final class VoiceTurnController {
         }
         listening = true
         VoiceLog.log("listen", "started (recogniser \(speech.localeIdentifier))")
-        ZeusSound.play(.listenStart)
+        if builtinCue { ZeusSound.play(.listenStart) }
         seams.duckBegin()
         lastPartialAt = nil
         heardSomething = false
@@ -271,7 +287,7 @@ final class VoiceTurnController {
         return true
     }
 
-    func release() {
+    func release(builtinCue: Bool = true) {
         guard listening else { return }
         // Capture already gave up for this turn: end it as a failure and do not read or send the partial.
         if let session = talkSession, let failure = captureFailures.failure(for: session) {
@@ -284,7 +300,7 @@ final class VoiceTurnController {
         turnReleasedAt = .now
         VoiceLatency.shared.begin()
         VoiceLog.log("listen", "stopped")
-        ZeusSound.play(.listenStop)
+        if builtinCue { ZeusSound.play(.listenStop) }
         seams.duckEnd()
         handsFreeTask?.cancel()
         handsFreeTask = nil
@@ -341,6 +357,7 @@ final class VoiceTurnController {
         listening = false
         speech.onCaptureFailure = nil
         talkSession = nil
+        spokenApprovalCardID = nil
         handsFreeTask?.cancel()
         handsFreeTask = nil
         ahead.cancel()
@@ -382,6 +399,7 @@ final class VoiceTurnController {
         let chromeInFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.google.Chrome"
         tabTask = chromeInFront ? Task { await ChromeBridge.activeTab(elements: true) } : nil
         buddy.think()
+        spokenApprovalCardID = SpokenApprovalCapture.atSpeechStart(displayedCardID: notch.model.approval?.id)
         let run = turnRun.begin()
         turnTask = Task {
             let result = await complete(transcript: request, finalAt: heardAt)
@@ -393,12 +411,18 @@ final class VoiceTurnController {
         }
     }
 
+    /// Milliseconds in a `Duration`, for the wake and idle quiet checks.
+    private static func milliseconds(_ duration: Duration) -> Int {
+        let parts = duration.components
+        return Int((parts.seconds * 1_000) + (parts.attoseconds / 1_000_000_000_000_000))
+    }
+
     /// A voice turn without the key: starts listening and stops after quiet once you have spoken.
     func handsFree() {
         guard press() else { return }
         handsFreeTask?.cancel()
         let opened = ContinuousClock.now
-        let silenceLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceAfterSpeech) : .milliseconds(1000)
+        let wakeSilenceMs = Self.milliseconds(.seconds(WakeConversationTiming.silenceAfterSpeech))
         let idleLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.silenceWhenEmpty) : .seconds(4)
         let hardLimit: Duration = wakeConversationActive ? .seconds(WakeConversationTiming.hardLimit) : .seconds(12)
         handsFreeTask = Task { @MainActor [weak self] in
@@ -406,7 +430,16 @@ final class VoiceTurnController {
                 try? await Task.sleep(for: .milliseconds(100))
                 let now = ContinuousClock.now
                 let quietFor = self.lastPartialAt.map { now - $0 } ?? (now - opened)
-                if self.heardSomething ? quietFor > silenceLimit : quietFor > idleLimit { break }
+                let quietMs = Self.milliseconds(quietFor)
+                let stop: Bool
+                if self.heardSomething, self.wakeConversationActive {
+                    stop = STTQuiet.reached(quietForMs: quietMs, thresholdMs: wakeSilenceMs)
+                } else if self.heardSomething {
+                    stop = STTHandsFree.quietEnded(quietForMs: quietMs)
+                } else {
+                    stop = STTQuiet.reached(quietForMs: quietMs, thresholdMs: Self.milliseconds(idleLimit))
+                }
+                if stop { break }
                 if now - opened > hardLimit { break }
             }
             guard let self, !Task.isCancelled, self.listening else { return }
@@ -450,6 +483,7 @@ final class VoiceTurnController {
     }
 
     private func finishTurn() async -> TurnResult {
+        let generation = speechGeneration
         var transcript = await seams.speechStop(speech).trimmingCharacters(in: .whitespacesAndNewlines)
         if let engine = turnEngine, let dictation = DictationHub.shared.controller {
             let samples = speech.takeSamples()
@@ -458,13 +492,18 @@ final class VoiceTurnController {
         }
         turnEngine = nil
         buddy.model.audioLevel = nil
+        speech.noteDelivered(generation: generation)
         return await complete(transcript: transcript, finalAt: .now)
     }
 
     /// A finished transcript: approval answers, walkthrough steering, the fast path, then the LLM.
     private func complete(transcript: String, finalAt: ContinuousClock.Instant) async -> TurnResult {
-        guard !Task.isCancelled else { return TurnResult(cancelled: true) }
+        guard !Task.isCancelled else {
+            spokenApprovalCardID = nil
+            return TurnResult(cancelled: true)
+        }
         guard !transcript.isEmpty else {
+            spokenApprovalCardID = nil
             VoiceLog.log("transcript", "(\(speech.diagnostics.nothingHeardSummary))")
             buddy.idle()
             return .nothingHeard
@@ -475,12 +514,27 @@ final class VoiceTurnController {
         VoiceLatency.shared.mark(.transcriptFinal)
 
         let options = SettingsStore.shared
+        let capturedCardID = spokenApprovalCardID
+        spokenApprovalCardID = nil
         if let approval = notch.model.approval, options.bool("voice.answers"),
            let verdict = ApprovalPhrases.verdict(for: transcript, approve: options.words("voice.approveWords"),
                                                  deny: options.words("voice.denyWords"), open: options.words("voice.openWords")) {
+            guard SpokenApprovalCapture.applies(capturedCardID: capturedCardID, displayedCardID: approval.id) else {
+                buddy.idle()
+                return TurnResult(spoken: "")
+            }
             approval.resolve(verdict)
             buddy.idle()
             let answer = verdict == .allow ? "Approved." : verdict == .ask ? "Over to the app." : "Denied."
+            say(answer)
+            return TurnResult(spoken: answer)
+        }
+
+        // Optional. Off leaves "stop" for the browser agent and a walkthrough.
+        if NotchStopAll.matchesVoice(transcript, enabled: AgentSettings.shared.voiceStop) {
+            let stopped = notch.stopAllSupervised()
+            buddy.idle()
+            let answer = stopped.isEmpty ? "Nothing is running." : "Stopped."
             say(answer)
             return TurnResult(spoken: answer)
         }
@@ -535,6 +589,10 @@ final class VoiceTurnController {
             let told = "Page text:\n\(page)\n\n\(transcript)"
             return await runTurn(transcript: told, screenshots: [], activeTab: activeTab, turn: turn,
                                  deep: deep, speak: speak, awaitActions: awaitActions, pageText: true)
+        }
+        // An explain request is words plus a drawing plan. Drop any speculative model run first.
+        if ExplainShowcase.blocksModelRace(transcript) {
+            ahead.cancel()
         }
         if let replay = ahead.take(matching: transcript) {
             return await runTurn(transcript: transcript, screenshots: [], activeTab: activeTab, turn: turn,
@@ -617,6 +675,9 @@ final class VoiceTurnController {
         if let local = await LocalTurns.handle(transcript, topBar: notch.topBar) {
             return speakInstant(local, transcript: transcript, speak: speak)
         }
+        if let showcase = ExplainShowcase.plan(for: transcript) {
+            return presentExplain(showcase, transcript: transcript, speak: speak)
+        }
         // "Ask Scout to ..." goes to that agent, not to command understanding.
         if AgentRouter.route(transcript, agents: AgentStore().profiles()) != nil { return nil }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
@@ -687,6 +748,100 @@ final class VoiceTurnController {
         if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
         remember(transcript, question)
         return TurnResult(spoken: question)
+    }
+
+    /// Speaks the explanation and draws it on the display under the pointer.
+    /// Beat 0 is shown immediately. Later beats follow `ExplainBeatSchedule` even when no voice
+    /// engine starts, so the sequence is not spoken-only and not painted all at once.
+    /// No capture and no model request. `talk.drawOnScreen` still gates a screenshot sent to an
+    /// engine. This path does not send one.
+    private func presentExplain(_ plan: ExplainShowcase, transcript: String, speak: Bool) -> TurnResult {
+        VoiceLog.log("route", "explain-showcase")
+        VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = plan.scaled(toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        let surface = presenter
+        surface.begin(draw, shot: shot, token: token)
+        drawActive = true
+        explainBegan = Date()
+        VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
+        if plan.travels {
+            showPen(plan.penFrame(at: 0), shot: shot, token: token)
+            explainReveal = Task { @MainActor [weak self] in
+                var shown = 0
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let elapsed = Date().timeIntervalSince(self.explainBegan)
+                    guard let frame = plan.penFrame(at: elapsed, audioStarts: self.explainAudioStarts) else { return }
+                    if frame.pointCount != shown {
+                        shown = frame.pointCount
+                        self.showPen(frame, shot: shot, token: token)
+                    }
+                    if frame.finished { break }
+                    try? await Task.sleep(for: .milliseconds(40))
+                }
+                guard !Task.isCancelled else { return }
+                self?.presenter.answerFinished(token: token)
+            }
+        } else {
+            let beats = plan.schedule.indexes
+            if let first = beats.first { surface.reveal(sentence: first, token: token) }
+            explainReveal = Task { @MainActor [weak self] in
+                for beat in beats.dropFirst() {
+                    try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                    guard !Task.isCancelled else { return }
+                    self?.presenter.reveal(sentence: beat, token: token)
+                }
+                guard !Task.isCancelled else { return }
+                self?.presenter.answerFinished(token: token)
+            }
+        }
+        buddy.idle()
+        if speak {
+            for (index, sentence) in plan.sentences.enumerated() {
+                speaker.speak(Self.voiced(sentence), onStart: { [weak self] in
+                    guard let self, index < self.explainAudioStarts.count else { return }
+                    self.explainAudioStarts[index] = Date().timeIntervalSince(self.explainBegan)
+                })
+            }
+        }
+        let spoken = plan.explanation
+        buddy.showCaption(Self.captionTail(spoken))
+        buddy.hideCaption()
+        remember(transcript, spoken)
+        ZeusSound.play(.voiceDone)
+        return TurnResult(spoken: spoken)
+    }
+
+    private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID) {
+        guard let frame else { return }
+        let scaled = ExplainShowcase.scaled(frame.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        presenter.showFrame(scaled, token: token)
+        let bolt = boltScreen(frame.bolt, shot: shot)
+        buddy.flight(to: bolt, label: "trace")
+    }
+
+    /// Canvas point to AppKit global point on the shot's display. Y flips to the bottom-left origin.
+    private func boltScreen(_ point: TalkDraw.Point, shot: ScreenShot) -> CGPoint {
+        let px = point.x * Double(shot.pixelWidth) / ExplainShowcase.canvasWidth
+        let py = point.y * Double(shot.pixelHeight) / ExplainShowcase.canvasHeight
+        let scaleX = max(Double(shot.pixelWidth) / Double(shot.displayFrame.width), 0.001)
+        let scaleY = max(Double(shot.pixelHeight) / Double(shot.displayFrame.height), 0.001)
+        return CGPoint(x: shot.displayFrame.minX + px / scaleX, y: shot.displayFrame.maxY - py / scaleY)
+    }
+
+    /// The display under the pointer, else the main display. The frame is the one
+    /// `TalkVisualPresenter` matches, so the marks land on that screen. JPEG bytes stay empty.
+    private func illustrationShot() -> ScreenShot {
+        let screens = NSScreen.screens
+        let pointer = NSEvent.mouseLocation
+        let chosen = screens.first { $0.frame.contains(pointer) } ?? NSScreen.main ?? screens.first
+        let frame = chosen?.frame ?? CGRect(x: 0, y: 0, width: CGFloat(ExplainShowcase.canvasWidth), height: CGFloat(ExplainShowcase.canvasHeight))
+        let scale = Double(chosen?.backingScaleFactor ?? 1)
+        let pixels = ExplainShowcase.pixelSize(width: Double(frame.width), height: Double(frame.height), scale: scale)
+        return ScreenShot(jpegData: Data(), label: "illustration canvas", pixelWidth: pixels.width, pixelHeight: pixels.height, displayFrame: frame)
     }
 
     private func remember(_ user: String, _ assistant: String) {

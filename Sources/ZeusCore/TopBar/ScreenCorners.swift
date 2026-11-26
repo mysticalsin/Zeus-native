@@ -73,53 +73,47 @@ public enum ScreenCorners {
     /// Finite, never negative, and never more than a quarter of the shorter side, so two corners and the
     /// edge between them always fit.
     public static func clampedRadius(_ radius: Double, in frame: CGRect) -> Double {
-        guard radius.isFinite, radius > 0,
-              frame.width.isFinite, frame.height.isFinite, frame.width > 0, frame.height > 0 else { return 0 }
-        return min(radius, min(frame.width, frame.height) / 4)
+        ScreenCornersBox.clampedRadius(radius, width: Double(frame.width), height: Double(frame.height))
     }
 
     /// The bottom-left and bottom-right squares of a screen frame (AppKit coordinates).
     public static func cornerFrames(screenFrame: CGRect, radius: Double) -> ScreenCornerFrames {
-        let r = clampedRadius(radius, in: screenFrame)
-        guard r > 0 else { return ScreenCornerFrames(radius: 0, bottomLeft: .zero, bottomRight: .zero) }
+        let frames = ScreenCornersBox.cornerFrames(
+            x: Double(screenFrame.minX),
+            y: Double(screenFrame.minY),
+            width: Double(screenFrame.width),
+            height: Double(screenFrame.height),
+            radius: radius
+        )
         return ScreenCornerFrames(
-            radius: r,
-            bottomLeft: CGRect(x: screenFrame.minX, y: screenFrame.minY, width: r, height: r),
-            bottomRight: CGRect(x: screenFrame.maxX - r, y: screenFrame.minY, width: r, height: r))
-    }
-
-    /// The disc whose inside stays clear: its centre is the square's inner corner, opposite the screen corner.
-    private static func discCentre(_ side: ScreenCornerSide, radius r: Double) -> CGPoint {
-        switch side {
-        case .bottomLeft: CGPoint(x: r, y: 0)
-        case .bottomRight: CGPoint(x: 0, y: 0)
-        }
+            radius: frames.radius,
+            bottomLeft: rect(frames.bottomLeft),
+            bottomRight: rect(frames.bottomRight)
+        )
     }
 
     /// Whether `point` (corner square coordinates, y down) is filled: inside the square and not inside the
     /// quarter disc. The arc itself counts as filled.
     public static func fills(_ point: CGPoint, side: ScreenCornerSide, radius r: Double) -> Bool {
-        guard r.isFinite, r > 0, point.x.isFinite, point.y.isFinite,
-              point.x >= 0, point.x <= r, point.y >= 0, point.y <= r else { return false }
-        let centre = discCentre(side, radius: r)
-        return hypot(point.x - centre.x, point.y - centre.y) >= r
+        ScreenCornersBox.fills(x: Double(point.x), y: Double(point.y), side: boxSide(side), radius: r)
     }
 
     /// The filled region as a closed outline (the last point joins the first), in corner square coordinates:
     /// the screen corner first, then the arc from one edge of the square to the other.
     public static func maskPoints(side: ScreenCornerSide, radius r: Double, segments: Int = 16) -> [CGPoint] {
-        guard r.isFinite, r > 0 else { return [] }
-        let steps = max(2, segments)
-        let centre = discCentre(side, radius: r)
-        let corner = CGPoint(x: side == .bottomLeft ? 0 : r, y: r)
-        var points = [corner]
-        // The arc runs from the far end of the square's outer side (angle pi for the left corner) to the
-        // square's bottom (angle pi/2); the right corner is the mirror image.
-        for step in 0...steps {
-            let angle = Double.pi - (Double.pi / 2) * Double(step) / Double(steps)
-            let x = r * cos(angle)
-            points.append(CGPoint(x: side == .bottomLeft ? centre.x + x : centre.x - x, y: centre.y + r * sin(angle)))
+        ScreenCornersBox.maskPoints(side: boxSide(side), radius: r, segments: segments).map {
+            CGPoint(x: $0.x, y: $0.y)
         }
-        return points
+    }
+
+    private static func rect(_ rect: ScreenCornersBox.Rect) -> CGRect {
+        CGRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height)
+    }
+
+    private static func boxSide(_ side: ScreenCornerSide) -> ScreenCornersBox.Side {
+        switch side {
+        case .bottomLeft: .bottomLeft
+        case .bottomRight: .bottomRight
+        }
     }
 }

@@ -480,7 +480,7 @@ class VoiceLatencyLint(unittest.TestCase):
         init = text[text.index("init("):text.index("private func armAhead")]
         for forbidden in ("prewarm", "BrainLaunchWarm", "ClaudeFlags.warm", "warmSelectedVoice"):
             self.assertNotIn(forbidden, init, f"{forbidden} runs at launch")
-        press = text[text.index("func press()"):text.index("func release()")]
+        press = text[text.index("func press(builtinCue: Bool = true)"):text.index("func release(builtinCue: Bool = true)")]
         self.assertIn("KeyDownWarmer.talkKeyDown()", press)
         self.assertIn("abortBusy()", press)
 
@@ -540,6 +540,41 @@ class VoiceLatencyScript(unittest.TestCase):
         self.assertIn("key-up -> first audio: p50 1150 ms", text)
         self.assertIn("target p50 for this route: 1200 ms -> PASS", text)
 
+    def test_first_audio_p50_stays_at_two_seconds_and_the_api_cap_is_not_raised(self):
+        self.assertEqual(voice_latency.TARGET_API_MS, 1200)
+        self.assertLessEqual(voice_latency.TARGET_API_MS, 1200)
+        self.assertEqual(voice_latency.TARGET_CLI_MS, 2500)
+        self.assertEqual(voice_latency.FIRST_AUDIO_P50_MS, 2000)
+        self.assertLessEqual(voice_latency.FIRST_AUDIO_P50_MS, 2000)
+        on_ceiling = voice_latency.parse(LINE.replace("brain=anthropic-api", "brain=claude-cli").replace("ttfa=1350", "ttfa=2000"))
+        over = voice_latency.parse(LINE.replace("brain=anthropic-api", "brain=claude-cli").replace("ttfa=1350", "ttfa=2001"))
+        self.assertIn("target p50 for this route: 2000 ms -> PASS", voice_latency.summary([on_ceiling]))
+        self.assertIn("target p50 for this route: 2000 ms -> ABOVE TARGET", voice_latency.summary([over]))
+
+    def test_speech_stop_uses_the_450_ms_final_and_cancels_the_task(self):
+        speech = (ROOT / "Sources/Zeus/Voice/SpeechInput.swift").read_text()
+        policy = (ROOT / "Sources/ZeusCore/Voice/STTLatency.swift").read_text()
+        targets = (ROOT / "Sources/ZeusCore/Voice/VoiceLatencyTrace.swift").read_text()
+        self.assertNotIn(".now() + 2.5", speech)
+        self.assertIn("STTSessionPolicy.production.endpointToFinalMs", speech)
+        self.assertIn("cancelRecognitionTask()", speech)
+        self.assertIn("endpointToFinalMs: 450", policy)
+        self.assertIn("public static let apiCloudVoiceMs = 1_200", targets)
+        self.assertIn("public static let firstAudioP50Ms = 2_000", targets)
+
+    def test_file_recognition_keeps_the_latest_partial_when_it_cancels(self):
+        # The 2 s file give-up used to cancel and then keep only an isFinal result, so a
+        # non-final partial became "No speech found." The give-up must settle the partial.
+        callback = (ROOT / "Sources/Zeus/Audio/OffMainAudioCallbacks.swift").read_text()
+        self.assertNotIn("result?.isFinal == true || error != nil", callback)
+        self.assertIn("STTFileRecognition()", callback)
+        self.assertIn("heard.giveUp()", callback)
+        self.assertIn("task.cancel()", callback)
+        self.assertIn("STTFileGiveUp.seconds", callback)
+        self.assertNotIn(".now() + 2.5", callback)
+        targets = (ROOT / "Sources/ZeusCore/Voice/VoiceLatencyTrace.swift").read_text()
+        self.assertIn("public static let apiCloudVoiceMs = 1_200", targets)
+
     def test_log_line_never_needs_a_transcript(self):
         row = voice_latency.parse(LINE)
         self.assertNotIn("transcript_text", row)
@@ -571,7 +606,7 @@ class Pass3VoiceTurnWiring(unittest.TestCase):
         self.assertNotRegex(self.TEXT, r"turnRunning\s*=\s*(true|false)")
 
     def test_press_stops_the_hands_free_timer(self):
-        body = pass3_function_body(self.TEXT, "func press() -> Bool")
+        body = pass3_function_body(self.TEXT, "func press(builtinCue: Bool = true) -> Bool")
         self.assertIn("handsFreeTask?.cancel()", body)
         self.assertIn("turnRun.invalidate()", body)
 

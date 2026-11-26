@@ -108,7 +108,7 @@ enum MeetingAXSnapshotter {
 /// and restores the one setting it may switch on in a browser or Electron app when the session ends.
 @MainActor
 final class MeetingSpeakerMonitor {
-    static let pollInterval: TimeInterval = 0.7
+    static let pollInterval = MeetingPollDue.interval
     static let walkBudget: TimeInterval = 0.08
 
     private let sources: [any MeetingSpeakerSource]
@@ -132,7 +132,7 @@ final class MeetingSpeakerMonitor {
     /// One reading when one is due (at most every `pollInterval`), stamped `elapsed`. Nil when not due, not
     /// trusted, or no call window with participants is on screen.
     func poll(now: TimeInterval, elapsed: TimeInterval) -> MeetingSpeakerObservation? {
-        guard now - lastPoll >= Self.pollInterval || now < lastPoll else { return nil }
+        guard MeetingPollDue.isDue(now: now, last: lastPoll) else { return nil }
         lastPoll = now
         guard trusted() else { return nil }
         let deadline = Date().addingTimeInterval(Self.walkBudget)

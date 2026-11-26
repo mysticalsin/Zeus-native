@@ -5,18 +5,47 @@ import Testing
 private let optIn1 = Date(timeIntervalSince1970: 1_000)
 private let optIn2 = Date(timeIntervalSince1970: 2_000)
 
-@Suite("Scribe automatic start opt-in")
+enum ScribeTestSuites {
+    /// A suite name with a slash is not a private domain on this runtime: parallel tests then share one store.
+    static func name(_ prefix: String) -> String {
+        "app.zeus.tests.\(prefix).\(UUID().uuidString)"
+    }
+}
+
+@Suite("Scribe automatic start opt-in", .serialized)
 struct ScribeAutoStartOptInTests {
-    private func fresh() throws -> (UserDefaults, () -> Void) {
-        let name = NSTemporaryDirectory() + "ScribeAutoStartOptIn.\(UUID().uuidString)"
+    @Test func theOptInDefaultsSuiteIsNotAFilePath() {
+        let name = ScribeTestSuites.name("ScribeAutoStartOptIn")
+        #expect(!name.contains("/"))
+        #expect(name.hasPrefix("app.zeus.tests.ScribeAutoStartOptIn."))
+    }
+
+    private func fresh() throws -> (UserDefaults, String, () -> Void) {
+        let name = ScribeTestSuites.name("ScribeAutoStartOptIn")
         let defaults = try #require(UserDefaults(suiteName: name))
-        return (defaults, { defaults.removePersistentDomain(forName: name) })
+        return (defaults, name, { defaults.removePersistentDomain(forName: name) })
+    }
+
+    @Test func aKeyWrittenThroughOneFreshSuiteStaysThere() throws {
+        let (first, firstName, cleanup) = try fresh()
+        defer { cleanup() }
+        first.set("stamp", forKey: ScribeAutoStartOptIn.key)
+        #expect(first.object(forKey: ScribeAutoStartOptIn.key) as? String == "stamp")
+        let (second, secondName, cleanupSecond) = try fresh()
+        defer { cleanupSecond() }
+        #expect(firstName != secondName)
+        #expect(second.object(forKey: ScribeAutoStartOptIn.key) == nil)
+        #expect(UserDefaults.standard.object(forKey: ScribeAutoStartOptIn.key) == nil)
+        cleanup()
+        let reopened = try #require(UserDefaults(suiteName: firstName))
+        defer { reopened.removePersistentDomain(forName: firstName) }
+        #expect(reopened.object(forKey: ScribeAutoStartOptIn.key) == nil)
     }
 
     // MARK: The stamp follows the choice
 
     @Test func choosingStartAutomaticallyWritesTheStampAtTheClick() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
         ScribeAutoStartOptIn.record(mode: .automatic, now: optIn1, defaults: defaults)
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == optIn1)
@@ -24,7 +53,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func choosingAnotherModeWithdrawsTheOptIn() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         for other in [ScribeAutoStartMode.ask, .off] {
             ScribeAutoStartOptIn.record(mode: .automatic, now: optIn1, defaults: defaults)
             #expect(ScribeAutoStartOptIn.date(defaults: defaults) != nil)
@@ -34,7 +63,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func choosingAutomaticAgainAfterWithdrawingIsAFreshOptIn() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         ScribeAutoStartOptIn.record(mode: .automatic, now: optIn1, defaults: defaults)
         ScribeAutoStartOptIn.record(mode: .ask, now: optIn1, defaults: defaults)
         ScribeAutoStartOptIn.record(mode: .automatic, now: optIn2, defaults: defaults)
@@ -42,7 +71,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func reconcileRemovesAStampFoundWhileTheModeIsNotAutomatic() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         for other in [ScribeAutoStartMode.ask, .off] {
             defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
             ScribeAutoStartOptIn.reconcile(mode: other, defaults: defaults)
@@ -56,14 +85,14 @@ struct ScribeAutoStartOptInTests {
     // MARK: Launch migration
 
     @Test func aStaleStampWithAskMeIsRemovedAtLaunch() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         defaults.set(optIn1.timeIntervalSince1970, forKey: ScribeAutoStartOptIn.key)
         ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: false, defaults: defaults)
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
     }
 
     @Test func anOldStampWithAutomaticCarriesOver() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         defaults.set(5_000.0, forKey: ScribeAutoStartOptIn.legacyKey)
         ScribeAutoStartOptIn.migrate(mode: .automatic, hasSavedMeetings: false, defaults: defaults)
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == Date(timeIntervalSince1970: 5_000))
@@ -71,7 +100,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func anOldStampWithAnyOtherChoiceIsDroppedNotCarried() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         for other in [ScribeAutoStartMode.ask, .off] {
             defaults.set(5_000.0, forKey: ScribeAutoStartOptIn.legacyKey)
             ScribeAutoStartOptIn.migrate(mode: other, hasSavedMeetings: false, defaults: defaults)
@@ -81,7 +110,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func anOldStampThatIsNotATimestampIsNeverCarried() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         defaults.set("yes", forKey: ScribeAutoStartOptIn.legacyKey)
         ScribeAutoStartOptIn.migrate(mode: .automatic, hasSavedMeetings: false, defaults: defaults)
         #expect(ScribeAutoStartOptIn.date(defaults: defaults) == nil)
@@ -89,7 +118,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func migrationNeverReplacesAnOptInThatIsAlreadyThere() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         ScribeAutoStartOptIn.record(mode: .automatic, now: optIn2, defaults: defaults)
         defaults.set(5_000.0, forKey: ScribeAutoStartOptIn.legacyKey)
         ScribeAutoStartOptIn.migrate(mode: .automatic, hasSavedMeetings: false, defaults: defaults)
@@ -97,7 +126,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func migrationRunsTwiceWithTheSameResult() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         defaults.set(5_000.0, forKey: ScribeAutoStartOptIn.legacyKey)
         ScribeAutoStartOptIn.migrate(mode: .automatic, hasSavedMeetings: true, defaults: defaults)
         ScribeAutoStartOptIn.migrate(mode: .automatic, hasSavedMeetings: true, defaults: defaults)
@@ -106,7 +135,7 @@ struct ScribeAutoStartOptInTests {
     }
 
     @Test func aMacThatAlreadyHoldsASavedMeetingHasRecorded() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: false, defaults: defaults)
         #expect(!ScribeAutoStartOptIn.hasRecorded(defaults: defaults))
         ScribeAutoStartOptIn.migrate(mode: .ask, hasSavedMeetings: true, defaults: defaults)
@@ -116,7 +145,7 @@ struct ScribeAutoStartOptInTests {
     // MARK: The first recording
 
     @Test func theFirstRecordingIsNotedOnceAndKeepsItsFirstTime() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         #expect(!ScribeAutoStartOptIn.hasRecorded(defaults: defaults))
         ScribeAutoStartOptIn.noteRecordingBegan(now: optIn1, defaults: defaults)
         #expect(ScribeAutoStartOptIn.hasRecorded(defaults: defaults))
@@ -133,7 +162,7 @@ struct ScribeAutoStartOptInTests {
     // MARK: Readiness
 
     @Test func aDefaultsWriteOfAutomaticWithoutTheClickIsNotReady() throws {
-        let (defaults, cleanup) = try fresh(); defer { cleanup() }
+        let (defaults, _, cleanup) = try fresh(); defer { cleanup() }
         defaults.set("Start automatically", forKey: FeatureSettings.key(ScribeAutoStartMode.settingID))
         ScribeAutoStartOptIn.noteRecordingBegan(now: optIn1, defaults: defaults)
         let mode = ScribeAutoStartMode.current(defaults: defaults)

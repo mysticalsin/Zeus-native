@@ -521,7 +521,8 @@ struct HomeWidgetCard: View {
                     Spacer(minLength: 0)
                 }
                 if !TopBarStyle.isSnapshot {
-                    NotchTextField(text: Binding(get: { topBar.note }, set: { topBar.note = $0 }), placeholder: "Note")
+                    NotchTextField(text: Binding(get: { topBar.note }, set: { topBar.note = $0 }), placeholder: "Note",
+                                   onSubmit: { topBar.commitPrivateNote() })
                         .frame(height: 18)
                         .padding(.horizontal, 7)
                         .background(Capsule().fill(Color.white.opacity(0.07)))

@@ -44,40 +44,41 @@ struct BuddyOverlayView: View {
                               paused: !(model.sparkVisible && model.hasAppeared))
                     .frame(width: 88, height: 88)
                     .opacity(model.sparkVisible && model.hasAppeared ? 1 : 0)
-                    .animation(.easeIn(duration: model.hasAppeared ? 0.25 : 2), value: model.sparkVisible)
-                    .animation(.easeIn(duration: 2), value: model.hasAppeared)
+                    .animation(Motion.reducible(.easeIn(duration: model.hasAppeared ? 0.25 : 2)), value: model.sparkVisible)
+                    .animation(Motion.reducible(.easeIn(duration: 2)), value: model.hasAppeared)
                     .offset(x: spark.x - 44, y: spark.y - 44)
             } else {
+                // The avatar art: one coloured bolt per state. It leans into a flight, upright otherwise.
                 AvatarView(state: AvatarStatus.shared.current, size: SparkView.avatarSize, paused: !(model.sparkVisible && model.hasAppeared))
                     .rotationEffect(.degrees(model.mode == .flying ? model.rotation : 0))
                     .scaleEffect(model.scale)
                     .shadow(color: Theme.bolt.opacity(0.55), radius: model.glow)
                     .opacity(model.sparkVisible && model.hasAppeared ? 1 : 0)
-                    .animation(.easeIn(duration: model.hasAppeared ? 0.25 : 2), value: model.sparkVisible)
-                    .animation(.easeIn(duration: 2), value: model.hasAppeared)
+                    .animation(Motion.reducible(.easeIn(duration: model.hasAppeared ? 0.25 : 2)), value: model.sparkVisible)
+                    .animation(Motion.reducible(.easeIn(duration: 2)), value: model.hasAppeared)
                     .offset(x: spark.x - SparkView.avatarSize / 2, y: spark.y - SparkView.avatarSize / 2)
             }
 
             WaveformView(level: model.audioLevel, active: model.mode == .listening)
                 .opacity(model.mode == .listening ? 1 : 0)
-                .animation(.easeInOut(duration: 0.15), value: model.mode)
+                .animation(Motion.reducible(.easeInOut(duration: 0.15)), value: model.mode)
                 .offset(x: spark.x - 9, y: spark.y - 8)
 
             SpinnerView(active: model.mode == .thinking)
                 .opacity(model.mode == .thinking ? 1 : 0)
-                .animation(.easeInOut(duration: 0.15), value: model.mode)
+                .animation(Motion.reducible(.easeInOut(duration: 0.15)), value: model.mode)
                 .offset(x: spark.x - 7, y: spark.y - 7)
 
             BubbleView(text: model.bubbleText)
                 .scaleEffect(model.bubbleVisible ? 1 : 0.5, anchor: .topLeading)
                 .opacity(model.bubbleVisible ? 1 : 0)
-                .animation(model.bubbleVisible ? .spring(response: 0.4, dampingFraction: 0.6) : .easeOut(duration: 0.5),
+                .animation(Motion.reducible(model.bubbleVisible ? .spring(response: 0.4, dampingFraction: 0.6) : .easeOut(duration: 0.5)),
                            value: model.bubbleVisible)
                 .offset(x: spark.x + 14, y: spark.y + 14)
 
             CaptionView(text: model.caption)
                 .opacity(model.captionVisible ? 1 : 0)
-                .animation(.easeOut(duration: 0.25), value: model.captionVisible)
+                .animation(Motion.reducible(.easeOut(duration: 0.25)), value: model.captionVisible)
                 .offset(x: captionX(spark.x), y: spark.y + (model.bubbleVisible ? 46 : 18))
         }
         .frame(width: screenFrame.width, height: screenFrame.height, alignment: .topLeading)

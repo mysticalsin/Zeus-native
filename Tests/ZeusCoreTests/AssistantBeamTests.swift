@@ -122,4 +122,17 @@ struct AssistantBeamTests {
             #expect(abs(a.radiusY - b.radiusY) < 0.01)
         }
     }
+
+    @Test func middleBarAndAnimationShareOneHue() {
+        let bar = MiddleBarTone.bar
+        #expect(bar == MiddleBarTone.RGB(hex: ZeusThemeTokens.zeusPurple))
+        #expect(MiddleBarTone.shades.count == 7)
+        #expect(MiddleBarTone.shades.contains(bar))
+        let gold = MiddleBarTone.RGB(hex: ZeusThemeTokens.lightningGold)
+        #expect(MiddleBarTone.hueDistance(bar, gold) > 0.2)
+        for shade in MiddleBarTone.shades {
+            #expect(MiddleBarTone.hueDistance(shade, bar) < 1e-9)
+            #expect(MiddleBarTone.hueDistance(shade, gold) > 0.2)
+        }
+    }
 }

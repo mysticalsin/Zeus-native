@@ -31,31 +31,21 @@ public struct RecordlyVisualTokens: Equatable, Sendable {
     public let previewInteractive: Bool
 
     public static func tokens(for phase: RecordlyVisualPhase) -> RecordlyVisualTokens {
+        let box = RecordlyVisualsBox.tokens(for: boxPhase(phase))
+        return RecordlyVisualTokens(
+            previewDim: box.previewDim, liveFrameOpacity: box.liveFrameOpacity, ambientGlow: box.ambientGlow,
+            buttonCorner: box.buttonCorner, showsLiveCapsule: box.showsLiveCapsule, showsMeters: box.showsMeters,
+            showsCountdownNumeral: box.showsCountdownNumeral, previewInteractive: box.previewInteractive)
+    }
+
+    private static func boxPhase(_ phase: RecordlyVisualPhase) -> RecordlyVisualsBox.Phase {
         switch phase {
-        case .idle:
-            RecordlyVisualTokens(previewDim: 0, liveFrameOpacity: 0, ambientGlow: 0.34, buttonCorner: 0.5,
-                                 showsLiveCapsule: false, showsMeters: false, showsCountdownNumeral: false,
-                                 previewInteractive: true)
-        case .countdown:
-            RecordlyVisualTokens(previewDim: 0.32, liveFrameOpacity: 0, ambientGlow: 0.5, buttonCorner: 0.5,
-                                 showsLiveCapsule: false, showsMeters: false, showsCountdownNumeral: true,
-                                 previewInteractive: false)
-        case .starting:
-            RecordlyVisualTokens(previewDim: 0.18, liveFrameOpacity: 0, ambientGlow: 0.2, buttonCorner: 0.5,
-                                 showsLiveCapsule: false, showsMeters: false, showsCountdownNumeral: false,
-                                 previewInteractive: false)
-        case .recording:
-            RecordlyVisualTokens(previewDim: 0, liveFrameOpacity: 1, ambientGlow: 0, buttonCorner: 0.3,
-                                 showsLiveCapsule: true, showsMeters: true, showsCountdownNumeral: false,
-                                 previewInteractive: false)
-        case .stopping:
-            RecordlyVisualTokens(previewDim: 0.12, liveFrameOpacity: 0.5, ambientGlow: 0, buttonCorner: 0.3,
-                                 showsLiveCapsule: true, showsMeters: false, showsCountdownNumeral: false,
-                                 previewInteractive: false)
-        case .saved:
-            RecordlyVisualTokens(previewDim: 0, liveFrameOpacity: 0, ambientGlow: 0.2, buttonCorner: 0.5,
-                                 showsLiveCapsule: false, showsMeters: false, showsCountdownNumeral: false,
-                                 previewInteractive: false)
+        case .idle: .idle
+        case .countdown: .countdown
+        case .starting: .starting
+        case .recording: .recording
+        case .stopping: .stopping
+        case .saved: .saved
         }
     }
 }
@@ -64,48 +54,42 @@ public struct RecordlyVisualTokens: Equatable, Sendable {
 public enum RecordlyCountdownVisual {
     /// The digit to show, or nil outside a countdown. Out-of-range values clamp to 1...seconds.
     public static func numeral(remaining: Int?) -> String? {
-        guard let remaining else { return nil }
-        return String(min(max(remaining, 1), RecordlyCountdown.seconds))
+        RecordlyVisualsBox.numeral(remaining: remaining, seconds: RecordlyCountdown.seconds)
     }
 
     /// Ring progress 0...1 for the time since the countdown began.
     public static func ringProgress(elapsed: TimeInterval) -> Double {
-        guard elapsed.isFinite else { return 0 }
-        return min(1, max(0, elapsed / Double(RecordlyCountdown.seconds)))
+        RecordlyVisualsBox.ringProgress(elapsed: elapsed, seconds: RecordlyCountdown.seconds)
     }
 
     /// Where inside the current second we are, 0...1. The numeral springs in at 0 and settles by about 0.35.
     public static func stepFraction(elapsed: TimeInterval) -> Double {
-        guard elapsed.isFinite, elapsed >= 0 else { return 0 }
-        return elapsed - elapsed.rounded(.down)
+        RecordlyVisualsBox.stepFraction(elapsed: elapsed)
     }
 
     /// Numeral scale: starts large, settles to 1 with a small overshoot-free ease, then rests.
     public static func numeralScale(stepFraction: Double) -> Double {
-        let t = min(1, max(0, stepFraction / 0.35))
-        let eased = 1 - pow(1 - t, 3)
-        return 1.35 - 0.35 * eased
+        RecordlyVisualsBox.numeralScale(stepFraction: stepFraction)
     }
 
     /// Numeral opacity: fades in fast, fades out over the last quarter second so the next digit replaces it.
     public static func numeralOpacity(stepFraction: Double) -> Double {
-        let f = min(1, max(0, stepFraction))
-        let fadeIn = min(1, f / 0.12)
-        let fadeOut = f > 0.75 ? max(0, 1 - (f - 0.75) / 0.25) : 1
-        return fadeIn * fadeOut
+        RecordlyVisualsBox.numeralOpacity(stepFraction: stepFraction)
     }
 }
 
 /// Which rows the live capsule's level meters show.
 public enum RecordlyLiveMeterRows {
     /// The Mic row appears only while microphone capture is actually on.
-    public static func showsMic(_ audio: RecordlyAudioOptions) -> Bool { audio.microphone }
+    public static func showsMic(_ audio: RecordlyAudioOptions) -> Bool {
+        RecordlyVisualsBox.showsMic(microphone: audio.microphone)
+    }
 }
 
 /// One level meter: 0...1 in, smoothed 0...1 out. Fast attack, slow release, so bars rise quickly and fall gently.
 public struct RecordlyLevelMeter: Equatable, Sendable {
-    public static let attackPerSecond = 18.0
-    public static let releasePerSecond = 4.5
+    public static let attackPerSecond = RecordlyVisualsBox.attackPerSecond
+    public static let releasePerSecond = RecordlyVisualsBox.releasePerSecond
     public private(set) var value: Double = 0
 
     public init() {}
@@ -113,12 +97,7 @@ public struct RecordlyLevelMeter: Equatable, Sendable {
     /// Advances the meter toward `target` over `dt` seconds and returns the new value.
     @discardableResult
     public mutating func step(target: Double, dt: TimeInterval) -> Double {
-        let goal = target.isFinite ? min(1, max(0, target)) : 0
-        let delta = dt.isFinite ? min(max(dt, 0), 0.25) : 0
-        let rate = goal > value ? Self.attackPerSecond : Self.releasePerSecond
-        let blend = 1 - exp(-rate * delta)
-        value += (goal - value) * blend
-        if value < 0.001 { value = 0 }
+        value = RecordlyVisualsBox.meterStep(value: value, target: target, dt: dt)
         return value
     }
 
@@ -126,15 +105,12 @@ public struct RecordlyLevelMeter: Equatable, Sendable {
 
     /// Maps linear peak amplitude (0...1) to a perceptual 0...1 meter position over a 48 dB range.
     public static func perceptual(peak: Float) -> Double {
-        guard peak.isFinite, peak > 0 else { return 0 }
-        let db = 20 * log10(Double(min(peak, 1)))
-        return min(1, max(0, (db + 48) / 48))
+        RecordlyVisualsBox.perceptual(peak: Double(peak))
     }
 
     /// How many of `count` segments are lit for a 0...1 value.
     public static func litSegments(value: Double, count: Int) -> Int {
-        guard count > 0, value.isFinite else { return 0 }
-        return min(count, max(0, Int((min(1, max(0, value)) * Double(count)).rounded())))
+        RecordlyVisualsBox.litSegments(value: value, count: count)
     }
 }
 
@@ -144,17 +120,19 @@ public enum RecordlyEntrance {
         case preview = 0, picker, chips, button
     }
 
-    public static let itemDuration = 0.2
-    public static let stagger = 0.05
+    public static let itemDuration = RecordlyVisualsBox.entranceItemDuration
+    public static let stagger = RecordlyVisualsBox.entranceStagger
     /// Start of the last item plus its duration.
-    public static var totalDuration: Double { Double(Item.allCases.count - 1) * stagger + itemDuration }
+    public static var totalDuration: Double { RecordlyVisualsBox.entranceTotal(itemCount: Item.allCases.count) }
 
     /// Delay before an item starts. Reduce Motion has no stagger: everything cross-fades together.
     public static func delay(_ item: Item, reduceMotion: Bool) -> Double {
-        reduceMotion ? 0 : Double(item.rawValue) * stagger
+        RecordlyVisualsBox.entranceDelay(index: item.rawValue, reduceMotion: reduceMotion)
     }
 
-    public static func offset(reduceMotion: Bool) -> Double { reduceMotion ? 0 : 10 }
+    public static func offset(reduceMotion: Bool) -> Double {
+        RecordlyVisualsBox.entranceOffset(reduceMotion: reduceMotion)
+    }
 }
 
 /// State of one source chip (System audio, Microphone, Cursor zoom, and so on).
@@ -165,48 +143,43 @@ public enum RecordlySourceChipState: Equatable, Sendable {
     case unavailable
 
     public static func resolve(on: Bool, available: Bool, needsPermission: Bool) -> RecordlySourceChipState {
-        if needsPermission { return .needsPermission }
-        if !available { return on ? .on : .unavailable }
-        return on ? .on : .off
-    }
-
-    /// The short word shown or spoken next to the chip title.
-    public var word: String {
-        switch self {
-        case .on: "On"
-        case .off: "Off"
-        case .needsPermission: "Needs permission"
-        case .unavailable: "Soon"
+        switch RecordlyVisualsBox.chip(on: on, available: available, needsPermission: needsPermission) {
+        case .on: .on
+        case .off: .off
+        case .needsPermission: .needsPermission
+        case .unavailable: .unavailable
         }
     }
 
-    public var isInteractive: Bool { self == .on || self == .off }
+    /// The short word shown or spoken next to the chip title.
+    public var word: String { RecordlyVisualsBox.chipWord(Self.boxChip(self)) }
+
+    public var isInteractive: Bool { RecordlyVisualsBox.chipInteractive(Self.boxChip(self)) }
+
+    private static func boxChip(_ state: RecordlySourceChipState) -> RecordlyVisualsBox.Chip {
+        switch state {
+        case .on: .on
+        case .off: .off
+        case .needsPermission: .needsPermission
+        case .unavailable: .unavailable
+        }
+    }
 }
 
 /// Text for the saved clip card.
 public enum RecordlyClipSummary {
     /// "0:07", "1:05", "1:02:09".
     public static func duration(_ seconds: TimeInterval) -> String {
-        guard seconds.isFinite, seconds > 0 else { return "0:00" }
-        let total = Int(seconds.rounded())
-        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+        RecordlyVisualsBox.durationText(seconds)
     }
 
     /// "812 KB", "4.2 MB", "1.3 GB". Decimal units, one decimal from MB up.
     public static func fileSize(_ bytes: Int64) -> String {
-        guard bytes > 0 else { return "0 KB" }
-        let value = Double(bytes)
-        if value < 1_000_000 { return "\(max(1, Int((value / 1000).rounded()))) KB" }
-        if value < 1_000_000_000 { return String(format: "%.1f MB", value / 1_000_000) }
-        return String(format: "%.1f GB", value / 1_000_000_000)
+        RecordlyVisualsBox.fileSize(bytes)
     }
 
     /// "0:07 · 4.2 MB", skipping whichever part is unknown.
     public static func line(duration seconds: TimeInterval?, bytes: Int64?) -> String {
-        var parts: [String] = []
-        if let seconds, seconds > 0 { parts.append(Self.duration(seconds)) }
-        if let bytes, bytes > 0 { parts.append(fileSize(bytes)) }
-        return parts.joined(separator: " \u{00B7} ")
+        RecordlyVisualsBox.summaryLine(duration: seconds, bytes: bytes)
     }
 }
