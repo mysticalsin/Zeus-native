@@ -11,26 +11,15 @@ enum CLILocator {
         let extraPaths: [String]
     }
 
-    static let tools: [Tool] = [
-        Tool(name: "claude", provider: .claudeCLI, extraPaths: []),
-        Tool(name: "codex", provider: .codexCLI, extraPaths: [
-            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
-        ]),
-        Tool(name: "gemini", provider: .geminiCLI, extraPaths: []),
-        Tool(name: "cursor-agent", provider: .cursorAgent, extraPaths: []),
-        Tool(name: "ollama", provider: .ollama, extraPaths: []),
-        Tool(name: "gh", provider: nil, extraPaths: []),
-    ]
+    static let tools: [Tool] = CLIToolCatalog.tools.map { record in
+        Tool(name: record.name, provider: record.provider, extraPaths: record.extraPaths)
+    }
 
     static var searchDirectories: [String] {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let fromEnvironment = (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
-        let common = [
-            "/opt/homebrew/bin", "/usr/local/bin",
-            "\(home)/.local/bin", "\(home)/.npm-global/bin", "\(home)/.bun/bin", "\(home)/.cargo/bin",
-        ]
-        var seen = Set<String>()
-        return (common + fromEnvironment).filter { seen.insert($0).inserted }
+        CLIToolCatalog.searchDirectories(
+            home: FileManager.default.homeDirectoryForCurrentUser.path,
+            pathEnvironment: ProcessInfo.processInfo.environment["PATH"] ?? ""
+        )
     }
 
     static func locate(_ tool: Tool) -> String? {
