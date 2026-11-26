@@ -204,6 +204,7 @@ private struct AgentReplyPane: View {
             }
             Text(MeetingState.hideDetails ? "Details hidden" : (session.reason ?? session.task))
                 .font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.cloudSecondary).lineLimit(2)
+            impactRow
             Spacer(minLength: 0)
             HStack(spacing: 8) {
                 NotchTextField(text: $hub.replyDraft, placeholder: canType ? "Reply to \(session.agent)" : "Reply in the terminal", onSubmit: send)
@@ -224,6 +225,35 @@ private struct AgentReplyPane: View {
     }
 
     private func send() { Task { await hub.sendReply(session: session) } }
+
+    /// The glass decision row for this session. Impact is above Allow once.
+    @ViewBuilder
+    private var impactRow: some View {
+        if let approval = matchingApproval {
+            let impact = HubApprovalImpact.preview(tool: approval.tool, command: approval.command, input: approval.detail?.input)
+            if !impact.isEmpty {
+                HubDecisionImpactRow(
+                    impact: impact,
+                    detailsHidden: MeetingState.hideDetails,
+                    onAllowOnce: { approval.resolve(.allow) },
+                    onDeny: { approval.resolve(.deny) }
+                )
+            }
+        }
+    }
+
+    private var matchingApproval: NotchModel.Approval? {
+        guard let approval = hub.notch?.model.approval else { return nil }
+        guard HubApprovalImpact.matchesSession(
+            approvalSession: approval.sessionID,
+            approvalAgent: approval.agent,
+            approvalProject: approval.project,
+            sessionID: session.id,
+            sessionAgent: session.agent,
+            sessionProject: session.project
+        ) else { return nil }
+        return approval
+    }
 }
 
 /// New chat: agent, project folder, instruction, Start.

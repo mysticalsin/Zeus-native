@@ -8808,6 +8808,18 @@
         "file": "Tests/ZeusCoreTests/NotchHoverNotifyTests.swift",
         "function": "hoverExpandDefersAnAgentNoticeAndDoesNotOpenWhileThePointerIsOnIt"
       }
+    },
+    {
+      "id": "REG-1002",
+      "failure": "The hub decision row could take Allow once before the files, deletes, hosts, installs, force-push, and secret paths were shown.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/HubApprovalImpactTests.swift",
+        "function": "thePreviewNamesFilesDeletesHostsInstallsForcePushAndSecretPathsBeforeAllow"
+      }
     }
   ]
 }
