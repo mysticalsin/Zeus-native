@@ -42,6 +42,7 @@ Use `--output /path/to/new-directory` to retain artifacts at a chosen location. 
 | `face-presence` (darwin only, not a default group) | Complete face presence rules and tests: landmark math, face selection, spoof cues, face match, enrollment plan, sampler, vault seal and open, presence machine and status text | Apple Vision, the camera, the Keychain and the vault file, the lock call, the Settings card, and every owner check in `docs/FACE-PRESENCE-PLAN.md` |
 | `equaliser` | Complete equaliser value types, band table, filter maths, app policy, lifecycle reducer and card rules with their tests, plus the Scribe and intent files the policy reads | Real taps, aggregates, listeners, render callbacks, the System Audio Recording prompt and the Settings card. Apple platform only: the filter maths takes its lock from the Apple SDK |
 | `wiki` (optional) | Complete Wiki files/tests and the exact `ScribeMeetingRecord` declaration | Native filesystem semantics and the app's learning integration |
+| `keychain` | KeychainStore, the AI connection registry and its tests, with an in-memory backend | macOS Keychain API, the Settings card, and any live provider call |
 
 The `face-presence` group needs CoreGraphics transforms and CryptoKit, so it runs on macOS only (`python3 qa/portable-core/prepare.py --group face-presence --run`), is left out of the default run, and is not one of the feature map's portable checks. The same cases run in `native-ZeusCoreTests`.
 

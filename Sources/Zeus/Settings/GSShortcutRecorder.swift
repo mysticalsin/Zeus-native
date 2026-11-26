@@ -128,6 +128,7 @@ struct ShortcutRecorderRow: View {
     let symbol: String
     let title: String
     let text: String
+    var detail: String? = nil
     let shortcut: Shortcut?
     let defaultValue: Shortcut?
     var allowsOff = false
@@ -142,7 +143,7 @@ struct ShortcutRecorderRow: View {
     let set: (Shortcut?) -> Void
 
     var body: some View {
-        GSRow(symbol: symbol, title: title, text: text) {
+        GSRow(symbol: symbol, title: title, text: text, detail: detail) {
             // One recorder style everywhere: the shortcut (or "Off") in a single control, and a menu beside it
             // with an explicit Off and Reset, instead of a loose "Off" pill that reads as a second button.
             HStack(spacing: 8) {

@@ -12,7 +12,7 @@ public enum RecordlyCaptureSource: Equatable, Sendable {
     }
 
     public var kind: Kind {
-        switch self {
+        switch RecordlyCaptureSourceBox.kind(of: stored) {
         case .display: .display
         case .window: .window
         case .region: .region
@@ -20,48 +20,46 @@ public enum RecordlyCaptureSource: Equatable, Sendable {
     }
 
     public var regionRect: CGRect {
-        switch self {
-        case .region(let x, let y, let width, let height): CGRect(x: x, y: y, width: width, height: height)
-        default: .zero
-        }
+        let region = RecordlyCaptureSourceBox.region(of: stored)
+        return CGRect(x: region.x, y: region.y, width: region.width, height: region.height)
     }
 
     public static func region(_ rect: CGRect) -> RecordlyCaptureSource {
-        .region(x: rect.origin.x, y: rect.origin.y, width: rect.width, height: rect.height)
+        let region = RecordlyCaptureSourceBox.region(
+            x: Double(rect.origin.x),
+            y: Double(rect.origin.y),
+            width: Double(rect.size.width),
+            height: Double(rect.size.height)
+        )
+        return .region(x: region.x, y: region.y, width: region.width, height: region.height)
+    }
+
+    fileprivate var stored: RecordlyCaptureSourceBox.Stored {
+        switch self {
+        case .display(let id): .display(id: id)
+        case .window(let number): .window(number: number)
+        case .region(let x, let y, let width, let height):
+            .region(x: x, y: y, width: width, height: height)
+        }
+    }
+
+    fileprivate init(_ stored: RecordlyCaptureSourceBox.Stored) {
+        switch stored {
+        case .display(let id): self = .display(id: id)
+        case .window(let number): self = .window(number: number)
+        case .region(let x, let y, let width, let height):
+            self = .region(x: x, y: y, width: width, height: height)
+        }
     }
 }
 
 extension RecordlyCaptureSource: Codable {
-    enum CodingKeys: String, CodingKey { case kind, id, number, x, y, width, height }
-
     public init(from decoder: Decoder) throws {
-        let box = try decoder.container(keyedBy: CodingKeys.self)
-        let kind = try box.decode(Kind.self, forKey: .kind)
-        switch kind {
-        case .display: self = .display(id: try box.decode(UInt32.self, forKey: .id))
-        case .window: self = .window(number: try box.decode(Int.self, forKey: .number))
-        case .region:
-            self = .region(
-                x: try box.decode(Double.self, forKey: .x),
-                y: try box.decode(Double.self, forKey: .y),
-                width: try box.decode(Double.self, forKey: .width),
-                height: try box.decode(Double.self, forKey: .height)
-            )
-        }
+        self.init(try RecordlyCaptureSourceBox.decode(from: decoder))
     }
 
     public func encode(to encoder: Encoder) throws {
-        var box = encoder.container(keyedBy: CodingKeys.self)
-        try box.encode(kind, forKey: .kind)
-        switch self {
-        case .display(let id): try box.encode(id, forKey: .id)
-        case .window(let number): try box.encode(number, forKey: .number)
-        case .region(let x, let y, let width, let height):
-            try box.encode(x, forKey: .x)
-            try box.encode(y, forKey: .y)
-            try box.encode(width, forKey: .width)
-            try box.encode(height, forKey: .height)
-        }
+        try RecordlyCaptureSourceBox.encode(stored, to: encoder)
     }
 }
 

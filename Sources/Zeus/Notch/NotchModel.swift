@@ -23,6 +23,8 @@ final class NotchModel {
         var lastEventAt = Date()
         /// Why it failed or stalled, for the card.
         var reason: String?
+        /// Zeus launched this run, or a hook reported it. Hooked unless a starter says otherwise.
+        var origin: SupervisedOrigin = .hooked
     }
 
     /// The red card in the peek after an agent's turn ends in an error.
@@ -147,5 +149,11 @@ final class NotchModel {
     var peekSession: Session? {
         guard let id = peekSessionID else { return sessions.first }
         return sessions.first { $0.id == id }
+    }
+
+    /// True when a stop-all has a run to halt. The approval card is not one of those runs.
+    var canStopAll: Bool {
+        let runs = sessions.map { SupervisedRun(id: $0.id, origin: $0.origin, status: $0.status) }
+        return !NotchStopAll.plan(runs, handlers: []).halted.isEmpty
     }
 }
