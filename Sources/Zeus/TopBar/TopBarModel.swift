@@ -531,6 +531,8 @@ final class TopBarModel {
     /// The mic is listening for a spoken approval answer.
     var micListening = false
     var micLevel: Double = 0
+    /// The talk key is held. Copied from the flag the hotkey already publishes. The indicator only reads it.
+    var talkHeld = false
     /// Recent dictation levels, newest last, for the live waveform.
     private(set) var dictationLevels: [Double] = Array(repeating: 0, count: 28)
 
