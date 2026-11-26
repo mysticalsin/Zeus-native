@@ -102,7 +102,8 @@ GROUPS = {
     ),
     "presentation": (
         core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
-             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Performance/DisplayAnimationPolicy.swift",
+             "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Voice/MiddleBarTone.swift",
+             "ThemeTokens.swift", "Performance/DisplayAnimationPolicy.swift",
              "TopBar/RecordingFeedback.swift"),
         tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
     ),

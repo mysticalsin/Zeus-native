@@ -2159,7 +2159,7 @@
         {
           "id": "F05.assistant-beam-contract",
           "check": "portable-presentation",
-          "acceptance": "The supplied Voice Assistant beam geometry uses seven lobes and a bounded contour, preserves processing leg timing and phase ownership, scales to the native host, rejects malformed input and holds one static Reduce Motion frame. Pure geometry does not establish rendered parity, physical frame rate or a reachable app journey.",
+          "acceptance": "The supplied Voice Assistant beam geometry uses seven lobes and a bounded contour, preserves processing leg timing and phase ownership, scales to the native host, rejects malformed input and holds one static Reduce Motion frame. The middle bar and its animation share the Zeus purple hue. Pure geometry does not establish rendered parity, physical frame rate or a reachable app journey.",
           "cases": [
             {
               "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
@@ -2196,6 +2196,10 @@
             {
               "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
               "function": "lateSessionMeterChangesCannotRewriteAccumulatedLobeTravel"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AssistantBeamTests.swift",
+              "function": "middleBarAndAnimationShareOneHue"
             }
           ]
         },

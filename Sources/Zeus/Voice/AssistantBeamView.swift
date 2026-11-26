@@ -1,9 +1,15 @@
 import SwiftUI
 import ZeusCore
 
+extension Color {
+    init(middleBar tone: MiddleBarTone.RGB) {
+        self.init(.sRGB, red: tone.red, green: tone.green, blue: tone.blue)
+    }
+}
+
 /// Paints only the supplied deterministic frame. The owning surface supplies its own timeline.
-/// Bottom inner light, a taller bloom, an edge ring and a chromatic bell contour adapt VoiceBeam
-/// to Zeus's native palette. No audio capture, shared driver or SVG displacement is used.
+/// Bottom inner light, a taller bloom, an edge ring and a bell contour use `MiddleBarTone`,
+/// the same Zeus purple as the bar. No audio capture, shared driver or SVG displacement is used.
 struct AssistantBeamView: View {
     let frame: AssistantBeam.Frame
     var reduceTransparency = false
@@ -14,7 +20,7 @@ struct AssistantBeamView: View {
 
     var body: some View {
         let palette = colors.isEmpty
-            ? [Theme.danger, Theme.sky, Theme.accent, Theme.leaf, Theme.ember, Theme.glow, Color(hex: 0x28C8BE)]
+            ? MiddleBarTone.shades.map { Color(middleBar: $0) }
             : Array(colors.prefix(7))
         Canvas { context, size in
             let geometry = frame.geometry(width: size.width, height: size.height, cornerRadius: cornerRadius)
@@ -26,7 +32,7 @@ struct AssistantBeamView: View {
                 // Opaque, unblurred state mark: no material, bloom or translucent wash.
                 let y = max(0, geometry.height - max(1, 2 * geometry.scale))
                 context.fill(Path(CGRect(x: 0, y: y, width: geometry.width, height: geometry.height - y)),
-                             with: .color(Theme.glow))
+                             with: .color(Color(middleBar: MiddleBarTone.bar)))
             } else {
                 paintLobes(context: &context, geometry: geometry, palette: palette, bloom: false)
                 context.drawLayer { bloom in
@@ -43,10 +49,9 @@ struct AssistantBeamView: View {
                         paintLobes(context: &stroke, geometry: geometry, palette: palette, bloom: true)
                     }
                 }
-                paintBand(context: &context, geometry: geometry)
+                paintBand(context: &context, geometry: geometry, palette: palette)
             }
         }
-        .hueRotation(.degrees(reduceTransparency ? 0 : frame.hueDegrees))
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -74,7 +79,7 @@ struct AssistantBeamView: View {
         }
     }
 
-    private func paintBand(context: inout GraphicsContext, geometry: AssistantBeam.Geometry) {
+    private func paintBand(context: inout GraphicsContext, geometry: AssistantBeam.Geometry, palette: [Color]) {
         guard let first = geometry.band.first, let last = geometry.band.last, geometry.bandOpacity > 0 else { return }
         let start = CGPoint(x: first.x, y: 0)
         let end = CGPoint(x: last.x, y: 0)
@@ -92,7 +97,7 @@ struct AssistantBeamView: View {
             for point in geometry.band.dropFirst() { line.addLine(to: CGPoint(x: point.x + x, y: point.y + y)) }
             return line
         }
-        let core = scheme == .dark ? Theme.cloudPrimary : Theme.glow
+        let core = palette.first ?? Color(middleBar: MiddleBarTone.bar)
         let width = 14 * geometry.bandWidth
         let corePath = path()
         context.drawLayer { halo in
@@ -100,10 +105,14 @@ struct AssistantBeamView: View {
             halo.stroke(corePath, with: shading(core, opacity: geometry.bandOpacity * 0.13),
                         style: StrokeStyle(lineWidth: width * 2.2, lineCap: .round, lineJoin: .round))
         }
+        func tone(_ index: Int) -> Color {
+            guard !palette.isEmpty else { return core }
+            return palette[index % palette.count]
+        }
         let fringes: [(Color, Double, Double, Double)] = [
-            (Theme.danger, geometry.fringeX, -geometry.fringeY, 1),
-            (Theme.leaf, geometry.fringeX * 0.35, -geometry.fringeY * 0.35, 0.55),
-            (Theme.sky, -geometry.fringeX, geometry.fringeY, 1),
+            (tone(0), geometry.fringeX, -geometry.fringeY, 1),
+            (tone(1), geometry.fringeX * 0.35, -geometry.fringeY * 0.35, 0.55),
+            (tone(4), -geometry.fringeX, geometry.fringeY, 1),
             (core, 0, 0, 0.9),
         ]
         context.drawLayer { ridge in
