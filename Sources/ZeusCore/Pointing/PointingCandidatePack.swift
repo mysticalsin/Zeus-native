@@ -3,6 +3,7 @@ import Foundation
 /// The controls under the pointer for one pointing question, on one display.
 /// Screenshot bytes stay out unless the person already turned that consent on.
 /// A secure control keeps its role and rectangle, and keeps no label and no value.
+/// Each acceptance answer is read from `PointingCandidatePackBox`. A zero-width space stays in a role.
 public struct PointingCandidatePack: Equatable, Sendable, Codable {
     public static let maxCandidates = 8
     public static let maxLabelBytes = 128
@@ -73,24 +74,18 @@ public struct PointingCandidatePack: Equatable, Sendable, Codable {
     public var carriesImageBytes: Bool { !(image?.isEmpty ?? true) }
 
     /// One display, a handful of controls, and no screenshot unless consent is on.
+    /// The limits, the role trim, and the stored image are read from `PointingCandidatePackBox`.
     public init?(displayID: UInt32, sendScreenshot: Bool = false, image: Data? = nil, candidates drafts: [Draft]) {
-        guard displayID != 0 else { return nil }
-        guard drafts.count <= Self.maxCandidates else { return nil }
-        let pixels = image?.isEmpty == false ? image : nil
-        if let pixels, pixels.count > Self.maxImageBytes { return nil }
-        if !sendScreenshot, pixels != nil { return nil }
-        var seen = Set<String>()
-        var accepted: [Candidate] = []
-        accepted.reserveCapacity(drafts.count)
-        for draft in drafts {
-            guard let candidate = Self.candidate(from: draft) else { return nil }
-            guard seen.insert(candidate.id).inserted else { return nil }
-            accepted.append(candidate)
-        }
-        self.displayID = displayID
-        self.sendScreenshot = sendScreenshot
-        self.image = sendScreenshot ? pixels : nil
-        self.candidates = accepted
+        guard let built = PointingCandidatePackBox.assemble(
+            displayID: displayID,
+            sendScreenshot: sendScreenshot,
+            image: image,
+            drafts: drafts
+        ) else { return nil }
+        self.displayID = built.displayID
+        self.sendScreenshot = built.sendScreenshot
+        self.image = built.image
+        self.candidates = built.candidates
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -105,23 +100,7 @@ public struct PointingCandidatePack: Equatable, Sendable, Codable {
         try container.encode(candidates, forKey: .candidates)
     }
 
-    private static func candidate(from draft: Draft) -> Candidate? {
-        guard draft.id.range(of: #"^[A-Za-z0-9_-]{1,32}$"#, options: .regularExpression) != nil else { return nil }
-        let role = cut(draft.role.trimmingCharacters(in: .whitespacesAndNewlines), bytes: maxRoleBytes)
-        guard !role.isEmpty else { return nil }
-        guard draft.rect.isDrawable else { return nil }
-        let label = draft.isSecure ? nil : draft.label.map { cut($0, bytes: maxLabelBytes) }
-        return Candidate(id: draft.id, role: role, label: label, rect: draft.rect, isSecure: draft.isSecure)
-    }
-
     static func cut(_ text: String, bytes limit: Int) -> String {
-        guard text.utf8.count > limit else { return text }
-        var result = ""
-        for character in text {
-            let next = result + String(character)
-            if next.utf8.count > limit { break }
-            result = next
-        }
-        return result
+        PointingCandidatePackBox.cut(text, bytes: limit)
     }
 }
