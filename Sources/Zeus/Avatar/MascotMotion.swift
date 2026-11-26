@@ -33,21 +33,8 @@ struct MascotMotion: Equatable {
     /// Poses a state cycles through and how long each slot lasts: the mascot "does" the action.
     /// A slot restarts its pose's clip, so one-shots replay and loops line up with `hold`.
     static func cycle(for state: AvatarState) -> (poses: [LivingPose], hold: Double) {
-        switch state {
-        case .idle: ([.idle], 4)
-        case .listening: ([.listening], 3)
-        case .thinking: ([.thinking, .curious], 3.2)
-        case .speaking: ([.welcome, .guiding], 1.8)
-        case .pointing: ([.guiding], 2)
-        case .clicking: ([.working, .organizing], 2.4)
-        case .typing: ([.typing], 2.4)
-        case .browsing: ([.searching, .curious], 2.4)
-        case .agent: ([.working, .typing, .searching, .organizing, .carrying], 2.4)
-        case .approval: ([.approval_wait], 4)
-        case .error: ([.error, .confused], 2)
-        case .done: ([.success, .celebrate], 1.8)
-        case .teleprompter: ([.guiding, .curious], 3)
-        }
+        let row = MascotPoseCycle.cycle(for: state.rawValue)
+        return (row.poses.compactMap(LivingPose.init(rawValue:)), row.hold)
     }
 
     /// Idle extras: a curious glance every `glanceEvery` s and a short walk every `walkEvery` s.
