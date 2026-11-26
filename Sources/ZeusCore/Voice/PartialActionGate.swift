@@ -28,9 +28,10 @@ public struct PartialActionGate: Sendable, Equatable {
         lastPartialKey = key
     }
 
+    /// A collapsed key. A zero-width space stays. The blank check is read from `PartialActionGateBox`.
     public static func key(_ text: String) -> String {
-        text.lowercased()
+        let collapsed = text.lowercased()
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return PartialActionGateBox.trimmedKey(collapsed)
     }
 }
