@@ -1689,15 +1689,38 @@ private func replayWithLog(_ run: WalkRun, _ names: [String]) -> (found: [String
     return (out + restCheck(sim, run), effects)
 }
 
-// The walks are exhaustive and CPU bound. One at a time they leave the other cores to the rest of the Core module, whose
-// socket and process tests time out when every core is busy walking (seen on the 3-core hosted CI runner).
-@Suite(.serialized) struct VoiceKeyWalkTests {
-    @Test(.serialized, arguments: WalkRun.all.filter { run in
+/// Runs a long synchronous job on a dedicated thread and hands its result back to the awaiting test.
+private enum WalkThread {
+    private final class Box<T>: @unchecked Sendable {
+        let work: () -> T
+        var result: T?
+        init(_ work: @escaping () -> T) { self.work = work }
+    }
+
+    static func run<T>(_ work: @escaping () -> T) async -> T {
+        let box = Box(work)
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            let thread = Thread {
+                box.result = box.work()
+                done.resume()
+            }
+            thread.stackSize = 8 << 20
+            thread.start()
+        }
+        return box.result!
+    }
+}
+
+@Suite struct VoiceKeyWalkTests {
+    @Test(arguments: WalkRun.all.filter { run in
         let only = ProcessInfo.processInfo.environment["WALK_ONLY"] ?? ""
         return only.isEmpty || only.split(separator: ",").contains { run.name.hasPrefix($0) }
     })
-    fileprivate func everyOrderOfPressesKeepsTheRules(run: WalkRun) {
-        let report = search(run)
+    fileprivate func everyOrderOfPressesKeepsTheRules(run: WalkRun) async {
+        // The search is CPU bound for seconds to minutes. On Swift's cooperative pool it would hold a thread the whole
+        // time, and on a 3-core runner the walks hold every thread, so async tests elsewhere cannot resume while their
+        // deadlines run. Each walk runs on its own thread instead and leaves the pool free.
+        let report = await WalkThread.run { search(run) }
         print("voice key walk \(run.name): \(report.states) states, \(report.moves) moves, \(String(format: "%.2f", report.seconds)) s")
         #expect(report.violations.isEmpty, "\(run.name): \(report.violations.joined(separator: "\n"))")
         #expect(report.states > 100, "the search found too few states to be a search")

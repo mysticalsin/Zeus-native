@@ -12,13 +12,12 @@ struct BridgePendingRepliesTests {
         func change(_ update: (inout Value) -> Void) { lock.withLock { update(&value) } }
     }
 
-    private func eventually(_ condition: @Sendable () -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while !condition(), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
-        #expect(condition())
+    private func eventually(_ condition: @Sendable () -> Bool) {
+        let met = PollingWait.until { condition() }
+        #expect(met, "the bridge state did not settle within the bound")
     }
 
-    @Test func duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete() async throws {
+    @Test func duplicateProtocolRequestGetsItsOwnErrorWhileOriginalReplyAndBothSocketsComplete() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-br-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -32,19 +31,19 @@ struct BridgePendingRepliesTests {
         try server.start()
         defer { server.stop() }
         let request = try JSONEncoder().encode(BridgeRequest(id: "same-id", type: "page.read"))
-        let original = Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }
-        try await eventually { pending.count == 1 && forwarded.read() == 1 }
-        let duplicateBytes = await Task.detached { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 3) }.value
+        let original = PollingWait.start { UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 30) }
+        eventually { pending.count == 1 && forwarded.read() == 1 }
+        let duplicateBytes = UnixSocket.request(path: path, payload: request, expectReply: true, timeout: 30)
         let duplicate = try JSONDecoder().decode(BridgeResponse.self, from: #require(duplicateBytes))
         #expect(duplicate.id == "same-id" && !duplicate.ok && duplicate.error?.code == "duplicate_request")
         #expect(pending.count == 1)
         #expect(forwarded.read() == 1, "Only the original request may be forwarded to Chrome")
         let success = BridgeResponse.success("same-id", .object(["original": .bool(true)]))
         #expect(pending.complete(success))
-        let originalBytes = await original.value
+        let originalBytes = original.wait()
         #expect(try JSONDecoder().decode(BridgeResponse.self, from: #require(originalBytes)) == success)
         #expect(!pending.complete(success))
-        try await eventually { pending.count == 0 && server.activeConnectionCount == 0 }
+        eventually { pending.count == 0 && server.activeConnectionCount == 0 }
     }
 
     @Test func anOldTimeoutCannotSettleAReusedRequestID() throws {
@@ -123,7 +122,7 @@ struct BridgePendingRepliesTests {
         let replies = Box<[Data?]>([])
         let token = try #require(pending.reserve(id: "deadline") { data in replies.change { $0.append(data) } })
         #expect(pending.armTimeout(id: "deadline", token: token, after: 0.03))
-        try await eventually { replies.read().count == 1 }
+        eventually { replies.read().count == 1 }
         let item = try #require(replies.read().first)
         let response = try JSONDecoder().decode(BridgeResponse.self, from: #require(item))
         #expect(response.error?.code == "timeout" && pending.count == 0)

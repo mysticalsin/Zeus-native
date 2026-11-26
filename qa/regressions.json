@@ -8820,6 +8820,18 @@
         "file": "Tests/ZeusCoreTests/HubApprovalImpactTests.swift",
         "function": "thePreviewNamesFilesDeletesHostsInstallsForcePushAndSecretPathsBeforeAllow"
       }
+    },
+    {
+      "id": "REG-975",
+      "failure": "The socket and native host test waits judged their deadline before looking at the condition again, so a waiter resumed late on a busy three core runner reported failure for a condition that had already been met. They also ran blocking socket calls on the shared task pool, which starved the waiters. Waits now check once more after the deadline and blocking calls run on their own threads.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PollingWaitTests.swift",
+        "function": "aLateWakeUpStillSeesAConditionThatBecameTrueDuringTheStall"
+      }
     }
   ]
 }
