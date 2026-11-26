@@ -6,16 +6,25 @@ import UniformTypeIdentifiers
 /// O11: send only the marked crop to the brain, not the full display shot.
 public enum AnnotationCrop {
     public static func croppedShot(from shot: ScreenShot, pixelRect: CGRect) -> ScreenShot? {
-        guard pixelRect.width >= 1, pixelRect.height >= 1,
+        // The stored size keeps a negative width so intersection can flip it around the origin.
+        let storedWidth = Double(pixelRect.size.width)
+        let storedHeight = Double(pixelRect.size.height)
+        guard AnnotationCropBox.acceptsMark(width: storedWidth, height: storedHeight),
               let source = jpegImage(from: shot.jpegData) else { return nil }
-        let bounds = CGRect(x: 0, y: 0, width: source.width, height: source.height)
-        let clip = pixelRect.intersection(bounds)
-        guard !clip.isNull, clip.width >= 1, clip.height >= 1,
-              let cropped = source.cropping(to: clip),
-              let jpeg = jpegData(from: cropped, quality: 0.85) else { return nil }
+        guard let clip = AnnotationCropBox.clip(
+            x: Double(pixelRect.origin.x),
+            y: Double(pixelRect.origin.y),
+            width: storedWidth,
+            height: storedHeight,
+            imageWidth: source.width,
+            imageHeight: source.height
+        ) else { return nil }
+        let rect = CGRect(x: clip.x, y: clip.y, width: clip.width, height: clip.height)
+        guard let cropped = source.cropping(to: rect),
+              let jpeg = jpegData(from: cropped, quality: AnnotationCropBox.jpegQuality) else { return nil }
         return ScreenShot(
             jpegData: jpeg,
-            label: shot.label + " (marked crop)",
+            label: AnnotationCropBox.markedLabel(shot.label),
             pixelWidth: cropped.width,
             pixelHeight: cropped.height,
             displayFrame: shot.displayFrame
