@@ -312,7 +312,7 @@ public actor VoiceProviderSession {
         currentCancel = nil
     }
 
-    public func speak(_ text: String) async -> ProviderSpeakOutcome {
+    public func speak(_ text: String, onPlaybackChunk: (@Sendable (Data) async -> Void)? = nil) async -> ProviderSpeakOutcome {
         let started = ContinuousClock.now
         speakCancelled = false
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -359,6 +359,9 @@ public actor VoiceProviderSession {
                 for try await chunk in synthesis.chunks {
                     if speakCancelled { throw ProviderFailure.cancelled }
                     if heard.fired { throw ProviderFailure.timedOut }
+                    let piece = chunk.data
+                    guard !piece.isEmpty else { continue }
+                    await onPlaybackChunk?(piece)
                     if audio.isEmpty {
                         heard.value = true
                         first = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
@@ -367,9 +370,9 @@ public actor VoiceProviderSession {
                             throw ProviderFailure.timedOut
                         }
                     }
-                    audio.append(chunk.data)
-                    if !chunk.data.starts(with: Data("RIFF".utf8)), !chunk.data.starts(with: Data("ID3".utf8)) {
-                        _ = assembler.append(chunk.data)
+                    audio.append(piece)
+                    if !piece.starts(with: Data("RIFF".utf8)), !piece.starts(with: Data("ID3".utf8)) {
+                        _ = assembler.append(piece)
                     }
                 }
                 if heard.fired { throw ProviderFailure.timedOut }

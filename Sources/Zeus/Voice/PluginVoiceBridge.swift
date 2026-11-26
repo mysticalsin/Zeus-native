@@ -2,6 +2,18 @@ import AVFoundation
 import Foundation
 import ZeusCore
 
+private final class StreamedFlag: @unchecked Sendable {
+    var value = false
+}
+
+enum ProviderClipFile {
+    static func write(_ wav: Data) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-voice-\(UUID().uuidString).wav")
+        try wav.write(to: url)
+        return url
+    }
+}
+
 /// Plays provider audio. Playback on a Mac is MAC-PENDING until it is run there.
 @MainActor
 enum PluginAudioPlay {
@@ -9,10 +21,17 @@ enum PluginAudioPlay {
     private static let delegate = ProviderPlayerDelegate()
     private static var player: AVAudioPlayer?
 
+    /// Starts a clip. A WAV file is written off the main actor, then the engine starts here.
     @discardableResult
-    static func play(_ data: Data) -> Bool {
+    static func play(_ data: Data) async -> Bool {
         guard !data.isEmpty else { return false }
-        if data.starts(with: Data("RIFF".utf8)), playWithEngine(data) { return true }
+        if data.starts(with: Data("RIFF".utf8)) {
+            let captured = data
+            guard let url = await Task.detached(priority: .userInitiated, operation: {
+                try? ProviderClipFile.write(captured)
+            }).value else { return false }
+            return playFile(at: url)
+        }
         guard let next = try? AVAudioPlayer(data: data) else { return false }
         next.delegate = delegate
         player = next
@@ -36,11 +55,15 @@ enum PluginAudioPlay {
         ProviderPlaybackGate.shared.reset()
     }
 
-    /// Schedules a WAV on `AVAudioEngine`. MP3 from a cloud provider uses `AVAudioPlayer`.
-    private static func playWithEngine(_ wav: Data) -> Bool {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("zeus-voice-\(UUID().uuidString).wav")
+    /// One more chunk of a clip that is already being spoken, or the first chunk.
+    static func enqueue(_ data: Data) async {
+        guard !data.isEmpty else { return }
+        _ = await play(data)
+    }
+
+    /// Schedules a WAV on `AVAudioEngine`. The file already exists.
+    private static func playFile(at url: URL) -> Bool {
         do {
-            try wav.write(to: url)
             let file = try AVAudioFile(forReading: url)
             let engine = AVAudioEngine()
             let node = AVAudioPlayerNode()
@@ -159,10 +182,16 @@ enum PluginVoiceBridge {
     static func speak(_ text: String) async -> Result {
         let choice = VoiceProviderPreferences(defaults: .standard).choice
         guard case .provider = choice else { return .passthrough }
-        let outcome = await sharedSession().speak(text)
+        let streamed = StreamedFlag()
+        let outcome = await sharedSession().speak(text) { chunk in
+            streamed.value = true
+            await PluginAudioPlay.enqueue(chunk)
+        }
         switch outcome.route {
         case .cloud(let providerID, let voiceID):
-            guard PluginAudioPlay.play(outcome.audio) else { return .localFallback(reason: outcome.statusLine) }
+            if !streamed.value {
+                guard await PluginAudioPlay.play(outcome.audio) else { return .localFallback(reason: outcome.statusLine) }
+            }
             let engine: UltronEngine = providerID == ElevenLabsTTSAdapter.id ? .elevenLabs : .system
             return .spoken(engine: engine, voice: voiceID, reason: "voice provider \(providerID)", firstAudioMs: outcome.firstAudioMs)
         case .local, .cancelled:
