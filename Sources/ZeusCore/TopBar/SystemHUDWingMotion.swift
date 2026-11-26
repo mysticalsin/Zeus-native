@@ -3,9 +3,10 @@ import Foundation
 
 /// Headless model for Glance-style system HUD wing expansion (width, height, opacity).
 /// Matches `NotchClosedBodyLayout` spring constants and `AnimatedNotchWidth` in the app.
+/// Width, opacity, and the timing bars are read from `SystemHUDWingMotionBox`.
 public enum SystemHUDWingMotion {
-    public static let sampleFPS: Double = 120
-    public static let frameStep: Double = 1.0 / 60.0
+    public static let sampleFPS: Double = SystemHUDWingMotionBox.sampleFPS
+    public static let frameStep: Double = SystemHUDWingMotionBox.frameStep
 
     /// Kinds exercised by `zeus debug animate` for HUD timing QA (silent, no hardware).
     public enum AnimateKind: String, CaseIterable, Sendable {
@@ -13,8 +14,11 @@ public enum SystemHUDWingMotion {
 
         public var cueExtraWidth: CGFloat {
             switch self {
-            case .volume, .brightness, .keyboard, .mute: 58
-            case .capsLock: 30
+            case .volume: CGFloat(SystemHUDWingMotionBox.Kind.volume.extraWidth)
+            case .brightness: CGFloat(SystemHUDWingMotionBox.Kind.brightness.extraWidth)
+            case .keyboard: CGFloat(SystemHUDWingMotionBox.Kind.keyboard.extraWidth)
+            case .mute: CGFloat(SystemHUDWingMotionBox.Kind.mute.extraWidth)
+            case .capsLock: CGFloat(SystemHUDWingMotionBox.Kind.capsLock.extraWidth)
             }
         }
     }
@@ -30,8 +34,8 @@ public enum SystemHUDWingMotion {
         public var message: String
     }
 
-    public static let referenceNotchWidth: CGFloat = 185
-    public static let referenceBarHeight: CGFloat = 32
+    public static let referenceNotchWidth: CGFloat = CGFloat(SystemHUDWingMotionBox.referenceNotchWidth)
+    public static let referenceBarHeight: CGFloat = CGFloat(SystemHUDWingMotionBox.referenceBarHeight)
 
     public static func idleWidth(notchWidth: CGFloat = referenceNotchWidth, shoulder: CGFloat = 0) -> CGFloat {
         NotchClosedBodyLayout.bodyWidth(
@@ -52,112 +56,63 @@ public enum SystemHUDWingMotion {
             at: t,
             response: NotchClosedBodyLayout.wingsSpringResponse,
             damping: NotchClosedBodyLayout.wingsSpringDamping)
-        let raw = opening ? 1 - remaining : remaining
-        return max(0, min(1.06, raw))
+        return SystemHUDWingMotionBox.expansion(remaining: remaining, opening: opening)
     }
 
     public static func sample(at time: Double, opening: Bool, extraWidth: CGFloat,
                               notchWidth: CGFloat = referenceNotchWidth) -> Sample {
-        let idle = idleWidth(notchWidth: notchWidth)
-        let target = finalWidth(extraWidth: extraWidth, notchWidth: notchWidth)
-        let delta = target - idle
-        let e = expansion(at: time, opening: opening)
-        let width = idle + CGFloat(e) * delta
-        let opacity = opening ? min(1, e) : max(0, min(1, e))
-        return Sample(time: time, width: width, height: referenceBarHeight, opacity: opacity)
+        let idle = Double(idleWidth(notchWidth: notchWidth))
+        let target = Double(finalWidth(extraWidth: extraWidth, notchWidth: notchWidth))
+        let placed = SystemHUDWingMotionBox.sample(
+            time: time,
+            opening: opening,
+            expansion: expansion(at: time, opening: opening),
+            idle: idle,
+            target: target,
+            height: Double(referenceBarHeight))
+        return Sample(
+            time: placed.time,
+            width: CGFloat(placed.width),
+            height: CGFloat(placed.height),
+            opacity: placed.opacity)
     }
 
     public static func timeline(opening: Bool, extraWidth: CGFloat, seconds: Double = 0.35) -> [Sample] {
-        let step = 1 / sampleFPS
-        var out: [Sample] = []
-        var t = 0.0
-        while t <= seconds + step * 0.5 {
-            out.append(sample(at: t, opening: opening, extraWidth: extraWidth))
-            t += step
+        let idle = Double(idleWidth())
+        let target = Double(finalWidth(extraWidth: extraWidth))
+        return SystemHUDWingMotionBox.timeline(
+            seconds: seconds,
+            opening: opening,
+            idle: idle,
+            target: target,
+            height: Double(referenceBarHeight)
+        ) { time in
+            GlanceTopBar.springRemaining(
+                at: time,
+                response: NotchClosedBodyLayout.wingsSpringResponse,
+                damping: NotchClosedBodyLayout.wingsSpringDamping)
+        }.map { placed in
+            Sample(
+                time: placed.time,
+                width: CGFloat(placed.width),
+                height: CGFloat(placed.height),
+                opacity: placed.opacity)
         }
-        return out
     }
 
     /// PASS bar from R24 HUD smooth FIX (open).
     public static func validateOpen(_ samples: [Sample], finalSize: CGFloat) -> [TimingIssue] {
-        guard samples.count >= 2 else { return [TimingIssue(message: "need samples")] }
-        let idle = samples[0].width
-        let delta = finalSize - idle
-        guard delta > 1 else { return [TimingIssue(message: "final size must exceed idle")] }
-
-        var issues: [TimingIssue] = []
-        let first = samples[1]
-        let firstExpansion = (first.width - idle) / delta
-        if firstExpansion > 0.15 {
-            issues.append(TimingIssue(message: "first frame expansion \(firstExpansion) > 0.15"))
-        }
-
-        for index in 1..<samples.count {
-            let prev = samples[index - 1]
-            let cur = samples[index]
-            if cur.time - prev.time > frameStep + 0.0001 { continue }
-            let stepDelta = abs(cur.width - prev.width)
-            if stepDelta > 0.25 * finalSize {
-                issues.append(TimingIssue(message: "step at \(cur.time)s delta \(stepDelta) > 25% final"))
-            }
-        }
-
-        let hit95 = samples.first { s in
-            s.time >= 0.08 && s.time <= 0.15 && (s.width - idle) / delta >= 0.95
-        }
-        if hit95 == nil {
-            issues.append(TimingIssue(message: "did not reach 95% between 80 and 150 ms"))
-        }
-
-        let peak = samples.map(\.width).max() ?? finalSize
-        if peak > finalSize + 0.06 * delta {
-            issues.append(TimingIssue(message: "overshoot \(peak - finalSize) > 6% of delta"))
-        }
-        return issues
+        SystemHUDWingMotionBox.validateOpen(samples: samples.map(boxSample), finalSize: Double(finalSize))
+            .map { TimingIssue(message: $0) }
     }
 
     /// PASS bar for close (mirrors open).
     public static func validateClose(_ samples: [Sample], finalSize: CGFloat) -> [TimingIssue] {
-        guard let start = samples.first else { return [TimingIssue(message: "need samples")] }
-        let idle = SystemHUDWingMotion.idleWidth()
-        let delta = finalSize - idle
-        guard delta > 1 else { return [TimingIssue(message: "final size must exceed idle")] }
-
-        var issues: [TimingIssue] = []
-        if abs(start.width - finalSize) > 0.5 {
-            issues.append(TimingIssue(message: "close must start at final width"))
-        }
-
-        let first = samples.count > 1 ? samples[1] : start
-        let firstExpansion = (first.width - idle) / delta
-        if firstExpansion < 0.85 {
-            issues.append(TimingIssue(message: "first close frame shrank past 15% in one step"))
-        }
-
-        for index in 1..<samples.count {
-            let prev = samples[index - 1]
-            let cur = samples[index]
-            if cur.time - prev.time > frameStep + 0.0001 { continue }
-            let stepDelta = abs(cur.width - prev.width)
-            if stepDelta > 0.25 * finalSize {
-                issues.append(TimingIssue(message: "close step at \(cur.time)s delta \(stepDelta) > 25% final"))
-            }
-        }
-
-        let nearZero = samples.first { s in
-            s.time <= 0.15 && (s.width - idle) / delta <= 0.05
-        }
-        if nearZero == nil {
-            issues.append(TimingIssue(message: "did not reach 5% expansion within 150 ms on close"))
-        }
-
-        if let last = samples.last, last.width <= idle + 0.5, last.opacity > 0.01 {
-            issues.append(TimingIssue(message: "opacity jumped before width on close"))
-        }
-        if let last = samples.last, last.width < idle - 1 {
-            issues.append(TimingIssue(message: "width jumped below idle"))
-        }
-        return issues
+        SystemHUDWingMotionBox.validateClose(
+            samples: samples.map(boxSample),
+            idle: Double(idleWidth()),
+            finalSize: Double(finalSize)
+        ).map { TimingIssue(message: $0) }
     }
 
     public static func validateKind(_ kind: AnimateKind) -> [TimingIssue] {
@@ -169,5 +124,9 @@ public enum SystemHUDWingMotion {
 
     public static func allKindsPass() -> Bool {
         AnimateKind.allCases.allSatisfy { validateKind($0).isEmpty }
+    }
+
+    private static func boxSample(_ sample: Sample) -> SystemHUDWingMotionBox.Sample {
+        .init(time: sample.time, width: Double(sample.width), height: Double(sample.height), opacity: sample.opacity)
     }
 }
