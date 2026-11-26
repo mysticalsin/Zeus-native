@@ -8,7 +8,8 @@ import Foundation
 /// shown line is "varies by model" and the badge is "needs reference".
 ///
 /// `approvedSourceIDs` is the caller's `ExplanationRegistry.sourceIDs`. This type
-/// does not fetch URLs and does not decide which URLs are approved.
+/// does not fetch URLs and does not decide which URLs are approved. The blank
+/// check is read from `ExplanationClaimsBox`. The shown line stays as written.
 public enum ExplanationClaims {
     public static let maximumPerEvent = 8
     public static let maximumSources = 4
@@ -162,10 +163,9 @@ public enum ExplanationClaims {
         }
     }
 
+    /// A blank line is refused. Blank scalars are named in `ExplanationClaimsBox`,
+    /// so a zero-width space still counts as text.
     private static func textIsBounded(_ text: String) -> Bool {
-        let scalars = text.unicodeScalars
-        guard (1...maximumTextScalars).contains(scalars.count) else { return false }
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        return scalars.allSatisfy { $0.value >= 32 && $0.value != 127 }
+        ExplanationClaimsBox.textIsBounded(text, maximumScalars: maximumTextScalars)
     }
 }
