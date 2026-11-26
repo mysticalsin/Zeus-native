@@ -20,25 +20,28 @@ public struct MusicAwakeRule: Equatable, Sendable {
     /// A pause or a gap between tracks shorter than this keeps the hold.
     public var grace: TimeInterval
 
-    public init(grace: TimeInterval = 20) {
+    public init(grace: TimeInterval = MusicAwakeBox.defaultGrace) {
         self.grace = grace
     }
 
     /// `lastPlayedAt` is the last moment a track was seen playing. Off wins, then not playing, then
     /// heat, then battery. Charging or AC overrides the battery floor, as in `KeepAwakeRules`.
+    /// The grace and the order are read from `MusicAwakeBox`. The power stop still comes from these rules.
     public func decide(enabled: Bool, isPlaying: Bool, lastPlayedAt: Date?, now: Date,
                        power: KeepAwakeRules.Power, rules: KeepAwakeRules) -> Verdict {
-        guard enabled else { return .release(.off) }
-        if !isPlaying {
-            // A play time in the future (clock set back) does not count as recent.
-            guard let lastPlayedAt, case let gap = now.timeIntervalSince(lastPlayedAt), gap >= 0, gap < grace else {
-                return .release(.notPlaying)
-            }
-        }
+        let stop: MusicAwakeBox.PowerStop
         switch rules.evaluate(power, elapsed: 0, remaining: nil, warned: true) {
-        case .end(.lowBattery(let percent)): return .release(.lowBattery(percent))
-        case .end(.tooHot): return .release(.tooHot)
-        case .end(.timeUp), .keepGoing, .warnLowBattery: return .hold
+        case .end(.lowBattery(let percent)): stop = .lowBattery(percent)
+        case .end(.tooHot): stop = .tooHot
+        case .end(.timeUp), .keepGoing, .warnLowBattery: stop = .clear
+        }
+        switch MusicAwakeBox.decide(enabled: enabled, isPlaying: isPlaying, lastPlayedAt: lastPlayedAt,
+                                    now: now, grace: grace, power: stop) {
+        case .hold: return .hold
+        case .release(.off): return .release(.off)
+        case .release(.notPlaying): return .release(.notPlaying)
+        case .release(.lowBattery(let percent)): return .release(.lowBattery(percent))
+        case .release(.tooHot): return .release(.tooHot)
         }
     }
 }
@@ -47,18 +50,18 @@ public struct MusicAwakeRule: Equatable, Sendable {
 /// the lease ends, so the relation is a rule with a test, not a comment.
 public enum MusicAwakeTiming {
     /// How long one assertion lasts if Zeus stops renewing it.
-    public static let lease: TimeInterval = 120
+    public static let lease: TimeInterval = MusicAwakeBox.lease
     /// How often the lease is renewed while a hold is wanted.
-    public static let renewEvery: TimeInterval = 60
+    public static let renewEvery: TimeInterval = MusicAwakeBox.renewEvery
     /// How late the system may fire the renewal timer, so it can batch wake-ups.
-    public static let renewTolerance: TimeInterval = 10
+    public static let renewTolerance: TimeInterval = MusicAwakeBox.renewTolerance
     /// Room for the renewal work itself on top of a late timer.
-    public static let margin: TimeInterval = 5
+    public static let margin: TimeInterval = MusicAwakeBox.margin
 
     /// True when a renewal that fires a whole tolerance late, plus the margin, still comes before the lease
     /// ends, and the period is positive.
     public static func isSafe(lease: TimeInterval, renewEvery: TimeInterval, tolerance: TimeInterval,
                               margin: TimeInterval = MusicAwakeTiming.margin) -> Bool {
-        renewEvery > 0 && renewEvery + tolerance + margin < lease
+        MusicAwakeBox.isSafe(lease: lease, renewEvery: renewEvery, tolerance: tolerance, margin: margin)
     }
 }

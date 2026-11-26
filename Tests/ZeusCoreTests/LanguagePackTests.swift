@@ -197,4 +197,21 @@ struct LanguagePackTests {
     @Test func sizesAreNilUntilAComponentDeclaresOne() {
         #expect(S().knownBytes(of: LanguagePackID.defaults) == nil)
     }
+
+    @Test func englishPinIgnoresTheMacLanguage() {
+        #expect(FeatureSettings.key(AppLanguagePin.settingID) == "opt.general.language")
+        #expect(AppLanguagePin.resolve(stored: "English", systemLanguages: ["pt-BR", "fr-FR"]) == .english)
+        #expect(AppLanguagePin.resolve(stored: " English ", systemLanguages: ["es-ES"]) == .english)
+    }
+
+    @Test func systemPinFollowsTheMacThenStaysEnglish() {
+        #expect(AppLanguagePin.resolve(stored: "System language", systemLanguages: ["pt-BR", "en-US"]) == .portuguese)
+        #expect(AppLanguagePin.resolve(stored: nil, systemLanguages: ["fr-CA"]) == .french)
+        #expect(AppLanguagePin.resolve(stored: nil, systemLanguages: ["en"]) == .english)
+        #expect(AppLanguagePin.resolve(stored: nil, systemLanguages: ["es_MX"]) == .spanish)
+        #expect(AppLanguagePin.resolve(stored: "", systemLanguages: ["ja-JP", "pt-PT"]) == .portuguese)
+        #expect(AppLanguagePin.resolve(stored: "French", systemLanguages: ["de-DE", "es-ES"]) == .spanish)
+        #expect(AppLanguagePin.resolve(stored: nil, systemLanguages: ["zh-Hans", "pt-PT"]) == .portuguese)
+        #expect(AppLanguagePin.resolve(stored: nil, systemLanguages: []) == .english)
+    }
 }

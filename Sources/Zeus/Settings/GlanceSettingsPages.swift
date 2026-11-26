@@ -108,15 +108,15 @@ private struct GeneralPage: View {
         GSCard("Day to day") {
             GSToggleRow(symbol: "power", title: "Launch Zeus at login", text: "Ready as soon as you sign in to your Mac.", isOn: bool("general.launchAtLogin"))
             GSDivider()
-            GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working. Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
+            GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working while the screen can still lock.", detail: "Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
             GSDivider()
-            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while the source shown in the notch is playing. Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
+            GSToggleRow(symbol: "music.note", title: "Keep the display awake while music plays", text: "Holds the display on only while the notch source is playing.", detail: "Stops on low battery or heat.", isOn: bool("keepAwake.whileMusic"))
             GSDivider()
             GSToggleRow(symbol: "person.2.wave.2", title: "Meeting mode", text: "Quiet sounds and private previews during calls and screen sharing.", isOn: bool("general.meetingMode"))
             GSDivider()
             GSToggleRow(symbol: "shared.with.you", title: "Show in screen sharing", text: "Off keeps Zeus windows out of screen shares and recordings.", isOn: bool("general.showInScreenSharing"))
             GSDivider()
-            GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", text: "After 10 minutes or more away, the notch shows what your agents finished or are waiting on.", isOn: bool("general.welcomeBack"))
+            GSToggleRow(symbol: "hand.wave", title: "Welcome back recap", text: "After 10 minutes away, the notch shows what your agents finished.", detail: "It also shows what they are waiting on.", isOn: bool("general.welcomeBack"))
         }
         GSSetupCard(openGuide: openGuide)
         GSCard("Keep awake") {
@@ -127,7 +127,7 @@ private struct GeneralPage: View {
                 ), options: KeepAwakeLength.all.map(KeepAwakeLength.label)).popupLabel("Keep awake session length")
             }
             GSDivider()
-            GSRow(symbol: "battery.25percent", title: "Battery floor", text: "Ends a session below this charge on battery. A notice comes first at 20%.") {
+            GSRow(symbol: "battery.25percent", title: "Battery floor", text: "Ends a session below this charge on battery.", detail: "A notice comes first at 20%.") {
                 GSPopup(selection: Binding(
                     get: { KeepAwakeRules.floorLabel(keepAwake.batteryFloor) },
                     set: { keepAwake.batteryFloor = KeepAwakeRules.floor(fromLabel: $0) }
@@ -178,7 +178,7 @@ struct GSSetupCard: View {
 
     var body: some View {
         GSCard("Setup") {
-            GSRow(symbol: "sparkles", title: "Show setup guide", text: "Open the guide again, even if you closed it earlier. Revisit agents and permissions.") {
+            GSRow(symbol: "sparkles", title: "Show setup guide", text: "Open the guide again, even if you closed it earlier.", detail: "Revisit agents and permissions.") {
                 Button("Open guide", action: openGuide)
                     .buttonStyle(GSButtonStyle())
                     .ownedJourneyControl("settings.general.openGuide")
@@ -241,7 +241,7 @@ private struct AppearancePage: View {
         }
         GSCard("Top bar") {
             GSRow(symbol: "arrow.up.and.down", title: "Top bar position",
-                  text: "Lowers the closed notch with its light, ticker and wings. The open panel and the screen edge light stay at the top. Applies to every display.") {
+                  text: "Lowers the closed notch with its light, ticker and wings.", detail: "The open panel and the screen edge light stay at the top, on every display.") {
                 HStack(spacing: 10) {
                     Text("Higher").font(GS.rowText).foregroundStyle(GS.secondary)
                     OBTickSlider(value: Binding(get: { TopBarPositionModel.shared.offset }, set: { TopBarPositionModel.shared.choose($0) }),
@@ -262,7 +262,7 @@ private struct AppearancePage: View {
             GSDivider()
             GSToggleRow(symbol: store.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash",
                         title: "Show Zeus in screen shares",
-                        text: "On: people you share your screen with, and screenshots, can see Zeus. Off keeps it out of them. Your choice applies during meetings too.",
+                        text: "People sharing your screen can see Zeus when this is on.", detail: "Off keeps Zeus out of screen sharing and screenshots, including during meetings.",
                         isOn: bool(ZeusScreenSharePolicy.showInSharingKey))
         }
         if let drawnNotchCard = DrawnNotchCardModel(context: context, navigation: navigation) { DrawnNotchCard(model: drawnNotchCard) }
@@ -272,13 +272,13 @@ private struct AppearancePage: View {
                 runningTheme("Essentials", "")
             }
             GSDivider()
-            GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens it after the delay. Click opens it only when you click the notch.") {
+            GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens the notch after the delay.", detail: "Click opens it only when you click the notch.") {
                 GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
             }
             GSDivider()
             // The delay only applies to hover, so it is subdued while the trigger is Click.
             let clickTrigger = SettingsStore.shared.string("notch.openTrigger") == "Click"
-            GSRow(symbol: "hand.point.up.left", title: "Hover delay", text: "How long the pointer rests before it opens. Used when the notch opens on hover.") {
+            GSRow(symbol: "hand.point.up.left", title: "Hover delay", text: "How long the pointer rests before the notch opens.", detail: "Used when the notch opens on hover.") {
                 GSPopup(selection: SettingsStore.binding("notch.openDelay"), options: SettingsCatalog.option("notch.openDelay")?.choices ?? []).popupLabel("Hover delay")
             }
             .disabled(clickTrigger)
@@ -294,7 +294,7 @@ private struct AppearancePage: View {
         }
         GSCard("Zeus beside the pointer") {
             GSRow(symbol: "cursorarrow.rays", title: "Show Zeus beside the pointer",
-                  text: "\"When I call him\" keeps your pointer clear: he appears for the talk shortcut, Hey Zeus, a voice turn or when he points, and fades out about 2 seconds after.") {
+                  text: "He stays out of the way until you call him, then fades out.", detail: "He appears for a talk shortcut, a voice turn or when he points, then fades after about 2 seconds.") {
                 GSPopup(selection: Binding(get: { BuddyPreference.shared.show.title },
                                            set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
                         options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
@@ -337,7 +337,7 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "rectangle.dashed", title: "Island background",
-                  text: "Transparent draws only the mascot and the text beside the notch, with no body, outline or glow. The notch itself stays black. The open panel is always black.") {
+                  text: "Draws only the mascot and the text, with no body or glow.", detail: "The notch and the open panel stay black.") {
                 GSPopup(selection: SettingsStore.binding(NotchBackground.settingID), options: NotchBackground.allCases.map(\.rawValue)).popupLabel("Island background")
             }
             GSDivider()
@@ -346,7 +346,7 @@ private struct AppearancePage: View {
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Light thickness")
             }
             GSDivider()
-            GSToggleRow(symbol: "dot.radiowaves.left.and.right", title: "Light wave to the screen edges", text: "When an agent starts, asks or finishes, a wave of light leaves the notch, ripples across the screen and fades.", isOn: bool("halo.edgeWave"))
+            GSToggleRow(symbol: "dot.radiowaves.left.and.right", title: "Light wave to the screen edges", text: "A wave of light leaves the notch when an agent starts or finishes.", detail: "The wave ripples across the screen and fades.", isOn: bool("halo.edgeWave"))
         }
         GSCard("Small moments, softly signaled") {
             Text("Keep the visual feedback you find useful.").font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
@@ -370,7 +370,7 @@ private struct AppearancePage: View {
             light("lyrics.wordByWord", "music.note.list", "Light lyrics word by word", "Each word lights as it is sung. Word timing is estimated from the line timing.")
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
             GSDivider()
-            GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum. Add the tab under Top bar tabs, further down this page.") {
+            GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum.", detail: "Add the tab under Top bar tabs, further down this page.") {
                 GSPopup(selection: SettingsStore.binding("waves.style"), options: WaveStyle.allCases.map(\.rawValue)).popupLabel("Waves style")
             }
             GSDivider()
@@ -393,7 +393,7 @@ private struct AppearancePage: View {
     private var screenCard: some View {
         GSCard("Screen") {
             GSToggleRow(symbol: "rectangle.roundedbottom", title: "Round the bottom screen corners",
-                        text: "Rounds the two bottom corners of a notched display to match the top. Click-through.",
+                        text: "Rounds the bottom corners of a notched display to match the top.", detail: "The rounded corners are click-through.",
                         isOn: bool("screen.roundBottomCorners"))
             GSDivider()
             GSRow(symbol: "circle.bottomhalf.filled", title: "Corner size") {
@@ -538,10 +538,10 @@ private struct TopBarTabsCard: View {
                         }
                     }
                 }
-                if full { GSInfo(text: "The row holds \(GlanceTopBar.maxTabs) tabs. Turn one off to add another.") }
+                if full { GSInfo(text: "The row holds \(GlanceTopBar.maxTabs) tabs.") }
             }
             GSCard("Weather") {
-                GSRow(symbol: "location.magnifyingglass", title: "City", text: "Forecasts come from Open-Meteo. Only the city name is sent. Press Return to apply it.") {
+                GSRow(symbol: "location.magnifyingglass", title: "City", text: "Only the city name is sent.", detail: "Forecasts come from Open-Meteo. Press Return to apply the city.") {
                     TextField("City", text: Binding(get: { topBar.weatherCity }, set: { topBar.weatherCity = $0 }))
                         .textFieldStyle(.plain)
                         .snapshotSafeText(topBar.weatherCity, placeholder: "City")
@@ -577,7 +577,7 @@ private struct TopBarTabsCard: View {
 private struct SoundsPage: View {
     let context: GSContext
     var body: some View {
-        GSPageHeading(section: .sounds, subtitle: "Choose your cues. Listen to each one before you begin.")
+        GSPageHeading(section: .sounds, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Sound feedback") {
             GSToggleRow(symbol: "speaker.wave.2", title: "Sound feedback", text: "Short sounds when agents start, ask and finish.",
@@ -591,6 +591,9 @@ private struct SoundsPage: View {
             .disabled(!ExtraPreferences.shared.soundsOn)
             .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         }
+        LockWakeChimesCard()
+            .disabled(!ExtraPreferences.shared.soundsOn)
+            .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         GSCard("Your cues") {
             cue("play.circle", "Run start", "When an agent starts a new task.", "sound.startStyle", SoundStyles.runStart, .start)
             GSDivider()
@@ -695,14 +698,14 @@ private struct GSNotificationsPage: View {
             GSRow(symbol: "checkmark.circle", title: "Finished tasks", text: "A macOS banner when an agent finishes, if Show system notifications below is on.")
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.triangle", title: "Errors and stuck agents",
-                        text: "A red or amber halo and card, plus a macOS notification when macOS allows Zeus notifications.", isOn: bool("notify.errors"))
+                        text: "A halo and a card, plus a notification when macOS allows it.", detail: "The halo is red or amber.", isOn: bool("notify.errors"))
             GSDivider()
             GSRow(symbol: "hourglass", title: "Mark an agent stuck after", text: "A working agent with no activity for this long turns amber.") {
                 GSPopup(selection: SettingsStore.binding("notify.stallMinutes"), options: AgentStall.choices).popupLabel("Mark an agent stuck after")
             }
             GSDivider()
             GSToggleRow(symbol: "eye.slash", title: "Stay quiet while sharing or in full screen",
-                        text: "Holds back macOS banners for usage, rain and access alerts during a call, on a mirrored display or while a full-screen app is in front.",
+                        text: "Holds back banners during a call or a full-screen app.", detail: "Also holds them back on a mirrored display, for usage, rain and access alerts.",
                         isOn: Binding(get: { ExtraPreferences.shared.quietWhileSharing }, set: { ExtraPreferences.shared.quietWhileSharing = $0 }))
         }
         GSCard("System notifications") {
@@ -812,7 +815,7 @@ private struct ShortcutsPage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Summon Zeus") {
             ShortcutRecorderRow(symbol: "mic.fill", title: "Talk to Zeus",
-                                text: "Hold to ask, let go to send. Zeus answers aloud, and if you point at something while you hold, it sees what you mean."
+                                text: "Hold to ask, then let go to send.", detail: "Zeus answers aloud, and if you point at something while you hold, it sees what you mean."
                                     + (state.chord != nil ? " Control + Option + Space does the same." : ""),
                                 shortcut: Preferences.shared.pushToTalk, defaultValue: ShortcutStore.talkDefault,
                                 otherName: "Dictation", other: DictationSettings.shared.key,
@@ -824,7 +827,7 @@ private struct ShortcutsPage: View {
             }
             GSDivider()
             ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
-                                text: "Hold to talk, let go to send, double-tap to keep listening, like the talk key. Left Option and Right Option with a letter type as usual.",
+                                text: "Hold to talk, let go to send, and double-tap to keep listening.", detail: "Left Option and Right Option with a letter still type as usual.",
                                 shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
                                 otherName: "Talk to Zeus", other: Preferences.shared.pushToTalk,
                                 notes: state.secondTalkNotes, quietNotes: state.secondTalkQuietNotes) { new in
@@ -927,7 +930,7 @@ private final class LearnedShortcutList: ObservableObject {
 private struct IntegrationsPage: View {
     let context: GSContext
     var body: some View {
-        GSPageHeading(section: .integrations, subtitle: "Your agents, followed from the notch.")
+        GSPageHeading(section: .integrations, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Connections") {
             connection("Claude Code", symbol: "asterisk", agent: .claude)
@@ -968,7 +971,7 @@ private struct MurmurePage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Dictation") {
             GSToggleRow(symbol: "mic", title: "Enable dictation",
-                        text: "Write with your voice in the app you are using. Apple Speech and downloaded engines run on this Mac; if you pick a cloud engine below, your audio goes to that provider.",
+                        text: "A cloud engine sends your audio to its provider.", detail: "Apple Speech and downloaded engines run on this Mac.",
                         isOn: Binding(get: { settings.enabled }, set: { settings.enabled = $0 }))
             if !(context.services.granted(.microphone) && context.services.granted(.accessibility)) {
                 GSInfo(text: "Microphone and Accessibility access are required.")
@@ -984,7 +987,7 @@ private struct MurmurePage: View {
             GSToggleRow(symbol: "speaker.wave.1", title: "Play dictation sounds", text: "A short cue when recording starts and ends.",
                         isOn: Binding(get: { settings.sounds }, set: { settings.sounds = $0 }))
             GSDivider()
-            GSRow(symbol: "globe", title: "Dictation language", text: "Automatic follows macOS for Apple Speech and lets Whisper detect. Selected languages go to Whisper; Parakeet applies a script hint where supported.") {
+            GSRow(symbol: "globe", title: "Dictation language", text: "Automatic follows macOS, and chosen languages go to Whisper.", detail: "Parakeet applies a script hint where supported.") {
                 GSPopup(selection: Binding(get: { settings.language.title },
                                            set: { value in settings.language = DictationLanguage(persistedValue: value) }),
                         options: DictationLanguage.allCases.map(\.title)).popupLabel("Dictation language")
@@ -1019,10 +1022,10 @@ private struct VoicePage: View {
         WakeWordCard()
         GSCard("Approval keywords") {
             GSToggleRow(symbol: "waveform", title: "Listen for approval keywords",
-                        text: "Say a keyword below, such as \u{201C}yes\u{201D} or \u{201C}no\u{201D}, to answer a permission card. This opens the microphone, only while a card is waiting. Off until you turn it on.",
+                        text: "This opens the microphone only while a card is waiting.", detail: "Say a keyword such as yes or no. Off until you turn it on.",
                         isOn: bool("voice.answers"))
             if store.bool("voice.answers"), VoicePermissions.access != .ready {
-                GSInfo(text: "Microphone and speech recognition are not allowed yet. Settings \u{203A} Permissions has the buttons.")
+                GSInfo(text: "Microphone and speech recognition are not allowed yet.")
             }
         }
         GSCard("Your keywords") {
@@ -1057,7 +1060,7 @@ private struct TalkMicrophoneRow: View {
 
     var body: some View {
         GSRow(symbol: "mic.circle", title: "Microphone",
-              text: "What Zeus listens on when you talk. Automatic uses the system input, so a connected headset wins. This Mac\u{2019}s microphone keeps a Bluetooth headset from switching mode. Dictation has its own.") {
+              text: "Automatic uses the system input, so a headset can win.", detail: "This Mac's microphone keeps a headset from switching mode. Dictation has its own.") {
             GSPopup(selection: Binding(get: { choice.title(devices: devices) },
                                        set: { title in
                                            guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
@@ -1076,7 +1079,7 @@ private struct WakeWordCard: View {
     var body: some View {
         GSCard("Hey Zeus") {
             GSToggleRow(symbol: "ear", title: "Listen for \u{201C}Hey Zeus\u{201D}",
-                        text: "Say it, then your request: \u{201C}Hey Zeus, open Spotify.\u{201D} Off until you turn it on. Zeus waits for the phrase on this Mac; nothing is sent while it waits.",
+                        text: "Nothing is sent while Zeus waits for the phrase.", detail: "Say the phrase, then your request. Off until you turn it on.",
                         isOn: Binding(get: { wake.enabled }, set: { wake.enabled = $0 }))
             if wake.enabled {
                 GSDivider()
@@ -1084,7 +1087,7 @@ private struct WakeWordCard: View {
                     GSStatus(ok: wake.listening, text: wake.listening ? "Listening" : wake.needsPermissions ? (VoicePermissions.access == .needsPrompt ? "Not asked yet" : "Denied") : "Paused")
                 }
             }
-            GSInfo(text: "Apple\u{2019}s on-device speech recognition, only while someone is talking. It pauses while you hold the talk key, dictate, take a call or lock the Mac. macOS shows the microphone indicator while it listens. What you ask after the phrase is a normal request, as with the talk key: simple commands run on this Mac, and anything else goes to your AI engine (Settings \u{203A} Engine).")
+            GSInfo(text: "macOS shows the microphone indicator while the wake phrase listens.")
         }
     }
 
@@ -1101,10 +1104,10 @@ private struct LicensePage: View {
     private var license: LicenseManager { LicenseManager.shared }
 
     var body: some View {
-        GSPageHeading(section: .license, subtitle: "Make yourself at home.")
+        GSPageHeading(section: .license, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Your license") {
-            GSRow(symbol: "key", title: status, text: license.isLicensed ? "Your license is kept across updates." : "A one-time purchase. Two Macs.") {
+            GSRow(symbol: "key", title: status, text: license.isLicensed ? "Your license is kept across updates." : "A one-time purchase for two Macs.") {
                 // Partial credential cleanup must keep its explanation and retry visible.
                 if license.isLicensed || license.deactivationError != nil {
                     GSDeactivateLicenseControl()
@@ -1133,7 +1136,7 @@ private struct LicensePage: View {
                 }
                 .padding(.vertical, 12)
                 if let message = navigation.licenseMessage { GSInfo(text: message) }
-                GSInfo(text: "One license covers 2 Macs. The key is emailed to you after purchase.")
+                GSInfo(text: "One license covers 2 Macs.")
             }
         }
     }
@@ -1154,7 +1157,7 @@ private struct LicensePage: View {
 private struct PermissionsPage: View {
     let context: GSContext
     var body: some View {
-        GSPageHeading(section: .permissions, subtitle: "Each access is optional. Zeus asks only when you turn a feature on.")
+        GSPageHeading(section: .permissions, subtitle: "")
             .padding(.bottom, -GS.cardGap)
             .task {
                 while !Task.isCancelled {
@@ -1189,7 +1192,7 @@ private struct PermissionsPage: View {
                 context.permissions.request(.screen)
             }
             GSDivider()
-            GSRow(symbol: "keyboard", title: "Keys from other apps", text: "Lets Zeus see the talk and dictation shortcuts. Accessibility or Input Monitoring is enough.") {
+            GSRow(symbol: "keyboard", title: "Keys from other apps", text: "Lets Zeus see the talk and dictation shortcuts.", detail: "Accessibility or Input Monitoring is enough.") {
                 HStack(spacing: 10) {
                     GSStatus(ok: KeyListenAccess.granted, text: KeyListenAccess.granted ? (KeyListenAccess.accessibility ? "Accessibility" : "Input Monitoring") : "Not allowed")
                     if !KeyListenAccess.granted {
@@ -1200,7 +1203,7 @@ private struct PermissionsPage: View {
             GSDivider()
             GSRow(symbol: "music.note", title: "Automation",
                   text: context.permissions.automationMessage
-                    ?? "Control playback in Music and Spotify, and read slide notes in Keynote and PowerPoint. macOS asks about each app only while it is open.") {
+                    ?? "Control playback and read slide notes while those apps are open.", detail: "macOS asks about each app only while it is open.") {
                 if context.permissions.automationAsking {
                     GSStatus(ok: false, text: "Waiting for macOS…")
                 } else if context.permissions.automationPending && !context.services.granted(.automation) {
@@ -1226,17 +1229,23 @@ private struct PermissionsPage: View {
     /// One button for everything: macOS still asks for each, but Zeus asks in turn, opens the right pane
     /// and moves on by itself (PermissionSweep).
     private func allowAll(_ sweep: PermissionSweepRunner) -> some View {
-        let text: String = if sweep.needsRestart {
-            "Screen Recording starts working after Zeus reopens."
+        let text: String
+        let detail: String?
+        if sweep.needsRestart {
+            text = "Screen Recording starts working after Zeus reopens."
+            detail = nil
         } else if sweep.isRunning {
-            "Follow the guide at the top of the screen. Skip anything you do not want."
+            text = "Follow the guide at the top of the screen."
+            detail = "Skip anything you do not want."
         } else if sweep.allAllowed {
-            "Everything Zeus can use is allowed."
+            text = "Everything Zeus can use is allowed."
+            detail = nil
         } else {
-            "Asks for everything at once, one after another. Click Allow in each macOS prompt or turn on the switch Zeus opens, and it moves on by itself."
+            text = "Asks for everything at once, one prompt after another."
+            detail = "Click Allow in each prompt, or turn on the switch Zeus opens."
         }
         return GSCard {
-            GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text) {
+            GSRow(symbol: "checkmark.shield", title: sweep.progressLine, text: text, detail: detail) {
                 if sweep.needsRestart {
                     Button("Restart Zeus now") { sweep.restartZeus() }.buttonStyle(GSButtonStyle(prominent: true))
                 } else if sweep.isRunning {
@@ -1257,7 +1266,7 @@ private struct PermissionsPage: View {
 
     /// Allowed / Not asked yet (Allow raises macOS's one prompt) / Refused (Allow opens the pane).
     private func voicePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind) -> some View {
-        GSRow(symbol: symbol, title: title, text: state == .denied ? "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
+        GSRow(symbol: symbol, title: title, text: state == .denied ? "Turn \(title) on under Privacy in System Settings." : text) {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
@@ -1274,7 +1283,7 @@ private struct PermissionsPage: View {
 
     /// Camera and Screen Recording: request-only (never starts capture).
     private func capturePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, allow: @escaping () -> Void) -> some View {
-        GSRow(symbol: symbol, title: title, text: state == .denied ? "Denied. Turn it on in System Settings \u{203A} Privacy \u{203A} \(title)." : text) {
+        GSRow(symbol: symbol, title: title, text: state == .denied ? "Turn \(title) on under Privacy in System Settings." : text) {
             switch state {
             case .authorized: GSStatus(ok: true, text: "Allowed")
             case .notDetermined:
@@ -1315,15 +1324,15 @@ private struct PrivacyPage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Notification details") {
             GSToggleRow(symbol: "eye", title: "Show project and command details",
-                        text: "Turn off to hide commands and project names on cards and banners. Meeting mode hides them too.", isOn: bool("privacy.details"))
+                        text: "Turn off to hide commands and project names on cards.", detail: "Meeting mode hides them too.", isOn: bool("privacy.details"))
         }
         GSCard("Music") {
             GSToggleRow(symbol: "text.quote", title: "Synced lyrics",
-                        text: "Sends the song title, artist, album and length to lrclib.net to fetch time-synced lyrics, which are kept on this Mac. Off until you turn it on.",
+                        text: "Sends the song title and artist to fetch lyrics kept on this Mac.", detail: "Off until you turn it on.",
                         isOn: bool("privacy.lyrics"))
             GSDivider()
             GSToggleRow(symbol: "globe", title: "Show media playing in Chrome",
-                        text: "Reads title, artist and position from Chrome tabs through the Zeus extension. Covers load from the page's own image link and are not saved. Calls are never shown.",
+                        text: "Reads the title and artist through the Zeus extension.", detail: "Covers load from the page and are not saved. Calls are never shown.",
                         isOn: bool("music.browserMedia"))
             if let reload = store.statusOverrides[BrowserMediaFeed.statusID] {
                 GSDivider()
@@ -1334,7 +1343,7 @@ private struct PrivacyPage: View {
         }
         GSFacePresenceCardHost()
         GSCard("Control from the notch") {
-            GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click for you when you ask it to drive your Mac. Off until you allow it in System Settings.") {
+            GSRow(symbol: "accessibility", title: "Accessibility", text: "Lets Zeus press keys and click when you ask it to drive the Mac.", detail: "Off until you allow it in System Settings.") {
                 Button("Open Accessibility settings") { store.actions["privacy.openAccessibility"]?() }.buttonStyle(GSButtonStyle())
             }
             GSDivider()
@@ -1346,15 +1355,15 @@ private struct PrivacyPage: View {
         GSCard("Command line") {
             if cliAccess.noticePending {
                 GSRow(symbol: "info.circle", title: "Command-line control was reset",
-                      text: "This setting now lives in your Keychain, not in a preferences file, so editing preferences cannot switch it on. Zeus turned it off once; turn it on again below if you use the zeus command.") {
+                      text: "This setting lives in your Keychain, and Zeus turned it off once.", detail: "Turn it on again below if you use the zeus command.") {
                     Button("Got it") { cliAccess.dismissNotice() }.buttonStyle(GSButtonStyle())
                 }
                 GSDivider()
             }
             GSToggleRow(symbol: "terminal", title: "Allow command-line control of sensitive actions",
                         text: cliAccess.failed
-                            ? "Zeus could not change this in your Keychain. Check Keychain access and try again."
-                            : "Lets the zeus command, and any program on this Mac running as you that runs it, listen on the microphone, record, type or click for you, open coding agents, terminals and browsers, import keys, read folders you name, and open or capture Zeus's own panels. Off by default and kept in your Keychain; read-only commands such as status always work.",
+                            ? "Zeus could not change this in your Keychain."
+                            : "Lets the zeus command use the microphone, record, type and click.",
                         isOn: Binding(get: { cliAccess.enabled }, set: { cliAccess.set($0) }))
         }
     }
@@ -1389,7 +1398,7 @@ private struct SpectrumPermissionRow: View {
     private var service: AudioSpectrumService { .shared }
     var body: some View {
         GSRow(symbol: "speaker.wave.2", title: "System audio",
-              text: service.permission == .refused ? "Denied. Turn it on in System Settings \u{203A} Privacy & Security \u{203A} Screen & System Audio Recording." : "Zeus never records or saves the sound; it only measures how loud each pitch is.") {
+              text: service.permission == .refused ? "Turn this on under Screen Recording in System Settings." : "Zeus never records or saves the sound; it only measures how loud each pitch is.") {
             switch service.permission {
             case .allowed: GSStatus(ok: true, text: "Allowed")
             case .notAsked:
@@ -1437,7 +1446,7 @@ private struct AirDropPermissionRow: View {
 
     var body: some View {
         GSRow(symbol: "airdrop", title: "Glow when AirDrop arrives",
-              text: status == .denied ? "Downloads folder access is off. Turn on Zeus in System Settings \u{203A} Privacy & Security \u{203A} Files and Folders." : "Blue intake glow and drops the file on the shelf.") {
+              text: status == .denied ? "Turn on Zeus for the Downloads folder in System Settings." : "Blue intake glow and drops the file on the shelf.") {
             HStack(spacing: 8) {
                 if status == .granted {
                     Toggle("Glow when AirDrop arrives", isOn: Binding(
@@ -1469,7 +1478,7 @@ private struct ScreenshotPermissionRow: View {
 
     var body: some View {
         GSRow(symbol: "camera", title: "Screenshot cue",
-              text: status == .denied ? "Desktop folder access is off. Turn on Zeus in System Settings \u{203A} Privacy & Security \u{203A} Files and Folders." : "Camera cue and shelf drop for new screenshots.") {
+              text: status == .denied ? "Turn on Zeus for the Desktop folder in System Settings." : "Camera cue and shelf drop for new screenshots.") {
             HStack(spacing: 8) {
                 if status == .granted {
                     Toggle("Screenshot cue", isOn: Binding(

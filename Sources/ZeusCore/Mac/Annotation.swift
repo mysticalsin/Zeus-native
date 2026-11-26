@@ -20,47 +20,51 @@ public struct AnnotationStroke: Equatable, Sendable {
     public init(points: [CGPoint]) { self.points = points }
 
     public var bounds: CGRect {
-        guard let first = points.first else { return .null }
-        var rect = CGRect(origin: first, size: .zero)
-        for point in points.dropFirst() { rect = rect.union(CGRect(origin: point, size: .zero)) }
-        return rect
+        Self.cg(AnnotationBox.bounds(samples))
     }
 
     public var length: Double {
-        zip(points, points.dropFirst()).reduce(0) { $0 + hypot($1.1.x - $1.0.x, $1.1.y - $1.0.y) }
+        AnnotationBox.length(samples)
     }
 
     public var shape: Shape {
-        let box = bounds
-        let diagonal = hypot(box.width, box.height)
-        guard points.count > 2, diagonal >= 12 else { return .spot }
-        let gap = hypot(points[0].x - points[points.count - 1].x, points[0].y - points[points.count - 1].y)
-        // Closed: the ends meet (within a third of the size) after going around at least once.
-        if gap <= diagonal / 3, length >= diagonal * 2 { return .circle }
-        if length <= diagonal * 1.25 { return .line }
-        return .scribble
+        switch AnnotationBox.shape(samples) {
+        case .circle: .circle
+        case .line: .line
+        case .spot: .spot
+        case .scribble: .scribble
+        }
     }
 
     /// The marked region, padded and clamped to `screen`. A line gets a band above and below
     /// (it marks text), a spot a small square.
     public func region(in screen: CGRect, padding: CGFloat = 12) -> CGRect {
-        var box = bounds
-        guard !box.isNull else { return .null }
-        switch shape {
-        case .spot: box = box.insetBy(dx: -40, dy: -40)
-        case .line: box = box.insetBy(dx: -padding, dy: -max(padding, 24))
-        case .circle, .scribble: box = box.insetBy(dx: -padding, dy: -padding)
-        }
-        return box.intersection(screen)
+        if screen.isNull { return .null }
+        let frame = screen.isInfinite ? .zero : screen.standardized
+        return Self.cg(AnnotationBox.region(
+            samples, screenMinX: Double(frame.minX), screenMinY: Double(frame.minY),
+            screenWidth: Double(frame.width), screenHeight: Double(frame.height),
+            padding: Double(padding), clamp: !screen.isInfinite))
     }
 
     /// The region in screenshot pixels (top-left origin) for a shot of `displayFrame`.
     public static func pixelRect(_ region: CGRect, displayFrame: CGRect, pixelWidth: Int, pixelHeight: Int) -> CGRect {
-        let sx = Double(pixelWidth) / displayFrame.width
-        let sy = Double(pixelHeight) / displayFrame.height
-        let x = (region.minX - displayFrame.minX) * sx
-        let y = (displayFrame.maxY - region.maxY) * sy
-        return CGRect(x: x.rounded(), y: y.rounded(), width: (region.width * sx).rounded(), height: (region.height * sy).rounded())
+        let rect = AnnotationBox.pixelRect(
+            minX: Double(region.minX), maxY: Double(region.maxY),
+            width: Double(region.width), height: Double(region.height),
+            displayMinX: Double(displayFrame.minX), displayMaxY: Double(displayFrame.maxY),
+            displayWidth: Double(displayFrame.width), displayHeight: Double(displayFrame.height),
+            pixelWidth: pixelWidth, pixelHeight: pixelHeight)
+        return CGRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height)
+    }
+
+    private var samples: [AnnotationBox.Point] {
+        points.map { AnnotationBox.Point(x: Double($0.x), y: Double($0.y)) }
+    }
+
+    private static func cg(_ rect: AnnotationBox.Rect) -> CGRect {
+        guard !rect.isNull else { return .null }
+        return CGRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height)
     }
 
     /// What the brain is told about the mark, next to the screenshot it was drawn on.

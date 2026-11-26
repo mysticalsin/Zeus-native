@@ -170,6 +170,8 @@ final class TopBarModel {
     var note: String {
         didSet { defaults.set(note, forKey: "topBar.note") }
     }
+    /// The note text Undo puts back. Updated when a note receipt is recorded.
+    @ObservationIgnored private var noteBaseline = ""
 
     // Dictation
     var dictationPhase: DictationPhase = .idle
@@ -179,7 +181,11 @@ final class TopBarModel {
     var vocabularyDraft = ""
     var dictationModeName = "Voice"
     var dictationModeSymbol = "waveform"
-    var dictationHistory: [DictationRecord] = []
+    var dictationHistory: [DictationRecord] = [] {
+        didSet { recordDictationReceipt(previous: oldValue) }
+    }
+    /// The first assignment is the history load. Receipts start with the next finished dictation.
+    @ObservationIgnored private var dictationReceiptsLive = false
     var dictationModes: [DictationMode] = DictationMode.builtIns
     var selectedModeKey: String {
         didSet { defaults.set(selectedModeKey, forKey: "dictation.mode") }
@@ -224,6 +230,13 @@ final class TopBarModel {
     var keepAwake = false {
         didSet { if keepAwake != oldValue { onKeepAwake(keepAwake) } }
     }
+
+    // Private action receipts. The hub decision row keeps bare U while it is showing.
+    private(set) var actionReceipts = PrivateActionLedger()
+    var decisionRowOwnsUndo = false
+    /// The clipboard observer skips one change that Undo itself wrote back.
+    var suppressClipboardReceipt = false
+    @ObservationIgnored private var receiptTask: Task<Void, Never>?
 
     // Cues
     private(set) var cue: NotchCue?
@@ -328,6 +341,7 @@ final class TopBarModel {
         weatherCity = defaults.string(forKey: "topBar.weatherCity") ?? ""
         useCelsius = defaults.object(forKey: "topBar.celsius") as? Bool ?? (Locale.current.measurementSystem != .us)
         note = defaults.string(forKey: "topBar.note") ?? ""
+        noteBaseline = note
         selectedModeKey = defaults.string(forKey: "dictation.mode") ?? "voice"
         script = defaults.string(forKey: "prompter.script") ?? Self.sampleScript
         roll = PrompterRoll(speed: defaults.object(forKey: "prompter.speed") as? Double ?? 32,
@@ -458,7 +472,12 @@ final class TopBarModel {
         let light = NotchLightKind.hudLevel(
             kind, value: value, previousLevel: previous.seen ? previous.value : value,
             muted: muted, limitEcho: atLowerBound || atUpperBound)
+        let volumeLightOn = ignoreSettings || SettingsStore.shared.bool(SystemHUDSettings.settingID(for: .volume))
         withAnimation(Motion.reducible(Motion.cueGrow)) {
+            // The wing cue still fades. The steady mark on the black bar does not.
+            if kind == .volume, volumeLightOn {
+                volumeSteady = VolumeSteadyLight(level: value, muted: muted)
+            }
             show(cue)
             flash(light, ignoreSettings: ignoreSettings)
         }
@@ -505,11 +524,15 @@ final class TopBarModel {
         }
     }
     private(set) var lights: [ActiveLight] = []
+    /// Volume up or down leaves this mark on the black bar. It stays after the HUD cue fades.
+    private(set) var volumeSteady: VolumeSteadyLight?
     /// Files are being dragged somewhere on screen: crests climb the arms.
     var isDraggingFiles = false
     /// The mic is listening for a spoken approval answer.
     var micListening = false
     var micLevel: Double = 0
+    /// The talk key is held. Copied from the flag the hotkey already publishes. The indicator only reads it.
+    var talkHeld = false
     /// Recent dictation levels, newest last, for the live waveform.
     private(set) var dictationLevels: [Double] = Array(repeating: 0, count: 28)
 
@@ -528,6 +551,10 @@ final class TopBarModel {
         if case .edgeWave(let tint) = kind {
             EdgeWaveController.shared.play(tint: tint, ignoreSettings: ignoreSettings)
             return
+        }
+        // Caps Lock, Shift held alone, and the command peeks travel the screen edge as well as the notch.
+        if let tint = ScreenEdgeKeyLight.tint(for: kind) {
+            EdgeWaveController.shared.play(tint: tint, ignoreSettings: ignoreSettings)
         }
         let duration = kind.duration(speedPercent: SettingsStore.shared.double("halo.speed"))
         if case .hudLevel(let newSystemKind, _, _, _, _) = kind,
@@ -589,6 +616,65 @@ final class TopBarModel {
         lights = kinds.map { ActiveLight(kind: $0.0, startedAt: Date().addingTimeInterval(-1e6 * $0.1), duration: 1e6) }
     }
 
+    // MARK: Private action receipts
+
+    /// Records a finished Zeus action. The withheld strings are checked against the receipt and are not stored on it.
+    func recordPrivateAction(kind: PrivateActionKind, withheld: [String], restore: String, token: String) {
+        guard actionReceipts.record(kind: kind, withheld: withheld, restore: restore, token: token) != nil else { return }
+        FlightRecorder.shared.record("receipt", kind.rawValue)
+        armReceiptHold()
+    }
+
+    /// Return in the Home note field. A keystroke is not an action, and an unchanged note is not one either.
+    func commitPrivateNote() {
+        let written = note
+        let previous = noteBaseline
+        guard written != previous else { return }
+        recordPrivateAction(kind: .note, withheld: [written, previous], restore: previous, token: "note")
+        noteBaseline = written
+    }
+
+    func performPrivateUndo() {
+        guard let outcome = actionReceipts.undo() else { return }
+        receiptTask?.cancel()
+        switch outcome.effect.kind {
+        case .note:
+            note = outcome.restore
+            noteBaseline = outcome.restore
+        case .file:
+            for part in outcome.effect.token.split(separator: ",") {
+                if let id = UUID(uuidString: String(part)) { removeFromShelf(id) }
+            }
+        case .clipboard:
+            suppressClipboardReceipt = true
+            if let id = UUID(uuidString: outcome.effect.token) { clipboard.remove(id) }
+            let board = NSPasteboard.general
+            board.clearContents()
+            if !outcome.restore.isEmpty { board.setString(outcome.restore, forType: .string) }
+        case .dictation:
+            dictationHistory.removeAll { $0.id == outcome.effect.token }
+        }
+    }
+
+    private func armReceiptHold() {
+        receiptTask?.cancel()
+        let id = actionReceipts.current?.id
+        receiptTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(PrivateActionLedger.hold))
+            guard !Task.isCancelled, let self, self.actionReceipts.current?.id == id else { return }
+            self.actionReceipts.dismiss()
+        }
+    }
+
+    private func recordDictationReceipt(previous: [DictationRecord]) {
+        let live = dictationReceiptsLive
+        dictationReceiptsLive = true
+        guard live else { return }
+        guard dictationHistory.count == previous.count + 1, let newest = dictationHistory.first,
+              !previous.contains(where: { $0.id == newest.id }) else { return }
+        recordPrivateAction(kind: .dictation, withheld: [newest.result, newest.rawResult], restore: "", token: newest.id)
+    }
+
     // MARK: Shelf
 
     func addToShelf(_ urls: [URL], isAirDrop: Bool = false) {
@@ -600,7 +686,11 @@ final class TopBarModel {
         let fresh = urls.filter { url in !shelf.contains { $0.url == url } }
         guard !fresh.isEmpty else { return }
         let isFling: Bool = { if case .fling = origin { return true } else { return false } }()
-        shelf.insert(contentsOf: fresh.map { ShelfItem(url: $0, origin: origin, stackID: stack, verified: isFling) }, at: 0)
+        let added = fresh.map { ShelfItem(url: $0, origin: origin, stackID: stack, verified: isFling) }
+        shelf.insert(contentsOf: added, at: 0)
+        let names = fresh.map(\.lastPathComponent)
+        recordPrivateAction(kind: .file, withheld: fresh.map(\.path) + names,
+                            restore: "", token: added.map(\.id.uuidString).joined(separator: ","))
         switch origin {
         case .fling(let peer):
             persistShelf()

@@ -200,6 +200,11 @@ final class SettingsStore {
         for option in SettingsCatalog.options(in: section) where option.state != .custom && Self.isValue(option.kind) {
             set(option.id, option.defaultValue, origin: .reset)
         }
+        if section == .sounds {
+            set(ChimeSettingsKey.closePath, "", origin: .reset)
+            set(ChimeSettingsKey.openPath, "", origin: .reset)
+            ChimeSettingsPersistence.clearChosenFiles(defaults: defaults)
+        }
         if let keys = Self.extraKeys[section] { ExtraPreferences.shared.reset(keys) }
     }
 
@@ -340,9 +345,11 @@ final class SettingsStore {
     }
 
     /// A specific talk microphone is a Core Audio id from this Mac: it is never exported. Automatic and This Mac's
-    /// microphone are plain names and travel like any other choice.
+    /// microphone are plain names and travel like any other choice. A chime file path is never exported: it
+    /// contains this Mac's account name, and another Mac must not play it.
     static func isExportable(id: String, value: String) -> Bool {
-        !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
+        guard ChimeSettingsExport.includes(id: id) else { return false }
+        return !(id == TalkMicrophoneChoice.settingID && TalkMicrophoneChoice(stored: value).isSpecificDevice)
     }
 
     func exportJSON() throws -> Data {
@@ -375,6 +382,8 @@ final class SettingsStore {
             if option.kind == .toggle, value == "true", Self.neverEnabledByImport.contains(id) { continue }
             if Self.importWouldSelectDrawnNotch(id: id, value: value) { continue }
             if Self.neverChosenByImport[id]?.contains(value) == true { continue }
+            // A chime file is chosen in the file picker on this Mac. An import never writes the path.
+            if ChimeSettingsKey.event(forPathID: id) != nil { continue }
             if values[id] != value { optionChanges.append((id, value)) }
         }
         var appChanges: [(key: String, value: Any)] = []

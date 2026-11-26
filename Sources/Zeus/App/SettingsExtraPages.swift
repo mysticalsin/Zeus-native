@@ -154,6 +154,12 @@ struct InterviewSettings: View {
             }
             GlassCard(title: "Interview helper") {
                 Paragraph(text: "Live hints during a call are not built yet. Whether ZEUS should listen to the other side of a call is still an open question, so nothing here records anyone.")
+                GlassDivider()
+                GlassRow(title: "Candidate context", note: "Stays on this Mac. Zeus does not send it, and nothing here records a call.") {
+                    GlassField(placeholder: "Role, strengths", text: Binding(
+                        get: { prefs.candidateContext },
+                        set: { prefs.candidateContext = $0 }), width: 230)
+                }
             }
         }
     }

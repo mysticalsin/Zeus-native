@@ -116,7 +116,8 @@ public struct AXSnapshotElement: Equatable, Sendable {
 }
 
 /// What the frontmost window looked like to Accessibility at one moment. Refs are numbered in walk
-/// order and belong to this snapshot only.
+/// order and belong to this snapshot only. Lookup, the nearest match, the order, and the text are
+/// read from `AXSnapshotBox`.
 public struct AXSnapshot: Equatable, Sendable {
     public let id: Int
     public let app: String
@@ -139,45 +140,45 @@ public struct AXSnapshot: Equatable, Sendable {
 
     /// The element for `ref`, or `.staleRef` when the ref belongs to another snapshot.
     public func element(_ ref: String) throws -> AXSnapshotElement {
-        guard let parsed = AXRef(ref) else { throw AXSnapshotError.malformedRef(ref) }
-        guard parsed.snapshot == id else { throw AXSnapshotError.staleRef(ref: parsed.description, current: id) }
-        guard elements.indices.contains(parsed.index - 1) else { throw AXSnapshotError.unknownRef(parsed.description) }
-        return elements[parsed.index - 1]
+        switch AXSnapshotBox.lookup(ref, snapshot: id, count: elements.count) {
+        case .found(let index):
+            return elements[index]
+        case .malformed:
+            throw AXSnapshotError.malformedRef(ref)
+        case .stale(let shown, let current):
+            throw AXSnapshotError.staleRef(ref: shown, current: current)
+        case .unknown(let shown):
+            throw AXSnapshotError.unknownRef(shown)
+        }
     }
 
     /// The element in this snapshot that is most likely `old` from an earlier one: same role and
     /// label, nearest on screen. Nil when `old` had no label to go by.
     public func relocate(_ old: AXSnapshotElement) -> AXSnapshotElement? {
-        guard let label = old.label?.lowercased(), !label.isEmpty else { return nil }
-        let center = CGPoint(x: old.frame.midX, y: old.frame.midY)
-        return elements.filter { $0.role == old.role && $0.label?.lowercased() == label }
-            .min { Self.distance($0.frame, center) < Self.distance($1.frame, center) }
-    }
-
-    static func distance(_ frame: CGRect, _ point: CGPoint) -> Double {
-        hypot(frame.midX - point.x, frame.midY - point.y)
+        let oldSpot = AXSnapshotBox.Spot(
+            role: old.role, label: old.label, midX: Double(old.frame.midX), midY: Double(old.frame.midY))
+        let spots = elements.map {
+            AXSnapshotBox.Spot(role: $0.role, label: $0.label, midX: Double($0.frame.midX), midY: Double($0.frame.midY))
+        }
+        guard let index = AXSnapshotBox.relocateIndex(old: oldSpot, among: spots) else { return nil }
+        return elements[index]
     }
 
     /// The elements worth showing, in order: enabled controls first, then labelled text and the
     /// rest, each group in walk order. Unlabelled containers are left out.
     public var ranked: [AXSnapshotElement] {
-        let shown = elements.filter { $0.isInteractive || !($0.label ?? "").isEmpty || !($0.value ?? "").isEmpty }
-        let first = shown.filter { $0.isInteractive && $0.enabled }
-        let rest = shown.filter { !($0.isInteractive && $0.enabled) }
-        return first + rest
+        let rows = elements.map {
+            AXSnapshotBox.Row(
+                interactive: $0.isInteractive, enabled: $0.enabled,
+                hasLabel: !($0.label ?? "").isEmpty, hasValue: !($0.value ?? "").isEmpty)
+        }
+        return AXSnapshotBox.rankedIndexes(rows).map { elements[$0] }
     }
 
     /// The compact text the brain reads: one line per element, at most `limit` lines.
     public func render(limit: Int = 40) -> String {
         let ranked = ranked
-        let shown = ranked.prefix(max(limit, 0))
-        let place = window.map { "\(app), window \"\(AXSnapshotElement.clip($0, 60))\"" } ?? app
-        var lines = ["Controls in \(place) (snapshot s\(id); use a ref like {\"ref\":\"s\(id):e1\"} to target one):"]
-        lines += shown.map { "- " + $0.line() }
-        let hidden = ranked.count - shown.count
-        if hidden > 0 || truncated {
-            lines.append("- ... \(hidden) more not listed" + (truncated ? "; the walk stopped early" : ""))
-        }
-        return lines.joined(separator: "\n")
+        return AXSnapshotBox.render(
+            app: app, window: window, snapshot: id, body: ranked.map { $0.line() }, limit: limit, truncated: truncated)
     }
 }

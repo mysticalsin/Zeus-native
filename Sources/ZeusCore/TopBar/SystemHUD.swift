@@ -7,48 +7,38 @@ public enum SystemHUDKind: String, Equatable, Sendable, CaseIterable {
 
 /// Pure math and gating for Glance-style level HUD (no AppKit).
 public enum SystemHUDMath {
-    public static let coalesceInterval: TimeInterval = 0.016
-    public static let valueDeltaThreshold = 0.004
-    public static let holdAfterChange: TimeInterval = 1.2
-    public static let easeOut: TimeInterval = 0.25
-    public static let segmentCount = 16
+    public static let coalesceInterval: TimeInterval = SystemHUDBox.coalesceInterval
+    public static let valueDeltaThreshold = SystemHUDBox.valueDeltaThreshold
+    public static let holdAfterChange: TimeInterval = SystemHUDBox.holdAfterChange
+    public static let easeOut: TimeInterval = SystemHUDBox.easeOut
+    public static let segmentCount = SystemHUDBox.segmentCount
 
     public static func shouldReport(previous: Double, next: Double, threshold: Double = valueDeltaThreshold) -> Bool {
-        abs(next - previous) > threshold
+        SystemHUDBox.shouldReport(previous: previous, next: next, threshold: threshold)
     }
 
     public static func segmentIndex(for value: Double) -> Int {
-        let clamped = max(0, min(1, value))
-        return min(segmentCount - 1, Int((clamped * Double(segmentCount)).rounded(.down)))
+        SystemHUDBox.segmentIndex(for: value)
     }
 
     public static func filledSegmentCount(for value: Double) -> Int {
-        segmentIndex(for: value) + 1
+        SystemHUDBox.filledSegmentCount(for: value)
     }
 
     /// Normal key step is 1/16; Shift+Option quarter step is 1/64.
-    public static func stepDelta(fine: Bool) -> Double { fine ? 1.0 / 64.0 : 1.0 / 16.0 }
+    public static func stepDelta(fine: Bool) -> Double { SystemHUDBox.stepDelta(fine: fine) }
 
     public static func steppedValue(_ value: Double, direction: Int, fine: Bool) -> Double {
-        let delta = stepDelta(fine: fine) * Double(direction)
-        return max(0, min(1, value + delta))
+        SystemHUDBox.steppedValue(value, direction: direction, fine: fine)
     }
 
     public static func cueDuration(sinceLastChange: TimeInterval) -> TimeInterval {
-        max(0, holdAfterChange - sinceLastChange) + easeOut
+        SystemHUDBox.cueDuration(sinceLastChange: sinceLastChange)
     }
 
     /// Merges timestamps closer than `coalesceInterval` into one emission at the last time.
     public static func coalesceTimes(_ times: [Date], window: TimeInterval = coalesceInterval) -> [Date] {
-        guard var last = times.first else { return [] }
-        var out: [Date] = []
-        for time in times.dropFirst() {
-            if time.timeIntervalSince(last) <= window { last = time; continue }
-            out.append(last)
-            last = time
-        }
-        out.append(last)
-        return out
+        SystemHUDBox.coalesceTimes(times, window: window)
     }
 }
 
@@ -151,15 +141,19 @@ public struct SystemHUDCoalescer: Sendable {
 /// known event (a media key, a volume change, a level that just moved) and does not run at all
 /// when neither HUD is on or the displays are asleep.
 public enum SystemHUDPollPolicy {
-    public static let burstInterval: TimeInterval = 0.1
-    public static let idleInterval: TimeInterval = 1.0
-    public static let burstWindow: TimeInterval = 2.0
+    public static let burstInterval: TimeInterval = SystemHUDBox.burstInterval
+    public static let idleInterval: TimeInterval = SystemHUDBox.idleInterval
+    public static let burstWindow: TimeInterval = SystemHUDBox.burstWindow
 
     public static func interval(sinceLastChange: TimeInterval) -> TimeInterval {
-        sinceLastChange < burstWindow ? burstInterval : idleInterval
+        SystemHUDBox.interval(sinceLastChange: sinceLastChange)
     }
 
     public static func shouldPoll(brightnessEnabled: Bool, keyboardBacklightEnabled: Bool, displaysAsleep: Bool) -> Bool {
-        !displaysAsleep && (brightnessEnabled || keyboardBacklightEnabled)
+        SystemHUDBox.shouldPoll(
+            brightnessEnabled: brightnessEnabled,
+            keyboardBacklightEnabled: keyboardBacklightEnabled,
+            displaysAsleep: displaysAsleep
+        )
     }
 }

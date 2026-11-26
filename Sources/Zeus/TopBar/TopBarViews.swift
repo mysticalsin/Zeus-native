@@ -427,6 +427,7 @@ enum MoreMenu {
         menu.addItem(parent)
         menu.addItem(.separator())
         menu.addItem(ScreenShareQuickToggle.menuItem(target: MoreMenuTarget.shared, action: #selector(MoreMenuTarget.toggleScreenShareVisibility)))
+        ScreenShareQuickToggle.installCatcher(on: menu)
         MoreMenuTarget.shared.topBar = topBar
         topBar.menuOpen = true
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
@@ -442,7 +443,10 @@ final class MoreMenuTarget: NSObject {
     @objc func openSettings() { topBar?.openSettings() }
     @objc func editTabs() { topBar?.beginTabEditing() }
     @objc func customizeHome() { topBar?.beginHomeCustomize() }
-    @objc func toggleScreenShareVisibility() { ScreenShareQuickToggle.toggle() }
+    @objc func toggleScreenShareVisibility() {
+        guard ScreenShareQuickToggle.allowMenuAction() else { return }
+        ScreenShareQuickToggle.toggle()
+    }
 
     @objc func chooseBuddy(_ item: NSMenuItem) {
         guard let raw = item.representedObject as? String, let choice = BuddyShow(rawValue: raw) else { return }
@@ -460,6 +464,12 @@ struct TopBarPage: View {
 
     var body: some View {
         PageSwitcher(key: topBar.selectedTab, reduceMotion: reduceMotion) { page }
+            .overlay(alignment: .bottom) {
+                if let receipt = topBar.actionReceipts.current {
+                    PrivateActionReceiptStrip(receipt: receipt) { topBar.performPrivateUndo() }
+                        .padding(.bottom, 8)
+                }
+            }
     }
 
     private var page: some View {
@@ -1454,7 +1464,7 @@ struct ClosedWings: View {
     /// The width between the wings: the footprint's wing base, so the gap is exactly the notch.
     var notchGap: CGFloat = NotchClosedBodyLayout.noNotchGap
 
-    enum Kind: Equatable { case recordly, scribe, recordingFeedback, cue(NotchCue), dictation, avatar(AvatarState), focus, music, none }
+    enum Kind: Equatable { case recordly, scribe, recordingFeedback, actionReceipt, cue(NotchCue), dictation, avatar(AvatarState), focus, music, none }
 
     static func kind(of topBar: TopBarModel) -> Kind {
         if RecordlyController.shared.isRecording { return .recordly }
@@ -1463,6 +1473,7 @@ struct ClosedWings: View {
         if RecordlyController.shared.topBarFeedback() != nil || ScribeController.shared.topBarFeedback() != nil {
             return .recordingFeedback
         }
+        if topBar.actionReceipts.current != nil { return .actionReceipt }
         if let cue = topBar.cue { return .cue(cue) }
         let avatar = AvatarStatus.shared
         if avatar.posePreview != nil || avatar.current != .idle { return .avatar(avatar.current) }
@@ -1508,7 +1519,7 @@ struct ClosedWings: View {
         case .recordingFeedback:
             wings {
                 Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 16)).foregroundStyle(Theme.glow)
+                    .font(.system(size: 16)).foregroundStyle(Color(middleBar: MiddleBarTone.bar))
                     .accessibilityHidden(true)
             } right: {
                 HStack(spacing: 5) {
@@ -1531,6 +1542,16 @@ struct ClosedWings: View {
                     DictationWave(levels: topBar.dictationLevels, color: TopBarStyle.rec)
                 } else {
                     ProgressView().controlSize(.mini).tint(Theme.cloudPrimary)
+                }
+            }
+        case .actionReceipt:
+            if let receipt = topBar.actionReceipts.current {
+                wings {
+                    Image(systemName: receipt.symbol)
+                        .font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.cloudPrimary)
+                        .accessibilityHidden(true)
+                } right: {
+                    PrivateActionReceiptStrip(receipt: receipt, compact: true) { topBar.performPrivateUndo() }
                 }
             }
         case .cue(let cue):
@@ -1575,6 +1596,7 @@ struct ClosedWings: View {
     /// Cues with text widen both wings by the same extra.
     static func extraWidth(for topBar: TopBarModel) -> CGFloat {
         switch kind(of: topBar) {
+        case .actionReceipt: return 150
         case .cue(let cue):
             switch cue {
             case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake: return 150

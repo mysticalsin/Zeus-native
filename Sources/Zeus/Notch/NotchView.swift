@@ -235,6 +235,12 @@ struct NotchView: View {
     /// How the closed notch grows into (and out of) its wings.
     @MainActor static var wingsSpring: Animation? { Motion.reducible(Motion.cueGrow) }
 
+    /// The capture-failure hint the notch already shows, when that is the current cue.
+    static func pttFailureText(_ cue: NotchCue?) -> String? {
+        if case .hint(let text) = cue { return text }
+        return nil
+    }
+
     private var closedWings: ClosedWingsFacts { topBar.map(ClosedWingsFacts.init(of:)) ?? .noWings }
 
     /// While closed (nil otherwise), what the closed width depends on besides the footprint: the trigger for
@@ -421,6 +427,20 @@ struct NotchView: View {
             if let topBar, model.presentation == .closed, layers.glow, hasNotch || slimPill || !topBar.lights.isEmpty {
                 NotchLights(topBar: topBar, status: status, body_: closedLightBody, shoulder: shoulder)
             }
+            if let steady = topBar?.volumeSteady {
+                VolumeSteadyLightMark(light: steady)
+            }
+        }
+        .overlay(alignment: .top) {
+            // Beside the existing lights. The round mark stays in this panel.
+            if let topBar {
+                PTTIndicatorOverlay(
+                    held: topBar.talkHeld,
+                    listening: topBar.micListening,
+                    level: topBar.micLevel,
+                    failureText: Self.pttFailureText(topBar.cue),
+                    reduceMotion: Motion.reduced)
+            }
         }
         .onChange(of: model.status) { old, new in
             guard let topBar, old == .idle, new != .idle, topBar.haloStyle != .off else { return }
@@ -511,6 +531,12 @@ struct NotchView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             Color.clear.frame(width: hasNotch ? notch.width + 8 : 12, height: 1)
             HStack(spacing: 7) {
+                if model.canStopAll {
+                    GlyphButton(symbol: "stop.fill", size: 11, tint: Theme.cloudSecondary, label: "Stop all agents") {
+                        NotchControllerBridge.stopAll()
+                    }
+                    .accessibilityHint("Halts runs Zeus started or hooked. A pending approval stays up.")
+                }
                 if !peekStatusText.isEmpty {
                     Text(peekStatusText)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -732,6 +758,15 @@ private struct ApprovalBody: View {
     }
 }
 
+private struct StopAllButton: View {
+    var body: some View {
+        NotchButton(title: "Stop all", tint: Theme.cloudSecondary, filled: false) {
+            NotchControllerBridge.stopAll()
+        }
+        .accessibilityHint("Halts runs Zeus started or hooked. A pending approval stays up.")
+    }
+}
+
 private struct NotchButton: View {
     let title: String
     let tint: Color
@@ -778,6 +813,13 @@ private struct PanelBody: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .frame(height: barHeight)
+
+            if model.canStopAll {
+                HStack {
+                    Spacer(minLength: 0)
+                    StopAllButton()
+                }
+            }
 
             if let approval = model.approval {
                 ApprovalBody(approval: approval, compact: false)
@@ -838,6 +880,12 @@ private struct TopBarPanelBody: View {
     private var agents: some View {
         PageScroll(.vertical) {
             VStack(spacing: 8) {
+                if model.canStopAll {
+                    HStack {
+                        Spacer(minLength: 0)
+                        StopAllButton()
+                    }
+                }
                 if model.sessions.isEmpty {
                     VStack(spacing: 6) {
                         Image(systemName: "bolt.horizontal.circle").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.cloudQuiet)

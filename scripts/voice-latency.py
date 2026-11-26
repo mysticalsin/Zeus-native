@@ -16,8 +16,11 @@ PAIR = re.compile(r'(\w+)=("[^"]*"|\S+)')
 LINE = re.compile(r"voice-latency\s+(.*)$")
 STAMP = re.compile(r"^(\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}))")
 # Targets from docs/VOICE-LATENCY.md: key-up to first audio.
+# The API cap stays 1200. The CLI row in the doc stays 2500. The scored p50 also
+# has to clear 2000, so a CLI log uses the tighter of the two.
 TARGET_API_MS = 1200
 TARGET_CLI_MS = 2500
+FIRST_AUDIO_P50_MS = 2000
 
 
 def parse(line):
@@ -89,7 +92,8 @@ def summary(rows):
         p50 = percentile(ttfa, 0.5)
         timed = [r for r in rows if number(r, "ttfa") is not None]
         api = [r for r in timed if r.get("brain", "").startswith(("anthropic", "openai"))]
-        target = TARGET_API_MS if timed and len(api) == len(timed) else TARGET_CLI_MS
+        route = TARGET_API_MS if timed and len(api) == len(timed) else TARGET_CLI_MS
+        target = min(route, FIRST_AUDIO_P50_MS)
         out.append(f"target p50 for this route: {target} ms -> {'PASS' if p50 <= target else 'ABOVE TARGET'}")
     return "\n".join(out)
 

@@ -14,6 +14,7 @@ enum NotchControllerBridge {
     }
     static func alertHover(_ hovered: Bool) { controller?.setAlertHovered(hovered) }
     static func closePeek() { if controller?.model.presentation == .peek { controller?.show(.closed) } }
+    static func stopAll() { controller?.stopAllSupervised() }
     static func applyScreenSharePolicy(visibleInShare: Bool) { controller?.applyScreenSharePolicy(visibleInShare: visibleInShare) }
 
     /// A tap on a system notification's Open action: the open panel on the Agents tab, with that
