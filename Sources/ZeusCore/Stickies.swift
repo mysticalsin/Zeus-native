@@ -77,29 +77,43 @@ public struct StickyStore: Sendable {
 /// Where an edge-shelf sticky sits: a slim tab when tucked away, the full card when it slides
 /// out on hover. Pure geometry so it can be tested.
 public enum EdgeShelf {
-    public static let tabWidth: Double = 22
-    public static let cardSize = CGSize(width: 260, height: 220)
+    public static let tabWidth: Double = EdgeShelfBox.tabWidth
+    public static let cardSize = CGSize(width: EdgeShelfBox.cardWidth, height: EdgeShelfBox.cardHeight)
 
     /// `visible` is the screen's visible frame (AppKit coordinates, origin bottom-left).
     /// `top` is the distance from the top of the visible frame to the card's top.
     public static func frame(edge: StickyNote.Edge, top: Double, expanded: Bool, visible: CGRect,
                              size: CGSize = cardSize) -> CGRect {
-        let clampedTop = min(max(top, 0), max(visible.height - size.height, 0))
-        let y = visible.maxY - clampedTop - size.height
-        let shown = expanded ? size.width : tabWidth
-        let x = edge == .left ? visible.minX - size.width + shown : visible.maxX - shown
-        return CGRect(x: x, y: y, width: size.width, height: size.height)
+        let rect = EdgeShelfBox.frame(
+            edge: edge == .left ? .left : .right,
+            top: top,
+            expanded: expanded,
+            visibleMinX: Double(visible.minX),
+            visibleMaxX: Double(visible.maxX),
+            visibleMaxY: Double(visible.maxY),
+            visibleHeight: Double(visible.height),
+            width: Double(size.width),
+            height: Double(size.height))
+        return CGRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height)
     }
 
     /// The edge a floating card was dropped nearest to, if it is within `snap` points of it.
-    public static func snapEdge(for frame: CGRect, visible: CGRect, snap: Double = 24) -> StickyNote.Edge? {
-        if frame.minX - visible.minX <= snap { return .left }
-        if visible.maxX - frame.maxX <= snap { return .right }
-        return nil
+    public static func snapEdge(for frame: CGRect, visible: CGRect,
+                                snap: Double = EdgeShelfBox.snapDistance) -> StickyNote.Edge? {
+        switch EdgeShelfBox.snapEdge(
+            frameMinX: Double(frame.minX),
+            frameMaxX: Double(frame.maxX),
+            visibleMinX: Double(visible.minX),
+            visibleMaxX: Double(visible.maxX),
+            snap: snap) {
+        case .left: .left
+        case .right: .right
+        case nil: nil
+        }
     }
 
     /// The `top` value that keeps a card where it was dropped.
     public static func top(for frame: CGRect, visible: CGRect) -> Double {
-        max(0, visible.maxY - frame.maxY)
+        EdgeShelfBox.top(frameMaxY: Double(frame.maxY), visibleMaxY: Double(visible.maxY))
     }
 }
