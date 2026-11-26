@@ -1047,12 +1047,17 @@ final class DictationController {
             }
         }
         // Only a target that is still alive, frontmost and focused gets an automatic paste.
+        // A warm run often misses that gate after the first ok. The field that already
+        // holds text is still written. Clipboard-only stays `inserted: false`.
         switch deliveryVerdict(for: context, allowClipboardFallback: allowClipboardFallback) {
         case .paste:
             break
         case .clipboardOnly:
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            if writeWarmField(text, context: context, onTextReady: onTextReady) { return .pasted }
+            if allowClipboardFallback {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
             return .copiedOnly
         case .abort:
             return .copiedOnly
@@ -1079,7 +1084,20 @@ final class DictationController {
             await insertionTracker.acknowledge(text, before: before, target: context.insertionField,
                                               sendsReturn: pressReturn, isCurrent: { check() == .paste })
         }
+        if outcome != .pasted, writeWarmField(text, context: context, onTextReady: onTextReady) {
+            return .pasted
+        }
         return outcome
+    }
+
+    /// Puts the words in the focused field, or the field this turn started in.
+    /// A miss leaves the clipboard path to the caller and does not count as inserted.
+    private func writeWarmField(_ text: String, context: DictationTurnContext,
+                                onTextReady: (@MainActor (String) -> Void)?) -> Bool {
+        guard ownership.owns(generation: context.generation) else { return false }
+        guard WarmFieldWriter.write(text, captured: context.insertionField?.element) else { return false }
+        onTextReady?("field")
+        return true
     }
 
     /// A correction replaces the entire last acknowledged turn, never a guessed earlier word.
