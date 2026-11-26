@@ -7,6 +7,8 @@ import Darwin
 /// Standard quarantine attribute format:
 /// `flags;timestamp;agent_bundle_or_name;uuid`
 /// AirDrop files have an agent field mentioning `sharingd` or `AirDrop`.
+/// The fields and the AirDrop answer are read from `QuarantineParserBox`.
+/// Reading the attribute still uses the file system.
 public struct QuarantineInfo: Equatable, Sendable {
     public var raw: String
     public var flags: String
@@ -23,28 +25,19 @@ public struct QuarantineInfo: Equatable, Sendable {
     }
 
     public var isAirDrop: Bool {
-        guard let agent = agent?.lowercased() else { return false }
-        return agent == "sharingd"
-            || agent == "com.apple.sharingd"
-            || agent == "airdrop"
-            || agent.contains("sharingd")
-            || agent.contains("airdrop")
+        QuarantineParserBox.isAirDrop(agent: agent)
     }
 }
 
 public enum QuarantineParser {
     public static func parse(_ raw: String) -> QuarantineInfo {
-        let parts = raw.components(separatedBy: ";")
-        let flags = parts.indices.contains(0) ? parts[0] : ""
-        let timestamp = parts.indices.contains(1) ? parts[1] : nil
-        let agent = parts.indices.contains(2) ? parts[2] : nil
-        let uuid = parts.indices.contains(3) ? parts[3] : nil
+        let fields = QuarantineParserBox.fields(raw)
         return QuarantineInfo(
             raw: raw,
-            flags: flags,
-            timestamp: timestamp?.isEmpty == true ? nil : timestamp,
-            agent: agent?.isEmpty == true ? nil : agent,
-            uuid: uuid?.isEmpty == true ? nil : uuid
+            flags: fields.flags,
+            timestamp: fields.timestamp,
+            agent: fields.agent,
+            uuid: fields.uuid
         )
     }
 
