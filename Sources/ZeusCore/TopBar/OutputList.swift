@@ -441,9 +441,7 @@ public enum OutputList {
     }
 
     private static func usable(_ name: String?) -> String? {
-        guard let name else { return nil }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        OutputListBox.usable(name)
     }
 
     private static func rowStatus(_ route: Route, pending: Pending?, failure: Failure?) -> OutputRowStatus {
