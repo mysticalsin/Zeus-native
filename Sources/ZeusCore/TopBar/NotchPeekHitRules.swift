@@ -5,17 +5,23 @@ import CoreGraphics
 /// choice never blocks the app underneath. AppKit coordinates (origin bottom-left).
 public enum NotchPeekHitRules {
     /// Room past the card so the edge is easy to hit.
-    public static let slack: CGFloat = 6
+    public static let slack: CGFloat = CGFloat(NotchPeekHitRulesBox.slack)
 
     /// The card as drawn: centred on the screen, hanging from the top offset.
     public static func cardRect(size: CGSize, screenFrame: CGRect, topOffset: CGFloat) -> CGRect {
-        CGRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - max(topOffset, 0) - size.height,
-               width: size.width, height: size.height)
+        let rect = NotchPeekHitRulesBox.cardRect(
+            width: Double(size.width), height: Double(size.height),
+            screenMinX: Double(screenFrame.minX), screenWidth: Double(screenFrame.width),
+            screenMaxY: Double(screenFrame.maxY), topOffset: Double(topOffset))
+        return CGRect(x: rect.x, y: rect.y, width: rect.width, height: rect.height)
     }
 
     public static func takesMouse(_ point: CGPoint, size: CGSize, screenFrame: CGRect, topOffset: CGFloat,
                                   slack: CGFloat = slack) -> Bool {
-        cardRect(size: size, screenFrame: screenFrame, topOffset: topOffset)
-            .insetBy(dx: -slack, dy: -slack).contains(point)
+        NotchPeekHitRulesBox.takesMouse(
+            x: Double(point.x), y: Double(point.y),
+            width: Double(size.width), height: Double(size.height),
+            screenMinX: Double(screenFrame.minX), screenWidth: Double(screenFrame.width),
+            screenMaxY: Double(screenFrame.maxY), topOffset: Double(topOffset), slack: Double(slack))
     }
 }
