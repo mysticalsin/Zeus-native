@@ -8844,6 +8844,18 @@
         "file": "Tests/ZeusCoreTests/AgentChoiceDismissTests.swift",
         "function": "aPeerSelectClearsTheSameChoice"
       }
+    },
+    {
+      "id": "REG-1004",
+      "failure": "A Right Option hold waited out the typing window before the bar appeared, and a hold that stayed alone never moved from shown to listening.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
+        "function": "aHeldRightOptionListensAfterTheBarIsAlreadyUp"
+      }
     }
   ]
 }

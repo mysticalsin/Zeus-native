@@ -158,6 +158,21 @@ final class BuddyController: NSObject {
         }
     }
 
+    /// Right Option came up, or a letter joined, before a turn started. He leaves now instead of waiting out the call.
+    /// A turn that is already listening or thinking keeps him up.
+    func releaseUnansweredCall() {
+        switch model.mode {
+        case .listening, .thinking, .flying, .pointing, .returning:
+            return
+        case .following:
+            break
+        }
+        callExpiry?.cancel()
+        callExpiry = nil
+        visibility.end(.call, at: Date())
+        applyVisibility()
+    }
+
     private func modeChanged(_ mode: BuddyModel.Mode) {
         let now = Date()
         switch mode {

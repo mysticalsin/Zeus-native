@@ -47,7 +47,8 @@ final class BuddyModel {
     var audioLevel: Double?
 
     var sparkVisible: Bool {
-        mode != .listening && mode != .thinking && !(mode == .following && PointerZone.shared.overNotchPanel)
+        // Listening keeps him on screen. Hiding the spark for the whole hold made the bar look late and silent.
+        mode != .thinking && !(mode == .following && PointerZone.shared.overNotchPanel)
     }
 }
 

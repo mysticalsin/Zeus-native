@@ -83,6 +83,10 @@ final class HotkeyMonitor {
     /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
     var onListenAccessMissing: (() -> Void)?
     var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
+    /// Right Option went down alone. The bar appears now. Listening waits for the typing window, in `onPress`.
+    var onHoldAppear: (() -> Void)?
+    /// Right Option came up, or a letter joined, before listening started. Take that bar down.
+    var onHoldHide: (() -> Void)?
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
     /// A turn the key ended without sending it: a shortcut or a larger chord took the press over.
@@ -130,6 +134,8 @@ final class HotkeyMonitor {
     private var consumedKeys: NSObjectProtocol?
     private var sleepObservers: [NSObjectProtocol] = []
     private var pair = TalkKeyPair()
+    /// Right Option's bar and listen decision. The voice machine still opens and closes the microphone.
+    private var rightOptionHold = RightOptionHold()
     /// A Space was seen down while the second key's turn was open (`lookForALauncherSpace`).
     private var launcherSpaceSeen = false
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
@@ -246,6 +252,7 @@ final class HotkeyMonitor {
         }
         send(.key(event, at: at))
         finishRecoveredHoldIfReleased()
+        noteRightOptionHold(at: at)
     }
 
     /// True when this monitor's shortcut is still physically down. A recovered prompt uses it.
@@ -294,6 +301,7 @@ final class HotkeyMonitor {
         let config = config, second = secondConfig
         let before = pair.generation
         run(pair.mouseDownTagged(at: at, primary: config, second: second), before: before, config, second)
+        noteRightOptionHold(at: at, spoiled: true)
     }
 
     /// A launcher on Option-Space that Carbon cannot see may tap and let go of Space between two looks at the keyboard. While the
@@ -318,6 +326,7 @@ final class HotkeyMonitor {
         lookForALauncherSpace()
         send(.tick(at: now(), live: liveModifiers()))
         finishRecoveredHoldIfReleased()
+        noteRightOptionHold(at: now())
     }
 
     /// Coming forward from System Settings is when a grant usually appears. Arm then, not only on the 3 s poll.
@@ -433,6 +442,32 @@ final class HotkeyMonitor {
         for signal in signals {
             switch signal {
             case .murmur:
+                break
+            }
+        }
+    }
+
+    /// The second talk key is Right Option. Show the bar at the key-down. `onPress` still opens the microphone when
+    /// the voice machine starts the turn, which is the same moment this hold says `listen`. A letter or a release
+    /// before that takes the bar down and does not listen.
+    private func noteRightOptionHold(at time: TimeInterval, spoiled: Bool = false) {
+        guard role == .talk, secondKeyProvider() == .rightOption else {
+            performRightOption(rightOptionHold.disarm())
+            return
+        }
+        var ordinary = pair.keys.keysDown
+        if spoiled { ordinary.insert(0) }
+        let confirm = VoiceKey.secondTalkConfirm(tiling: Self.tilingConfirm(.rightOption))
+        performRightOption(rightOptionHold.observe(deviceKeys: pair.keys.deviceKeys, ordinaryKeys: ordinary,
+                                                   at: time, confirm: confirm))
+    }
+
+    private func performRightOption(_ actions: [RightOptionHold.Action]) {
+        for action in actions {
+            switch action {
+            case .showBar: onHoldAppear?()
+            case .hideBar: onHoldHide?()
+            case .listen, .stopListening:
                 break
             }
         }
