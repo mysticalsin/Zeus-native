@@ -320,10 +320,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.cliInstall) { CLIInstaller.install() }
         if on(.assistantKeyImport) { AssistantKeyImporter.importDefaultIfNeeded() }
         if on(.talkHotkey) {
-            hotkey.onPress = { [weak self] in self?.talkKeyPressed() ?? false }
+            // The monitor plays the installed talk cues. This path does not also play listenStart.
+            hotkey.onPress = { [weak self] in self?.talkKeyPressed(builtinCue: false) ?? false }
             hotkey.onRelease = { [weak self] in
                 WakeWordController.shared.talkKeyHeld = false
-                self?.voice?.release()
+                self?.voice?.release(builtinCue: false)
+            }
+            // Right Command is Murmur, owned by the dictation monitor. This talk monitor must not start a second session.
+            hotkey.onListenAccessMissing = { [weak self] in
+                if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
             hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
             // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one. Every event reads
@@ -655,26 +660,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Whether a turn opened: false tells the key machine nothing is listening, so no release or cancel is owed.
-    private func talkKeyPressed() -> Bool {
+    private func talkKeyPressed(builtinCue: Bool = true) -> Bool {
+        guard on(.talkHotkey), voice != nil else { return false }
+        switch CommandHotkeyAccess.press(voice: hotkeyVoice(VoicePermissions.access)) {
+        case .start:
+            return beginTalkHold(builtinCue: builtinCue)
+        case .ask:
+            ExplanationAudioArbitration.yieldToNewCapture()
+            WakeWordController.shared.talkKeyHeld = true
+            buddy.call()
+            VoiceLog.log("key", "talk shortcut pressed (access \(VoicePermissions.access))")
+            NotificationCenter.default.post(name: Speaker.talkKeyPressed, object: nil)
+            Task { @MainActor in
+                let access = await VoicePermissions.ensure(explicit: true)
+                switch CommandHotkeyAccess.recover(voice: self.hotkeyVoice(access), keyStillDown: self.hotkey.shortcutIsDown()) {
+                case .start:
+                    self.hotkey.noteRecoveredHold()
+                    if !self.beginTalkHold(builtinCue: builtinCue) { self.hotkey.cancelRecoveredHold() }
+                case .degradeVoice:
+                    WakeWordController.shared.talkKeyHeld = false
+                case .wait:
+                    WakeWordController.shared.talkKeyHeld = false
+                    if access == .ready {
+                        self.topBar.show(.hint("Zeus can hear you now: hold Control + Option again"))
+                    }
+                case .ask:
+                    WakeWordController.shared.talkKeyHeld = false
+                }
+            }
+            return false
+        case .degradeVoice:
+            WakeWordController.shared.talkKeyHeld = false
+            Task { @MainActor in _ = await VoicePermissions.ensure(explicit: true) }
+            return false
+        case .wait:
+            WakeWordController.shared.talkKeyHeld = false
+            return false
+        }
+    }
+
+    private func hotkeyVoice(_ access: VoiceAccess) -> CommandHotkeyAccess.Voice {
+        switch access {
+        case .ready: .ready
+        case .needsPrompt: .needsPrompt
+        case .denied: .denied
+        }
+    }
+
+    /// Opens the talk hold. False means the microphone did not start.
+    private func beginTalkHold(builtinCue: Bool) -> Bool {
         guard on(.talkHotkey), voice != nil else { return false }
         ExplanationAudioArbitration.yieldToNewCapture()
-        // The wake-word listener lets go of the mic before the turn takes it.
         WakeWordController.shared.talkKeyHeld = true
         buddy.call()
         VoiceLog.log("key", "talk shortcut pressed (access \(VoicePermissions.access))")
         NotificationCenter.default.post(name: Speaker.talkKeyPressed, object: nil)
-        // First use asks once (macOS shows its prompt the first time only); a refusal gets the
-        // notch cue with a button. While a prompt is up the key can't start a turn, so press again.
-        guard VoicePermissions.access == .ready else {
-            WakeWordController.shared.talkKeyHeld = false
-            Task { @MainActor in
-                let access = await VoicePermissions.ensure(explicit: true)
-                if access == .ready { self.topBar.show(.hint("Zeus can hear you now: press the talk key again")) }
-            }
-            return false
-        }
-        let took = voice?.press() ?? false
-        // No release follows a press that opened nothing, so the wake word listener must not stay held off.
+        let took = voice?.press(builtinCue: builtinCue) ?? false
         if !took { WakeWordController.shared.talkKeyHeld = false }
         return took
     }

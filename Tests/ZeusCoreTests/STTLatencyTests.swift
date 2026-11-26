@@ -392,43 +392,124 @@ struct STTLatencyTests {
         #expect(live.publishLevel)
     }
 
-    /// A file task cancelled at the 2 s stand-in used to deliver only `isFinal` text.
-    /// The cancel callback carries no final, so DictationController reported "No speech found."
-    @Test func fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled() {
-        let heard = STTFileRecognition()
-        let waiting = heard.note(text: "set a timer", isFinal: false, failed: false)
-        let replaced = heard.note(text: "set a timer for five", isFinal: false, failed: false)
-        let delivered = heard.giveUp()
-        let lateCancel = heard.note(text: nil, isFinal: false, failed: true)
-        #expect(waiting == nil)
-        #expect(replaced == nil)
-        #expect(delivered == "set a timer for five")
-        #expect(lateCancel == nil)
-        #expect(delivered?.isEmpty == false)
+    @Test func warmMedianOfFiveStaysInsideThePartialAndFinalCeilings() {
+        let samples = [
+            STTTimingSample(utteranceMs: 3_000, firstPartialMs: 100, finalAfterUtteranceMs: 200),
+            STTTimingSample(utteranceMs: 3_500, firstPartialMs: 200, finalAfterUtteranceMs: 400),
+            STTTimingSample(utteranceMs: 4_000, firstPartialMs: 400, finalAfterUtteranceMs: 450),
+            STTTimingSample(utteranceMs: 4_500, firstPartialMs: 900, finalAfterUtteranceMs: 800),
+            STTTimingSample(utteranceMs: 5_000, firstPartialMs: 1_400, finalAfterUtteranceMs: 2_900),
+        ]
+        #expect(samples.count >= STTAcceptance.minimumRuns)
+        #expect(STTTimingScore.median(samples.map(\.firstPartialMs)) == 400)
+        #expect(STTTimingScore.median(samples.map(\.finalAfterUtteranceMs)) == 450)
+        #expect(STTTimingScore.warmPasses(samples))
+        #expect(!STTTimingScore.warmPasses(Array(samples.prefix(4))))
+        let slowPartial = samples.map { sample -> STTTimingSample in
+            var copy = sample
+            copy.firstPartialMs = 1_600
+            return copy
+        }
+        #expect(!STTTimingScore.warmPasses(slowPartial))
+        let slowFinal = samples.map { sample -> STTTimingSample in
+            var copy = sample
+            copy.finalAfterUtteranceMs = 3_100
+            return copy
+        }
+        #expect(!STTTimingScore.warmPasses(slowFinal))
+        var short = samples
+        short[0].utteranceMs = 2_000
+        #expect(!STTTimingScore.warmPasses(short))
+        var cold = samples
+        cold[0].cold = true
+        #expect(!STTTimingScore.warmPasses(cold))
+    }
 
-        let finished = STTFileRecognition()
-        let final = finished.note(text: "done", isFinal: true, failed: false)
-        let afterFinal = finished.giveUp()
-        #expect(final == "done")
-        #expect(afterFinal == nil)
+    @Test func aFourSecondUtteranceOnTheProductionClockStaysInsideTheCeilings() {
+        let events: [STTEvent] = [
+            .keyDown(0),
+            .capture(15),
+            .modelReady(0),
+            .audio(at: 40, rms: 0.05, partialToken: 1),
+            .audio(at: 4_000, rms: 0.05, partialToken: 2),
+            .keyUp(4_000),
+        ]
+        let turn = STTLiveTurn.replay(path: .talkHold, policy: .production, events: events, endOnSilence: false)
+        let partial = turn.trace.offset(.firstPartial)!
+        let endpoint = turn.trace.offset(.endpointFired)!
+        let final = turn.trace.offset(.finalTranscript)!
+        let afterUtterance = final - 4_000
+        #expect(STTAcceptance.utteranceInRange(4_000))
+        #expect(partial <= STTAcceptance.warmFirstPartialMs)
+        #expect(afterUtterance <= STTAcceptance.warmFinalMs)
+        #expect(final - endpoint == STTSessionPolicy.production.endpointToFinalMs)
+        #expect(STTTimingScore.warmPasses([
+            STTTimingSample(utteranceMs: 4_000, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 3_000, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 3_500, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 4_500, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+            STTTimingSample(utteranceMs: 5_000, firstPartialMs: partial, finalAfterUtteranceMs: afterUtterance),
+        ]))
+    }
 
-        let silent = STTFileRecognition()
-        let empty = silent.giveUp()
-        #expect(empty == "")
+    @Test func coldFirstFinalStaysInsideEightSeconds() {
+        let coldCap = STTSessionPolicy.production.batchGiveUpMs(audioMs: 5_000)
+        #expect(STTAcceptance.coldFirstFinalMs == 8_000)
+        #expect(coldCap <= STTAcceptance.coldFirstFinalMs)
+        #expect(coldCap != STTAcceptance.coldFirstFinalMs)
+        #expect(STTTimingScore.coldFirstFinalPasses(ms: coldCap))
+        #expect(STTTimingScore.coldFirstFinalPasses(ms: 8_000))
+        #expect(!STTTimingScore.coldFirstFinalPasses(ms: 8_001))
+        #expect(!STTSessionPolicy.production.allowsServerRoundTrip)
+    }
 
-        let cancelled = STTFileRecognition()
-        let ignored = cancelled.note(text: "hello", isFinal: false, failed: false)
-        let fromError = cancelled.note(text: nil, isFinal: false, failed: true)
-        #expect(ignored == nil)
-        #expect(fromError == "hello")
+    @Test func aMidStreamAbortFinishesInsideTheAbortCeiling() {
+        var clock = STTClock(nowMs: 0)
+        var turn = STTLiveTurn(path: .murmurTap, policy: .production, endOnSilence: false)
+        turn.keyDown(clock: clock)
+        clock.advance(to: 40)
+        turn.feed(clock: clock, rms: 0.05, partialToken: 1)
+        clock.advance(to: 2_000)
+        turn.abort(clock: clock)
+        let finished = turn.abortedAtMs!
+        #expect(turn.taskCancelled)
+        #expect(turn.failure == .aborted)
+        #expect(turn.failure != .hang)
+        #expect(finished == 2_000)
+        #expect(STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: finished))
+        #expect(STTSessionPolicy.production.hangGiveUpMs <= STTAcceptance.abortMs)
+        #expect(STTAcceptance.abortMs == 1_400)
+        #expect(!STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: 2_000 + 1_401))
+        #expect(!STTTimingScore.abortPasses(requestedAtMs: 2_000, finishedAtMs: 1_999))
+    }
 
-        let blank = STTFileRecognition()
-        let spaces = blank.note(text: "   ", isFinal: false, failed: false)
-        let noSpeech = blank.giveUp()
-        #expect(spaces == nil)
-        #expect(noSpeech == "")
+    @Test func theFailureRateLineIsNotASwiftFailureDiagnostic() {
+        var ledger = STTFailureLedger()
+        for _ in 0..<4 { ledger.record(path: .talkHold, failure: .noText) }
+        let line = ledger.line(.talkHold)
+        let looksLikeASuiteFailure = line.range(
+            of: #"(?:✘|Test run .* failed|[1-9]\d* failures?)"#,
+            options: .regularExpression) != nil
+        #expect(line.contains("attempts=4"))
+        #expect(line.contains("rate=1.000"))
+        #expect(!looksLikeASuiteFailure)
+    }
 
-        #expect(STTFileGiveUp.seconds(audioMs: STTFileGiveUp.standInAudioMs) == 2)
-        #expect(STTSessionPolicy.production.endpointToFinalMs == 450)
+    @Test func aCallbackAndItsGiveUpCompleteOnce() {
+        let gate = STTOnce()
+        var hits = 0
+        gate.run { hits += 1 }
+        gate.run { hits += 1 }
+        #expect(hits == 1)
+    }
+
+    @Test func aDeniedMicOrMissingEngineRetriesInsteadOfHanging() {
+        for fault in [STTFault.micDenied, .engineUnavailable] {
+            let answer = STTFaultGate.answer(fault)
+            #expect(answer.fault == fault)
+            #expect(answer.recoverable)
+            #expect(answer.retry)
+            #expect(!answer.hangs)
+        }
     }
 }

@@ -61,7 +61,7 @@ enum KeyListenAccess {
 /// invisible to them). Pure so the message and startup check are unit-testable.
 enum KeyAccessNotice {
     static func cue(granted: Bool) -> (text: String, pane: String)? {
-        granted ? nil : ("Hold-to-talk and dictation need Accessibility or Input Monitoring.", "Privacy_Accessibility")
+        granted ? nil : ("Hold Control + Option to talk. That needs Accessibility or Input Monitoring.", "Privacy_Accessibility")
     }
 }
 
@@ -77,6 +77,12 @@ final class HotkeyMonitor {
     /// start) tells the machine the turn never opened, so no release or cancel follows.
     var onPress: (() -> Bool)?
     var onRelease: (() -> Void)?
+    /// Control+Option hold, after the debounce. Separate from `onPress` so other shortcuts keep their path.
+    var onTalkBegin: (() -> Void)?
+    var onTalkEnd: (() -> Void)?
+    /// Global flags never arrive until Accessibility or Input Monitoring is on. The existing cue.
+    var onListenAccessMissing: (() -> Void)?
+    var cues: (any TalkCuePlaying)? = InstalledTalkCuePlayer.shared
     /// Called when the key is held but can't be used (Control+Option while VoiceOver is on).
     var onBlocked: ((String) -> Void)?
     /// A turn the key ended without sending it: a shortcut or a larger chord took the press over.
@@ -116,6 +122,9 @@ final class HotkeyMonitor {
     /// Of these ordinary keys, the ones the system reports down now. Nil until `start()` asks the keyboard itself, so a
     /// test that feeds keys with no key-up is not undone by the real keyboard.
     var keysStillDown: ((Set<UInt16>) -> Set<UInt16>)?
+    /// Whether a modifier key code is physically down. Nil in tests, so a flags event is taken as the picture.
+    /// `start()` reads the hardware. A repeat while both sides are down is dropped only when this says the key is still down.
+    var modifierIsDown: ((UInt16) -> Bool)?
 
     private var keyMonitors: [Any] = []
     private var consumedKeys: NSObjectProtocol?
@@ -125,6 +134,20 @@ final class HotkeyMonitor {
     private var launcherSpaceSeen = false
     /// The number the machine gave the last turn that `onPress` was asked to start, 0 before the first.
     private var ownerTurn = 0
+
+    private var rightCommand = RightCommandTap()
+    private var rightCommandDown = false
+    private var rightCommandHoldOwned = false
+    /// The keys the right Command tap saw, applied before the talk machine handles the same event.
+    private var rightCommandState = ShortcutState()
+    private var listenRecovery = KeyListenRecovery()
+    private var waitingForKeys = false
+    private var globalArmed = false
+    private var started = false
+    private var activeObserver: NSObjectProtocol?
+    /// A talk hold opened after the permission prompt, outside the key machine. Release still stops it.
+    private var recoveredHold = false
+    private var recoveredPoll = false
 
     /// Keys the tiling tap consumes never reach the event monitors; the tap posts each one as the event a monitor would
     /// have seen. It goes through the same `feed` as the monitors' own events, so a consumed key and the same key
@@ -141,9 +164,22 @@ final class HotkeyMonitor {
 
     func start() {
         if keysStillDown == nil { keysStillDown = ordinaryKeysDownInTheSystem }
+        if modifierIsDown == nil {
+            modifierIsDown = { CGEventSource.keyState(.hidSystemState, key: CGKeyCode($0)) }
+        }
         observeConsumedKeys()
         observeSleep()
-        KeyListenAccess.whenGranted { [weak self] in self?.startGlobal() }
+        observeActivation()
+        started = true
+        performListen(listenRecovery.send(.start(granted: KeyListenAccess.granted)))
+        if !listenRecovery.armed, !waitingForKeys {
+            waitingForKeys = true
+            KeyListenAccess.whenGranted { [weak self] in
+                guard let self else { return }
+                self.waitingForKeys = false
+                self.performListen(self.listenRecovery.send(.granted))
+            }
+        }
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
             let time = event.timestamp
@@ -160,6 +196,8 @@ final class HotkeyMonitor {
 
     /// Global monitors only once access is on, so macOS never prompts mid-use.
     private func startGlobal() {
+        guard !globalArmed else { return }
+        globalArmed = true
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.flagsChanged, .keyDown, .keyUp], handler: { [weak self] event in
             let converted = Self.convert(event)
             let time = event.timestamp
@@ -194,6 +232,9 @@ final class HotkeyMonitor {
         if !held.isEmpty, let keysStillDown { send(.sweep(live: keysStillDown(held))) }
         let arrived = now()
         let at = time.map { $0 > 0 ? min($0, arrived) : arrived } ?? arrived
+        if dropStillHeldRepeat(event) { return }
+        rightCommandState.apply(event)
+        driveRightCommand(event, at: at)
         // The talk chord's Space may be held by Carbon, which hides its key-down from the monitors. On a flags event the
         // system is asked about it, and the machine hears the key-down it missed, on the flags it had before this event, so
         // a Space that came before the set spoils the hold and a Space that joined the set does not. It is read at the time
@@ -204,7 +245,23 @@ final class HotkeyMonitor {
             send(.key(.keyDown(keyCode: chord, modifiers: pair.keys.flagModifiers), at: at))
         }
         send(.key(event, at: at))
+        finishRecoveredHoldIfReleased()
     }
+
+    /// True when this monitor's shortcut is still physically down. A recovered prompt uses it.
+    func shortcutIsDown() -> Bool {
+        guard let key = keyProvider(), let live = liveModifiers() else { return false }
+        return live.isSuperset(of: key.modifiers)
+    }
+
+    /// The permission prompt returned ready while the key was still held. The machine already
+    /// abandoned that press, so this hold owns the matching release.
+    func noteRecoveredHold() {
+        recoveredHold = true
+        finishRecoveredHoldIfReleased()
+    }
+
+    func cancelRecoveredHold() { recoveredHold = false }
 
     /// The owner's turn stopped listening for a reason of its own (Esc, a failed start): the machine forgets it. It
     /// names the last turn the owner was given. When the machine has ended that turn itself (the echo of its own `send`
@@ -212,7 +269,15 @@ final class HotkeyMonitor {
     func turnEnded() { send(.abandon(turn: ownerTurn)) }
 
     /// Sleep or wake: an open turn is cancelled, and nothing begins until every key is up.
-    func interrupt() { send(.interrupt(live: liveModifiers())) }
+    /// A Right Command press whose key-up was lost is cleared, so the next tap is a new press.
+    func interrupt() {
+        let wasRecovered = recoveredHold
+        recoveredHold = false
+        rightCommandDown = false
+        _ = rightCommand.hardwareRightCommandUp(at: now())
+        send(.interrupt(live: liveModifiers()))
+        if wasRecovered { onRelease?() }
+    }
 
     /// A key the monitor reads changed (a setting, VoiceOver): one tick so a turn the change ends is ended at once, as turning the
     /// second key off in the middle of a hands-free turn must.
@@ -249,8 +314,128 @@ final class HotkeyMonitor {
     }
 
     private func tick() {
+        recoverMissedModifierUps()
         lookForALauncherSpace()
         send(.tick(at: now(), live: liveModifiers()))
+        finishRecoveredHoldIfReleased()
+    }
+
+    /// Coming forward from System Settings is when a grant usually appears. Arm then, not only on the 3 s poll.
+    private func observeActivation() {
+        guard activeObserver == nil else { return }
+        activeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.recoverKeyAccessIfGranted() }
+        }
+    }
+
+    /// Accessibility or Input Monitoring is on. Arm the global monitors once and drop a stuck press.
+    func recoverKeyAccessIfGranted() {
+        guard started, KeyListenAccess.granted else { return }
+        waitingForKeys = false
+        performListen(listenRecovery.send(.granted))
+    }
+
+    private func performListen(_ effects: [KeyListenRecovery.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .armMonitors:
+                startGlobal()
+            case .announceMissing:
+                onListenAccessMissing?()
+            case .clearStuckPress:
+                interrupt()
+            }
+        }
+    }
+
+    private func finishRecoveredHoldIfReleased() {
+        guard recoveredHold else { recoveredPoll = false; return }
+        guard let key = keyProvider(), let live = liveModifiers() else { return }
+        if live.isSuperset(of: key.modifiers) {
+            guard !recoveredPoll else { return }
+            recoveredPoll = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.recoveredPoll = false
+                    self?.finishRecoveredHoldIfReleased()
+                }
+            }
+            return
+        }
+        recoveredPoll = false
+        recoveredHold = false
+        onRelease?()
+    }
+
+    /// A flags repeat while both sides are down and the hardware still holds this side. Dropping it
+    /// keeps the right-hand key from looking released.
+    private func dropStillHeldRepeat(_ event: ShortcutEvent) -> Bool {
+        guard let modifierIsDown, case .flags(let code, let mods) = event else { return false }
+        return ModifierFlagsRepeat.isHardwareStillDown(
+            keyCode: code, modifiers: mods, deviceKeys: pair.keys.deviceKeys, hardwareDown: modifierIsDown)
+    }
+
+    /// Modifier key-ups the event stream missed. Each one is fed as the flags event the release would have been.
+    private func recoverMissedModifierUps() {
+        guard let modifierIsDown else { return }
+        let missed = ModifierFlagsRepeat.missedReleases(
+            deviceKeys: pair.keys.deviceKeys, flagModifiers: pair.keys.flagModifiers, hardwareDown: modifierIsDown)
+        for event in missed {
+            feed(event, at: now())
+        }
+        if rightCommandDown, !modifierIsDown(RightCommandTap.rightKeyCode) {
+            rightCommandDown = false
+            _ = rightCommand.hardwareRightCommandUp(at: now())
+        }
+    }
+
+    /// A solo right Command tap is Murmur. Talk does not start from it. While a talk turn is open the tap is discarded.
+    private func driveRightCommand(_ event: ShortcutEvent, at now: TimeInterval) {
+        let owns = pair.owner != nil
+        if owns, !rightCommandHoldOwned {
+            _ = rightCommand.holdOwnsKeyboard()
+        } else if !owns, rightCommandHoldOwned {
+            rightCommand.holdReleasedKeyboard()
+        }
+        rightCommandHoldOwned = owns
+        let keys = rightCommandState
+        switch event {
+        case .flags(let code, _):
+            if code != RightCommandTap.rightKeyCode, rightCommandDown, keys.deviceKeys.contains(code) {
+                _ = rightCommand.otherKey()
+            }
+            if code == RightCommandTap.leftKeyCode {
+                if keys.deviceKeys.contains(code) { _ = rightCommand.leftDown(at: now) }
+                else { _ = rightCommand.leftUp(at: now) }
+                return
+            }
+            guard code == RightCommandTap.rightKeyCode else { return }
+            let down = keys.deviceKeys.contains(code)
+            if down, !rightCommandDown {
+                rightCommandDown = true
+                let leftDown = keys.deviceKeys.contains(RightCommandTap.leftKeyCode)
+                let other = leftDown || !keys.keysDown.isEmpty || !keys.modifiers.subtracting(.command).isEmpty
+                _ = rightCommand.rightDown(at: now, otherKeyDown: other)
+            } else if !down, rightCommandDown {
+                rightCommandDown = false
+                applyRightCommand(rightCommand.rightUp(at: now))
+            }
+        case .keyDown:
+            _ = rightCommand.otherKey()
+        case .keyUp:
+            break
+        }
+    }
+
+    /// Murmur belongs to the dictation monitor, which already saw this key. Starting talk here would be a second action.
+    private func applyRightCommand(_ signals: [RightCommandTap.Signal]) {
+        for signal in signals {
+            switch signal {
+            case .murmur:
+                break
+            }
+        }
     }
 
     // MARK: Effects
@@ -298,6 +483,11 @@ final class HotkeyMonitor {
                 ownerTurn = turn
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut down (\(heard.key?.title ?? "none"))")
+                if role == .talk {
+                    rightCommand.noteSession(listening: true)
+                    cues?.preload()
+                    cues?.playStart()
+                }
                 if onPress?() == false { send(.abandon(turn: turn)) }
             case .send:
                 // A launcher or another app may hold Option-Space (Carbon cannot see it): a Space the system reports down at the release
@@ -309,10 +499,18 @@ final class HotkeyMonitor {
                 } else {
                     onRelease?()
                 }
+                if role == .talk {
+                    rightCommand.noteSession(listening: false)
+                    cues?.playEnd()
+                }
             case .cancel:
                 launcherSpaceSeen = false
                 VoiceLog.log("key", "\(role == .talk ? "talk" : "dictation") shortcut (\(heard.key?.title ?? "none")) became another shortcut: cancelled, nothing sent")
                 onCancel?()
+                if role == .talk {
+                    rightCommand.noteSession(listening: false)
+                    cues?.playEnd()
+                }
             case .refused:
                 onBlocked?("VoiceOver is using Control and Option. Record another shortcut in ZEUS Settings.")
             case .wake(let after):

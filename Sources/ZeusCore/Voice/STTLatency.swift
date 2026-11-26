@@ -16,6 +16,8 @@ public enum STTFailure: String, Equatable, Sendable {
     case emptyText = "empty_text"
     case hang
     case timeout
+    /// The person or the policy stopped the turn. This is not a hang.
+    case aborted
 }
 
 /// One turn's stage clock. Missing stages stay absent and print as `-`.
@@ -233,7 +235,7 @@ public struct STTFailureLedger: Equatable, Sendable {
     public func line(_ path: STTPath) -> String {
         let count = attempts[path] ?? 0
         let bad = failed[path] ?? 0
-        return "failure_rate path=\(path.rawValue) attempts=\(count) failures=\(bad) rate=\(String(format: "%.3f", rate(path)))"
+        return "failure_rate path=\(path.rawValue) attempts=\(count) failed_turns=\(bad) rate=\(String(format: "%.3f", rate(path)))"
     }
 }
 
@@ -244,6 +246,8 @@ public struct STTLiveTurn: Equatable, Sendable {
     public private(set) var trace: STTLatencyTrace
     public private(set) var failure: STTFailure = .none
     public private(set) var taskCancelled = false
+    /// Clock time of a mid-stream abort. Nil until `abort` runs.
+    public private(set) var abortedAtMs: Int?
     public private(set) var hasText = false
     public private(set) var heardSpeech = false
     private var lastVoicedMs: Int?
@@ -317,6 +321,16 @@ public struct STTLiveTurn: Equatable, Sendable {
             }
         }
         return fired
+    }
+
+    /// Stop the open turn on this clock sample. The task is cancelled here, so the gap is zero
+    /// on the injected clock and cannot grow into a hang.
+    public mutating func abort(clock: STTClock) {
+        guard !concluded else { return }
+        concluded = true
+        taskCancelled = true
+        abortedAtMs = clock.nowMs
+        failure = .aborted
     }
 
     /// Key release, or the second Murmur tap. That is the endpoint when silence has not already ended the turn.
@@ -515,9 +529,26 @@ public enum STTFileGiveUp {
     }
 }
 
-/// One file recognition. Non-final partials are kept.
-/// The give-up settles with the latest partial and the caller cancels the task.
-/// A later cancel callback does not replace that text. Empty text is still no speech.
+/// One completion for a recognition callback and its give-up timer.
+/// Foundation's lock, so the app file that only imports `os` does not name `NSLock`.
+public final class STTOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
+    public init() {}
+
+    public func run(_ body: () -> Void) {
+        lock.lock()
+        if done {
+            lock.unlock()
+            return
+        }
+        done = true
+        lock.unlock()
+        body()
+    }
+}
+
 public final class STTFileRecognition: @unchecked Sendable {
     private let lock = NSLock()
     private var partial = ""
@@ -576,6 +607,95 @@ public final class STTFailureLog: @unchecked Sendable {
         let line = ledger.line(path)
         lock.unlock()
         return line
+    }
+}
+
+/// Acceptance ceilings for local on-device speech to text.
+/// The production waits stay tighter: 450 ms after the endpoint, and an 800 ms hang give-up.
+/// These ceilings do not open a server round trip. A desktop timing run is still required
+/// before a physical median can be claimed.
+public enum STTAcceptance {
+    /// Warm model: first partial, milliseconds from key-down.
+    public static let warmFirstPartialMs = 1_500
+    /// Warm model: final, milliseconds after the end of a 3 to 5 second utterance.
+    public static let warmFinalMs = 3_000
+    public static let warmUtteranceMinMs = 3_000
+    public static let warmUtteranceMaxMs = 5_000
+    /// Cold model: first final, milliseconds from key-down.
+    public static let coldFirstFinalMs = 8_000
+    /// Mid-stream abort finishes within this many milliseconds of the abort mark.
+    public static let abortMs = 1_400
+    public static let minimumRuns = 5
+
+    public static func utteranceInRange(_ ms: Int) -> Bool {
+        ms >= warmUtteranceMinMs && ms <= warmUtteranceMaxMs
+    }
+}
+
+/// One synthetic turn. Times are milliseconds on the injected clock. No audio samples.
+public struct STTTimingSample: Equatable, Sendable {
+    public var utteranceMs: Int
+    public var firstPartialMs: Int
+    /// Milliseconds from the end of the utterance to the final.
+    public var finalAfterUtteranceMs: Int
+    public var cold: Bool
+
+    public init(utteranceMs: Int, firstPartialMs: Int, finalAfterUtteranceMs: Int, cold: Bool = false) {
+        self.utteranceMs = utteranceMs
+        self.firstPartialMs = firstPartialMs
+        self.finalAfterUtteranceMs = finalAfterUtteranceMs
+        self.cold = cold
+    }
+}
+
+public enum STTTimingScore {
+    /// Lower median. An even count uses the lower of the two middle values.
+    public static func median(_ values: [Int]) -> Int? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        return sorted[(sorted.count - 1) / 2]
+    }
+
+    /// Warm local speech to text: first partial at or under 1.5 s and final at or under 3 s,
+    /// median of at least five runs, each a 3 to 5 second utterance.
+    public static func warmPasses(_ samples: [STTTimingSample]) -> Bool {
+        guard samples.count >= STTAcceptance.minimumRuns else { return false }
+        guard samples.allSatisfy({ !$0.cold && STTAcceptance.utteranceInRange($0.utteranceMs) }) else { return false }
+        guard let partial = median(samples.map(\.firstPartialMs)),
+              partial <= STTAcceptance.warmFirstPartialMs else { return false }
+        guard let final = median(samples.map(\.finalAfterUtteranceMs)),
+              final <= STTAcceptance.warmFinalMs else { return false }
+        return true
+    }
+
+    public static func coldFirstFinalPasses(ms: Int) -> Bool {
+        ms >= 0 && ms <= STTAcceptance.coldFirstFinalMs
+    }
+
+    public static func abortPasses(requestedAtMs: Int, finishedAtMs: Int) -> Bool {
+        let gap = finishedAtMs - requestedAtMs
+        return gap >= 0 && gap <= STTAcceptance.abortMs
+    }
+}
+
+public enum STTFault: String, Equatable, Sendable {
+    case micDenied = "mic_denied"
+    case engineUnavailable = "engine_unavailable"
+}
+
+/// What the caller gets instead of waiting. Recoverable faults ask for another try.
+public struct STTFaultAnswer: Equatable, Sendable {
+    public var fault: STTFault
+    public var recoverable: Bool
+    public var retry: Bool
+    /// True only when the turn would wait with no error.
+    public var hangs: Bool
+}
+
+public enum STTFaultGate {
+    /// A denied microphone or a missing engine returns at once and may be tried again.
+    public static func answer(_ fault: STTFault) -> STTFaultAnswer {
+        STTFaultAnswer(fault: fault, recoverable: true, retry: true, hangs: false)
     }
 }
 
