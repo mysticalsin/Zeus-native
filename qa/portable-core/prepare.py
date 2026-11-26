@@ -80,11 +80,11 @@ GROUPS = {
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
              "Dictation/SpokenDictationMarkup.swift", "Dictation/TranscriptionEngine.swift", "Dictation/WhisperPromptRecovery.swift",
              "Dictation/ThinkingOrbMath.swift", "Dictation/FocusedFieldWrite.swift",
-             "Voice/UltronVoiceSignal.swift", "Voice/STTLatency.swift", "Voice/CommandHotkeyAccess.swift",
+             "Voice/UltronVoiceSignal.swift", "Voice/STTLatency.swift", "Voice/STTFlushLines.swift", "Voice/CommandHotkeyAccess.swift",
              "Recordly/RecordlyCaptureTimeline.swift", "Mac/DriveTypingFlow.swift"),
         tests("DictationExplicitCorrectionTests", "DictationQAFixTests", "SpeechEngineCatalogTests",
               "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests",
-              "ThinkingOrbMathTests", "STTLatencyTests", "CommandDictatePathTests"),
+              "ThinkingOrbMathTests", "STTLatencyTests", "STTFlushLinesTests", "CommandDictatePathTests"),
     ),
     "scribe": (
         core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift",

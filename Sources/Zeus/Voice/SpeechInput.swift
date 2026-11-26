@@ -105,6 +105,14 @@ final class SpeechInput: @unchecked Sendable {
     }
     /// Core Audio UID of the microphone to use; nil follows the system input.
     var deviceUID: String?
+    /// `talk-hold` or `murmur-tap`. The flush lines carry this word and no transcript.
+    var sttPathName = STTFlushLines.talkHold
+    private var sttGeneration = 0
+    private var sttFlushed = true
+    private var sttArmedUptime: TimeInterval?
+    private var sttCaptureStart = "-"
+    private var sttAttempts = 0
+    private var sttFailed = 0
     /// A chosen device was applied, so dropping the choice must point back at the system input.
     private var usedDevice = false
 
@@ -250,6 +258,7 @@ final class SpeechInput: @unchecked Sendable {
         finished = false
         Self.resetLiveTapSuppression(suppress: &suppressLiveTap)
         generation += 1
+        armSTTFlushHoldingLock()
         recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
         samples = []
         resampler = recordsSamples ? AudioSamples.Resampler(from: format) : nil
@@ -297,6 +306,7 @@ final class SpeechInput: @unchecked Sendable {
         }
         if !traceArmed { noteKeyDown(path: .talkHold) }
         markTrace(.captureStart)
+        markSTTCapture()
         closeCaptureIfNotOwned(capture, session: current)
         return current
     }
@@ -472,6 +482,7 @@ final class SpeechInput: @unchecked Sendable {
         finished = false
         suppressLiveTap = true
         generation += 1
+        armSTTFlushHoldingLock()
         recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
         samples = []
         resampler = nil
@@ -480,6 +491,7 @@ final class SpeechInput: @unchecked Sendable {
         beginRecognition(request: request, recognizer: activeRecognizer,
                          turn: RecognitionTurn(sessionID: current, origin: controllerGeneration))
         markTrace(.captureStart)
+        markSTTCapture()
         return current
     }
 
@@ -737,6 +749,7 @@ final class SpeechInput: @unchecked Sendable {
     /// `waitForFinal: false` returns Apple's latest partial words at once (a local model makes the
     /// final text, so release must not wait for Apple's second pass).
     func stop(waitForFinal: Bool = true) async -> String {
+        defer { flushSTTLines(cancelled: false) }
         let (session, capture, owner) = lock.withLock { () -> (Int, Capture, Int) in
             stopRequested = true
             return (generation, takeCapture(), armedGeneration)
@@ -797,6 +810,7 @@ final class SpeechInput: @unchecked Sendable {
         release(capture)
         oldTask?.cancel()
         finish()
+        flushSTTLines(cancelled: true)
         return true
     }
 
@@ -1033,6 +1047,49 @@ final class SpeechInput: @unchecked Sendable {
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1_600) else { return nil }
         buffer.frameLength = 1_600
         return buffer
+    }
+
+    /// Arms one flush generation. Holds `lock`. A later cancel still writes the lines.
+    private func armSTTFlushHoldingLock() {
+        sttGeneration += 1
+        sttFlushed = false
+        sttArmedUptime = ProcessInfo.processInfo.systemUptime
+        sttCaptureStart = "-"
+    }
+
+    private func markSTTCapture() {
+        lock.withLock {
+            guard sttGeneration > 0, !sttFlushed, sttCaptureStart == "-" else { return }
+            sttCaptureStart = String(sttElapsedHoldingLock())
+        }
+    }
+
+    /// Writes `stt-latency` and `stt-failure` into voice.log before returning.
+    /// One generation writes once. Generation zero writes nothing.
+    private func flushSTTLines(cancelled: Bool) {
+        let lines: [STTVoiceLogLine]? = lock.withLock {
+            guard sttGeneration > 0, !sttFlushed else { return nil }
+            sttFlushed = true
+            let transcript = latest.trimmingCharacters(in: .whitespacesAndNewlines)
+            let textLanded = !recognizesFlag || !transcript.isEmpty
+            let failure = STTFlushLines.failureWord(cancelled: cancelled, textLanded: textLanded)
+            sttAttempts += 1
+            if failure != "none" { sttFailed += 1 }
+            return STTFlushLines.details(
+                generation: sttGeneration, cancelled: cancelled, path: sttPathName,
+                captureStart: sttCaptureStart, deliveredToUI: String(sttElapsedHoldingLock()),
+                failure: failure, attempts: sttAttempts, failedTurns: sttFailed)
+        }
+        guard let lines else { return }
+        for line in lines {
+            VoiceLog.flush(line.stage, line.detail)
+        }
+    }
+
+    private func sttElapsedHoldingLock() -> Int {
+        let now = ProcessInfo.processInfo.systemUptime
+        let start = sttArmedUptime ?? now
+        return max(0, Int(((now - start) * 1000).rounded()))
     }
 
     private func finish(ifSession session: Int, recognizerFinished: Bool, owner: Int) {

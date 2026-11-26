@@ -8856,6 +8856,18 @@
         "file": "Tests/ZeusCoreTests/RightOptionHoldTests.swift",
         "function": "aHeldRightOptionListensAfterTheBarIsAlreadyUp"
       }
+    },
+    {
+      "id": "REG-1005",
+      "failure": "A packaged speech turn flushed zero stt-latency and stt-failure lines. The open path cancelled the utterance before delivery, and the delivery gate then refused generation writes, so voice.log never received either line.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTFlushLinesTests.swift",
+        "function": "aCancelledOpenStillFlushesBothTipLines"
+      }
     }
   ]
 }
