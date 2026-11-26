@@ -115,6 +115,9 @@ class ReleaseScripts(unittest.TestCase):
             (self.root / "extension" / name).mkdir(parents=True)
         for name in ("manifest.json", "popup.html"):
             (self.root / "extension" / name).write_text("fixture")
+        licenses = self.root / "LICENSES"
+        licenses.mkdir()
+        (licenses / "jarvis2.0-LICENSE").write_text("jarvis-license-fixture")
         output = self.root / "swift-output"
         output.mkdir()
         for name in ("Zeus", "zeus-hook", "zeus-bridge", "zeus-cli"):
@@ -166,6 +169,7 @@ class ReleaseScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         resources = self.root / "build/Zeus.app/Contents/Resources"
         self.assertTrue((resources / "Zeus_Zeus.bundle/resource.txt").is_file())
+        self.assertEqual((resources / "jarvis2.0-LICENSE").read_text(), "jarvis-license-fixture")
         self.assertEqual(sorted(p.name for p in resources.glob("*Tests.bundle")), [])
 
     def test_release_requires_identity_and_profile_before_build(self):
