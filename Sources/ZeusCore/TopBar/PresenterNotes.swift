@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
 
 /// One slide's speaker notes.
 public struct SlideNotes: Equatable, Sendable {
@@ -41,20 +44,21 @@ public struct PresenterDeck: Equatable, Sendable {
 
     /// The teleprompter script: a cue per slide (`# 3 · Roadmap`), then its notes. Slides
     /// without notes keep their cue so the slide count stays in step.
+    /// A zero-width space stays. The blank check is read from `PresenterNotesBox`.
     public var script: String {
         slides.map { slide in
-            let title = slide.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = PresenterNotesBox.trimmedText(slide.title)
             let cue = "# \(slide.number)" + (title.isEmpty ? "" : " · \(title.replacingOccurrences(of: "\n", with: " "))")
-            let notes = slide.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            let notes = PresenterNotesBox.trimmedText(slide.notes)
             return notes.isEmpty ? cue : cue + "\n" + notes
         }.joined(separator: "\n\n")
     }
 
     public var slideCount: Int { slides.count }
 
-    /// Whether any slide has speaker notes.
+    /// Whether any slide has speaker notes. Named blanks are empty. A zero-width space counts.
     public var hasNotes: Bool {
-        slides.contains { !$0.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        slides.contains { !PresenterNotesBox.trimmedText($0.notes).isEmpty }
     }
 
     public func slide(_ number: Int) -> SlideNotes? { slides.first { $0.number == number } }
@@ -65,7 +69,7 @@ public struct PresenterDeck: Equatable, Sendable {
     /// One slide's notes as a prompter script. No cue line: the prompter shows the slide
     /// number and the next slide's title above the text instead.
     public func script(forSlide number: Int) -> String {
-        slide(number)?.notes.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        slide(number).map { PresenterNotesBox.trimmedText($0.notes) } ?? ""
     }
 
     /// "Slide 7/24".
@@ -74,7 +78,7 @@ public struct PresenterDeck: Equatable, Sendable {
     /// The small cue for what comes next: "Next: Roadmap", "Next: slide 8", or "Last slide".
     public func nextCue(after number: Int) -> String {
         guard let next = slide(after: number) else { return "Last slide" }
-        let title = next.title.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = PresenterNotesBox.trimmedText(next.title.replacingOccurrences(of: "\n", with: " "))
         return title.isEmpty ? "Next: slide \(next.number)" : "Next: \(title)"
     }
 
@@ -85,7 +89,7 @@ public struct PresenterDeck: Equatable, Sendable {
     }
 
     static func baseName(_ name: String) -> String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = PresenterNotesBox.trimmedText(name)
         let lower = trimmed.lowercased()
         for ext in [".key", ".pptx", ".pptm", ".ppt", ".ppsx", ".pps", ".potx"] where lower.hasSuffix(ext) {
             return String(trimmed.dropLast(ext.count))
