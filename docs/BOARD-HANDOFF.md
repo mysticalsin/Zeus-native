@@ -1,19 +1,18 @@
 # Board handoff
 
-Updated 2026-11-26, 16:41 America/Sao_Paulo. The drafts whose base was `main` and whose files did not clash were merged. `main` is now `08dce0e9882bfc231ec88c0fb0a0231bd32dc149`.
+Updated 2026-11-26, 19:59 America/Sao_Paulo. Every pull request whose base was `main` is merged. `main` is now `0da69d62ff10ac37a0b4b6cf0c5ac3f3beabcd3f`.
 
-Still open against `main`, because they edit the same files and Git cannot combine them without a manual resolution:
+These were resolved by hand and landed. Where both sides added behavior, both stayed:
 
-- #419 notch hover
-- #418 agent choice dismiss
-- #406 approval preview
-- #403 speech-to-text lines
-- #401 Right Option hold
-- #249 Command dictation
-- #19 voice-key walk bound
-- #12 voice-key walk socket tests
+- #419 notch hover, #406 approval preview, and #12 socket tests (already on `main` before this pass)
+- #418 agent choice dismiss, at `161a13a322709d00b5628e7d204f7fa091a1f897` (halt and the peer choice card)
+- #169 first playback chunk and #125 provider stop, at `14c6b5609295ee723a5da7b464dafa6da82f285c` and `6796c0314b873146337a129a975a1d19ce45577b`
+- #401 Right Option hold, at `6eec8c4b5b072508056026d6f83a9472dfe6d51f`
+- #403 speech-to-text flush lines, at `89c3ee19c94e6322245005c622f0150990448061` (the latency trace on `main` stayed)
+- #19 voice-key walk bound, at `8243690991d910b179c1fcaf0996d78c60f06e21` (the search stops at 1,883,647 states and caches a finished full run)
+- #249 Command dictation was already on `main` at `94ac788c3645697b2628f5c050075b0f858bd78d`. A later sync of that branch had no new work, so `0da69d62ff10ac37a0b4b6cf0c5ac3f3beabcd3f` records the pull request as merged and keeps the current tree.
 
-Pull requests whose base is `codex/integration-20261111` or another feature branch were not merged into `main`. Merging that older line on top of this `main` would replay a different history.
+Pull requests whose base is `codex/integration-20261111` or another feature branch were not merged into `main`. Merging that older line on top of this `main` would replay a different history. About 119 of those still use `codex/integration-20261111` as their base. #348 stays on `zeus-bot/s04-11-deck-notes` for the same reason.
 
 The note below is the earlier record of cards that had no branch of their own.
 
@@ -57,4 +56,4 @@ ZGB-288 is in progress and had no branch at 14:29 America/Sao_Paulo. Another age
 
 1. Read the open pull request for the card. The branch on that pull request is the work.
 2. If this file says the card has no branch, the blocker above is the reason. Do not invent a second copy of an owned file.
-3. Leave `main` where it is. Do not force-push. Do not merge a draft whose proof is still pending.
+3. Do not force-push. Do not merge a pull request whose base is `codex/integration-20261111` or another feature branch into this `main`.
