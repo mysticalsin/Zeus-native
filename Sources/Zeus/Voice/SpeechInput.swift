@@ -121,6 +121,13 @@ final class SpeechInput: @unchecked Sendable {
     private var engine: any CaptureEngine = AVCaptureEngine(AVAudioEngine())
     /// Builds each turn's engine. Tests swap in a fake; production wraps a fresh `AVAudioEngine`.
     var captureEngineFactory: () -> any CaptureEngine = { AVCaptureEngine(AVAudioEngine()) }
+    /// Prepared while listening is enabled. A press reuses it when the input format is still valid.
+    private var warmEngine: (any CaptureEngine)?
+    private var warmth = ListeningEnginePlan()
+    /// Duration marks only. The closure is never given audio or transcript text.
+    var onLatencyStage: (@Sendable (DictationLatency.Stage) -> Void)?
+    private var frameMarked = false
+    private var partialMarked = false
     private var recognizer: SFSpeechRecognizer?
     private let lock = NSLock()
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -207,9 +214,9 @@ final class SpeechInput: @unchecked Sendable {
                                     serverAllowed: allowServerRecognition) else { throw InputError.onDeviceUnavailable }
         }
         cancel()
-        // Fresh engine every turn (see the stored property's comment): avoids the second-turn
-        // silent-audio bug from reusing a stopped engine's input node.
-        let capture = captureEngineFactory()
+        // Reuse the prepared engine while its format is still valid. A stale format after stop
+        // builds a new engine, which is what kept a second hold from coming back silent.
+        let capture = engineForPress()
         let avEngine = (capture as? AVCaptureEngine)?.avEngine
 
         let request = makeRequest(recognizer: activeRecognizer)
@@ -236,6 +243,8 @@ final class SpeechInput: @unchecked Sendable {
         generation += 1
         recorder = SpeechRecorder.reduce(recorder, .started(session: generation)).0
         samples = []
+        frameMarked = false
+        partialMarked = false
         resampler = recordsSamples ? AudioSamples.Resampler(from: format) : nil
         captureDiagnostics = CaptureDiagnostics(deviceName: deviceName, sampleRate: format.sampleRate,
                                                 channels: Int(format.channelCount))
@@ -271,7 +280,10 @@ final class SpeechInput: @unchecked Sendable {
         installTap(on: capture, format: format, session: current, origin: controllerGeneration,
                    policy: capturePolicy, startedAt: startedAt, resampler: turnResampler)
         capture.prepare()
-        do { try capture.start() } catch {
+        do {
+            try capture.start()
+            onLatencyStage?(.micHot)
+        } catch {
             // Only this turn's own engine: a newer turn that replaced it keeps its engine and observer.
             if !cancelTurn(ifSession: current) { release((capture, nil)) }
             throw error
@@ -288,7 +300,13 @@ final class SpeechInput: @unchecked Sendable {
         input.removeInputTap()
         input.installInputTap(format: format) { [weak self] buffer, _ in
             guard let self else { return }
-            self.lock.withLock { if self.generation == current { self.captureDiagnostics.frames += Int(buffer.frameLength) } }
+            let firstFrame = self.lock.withLock { () -> Bool in
+                if self.generation == current { self.captureDiagnostics.frames += Int(buffer.frameLength) }
+                guard self.generation == current, !self.frameMarked, buffer.frameLength > 0 else { return false }
+                self.frameMarked = true
+                return true
+            }
+            if firstFrame { self.onLatencyStage?(.firstFrame) }
             if policy.maximumSeconds != nil {
                 let failure = self.lock.withLock { () -> CaptureFailure? in
                     guard self.generation == current, !self.stopRequested else { return nil }
@@ -494,6 +512,12 @@ final class SpeechInput: @unchecked Sendable {
                     return joined
                 }
                 guard let combined else { return }
+                let streaming = self.lock.withLock { () -> Bool in
+                    guard self.generation == turn.sessionID, !self.stopRequested, !self.partialMarked else { return false }
+                    self.partialMarked = true
+                    return true
+                }
+                if streaming { self.onLatencyStage?(.partial) }
                 turn.emit(combined, legacy: self.onPartial, identified: self.onIdentifiedPartial)
                 if result.isFinal {
                     let nextRequest = self.makeRequest(recognizer: recognizer)
@@ -686,7 +710,10 @@ final class SpeechInput: @unchecked Sendable {
             request?.endAudio()
             return (finished, latest)
         }
-        if alreadyDone || !waitForFinal { return text }
+        if alreadyDone || !waitForFinal {
+            onLatencyStage?(.finalTranscript)
+            return text
+        }
 
         return await withCheckedContinuation { continuation in
             let doneText: String? = lock.withLock {
@@ -695,6 +722,7 @@ final class SpeechInput: @unchecked Sendable {
                 return nil
             }
             if let doneText {
+                onLatencyStage?(.finalTranscript)
                 continuation.resume(returning: doneText)
                 return
             }
@@ -705,7 +733,8 @@ final class SpeechInput: @unchecked Sendable {
             // partial (e.g. "Yeah.") instead of waiting the extra few hundred ms for the real one.
             DispatchQueue.global().asyncAfter(deadline: .now() + 2.5) { [weak self] in
                 guard let self else { return }
-                self.finish(ifSession: session)
+                self.onLatencyStage?(.finalTranscript)
+            self.finish(ifSession: session)
             }
         }
     }
@@ -783,6 +812,29 @@ final class SpeechInput: @unchecked Sendable {
             return buffer
         }
         return status == .error || output.frameLength == 0 ? nil : output
+    }
+
+    /// Prepare the capture graph once. A later press reuses it while the input format stays valid.
+    func armListening() {
+        warmth.arm()
+        guard warmEngine == nil else { return }
+        let prepared = captureEngineFactory()
+        prepared.prepare()
+        warmEngine = prepared
+    }
+
+    /// The engine for this press. Builds only when nothing is prepared or the prepared format is unusable.
+    private func engineForPress() -> any CaptureEngine {
+        if let warmEngine, let format = warmEngine.inputFormat(),
+           Self.validInputFormat(sampleRate: format.sampleRate, channels: format.channelCount) {
+            _ = warmth.press(formatValid: true)
+            return warmEngine
+        }
+        _ = warmth.press(formatValid: false)
+        let fresh = captureEngineFactory()
+        fresh.prepare()
+        warmEngine = fresh
+        return fresh
     }
 
     /// The engine and configuration observer of the turn being stopped.
