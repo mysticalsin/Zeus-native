@@ -3,15 +3,15 @@ import Foundation
 
 /// Decorative companion motion. It never posts a mouse, key, or scroll event.
 public enum CompanionActuation {
-    public static let movesSystemPointer = false
+    public static let movesSystemPointer = CompanionMotionBox.movesSystemPointer
 }
 
 /// Damped follow. Response 0.2 s, damping 0.6, with the velocity kept between frames.
 /// The rest spot is 35 pt to the right and 25 pt down from the pointer (logical units, y down).
 public struct CompanionSpring: Equatable, Sendable {
-    public static let response: Double = 0.2
-    public static let damping: Double = 0.6
-    public static let logicalOffset = CGPoint(x: 35, y: 25)
+    public static let response: Double = CompanionMotionBox.Spring.response
+    public static let damping: Double = CompanionMotionBox.Spring.damping
+    public static let logicalOffset = CGPoint(x: CompanionMotionBox.Spring.offsetX, y: CompanionMotionBox.Spring.offsetY)
 
     public var position: CGPoint
     public var velocity: CGPoint
@@ -23,35 +23,16 @@ public struct CompanionSpring: Equatable, Sendable {
 
     /// `pointer` is AppKit global (y up). Down is a smaller y.
     public static func rest(near pointer: CGPoint) -> CGPoint {
-        CGPoint(x: pointer.x + logicalOffset.x, y: pointer.y - logicalOffset.y)
+        CompanionMotionBox.Spring.rest(near: pointer.motionPoint).cgPoint
     }
 
     /// Section I: "Never" leaves the companion where it is. Always and on-call still track.
-    public static func tracksPointer(_ show: BuddyShow) -> Bool { show != .never }
-
-    public func stepped(toward target: CGPoint, dt: Double, reducedMotion: Bool = false) -> CompanionSpring {
-        guard !reducedMotion else { return CompanionSpring(position: target, velocity: .zero) }
-        guard dt.isFinite, dt > 0 else { return self }
-        let x = Self.axis(position.x, velocity.x, target.x, dt)
-        let y = Self.axis(position.y, velocity.y, target.y, dt)
-        return CompanionSpring(position: CGPoint(x: x.pos, y: y.pos), velocity: CGPoint(x: x.vel, y: y.vel))
+    public static func tracksPointer(_ show: BuddyShow) -> Bool {
+        CompanionMotionBox.Spring.tracksPointer(showIsNever: show == .never)
     }
 
-    /// Underdamped oscillator, displacement measured from `target`.
-    private static func axis(_ pos: Double, _ vel: Double, _ target: Double, _ dt: Double) -> (pos: Double, vel: Double) {
-        let omega = 2 * Double.pi / response
-        let zeta = damping
-        let x0 = pos - target
-        let beta = zeta * omega
-        let omegaD = omega * sqrt(max(0, 1 - zeta * zeta))
-        let decay = exp(-beta * dt)
-        let sine = sin(omegaD * dt)
-        let cosine = cos(omegaD * dt)
-        let swing = (vel + beta * x0) / omegaD
-        let offset = decay * (x0 * cosine + swing * sine)
-        let speed = -beta * offset + decay * omegaD * (-x0 * sine + swing * cosine)
-        guard offset.isFinite, speed.isFinite else { return (target, 0) }
-        return (target + offset, speed)
+    public func stepped(toward target: CGPoint, dt: Double, reducedMotion: Bool = false) -> CompanionSpring {
+        motionSpring.stepped(toward: target.motionPoint, dt: dt, reducedMotion: reducedMotion).companionSpring
     }
 }
 
@@ -73,103 +54,44 @@ public struct CompanionFlight: Equatable, Sendable {
     public var duration: Double
     public var reducedMotion: Bool
 
-    public static let scaleRest: Double = 1
-    public static let scalePeak: Double = 1.3
-    public static let glowRest: Double = 8
-    public static let glowPeak: Double = 14
+    public static let scaleRest: Double = CompanionMotionBox.Flight.scaleRest
+    public static let scalePeak: Double = CompanionMotionBox.Flight.scalePeak
+    public static let glowRest: Double = CompanionMotionBox.Flight.glowRest
+    public static let glowPeak: Double = CompanionMotionBox.Flight.glowPeak
 
     public static func duration(distance: Double, reducedMotion: Bool) -> Double {
-        guard !reducedMotion else { return 0 }
-        let clamped = min(max(distance / 800, 0.6), 1.4)
-        return (clamped * 1000).rounded() / 1000
+        CompanionMotionBox.Flight.duration(distance: distance, reducedMotion: reducedMotion)
     }
 
     public static func plan(from: CGPoint, to: CGPoint, departureTangent: CGPoint? = nil, reducedMotion: Bool = false) -> CompanionFlight {
-        let distance = hypot(to.x - from.x, to.y - from.y)
-        let lift = min(0.2 * distance, 80)
-        let control: CGPoint
-        if let tangent = unit(departureTangent), lift > 0 {
-            control = CGPoint(x: from.x + tangent.x * lift, y: from.y + tangent.y * lift)
-        } else {
-            control = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 + lift)
-        }
-        return CompanionFlight(
-            from: from,
-            control: control,
-            to: to,
-            duration: duration(distance: distance, reducedMotion: reducedMotion),
-            reducedMotion: reducedMotion
-        )
+        CompanionMotionBox.Flight.plan(from: from.motionPoint, to: to.motionPoint,
+                                        departureTangent: departureTangent?.motionPoint,
+                                        reducedMotion: reducedMotion).companionFlight
     }
 
     public func sample(at time: Double) -> CompanionFlightSample {
-        let linear: Double
-        if duration <= 0 { linear = 1 }
-        else { linear = min(max(time / duration, 0), 1) }
-        let eased = linear * linear * (3 - 2 * linear)
-        let position = bezier(eased)
-        let tangent = bezierTangent(eased)
-        let rotation = hypot(tangent.x, tangent.y) > 0.0001 ? atan2(tangent.x, tangent.y) * 180 / .pi : 0
-        let pulse = reducedMotion ? 0 : sin(.pi * linear)
-        return CompanionFlightSample(
-            position: position,
-            rotation: rotation,
-            scale: Self.scaleRest + (Self.scalePeak - Self.scaleRest) * pulse,
-            glow: Self.glowRest + (Self.glowPeak - Self.glowRest) * pulse,
-            progress: linear
-        )
+        let sample = motionFlight.sample(at: time)
+        return CompanionFlightSample(position: sample.position.cgPoint, rotation: sample.rotation,
+                                     scale: sample.scale, glow: sample.glow, progress: sample.progress)
     }
 
     /// A new flight from where this one is now. The current tangent is the departure, so the turn does not snap.
     public func retarget(to newTarget: CGPoint, at time: Double) -> CompanionFlight {
-        let here = sample(at: time).position
-        return Self.plan(from: here, to: newTarget, departureTangent: tangent(at: time), reducedMotion: reducedMotion)
+        motionFlight.retarget(to: newTarget.motionPoint, at: time).companionFlight
     }
 
     /// Fly home along the landing tangent, so the rotation at the target does not pop.
     public func returning(home: CGPoint) -> CompanionFlight {
-        Self.plan(from: to, to: home, departureTangent: tangent(at: duration), reducedMotion: reducedMotion)
+        motionFlight.returning(home: home.motionPoint).companionFlight
     }
 
     /// Shift the whole curve after a display moves. Unchanged duration.
     public func shifted(by delta: CGPoint) -> CompanionFlight {
-        CompanionFlight(
-            from: CGPoint(x: from.x + delta.x, y: from.y + delta.y),
-            control: CGPoint(x: control.x + delta.x, y: control.y + delta.y),
-            to: CGPoint(x: to.x + delta.x, y: to.y + delta.y),
-            duration: duration,
-            reducedMotion: reducedMotion
-        )
+        motionFlight.shifted(by: delta.motionPoint).companionFlight
     }
 
     public func tangent(at time: Double) -> CGPoint {
-        let linear: Double
-        if duration <= 0 { linear = 1 }
-        else { linear = min(max(time / duration, 0), 1) }
-        let eased = linear * linear * (3 - 2 * linear)
-        return bezierTangent(eased)
-    }
-
-    private func bezier(_ t: Double) -> CGPoint {
-        let u = 1 - t
-        return CGPoint(
-            x: u * u * from.x + 2 * u * t * control.x + t * t * to.x,
-            y: u * u * from.y + 2 * u * t * control.y + t * t * to.y
-        )
-    }
-
-    private func bezierTangent(_ t: Double) -> CGPoint {
-        CGPoint(
-            x: 2 * (1 - t) * (control.x - from.x) + 2 * t * (to.x - control.x),
-            y: 2 * (1 - t) * (control.y - from.y) + 2 * t * (to.y - control.y)
-        )
-    }
-
-    private static func unit(_ vector: CGPoint?) -> CGPoint? {
-        guard let vector else { return nil }
-        let length = hypot(vector.x, vector.y)
-        guard length > 0.001, length.isFinite else { return nil }
-        return CGPoint(x: vector.x / length, y: vector.y / length)
+        motionFlight.tangent(at: time).cgPoint
     }
 }
 
@@ -177,7 +99,8 @@ public struct CompanionFlight: Equatable, Sendable {
 public enum DisplayRebase {
     public static func shift(of id: Int, from old: [DisplayMap], to new: [DisplayMap]) -> CGPoint? {
         guard let before = old.first(where: { $0.id == id }), let after = new.first(where: { $0.id == id }) else { return nil }
-        return CGPoint(x: after.frame.minX - before.frame.minX, y: after.frame.minY - before.frame.minY)
+        return CompanionMotionBox.displayShift(oldMinX: Double(before.frame.minX), oldMinY: Double(before.frame.minY),
+                                                newMinX: Double(after.frame.minX), newMinY: Double(after.frame.minY)).cgPoint
     }
 }
 
@@ -298,5 +221,41 @@ public struct ShowMeWhere: Equatable, Sendable {
             ring: ring,
             screenTarget: screen
         )
+    }
+}
+
+private extension CGPoint {
+    var motionPoint: CompanionMotionBox.Point {
+        CompanionMotionBox.Point(x: Double(x), y: Double(y))
+    }
+}
+
+private extension CompanionMotionBox.Point {
+    var cgPoint: CGPoint { CGPoint(x: x, y: y) }
+}
+
+private extension CompanionSpring {
+    var motionSpring: CompanionMotionBox.Spring {
+        CompanionMotionBox.Spring(position: position.motionPoint, velocity: velocity.motionPoint)
+    }
+}
+
+private extension CompanionMotionBox.Spring {
+    var companionSpring: CompanionSpring {
+        CompanionSpring(position: position.cgPoint, velocity: velocity.cgPoint)
+    }
+}
+
+private extension CompanionFlight {
+    var motionFlight: CompanionMotionBox.Flight {
+        CompanionMotionBox.Flight(from: from.motionPoint, control: control.motionPoint, to: to.motionPoint,
+                                   duration: duration, reducedMotion: reducedMotion)
+    }
+}
+
+private extension CompanionMotionBox.Flight {
+    var companionFlight: CompanionFlight {
+        CompanionFlight(from: from.cgPoint, control: control.cgPoint, to: to.cgPoint,
+                        duration: duration, reducedMotion: reducedMotion)
     }
 }
