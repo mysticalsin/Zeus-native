@@ -28,7 +28,7 @@ Two queued cards already have branches:
 | ZGB-17 Animate the push-to-talk top bar | #355 | `zeus-bot/ptt-bar-round-indicator` at `9b4b52220c7ca7937e19fe18082c0df4ded70e3a` |
 | ZGB-19 Read in-browser deck notes in the bar | #348 | `zeus-bot/s04-11-deck-notes` at `6a57ddbbd6bb879d9d41bf37aaf04543a6a148cf` |
 
-#355 stays held until Tony reviews the mock-up. #348 stays held. Do not merge either first.
+#355 was merged onto `main` at `733d9b26a87b83be9373410cf8edcbea2f9857b7`. #348 stays on `zeus-bot/s04-11-deck-notes` and was not merged, because its base is the older integration branch.
 
 Parent cards ZGB-1, ZGB-41, and ZGB-42 do not have a branch of their own. Their child drafts are the pull requests already open.
 
