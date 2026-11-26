@@ -8688,6 +8688,18 @@
         "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
         "function": "anExplainRequestProducesWordsAndAShowcasePlan"
       }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The three-dots row Hide Zeus from screen shares flipped once or twice, then a later click did nothing while the pointer stayed on the row. Menu tracking drops that mouse-up, and a second delivery of the same mouse-up must not flip twice. NSWindow.sharingType's getter also sticks at hidden, so a write that skipped when the getter already matched never hid the windows again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
+        "function": "aClickOnTheRowFlipsHideAndShowEvenWhenThePointerStays"
+      }
     }
   ]
 }
