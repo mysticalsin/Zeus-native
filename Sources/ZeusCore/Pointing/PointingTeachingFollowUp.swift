@@ -7,6 +7,8 @@ import Foundation
 /// speak a shorter line and remove detail ids. "highlight the battery" highlights
 /// the existing `battery`. The motor and battery ids stay. This type does not
 /// create a part, does not apply an edit, and does not open a connection.
+/// The spoken phrase is the one `PointingTeachingFollowUpBox` returns. A zero-width
+/// space stays in that phrase.
 public enum PointingTeachingFollowUp {
     public static let motorID = "motor"
     public static let batteryID = "battery"
@@ -165,11 +167,7 @@ public enum PointingTeachingFollowUp {
     }
 
     private static func command(in utterance: String) -> Command? {
-        var text = utterance.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        if let last = text.last, last == "." || last == "!" || last == "?" {
-            text.removeLast()
-            text = text.trimmingCharacters(in: .whitespaces)
-        }
+        var text = PointingTeachingFollowUpBox.phrase(utterance)
         let please = "please "
         if text.hasPrefix(please) {
             text = String(text.dropFirst(please.count))
