@@ -714,7 +714,7 @@ final class VoiceTurnController {
         VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
         clearDrawingForNewTurn()
         let shot = illustrationShot()
-        let draw = plan.scaled(toWidth: shot.pixelWidth, height: shot.pixelHeight)
+        let draw = plan.scaled(toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
         let token = UUID()
         let surface = presenter
         surface.begin(draw, shot: shot, token: token)
