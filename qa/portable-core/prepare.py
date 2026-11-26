@@ -79,9 +79,11 @@ GROUPS = {
     "regressions": (
         core("Dictation/DictationCore.swift", "Dictation/SpeechEngineCatalog.swift",
              "Dictation/SpokenDictationMarkup.swift", "Dictation/TranscriptionEngine.swift", "Dictation/WhisperPromptRecovery.swift",
-             "Dictation/ThinkingOrbMath.swift", "Voice/UltronVoiceSignal.swift", "Recordly/RecordlyCaptureTimeline.swift", "Mac/DriveTypingFlow.swift"),
+             "Dictation/ThinkingOrbMath.swift", "Voice/UltronVoiceSignal.swift", "Voice/STTLatency.swift",
+             "Recordly/RecordlyCaptureTimeline.swift", "Mac/DriveTypingFlow.swift"),
         tests("DictationExplicitCorrectionTests", "DictationQAFixTests", "SpeechEngineCatalogTests",
-              "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests", "ThinkingOrbMathTests"),
+              "UltronVoiceSignalTests", "RecordlyCaptureTimelineTests", "DriveTypingFlowTests", "WhisperPromptRecoveryTests",
+              "ThinkingOrbMathTests", "STTLatencyTests"),
     ),
     "scribe": (
         core("MeetingCopilot.swift", "TopBar/RecordingMotion.swift", "TopBar/RecordingFeedback.swift",
@@ -156,6 +158,11 @@ GROUPS = {
              "Intent/Utterance.swift", "Dictation/TranscriptionEngine.swift", "ZeusPaths.swift"),
         tests("EqualiserTypesTests", "EqualiserModelTests", "EqualiserDSPTests", "EqualiserCardRulesTests",
               "EqualiserPolicyTests", "EqualiserLifecycleTests", "EqualiserConsentTests"),
+    ),
+    "chimes": (
+        core("Chime/ChimeSession.swift", "Chime/ChimeSettings.swift", "Chime/ChimeSoundResolver.swift",
+             "Chime/ChimeTone.swift", "Chime/ChimeFileAccess.swift"),
+        tests("ChimeTests"),
     ),
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (

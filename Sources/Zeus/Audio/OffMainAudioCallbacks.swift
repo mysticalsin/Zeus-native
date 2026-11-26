@@ -1,5 +1,6 @@
 import AVFAudio
 import Speech
+import ZeusCore
 
 /// Audio and speech callbacks that run on a realtime or background thread.
 ///
@@ -20,14 +21,31 @@ enum OffMainAudioCallbacks {
         }
     }
 
-    /// Runs one recognition and reports only the final text, or the error message, on the main actor.
+    /// Runs one recognition and reports it on the main actor.
+    /// A final is delivered at once. At the give-up the task is cancelled and the latest
+    /// partial is delivered. The text is empty only when no partial arrived.
     nonisolated static func recognizeFinal(_ recognizer: SFSpeechRecognizer, request: SFSpeechRecognitionRequest,
                                            completion: @escaping @MainActor @Sendable (String, String?) -> Void) {
-        recognizer.recognitionTask(with: request) { result, error in
-            guard result?.isFinal == true || error != nil else { return }
-            let text = result?.bestTranscription.formattedString ?? ""
-            let message = error?.localizedDescription
-            DispatchQueue.main.async { MainActor.assumeIsolated { completion(text, message) } }
+        let gate = STTOnce()
+        let heard = STTFileRecognition()
+        let task = recognizer.recognitionTask(with: request) { result, error in
+            let text = heard.note(text: result?.bestTranscription.formattedString,
+                                  isFinal: result?.isFinal == true,
+                                  failed: error != nil)
+            guard let text else { return }
+            let message = text.isEmpty ? error?.localizedDescription : nil
+            gate.run {
+                DispatchQueue.main.async { MainActor.assumeIsolated { completion(text, message) } }
+            }
+        }
+        let giveUp = STTFileGiveUp.seconds(audioMs: STTFileGiveUp.standInAudioMs)
+        DispatchQueue.global().asyncAfter(deadline: .now() + giveUp) {
+            let text = heard.giveUp()
+            task.cancel()
+            guard let text else { return }
+            gate.run {
+                DispatchQueue.main.async { MainActor.assumeIsolated { completion(text, nil) } }
+            }
         }
     }
 }

@@ -8700,6 +8700,30 @@
         "file": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
         "function": "aClickOnTheRowFlipsHideAndShowEvenWhenThePointerStays"
       }
+    },
+    {
+      "id": "REG-993",
+      "failure": "Speech to text waited 2.5 s for a final that often never arrived and left the recognition task running, and an unchanged partial reset the silence endpoint. Talk hold and Murmur tap both did this. On-device recognition could also sit for at least 30 s.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "latencyRegressionBothPathsStayInsideTheBudget"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "File recognition cancelled at the 2 s stand-in and kept only an isFinal result, so a non-final partial was dropped and the file was reported as no speech.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled"
+      }
     }
   ]
 }
