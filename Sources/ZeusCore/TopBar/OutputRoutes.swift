@@ -196,9 +196,10 @@ public enum OutputRouteRules {
         return capped(sorted, locale: locale)
     }
 
-    /// "Bluetooth, current". An empty status is the transport word alone.
+    /// "Bluetooth, current". A status of only named blanks is the transport word alone.
+    /// A zero-width space stays. The blank check is read from `OutputRoutesBox`.
     public static func spokenValue(for route: OutputRoute, status: String) -> String {
-        let tail = status.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tail = OutputRoutesBox.trimmedStatus(status)
         if tail.isEmpty { return route.transport.word }
         return "\(route.transport.word), \(tail)"
     }
