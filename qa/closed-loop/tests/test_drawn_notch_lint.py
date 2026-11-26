@@ -152,15 +152,15 @@ def anchor_has_one_source(text):
 
 
 def view_offset_comes_last(text):
-    """In NotchView.body the one sideways offset is the outermost modifier, after the alert overlay's animation, so
-    the alerts move with the body. `offset` moves drawing and not layout."""
+    """In NotchView.body the one sideways offset is the last modifier, after the alert animation, so the alerts move
+    with the body. The animation may wrap the overlay in a closure. `offset` moves drawing and not layout."""
     view = text[text.index("struct NotchView: View"):]
     body = function_body(view, "var body: some View")
     marker = "value: model.alerts.isEmpty)"
-    if body.count(".offset(x:") != 1 or marker not in body:
+    lines = [line.strip() for line in code_lines(body) if line.strip()]
+    if body.count(".offset(x:") != 1 or marker not in body or not lines:
         return False
-    after = "\n".join(code_lines(body[body.index(marker) + len(marker):])).strip()
-    return after == ".offset(x: NotchAnchor.offset(footprint))"
+    return lines[-1] == ".offset(x: NotchAnchor.offset(footprint))" and body.index(marker) < body.index(".offset(x:")
 
 
 def has_dash(text):

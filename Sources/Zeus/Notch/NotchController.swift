@@ -63,6 +63,14 @@ final class NotchController {
     private var dragMonitors: [Any] = []
     private var dragChangeCount = 0
     private var hoverTask: Task<Void, Never>?
+    /// An agent card asked to peek while a dwell was running or the panel was open.
+    private var deferredAgentPeek = false
+    /// A peek fold asked to close the island while a dwell was running.
+    private var deferredFold = false
+    private var deferredFoldClearsCompletion = false
+    /// Alerts kept off the stack so `isEmpty` does not flip during the expand.
+    private var heldAlerts: [AlertItem] = []
+    private var hoverArmed: Bool { hoverTask != nil || model.hoverExpandArmed }
     /// Injectable for non-capturing app tests. Pinning applies only to the Polyglot page.
     var isPolyglotPinned: () -> Bool = { PolyglotController.shared.isPinned }
     /// The pin rules live in ZeusCore; this only reports the current facts.
@@ -165,8 +173,24 @@ final class NotchController {
     // MARK: Presentation
 
     func show(_ presentation: NotchModel.Presentation) {
+        // A Claude card must not turn a dwell, or an open panel, into a peek. The card is still on the model.
+        if presentation == .peek, NotchHoverNotify.deferAgentPeek(surface: .init(model.presentation), hoverArmed: hoverArmed) {
+            deferredAgentPeek = true
+            deferredFold = false
+            deferredFoldClearsCompletion = false
+            return
+        }
         let opening = presentation == .panel && model.presentation != .panel
         if opening { model.openedAt = Date() }
+        if presentation == .panel {
+            if deferredFoldClearsCompletion { model.completion = nil }
+            deferredFold = false
+            deferredFoldClearsCompletion = false
+            deferredAgentPeek = false
+            hoverTask?.cancel()
+            hoverTask = nil
+            model.hoverExpandArmed = false
+        }
         // NotchView animates width and height on their own springs (Glance's height leads on open).
         model.heightPresentation = presentation
         model.presentation = presentation
@@ -179,6 +203,52 @@ final class NotchController {
         if opening { NotchHaptics.open() }
         updatePanelWatch()
         onPresentationChange(presentation)
+        // Next turn, after this surface change has its own spring. Same-turn insert restarted the size animation.
+        if presentation == .closed {
+            Task { @MainActor [weak self] in self?.flushHeldAlertsIfResting() }
+        }
+    }
+
+    /// The peek's timer. While a dwell is running this waits, so the island is not closed and then opened.
+    /// Explicit `show(.closed)` is unchanged.
+    @discardableResult
+    func foldPeek(clearCompletion: Bool = false) -> Bool {
+        guard model.presentation == .peek else { return false }
+        if NotchHoverNotify.deferPeekFold(surface: .peek, hoverArmed: hoverArmed) {
+            deferredFold = true
+            if clearCompletion { deferredFoldClearsCompletion = true }
+            return false
+        }
+        let clear = clearCompletion || deferredFoldClearsCompletion
+        deferredFold = false
+        deferredFoldClearsCompletion = false
+        if clear { model.completion = nil }
+        show(.closed)
+        return true
+    }
+
+    /// The dwell ended or was cancelled. A panel open clears the same flags itself and does not replay a card.
+    private func disarmHover() {
+        guard hoverArmed || deferredFold || deferredAgentPeek || !heldAlerts.isEmpty else { return }
+        hoverTask?.cancel()
+        hoverTask = nil
+        if model.hoverExpandArmed { model.hoverExpandArmed = false }
+        let fold = deferredFold
+        let clear = deferredFoldClearsCompletion
+        let peek = deferredAgentPeek
+        deferredFold = false
+        deferredFoldClearsCompletion = false
+        deferredAgentPeek = false
+        if peek, model.presentation == .closed {
+            show(.peek)
+            return
+        }
+        if fold, model.presentation == .peek {
+            if clear { model.completion = nil }
+            show(.closed)
+            return
+        }
+        flushHeldAlertsIfResting()
     }
 
     /// While the panel is open the pointer is also checked five times a second; a peek re-reads its click-through. Global mouse monitors go quiet
@@ -288,7 +358,7 @@ final class NotchController {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(5))
                 guard let self, self.model.presentation == .peek, self.model.approval == nil, self.model.completion == nil, self.model.failure == nil else { return }
-                self.show(.closed)
+                self.foldPeek()
             }
         }
     }
@@ -406,20 +476,33 @@ final class NotchController {
                 let over = notificationLineRect(screen).contains(NSEvent.mouseLocation)
                 setIgnoresMouse(!over && ignoresMouseWhileClosed())
                 if !over, model.alerts.isHovered { setAlertHovered(false) }
+                // Leaving the capsule used to keep a dwell that then opened the island under the pointer.
+                if NotchHoverNotify.cancelArmedHover(pointerOnNotification: over, hoverArmed: hoverArmed) {
+                    disarmHover()
+                }
                 if over { return }
             }
             // Click mode: hovering never opens it (openOnClick does).
-            guard NotchOpenRules.opensOnHover(Self.openTrigger) else { hoverTask?.cancel(); hoverTask = nil; return }
+            guard NotchOpenRules.opensOnHover(Self.openTrigger) else { disarmHover(); return }
             // Calibrating the drawn notch: the pointer never opens it, so the shape can be judged in place.
-            guard !drawnNotch.isCalibrating else { hoverTask?.cancel(); hoverTask = nil; return }
-            guard inHotZone(screen) else { hoverTask?.cancel(); hoverTask = nil; return }
+            guard !drawnNotch.isCalibrating else { disarmHover(); return }
+            guard inHotZone(screen) else { disarmHover(); return }
             guard topBar != nil else { show(.panel); return }
             guard hoverTask == nil else { return }
+            model.hoverExpandArmed = true
             hoverTask = Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(Self.openDelayMilliseconds))
                 guard let self, !Task.isCancelled else { return }
                 self.hoverTask = nil
-                if self.inHotZone(screen), self.model.presentation != .panel { self.show(.panel) }
+                guard let screen = self.screen else { self.disarmHover(); return }
+                let onNote = self.model.notificationLine != nil && self.model.presentation == .closed
+                    && self.notificationLineRect(screen).contains(NSEvent.mouseLocation)
+                let surface = NotchHoverNotify.Surface(self.model.presentation)
+                if NotchHoverNotify.commitHover(inHotZone: self.inHotZone(screen), pointerOnNotification: onNote, surface: surface) {
+                    self.show(.panel)
+                } else {
+                    self.disarmHover()
+                }
             }
         case .panel:
             // The teleprompter stays up while you read, wherever the pointer goes; so does the picker.
@@ -506,8 +589,6 @@ final class NotchController {
         let zone = NotchFootprintRules.clickZone(footprint, screenFrame: anchorFrame(screen), topOffset: topOffset)
         guard NotchOpenRules.opensOnClick(trigger: Self.openTrigger, panelIsOpen: model.presentation == .panel,
                                           point: NSEvent.mouseLocation, zone: zone) else { return false }
-        hoverTask?.cancel()
-        hoverTask = nil
         show(.panel)
         return true
     }
@@ -518,8 +599,6 @@ final class NotchController {
         guard model.presentation != .panel else { return }
         guard screen != nil, topBar != nil || !model.sessions.isEmpty || model.approval != nil else { return }
         guard !drawnNotch.isCalibrating else { return }
-        hoverTask?.cancel()
-        hoverTask = nil
         show(.panel)
     }
 
@@ -745,7 +824,17 @@ final class NotchController {
     /// `whileOpen` queues the alert even when the notch is open (a snoozed alert coming back must not be lost); it then
     /// shows, with its full time, when the notch closes.
     func postAlert(_ item: AlertItem, whileOpen: Bool = false) {
-        guard whileOpen || model.presentation == .closed else { return }
+        switch NotchHoverNotify.alertAdmission(surface: .init(model.presentation), hoverArmed: hoverArmed, whileOpen: whileOpen) {
+        case .hold:
+            heldAlerts.append(item)
+        case .drop:
+            break
+        case .post:
+            insertAlert(item)
+        }
+    }
+
+    private func insertAlert(_ item: AlertItem) {
         let result = model.alerts.post(item, now: now())
         if case .added = result {
             // Each alert is announced once, politely; a coalesced duplicate does not repeat it.
@@ -755,6 +844,15 @@ final class NotchController {
             ])
         }
         alertsChanged()
+    }
+
+    /// Posts alerts that waited out a dwell or an open panel. Only once the island is closed and idle,
+    /// so the insert is not in the expand or close transaction.
+    private func flushHeldAlertsIfResting() {
+        guard model.presentation == .closed, !hoverArmed, !heldAlerts.isEmpty else { return }
+        let pending = heldAlerts
+        heldAlerts = []
+        for item in pending { insertAlert(item) }
     }
 
     func dismissNotificationLine() {

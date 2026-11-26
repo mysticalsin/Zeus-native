@@ -84,6 +84,8 @@ final class NotchModel {
     @ObservationIgnored var onCardChange: () -> Void = {}
 
     var presentation: Presentation = .closed
+    /// A hover dwell has started. The alert capsule unmounts for this, before the island's size changes.
+    var hoverExpandArmed = false
     /// The shape's height follows this, set in its own faster transaction (Glance's height leads its
     /// width on open). Nil follows `presentation` (snapshots, tests).
     var heightPresentation: Presentation?
@@ -155,5 +157,15 @@ final class NotchModel {
     var canStopAll: Bool {
         let runs = sessions.map { SupervisedRun(id: $0.id, origin: $0.origin, status: $0.status) }
         return !NotchStopAll.plan(runs, handlers: []).halted.isEmpty
+    }
+}
+
+extension NotchHoverNotify.Surface {
+    init(_ presentation: NotchModel.Presentation) {
+        switch presentation {
+        case .closed: self = .closed
+        case .peek: self = .peek
+        case .panel: self = .panel
+        }
     }
 }
