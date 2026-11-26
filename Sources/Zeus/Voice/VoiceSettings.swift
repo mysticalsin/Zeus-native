@@ -173,6 +173,7 @@ final class VoiceSettings {
         case .elevenLabs: .elevenLabs
         case .openAICompatible: .openAI
         case .gemini: .gemini
+        case .googleCloud: .system
         }
     }
 

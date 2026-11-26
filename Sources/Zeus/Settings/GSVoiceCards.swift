@@ -65,6 +65,8 @@ struct ZeusVoiceCards: View {
                     .accessibilityValue(String(format: "%.0f percent", UltronVoiceEffect.intensity * 100))
             }
             GSDivider()
+            VoiceProvidersCard(embedded: true)
+            GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
                 GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
                     if title == Self.automaticTitle { voice.engineAuto = true }
@@ -306,6 +308,7 @@ struct ZeusVoiceCards: View {
             return "ElevenLabs"
         case .openAICompatible: return "OpenAI-compatible TTS"
         case .gemini: return "Google Gemini TTS"
+        case .googleCloud: return "Google Cloud Text-to-Speech"
         }
     }
 
