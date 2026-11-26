@@ -1,5 +1,15 @@
 import AppKit
 import SwiftUI
+import ZeusCore
+
+/// The Settings root writes this before the glass reads it. Dark until that write, which is today's look.
+enum WindowGlassAppearance {
+    nonisolated(unsafe) static var resolved = WindowGlassPalette.Resolved.dark
+
+    static func install(_ resolved: WindowGlassPalette.Resolved) {
+        self.resolved = resolved
+    }
+}
 
 // Settings, measured on Glance 0.3.1's live Settings window (1080 x 780 pt; screencapture -l,
 // glance-clone-proof/laneb/parity/settings). Sidebar of three groups, a 845 x 722 rounded panel
@@ -9,25 +19,30 @@ enum GS {
     static let size = CGSize(width: 1080, height: 780)
 
     // MARK: Colour
-    static let window = Color(rgb: 20, 22, 27)
-    static let panel = Color(rgb: 31, 32, 37)
-    static let panelStroke = Color(rgb: 53, 54, 59)
-    static let card = Color(rgb: 35, 37, 44)
-    static let cardStroke = Color(rgb: 61, 63, 69)
-    static let separator = Color(rgb: 55, 57, 63)
-    static let text = Color(rgb: 241, 243, 248)
-    static let secondary = Color(rgb: 173, 181, 195)
-    static let selectedFill = Color(rgb: 38, 56, 86)
-    static let selectedText = Color(rgb: 128, 178, 249)
-    static let buttonFill = Color(rgb: 20, 22, 27)
-    static let buttonStroke = Color(rgb: 48, 50, 54)
-    /// Secondary buttons and chips on dark surfaces: a lifted fill and a rim that reads on cards
-    /// (3:1 against the card), with label text above 4.5:1. Use these, not buttonFill, for controls.
-    static let controlFill = Color(rgb: 54, 57, 66)
-    static let controlStroke = Color(rgb: 104, 109, 122)
-    static let controlText = Color(rgb: 232, 235, 242)
-    static let toggleOff = Color(rgb: 89, 91, 97)
-    static let knob = Color(rgb: 230, 231, 232)
+    static var window: Color { paint(\.window) }
+    static var panel: Color { paint(\.panel) }
+    static var panelStroke: Color { paint(\.panelStroke) }
+    static var card: Color { paint(\.card) }
+    static var cardStroke: Color { paint(\.cardStroke) }
+    static var separator: Color { paint(\.separator) }
+    static var text: Color { paint(\.text) }
+    static var secondary: Color { paint(\.secondary) }
+    static var selectedFill: Color { paint(\.selectedFill) }
+    static var selectedText: Color { paint(\.selectedText) }
+    static var buttonFill: Color { paint(\.buttonFill) }
+    static var buttonStroke: Color { paint(\.buttonStroke) }
+    /// Secondary buttons and chips: a lifted fill and a rim, with label text above 4.5:1 on the fill.
+    /// Use these, not buttonFill, for controls.
+    static var controlFill: Color { paint(\.controlFill) }
+    static var controlStroke: Color { paint(\.controlStroke) }
+    static var controlText: Color { paint(\.controlText) }
+    static var toggleOff: Color { paint(\.toggleOff) }
+    static var knob: Color { paint(\.knob) }
+
+    private static func paint(_ key: KeyPath<WindowGlassPalette.Tokens, WindowGlassPalette.RGB>) -> Color {
+        let rgb = WindowGlassPalette.tokens(WindowGlassAppearance.resolved)[keyPath: key]
+        return Color(rgb: Int(rgb.red), Int(rgb.green), Int(rgb.blue))
+    }
 
     // MARK: Geometry
     static let panelFrame = CGRect(x: 218.5, y: 42, width: 845, height: 722)
@@ -253,7 +268,7 @@ extension View {
     @ViewBuilder func snapshotSafeText(_ value: String, placeholder: String = "", secure: Bool = false, multiline: Bool = false) -> some View {
         if TopBarStyle.isSnapshot {
             let shown = value.isEmpty ? placeholder : (secure ? String(repeating: "•", count: min(max(value.count, 1), 14)) : value)
-            let color = value.isEmpty ? Color.white.opacity(0.62) : GS.text
+            let color = value.isEmpty ? GS.secondary : GS.text
             if multiline {
                 Text(shown).foregroundStyle(color).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
@@ -271,8 +286,8 @@ extension View {
             let fraction = range.upperBound > range.lowerBound ? (value - range.lowerBound) / (range.upperBound - range.lowerBound) : 0
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.18))
-                    Capsule().fill(Color.white.opacity(0.75)).frame(width: max(6, geo.size.width * CGFloat(min(max(fraction, 0), 1))))
+                    Capsule().fill(GS.separator)
+                    Capsule().fill(GS.text).frame(width: max(6, geo.size.width * CGFloat(min(max(fraction, 0), 1))))
                 }
             }
             .frame(height: 4)
