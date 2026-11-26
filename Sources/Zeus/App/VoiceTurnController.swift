@@ -31,6 +31,11 @@ final class VoiceTurnController {
     private var sightNotice = ScreenSightNotice()
     /// A drawing from this controller's last answer may still be on screen.
     private var drawActive = false
+    /// Later explain beats. Cancelled when the next turn clears the drawing.
+    private var explainReveal: Task<Void, Never>?
+    /// Sentence start times for the explain pen. Nil until that sentence's audio starts.
+    private var explainAudioStarts: [TimeInterval?] = [nil, nil, nil]
+    private var explainBegan = Date()
 
     /// What one turn really sent, for the tests: the brain request, the route it asked for, and every capture the
     /// turn kept for POINT tags and the drive and walkthrough actions.
@@ -171,6 +176,9 @@ final class VoiceTurnController {
 
     /// Hides the marks of the last answer. A turn that never drew makes no presenter call.
     func clearDrawingForNewTurn() {
+        explainReveal?.cancel()
+        explainReveal = nil
+        explainAudioStarts = [nil, nil, nil]
         guard drawActive else { return }
         drawActive = false
         presenter.clear()
@@ -536,6 +544,10 @@ final class VoiceTurnController {
             return await runTurn(transcript: told, screenshots: [], activeTab: activeTab, turn: turn,
                                  deep: deep, speak: speak, awaitActions: awaitActions, pageText: true)
         }
+        // An explain request is words plus a drawing plan. Drop any speculative model run first.
+        if ExplainShowcase.blocksModelRace(transcript) {
+            ahead.cancel()
+        }
         if let replay = ahead.take(matching: transcript) {
             return await runTurn(transcript: transcript, screenshots: [], activeTab: activeTab, turn: turn,
                                  deep: deep, speak: speak, awaitActions: awaitActions, replay: replay,
@@ -617,6 +629,9 @@ final class VoiceTurnController {
         if let local = await LocalTurns.handle(transcript, topBar: notch.topBar) {
             return speakInstant(local, transcript: transcript, speak: speak)
         }
+        if let showcase = ExplainShowcase.plan(for: transcript) {
+            return presentExplain(showcase, transcript: transcript, speak: speak)
+        }
         // "Ask Scout to ..." goes to that agent, not to command understanding.
         if AgentRouter.route(transcript, agents: AgentStore().profiles()) != nil { return nil }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
@@ -687,6 +702,100 @@ final class VoiceTurnController {
         if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
         remember(transcript, question)
         return TurnResult(spoken: question)
+    }
+
+    /// Speaks the explanation and draws it on the display under the pointer.
+    /// Beat 0 is shown immediately. Later beats follow `ExplainBeatSchedule` even when no voice
+    /// engine starts, so the sequence is not spoken-only and not painted all at once.
+    /// No capture and no model request. `talk.drawOnScreen` still gates a screenshot sent to an
+    /// engine. This path does not send one.
+    private func presentExplain(_ plan: ExplainShowcase, transcript: String, speak: Bool) -> TurnResult {
+        VoiceLog.log("route", "explain-showcase")
+        VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = plan.scaled(toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        let surface = presenter
+        surface.begin(draw, shot: shot, token: token)
+        drawActive = true
+        explainBegan = Date()
+        VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
+        if plan.travels {
+            showPen(plan.penFrame(at: 0), shot: shot, token: token)
+            explainReveal = Task { @MainActor [weak self] in
+                var shown = 0
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let elapsed = Date().timeIntervalSince(self.explainBegan)
+                    guard let frame = plan.penFrame(at: elapsed, audioStarts: self.explainAudioStarts) else { return }
+                    if frame.pointCount != shown {
+                        shown = frame.pointCount
+                        self.showPen(frame, shot: shot, token: token)
+                    }
+                    if frame.finished { break }
+                    try? await Task.sleep(for: .milliseconds(40))
+                }
+                guard !Task.isCancelled else { return }
+                self?.presenter.answerFinished(token: token)
+            }
+        } else {
+            let beats = plan.schedule.indexes
+            if let first = beats.first { surface.reveal(sentence: first, token: token) }
+            explainReveal = Task { @MainActor [weak self] in
+                for beat in beats.dropFirst() {
+                    try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                    guard !Task.isCancelled else { return }
+                    self?.presenter.reveal(sentence: beat, token: token)
+                }
+                guard !Task.isCancelled else { return }
+                self?.presenter.answerFinished(token: token)
+            }
+        }
+        buddy.idle()
+        if speak {
+            for (index, sentence) in plan.sentences.enumerated() {
+                speaker.speak(Self.voiced(sentence), onStart: { [weak self] in
+                    guard let self, index < self.explainAudioStarts.count else { return }
+                    self.explainAudioStarts[index] = Date().timeIntervalSince(self.explainBegan)
+                })
+            }
+        }
+        let spoken = plan.explanation
+        buddy.showCaption(Self.captionTail(spoken))
+        buddy.hideCaption()
+        remember(transcript, spoken)
+        ZeusSound.play(.voiceDone)
+        return TurnResult(spoken: spoken)
+    }
+
+    private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID) {
+        guard let frame else { return }
+        let scaled = ExplainShowcase.scaled(frame.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        presenter.showFrame(scaled, token: token)
+        let bolt = boltScreen(frame.bolt, shot: shot)
+        buddy.flight(to: bolt, label: "trace")
+    }
+
+    /// Canvas point to AppKit global point on the shot's display. Y flips to the bottom-left origin.
+    private func boltScreen(_ point: TalkDraw.Point, shot: ScreenShot) -> CGPoint {
+        let px = point.x * Double(shot.pixelWidth) / ExplainShowcase.canvasWidth
+        let py = point.y * Double(shot.pixelHeight) / ExplainShowcase.canvasHeight
+        let scaleX = max(Double(shot.pixelWidth) / Double(shot.displayFrame.width), 0.001)
+        let scaleY = max(Double(shot.pixelHeight) / Double(shot.displayFrame.height), 0.001)
+        return CGPoint(x: shot.displayFrame.minX + px / scaleX, y: shot.displayFrame.maxY - py / scaleY)
+    }
+
+    /// The display under the pointer, else the main display. The frame is the one
+    /// `TalkVisualPresenter` matches, so the marks land on that screen. JPEG bytes stay empty.
+    private func illustrationShot() -> ScreenShot {
+        let screens = NSScreen.screens
+        let pointer = NSEvent.mouseLocation
+        let chosen = screens.first { $0.frame.contains(pointer) } ?? NSScreen.main ?? screens.first
+        let frame = chosen?.frame ?? CGRect(x: 0, y: 0, width: CGFloat(ExplainShowcase.canvasWidth), height: CGFloat(ExplainShowcase.canvasHeight))
+        let scale = Double(chosen?.backingScaleFactor ?? 1)
+        let pixels = ExplainShowcase.pixelSize(width: Double(frame.width), height: Double(frame.height), scale: scale)
+        return ScreenShot(jpegData: Data(), label: "illustration canvas", pixelWidth: pixels.width, pixelHeight: pixels.height, displayFrame: frame)
     }
 
     private func remember(_ user: String, _ assistant: String) {

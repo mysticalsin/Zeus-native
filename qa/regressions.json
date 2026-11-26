@@ -8676,6 +8676,18 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "An explain request produced neither a spoken explanation nor a talk-draw plan, so the existing drawing surface had nothing local to show.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-explain-showcase",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+        "function": "anExplainRequestProducesWordsAndAShowcasePlan"
+      }
     }
-]
+  ]
 }
