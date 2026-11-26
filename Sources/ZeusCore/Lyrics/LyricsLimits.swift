@@ -20,10 +20,11 @@ public enum LyricsLimits {
     /// A word tag (`<mm:ss.xx>`) is never longer than this; a longer `<...>` stays as text.
     public static let maxWordTagCharacters = 16
 
-    /// `text` cut to `maxLineCharacters`, with the whitespace the cut leaves at its end removed.
+    /// `text` cut to `maxLineCharacters`, with the blanks the cut leaves at either end removed.
+    /// A zero-width space stays. The blank check is read from `LyricsLimitsBox`.
     public static func clipped(_ text: String) -> String {
         guard text.count > maxLineCharacters else { return text }
-        return String(text.prefix(maxLineCharacters)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return LyricsLimitsBox.trimmedLine(String(text.prefix(maxLineCharacters)))
     }
 
     /// `lines` cut to `maxLines`, each line cut to `maxLineCharacters`. The same array when nothing is over a limit.
