@@ -297,7 +297,7 @@ public final class UnixSocketServer: @unchecked Sendable {
             let verifier = peerVerifier, token = peer?.auditToken
             let context = PeerContext { verifier(token) }
             let id = UUID()
-            let connection = Connection(fd: client, context: context) { [weak self] in
+            let connection = Connection(fd: client, context: context, life: context.life) { [weak self] in
                 guard let self else { return }
                 _ = self.lock.withLock { self.connections.removeValue(forKey: id) }
             }
@@ -328,14 +328,23 @@ public final class UnixSocketServer: @unchecked Sendable {
         private enum State { case reading, waiting, writing, closed }
         private let fd: Int32
         private let context: PeerContext
+        private let life: PeerLife
         private let lock = NSLock()
         private let onClose: @Sendable () -> Void
+        private let watchKey = DispatchSpecificKey<Int>()
+        private var watchQueue: DispatchQueue?
         private var state = State.waiting
         private var cancelled = false
+        /// Set before this side shuts the socket down, so that close is not read as a peer selection.
+        private var leaving = false
+        private var watching = false
+        /// The descriptor is closed once, by the watch queue after it has left `poll`, or immediately when no watch exists.
+        private var descriptorClosed = false
 
-        init(fd: Int32, context: PeerContext, onClose: @escaping @Sendable () -> Void) {
+        init(fd: Int32, context: PeerContext, life: PeerLife, onClose: @escaping @Sendable () -> Void) {
             self.fd = fd
             self.context = context
+            self.life = life
             self.onClose = onClose
         }
 
@@ -348,14 +357,69 @@ public final class UnixSocketServer: @unchecked Sendable {
             guard start else { return }
             DispatchQueue.global(qos: .userInitiated).async { [self] in
                 guard let line = UnixSocket.readLine(fd), UnixSocket.boundedMessage(line) else { finish(); return }
-                let deliver = lock.withLock { () -> Bool in
-                    guard !cancelled, state == .reading else { return false }
+                let queue = lock.withLock { () -> DispatchQueue? in
+                    guard !cancelled, state == .reading else { return nil }
                     state = .waiting
-                    return true
+                    // The queue exists before `watching` is visible, so a finish on another thread can hand it the close.
+                    let queue = DispatchQueue(label: "zeus.socket.peer")
+                    queue.setSpecific(key: watchKey, value: 1)
+                    watchQueue = queue
+                    watching = true
+                    return queue
                 }
-                guard deliver else { finish(); return }
+                guard let queue else { finish(); return }
+                queue.async { [self] in watchLoop() }
                 handler(line, context) { [self] in reply($0) }
             }
+        }
+
+        private func watchLoop() {
+            while true {
+                let still = lock.withLock { state == .waiting && !leaving && !cancelled }
+                if !still { return }
+                var descriptor = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+                let result = poll(&descriptor, 1, -1)
+                if result < 0 && errno == EINTR { continue }
+                let stillAfter = lock.withLock { state == .waiting && !leaving && !cancelled }
+                if !stillAfter { return }
+                let hangup = Int16(POLLHUP | POLLERR | POLLNVAL)
+                if result <= 0 || (descriptor.revents & hangup) != 0 {
+                    life.markClosed()
+                    return
+                }
+                var byte: UInt8 = 0
+                #if canImport(Darwin)
+                let count = recv(fd, &byte, 1, MSG_PEEK)
+                #else
+                let count = recv(fd, &byte, 1, Int32(MSG_PEEK))
+                #endif
+                if count == 0 || (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                    life.markClosed()
+                    return
+                }
+                if count > 0 { return }
+            }
+        }
+
+        /// Wake the watch. The watch queue closes the descriptor after `poll` returns, so this thread does not wait.
+        private func endWatch() {
+            guard watching, let queue = watchQueue else { return }
+            lock.withLock { leaving = true }
+            _ = shutdown(fd, Int32(SHUT_RDWR))
+            // On the watch thread, `poll` has already returned. Closing here is the caller's job.
+            if DispatchQueue.getSpecific(key: watchKey) == nil {
+                queue.async { [self] in releaseDescriptor() }
+            }
+        }
+
+        private func releaseDescriptor() {
+            let should = lock.withLock { () -> Bool in
+                guard !descriptorClosed else { return false }
+                descriptorClosed = true
+                return true
+            }
+            guard should else { return }
+            close(fd)
         }
 
         func reply(_ data: Data?) {
@@ -375,6 +439,7 @@ public final class UnixSocketServer: @unchecked Sendable {
             let closeIdle = lock.withLock { () -> Bool in
                 guard state != .closed else { return false }
                 cancelled = true
+                leaving = true
                 _ = shutdown(fd, Int32(SHUT_RDWR))
                 return state == .waiting
             }
@@ -383,13 +448,20 @@ public final class UnixSocketServer: @unchecked Sendable {
         }
 
         private func finish() {
-            let closed = lock.withLock { () -> Bool in
+            let shouldClose = lock.withLock { () -> Bool in
                 guard state != .closed else { return false }
                 state = .closed
-                close(fd)
+                leaving = true
                 return true
             }
-            if closed { onClose() }
+            guard shouldClose else { return }
+            let watched = watching
+            endWatch()
+            // No watch, or this is the watch thread (it has left `poll`): close now. Otherwise the watch queue closes.
+            if !watched || DispatchQueue.getSpecific(key: watchKey) != nil {
+                releaseDescriptor()
+            }
+            onClose()
         }
     }
 }

@@ -8832,6 +8832,18 @@
         "file": "Tests/ZeusCoreTests/PollingWaitTests.swift",
         "function": "aLateWakeUpStillSeesAConditionThatBecameTrueDuringTheStall"
       }
+    },
+    {
+      "id": "REG-1003",
+      "failure": "A choice selected only in the peer app left Zeus's popup open.",
+      "features": [
+        "F12"
+      ],
+      "check": "portable-agent-choice-dismiss",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/AgentChoiceDismissTests.swift",
+        "function": "aPeerSelectClearsTheSameChoice"
+      }
     }
   ]
 }

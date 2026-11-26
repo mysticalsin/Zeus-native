@@ -56,11 +56,11 @@ final class AgentEventServer {
             return await commandHandler(line, peer)
         }
         guard let event = try? JSONDecoder().decode(HookEvent.self, from: line) else { return nil }
-        return await process(event)
+        return await process(event, peer: peer)
     }
 
     /// One agent event from a hook or a log watcher. Returns the reply for decision events.
-    func process(_ event: HookEvent) async -> Data? {
+    func process(_ event: HookEvent, peer: PeerContext? = nil) async -> Data? {
         let sessionID = event.session ?? "unknown"
         // A stop-all already halted this run. Leave any approval card alone and refuse the next ask.
         if notch.isHalted(sessionID), event.event != "SessionEnd" {
@@ -89,6 +89,10 @@ final class AgentEventServer {
         case "PreToolUse", "PostToolUse":
             if event.event == "PostToolUse", event.tool == "AskUserQuestion" {
                 QuestionAnswers.shared.toolResult(session: sessionID, text: event.detail)
+                // The peer app already has the answer. Clear Zeus's copy of that question.
+                if PeerQuestionSelection.chose(detail: event.detail) {
+                    notch.dismissPeerSelection(session: sessionID, tool: event.tool ?? "AskUserQuestion")
+                }
             }
             if let tool = event.tool {
                 notch.upsertSession(id: sessionID, agent: agent, project: project,
@@ -130,7 +134,10 @@ final class AgentEventServer {
                 timeout: .seconds(100),
                 onTimeout: .ask,
                 detail: detail,
-                trust: trust
+                trust: trust,
+                choiceSession: sessionID,
+                sourceTool: event.tool ?? "Tool",
+                peer: peer
             )
             notch.update(sessionID: sessionID, status: verdict == .deny ? .idle : .working)
             peekBriefly()
