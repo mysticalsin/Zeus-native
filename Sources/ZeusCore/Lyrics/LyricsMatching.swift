@@ -28,6 +28,7 @@ public enum LyricsTitle {
     /// A title over `LyricsLimits.maxTitleCharacters` is never cleaned up. Each run of whitespace counts as one
     /// space while the rules run, which keeps the regular expressions from backtracking over long runs; a title
     /// that did lose a suffix comes back with its whitespace collapsed.
+    /// A zero-width space stays. The blank check is read from `LyricsMatchingBox`.
     public static func stripped(_ title: String) -> String {
         guard title.count <= LyricsLimits.maxTitleCharacters else { return title }
         var current = title.split(whereSeparator: \.isWhitespace).joined(separator: " ")
@@ -37,7 +38,7 @@ public enum LyricsTitle {
             for pattern in suffixes {
                 if let range = current.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
                     current.removeSubrange(range)
-                    current = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                    current = LyricsMatchingBox.trimmedText(current)
                     removed = true
                     rounds += 1
                     continue search
@@ -59,11 +60,12 @@ public enum LyricsTitle {
     /// "Earth, Wind & Fire" is unchanged. For the exact-match request, where a half of a group name finds nothing.
     public static func withoutFeaturedArtists(_ artist: String) -> String { head(of: artist, at: featuredSeparators) }
 
+    /// A zero-width space stays in the kept name. The blank check is read from `LyricsMatchingBox`.
     private static func head(of artist: String, at separators: [String]) -> String {
-        let trimmed = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = LyricsMatchingBox.trimmedText(artist)
         let cuts = separators.compactMap { trimmed.range(of: $0, options: .caseInsensitive)?.lowerBound }
         guard let cut = cuts.min() else { return artist }
-        let first = trimmed[..<cut].trimmingCharacters(in: .whitespacesAndNewlines)
+        let first = LyricsMatchingBox.trimmedText(String(trimmed[..<cut]))
         return first.isEmpty ? artist : first
     }
 }
@@ -85,23 +87,25 @@ public struct LyricsCandidate: Equatable, Sendable {
     }
 
     /// What this candidate holds, read the same way as a `/api/get` body.
+    /// A zero-width space stays in the plain body. The blank check is read from `LyricsMatchingBox`.
     public var result: LyricsResult {
         if instrumental { return .instrumental }
         if let syncedText {
             let lines = LRC.parse(syncedText)
             if !lines.isEmpty { return .synced(lines) }
         }
-        if let plainText, !plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .plain(plainText) }
+        if let plainText, !LyricsMatchingBox.trimmedText(plainText).isEmpty { return .plain(plainText) }
         return .none
     }
 }
 
 public extension LRCLIBResponse {
     /// Parses the body of `/api/search`: an array of tracks. Anything unreadable gives an empty list.
+    /// A zero-width space stays in a lyric body. The blank check is read from `LyricsMatchingBox`.
     static func parseSearch(_ data: Data) -> [LyricsCandidate] {
         guard let array = (try? JSONSerialization.jsonObject(with: data)) as? [Any] else { return [] }
         func text(_ value: Any?) -> String? {
-            guard let string = value as? String, !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            guard let string = value as? String, !LyricsMatchingBox.trimmedText(string).isEmpty else { return nil }
             return string
         }
         return array.compactMap { element in
@@ -124,8 +128,9 @@ public enum LyricsMatch {
     public static func window(for duration: Double) -> Double { max(2, duration * 3 / 100) }
 
     /// A title for comparing: trimmed, lower case, curly apostrophes straight so "Don\u{2019}t" matches "Don't".
+    /// A zero-width space stays. The blank check is read from `LyricsMatchingBox`.
     private static func plain(_ title: String) -> String {
-        title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        LyricsMatchingBox.trimmedText(title).lowercased()
             .replacingOccurrences(of: "\u{2018}", with: "'").replacingOccurrences(of: "\u{2019}", with: "'")
     }
 
