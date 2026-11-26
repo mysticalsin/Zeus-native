@@ -123,6 +123,9 @@ public protocol PointingActionSink: AnyObject {
 /// The proposal gate decides whether a model proposal is admissible. This type is the step
 /// after that: show a card, honour cancel, and call the sink only on an accepted ordinary
 /// field. It does not type, click a window, or open a link.
+///
+/// A text or a summary counts as present only when `PointingActionToolsBox` says it has a body.
+/// A zero-width space counts. Named blanks do not. The written text stays as given.
 public struct PointingActionTools: Equatable, Sendable {
     public private(set) var phase: PointingActionPhase = .idle
     private var armed: PointingActionRequest?
@@ -201,7 +204,7 @@ public struct PointingActionTools: Equatable, Sendable {
                 explanation: "That action needs a short summary before I can ask."
             )
         }
-        if request.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !PointingActionToolsBox.hasBody(request.text) {
             return PointingActionRefusal(id: request.id, reason: .emptyText, explanation: "There is no text to put there.")
         }
         if request.text.utf8.count > PointingActionRequest.maxTextBytes {
@@ -234,9 +237,10 @@ public struct PointingActionTools: Equatable, Sendable {
         (1...PointingActionRequest.maxIdentifierBytes).contains(id.utf8.count)
     }
 
+    /// A body of only named blanks is empty. A zero-width space is a summary.
     private static func validSummary(_ summary: String) -> Bool {
         guard (1...PointingActionRequest.maxSummaryBytes).contains(summary.utf8.count) else { return false }
-        return !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return PointingActionToolsBox.hasBody(summary)
     }
 
     private mutating func perform(_ request: PointingActionRequest, sink: any PointingActionSink) {
