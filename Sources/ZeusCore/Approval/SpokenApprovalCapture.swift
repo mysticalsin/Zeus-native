@@ -5,7 +5,7 @@ public enum SpokenApprovalCapture {
     /// The card id to keep. A blank id is the same as no card.
     public static func atSpeechStart(displayedCardID: String?) -> String? {
         guard let displayedCardID else { return nil }
-        let trimmed = displayedCardID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = SpokenApprovalCaptureBox.trimmedCardID(displayedCardID)
         guard !trimmed.isEmpty else { return nil }
         return trimmed
     }
