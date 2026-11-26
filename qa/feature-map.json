@@ -508,7 +508,7 @@
       "id": "portable-keychain",
       "kind": "portable",
       "tier": "contract",
-      "scope": "Exact KeychainStore policy with an in-memory backend and isolated fixture defaults. No macOS Keychain API, secrets, permission prompt or credential UI interaction.",
+      "scope": "Exact KeychainStore policy and AI connection registration with an in-memory backend and isolated fixture defaults. A synthetic connection secret is accepted only by the Keychain store. No macOS Keychain API, live provider call, permission prompt or credential UI interaction.",
       "group": "keychain"
     },
     {
@@ -8219,6 +8219,45 @@
             {
               "file": "Tests/ZeusAppTests/KeychainImportTests.swift",
               "function": "theSavedElevenLabsVoiceCanBeImportedByScripts"
+            }
+          ]
+        },
+        {
+          "id": "F13.ai-connections",
+          "check": "portable-keychain",
+          "acceptance": "The Settings connection list is Cloud Protocol, CLI, Cursor, ElevenLabs API, other model APIs, and voice chat. ElevenLabs is the first registered external voice and uses the existing elevenlabs.api-key slot. A synthetic secret is written only through KeychainStore. Preferences, isolated defaults, diagnostics, a poisoned preference blob, and a refused write do not contain it. No live provider call and no macOS Keychain API.",
+          "cases": [
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "sectionListsTheSixConnectionKinds"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "elevenLabsStaysTheFirstExternalVoice"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "duplicateAndUnsafePlugsAreRejected"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "syntheticSecretStaysInTheKeychainAndOutOfPreferences"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "emptyDraftDoesNotRemoveASavedKey"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "poisonedPreferencesAreReplacedAndNeverEnterTheKeychain"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "refusedWriteLeavesTheDraftOutOfPreferences"
+            },
+            {
+              "file": "Tests/ZeusCoreTests/AIConnectionRegistryTests.swift",
+              "function": "registryFileDoesNotOpenTheNetwork"
             }
           ]
         }
