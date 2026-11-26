@@ -3,7 +3,7 @@ import CoreGraphics
 /// Shared onboarding chrome measurements (QA19: one left edge for the brand mark and headings).
 public enum OnboardingChromeLayout {
     public static let leadingEdge: CGFloat = 48
-    public static let headingTopY: CGFloat = 168
+    public static let headingTopY: CGFloat = CGFloat(OnboardingRowMeasures.headingTopY)
     public static let windowWidth: CGFloat = 960
     public static let windowHeight: CGFloat = 760
     public static let trailingMargin: CGFloat = 32
@@ -15,27 +15,27 @@ public enum OnboardingChromeLayout {
 
     // MARK: Rows (R24: every step's rows and its right-hand visual share one grid)
     /// Heading block (title) height and the gap under it.
-    public static let headingHeight: CGFloat = 44
-    public static let headingToRows: CGFloat = 24
+    public static let headingHeight: CGFloat = CGFloat(OnboardingRowMeasures.headingHeight)
+    public static let headingToRows: CGFloat = CGFloat(OnboardingRowMeasures.headingToRows)
     /// Top of the first row on any step.
-    public static var rowsTopY: CGFloat { headingTopY + headingHeight + headingToRows }
+    public static var rowsTopY: CGFloat { CGFloat(OnboardingRowMeasures.rowsTopY) }
     /// Default distance between row tops (row 61 pt plus the 1 pt divider).
-    public static let rowPitch: CGFloat = 62
+    public static let rowPitch: CGFloat = CGFloat(OnboardingRowMeasures.rowPitch)
 
     /// Vertical extent of `count` rows of `pitch` points, from the first row's top to the last row's bottom.
     public static func rowsBlock(count: Int, pitch: CGFloat = rowPitch) -> (top: CGFloat, height: CGFloat) {
-        (rowsTopY, CGFloat(max(count, 0)) * pitch)
+        let block = OnboardingRowMeasures.rowsBlock(count: count, pitch: Double(pitch))
+        return (CGFloat(block.top), CGFloat(block.height))
     }
 
     /// Window y of the centre of row `index` (0-based).
     public static func rowCenterY(_ index: Int, pitch: CGFloat = rowPitch) -> CGFloat {
-        rowsTopY + CGFloat(index) * pitch + pitch / 2
+        CGFloat(OnboardingRowMeasures.rowCenterY(index, pitch: Double(pitch)))
     }
 
     /// Window y of the centre of the whole rows block.
     public static func rowsMidY(count: Int, pitch: CGFloat = rowPitch) -> CGFloat {
-        let block = rowsBlock(count: count, pitch: pitch)
-        return block.top + block.height / 2
+        CGFloat(OnboardingRowMeasures.rowsMidY(count: count, pitch: Double(pitch)))
     }
 
     /// A step's content reads as balanced when its rows end past this fraction of the space between the
