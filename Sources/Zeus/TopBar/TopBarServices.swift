@@ -317,11 +317,17 @@ final class TopBarServices {
         }
     }
 
-    // MARK: Calendar and reminders (EventKit, asked only from the Calendar page)
+    // MARK: Calendar and reminders (EventKit). Full calendar access is not asked here.
 
     private func requestCalendar() {
         Task { @MainActor in
-            let events = (try? await eventStore.requestFullAccessToEvents()) ?? false
+            let already = EKEventStore.authorizationStatus(for: .event) == .fullAccess
+            let events: Bool
+            if already || !CalendarAccessPolicy.mayRequestFullAccess(.topBar) {
+                events = already
+            } else {
+                events = (try? await eventStore.requestFullAccessToEvents()) ?? false
+            }
             _ = try? await eventStore.requestFullAccessToReminders()
             model.calendarAccess = events ? .granted : .denied
             refreshCalendarIfAllowed()
@@ -349,13 +355,17 @@ final class TopBarServices {
         )
     }
 
-    /// Saves an event on the default calendar. Calendar access is asked for here, the first time someone
-    /// adds an event (the system sheet), and never before.
+    /// Saves an event on the default calendar. Full calendar access is not asked here. Without a grant
+    /// already on the Mac, the save reports that access is needed.
     private func saveEvent(_ parsed: CalendarQuickAdd.Parsed) async -> TopBarModel.EventCreateResult {
         switch EKEventStore.authorizationStatus(for: .event) {
         case .fullAccess:
             break
         case .notDetermined:
+            guard CalendarAccessPolicy.mayRequestFullAccess(.topBar) else {
+                model.calendarAccess = .denied
+                return .needsAccess
+            }
             let granted = (try? await eventStore.requestFullAccessToEvents()) ?? false
             guard granted else { model.calendarAccess = .denied; return .needsAccess }
             model.calendarAccess = .granted
