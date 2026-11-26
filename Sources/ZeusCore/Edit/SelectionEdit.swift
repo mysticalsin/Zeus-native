@@ -79,33 +79,16 @@ public struct SelectionEditSession: Equatable, Sendable {
     }
 }
 
+/// Spoken edits of the current selection. A draft never sends.
+/// Each answer is read from `SelectionEditBox`.
 public enum SelectionRewrite {
     public static func plan(utterance: String, selection: String) -> SelectionEdit? {
-        let trimmed = utterance.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lower = trimmed.lowercased()
-        if lower.hasPrefix("reply to this") {
-            let rest = trimmed.dropFirst("reply to this".count)
-            var body = rest.trimmingCharacters(in: .whitespacesAndNewlines)
-            if body.hasPrefix(".") { body = body.dropFirst().trimmingCharacters(in: .whitespacesAndNewlines) }
-            if body.isEmpty { body = selection }
-            return SelectionEdit(kind: .draft, before: selection, after: String(body), sends: false)
-        }
-        if lower.hasPrefix("insert ") {
-            let body = trimmed.dropFirst("insert ".count).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !body.isEmpty else { return nil }
-            return SelectionEdit(kind: .insert, before: selection, after: body, sends: false)
-        }
-        if lower.contains("shorter") {
-            return SelectionEdit(kind: .replace, before: selection, after: shorter(selection), sends: false)
-        }
-        return nil
+        SelectionEditBox.plan(utterance: utterance, selection: selection)
     }
 
     /// Keeps the first half of the words. No model call.
     public static func shorter(_ text: String) -> String {
-        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
-        guard words.count > 1 else { return text }
-        return words.prefix(max(words.count / 2, 1)).joined(separator: " ")
+        SelectionEditBox.shorter(text)
     }
 }
 
