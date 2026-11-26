@@ -421,6 +421,9 @@ struct NotchView: View {
             if let topBar, model.presentation == .closed, layers.glow, hasNotch || slimPill || !topBar.lights.isEmpty {
                 NotchLights(topBar: topBar, status: status, body_: closedLightBody, shoulder: shoulder)
             }
+            if let steady = topBar?.volumeSteady {
+                VolumeSteadyLightMark(light: steady)
+            }
         }
         .onChange(of: model.status) { old, new in
             guard let topBar, old == .idle, new != .idle, topBar.haloStyle != .off else { return }

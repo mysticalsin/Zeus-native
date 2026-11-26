@@ -472,7 +472,12 @@ final class TopBarModel {
         let light = NotchLightKind.hudLevel(
             kind, value: value, previousLevel: previous.seen ? previous.value : value,
             muted: muted, limitEcho: atLowerBound || atUpperBound)
+        let volumeLightOn = ignoreSettings || SettingsStore.shared.bool(SystemHUDSettings.settingID(for: .volume))
         withAnimation(Motion.reducible(Motion.cueGrow)) {
+            // The wing cue still fades. The steady mark on the black bar does not.
+            if kind == .volume, volumeLightOn {
+                volumeSteady = VolumeSteadyLight(level: value, muted: muted)
+            }
             show(cue)
             flash(light, ignoreSettings: ignoreSettings)
         }
@@ -519,6 +524,8 @@ final class TopBarModel {
         }
     }
     private(set) var lights: [ActiveLight] = []
+    /// Volume up or down leaves this mark on the black bar. It stays after the HUD cue fades.
+    private(set) var volumeSteady: VolumeSteadyLight?
     /// Files are being dragged somewhere on screen: crests climb the arms.
     var isDraggingFiles = false
     /// The mic is listening for a spoken approval answer.
@@ -542,6 +549,10 @@ final class TopBarModel {
         if case .edgeWave(let tint) = kind {
             EdgeWaveController.shared.play(tint: tint, ignoreSettings: ignoreSettings)
             return
+        }
+        // Caps Lock, Shift held alone, and the command peeks travel the screen edge as well as the notch.
+        if let tint = ScreenEdgeKeyLight.tint(for: kind) {
+            EdgeWaveController.shared.play(tint: tint, ignoreSettings: ignoreSettings)
         }
         let duration = kind.duration(speedPercent: SettingsStore.shared.double("halo.speed"))
         if case .hudLevel(let newSystemKind, _, _, _, _) = kind,
