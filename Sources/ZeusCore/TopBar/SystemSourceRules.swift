@@ -123,12 +123,13 @@ public enum SystemSourceRules {
 
     /// Maps a shown item. The position anchors on the service time when that time is inside the last day and not
     /// in the future. Rate 0 is paused. A duration that is missing, zero or not finite cannot seek.
+    /// A zero-width space stays in the app name. The blank check is read from `SystemSourceRulesBox`.
     public static func nowPlaying(_ item: Item, appName: String, receivedAt: Date) -> Shown {
         let duration = finiteNonNegative(item.duration)
         var capabilities: SourceCapabilities = [.playPause, .next, .previous]
         if duration > 0 { capabilities.insert(.seek) }
         let rate = finiteNonNegative(item.rate)
-        let name = appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = SystemSourceRulesBox.trimmedName(appName)
         return Shown(appBundleID: item.app, appName: name.isEmpty ? unknownAppName : name, title: item.title,
                      artist: item.artist, album: item.album, isPlaying: rate > 0, duration: duration,
                      position: finiteNonNegative(item.elapsed), positionAt: anchor(item.at, receivedAt: receivedAt),
