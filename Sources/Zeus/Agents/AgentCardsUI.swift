@@ -15,11 +15,14 @@ final class AgentSettings {
     var quietInFullScreen: Bool { didSet { defaults.set(quietInFullScreen, forKey: "agents.quietFullScreen") } }
     var completionSound: Bool { didSet { defaults.set(completionSound, forKey: "agents.completionSound") } }
     var completionCards: Bool { didSet { defaults.set(completionCards, forKey: "agents.completionCards") } }
+    /// Off until the person turns it on. The notch button works either way.
+    var voiceStop: Bool { didSet { defaults.set(voiceStop, forKey: "agents.voiceStop") } }
 
     private init() {
         quietInFullScreen = defaults.object(forKey: "agents.quietFullScreen") as? Bool ?? true
         completionSound = defaults.object(forKey: "agents.completionSound") as? Bool ?? true
         completionCards = defaults.object(forKey: "agents.completionCards") as? Bool ?? true
+        voiceStop = defaults.object(forKey: "agents.voiceStop") as? Bool ?? false
     }
 }
 
@@ -33,6 +36,9 @@ struct AgentSettingsSection: View {
             Toggle("Show a card when an agent finishes", isOn: Binding(get: { settings.completionCards }, set: { settings.completionCards = $0 }))
             Toggle("Play a sound when an agent finishes", isOn: Binding(get: { settings.completionSound }, set: { settings.completionSound = $0 }))
             Toggle("Stay quiet while an app is full screen", isOn: Binding(get: { settings.quietInFullScreen }, set: { settings.quietInFullScreen = $0 }))
+            Toggle("Stop agents by voice", isOn: Binding(get: { settings.voiceStop }, set: { settings.voiceStop = $0 }))
+            Text("When this is on, saying stop all agents halts runs Zeus started or hooked. A pending approval stays on the notch. The Stop all button works either way.")
+                .font(.callout).foregroundStyle(.secondary)
             Text("In full screen only questions and approvals appear, without sound, because the agent is waiting on them.")
                 .font(.callout).foregroundStyle(.secondary)
             LabeledContent("Question answers") {
@@ -104,6 +110,25 @@ final class AgentTerminals {
     func forget(_ session: String) { bySession[session] = nil }
 
     func info(for session: String) -> TerminalInfo? { bySession[session] }
+
+    /// One interrupt byte to the session's terminal, when the path is a real device. False when it is not.
+    @discardableResult
+    func interrupt(_ session: String) -> Bool {
+        guard let tty = NotchStopAll.interruptDevice(bySession[session]?.tty) else { return false }
+        return Self.writeInterrupt(tty)
+    }
+
+    static func writeInterrupt(_ tty: String) -> Bool {
+        guard NotchStopAll.interruptDevice(tty) != nil else { return false }
+        do {
+            let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: tty))
+            defer { try? handle.close() }
+            try handle.write(contentsOf: Data([0x03]))
+            return true
+        } catch {
+            return false
+        }
+    }
 
     func canJump(to session: String?) -> Bool {
         session.flatMap { bySession[$0]?.targetBundleID } != nil

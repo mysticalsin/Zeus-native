@@ -79,7 +79,7 @@ final class PermissionsModel {
     /// raising the system prompt.
     @MainActor
     struct EventAccess {
-        /// Asks for full access to the kind and answers whether it was granted.
+        /// Asks when this caller may, and answers whether it was granted. Calendar full access is not asked here.
         var request: (Kind) async -> Bool
         /// Called once Calendar full access has just been granted.
         var calendarGranted: () -> Void
@@ -87,10 +87,13 @@ final class PermissionsModel {
         static var live: Self {
             Self(
                 request: { kind in
+                    if kind == .calendar {
+                        if EKEventStore.authorizationStatus(for: .event) == .fullAccess { return true }
+                        guard CalendarAccessPolicy.mayRequestFullAccess(.permissionsDesk) else { return false }
+                        return (try? await EKEventStore().requestFullAccessToEvents()) ?? false
+                    }
                     let store = EKEventStore()
-                    let answer = kind == .calendar ? try? await store.requestFullAccessToEvents()
-                                                   : try? await store.requestFullAccessToReminders()
-                    return answer ?? false
+                    return (try? await store.requestFullAccessToReminders()) ?? false
                 },
                 calendarGranted: { ScribeCallWatcher.shared.follow() }
             )

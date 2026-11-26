@@ -12,9 +12,9 @@ public enum FlickSensitivity: String, CaseIterable, Sendable {
     /// Points per second, measured over the last 80 ms of the drag.
     public var threshold: CGFloat {
         switch self {
-        case .low: return 1800
-        case .normal: return 1200
-        case .high: return 800
+        case .low: return CGFloat(FlingFlickBox.lowThreshold)
+        case .normal: return CGFloat(FlingFlickBox.normalThreshold)
+        case .high: return CGFloat(FlingFlickBox.highThreshold)
         }
     }
 }
@@ -26,20 +26,16 @@ public enum FlickOutcome: Equatable, Sendable {
 }
 
 public enum FlingFlick {
-    public static let window: TimeInterval = 0.08
+    public static let window: TimeInterval = FlingFlickBox.window
 
     /// Points are in screen space with y growing downward, so up is negative y. `peers` counts the Macs a flick may
     /// reach; with none, a fast flick still opens the picker, which lists AirDrop.
     public static func classify(samples: [FlickSample], sensitivity: FlickSensitivity, peers: Int) -> FlickOutcome {
-        guard let last = samples.last else { return .drop }
-        let recent = samples.filter { $0.time >= last.time - window - 1e-9 }
-        guard let first = recent.first, last.time > first.time else { return .drop }
-        let dt = CGFloat(last.time - first.time)
-        let dx = last.point.x - first.point.x, dy = last.point.y - first.point.y
-        guard hypot(dx, dy) / dt >= sensitivity.threshold else { return .drop }
-        if peers <= 0 { return .picker }
-        if peers == 1 { return .send(peerIndex: 0) }
-        if abs(dy) > abs(dx) { return dy < 0 ? .picker : .drop }
-        return .send(peerIndex: dx < 0 ? 0 : peers - 1)
+        let boxed = samples.map { FlickPointBox(time: $0.time, x: Double($0.point.x), y: Double($0.point.y)) }
+        switch FlingFlickBox.classify(samples: boxed, threshold: Double(sensitivity.threshold), peers: peers) {
+        case .drop: return .drop
+        case .picker: return .picker
+        case .send(let peerIndex): return .send(peerIndex: peerIndex)
+        }
     }
 }

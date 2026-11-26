@@ -295,3 +295,27 @@ public enum LanguagePackConsent {
         Set((raw ?? []).compactMap(LanguagePackID.init(rawValue:)))
     }
 }
+
+/// The stored `general.language` choice. Settings keeps the catalog string. English pins the app
+/// to the English pack and ignores the Mac. Any other stored value follows the Mac language list.
+/// A Mac language outside the four packs stays English, because that is the only copy.
+public enum AppLanguagePin {
+    public static let settingID = "general.language"
+    public static let systemChoice = "System language"
+    public static let englishChoice = "English"
+
+    public static func resolve(stored: String?, systemLanguages: [String]) -> LanguagePackID {
+        let choice = stored?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if choice == englishChoice { return .english }
+        return pack(matching: systemLanguages) ?? .english
+    }
+
+    /// First preferred language whose language subtag is one of the four packs.
+    public static func pack(matching languages: [String]) -> LanguagePackID? {
+        for language in languages {
+            let subtag = language.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? ""
+            if let pack = LanguagePackID(rawValue: subtag.lowercased()) { return pack }
+        }
+        return nil
+    }
+}

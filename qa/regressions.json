@@ -2339,7 +2339,7 @@
     },
     {
       "id": "REG-194",
-      "failure": "A rejected Chat switch could leave another conversation’s private history active for submission under the newly selected Chat.",
+      "failure": "A rejected Chat switch could leave another conversation\u2019s private history active for submission under the newly selected Chat.",
       "features": [
         "F09"
       ],
@@ -8676,6 +8676,78 @@
         "file": "Tests/ZeusAppTests/CaptureEngineLifecycleRaceTests.swift",
         "function": "aStopDuringTheEngineStartLeavesTheMicClosedAndNoObserver"
       }
+    },
+    {
+      "id": "REG-991",
+      "failure": "An explain request produced neither a spoken explanation nor a talk-draw plan, so the existing drawing surface had nothing local to show.",
+      "features": [
+        "F11"
+      ],
+      "check": "portable-explain-showcase",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ExplainShowcaseTests.swift",
+        "function": "anExplainRequestProducesWordsAndAShowcasePlan"
+      }
+    },
+    {
+      "id": "REG-992",
+      "failure": "The three-dots row Hide Zeus from screen shares flipped once or twice, then a later click did nothing while the pointer stayed on the row. Menu tracking drops that mouse-up, and a second delivery of the same mouse-up must not flip twice. NSWindow.sharingType's getter also sticks at hidden, so a write that skipped when the getter already matched never hid the windows again.",
+      "features": [
+        "F13"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/ScreenShareAndUpdateTests.swift",
+        "function": "aClickOnTheRowFlipsHideAndShowEvenWhenThePointerStays"
+      }
+    },
+    {
+      "id": "REG-993",
+      "failure": "Speech to text waited 2.5 s for a final that often never arrived and left the recognition task running, and an unchanged partial reset the silence endpoint. Talk hold and Murmur tap both did this. On-device recognition could also sit for at least 30 s.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "latencyRegressionBothPathsStayInsideTheBudget"
+      }
+    },
+    {
+      "id": "REG-994",
+      "failure": "File recognition cancelled at the 2 s stand-in and kept only an isFinal result, so a non-final partial was dropped and the file was reported as no speech.",
+      "features": [
+        "F01"
+      ],
+      "check": "portable-regressions",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/STTLatencyTests.swift",
+        "function": "fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled"
+      }
+    },
+    {
+      "id": "REG-995",
+      "failure": "Push to talk could leave the listening ring up after a release or an error, pulse under Reduce Motion, and speak on every level change.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+        "function": "releaseClearsWithinOneFrameBudget"
+      }
+    },
+    {
+      "id": "REG-996",
+      "failure": "The push-to-talk hold waited for the next avatar-feed tick, so a short hold could end before the top-bar light and the round mark appeared. The held flag is now copied in the same call that sets it. A later tick that repeats the same flag changes nothing.",
+      "features": [
+        "F11"
+      ],
+      "check": "native-ZeusCoreTests",
+      "guard": {
+        "file": "Tests/ZeusCoreTests/PTTIndicatorTests.swift",
+        "function": "theHoldReachesTheIndicatorInTheSameSample"
+      }
     }
-]
+  ]
 }

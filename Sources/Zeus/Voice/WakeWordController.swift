@@ -48,7 +48,13 @@ final class WakeWordController {
     /// The `zeus status` line: "listening", "paused (dictation)", "no permission", "off".
     var cliStatus: String { lastGate.statusLine(listening: listening) }
     /// True while the talk key is held (set by the hotkey), so the two never share the mic.
-    @ObservationIgnored var talkKeyHeld = false { didSet { evaluate() } }
+    /// The notch indicator reads the copy made in this same call, not the next avatar-feed tick.
+    @ObservationIgnored var talkKeyHeld = false {
+        didSet {
+            publishTalkHold()
+            evaluate()
+        }
+    }
 
     init() {
         enabled = UserDefaults.standard.object(forKey: Self.defaultsKey) as? Bool ?? false
@@ -58,6 +64,7 @@ final class WakeWordController {
         guard !TopBarStyle.isSnapshot else { return }
         self.voice = voice
         self.topBar = topBar
+        publishTalkHold()
         let distributed = DistributedNotificationCenter.default()
         observers.append(distributed.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { WakeWordController.shared.setLocked(true) }
@@ -80,6 +87,13 @@ final class WakeWordController {
         // Launch never asks macOS for anything: permissions are requested only from the explicit
         // enable action (`enabled.didSet`) or the talk key. Just record the current state.
         VoiceLog.log("launch", "wake word \(enabled ? "on" : "off"), voice access \(VoicePermissions.access)")
+    }
+
+    /// Copies the held flag onto the top bar in this call. A feed tick that repeats it writes nothing.
+    private func publishTalkHold() {
+        guard let topBar else { return }
+        let sample = PTTHoldPublish.sample(previous: topBar.talkHeld, published: talkKeyHeld)
+        if sample.changed { topBar.talkHeld = sample.held }
     }
 
     /// Assigns only on change, so an open Settings page isn't redrawn by the 0.5 s poll.

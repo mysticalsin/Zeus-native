@@ -15,6 +15,12 @@ protocol TalkVisualPresenting: AnyObject {
     func answerFinished(token: UUID)
     /// Hide everything now.
     func clear()
+    /// Replace the visible marks with this frame so a pen stroke can grow one point at a time.
+    func showFrame(_ draw: TalkDraw, token: UUID)
+}
+
+extension TalkVisualPresenting {
+    func showFrame(_ draw: TalkDraw, token: UUID) {}
 }
 
 /// Draws the marks of one talk answer on the display it was captured from. The marks of a sentence appear
@@ -36,6 +42,7 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     private var token: UUID?
     private var identity: (session: UUID, scene: UUID, revision: Int)?
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
+    private var shot: ScreenShot?
 
     var isShowing: Bool { overlay.isVisible }
     var hideIsArmed: Bool { hideTask != nil }
@@ -67,9 +74,28 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         }
         capture = ExplanationCaptureContext(geometry: geometry, currentDisplay: geometry.display)
         self.token = token
+        self.shot = shot
         identity = (UUID(), UUID(), 0)
         pending = TalkDrawScene.objects(draw, shot: shot, captureID: geometry.captureID)
         watchForStaleScreen()
+    }
+
+    func showFrame(_ draw: TalkDraw, token: UUID) {
+        guard token == self.token, let capture, let shot, var identity else { return }
+        hideTask?.cancel()
+        hideTask = nil
+        let grouped = TalkDrawScene.objects(draw, shot: shot, captureID: capture.geometry.captureID)
+        shown = grouped.keys.sorted().flatMap { grouped[$0] ?? [] }
+        pending = [:]
+        identity.revision += 1
+        self.identity = identity
+        let scene = ExplanationScene(sessionID: identity.session, sceneID: identity.scene, revision: identity.revision,
+                                     canvasSize: capture.geometry.imageSize,
+                                     captureID: capture.geometry.captureID,
+                                     objects: Dictionary(shown.map { ($0.id, $0) }, uniquingKeysWith: { $1 }))
+        if !overlay.present(scene: scene, capture: capture, reduceMotion: reduceMotion()) {
+            VoiceLog.log("draw", "pen frame could not be drawn")
+        }
     }
 
     func reveal(sentence: Int, token: UUID) {
@@ -105,6 +131,7 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         observers = []
         overlay.hide()
         capture = nil
+        shot = nil
         token = nil
         identity = nil
         pending = [:]

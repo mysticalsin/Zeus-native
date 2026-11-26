@@ -88,11 +88,13 @@ struct RecordingFeedbackFrameView: View {
         let label = reduceMotion ? RecordingFeedback.StatusFrame.settled(snapshot.label) : status ?? .settled(snapshot.label)
         let beamTime = reduceMotion ? 0 : beamElapsed ?? frame.elapsed
         if frame.visible {
+            let tone = Color(middleBar: MiddleBarTone.bar)
+            let mark = snapshot.phase == .failed ? Theme.ember : tone
             Button(action: open) {
                 HStack(spacing: 6) {
                     Image(systemName: symbol)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(mark)
                         .opacity(frame.reveal)
                         .blur(radius: frame.blur)
                     Text(label.text)
@@ -106,19 +108,20 @@ struct RecordingFeedbackFrameView: View {
                 .padding(.horizontal, 9)
                 .frame(height: 24)
                 .background {
-                    Capsule().fill(reduceTransparency ? Color.black : Color.white.opacity(0.08))
+                    Capsule().fill(reduceTransparency ? Color.black : mark.opacity(0.16))
                         .overlay {
                             if frame.beamOpacity > 0 {
                                 AssistantBeamView(
                                     frame: AssistantBeam.frame(elapsed: beamTime, level: 0,
                                                                processing: snapshot.phase != .failed,
                                                                processingElapsed: beamTime, reduceMotion: reduceMotion),
-                                    reduceTransparency: reduceTransparency, cornerRadius: 12
+                                    reduceTransparency: reduceTransparency, cornerRadius: 12,
+                                    colors: MiddleBarTone.shades.map { Color(middleBar: $0) }
                                 )
                                 .opacity(frame.beamOpacity)
                             }
                         }
-                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
+                        .overlay(Capsule().strokeBorder(mark.opacity(0.45), lineWidth: 1))
                 }
             }
             .buttonStyle(RecordingFeedbackPressStyle(reduceMotion: reduceMotion))
@@ -131,7 +134,6 @@ struct RecordingFeedbackFrameView: View {
         }
     }
 
-    private var tint: Color { snapshot.phase == .failed ? Theme.ember : Theme.glow }
     private var symbol: String {
         switch snapshot.phase {
         case .completed: "checkmark.circle.fill"

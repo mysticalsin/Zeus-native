@@ -194,33 +194,48 @@ final class AppleSpeechEngine: TranscriptionEngine, @unchecked Sendable {
         guard recognizer.supportsOnDeviceRecognition else { throw OnDeviceUnavailable() }
         guard !samples.isEmpty, let buffer = AudioSamples.buffer(samples) else { throw TranscriptionError.noSpeech }
         let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
         request.addsPunctuation = true
         request.contextualStrings = hints
         request.requiresOnDeviceRecognition = true
         request.append(buffer)
         request.endAudio()
         let run = AppleRecognitionRun()
-        // Generous bound: a recognizer that never answers must not hang the caller forever.
-        let timeout = max(30.0, Double(samples.count) / 16_000 * 3)
+        let latest = LatestPartial()
+        // A recognizer that never calls back is cancelled on the on-device budget.
+        // This is not the 8 s, 20 s or 45 s budget used by other subsystems.
+        let audioMs = samples.count / 16
+        let timeout = Double(STTSessionPolicy.production.batchGiveUpMs(audioMs: audioMs)) / 1000
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                 run.begin(continuation)
                 let task = recognizer.recognitionTask(with: request) { result, error in
-                    if let result, result.isFinal {
-                        run.finish(.success(result.bestTranscription.formattedString))
+                    if let result {
+                        latest.store(result.bestTranscription.formattedString)
+                        if result.isFinal { run.finish(.success(latest.load())) }
                     } else if let error {
                         run.finish(.failure(error))
                     }
                 }
                 run.attach(task)
                 DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                    run.finish(.failure(AppleRecognitionTimedOut()))
+                    let text = latest.load().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if text.isEmpty { run.finish(.failure(AppleRecognitionTimedOut())) }
+                    else { run.finish(.success(text)) }
                 }
             }
         } onCancel: {
             run.finish(.failure(CancellationError()))
         }
     }
+}
+
+/// The newest partial from one recognition callback. The text stays in memory and is not logged.
+private final class LatestPartial: @unchecked Sendable {
+    private let lock = NSLock()
+    private var text = ""
+    func store(_ text: String) { lock.withLock { self.text = text } }
+    func load() -> String { lock.withLock { text } }
 }
 
 struct AppleRecognitionTimedOut: LocalizedError {
