@@ -312,9 +312,16 @@ public struct ExplainBeatSchedule: Equatable, Sendable {
     }
 
     /// Beats whose start time is at or before `elapsed`. Later beats stay hidden.
+    /// A negative or non-finite time stays on the first beat.
     public func revealed(at elapsed: TimeInterval) -> [Int] {
-        let safe = max(0, elapsed)
-        let steps = safe == 0 ? 0 : Int((safe / Self.gap).rounded(.down))
+        guard elapsed.isFinite, elapsed > 0 else {
+            return Array(indexes.prefix(1))
+        }
+        let raw = elapsed / Self.gap
+        if !raw.isFinite || raw >= Double(indexes.count) {
+            return indexes
+        }
+        let steps = Int(raw.rounded(.down))
         let count = min(indexes.count, steps + 1)
         return Array(indexes.prefix(max(count, 1)))
     }

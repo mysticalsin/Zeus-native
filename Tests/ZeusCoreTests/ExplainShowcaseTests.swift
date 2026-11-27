@@ -95,6 +95,20 @@ import Testing
         #expect(first != second && second != third)
     }
 
+    @Test func aNonFiniteExplainTimeStaysOnTheFirstBeat() throws {
+        let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
+        let first = try #require(showcase.guideBolt(at: 0))
+        #expect(showcase.guideBolt(at: .infinity) == first)
+        #expect(showcase.guideBolt(at: -.infinity) == first)
+        #expect(showcase.guideBolt(at: .nan) == first)
+        let schedule = ExplainBeatSchedule(indexes: [0, 1, 2])
+        #expect(schedule.revealed(at: .nan) == [0])
+        #expect(schedule.revealed(at: .infinity) == [0])
+        #expect(schedule.revealed(at: -1) == [0])
+        let huge = ExplainBeatSchedule.gap * 10_000
+        #expect(schedule.revealed(at: huge) == [0, 1, 2])
+    }
+
     @Test func aMovingExplainKeepsTheBoltOnThePenTip() throws {
         let showcase = try #require(ExplainShowcase.plan(for: Self.tesla))
         let frame = try #require(showcase.penFrame(at: 0))
