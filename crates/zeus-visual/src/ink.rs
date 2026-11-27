@@ -1,9 +1,12 @@
+use std::collections::VecDeque;
+
 use crate::Point;
 
 /// Pointer strokes. Near-duplicate samples are dropped, a pause starts a new stroke,
-/// and a sharp corner is kept.
+/// and a sharp corner is kept. A full stroke drops its oldest point from the front
+/// without shifting the rest.
 pub struct InkTrail {
-    pub strokes: Vec<Vec<Point>>,
+    pub strokes: VecDeque<VecDeque<Point>>,
     pub dropped_points: u32,
     open: bool,
     last_time: Option<f64>,
@@ -24,7 +27,7 @@ impl InkTrail {
     pub const CORNER_DEGREES: f64 = 55.0;
 
     pub fn new() -> Self {
-        Self { strokes: Vec::new(), dropped_points: 0, open: false, last_time: None }
+        Self { strokes: VecDeque::new(), dropped_points: 0, open: false, last_time: None }
     }
 
     pub fn add(&mut self, point: Point, time: f64) -> InkStep {
@@ -33,34 +36,34 @@ impl InkTrail {
             return InkStep::Dropped;
         }
         if self.open {
-            if let Some(mut current) = self.strokes.pop() {
-                if let Some(last) = current.last().copied() {
+            if let Some(mut current) = self.strokes.pop_back() {
+                if let Some(last) = current.back().copied() {
                     if distance(point, last) < Self::MIN_SPACING {
-                        self.strokes.push(current);
+                        self.strokes.push_back(current);
                         self.dropped_points += 1;
                         return InkStep::Dropped;
                     }
                 }
                 if self.last_time.is_some_and(|last| time - last >= Self::PAUSE_SPLIT) {
-                    self.strokes.push(current);
+                    self.strokes.push_back(current);
                     self.open = false;
                 } else {
-                    current.push(point);
+                    current.push_back(point);
                     if current.len() > Self::MAX_POINTS_PER_STROKE {
-                        current.remove(0);
+                        current.pop_front();
                         self.dropped_points += 1;
                     }
-                    self.strokes.push(current);
+                    self.strokes.push_back(current);
                     self.last_time = Some(time);
                     return InkStep::Extended;
                 }
             }
         }
         if self.strokes.len() >= Self::MAX_STROKES {
-            self.strokes.remove(0);
+            self.strokes.pop_front();
             self.dropped_points += 1;
         }
-        self.strokes.push(vec![point]);
+        self.strokes.push_back(VecDeque::from([point]));
         self.open = true;
         self.last_time = Some(time);
         InkStep::Began
@@ -75,7 +78,20 @@ impl InkTrail {
     }
 
     pub fn smoothed(&self) -> Vec<Vec<Point>> {
-        self.strokes.iter().map(|stroke| smooth(stroke)).collect()
+        self.strokes
+            .iter()
+            .map(|stroke| {
+                let (head, tail) = stroke.as_slices();
+                if tail.is_empty() {
+                    smooth(head)
+                } else {
+                    let mut owned = Vec::with_capacity(stroke.len());
+                    owned.extend_from_slice(head);
+                    owned.extend_from_slice(tail);
+                    smooth(&owned)
+                }
+            })
+            .collect()
     }
 }
 
@@ -167,6 +183,20 @@ mod tests {
         assert_eq!(trail.add(Point::new(20.0, 0.0), 1.0), InkStep::Began);
         assert_eq!(trail.strokes.len(), 2);
         assert!(trail.is_drawing());
+    }
+
+    #[test]
+    fn a_long_stroke_drops_the_oldest_point_and_keeps_the_newest() {
+        let mut trail = InkTrail::new();
+        for index in 0..600 {
+            let x = index as f64 * 10.0;
+            trail.add(Point::new(x, 0.0), index as f64 * 0.01);
+        }
+        assert_eq!(trail.strokes.len(), 1);
+        let stroke = &trail.strokes[0];
+        assert_eq!(stroke.len(), InkTrail::MAX_POINTS_PER_STROKE);
+        assert_eq!(stroke.front().copied(), Some(Point::new(880.0, 0.0)));
+        assert_eq!(stroke.back().copied(), Some(Point::new(5990.0, 0.0)));
     }
 
     #[test]
