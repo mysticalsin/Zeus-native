@@ -45,6 +45,10 @@ struct PointerGuideCaptionTests {
         #expect(PointerGuideCaptionSplit.boltText(String(repeating: "a", count: 41)) == nil)
         #expect(PointerGuideCaptionSplit.boltText("One\nTwo\nThree\nFour") == nil)
         #expect(PointerGuideCaptionSplit.boltText("   \n  ") == nil)
+        let sentence = "To leave the ground, a car would need an upward force greater than its weight."
+        let line = PointerGuideCaptionSplit.oneLine(sentence)
+        #expect(line == "To leave the ground, a car would need an")
+        #expect((line?.count ?? 0) <= PointerGuideCaptionSplit.maxLineCharacters)
     }
 
     @Test func theCaptionIsThreeShortLinesAndTheDetailStaysOff() throws {

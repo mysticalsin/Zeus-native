@@ -774,7 +774,7 @@ final class VoiceTurnController {
         VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
         // Leave listening before the pen flies. idle() clears a flight, so it has to run first.
         buddy.idle()
-        let penLabel = Self.pointLabel(plan.sentences.first, fallback: "Here")
+        let penLabel = PointerGuideCaptionSplit.oneLine(plan.sentences.first ?? "") ?? "Here"
         if plan.travels {
             showPen(plan.penFrame(at: 0), shot: shot, token: token, label: penLabel)
             explainReveal = Task { @MainActor [weak self] in
@@ -1452,13 +1452,13 @@ final class VoiceTurnController {
         UltronSpeechText.prepared(PersonaCompliance.stripOminousHedges(text), personality: ZeusPersonality.current())
     }
 
-    /// The last ~240 characters of the reply, cut at a word boundary.
     /// The words drawn beside a point. At most three short lines. A line that is too long stays off.
     static func pointLabel(_ raw: String?, fallback: String) -> String {
         guard let raw, let text = PointerGuideCaptionSplit.boltText(raw) else { return fallback }
         return text
     }
 
+    /// The last ~240 characters of the reply, cut at a word boundary.
     static func captionTail(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 240 else { return trimmed }

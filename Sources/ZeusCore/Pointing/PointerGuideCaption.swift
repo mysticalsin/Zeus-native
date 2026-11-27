@@ -42,6 +42,20 @@ public enum PointerGuideCaptionSplit {
         return lines.joined(separator: "\n")
     }
 
+    /// The first words of a sentence that fit on one caption line.
+    public static func oneLine(_ raw: String) -> String? {
+        var current = ""
+        for word in raw.split(whereSeparator: \.isWhitespace) {
+            let piece = String(word)
+            let next = current.isEmpty ? piece : current + " " + piece
+            if next.count > maxLineCharacters { break }
+            current = next
+        }
+        let line = normalize(current)
+        guard !line.isEmpty, line.count <= maxLineCharacters else { return nil }
+        return line
+    }
+
     private static func normalize(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
