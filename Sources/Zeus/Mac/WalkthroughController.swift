@@ -100,7 +100,7 @@ final class WalkthroughController {
             let label = PointerGuideCaptionSplit.boltText(target.label)
                 ?? PointerGuideCaptionSplit.boltText(step.say)
                 ?? "Here"
-            buddy?.point(to: target.screenPoint, label: label)
+            buddy?.point(to: target.screenPoint, label: label, ring: target.hitRect)
         }
         say?("\(session.progress). \(step.say)")
         if !step.waitForClick || (step.target == nil && step.targetLabel == nil) {

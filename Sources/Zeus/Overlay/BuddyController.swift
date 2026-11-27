@@ -266,12 +266,18 @@ final class BuddyController: NSObject {
 
     /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame under the
     /// point wins over the raw coordinate. Decorative: this does not move the system pointer.
-    func point(to point: CGPoint, label: String) {
+    func point(to point: CGPoint, label: String, ring explicitRing: CGRect? = nil) {
         guard CompanionSpring.tracksPointer(showPolicy) else { return }
         wake()
         resetPointing()
         startPointingClickMonitor()
         AvatarStatus.shared.set(\.turn, .pointing)
+        if let explicitRing, explicitRing.width > 0, explicitRing.height > 0 {
+            let center = CGPoint(x: explicitRing.midX, y: explicitRing.midY)
+            let curve = VisualFlight.plan(from: model.position, to: center, reducedMotion: Motion.reduced)
+            launch(curve, label: label, ring: explicitRing)
+            return
+        }
         let mapper = presentMapper()
         if let display = mapper.display(containing: point),
            let snapshot = AXSnapshotter.shared.latest,
