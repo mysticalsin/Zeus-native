@@ -128,7 +128,7 @@ public enum InsomniaParse {
         var volume: Int?
         var muted: Bool?
         for part in settings.split(separator: ",") {
-            let pair = part.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            let pair = part.split(separator: ":", maxSplits: 1).map { InsomniaParseBox.trimmedField(String($0)) }
             guard pair.count == 2 else { continue }
             if pair[0] == "output volume" { volume = Int(pair[1]) }
             if pair[0] == "output muted" { muted = pair[1] == "true" }
