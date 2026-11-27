@@ -314,6 +314,20 @@ struct TalkVisualTurnTests {
         .init(shape: .ring(center: .init(x: 300, y: 200), radius: 20), at: 1),
     ])
 
+    @Test func clearingTheDrawingStopsThatPenAndANewerTurnKeepsItsOwn() {
+        let drawing = presenter()
+        defer { drawing.clear() }
+        let first = UUID()
+        #expect(drawing.begin(Self.draw, shot: Self.shots[0], token: first))
+        #expect(!drawing.penShouldStop(first))
+        drawing.clear()
+        #expect(drawing.penShouldStop(first))
+        let second = UUID()
+        #expect(drawing.begin(Self.draw, shot: Self.shots[0], token: second))
+        #expect(!drawing.penShouldStop(first))
+        #expect(!drawing.penShouldStop(second))
+    }
+
     @Test func anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture() {
         let drawing = presenter()
         defer { drawing.clear() }

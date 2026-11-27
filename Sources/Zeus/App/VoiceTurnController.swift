@@ -836,7 +836,13 @@ final class VoiceTurnController {
     private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID, label: String) {
         guard let frame else { return }
         let scaled = ExplainShowcase.scaled(frame.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
-        guard presenter.showFrame(scaled, token: token) else { return }
+        guard presenter.showFrame(scaled, token: token) else {
+            if presenter.penShouldStop(token) {
+                buddy.idle()
+                explainReveal?.cancel()
+            }
+            return
+        }
         let bolt = boltScreen(frame.bolt, shot: shot)
         buddy.flight(to: bolt, label: label)
     }

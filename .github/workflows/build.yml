@@ -81,6 +81,9 @@ jobs:
           cargo build --release --manifest-path crates/zeus-visual/Cargo.toml
           mkdir -p Sources/CZeusVisual/lib
           cp crates/zeus-visual/target/release/libzeus_visual.a Sources/CZeusVisual/lib/
+          if ! command -v llvm-objcopy >/dev/null 2>&1 && ! xcrun --find llvm-objcopy >/dev/null 2>&1; then
+            rustup component add llvm-tools
+          fi
           sh tools/hide-visual-personality.sh Sources/CZeusVisual/lib/libzeus_visual.a
       - name: Native build
         id: build

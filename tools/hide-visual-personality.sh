@@ -17,6 +17,15 @@ redefine() {
     llvm-objcopy --redefine-sym "$from=$to" "$archive"
   elif command -v xcrun >/dev/null 2>&1 && xcrun --find llvm-objcopy >/dev/null 2>&1; then
     xcrun llvm-objcopy --redefine-sym "$from=$to" "$archive"
+  elif command -v rustc >/dev/null 2>&1; then
+    host=$(rustc -vV | sed -n 's/^host: //p')
+    tool="$(rustc --print sysroot)/lib/rustlib/${host}/bin/llvm-objcopy"
+    if [ -x "$tool" ]; then
+      "$tool" --redefine-sym "$from=$to" "$archive"
+    else
+      echo "llvm-objcopy is required to rename rust_eh_personality" >&2
+      exit 1
+    fi
   else
     echo "llvm-objcopy is required to rename rust_eh_personality" >&2
     exit 1
