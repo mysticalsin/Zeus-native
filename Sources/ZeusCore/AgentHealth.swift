@@ -20,7 +20,7 @@ public enum AgentFailureParser {
     }
 
     public static func reason(code: String?, detail: String?) -> String {
-        let cleaned = detail.map { $0.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines) }
+        let cleaned = detail.map { AgentHealthBox.trimmedDetail($0.replacingOccurrences(of: "\n", with: " ")) }
         let lead = code.flatMap(friendly)
         switch (lead, cleaned) {
         case (let lead?, let detail?) where !detail.isEmpty && !detail.localizedCaseInsensitiveContains(lead):
