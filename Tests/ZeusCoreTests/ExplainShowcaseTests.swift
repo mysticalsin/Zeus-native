@@ -106,6 +106,24 @@ import Testing
         #expect(moving.sentences.contains { $0.hasPrefix(later) })
     }
 
+    @Test func anExplainHowItWorksNamesTheThingAndDrawsTheChange() throws {
+        let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
+        #expect(showcase.sentences[0] == "You asked about photosynthesis.")
+        #expect(showcase.sentences[1] == "Next is how photosynthesis works.")
+        #expect(showcase.sentences[2].contains("does not prove that the end happens"))
+        #expect(!showcase.explanation.lowercased().contains("question"))
+        let cards = showcase.draw.marks.compactMap { mark -> String? in
+            if case .card(_, let text) = mark.shape { return text }
+            return nil
+        }
+        #expect(cards.contains("photosynthesis"))
+        #expect(cards.contains("works?"))
+        #expect(!cards.contains("question?"))
+        let walk = try #require(ExplainShowcase.plan(for: "walk me through sharing this window"))
+        #expect(walk.sentences[0] == "You asked about sharing this window.")
+        #expect(!walk.explanation.lowercased().contains("question"))
+    }
+
     @Test func aStillExplainMovesTheBoltWithEachBeat() throws {
         let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
         #expect(showcase.travels == false)

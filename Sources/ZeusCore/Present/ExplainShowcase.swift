@@ -39,7 +39,7 @@ public struct ExplainShowcase: Equatable, Sendable {
         let asked = clip(pieces.asked)
         guard !start.isEmpty, !asked.isEmpty else { return nil }
         let motion = asksMotion(subject)
-        let sentences = motion ? motionSentences(start: start, asked: asked) : stillSentences(start: start)
+        let sentences = motion ? motionSentences(start: start, asked: asked) : stillSentences(start: start, asked: asked)
         let stroke = motion ? motionStroke : []
         let marks = motion ? motionMarks(asked: asked, stroke: stroke) : stillMarks(start: start, asked: asked)
         guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
@@ -241,8 +241,14 @@ public struct ExplainShowcase: Equatable, Sendable {
             let asked = bare(String(subject[range.upperBound...]))
             if !start.isEmpty, !asked.isEmpty { return (start, asked) }
         }
+        let words = subject.split(separator: " ").map(String.init)
+        if words.count >= 2, let last = words.last, ["works", "work", "happens", "happen"].contains(last) {
+            let start = bare(words.dropLast().joined(separator: " "))
+            if !start.isEmpty { return (start, last) }
+        }
         let start = bare(subject)
-        return (start.isEmpty ? subject : start, "question")
+        let named = start.isEmpty ? subject : start
+        return (named, named)
     }
 
     private static func bare(_ text: String) -> String {
@@ -274,11 +280,6 @@ public struct ExplainShowcase: Equatable, Sendable {
         return line.isEmpty ? "Here" : line
     }
 
-    private static func leading(_ label: String) -> String {
-        guard let first = label.first else { return label }
-        return first.uppercased() + label.dropFirst()
-    }
-
     /// The mechanism is an upward force the sketch does not contain. No registry source is invented.
     /// The last sentence still refuses to treat the drawing as proof.
     private static func motionSentences(start: String, asked: String) -> [String] {
@@ -289,10 +290,13 @@ public struct ExplainShowcase: Equatable, Sendable {
         ]
     }
 
-    private static func stillSentences(start: String) -> [String] {
-        [
-            "\(leading(start)) is the start of the explanation.",
-            "The next mark is the change you asked to see.",
+    private static func stillSentences(start: String, asked: String) -> [String] {
+        let change = asked == start
+            ? "The arrow marks the change you asked to see."
+            : "Next is how \(start) \(asked)."
+        return [
+            "You asked about \(start).",
+            change,
             "The drawing does not prove that the end happens.",
         ]
     }
