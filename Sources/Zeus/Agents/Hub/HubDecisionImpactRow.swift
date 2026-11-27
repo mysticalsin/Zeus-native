@@ -12,6 +12,7 @@ struct HubDecisionImpactRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             impactLines
+                .accessibilityIdentifier("hub.decision.impact")
             HStack(spacing: 8) {
                 decisionButton(
                     title: HubApprovalImpact.allowOnceTitle,
@@ -63,7 +64,6 @@ struct HubDecisionImpactRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(impact.accessibilitySummary(detailsHidden: detailsHidden))
-        .accessibilityIdentifier("hub.decision.impact")
     }
 
     private func decisionButton(title: String, hint: String, filled: Bool, identifier: String,

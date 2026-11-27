@@ -6,7 +6,7 @@ public enum RewriterStream {
     /// The rewrite budget. The caller kills the process at this many seconds.
     public static let timeout: TimeInterval = 45
     /// How long the readers may finish after the body returns. This is not the process budget.
-    public static let readerDrain: TimeInterval = 2
+    public static let readerDrain: TimeInterval = 15
 
     public struct Collected: Equatable, Sendable {
         public var stdout: Data

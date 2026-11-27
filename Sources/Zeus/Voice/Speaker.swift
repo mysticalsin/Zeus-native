@@ -203,6 +203,13 @@ final class Speaker: SentenceSpeaking, LineSpeaking {
         lineOnStart = onStart
         lineBase = chain.ledger.scheduled
         defer { lineOnStart = nil }
+        // Tests stand in for every engine. The override runs before any real voice, and the start
+        // callback stays armed so it can fire during the override or once the line has begun.
+        if let attemptOverride, let voice = await attemptOverride(text) {
+            armLineStart()
+            let ms = audioReadyAt.map { Int($0.timeIntervalSince(began) * 1000) }
+            return Played(engine: .system, voice: voice, reason: "test stand-in", firstAudioMs: ms)
+        }
         let personaVoice = PersonaSpeakRoute.resolvedVoiceID(for: PersonaCatalog.current())
         let steps = Self.personaSteps(settings)
         VoiceLog.log("speak", PersonaSpeakRoute.logLine(voiceID: personaVoice, steps: steps))

@@ -367,7 +367,7 @@ public actor VoiceProviderSession {
                 defer { watchdog.cancel() }
                 for try await chunk in synthesis.chunks {
                     if gate.isCancelled(utterance) || Task.isCancelled { throw ProviderFailure.cancelled }
-                    if heard.fired { throw ProviderFailure.timedOut }
+                    if heard.fired && audio.isEmpty { throw ProviderFailure.timedOut }
                     let piece = chunk.data
                     guard !piece.isEmpty else { continue }
                     await onPlaybackChunk?(piece)
@@ -384,7 +384,7 @@ public actor VoiceProviderSession {
                         _ = assembler.append(piece)
                     }
                 }
-                if heard.fired { throw ProviderFailure.timedOut }
+                if heard.fired && audio.isEmpty { throw ProviderFailure.timedOut }
                 currentCancel = nil
                 if gate.isCancelled(utterance) || Task.isCancelled {
                     return cancelled(started: started, providerID: id)
