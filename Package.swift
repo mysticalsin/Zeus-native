@@ -1,9 +1,10 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+let visualLib = Context.packageDirectory + "/Sources/CZeusVisual/lib"
 let visualLink: [LinkerSetting] = [
     .linkedLibrary("zeus_visual"),
-    .unsafeFlags(["-L", "Sources/CZeusVisual/lib"]),
+    .unsafeFlags(["-L", visualLib]),
 ]
 
 let package = Package(
