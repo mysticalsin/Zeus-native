@@ -1019,6 +1019,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastHidden: Bool?
     private var chimePolicy = AgentChimePolicy()
     private var lastApprovalSeen = false
+    private var approvalBoltShown = false
     private var lastFailed = 0
     private var feedTicks = 0
     private var lastMeetingCheck = Date.distantPast
@@ -1120,6 +1121,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Points at Approve and says the same line as Play Demo. A missing button shows "Not found".
+    private func showLiveApproval() {
+        let found = notch.approveButtonPoint != nil
+        let step = PlayDemoScript.liveApproval(approveButtonFound: found)
+        if let point = notch.approveButtonPoint {
+            buddy.point(to: point, label: step.bolt)
+        } else {
+            buddy.showCaption(step.bolt)
+        }
+        voice?.say(step.spoken)
+    }
+
     private func playAgentChime(_ cue: AgentChimePolicy.Cue?) {
         switch cue {
         case .start: ZeusSound.play(.start)
@@ -1136,7 +1149,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let approval = notch.model.approval != nil
         let now = Date()
         playAgentChime(chimePolicy.approval(visible: approval, at: now))
-        if approval != lastApprovalSeen { lastApprovalSeen = approval; registerShortcuts() }
+        if approval != lastApprovalSeen {
+            if approval, demo?.isPlaying != true {
+                showLiveApproval()
+                approvalBoltShown = true
+            } else if !approval, approvalBoltShown {
+                approvalBoltShown = false
+                buddy.idle()
+            }
+            lastApprovalSeen = approval
+            registerShortcuts()
+        }
         let startEnabled = SettingsStore.shared.bool("sound.agentStart")
         for session in notch.model.sessions {
             playAgentChime(chimePolicy.session(session.id, status: session.status, at: now, startEnabled: startEnabled))

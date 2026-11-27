@@ -76,6 +76,17 @@ import Testing
         #expect(PlayDemoScript.closed.spoken == "That's the tour. I'll put the notch away.")
     }
 
+    @Test func aLiveApprovalUsesTheDemoLines() {
+        let found = PlayDemoScript.liveApproval(approveButtonFound: true)
+        let missing = PlayDemoScript.liveApproval(approveButtonFound: false)
+        #expect(found == PlayDemoScript.approval)
+        #expect(missing == PlayDemoScript.approvalMissing)
+        #expect(PlayDemoScript.ready(found))
+        #expect(PlayDemoScript.ready(missing))
+        #expect(found.bolt == "Approve or deny, or say ok")
+        #expect(missing.bolt == "Not found")
+    }
+
     @Test func aStepThatIsNotDrawnIsNotReady() {
         let spokenOnly = PlayDemoScript.Step(
             spoken: "Click the bolt anytime",

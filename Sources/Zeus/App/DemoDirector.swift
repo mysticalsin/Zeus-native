@@ -11,6 +11,10 @@ final class DemoDirector {
     private let statusItemFrame: () -> CGRect?
     private let say: (String) -> Void
     private var task: Task<Void, Never>?
+    private var playing = false
+
+    /// True while Play Demo is running, so a live approval cue does not speak over it.
+    var isPlaying: Bool { playing }
 
     init(buddy: BuddyController, notch: NotchController, statusItemFrame: @escaping () -> CGRect?,
          say: @escaping (String) -> Void = { _ in }) {
@@ -22,7 +26,11 @@ final class DemoDirector {
 
     func play() {
         task?.cancel()
-        task = Task { await run() }
+        playing = true
+        task = Task {
+            await run()
+            if !Task.isCancelled { playing = false }
+        }
     }
 
     /// The voice gets the sentence. The spark caption gets the short line.

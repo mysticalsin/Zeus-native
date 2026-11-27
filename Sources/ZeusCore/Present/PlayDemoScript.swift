@@ -82,6 +82,12 @@ public enum PlayDemoScript {
         showsOnScreen: true
     )
 
+    /// The live approval card uses the same lines as Play Demo. A missing Approve button
+    /// keeps going with the not-found line.
+    public static func liveApproval(approveButtonFound: Bool) -> Step {
+        approveButtonFound ? approval : approvalMissing
+    }
+
     /// Ready when the step is drawn and the bolt line is a caption the overlay can show.
     public static func ready(_ step: Step) -> Bool {
         guard step.showsOnScreen, !step.spoken.isEmpty else { return false }
