@@ -971,6 +971,50 @@ final class VoiceTurnController {
         }
     }
 
+    /// A model action that failed. Accessibility for Drive is drawn; other lines stay spoken.
+    private func sayActionProblem(_ problem: String) {
+        let spoken = SpokenFailure.line(problem)
+        if let visual = DriveAccessDraw.from(line: problem) ?? DriveAccessDraw.from(line: spoken) {
+            showDriveAccess(visual, speak: true)
+            say(spoken)
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else {
+            say(spoken)
+        }
+    }
+
+    /// Draws the Accessibility grant Drive mode needs, under the pointer.
+    /// The caller speaks the full line. A step that is already running is not this card.
+    private func showDriveAccess(_ plan: DriveAccessDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDriveAccess(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDriveAccess(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDriveAccess(_ plan: DriveAccessDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws a refused screen lock on the display under the pointer.
     /// The caller speaks the full line. A lock the notch shows is not this card.
     private func showLockFail(_ plan: LockFailDraw, speak: Bool) {
@@ -2648,7 +2692,7 @@ final class VoiceTurnController {
                 actionTasks.append(task)
                 if !awaitActions {
                     Task { [weak self] in
-                        if let problem = await task.value { self?.say(SpokenFailure.line(problem)) }
+                        if let problem = await task.value { self?.sayActionProblem(problem) }
                     }
                 }
             case .tag(.point(nil)):
