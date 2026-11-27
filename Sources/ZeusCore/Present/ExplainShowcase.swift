@@ -4,9 +4,10 @@ import Foundation
 ///
 /// Beats are revealed in order, one `ExplainBeatSchedule.gap` apart, including when no voice
 /// engine starts. A motion ask (fly, move, path, and the words listed below) draws an open pen
-/// stroke that grows across those beats. The words name the mechanism and say the drawing does
-/// not prove the asked end happens. Canvas is 1280 by 720 screenshot pixels, top-left origin.
-/// No model call, no screenshot, and no provider key.
+/// stroke that grows across those beats. A still ask draws its box during the first sentence,
+/// one side at a time, then the arrow, then the card. The words name the mechanism and say the
+/// drawing does not prove the asked end happens. Canvas is 1280 by 720 screenshot pixels,
+/// top-left origin. No model call, no screenshot, and no provider key.
 public struct ExplainShowcase: Equatable, Sendable {
     public static let canvasWidth = 1280.0
     public static let canvasHeight = 720.0
@@ -16,8 +17,8 @@ public struct ExplainShowcase: Equatable, Sendable {
     /// True when the mechanism beat is an open traveling stroke rather than a closed box.
     public var travels: Bool
     public var schedule: ExplainBeatSchedule
-    /// Open stroke in canvas pixels. Empty when the ask is not about motion. The pen shows a
-    /// prefix of this, one new point at a time.
+    /// Open stroke, or the still box, in canvas pixels. A moving ask shows a prefix one point
+    /// per beat. A still ask draws this box during the first sentence, one side at a time.
     public var stroke: [TalkDraw.Point]
 
     public init(sentences: [String], draw: TalkDraw, travels: Bool, schedule: ExplainBeatSchedule,
@@ -40,7 +41,7 @@ public struct ExplainShowcase: Equatable, Sendable {
         guard !start.isEmpty, !asked.isEmpty else { return nil }
         let motion = asksMotion(subject)
         let sentences = motion ? motionSentences(start: start, asked: asked) : stillSentences(start: start, asked: asked)
-        let stroke = motion ? motionStroke : []
+        let stroke = motion ? motionStroke : stillBox
         let marks = motion ? motionMarks(asked: asked, stroke: stroke) : stillMarks(start: start, asked: asked)
         guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
         let indexes = Array(Set(draw.marks.map(\.at))).sorted()
@@ -110,6 +111,35 @@ public struct ExplainShowcase: Equatable, Sendable {
         }
         guard finite(point) else { return nil }
         return point
+    }
+
+    /// The still box drawn so far, plus the beats that are already due. Nil for a moving ask.
+    /// The first sentence draws one side at a time. Later sentences keep the closed box and add
+    /// the arrow, then the card. A negative or non-finite time stays on the first side.
+    public func builtFrame(at elapsed: TimeInterval) -> TalkDraw? {
+        guard !travels, stroke.count >= 2 else { return nil }
+        let time = elapsed.isFinite && elapsed > 0 ? elapsed : 0
+        let shown = Set(schedule.revealed(at: time))
+        var marks = draw.marks.filter { shown.contains($0.at) && !Self.isInk($0) }
+        let count = builtInkCount(at: time)
+        marks.insert(.init(shape: .ink(Array(stroke.prefix(count))), at: 0), at: 0)
+        return TalkDrawParser.parse(TalkDraw(screen: draw.screen, marks: marks).json)
+    }
+
+    /// How many box corners are on screen at `elapsed`. Two at the start of the first sentence,
+    /// the whole box by the end of that sentence.
+    public func builtInkCount(at elapsed: TimeInterval) -> Int {
+        guard !travels, stroke.count >= 2 else { return 0 }
+        let time = elapsed.isFinite && elapsed > 0 ? elapsed : 0
+        let steps = stroke.count - 1
+        let span = min(time, ExplainBeatSchedule.gap)
+        let done = Int((span / ExplainBeatSchedule.gap * Double(steps)).rounded(.down))
+        return min(stroke.count, max(2, done + 2))
+    }
+
+    private static func isInk(_ mark: TalkDraw.Mark) -> Bool {
+        if case .ink = mark.shape { return true }
+        return false
     }
 
     /// The ink visible at `elapsed`. Without audio, one new point every `ExplainBeatSchedule.gap`.
@@ -301,6 +331,13 @@ public struct ExplainShowcase: Equatable, Sendable {
         ]
     }
 
+    /// Closed box. The live still path shows a prefix during the first sentence, one side at a time.
+    private static let stillBox: [TalkDraw.Point] = [
+        .init(x: 180, y: 220), .init(x: 460, y: 220),
+        .init(x: 460, y: 420), .init(x: 180, y: 420),
+        .init(x: 180, y: 220),
+    ]
+
     /// One open stroke. The live pen shows a prefix, one new point at a time. Not a closed box.
     private static let motionStroke: [TalkDraw.Point] = [
         .init(x: 200, y: 500), .init(x: 480, y: 500), .init(x: 640, y: 440),
@@ -318,13 +355,8 @@ public struct ExplainShowcase: Equatable, Sendable {
     }
 
     private static func stillMarks(start: String, asked: String) -> [TalkDraw.Mark] {
-        let box = [
-            TalkDraw.Point(x: 180, y: 220), TalkDraw.Point(x: 460, y: 220),
-            TalkDraw.Point(x: 460, y: 420), TalkDraw.Point(x: 180, y: 420),
-            TalkDraw.Point(x: 180, y: 220),
-        ]
         return [
-            .init(shape: .ink(box), at: 0),
+            .init(shape: .ink(stillBox), at: 0),
             .init(shape: .ring(center: .init(x: 320, y: 320), radius: 36), at: 0),
             .init(shape: .card(origin: .init(x: 180, y: 160), text: start), at: 0),
             .init(shape: .arrow(from: .init(x: 480, y: 320), to: .init(x: 900, y: 320)), at: 1),

@@ -124,6 +124,32 @@ import Testing
         #expect(!walk.explanation.lowercased().contains("question"))
     }
 
+    @Test func aStillQuestionDrawsTheBoxOneSideAtATime() throws {
+        let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
+        #expect(showcase.travels == false)
+        #expect(showcase.stroke.count == 5)
+        let opening = try #require(showcase.builtFrame(at: 0))
+        let early = inkPoints(opening)
+        #expect(early.count == 2)
+        #expect(early == Array(showcase.stroke.prefix(2)))
+        #expect(hasShape(opening, ring: true))
+        #expect(!hasShape(opening, arrow: true))
+        let closed = try #require(showcase.builtFrame(at: ExplainBeatSchedule.gap))
+        #expect(inkPoints(closed) == showcase.stroke)
+        #expect(hasShape(closed, arrow: true))
+        #expect(!cardTexts(closed).contains("works?"))
+        let last = try #require(showcase.builtFrame(at: ExplainBeatSchedule.gap * 2))
+        #expect(inkPoints(last) == showcase.stroke)
+        #expect(cardTexts(last).contains("works?"))
+        let broken = try #require(showcase.builtFrame(at: .nan))
+        #expect(inkPoints(broken).count == 2)
+        #expect(!hasShape(broken, arrow: true))
+        #expect(showcase.builtInkCount(at: -1) == 2)
+        let moving = try #require(ExplainShowcase.plan(for: Self.tesla))
+        #expect(moving.builtFrame(at: 0) == nil)
+        #expect(moving.builtInkCount(at: 0) == 0)
+    }
+
     @Test func aStillExplainMovesTheBoltWithEachBeat() throws {
         let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
         #expect(showcase.travels == false)
@@ -237,6 +263,30 @@ import Testing
             case .ink(let stroke):
                 #expect(stroke.allSatisfy { $0.x >= 0 && $0.x <= 640 && $0.y >= 0 && $0.y <= 360 })
             }
+        }
+    }
+
+    private func inkPoints(_ draw: TalkDraw) -> [TalkDraw.Point] {
+        for mark in draw.marks {
+            if case .ink(let points) = mark.shape { return points }
+        }
+        return []
+    }
+
+    private func hasShape(_ draw: TalkDraw, ring: Bool = false, arrow: Bool = false) -> Bool {
+        draw.marks.contains { mark in
+            switch mark.shape {
+            case .ring: return ring
+            case .arrow: return arrow
+            default: return false
+            }
+        }
+    }
+
+    private func cardTexts(_ draw: TalkDraw) -> [String] {
+        draw.marks.compactMap { mark in
+            if case .card(_, let text) = mark.shape { return text }
+            return nil
         }
     }
 }

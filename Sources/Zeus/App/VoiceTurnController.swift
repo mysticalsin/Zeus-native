@@ -759,10 +759,11 @@ final class VoiceTurnController {
     }
 
     /// Speaks the explanation and draws it on the display under the pointer.
-    /// Beat 0 is shown immediately. Later beats follow `ExplainBeatSchedule` even when no voice
-    /// engine starts, so the sequence is not spoken-only and not painted all at once.
-    /// No capture and no model request. `talk.drawOnScreen` still gates a screenshot sent to an
-    /// engine. This path does not send one.
+    /// Beat 0 is shown immediately. A moving ask grows the pen. A still ask draws the box one
+    /// side at a time during the first sentence, then the arrow, then the card. Later beats
+    /// follow `ExplainBeatSchedule` even when no voice engine starts, so the sequence is not
+    /// spoken-only and not painted all at once. No capture and no model request.
+    /// `talk.drawOnScreen` still gates a screenshot sent to an engine. This path does not send one.
     private func presentExplain(_ plan: ExplainShowcase, transcript: String, speak: Bool) -> TurnResult {
         VoiceLog.log("route", "explain-showcase")
         VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
@@ -790,6 +791,32 @@ final class VoiceTurnController {
                         self.showPen(frame, shot: shot, token: token, label: plan.boltCaption(at: elapsed))
                     }
                     if frame.finished { break }
+                    try? await Task.sleep(for: .milliseconds(40))
+                }
+                guard let self, !Task.isCancelled else { return }
+                await self.finishExplainDrawing(token: token, speak: speak)
+            }
+        } else if ready, plan.builtFrame(at: 0) != nil {
+            showBuilt(plan.builtFrame(at: 0), shot: shot, token: token)
+            flyGuide(plan, at: 0, shot: shot, label: plan.boltCaption(at: 0))
+            explainReveal = Task { @MainActor [weak self] in
+                var ink = plan.builtInkCount(at: 0)
+                var beats = plan.schedule.revealed(at: 0).count
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    let elapsed = Date().timeIntervalSince(self.explainBegan)
+                    let shownBeats = plan.schedule.revealed(at: elapsed).count
+                    let count = plan.builtInkCount(at: elapsed)
+                    if count != ink || shownBeats != beats {
+                        let beatChanged = shownBeats != beats
+                        ink = count
+                        beats = shownBeats
+                        self.showBuilt(plan.builtFrame(at: elapsed), shot: shot, token: token)
+                        if beatChanged {
+                            self.flyGuide(plan, at: elapsed, shot: shot, label: plan.boltCaption(at: elapsed))
+                        }
+                    }
+                    if shownBeats >= plan.schedule.indexes.count { break }
                     try? await Task.sleep(for: .milliseconds(40))
                 }
                 guard let self, !Task.isCancelled else { return }
@@ -841,6 +868,18 @@ final class VoiceTurnController {
     private func flyGuide(_ plan: ExplainShowcase, at elapsed: TimeInterval, shot: ScreenShot, label: String) {
         guard let bolt = plan.guideBolt(at: elapsed) else { return }
         buddy.flight(to: boltScreen(bolt, shot: shot), label: label)
+    }
+
+    private func showBuilt(_ draw: TalkDraw?, shot: ScreenShot, token: UUID) {
+        guard let draw else { return }
+        let scaled = ExplainShowcase.scaled(draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        guard presenter.showFrame(scaled, token: token) else {
+            if presenter.penShouldStop(token) {
+                buddy.idle()
+                explainReveal?.cancel()
+            }
+            return
+        }
     }
 
     private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID, label: String) {
