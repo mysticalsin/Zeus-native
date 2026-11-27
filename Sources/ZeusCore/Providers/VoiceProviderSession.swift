@@ -350,13 +350,13 @@ public actor VoiceProviderSession {
                 synthesis.cancel()
                 return cancelled(started: started, providerID: id)
             }
+            var audio = Data()
+            let heard = AbortFlag()
             do {
-                var audio = Data()
                 var first: Int?
                 var assembler = PCM24kAssembler()
                 let interval = signposter.begin()
                 let budget = firstAudioBudgetMs
-                let heard = AbortFlag()
                 let readyBeforeWait = transport.preparedFirstByteMs()
                 let watchdog = Task {
                     try? await Task.sleep(for: .milliseconds(budget))
