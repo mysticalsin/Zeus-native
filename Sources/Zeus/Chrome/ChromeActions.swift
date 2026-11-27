@@ -27,7 +27,9 @@ final class ChromeActions {
                 return nil // handled by DriveController / WalkthroughController / BrowserAgentRunner / CodeActions
 
             case .browserOpen:
-                guard let url = payload["url"]?.stringValue else { return nil }
+                guard let raw = payload["url"]?.stringValue, let url = BrowserAgentOp.webURL(raw) else {
+                    return "That link isn't a web page, so I left it."
+                }
                 _ = try await ChromeBridge.call("tab.open", ["url": .string(url)])
 
             case .panelOpen, .delegateDust, .delegateChrome:
