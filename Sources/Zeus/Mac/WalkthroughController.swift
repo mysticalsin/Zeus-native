@@ -67,8 +67,8 @@ final class WalkthroughController {
         guard isRunning else { return }
         session?.cancel()
         NSLog("[ZEUS] walkthrough: cancelled")
-        say?("Okay, tour stopped.")
         stop()
+        say?("Okay, tour stopped.")
     }
 
     private func clicked(at point: CGPoint) {
