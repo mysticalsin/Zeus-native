@@ -25,6 +25,11 @@ final class DemoDirector {
         task = Task { await run() }
     }
 
+    private func show(_ step: PlayDemoScript.Step, at point: CGPoint) {
+        say(step.spoken)
+        buddy.point(to: point, label: step.bolt)
+    }
+
     private func pause(_ seconds: Double) async -> Bool {
         try? await Task.sleep(for: .seconds(seconds))
         return !Task.isCancelled
@@ -47,9 +52,7 @@ final class DemoDirector {
         let mainFrame = (NSScreen.main ?? NSScreen.screens[0]).frame
         let iconTarget = statusItemFrame().map { CGPoint(x: $0.midX, y: $0.minY - 6) }
             ?? CGPoint(x: mainFrame.midX, y: mainFrame.midY)
-        let menuBar = PlayDemoScript.menuBar
-        say(menuBar.spoken)
-        buddy.point(to: iconTarget, label: menuBar.bolt)
+        show(PlayDemoScript.menuBar, at: iconTarget)
         guard await pause(7.5) else { return }
 
         // 3. A coding agent starts work; the notch peeks.
@@ -64,7 +67,7 @@ final class DemoDirector {
         notch.update(sessionID: "cc", status: .needsYou)
         guard await pause(0.6) else { return }
         if let approve = notch.approveButtonPoint {
-            buddy.point(to: approve, label: "approve or deny, or just say ok")
+            show(PlayDemoScript.approval, at: approve)
         }
         let decision = await verdict
         guard !Task.isCancelled else { return }

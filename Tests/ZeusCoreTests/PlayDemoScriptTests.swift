@@ -12,6 +12,16 @@ import Testing
         #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
     }
 
+    @Test func theApprovalDemoIsSpokenAndShown() {
+        let step = PlayDemoScript.approval
+        #expect(PlayDemoScript.ready(step))
+        #expect(step.showsOnScreen)
+        #expect(step.spoken == "This needs you. Approve or deny, or just say ok.")
+        #expect(step.bolt == "Approve or deny, or say ok")
+        #expect(PointerGuideCaptionSplit.boltText(step.bolt) == step.bolt)
+        #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
+    }
+
     @Test func aStepThatIsNotDrawnIsNotReady() {
         let spokenOnly = PlayDemoScript.Step(
             spoken: "Click the bolt anytime",

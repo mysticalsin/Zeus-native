@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Play Demo menu-bar moment. It is drawn on screen and spoken.
+/// Play Demo moments that are drawn on screen and spoken.
 /// The bolt gets the short line. The voice gets the sentence.
 public enum PlayDemoScript {
     public struct Step: Equatable, Sendable {
@@ -19,6 +19,12 @@ public enum PlayDemoScript {
     public static let menuBar = Step(
         spoken: "That's me up here. Click the bolt anytime.",
         bolt: "Click the bolt anytime",
+        showsOnScreen: true
+    )
+
+    public static let approval = Step(
+        spoken: "This needs you. Approve or deny, or just say ok.",
+        bolt: "Approve or deny, or say ok",
         showsOnScreen: true
     )
 
