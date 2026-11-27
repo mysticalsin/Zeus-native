@@ -4,8 +4,7 @@ import Foundation
 /// error becomes an in-character line from the persona bank (`ZeusVoiceLines.Situation.errorSpoken`).
 public enum SpokenFailure {
     public static func line(_ raw: String) -> String {
-        let text = raw.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = SpokenFailureBox.folded(raw)
         guard !text.isEmpty else { return ZeusVoiceLines.line(for: .errorSpoken) }
         let lowered = text.lowercased()
         if isQuota(lowered) { return "Every AI is out of quota." }
