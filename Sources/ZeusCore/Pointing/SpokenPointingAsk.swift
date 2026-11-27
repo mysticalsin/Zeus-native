@@ -24,11 +24,11 @@ public enum SpokenPointingAsk {
     /// The guide to draw, after the allowlist admits one click target. Nil when the words
     /// are not a point, the target is missing or secure, or the gate refuses.
     public static func show(in utterance: String, candidates: [PointingProposalCandidate]) -> Show? {
-        guard let phrase = askedLabel(in: utterance) else { return nil }
-        guard let match = best(phrase, in: candidates) else { return nil }
+        guard let ask = askedLabel(in: utterance) else { return nil }
+        guard let match = best(ask.phrase, in: candidates) else { return nil }
         let name = match.label.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return nil }
-        let summary = String("Point at \(name)".prefix(160))
+        let summary = String("\(ask.verb) \(name)".prefix(160))
         let draft = PointingProposalDraft(
             id: "spoken-point",
             kind: "guidance",
@@ -48,25 +48,33 @@ public enum SpokenPointingAsk {
         return Show(spoken: "\(name) is right here.", bolt: bolt, targetID: match.id)
     }
 
-    private static let leads = [
-        "point at ", "point to ", "show me where ", "show me ", "where is ", "where s ",
+    private static let leads: [(prefix: String, verb: String)] = [
+        ("point at ", "Point at"),
+        ("point to ", "Point at"),
+        ("point out ", "Point at"),
+        ("show me where ", "Point at"),
+        ("show me ", "Point at"),
+        ("highlight ", "Highlight"),
+        ("outline ", "Outline"),
+        ("where is ", "Point at"),
+        ("where s ", "Point at"),
     ]
 
-    private static func askedLabel(in utterance: String) -> String? {
+    private static func askedLabel(in utterance: String) -> (verb: String, phrase: String)? {
         let raw = utterance.lowercased()
         if raw.contains("://") || raw.contains("javascript:") || raw.contains("data:") || raw.contains("file:") {
             return nil
         }
         let key = normalized(utterance)
         guard !key.isEmpty else { return nil }
-        for lead in leads where key.hasPrefix(lead) {
-            var rest = String(key.dropFirst(lead.count))
+        for lead in leads where key.hasPrefix(lead.prefix) {
+            var rest = String(key.dropFirst(lead.prefix.count))
             if rest.hasPrefix("how ") || rest == "how" { return nil }
             var words = rest.split(separator: " ").map(String.init)
             while let first = words.first, ["the", "a", "an"].contains(first) { words.removeFirst() }
             rest = words.joined(separator: " ")
             guard !rest.isEmpty, rest.count <= 80 else { return nil }
-            return rest
+            return (lead.verb, rest)
         }
         return nil
     }

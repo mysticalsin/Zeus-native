@@ -14,6 +14,18 @@ import Testing
         #expect(PointerGuideCaptionSplit.boltText(shown?.bolt ?? "") == shown?.bolt)
     }
 
+    @Test func aSpokenHighlightAndOutlineUseTheSameGuide() {
+        let highlighted = SpokenPointingAsk.show(in: "highlight the File menu", candidates: [file, fileMenu, password])
+        #expect(highlighted?.targetID == "t4")
+        #expect(highlighted?.bolt == "Highlight File Menu")
+        #expect(highlighted?.spoken == "File Menu is right here.")
+        let outlined = SpokenPointingAsk.show(in: "outline File", candidates: [fileMenu, file])
+        #expect(outlined?.targetID == "t3")
+        #expect(outlined?.bolt == "Outline File")
+        #expect(SpokenPointingAsk.isAsk("highlight how a car can fly") == false)
+        #expect(SpokenPointingAsk.show(in: "highlight javascript:alert(1)", candidates: [file]) == nil)
+    }
+
     @Test func anExactShortLabelBeatsALongerOne() {
         let shown = SpokenPointingAsk.show(in: "show me File", candidates: [fileMenu, file])
         #expect(shown?.targetID == "t3")
