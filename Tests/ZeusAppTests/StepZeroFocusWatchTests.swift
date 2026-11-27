@@ -225,7 +225,7 @@ final class StepZeroFocusWatch: @unchecked Sendable {
     #if canImport(Darwin)
     private var fileInstalled: Bool { fileSource != nil }
 
-    private static let eventMask: DispatchSource.FileSystemEvent = [
+    nonisolated(unsafe) private static let eventMask: DispatchSource.FileSystemEvent = [
         .write, .extend, .attrib, .link, .rename, .delete,
     ]
 
