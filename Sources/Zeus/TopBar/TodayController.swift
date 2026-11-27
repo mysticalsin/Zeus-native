@@ -10,6 +10,8 @@ final class TodayController {
     static let shared = TodayController()
 
     private(set) var summary: TodaySummary?
+    /// The board drawn while the latest brief is spoken. Nil until a brief has been built.
+    private(set) var board: TodayBoardDraw?
     private(set) var vaultName: String?
     private(set) var scanning = false
     private var scannedAt = Date.distantPast
@@ -48,8 +50,14 @@ final class TodayController {
         let todays = events.filter { today.isDateInToday($0.start) }
             .map { (title: $0.title, time: $0.isAllDay ? "all day" : formatter.string(from: $0.start)) }
         let summary = summary ?? TodaySummary(day: TodoQuickAdd.dayString(Date()))
+        let facts = DailyBrief.board(summary: summary, events: todays, zeusTodos: TodoController.shared.items)
+        let weatherLine = weather.map { "It's \(Int($0.temperature.rounded())) degrees, high of \(Int($0.high.rounded()))." }
+        board = TodayBoardDraw.plan(events: TodayBoardDraw.eventLine(count: facts.eventCount, first: facts.firstEvent),
+                                    todos: TodayBoardDraw.todoLine(count: facts.todoCount, overdue: facts.overdue, first: facts.firstTodo),
+                                    meetings: TodayBoardDraw.meetingLine(count: facts.meetingCount, first: facts.firstMeeting),
+                                    weather: weatherLine)
         return DailyBrief.text(summary: summary, events: todays, zeusTodos: TodoController.shared.items,
-                               weather: weather.map { "It's \(Int($0.temperature.rounded())) degrees, high of \(Int($0.high.rounded()))." })
+                               weather: weatherLine)
     }
 
     func open(_ file: String) {

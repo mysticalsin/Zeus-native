@@ -140,6 +140,45 @@ public enum DailyBrief {
         if let weather { lines.append(weather) }
         return lines.joined(separator: " ")
     }
+
+    /// The same groups the spoken brief uses, as counts and the first name, so the on-screen board
+    /// does not invent a different day.
+    public struct Board: Equatable, Sendable {
+        public var eventCount: Int
+        public var firstEvent: String?
+        public var todoCount: Int
+        public var overdue: Int
+        public var firstTodo: String?
+        public var meetingCount: Int
+        public var firstMeeting: String?
+
+        public init(eventCount: Int, firstEvent: String?, todoCount: Int, overdue: Int, firstTodo: String?,
+                    meetingCount: Int, firstMeeting: String?) {
+            self.eventCount = eventCount
+            self.firstEvent = firstEvent
+            self.todoCount = todoCount
+            self.overdue = overdue
+            self.firstTodo = firstTodo
+            self.meetingCount = meetingCount
+            self.firstMeeting = firstMeeting
+        }
+    }
+
+    public static func board(summary: TodaySummary, events: [(title: String, time: String)], zeusTodos: [TodoItem]) -> Board {
+        let todayTodos = zeusTodos.filter { todo in
+            guard !todo.done, let due = todo.due, !due.isEmpty else { return false }
+            return due <= summary.day
+        }
+        let titles = todayTodos.map(\.title) + summary.tasks.map(\.title)
+        let overdue = todayTodos.filter { ($0.due ?? summary.day) < summary.day }.count + summary.tasks.filter(\.overdue).count
+        return Board(eventCount: events.count,
+                     firstEvent: events.first.map { "\($0.title) at \($0.time)" },
+                     todoCount: titles.count,
+                     overdue: overdue,
+                     firstTodo: titles.first,
+                     meetingCount: summary.meetings.count,
+                     firstMeeting: summary.meetings.first?.title)
+    }
 }
 
 /// The one place ZEUS may write in a second brain: `00_Inbox/from-zeus/`.

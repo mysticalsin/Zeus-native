@@ -666,6 +666,46 @@ final class VoiceTurnController {
         return TurnResult(spoken: answer)
     }
 
+    private func speakToday(_ plan: TodayBoardDraw, _ spoken: String, transcript: String, speak: Bool) -> TurnResult {
+        showTodayBoard(plan, speak: speak)
+        if speak { say(spoken) }
+        buddy.showCaption(plan.boltCaption(at: 0))
+        remember(transcript, spoken)
+        return TurnResult(spoken: spoken)
+    }
+
+    /// Draws today's brief on the display under the pointer: Today, then the calendar, the to-dos, and the weather.
+    /// The caller speaks the full brief. The marks still appear when that speech is off.
+    private func showTodayBoard(_ plan: TodayBoardDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTodayBoard(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTodayBoard(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTodayBoard(_ plan: TodayBoardDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws a coding-agent start on the display under the pointer: Building, then the tool, then the task.
     /// The caller speaks the full line. The marks still appear when that speech is off.
     private func showAgentStart(_ plan: AgentStartDraw, speak: Bool) {
@@ -848,6 +888,14 @@ final class VoiceTurnController {
                     buddy.showCaption(plan.boltCaption(at: 0))
                     remember(transcript, local)
                     return TurnResult(spoken: local)
+                }
+            }
+            if let kind = TodoVoice.parse(transcript) {
+                if case .today = kind, let plan = TodayController.shared.board {
+                    return speakToday(plan, local, transcript: transcript, speak: speak)
+                }
+                if case .brief = kind, let plan = TodayController.shared.board {
+                    return speakToday(plan, local, transcript: transcript, speak: speak)
                 }
             }
             return speakInstant(local, transcript: transcript, speak: speak)

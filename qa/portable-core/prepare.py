@@ -115,9 +115,10 @@ GROUPS = {
     "explain-showcase": (
         core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift", "Present/ResearchSourceDraw.swift", "Present/LocalAnswerDraw.swift",
              "Present/TodoListDraw.swift", "Present/CalendarEventDraw.swift", "Present/AgentStartDraw.swift",
+             "Present/TodayBoardDraw.swift",
              "Explanation/ExplanationEquationGeometryBox.swift", "Explanation/ExplanationEquationGeometry.swift"),
         tests("ExplainShowcaseTests", "ResearchSourceDrawTests", "LocalAnswerDrawTests", "TodoListDrawTests",
-              "CalendarEventDrawTests", "AgentStartDrawTests"),
+              "CalendarEventDrawTests", "AgentStartDrawTests", "TodayBoardDrawTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Present/CompanionMotionBox.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
