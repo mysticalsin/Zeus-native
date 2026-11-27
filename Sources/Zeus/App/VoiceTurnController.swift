@@ -1248,6 +1248,38 @@ final class VoiceTurnController {
         return TurnResult(spoken: reply)
     }
 
+    /// Draws a saved routine on the display under the pointer: Routine, then the name, then when it runs.
+    /// The caller speaks the full line. The marks still appear when that speech is off.
+    private func showRoutineSaved(_ plan: RoutineSavedDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyRoutineSaved(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyRoutineSaved(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyRoutineSaved(_ plan: RoutineSavedDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     private func handleRoutineVoice(_ transcript: String, speak: Bool) -> TurnResult? {
         guard let parsed = RoutineVoiceParse.parse(transcript) else { return nil }
         if CLIAccess.turnRestricted { return refuseRestricted(speak: speak) }
@@ -1255,7 +1287,17 @@ final class VoiceTurnController {
         RoutineRunner.shared.add(routine)
         let reply = "Routine saved."
         buddy.idle()
-        if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+        let when = RoutineSavedDraw.whenLine(daily: parsed.schedule.days == .daily, hour: parsed.schedule.hour)
+        if let plan = RoutineSavedDraw.plan(name: parsed.name, when: when) {
+            showRoutineSaved(plan, speak: speak)
+            if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+            buddy.showCaption(plan.boltCaption(at: 0))
+        } else if speak {
+            say(reply)
+        } else {
+            buddy.showCaption(reply)
+            buddy.hideCaption()
+        }
         return TurnResult(spoken: reply)
     }
 
