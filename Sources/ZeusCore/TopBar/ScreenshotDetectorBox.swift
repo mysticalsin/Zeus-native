@@ -28,7 +28,7 @@ public enum ScreenshotDetectorBox {
     ]
 
     public static func isScreenshot(filename: String) -> Bool {
-        let name = filename.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = ScreenshotFilenameBox.trimmedName(filename)
         guard !name.hasPrefix(".") else { return false }
 
         let pathExtension = (name as NSString).pathExtension.lowercased()
