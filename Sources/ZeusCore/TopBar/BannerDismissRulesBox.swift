@@ -8,7 +8,7 @@ public enum BannerDismissRulesBox {
 
     /// A blank id opens the Notifications pane. Any other id is trimmed and passed as the `id` query.
     public static func url(for bundleID: String) -> URL? {
-        let trimmed = bundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = BannerBundleBlankBox.trimmedBundle(bundleID)
         guard !trimmed.isEmpty else { return URL(string: settingsPane) }
         return URL(string: "\(settingsPane)?id=\(trimmed)")
     }
