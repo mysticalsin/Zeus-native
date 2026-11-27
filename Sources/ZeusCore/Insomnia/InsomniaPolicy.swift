@@ -115,7 +115,7 @@ public struct InsomniaDuration: Equatable, Sendable {
 
     /// "23:30", "7:05": a clock time, or nil.
     public static func parseClock(_ text: String) -> (hour: Int, minute: Int)? {
-        let parts = text.trimmingCharacters(in: .whitespaces).split(separator: ":")
+        let parts = InsomniaClockBox.trimmedClock(text).split(separator: ":")
         guard parts.count == 2, let hour = Int(parts[0]), let minute = Int(parts[1]),
               (0...23).contains(hour), (0...59).contains(minute), parts[1].count == 2 else { return nil }
         return (hour, minute)
