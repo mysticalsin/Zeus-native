@@ -73,6 +73,22 @@ public struct PointerGuidePose: Equatable, Sendable {
     public var flight: CompanionFlight
 }
 
+/// One ring the live overlay already resolved, turned into a guide plan.
+public enum PointerGuideAdmission {
+    public static func step(id: String, bolt: CGPoint, ring: CGRect, caption: String, reduceMotion: Bool) -> PointerGuidePlan? {
+        let line = caption.split(whereSeparator: \.isNewline).first.map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+        guard (1...PointerGuidePlan.maxCaption).contains(line.count) else { return nil }
+        guard ring.width > 0, ring.height > 0, bolt.x.isFinite, bolt.y.isFinite else { return nil }
+        let safeID = id.range(of: #"^[A-Za-z0-9_-]{1,64}$"#, options: .regularExpression) != nil ? id : "step"
+        let step = PointerGuideStep(
+            id: safeID,
+            bolt: PointerGuidePoint(x: bolt.x, y: bolt.y),
+            ring: PointerGuideRect(x: ring.minX, y: ring.minY, width: ring.width, height: ring.height),
+            caption: line)
+        return PointerGuidePlan(steps: [step], reduceMotion: reduceMotion)
+    }
+}
+
 /// The steps from one model reply. Clicks move through them on device.
 public struct PointerGuidePlan: Equatable, Sendable {
     public static let captionCharacterDelay: TimeInterval = 0.04

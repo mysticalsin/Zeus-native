@@ -797,6 +797,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.topBar.show(.permission("Pointing needs Input Monitoring or Accessibility to see the hold keys.", pane: "Privacy_ListenEvent"))
         }
         self.pointing = pointing; pointingProviders = providers
+        buddy.onPointingClick = { [weak pointing] point in pointing?.guideClick(at: point) ?? false }
         return pointing
     }
 

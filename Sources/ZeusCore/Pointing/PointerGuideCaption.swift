@@ -29,6 +29,19 @@ public enum PointerGuideCaptionSplit {
         text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
     }
 
+    /// The caption the bolt may show. One line is the action. Two or three lines are
+    /// what it is, what to do, and what happens next. A fourth line, or any line longer
+    /// than `maxLineCharacters`, stays off the overlay.
+    public static func boltText(_ raw: String) -> String? {
+        let pieces = raw.split(whereSeparator: \.isNewline).map { normalize(String($0)) }.filter { !$0.isEmpty }
+        guard !pieces.isEmpty, pieces.count <= maxLines else { return nil }
+        let what = pieces.count == 1 ? "" : pieces[0]
+        let todo = pieces.count == 1 ? pieces[0] : pieces[1]
+        let next = pieces.count > 2 ? pieces[2] : ""
+        guard let lines = overlayLines(whatItIs: what, whatToDo: todo, whatHappensNext: next, detail: "") else { return nil }
+        return lines.joined(separator: "\n")
+    }
+
     private static func normalize(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

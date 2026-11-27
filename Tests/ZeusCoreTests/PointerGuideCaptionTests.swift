@@ -38,6 +38,15 @@ struct PointerGuideCaptionTests {
 
     private let shareLines = ["Share button", "Click Share", "The share menu opens"]
 
+    @Test func theBoltShowsThreeShortLinesAndDropsAFourth() {
+        let shown = PointerGuideCaptionSplit.boltText("Share button\nClick Share\nThe share menu opens")
+        #expect(shown == shareLines.joined(separator: "\n"))
+        #expect(PointerGuideCaptionSplit.boltText("Click File") == "Click File")
+        #expect(PointerGuideCaptionSplit.boltText(String(repeating: "a", count: 41)) == nil)
+        #expect(PointerGuideCaptionSplit.boltText("One\nTwo\nThree\nFour") == nil)
+        #expect(PointerGuideCaptionSplit.boltText("   \n  ") == nil)
+    }
+
     @Test func theCaptionIsThreeShortLinesAndTheDetailStaysOff() throws {
         let frame = try loaded(named: "share-menu")
         let lines = try #require(PointerGuideCaptionSplit.overlayLines(

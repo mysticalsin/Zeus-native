@@ -729,13 +729,38 @@ final class PointingController {
         guard let ring = marks.filter({ $0.geometry.kind == .ring }).min(by: { $0.id < $1.id }),
               let global = capture.geometry.globalPoint(fromImage: .init(x: ring.transform.position.x, y: ring.transform.position.y),
                                                         current: capture.currentDisplay) else { return }
-        let text = marks.filter { $0.geometry.kind == .label }.min(by: { $0.id < $1.id })?.text ?? "Here"
-        startWatching(atGlobal: CGPoint(x: global.x, y: global.y))
-        if marker.flight(CGPoint(x: global.x, y: global.y), String(text.prefix(40))) {
+        let raw = marks.filter { $0.geometry.kind == .label }.min(by: { $0.id < $1.id })?.text ?? "Here"
+        let caption = PointerGuideCaptionSplit.boltText(raw) ?? "Here"
+        let bolt = CGPoint(x: global.x, y: global.y)
+        startWatching(atGlobal: bolt)
+        if marker.flight(bolt, caption) {
             flightLaunched = true
             metrics.flightStartAt = services.now()
             metrics.flightUsedFallback = fallback
+            admitLiveGuide(id: ring.id, bolt: bolt, caption: caption)
         }
+    }
+
+    /// A click on the admitted ring moves to the next step. A miss stays on this step.
+    /// Returns true when a guide is up, so the companion does not treat the click as a dismissal.
+    @discardableResult
+    func guideClick(at screen: CGPoint) -> Bool {
+        guard session.state == .guiding, session.guide != nil else { return false }
+        let transition = session.guideClick(at: PointerGuidePoint(x: screen.x, y: screen.y))
+        if transition.effects.contains(.showGuideStep), let step = session.guide?.current {
+            let caption = PointerGuideCaptionSplit.boltText(step.caption) ?? step.caption
+            _ = marker.flight(CGPoint(x: step.bolt.x, y: step.bolt.y), caption)
+        } else if transition.to == .idle {
+            marker.idle()
+        }
+        return true
+    }
+
+    private func admitLiveGuide(id: String, bolt: CGPoint, caption: String) {
+        guard session.state == .speaking else { return }
+        let ring = CGRect(x: bolt.x - 28, y: bolt.y - 18, width: 56, height: 36)
+        guard let plan = PointerGuideAdmission.step(id: id, bolt: bolt, ring: ring, caption: caption, reduceMotion: explanation.reduceMotion) else { return }
+        _ = session.admitGuide(plan)
     }
 
     private func turnEnded(_ error: Error?) {
@@ -747,7 +772,7 @@ final class PointingController {
         // Speech finished (or captions only). If the flight never left, send it now.
         if !flightLaunched, let scene = explanation.scene { revealed(scene, fallback: true) }
         if !flightLaunched { marker.idle() }
-        _ = session.send(.turnCompleted)
+        if session.state != .guiding { _ = session.send(.turnCompleted) }
         emitTrace(.completed)
     }
 

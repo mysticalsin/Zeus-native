@@ -314,6 +314,9 @@ final class BuddyController: NSObject {
         model.mode = .flying
     }
 
+    /// A click while the companion is pointing. Return true when a guide consumed it.
+    var onPointingClick: (@MainActor (CGPoint) -> Bool)?
+
     /// The next click or key removes the ring and sends the companion home.
     private func clearRing() {
         guard ring.clearOnUserInput() else { return }
@@ -476,6 +479,7 @@ final class BuddyController: NSObject {
         pointingClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.model.mode == .pointing else { return }
+                if self.onPointingClick?(NSEvent.mouseLocation) == true { return }
                 self.idle()
             }
         }

@@ -192,6 +192,16 @@ struct PointerGuidePlanTests {
         #expect(PointerGuidePlan(steps: many, reduceMotion: true) == nil)
     }
 
+    @Test func aLiveRingBecomesOneLocalStep() {
+        let bolt = CGPoint(x: 80, y: 740)
+        let ring = CGRect(x: 40, y: 720, width: 80, height: 28)
+        let plan = PointerGuideAdmission.step(id: "ring-1", bolt: bolt, ring: ring, caption: "Click File\nThe menu opens", reduceMotion: false)
+        #expect(plan?.current?.caption == "Click File")
+        #expect(plan?.current?.ring.contains(PointerGuidePoint(x: 50, y: 730)) == true)
+        #expect(PointerGuideAdmission.step(id: "ring-1", bolt: bolt, ring: ring, caption: String(repeating: "a", count: 41), reduceMotion: false) == nil)
+        #expect(PointerGuideAdmission.step(id: "ring-1", bolt: bolt, ring: .zero, caption: "Click File", reduceMotion: false) == nil)
+    }
+
     @Test func admitGuideWhileSpeakingIsTheOnlyModelTurn() throws {
         var idle = PointingSession()
         let guide = try plan(named: "file-then-export")
