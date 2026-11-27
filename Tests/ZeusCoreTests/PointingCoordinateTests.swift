@@ -29,6 +29,15 @@ struct PointingCoordinateTests {
                 "got \(r)", sourceLocation: sourceLocation)
     }
 
+    @Test func screenshotTopLeftLandsOnTheTopLeftOfThatDisplay() {
+        let capture = CaptureMap(displayID: 2, pixelWidth: 1920, pixelHeight: 1080)
+        let ctx = MapContext(displayID: 2, capture: capture)
+        let topLeft = mapper.convert(CGPoint(x: 0, y: 0), from: .pixel, to: .screen, context: ctx)
+        #expect(topLeft == CGPoint(x: -1920, y: 1080))
+        let center = mapper.convert(CGPoint(x: 960, y: 540), from: .pixel, to: .screen, context: ctx)
+        #expect(center == CGPoint(x: -960, y: 540))
+    }
+
     @Test func retinaDisplayDownscaledToTheDeliveredImage() throws {
         let (geometry, display) = try capture(Self.main, full: .init(width: 2880, height: 1800), delivered: .init(width: 1440, height: 900))
         // AX frame: 100 right of the left edge, 50 below the top.
