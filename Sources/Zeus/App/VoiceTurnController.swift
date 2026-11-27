@@ -799,11 +799,13 @@ final class VoiceTurnController {
         } else if ready {
             let beats = plan.schedule.indexes
             if let first = beats.first { surface.reveal(sentence: first, token: token) }
+            flyGuide(plan, at: 0, shot: shot, label: penLabel)
             explainReveal = Task { @MainActor [weak self] in
-                for beat in beats.dropFirst() {
+                for (offset, beat) in beats.dropFirst().enumerated() {
                     try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
                     guard !Task.isCancelled else { return }
                     self?.presenter.reveal(sentence: beat, token: token)
+                    self?.flyGuide(plan, at: Double(offset + 1) * ExplainBeatSchedule.gap, shot: shot, label: penLabel)
                 }
                 guard let self, !Task.isCancelled else { return }
                 await self.finishExplainDrawing(token: token, speak: speak)
@@ -834,6 +836,11 @@ final class VoiceTurnController {
             }
         }
         presenter.answerFinished(token: token)
+    }
+
+    private func flyGuide(_ plan: ExplainShowcase, at elapsed: TimeInterval, shot: ScreenShot, label: String) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: label)
     }
 
     private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID, label: String) {

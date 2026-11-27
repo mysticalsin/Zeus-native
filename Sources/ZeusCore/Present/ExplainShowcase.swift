@@ -48,6 +48,35 @@ public struct ExplainShowcase: Equatable, Sendable {
                                schedule: ExplainBeatSchedule(indexes: indexes), stroke: stroke)
     }
 
+    /// Where the bolt sits at `elapsed`. A moving ask follows the pen tip. A still ask
+    /// sits on the newest mark: a ring, then an arrow, then the ink, then a card.
+    public func guideBolt(at elapsed: TimeInterval) -> TalkDraw.Point? {
+        if travels { return penFrame(at: elapsed)?.bolt }
+        let shown = Set(schedule.revealed(at: elapsed))
+        let marks = draw.marks.filter { shown.contains($0.at) }
+        guard let beat = marks.map(\.at).max() else { return nil }
+        let atBeat = marks.filter { $0.at == beat }
+        for mark in atBeat {
+            if case .ring = mark.shape { return Self.anchor(of: mark) }
+        }
+        for mark in atBeat {
+            if case .arrow = mark.shape { return Self.anchor(of: mark) }
+        }
+        for mark in atBeat {
+            if case .ink = mark.shape { return Self.anchor(of: mark) }
+        }
+        return atBeat.last.flatMap(Self.anchor(of:))
+    }
+
+    private static func anchor(of mark: TalkDraw.Mark) -> TalkDraw.Point? {
+        switch mark.shape {
+        case .ring(let center, _): return center
+        case .arrow(let from, let to): return .init(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+        case .ink(let points): return points.last
+        case .card(let origin, _): return origin
+        }
+    }
+
     /// The ink visible at `elapsed`. Without audio, one new point every `ExplainBeatSchedule.gap`.
     /// With sentence start times, points stay inside the sentence that is actually playing.
     public func penFrame(at elapsed: TimeInterval, audioStarts: [TimeInterval?] = []) -> ExplainPenFrame? {

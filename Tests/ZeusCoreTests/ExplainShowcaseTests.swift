@@ -83,6 +83,24 @@ import Testing
         #expect(showcase.draw.marks.last?.at == 2)
     }
 
+    @Test func aStillExplainMovesTheBoltWithEachBeat() throws {
+        let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
+        #expect(showcase.travels == false)
+        let first = try #require(showcase.guideBolt(at: 0))
+        #expect(first == TalkDraw.Point(x: 320, y: 320))
+        let second = try #require(showcase.guideBolt(at: ExplainBeatSchedule.gap))
+        #expect(second == TalkDraw.Point(x: 690, y: 320))
+        let third = try #require(showcase.guideBolt(at: ExplainBeatSchedule.gap * 2))
+        #expect(third == TalkDraw.Point(x: 920, y: 280))
+        #expect(first != second && second != third)
+    }
+
+    @Test func aMovingExplainKeepsTheBoltOnThePenTip() throws {
+        let showcase = try #require(ExplainShowcase.plan(for: Self.tesla))
+        let frame = try #require(showcase.penFrame(at: 0))
+        #expect(showcase.guideBolt(at: 0) == frame.bolt)
+    }
+
     @Test func aCommandOrABareExplainProducesNoShowcase() {
         #expect(ExplainShowcase.plan(for: "what time is it") == nil)
         #expect(ExplainShowcase.plan(for: "open Safari") == nil)
