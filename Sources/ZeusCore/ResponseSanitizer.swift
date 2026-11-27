@@ -83,6 +83,6 @@ public enum ResponseSanitizer: Sendable {
         }
         stripped = stripped.replacingOccurrences(
             of: trailingBareRoleMarkerPattern, with: "", options: [.regularExpression, .caseInsensitive])
-        return stripped.trimmingCharacters(in: .whitespacesAndNewlines)
+        return SanitizedReplyBox.trimmedText(stripped)
     }
 }
