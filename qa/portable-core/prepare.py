@@ -162,9 +162,10 @@ GROUPS = {
         core("AgentChoiceDismiss.swift", "JSONValue.swift", "FacePresence/FaceTemplateProof.swift",
              "Earbuds/EarbudsCuePolicy.swift", "Earbuds/EarbudsCuePolicyBox.swift",
              "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift",
-             "BrowserAgent/WebAddress.swift"),
+             "BrowserAgent/WebAddress.swift",
+             "FacePresence/SpoofCuesBox.swift", "FacePresence/SpoofCues.swift", "FacePresence/FaceMatch.swift"),
         tests("AgentChoiceDismissTests", "FaceTemplateProofTests", "EarbudsCuePolicyTests", "EarbudsCuePolicyBoxTests",
-              "EarbudsModeSpeechTests", "BrowserWebURLTests"),
+              "EarbudsModeSpeechTests", "BrowserWebURLTests", "FaceMatchCeilingTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
@@ -315,7 +316,7 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe", "agent-choice-dismiss") and platform_name == "linux"
     extra_target = ''
     products = ''
     core_dependencies = '[]'

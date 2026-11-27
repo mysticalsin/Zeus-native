@@ -92,6 +92,15 @@ struct FaceMatchTests {
         #expect(!FaceMatch.matches(observation([.nan, 0, 0]), face: cloud))
     }
 
+    @Test func aStoredLimitAboveTheCeilingDoesNotAdmitAStranger() {
+        let owner = observation([1, 0])
+        let stranger = observation([0, 1])
+        #expect(FaceMatch.matches(owner, face: face([[1, 0]], threshold: 10)))
+        #expect(!FaceMatch.matches(stranger, face: face([[1, 0]], threshold: 10)))
+        #expect(!FaceMatch.matches(owner, face: face([[1, 0]], threshold: .nan)))
+        #expect(!FaceMatch.matches(owner, face: face([[1, 0]], threshold: -1)))
+    }
+
     @Test func aSwitchedOffFaceNeverMatches() {
         let samples = [planar(0), planar(5), planar(10)]
         let seen = observation(planar(5))

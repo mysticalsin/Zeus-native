@@ -117,9 +117,12 @@ public enum FaceMatch {
     /// the nearest sample are both within the face's threshold.
     public static func matches(_ observation: FaceObservation, face: EnrolledFace) -> Bool {
         guard face.isEnabled, face.revision == observation.revision,
+              face.threshold.isFinite, face.threshold >= 0,
               let score = score(observation, against: face)
         else { return false }
-        return score.centroidDistance <= face.threshold && score.nearestSampleDistance <= face.threshold
+        // A stored limit above the ceiling would let a stranger through. The floor stays an enrollment rule.
+        let limit = min(face.threshold, thresholdCeiling)
+        return score.centroidDistance <= limit && score.nearestSampleDistance <= limit
     }
 
     /// Among the faces that match, the one whose centroid is nearest. Nil when none matches.
