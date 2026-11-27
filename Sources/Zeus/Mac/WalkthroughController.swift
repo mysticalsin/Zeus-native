@@ -98,8 +98,8 @@ final class WalkthroughController {
         self.session = session
         if session.state == .finished {
             NSLog("[ZEUS] walkthrough: finished")
-            say?("That's it, you're done.")
             stop()
+            say?("That's it, you're done.")
         } else {
             present()
         }

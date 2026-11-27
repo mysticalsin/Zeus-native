@@ -1265,7 +1265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.earbudsNotch.present(facts, id: id, speak: speak)
         }
         WalkthroughController.shared.buddy = buddy
-        WalkthroughController.shared.say = { [weak self] text in self?.voice.say(text) }
+        WalkthroughController.shared.say = { [weak self] text in self?.voice.walkthroughSaid(text) }
         AnnotationController.shared.onMark = { [weak self] prompt, shots in
             guard let self else { return }
             Task { @MainActor in _ = await self.voice?.annotationTurn(prompt, screenshots: shots) }
