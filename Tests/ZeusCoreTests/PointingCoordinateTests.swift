@@ -47,6 +47,12 @@ struct PointingCoordinateTests {
         #expect(PresentScreenIndex.offset(screen: 3, count: 2) == nil)
         #expect(PresentScreenIndex.offset(screen: 0, count: 2) == nil)
         #expect(PresentScreenIndex.offset(screen: 1, count: 0) == nil)
+        #expect(PresentPixelBounds.contains(x: 0, y: 0, width: 100, height: 80))
+        #expect(PresentPixelBounds.contains(x: 99, y: 79, width: 100, height: 80))
+        #expect(!PresentPixelBounds.contains(x: 100, y: 40, width: 100, height: 80))
+        #expect(!PresentPixelBounds.contains(x: -1, y: 0, width: 100, height: 80))
+        #expect(PresentPixelBounds.intersects(x: -10, y: 4, width: 20, height: 8, imageWidth: 100, imageHeight: 80))
+        #expect(!PresentPixelBounds.intersects(x: 100, y: 0, width: 10, height: 10, imageWidth: 100, imageHeight: 80))
     }
 
     @Test func retinaDisplayDownscaledToTheDeliveredImage() throws {

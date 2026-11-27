@@ -36,6 +36,18 @@ public enum PresentScreenIndex {
     }
 }
 
+/// Screenshot pixels. A point past the image is not pulled back onto it.
+public enum PresentPixelBounds {
+    public static func contains(x: Int, y: Int, width: Int, height: Int) -> Bool {
+        width > 0 && height > 0 && x >= 0 && y >= 0 && x < width && y < height
+    }
+
+    public static func intersects(x: Int, y: Int, width: Int, height: Int, imageWidth: Int, imageHeight: Int) -> Bool {
+        guard width > 0, height > 0, imageWidth > 0, imageHeight > 0 else { return false }
+        return x + width > 0 && y + height > 0 && x < imageWidth && y < imageHeight
+    }
+}
+
 /// How close a ring or trail must land, in physical pixels.
 /// 24 px at 1080p (scale 1). 48 px at 4K: scale 2, or a panel at least 3840 px wide.
 public enum PresentTolerance {
