@@ -838,7 +838,16 @@ final class VoiceTurnController {
         guard let path = SpotlightQuery.pick(paths: paths, query: query) else {
             let missing = "I couldn't find that."
             buddy.idle()
-            if speak { say(missing) } else { buddy.showCaption(missing); buddy.hideCaption() }
+            if let visual = FileFoundDraw.missing() {
+                showFileFound(visual, speak: speak)
+                if speak { say(missing) } else { buddy.showCaption(missing); buddy.hideCaption() }
+                buddy.showCaption(visual.boltCaption(at: 0))
+            } else if speak {
+                say(missing)
+            } else {
+                buddy.showCaption(missing)
+                buddy.hideCaption()
+            }
             remember(transcript, missing)
             return TurnResult(spoken: missing)
         }
@@ -846,7 +855,16 @@ final class VoiceTurnController {
         let name = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
         let answer = "Opening \(name)."
         buddy.idle()
-        if speak { say(answer) } else { buddy.showCaption(answer); buddy.hideCaption() }
+        if let visual = FileFoundDraw.plan(name: name) {
+            showFileFound(visual, speak: speak)
+            if speak { say(answer) } else { buddy.showCaption(answer); buddy.hideCaption() }
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else if speak {
+            say(answer)
+        } else {
+            buddy.showCaption(answer)
+            buddy.hideCaption()
+        }
         remember(transcript, answer)
         return TurnResult(spoken: answer, actions: ["files \(path)"])
     }
@@ -914,6 +932,38 @@ final class VoiceTurnController {
         case .ask(let question, let engine): return askBack(question, engine: engine, transcript: transcript, speak: speak)
         case .miss: return nil
         }
+    }
+
+    /// Draws a found file on the display under the pointer while Zeus says it is opening.
+    /// A miss shows Not found. The caller speaks the full line.
+    private func showFileFound(_ plan: FileFoundDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFileFound(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFileFound(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFileFound(_ plan: FileFoundDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
     /// Draws a Beamer command on the display under the pointer while it runs.
