@@ -666,6 +666,38 @@ final class VoiceTurnController {
         return TurnResult(spoken: answer)
     }
 
+    /// Draws added to-dos on the display under the pointer, one title at a time.
+    /// The caller speaks the full line. The marks still appear when that speech is off.
+    private func showTodoList(_ plan: TodoListDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTodoList(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTodoList(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTodoList(_ plan: TodoListDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws the short local answer on the display under the pointer. The caller speaks the full line.
     private func showLocalAnswer(_ plan: LocalAnswerDraw, speak: Bool) {
         clearDrawingForNewTurn()
@@ -735,6 +767,16 @@ final class VoiceTurnController {
         }
         // To-dos and the daily brief are answered on the Mac, no model call.
         if let local = await LocalTurns.handle(transcript, topBar: notch.topBar) {
+            if case .add(let items)? = TodoVoice.parse(transcript) {
+                let titles = items.map { TodoQuickAdd.parse($0).title }
+                if let plan = TodoListDraw.plan(titles: titles) {
+                    showTodoList(plan, speak: speak)
+                    if speak { say(local) }
+                    buddy.showCaption(plan.boltCaption(at: 0))
+                    remember(transcript, local)
+                    return TurnResult(spoken: local)
+                }
+            }
             return speakInstant(local, transcript: transcript, speak: speak)
         }
         if let showcase = ExplainShowcase.plan(for: transcript) {
