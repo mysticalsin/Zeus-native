@@ -57,7 +57,7 @@ public enum EarbudsCuePolicyBox {
         switch cue.kind {
         case .levels:
             guard case .earbuds(let currentID, _, true) = current else { return false }
-            return currentID == id
+            return trimmedID(currentID) == id
         case .connected, .disconnected:
             return true
         }
