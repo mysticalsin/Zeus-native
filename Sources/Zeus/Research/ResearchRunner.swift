@@ -17,6 +17,8 @@ final class ResearchRunner {
 
     weak var notch: NotchController?
     var say: (String) -> Void = { _ in }
+    /// Draws the source sites while the summary is spoken. No-op when there is no web source.
+    var showSources: (ResearchSourceDraw, Bool) -> Void = { _, _ in }
 
     private(set) var isRunning = false
     private var task: Task<(ResearchReport.Parsed?, String, String?), Never>?
@@ -29,6 +31,7 @@ final class ResearchRunner {
         var report: URL?
         var problem: String?
         var cancelled = false
+        var sources: [String] = []
     }
 
     /// Runs one question to the end. nil when another run is going.
@@ -59,7 +62,7 @@ final class ResearchRunner {
         var spoken = parsed.summary.isEmpty ? "Done. The report is saved." : parsed.summary
         if report == nil { spoken += " I couldn't save the report." }
         record(question: question, depth: depth, parsed: parsed, engine: engine, report: report)
-        return finish(Outcome(spoken: spoken, report: report), question: question, depth: depth, speak: speak, engine: engine)
+        return finish(Outcome(spoken: spoken, report: report, sources: parsed.sources), question: question, depth: depth, speak: speak, engine: engine)
     }
 
     func stop() {
@@ -174,6 +177,9 @@ final class ResearchRunner {
             }
         }
         AvatarStatus.shared.flash(outcome.problem == nil && !outcome.cancelled ? .done : .error, for: 2)
+        if let plan = ResearchSourceDraw.plan(sources: outcome.sources) {
+            showSources(plan, speak && !outcome.spoken.isEmpty)
+        }
         if speak, !outcome.spoken.isEmpty { say(outcome.spoken) }
         return outcome
     }

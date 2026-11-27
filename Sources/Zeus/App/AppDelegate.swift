@@ -1251,6 +1251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CodeActions.shared.say = { [weak self] text in self?.voice.say(text) }
         ResearchRunner.shared.notch = notch
         ResearchRunner.shared.say = { [weak self] text in self?.voice.say(text) }
+        ResearchRunner.shared.showSources = { [weak self] plan, speak in self?.voice.showResearch(plan, speak: speak) }
         WalkthroughController.shared.buddy = buddy
         WalkthroughController.shared.say = { [weak self] text in self?.voice.say(text) }
         AnnotationController.shared.onMark = { [weak self] prompt, shots in
