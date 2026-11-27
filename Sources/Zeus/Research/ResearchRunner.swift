@@ -19,6 +19,8 @@ final class ResearchRunner {
     var say: (String) -> Void = { _ in }
     /// Draws the source sites while the summary is spoken. No-op when there is no web source.
     var showSources: (ResearchSourceDraw, Bool) -> Void = { _, _ in }
+    /// Draws a saved report when there are no source sites. The voice says the line.
+    var showReportSaved: (ReportSavedDraw, String, Bool) -> Void = { _, _, _ in }
 
     private(set) var isRunning = false
     private var task: Task<(ResearchReport.Parsed?, String, String?), Never>?
@@ -179,8 +181,12 @@ final class ResearchRunner {
         AvatarStatus.shared.flash(outcome.problem == nil && !outcome.cancelled ? .done : .error, for: 2)
         if let plan = ResearchSourceDraw.plan(sources: outcome.sources) {
             showSources(plan, speak && !outcome.spoken.isEmpty)
+            if speak, !outcome.spoken.isEmpty { say(outcome.spoken) }
+        } else if let saved = ReportSavedDraw.from(line: outcome.spoken) {
+            showReportSaved(saved, outcome.spoken, speak && !outcome.spoken.isEmpty)
+        } else if speak, !outcome.spoken.isEmpty {
+            say(outcome.spoken)
         }
-        if speak, !outcome.spoken.isEmpty { say(outcome.spoken) }
         return outcome
     }
 }

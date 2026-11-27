@@ -1258,6 +1258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ResearchRunner.shared.notch = notch
         ResearchRunner.shared.say = { [weak self] text in self?.voice.say(text) }
         ResearchRunner.shared.showSources = { [weak self] plan, speak in self?.voice.showResearch(plan, speak: speak) }
+        ResearchRunner.shared.showReportSaved = { [weak self] plan, line, speak in self?.voice.showReportSaved(plan, line: line, speak: speak) }
         earbudsNotch.topBar = topBar
         earbudsNotch.say = { [weak self] text in self?.voice.say(text) }
         earbudsNotch.hideDetails = { MeetingState.hideDetails }
