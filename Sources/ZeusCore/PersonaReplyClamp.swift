@@ -11,7 +11,7 @@ public enum PersonaReplyClamp: Sendable {
     }
 
     public static func kind(for transcript: String) -> Kind {
-        let text = transcript.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = PersonaReplyClampBox.trimmedText(transcript.lowercased())
         if text.hasPrefix("thank") || text == "thanks" || text.contains("thank you") { return .gratitude }
         if text.contains("remind me") || text.contains("set a timer") || text.contains("set timer")
             || text.contains("timer for") {
@@ -43,7 +43,7 @@ public enum PersonaReplyClamp: Sendable {
     /// Keeps at most `maxSentences` complete sentences; drops trailing partial clauses.
     public static func clamp(_ text: String, maxSentences: Int) -> String {
         guard maxSentences > 0 else { return "" }
-        let trimmed = PersonaCompliance.stripOminousHedges(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        let trimmed = PersonaCompliance.stripOminousHedges(PersonaReplyClampBox.trimmedText(text))
             .replacingOccurrences(of: "—", with: ", ")
             .replacingOccurrences(of: "–", with: ", ")
         guard !trimmed.isEmpty else { return trimmed }
@@ -52,14 +52,14 @@ public enum PersonaReplyClamp: Sendable {
         for character in trimmed {
             current.append(character)
             if ".!?".contains(character) {
-                let piece = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                let piece = PersonaReplyClampBox.trimmedText(current)
                 if !piece.isEmpty { sentences.append(piece) }
                 current = ""
                 if sentences.count >= maxSentences { break }
             }
         }
-        if sentences.count < maxSentences, !current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sentences.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+        if sentences.count < maxSentences, !PersonaReplyClampBox.trimmedText(current).isEmpty {
+            sentences.append(PersonaReplyClampBox.trimmedText(current))
         }
         return sentences.prefix(maxSentences).joined(separator: " ")
     }
