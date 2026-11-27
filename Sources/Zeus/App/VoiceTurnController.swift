@@ -971,6 +971,52 @@ final class VoiceTurnController {
         }
     }
 
+    /// Speaks a command-line control refusal and draws Control, then Off.
+    private func sayControlOff(_ note: String, speak: Bool) {
+        if let visual = ControlOffDraw.from(line: note) {
+            showControlOff(visual, speak: speak)
+            if speak { say(note) } else { buddy.showCaption(note); buddy.hideCaption() }
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else if speak {
+            say(note)
+        } else {
+            buddy.showCaption(note)
+            buddy.hideCaption()
+        }
+    }
+
+    /// Draws command-line control off on the display under the pointer.
+    /// The caller speaks the full line.
+    private func showControlOff(_ plan: ControlOffDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyControlOff(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyControlOff(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyControlOff(_ plan: ControlOffDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws an action that did not finish, under the pointer.
     /// The caller speaks the full line. An answer failure stays on its own card.
     private func showActionMiss(_ plan: ActionMissDraw, speak: Bool) {
@@ -1820,7 +1866,7 @@ final class VoiceTurnController {
         VoiceLog.log("action", "refused (command-line control off)")
         buddy.idle()
         let note = Self.restrictedNote
-        if speak { say(note) } else { buddy.showCaption(note); buddy.hideCaption() }
+        sayControlOff(note, speak: speak)
         var result = TurnResult(spoken: note)
         result.problems.append(note)
         return result
@@ -2716,7 +2762,7 @@ final class VoiceTurnController {
         if blockedByRestriction {
             // Said and captioned once (the flag is per turn), and the delivered answer says nothing ran.
             let note = Self.blockedActionNote
-            if speak { say(note) } else { buddy.showCaption(note); buddy.hideCaption() }
+            sayControlOff(note, speak: speak)
             result.spoken = result.spoken.isEmpty ? note : result.spoken + " " + note
             result.problems.append(note)
         }
