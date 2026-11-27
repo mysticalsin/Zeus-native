@@ -113,19 +113,16 @@ final class WalkthroughController {
         let snapshot = AXSnapshotter.shared.latest
         resolved = GuidedPresent.resolve(step: step, shots: shots, snapshot: snapshot)
         NSLog("[ZEUS] walkthrough: %@", session.progress)
+        let cue = step.cue(progress: session.progress, found: resolved != nil)
         if let target = resolved {
             let label = PointerGuideCaptionSplit.boltText(target.label)
                 ?? PointerGuideCaptionSplit.boltText(step.say)
                 ?? "Here"
             buddy?.point(to: target.screenPoint, label: label, ring: target.hitRect)
+        } else if let bolt = cue.bolt {
+            buddy?.showCaption(bolt)
         }
-        let missing = !step.holdsForClick(found: resolved != nil)
-            && step.waitForClick
-            && (step.target != nil || step.targetLabel != nil)
-        let spoken = missing
-            ? "\(session.progress). \(step.say) I couldn't find that on screen, so I'll keep going."
-            : "\(session.progress). \(step.say)"
-        say?(spoken)
+        say?(cue.spoken)
         if !step.holdsForClick(found: resolved != nil) {
             let revision = session.revision
             autoAdvance = Task { @MainActor in
