@@ -302,7 +302,7 @@ private struct AppearancePage: View {
             GSInfo(text: "The More button (three dots) on the notch has the same choice for a quick change.")
             GSDivider()
             GSRow(symbol: "circle.circle", title: "Persona and mascot",
-                  text: "Classic keeps this mascot. Orb is an optional particle mascot and a spoken-reply personality. It stays off until you choose it.") {
+                  text: "Classic keeps this mascot; Orb stays off until you choose it.") {
                 GSPopup(selection: Binding(get: { PersonaSetting.shared.displayName },
                                            set: { PersonaSetting.shared.select(displayName: $0) }),
                         options: PersonaSetting.choices, label: "Persona and mascot")
