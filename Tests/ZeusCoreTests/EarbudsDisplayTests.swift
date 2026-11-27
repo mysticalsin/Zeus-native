@@ -59,8 +59,9 @@ struct EarbudsDisplayTests {
             EarbudsPartReading(part: .left, level: .fresh(80)),
         ])
         let spoken = EarbudsWords.spoken(cue, hideDetails: true)
-        #expect(spoken == "Earbuds connected. Left 80 percent.")
+        #expect(spoken == "Earbuds connected.")
         #expect(!spoken.contains("Secret"))
+        #expect(!spoken.contains("80"))
         let panel = EarbudsPanelModel.make(presence: shown(), mode: nil, hideDetails: true)
         #expect(panel?.name == "Earbuds")
         #expect(panel?.name.contains("Pro") == false)

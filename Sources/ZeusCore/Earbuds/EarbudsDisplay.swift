@@ -221,6 +221,7 @@ public enum EarbudsWords {
     public static func spoken(_ cue: EarbudsCueFacts, hideDetails: Bool) -> String {
         let name = EarbudsName.display(cue.name, hideDetails: hideDetails)
         guard cue.connected else { return "\(name) disconnected." }
+        if hideDetails { return "\(name) connected." }
         let phrases = ordered(cue.parts).enumerated().map { spokenPhrase($1, first: $0 == 0) }
         guard !phrases.isEmpty else { return "\(name) connected." }
         return "\(name) connected. \(phrases.joined(separator: ", "))."
