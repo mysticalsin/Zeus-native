@@ -93,7 +93,7 @@ public enum AXSnapshotBox {
     }
 
     private static func parse(_ text: String) -> (snapshot: Int, index: Int)? {
-        var body = Substring(text.trimmingCharacters(in: .whitespaces).lowercased())
+        var body = Substring(AXSnapshotRefBox.trimmedRef(text).lowercased())
         if body.hasPrefix("@") { body = body.dropFirst() }
         if body.hasPrefix("["), body.hasSuffix("]") { body = body.dropFirst().dropLast() }
         let parts = body.split(separator: ":")
