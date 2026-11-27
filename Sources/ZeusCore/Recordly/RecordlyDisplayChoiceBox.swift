@@ -102,7 +102,7 @@ public enum RecordlyDisplayChoiceBox {
 
     /// The trimmed name, or "Display N" when the system gave none. `position` is zero-based.
     public static func title(name: String?, position: Int) -> String {
-        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let trimmed = RecordlyDisplayNameBox.trimmedName(name ?? "")
         return trimmed.isEmpty ? "Display \(position + 1)" : trimmed
     }
 
