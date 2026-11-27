@@ -102,8 +102,14 @@ final class WalkthroughController {
                 ?? "Here"
             buddy?.point(to: target.screenPoint, label: label, ring: target.hitRect)
         }
-        say?("\(session.progress). \(step.say)")
-        if !step.waitForClick || (step.target == nil && step.targetLabel == nil) {
+        let missing = !step.holdsForClick(found: resolved != nil)
+            && step.waitForClick
+            && (step.target != nil || step.targetLabel != nil)
+        let spoken = missing
+            ? "\(session.progress). \(step.say) I couldn't find that on screen, so I'll keep going."
+            : "\(session.progress). \(step.say)"
+        say?(spoken)
+        if !step.holdsForClick(found: resolved != nil) {
             let revision = session.revision
             autoAdvance = Task { @MainActor in
                 try? await Task.sleep(for: .seconds(4 + Double(step.say.count) / 15))

@@ -17,6 +17,11 @@ public struct Walkthrough: Equatable, Sendable {
             self.targetLabel = targetLabel
             self.waitForClick = waitForClick
         }
+
+        /// A click wait needs a ring on screen. A missing control does not hold the tour.
+        public func holdsForClick(found: Bool) -> Bool {
+            found && waitForClick && (target != nil || targetLabel != nil)
+        }
     }
 
     public static let maxSteps = 15
