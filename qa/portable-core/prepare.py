@@ -46,13 +46,13 @@ GROUPS = {
     ),
     "socket-safety": (
         core("UnixSocket.swift", "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "ZeusPaths.swift"),
-        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests"),
+        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests", "PollingWait"),
     ),
     "bridge-transport": (
         core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
              "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "JSONValue.swift", "ZeusPaths.swift",
              "Version.swift") + ["Sources/zeus-bridge/main.swift"],
-        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
+        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests", "PollingWait"),
     ),
     "keychain": (
         core("Keychain/KeychainStore.swift", "Connections/AIConnectionRegistry.swift",
@@ -69,7 +69,7 @@ GROUPS = {
         tests("WikiExportTests"),
     ),
     "dictation-insertion": (
-        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift"),
+        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift", "Dictation/WarmFieldInsertBox.swift"),
         tests("TextInsertionReceiptTests", "WarmFieldInsertTests"),
     ),
     "polyglot": (
@@ -117,7 +117,7 @@ GROUPS = {
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
              "Recordly/RecordlyCursorLog.swift", "Recordly/RecordlyZoomRegions.swift", "Recordly/RecordlyExportPlan.swift",
-             "Recordly/RecordlyExportSettings.swift"),
+             "Recordly/RecordlyExportSettings.swift", "Present/CompanionMotionBox.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
     ),
     "pointing": (
@@ -133,7 +133,7 @@ GROUPS = {
              "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
              "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",
              "Pointing/PointingStaleTarget.swift", "Pointing/PointingShortcutConflicts.swift", "Pointing/ShowMeKey.swift",
-             "Pointing/PointingInkTrail.swift", "Pointing/PointingTraceSpans.swift"),
+             "Pointing/PointingInkTrail.swift", "Pointing/PointingInkTrailBox.swift", "Pointing/PointingTraceSpans.swift"),
         tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
               "ExplanationProtocolV2Tests", "ExplanationProtocolV3Tests", "PointingCardAnchorsTests", "PointingProviderTests", "PointingStrokeTargetingTests", "PointingDeixisTests",
               "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
@@ -144,7 +144,8 @@ GROUPS = {
         tests("RightOptionHoldTests"),
     ),
     "buddy": (
-        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
+        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift",
+             "Present/CompanionMotionBox.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "agent-choice-dismiss": (
@@ -265,6 +266,10 @@ def write_excerpts(root, group, manifest):
     elif group == "recordly-geometry":
         text, evidence = section(CORE + "Present/CompanionMotion.swift", "public struct CompanionSpring:",
                                  "/// One frame of a flight.")
+        pieces.append(text)
+        manifest["excerpts"].append(evidence)
+        text, evidence = section(CORE + "Present/CompanionMotion.swift", "private extension CGPoint {",
+                                 "private extension CompanionFlight {")
         pieces.append(text)
         manifest["excerpts"].append(evidence)
     if pieces:
