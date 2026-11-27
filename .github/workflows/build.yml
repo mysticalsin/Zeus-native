@@ -72,6 +72,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: extension/package-lock.json
+      - name: Visual math library
+        run: |
+          if ! command -v cargo >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+            . "$HOME/.cargo/env"
+          fi
+          cargo build --release --manifest-path crates/zeus-visual/Cargo.toml
+          mkdir -p Sources/CZeusVisual/lib
+          cp crates/zeus-visual/target/release/libzeus_visual.a Sources/CZeusVisual/lib/
       - name: Native build
         id: build
         run: |

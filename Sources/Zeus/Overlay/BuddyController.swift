@@ -278,11 +278,12 @@ final class BuddyController: NSObject {
            let frame = ElementSnap.best(axFrames: snapshot.elements.map(\.frame), around: point, displayID: display.id, mapper: mapper),
            let plan = ShowMeWhere.plan(from: model.position, axFrame: frame, displayID: display.id, mapper: mapper, label: label, reducedMotion: Motion.reduced),
            let screenRect = mapper.convert(plan.ring.frame, from: .overlay, to: .screen, context: MapContext(displayID: display.id)) {
-            launch(plan.flight, label: label, ring: screenRect)
+            let curve = VisualFlight.plan(from: model.position, to: plan.screenTarget, reducedMotion: Motion.reduced)
+            launch(curve, label: label, ring: screenRect)
             return
         }
         let target = clampedToScreen(point)
-        let curve = CompanionFlight.plan(from: model.position, to: target, reducedMotion: Motion.reduced)
+        let curve = VisualFlight.plan(from: model.position, to: target, reducedMotion: Motion.reduced)
         launch(curve, label: label, ring: CGRect(x: target.x - 22, y: target.y - 22, width: 44, height: 44))
     }
 
@@ -296,7 +297,7 @@ final class BuddyController: NSObject {
         resetPointing()
         startPointingClickMonitor()
         AvatarStatus.shared.set(\.turn, .pointing)
-        let curve = CompanionFlight.plan(from: model.position, to: clampedToScreen(point), reducedMotion: Motion.reduced)
+        let curve = VisualFlight.plan(from: model.position, to: clampedToScreen(point), reducedMotion: Motion.reduced)
         let began = CACurrentMediaTime()
         flight = ActiveFlight(curve: curve, start: began, returning: false, mouseAtStart: NSEvent.mouseLocation)
         pointing = Pointing(target: curve.to, label: CompanionPointingLabel(text: label, beganAt: 0, reduceMotion: Motion.reduced))

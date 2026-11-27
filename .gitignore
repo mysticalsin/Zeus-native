@@ -1,6 +1,7 @@
 .build/
 build/
 target/
+Sources/CZeusVisual/lib/
 *.xcodeproj/xcuserdata/
 .swiftpm/
 extension/node_modules/

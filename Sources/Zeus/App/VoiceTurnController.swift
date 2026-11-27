@@ -845,7 +845,7 @@ final class VoiceTurnController {
         let chosen = screens.first { $0.frame.contains(pointer) } ?? NSScreen.main ?? screens.first
         let frame = chosen?.frame ?? CGRect(x: 0, y: 0, width: CGFloat(ExplainShowcase.canvasWidth), height: CGFloat(ExplainShowcase.canvasHeight))
         let scale = Double(chosen?.backingScaleFactor ?? 1)
-        let pixels = ExplainShowcase.pixelSize(width: Double(frame.width), height: Double(frame.height), scale: scale)
+        let pixels = VisualFlight.pixelSize(width: Double(frame.width), height: Double(frame.height), scale: scale)
         return ScreenShot(jpegData: Data(), label: "illustration canvas", pixelWidth: pixels.width, pixelHeight: pixels.height, displayFrame: frame)
     }
 

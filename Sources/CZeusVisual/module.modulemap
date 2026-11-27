@@ -1,0 +1,5 @@
+module CZeusVisual {
+    header "zeus_visual.h"
+    link "zeus_visual"
+    export *
+}

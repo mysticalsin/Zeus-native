@@ -8,3 +8,4 @@ license = "MIT"
 [lib]
 name = "zeus_visual"
 path = "src/lib.rs"
+crate-type = ["lib", "staticlib"]

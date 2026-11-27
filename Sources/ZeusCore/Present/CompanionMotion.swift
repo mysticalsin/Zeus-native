@@ -54,6 +54,14 @@ public struct CompanionFlight: Equatable, Sendable {
     public var duration: Double
     public var reducedMotion: Bool
 
+    public init(from: CGPoint, control: CGPoint, to: CGPoint, duration: Double, reducedMotion: Bool) {
+        self.from = from
+        self.control = control
+        self.to = to
+        self.duration = duration
+        self.reducedMotion = reducedMotion
+    }
+
     public static let scaleRest: Double = CompanionMotionBox.Flight.scaleRest
     public static let scalePeak: Double = CompanionMotionBox.Flight.scalePeak
     public static let glowRest: Double = CompanionMotionBox.Flight.glowRest

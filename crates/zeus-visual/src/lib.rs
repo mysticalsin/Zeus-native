@@ -4,6 +4,7 @@
 //! `PointingInkTrailBox`, `CompanionMotionBox`, and `ExplainShowcase.pixelSize`.
 //! Nothing here reads a pointer, a screen, or a clock.
 
+pub mod ffi;
 pub mod flight;
 pub mod ink;
 pub mod showcase;

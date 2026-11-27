@@ -1,6 +1,11 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+let visualLink: [LinkerSetting] = [
+    .linkedLibrary("zeus_visual"),
+    .unsafeFlags(["-L", "Sources/CZeusVisual/lib"]),
+]
+
 let package = Package(
     name: "Zeus",
     platforms: [.macOS("14.2")],
@@ -23,6 +28,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "ZeusCore"),
+        .systemLibrary(name: "CZeusVisual", path: "Sources/CZeusVisual"),
         // Fling transport on Network.framework. Its callbacks are not Sendable-annotated, so it builds in Swift 5 mode.
         .target(name: "ZeusFling", dependencies: ["ZeusCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
         // Catches Objective-C exceptions from Apple frameworks that Swift cannot catch (see header).
@@ -31,9 +37,10 @@ let package = Package(
             "ZeusCore",
             "ZeusFling",
             "ZeusObjCGuard",
+            "CZeusVisual",
             .product(name: "FluidAudio", package: "FluidAudio"),
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
-        ], resources: [
+        ], linkerSettings: visualLink, resources: [
             .copy("Avatar/Poses"), .copy("Avatar/Anim"), .copy("Fonts"),
             .copy("Onboarding/Media"), .copy("Integrations/Brands"), .copy("Sounds"), .copy("Personality"),
         ]),
@@ -49,6 +56,7 @@ let package = Package(
         .testTarget(name: "ZeusCoreTests", dependencies: ["ZeusCore"], resources: [
             .copy("Fixtures"),
         ]),
-        .testTarget(name: "ZeusAppTests", dependencies: ["Zeus", "ZeusCore", "ZeusFling"]),
+        .testTarget(name: "ZeusAppTests", dependencies: ["Zeus", "ZeusCore", "ZeusFling", "CZeusVisual"],
+                    linkerSettings: visualLink),
     ]
 )
