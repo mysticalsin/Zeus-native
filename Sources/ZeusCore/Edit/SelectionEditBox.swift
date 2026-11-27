@@ -43,6 +43,7 @@ public enum SelectionEditBox {
     /// An insert or a reply keeps a zero-width space in the body. A body of only named blanks
     /// is empty: an insert is refused, and a reply keeps the selection.
     public static func plan(utterance: String, selection: String) -> SelectionEdit? {
+        if isBareSecret(selection) { return nil }
         let trimmedUtterance = trimmed(utterance)
         let lower = trimmedUtterance.lowercased()
         if lower.hasPrefix("reply to this") {
@@ -52,17 +53,30 @@ public enum SelectionEditBox {
                 body = trimmed(String(body.dropFirst()))
             }
             if body.isEmpty { body = selection }
+            if isBareSecret(body) { return nil }
             return SelectionEdit(kind: .draft, before: selection, after: body, sends: false)
         }
         if lower.hasPrefix("insert ") {
             let body = trimmed(String(trimmedUtterance.dropFirst("insert ".count)))
-            guard !body.isEmpty else { return nil }
+            guard !body.isEmpty, !isBareSecret(body) else { return nil }
             return SelectionEdit(kind: .insert, before: selection, after: body, sends: false)
         }
         if lower.contains("shorter") {
             return SelectionEdit(kind: .replace, before: selection, after: shorter(selection), sends: false)
         }
         return nil
+    }
+
+    /// Same words the spoken point refuses. A longer note such as
+    /// "Change the password tomorrow" is not this, so that note can still be shortened.
+    private static let secretWords: Set<String> = ["password", "passcode", "passphrase", "pin", "secret", "cvv", "cvc", "otp", "token"]
+    private static let secretPhrases = ["card number", "security code", "api key", "verification code"]
+
+    private static func isBareSecret(_ text: String) -> Bool {
+        let words = text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        let phrase = words.joined(separator: " ")
+        if secretPhrases.contains(phrase) { return true }
+        return !words.isEmpty && words.allSatisfy { secretWords.contains($0) }
     }
 
     /// Keeps the first half of the words. A single word is returned unchanged.
