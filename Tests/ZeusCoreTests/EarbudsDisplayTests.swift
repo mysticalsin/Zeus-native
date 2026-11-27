@@ -193,7 +193,8 @@ struct EarbudsDisplayTests {
         #expect(EarbudsWords.modeTitle(.adaptive) == "Adaptive")
         #expect(EarbudsWords.spoken(.changed(.noiseCancelling)) == "Noise cancelling on.")
         #expect(EarbudsWords.spoken(.stayed(.transparency)) == "Listening mode stayed on Transparency.")
-        #expect(EarbudsWords.spoken(.changed(.off)) == "Off on.")
+        #expect(EarbudsWords.spoken(.changed(.off)) == "Listening mode off.")
+        #expect(EarbudsWords.spoken(.stayed(.off)) == "Listening mode stayed off.")
         #expect(EarbudsWords.spoken(.stayed(.adaptive)) == "Listening mode stayed on Adaptive.")
     }
 

@@ -261,9 +261,9 @@ public enum EarbudsWords {
     public static func spoken(_ outcome: EarbudsModeOutcome) -> String {
         switch outcome {
         case .changed(let mode):
-            "\(modeTitle(mode)) on."
+            mode == .off ? "Listening mode off." : "\(modeTitle(mode)) on."
         case .stayed(let mode):
-            "Listening mode stayed on \(modeTitle(mode))."
+            mode == .off ? "Listening mode stayed off." : "Listening mode stayed on \(modeTitle(mode))."
         }
     }
 
