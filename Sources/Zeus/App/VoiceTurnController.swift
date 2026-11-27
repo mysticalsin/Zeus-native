@@ -683,6 +683,9 @@ final class VoiceTurnController {
         if let showcase = ExplainShowcase.plan(for: transcript) {
             return presentExplain(showcase, transcript: transcript, speak: speak)
         }
+        if let pointed = pointSpokenAsk(transcript, speak: speak) {
+            return pointed
+        }
         // "Ask Scout to ..." goes to that agent, not to command understanding.
         if AgentRouter.route(transcript, agents: AgentStore().profiles()) != nil { return nil }
         guard !Task.isCancelled else { return TurnResult(cancelled: true) }
@@ -1419,6 +1422,45 @@ final class VoiceTurnController {
 
     private func globalPoint(x: Int, y: Int, screen: Int?, in shots: [ScreenShot]) -> CGPoint? {
         PresentPointMapping.screenPoint(x: x, y: y, screen: screen, in: shots)
+    }
+
+    /// A spoken "point at" or "show me" becomes one allowlisted guide. The bolt is drawn
+    /// whether or not captions or spoken replies are on. Speech uses the speak-replies setting.
+    private func pointSpokenAsk(_ transcript: String, speak: Bool) -> TurnResult? {
+        guard SpokenPointingAsk.isAsk(transcript) else { return nil }
+        let snapshot = AXSnapshotter.shared.latest ?? AXSnapshotter.shared.capture(budget: 0.2)
+        guard let snapshot else { return nil }
+        var candidates: [PointingProposalCandidate] = []
+        var frames: [String: CGRect] = [:]
+        var number = 1
+        for element in snapshot.elements {
+            guard number <= 99 else { break }
+            guard let label = element.label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty,
+                  !element.isSecure, element.frame.width > 0, element.frame.height > 0 else { continue }
+            let id = "t\(number)"
+            candidates.append(PointingProposalCandidate(id: id, isSecure: false, label: label))
+            frames[id] = element.frame
+            number += 1
+        }
+        guard let show = SpokenPointingAsk.show(in: transcript, candidates: candidates),
+              let frame = frames[show.targetID],
+              let screen = axFrameOnScreen(frame), screen.width > 0, screen.height > 0 else { return nil }
+        if speak { say(show.spoken) }
+        let center = CGPoint(x: screen.midX, y: screen.midY)
+        buddy.point(to: center, label: show.bolt, ring: screen)
+        remember(transcript, show.spoken)
+        return TurnResult(spoken: show.spoken)
+    }
+
+    private func axFrameOnScreen(_ frame: CGRect) -> CGRect? {
+        let displays: [DisplayMap] = NSScreen.screens.compactMap { screen in
+            guard let id = screen.displayID else { return nil }
+            return DisplayMap(id: Int(id), frame: screen.frame, scale: Double(screen.backingScaleFactor))
+        }
+        guard !displays.isEmpty else { return nil }
+        let mainID = NSScreen.main?.displayID.map { Int($0) }
+        let mapper = ScreenCoordinateMapper(displays: displays, mainDisplayID: mainID)
+        return mapper.convert(frame, from: .ax, to: .screen, context: MapContext())
     }
 
     /// The fuller answer from the background deep engine, after the quick one. It always shows in the notch caption;
