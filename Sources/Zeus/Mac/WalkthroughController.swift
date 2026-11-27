@@ -97,7 +97,10 @@ final class WalkthroughController {
         resolved = GuidedPresent.resolve(step: step, shots: shots, snapshot: snapshot)
         NSLog("[ZEUS] walkthrough: %@", session.progress)
         if let target = resolved {
-            buddy?.point(to: target.screenPoint, label: target.label)
+            let label = PointerGuideCaptionSplit.boltText(target.label)
+                ?? PointerGuideCaptionSplit.boltText(step.say)
+                ?? "Here"
+            buddy?.point(to: target.screenPoint, label: label)
         }
         say?("\(session.progress). \(step.say)")
         if !step.waitForClick || (step.target == nil && step.targetLabel == nil) {
