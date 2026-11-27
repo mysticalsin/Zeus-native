@@ -44,18 +44,21 @@ public struct MarkLayout {
     public func place(_ marks: [MarkPin]) -> [PlacedScreenMark] {
         let current = screens()
         return marks.compactMap { mark in
-            guard let screen = current.first(where: { Self.owns(mark.point, on: $0) }) else { return nil }
+            guard let screen = current.first(where: { Self.owns(mark.point, on: $0, among: current) }) else { return nil }
             return PlacedScreenMark(number: mark.number, title: mark.title, screenID: screen.id,
                               local: Self.local(mark.point, on: screen),
                               accessibilityLabel: "Mark \(mark.number), \(mark.title)")
         }
     }
 
-    /// The minimum corner is inside the frame. The maximum corner is too: it is the one point
-    /// `CGRect.contains` leaves outside.
-    static func owns(_ point: CGPoint, on screen: MarkScreen) -> Bool {
-        if screen.frame.contains(point) { return true }
-        return point.x == screen.frame.maxX && point.y == screen.frame.maxY
+    /// Includes the far edges `CGRect.contains` leaves out. A shared edge stays with the screen
+    /// whose minimum edge it is, so it is not drawn twice.
+    static func owns(_ point: CGPoint, on screen: MarkScreen, among screens: [MarkScreen]) -> Bool {
+        let frame = screen.frame
+        guard point.x >= frame.minX, point.x <= frame.maxX, point.y >= frame.minY, point.y <= frame.maxY else { return false }
+        let onFarEdge = point.x == frame.maxX || point.y == frame.maxY
+        guard onFarEdge else { return true }
+        return !screens.contains { other in other.id != screen.id && other.frame.contains(point) }
     }
 
     /// Flip into one screen. The screen's own height is the top, not a shared window.
