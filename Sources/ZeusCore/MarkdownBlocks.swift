@@ -3,6 +3,7 @@ import Foundation
 /// Block-level Markdown for chat replies and agent plans: headings, paragraphs, bullet and
 /// numbered lists (with nesting), fenced code, quotes and rules. Inline styling (bold, code,
 /// links) is left to the renderer.
+/// `MarkdownLineBox` removes named blanks at a line's edges. A zero-width space stays, so it is still a line.
 public enum MarkdownBlock: Equatable, Sendable {
     public struct Item: Equatable, Sendable {
         public var text: String
@@ -44,7 +45,7 @@ public enum MarkdownBlock: Equatable, Sendable {
 
         for rawLine in markdown.components(separatedBy: "\n") {
             let line = rawLine.replacingOccurrences(of: "\t", with: "    ")
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let trimmed = MarkdownLineBox.trimmedText(line)
 
             if var open = code {
                 if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
@@ -58,7 +59,7 @@ public enum MarkdownBlock: Equatable, Sendable {
             }
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
                 flushAll()
-                let language = trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)
+                let language = MarkdownLineBox.trimmedText(String(trimmed.dropFirst(3)))
                 code = (language.isEmpty ? nil : language, [])
                 continue
             }
@@ -78,7 +79,7 @@ public enum MarkdownBlock: Equatable, Sendable {
             }
             if trimmed.hasPrefix(">") {
                 flushParagraph(); flushList()
-                quote.append(String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces))
+                quote.append(MarkdownLineBox.trimmedText(String(trimmed.dropFirst())))
                 continue
             }
             let indent = line.prefix { $0 == " " }.count
@@ -108,7 +109,7 @@ public enum MarkdownBlock: Equatable, Sendable {
     static func headingLevel(_ line: String) -> (level: Int, text: String)? {
         let hashes = line.prefix { $0 == "#" }.count
         guard (1...6).contains(hashes), line.dropFirst(hashes).first == " " else { return nil }
-        return (hashes, line.dropFirst(hashes).trimmingCharacters(in: .whitespaces))
+        return (hashes, MarkdownLineBox.trimmedText(String(line.dropFirst(hashes))))
     }
 
     static func isRule(_ line: String) -> Bool {
@@ -133,6 +134,6 @@ public enum MarkdownBlock: Equatable, Sendable {
         var checked: Bool?
         if text.hasPrefix("[ ] ") { checked = false; text = text.dropFirst(4) }
         else if text.lowercased().hasPrefix("[x] ") { checked = true; text = text.dropFirst(4) }
-        return (number != nil, Item(text: text.trimmingCharacters(in: .whitespaces), depth: depth, number: number, checked: checked))
+        return (number != nil, Item(text: MarkdownLineBox.trimmedText(String(text)), depth: depth, number: number, checked: checked))
     }
 }
