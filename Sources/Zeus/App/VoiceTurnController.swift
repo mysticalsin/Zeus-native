@@ -774,8 +774,9 @@ final class VoiceTurnController {
         VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
         // Leave listening before the pen flies. idle() clears a flight, so it has to run first.
         buddy.idle()
+        let penLabel = Self.pointLabel(plan.sentences.first, fallback: "Here")
         if plan.travels {
-            showPen(plan.penFrame(at: 0), shot: shot, token: token)
+            showPen(plan.penFrame(at: 0), shot: shot, token: token, label: penLabel)
             explainReveal = Task { @MainActor [weak self] in
                 var shown = 0
                 while !Task.isCancelled {
@@ -784,7 +785,7 @@ final class VoiceTurnController {
                     guard let frame = plan.penFrame(at: elapsed, audioStarts: self.explainAudioStarts) else { return }
                     if frame.pointCount != shown {
                         shown = frame.pointCount
-                        self.showPen(frame, shot: shot, token: token)
+                        self.showPen(frame, shot: shot, token: token, label: penLabel)
                     }
                     if frame.finished { break }
                     try? await Task.sleep(for: .milliseconds(40))
@@ -821,12 +822,12 @@ final class VoiceTurnController {
         return TurnResult(spoken: spoken)
     }
 
-    private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID) {
+    private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID, label: String) {
         guard let frame else { return }
         let scaled = ExplainShowcase.scaled(frame.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
         presenter.showFrame(scaled, token: token)
         let bolt = boltScreen(frame.bolt, shot: shot)
-        buddy.flight(to: bolt, label: "trace")
+        buddy.flight(to: bolt, label: label)
     }
 
     /// Canvas point to AppKit global point on the shot's display. Y flips to the bottom-left origin.
