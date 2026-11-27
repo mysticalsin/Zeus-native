@@ -67,7 +67,7 @@ public enum RecordlySourceSelectionBox {
         switch intent {
         case .display(let id): id != 0
         case .window(let number, let token):
-            number > 0 && !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            number > 0 && !RecordlyWindowIdentityBox.trimmedToken(token).isEmpty
         case .region:
             false
         }
@@ -105,7 +105,7 @@ public enum RecordlySourceSelectionBox {
             return .ready(.display(id: id))
 
         case .window(let number, let identityToken):
-            guard number > 0, !identityToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            guard number > 0, !RecordlyWindowIdentityBox.trimmedToken(identityToken).isEmpty else {
                 return .invalidIntent(reason: "Choose a window with a valid identity before starting capture.")
             }
             let bindings = windows.filter { $0.number == number }
