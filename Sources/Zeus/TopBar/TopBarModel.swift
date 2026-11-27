@@ -340,8 +340,9 @@ final class TopBarModel {
         liveMusicWings = defaults.object(forKey: "topBar.musicWings") as? Bool ?? true
         weatherCity = defaults.string(forKey: "topBar.weatherCity") ?? ""
         useCelsius = defaults.object(forKey: "topBar.celsius") as? Bool ?? (Locale.current.measurementSystem != .us)
-        note = defaults.string(forKey: "topBar.note") ?? ""
-        noteBaseline = note
+        let savedNote = defaults.string(forKey: "topBar.note") ?? ""
+        note = savedNote
+        noteBaseline = savedNote
         selectedModeKey = defaults.string(forKey: "dictation.mode") ?? "voice"
         script = defaults.string(forKey: "prompter.script") ?? Self.sampleScript
         roll = PrompterRoll(speed: defaults.object(forKey: "prompter.speed") as? Double ?? 32,

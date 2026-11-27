@@ -24,7 +24,6 @@ struct OrbMascotView: NSViewRepresentable {
         view.isPaused = paused
         view.enableSetNeedsDisplay = false
         view.preferredFramesPerSecond = 120
-        view.isOpaque = false
         view.layer?.isOpaque = false
         renderer.setVisualState(visualState)
         renderer.setReduceMotion(reduceMotion)
