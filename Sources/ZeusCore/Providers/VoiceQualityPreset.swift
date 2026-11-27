@@ -616,7 +616,8 @@ public struct VoiceQualitySpeaker: Sendable {
     private static func stream(_ work: @escaping @Sendable () async throws -> Data) -> Synthesis {
         let task = SynthesisTask()
         let chunks = AsyncThrowingStream<AudioChunk, Error> { continuation in
-            let job = Task {
+            // Detached so a caller blocked on the shared pool cannot postpone the URL task.
+            let job = Task.detached(priority: .userInitiated) {
                 do {
                     try Task.checkCancellation()
                     let audio = try await work()

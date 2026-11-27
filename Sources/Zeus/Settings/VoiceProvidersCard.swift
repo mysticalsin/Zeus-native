@@ -207,7 +207,8 @@ final class VoiceProvidersController {
         Task {
             let outcome = await session.speak(VoiceProviderCopy.sample)
             model = await session.card()
-            if case .cloud = outcome.route, PluginAudioPlay.play(outcome.audio) {
+            let played = await PluginAudioPlay.play(outcome.audio)
+            if case .cloud = outcome.route, played {
                 busy = false
                 return
             }

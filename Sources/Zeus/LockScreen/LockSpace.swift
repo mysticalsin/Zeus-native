@@ -222,7 +222,7 @@ private struct LockSpaceTable: Sendable {
 #if os(macOS)
 private struct LockSpaceArray {
     let array: CFArray
-    var pointer: UnsafeRawPointer { Unmanaged.passUnretained(array).toOpaque() }
+    var pointer: UnsafeRawPointer { UnsafeRawPointer(Unmanaged.passUnretained(array).toOpaque()) }
 
     /// One signed 64-bit number in an array the space calls can take. The space id itself stays
     /// a `UInt64` in the host; this is only the array element. The caller keeps this value until

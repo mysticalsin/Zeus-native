@@ -6,7 +6,7 @@ public enum RewriterStream {
     /// The rewrite budget. The caller kills the process at this many seconds.
     public static let timeout: TimeInterval = 45
     /// How long the readers may finish after the body returns. This is not the process budget.
-    public static let readerDrain: TimeInterval = 2
+    public static let readerDrain: TimeInterval = 15
 
     public struct Collected: Equatable, Sendable {
         public var stdout: Data
@@ -25,11 +25,12 @@ public enum RewriterStream {
         let err = Box()
         let stdoutDone = Gate()
         let stderrDone = Gate()
-        DispatchQueue.global(qos: .userInitiated).async {
+        // A detached thread, not the shared queue: a saturated pool must not stall the pipe read.
+        Thread.detachNewThread {
             drain(stdout.fileHandleForReading, into: out)
             stdoutDone.mark()
         }
-        DispatchQueue.global(qos: .userInitiated).async {
+        Thread.detachNewThread {
             drain(stderr.fileHandleForReading, into: err)
             stderrDone.mark()
         }
@@ -61,6 +62,12 @@ public enum RewriterStream {
     }
 
     private static func bothDone(_ first: Gate, _ second: Gate, within bound: TimeInterval) -> Bool {
+        if wait(first, second, bound) { return true }
+        // A stalled sleep can burn the first bound before either reader is scheduled.
+        return wait(first, second, bound)
+    }
+
+    private static func wait(_ first: Gate, _ second: Gate, _ bound: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(bound)
         while Date() < deadline {
             if first.isOpen, second.isOpen { return true }

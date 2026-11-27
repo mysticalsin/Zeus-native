@@ -96,7 +96,7 @@ struct LockLayoutTests {
         #expect(LockStatusText.status(for: .closing(1)) == nil)
 
         let unavailable = LockStatusText.status(for: .unavailable(.untestedSystem(15)))
-        let missing = LockStatusText.status(for: .unavailable(.missingSymbols(["SLSSpaceCreate"])))
+        let missing = LockStatusText.status(for: .unavailable(.missingSymbols(["symbol-create"])))
         #expect(unavailable == LockStatus(word: "Not available on this macOS", symbol: "exclamationmark.triangle", canTurnOnAgain: false))
         #expect(missing == unavailable)
 

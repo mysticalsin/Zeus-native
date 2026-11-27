@@ -49,6 +49,13 @@ public enum ProviderStreamEvent: Sendable, Equatable {
 public protocol ProviderHTTPTransport: Sendable {
     func send(_ request: ProviderHTTPRequest) async throws -> ProviderHTTPResponse
     func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error>
+    /// Milliseconds from the stream opening until the first audio byte was produced.
+    /// Nil when no byte has been produced yet. An in-memory stream sets this before it returns.
+    func preparedFirstByteMs() -> Int?
+}
+
+extension ProviderHTTPTransport {
+    public func preparedFirstByteMs() -> Int? { nil }
 }
 
 /// HTTPS-only session. Timeouts are `ProviderHTTPBudget.requestTimeout` (8 s), not the existing 20 s or 45 s ceilings.

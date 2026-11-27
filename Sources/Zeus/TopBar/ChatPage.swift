@@ -110,7 +110,7 @@ struct ChatPage: View {
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Pick an agent").font(TopBarStyle.label(13, .semibold)).foregroundStyle(Theme.cloudPrimary)
-                Text("Reply to a running session from here, or start a new chat.").font(TopBarStyle.label(11.5)).foregroundStyle(Theme.cloudQuiet)
+                Text("Answer a running session from here, or start a new chat.").font(TopBarStyle.label(11.5)).foregroundStyle(Theme.cloudQuiet)
             }
         }
     }
@@ -190,6 +190,22 @@ private struct AgentReplyPane: View {
     @Bindable var hub: AgentHub
     let session: NotchModel.Session
 
+    /// The glass decision row for this session. Impact is above Allow once.
+    @ViewBuilder
+    private var impactRow: some View {
+        if let approval = matchingApproval {
+            let impact = HubApprovalImpact.preview(tool: approval.tool, command: approval.command, input: approval.detail?.input)
+            if !impact.isEmpty {
+                HubDecisionImpactRow(
+                    impact: impact,
+                    detailsHidden: MeetingState.hideDetails,
+                    onAllowOnce: { approval.resolve(.allow) },
+                    onDeny: { approval.resolve(.deny) }
+                )
+            }
+        }
+    }
+
     var body: some View {
         let canType = hub.canReply(to: session.id)
         VStack(alignment: .leading, spacing: 8) {
@@ -225,22 +241,6 @@ private struct AgentReplyPane: View {
     }
 
     private func send() { Task { await hub.sendReply(session: session) } }
-
-    /// The glass decision row for this session. Impact is above Allow once.
-    @ViewBuilder
-    private var impactRow: some View {
-        if let approval = matchingApproval {
-            let impact = HubApprovalImpact.preview(tool: approval.tool, command: approval.command, input: approval.detail?.input)
-            if !impact.isEmpty {
-                HubDecisionImpactRow(
-                    impact: impact,
-                    detailsHidden: MeetingState.hideDetails,
-                    onAllowOnce: { approval.resolve(.allow) },
-                    onDeny: { approval.resolve(.deny) }
-                )
-            }
-        }
-    }
 
     private var matchingApproval: NotchModel.Approval? {
         guard let approval = hub.notch?.model.approval else { return nil }

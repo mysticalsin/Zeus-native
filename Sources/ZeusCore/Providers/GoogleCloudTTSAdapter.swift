@@ -112,12 +112,14 @@ public struct GoogleCloudTTSAdapter: TTSProvider, Sendable {
 enum ProviderSynthesis {
     static func stream(request: ProviderHTTPRequest, using transport: any ProviderHTTPTransport, make: @escaping @Sendable (Data, Int) -> AudioChunk) -> Synthesis {
         let task = SynthesisTask()
+        // Open the transport here so an in-memory stream buffers its chunks before the caller waits.
+        let source = transport.stream(request)
         let chunks = AsyncThrowingStream<AudioChunk, Error> { continuation in
             let work = Task {
                 do {
                     var status = 0
                     var index = 0
-                    for try await event in transport.stream(request) {
+                    for try await event in source {
                         try Task.checkCancellation()
                         switch event {
                         case .status(let code):

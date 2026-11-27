@@ -123,6 +123,7 @@ struct MotionSourceLintTests {
         ("reducedInterval", "the edge wave's fixed 0.1 s step for Reduce Motion"),
         ("clock.interval", "the mascot's clip rate (12, 20 or 24 fps), set by `MascotClipClock`"),
         ("Self.clipInterval(", "the mascot's clip rate for a pinned pose preview"),
+        ("PTTIndicatorMotion.frameBudget", "the push-to-talk mark's 60 Hz frame: a release must leave listening inside one frame"),
     ]
 
     /// Visible motion must not run on a run-loop clock faster than 0.1 s: `TickingView(interval:)`, and

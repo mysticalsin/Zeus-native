@@ -99,6 +99,21 @@ struct STTLatencyTests {
         #expect(oneSecond == 0.8)
     }
 
+    @Test func fileGiveUpKeepsTheLatestPartialWhenTheTaskIsCancelled() {
+        let waiting = STTFileRecognition()
+        #expect(waiting.note(text: "hello", isFinal: false, failed: false) == nil)
+        #expect(waiting.note(text: "hello there", isFinal: false, failed: false) == nil)
+        #expect(waiting.giveUp() == "hello there")
+        #expect(waiting.giveUp() == nil)
+
+        let unheard = STTFileRecognition()
+        #expect(unheard.giveUp() == "")
+
+        let finished = STTFileRecognition()
+        #expect(finished.note(text: "done", isFinal: true, failed: false) == "done")
+        #expect(finished.giveUp() == nil)
+    }
+
     @Test func failureRateIsZeroWhenAPartialWasAlreadyHeard() {
         let lines = STTLatencyHarness.failureReport(policy: .production, turns: 4)
         #expect(lines.count == 2)

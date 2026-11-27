@@ -293,11 +293,11 @@ struct VoiceQualityPresetTests {
                 return VoiceQualityError.publicName(error)
             }
         }
-        #expect(HangURLStub.waitUntilStarted(timeout: 3))
+        #expect(await HangURLStub.waitUntilStarted(timeout: 3))
         synthesis.cancel()
         let name = await finished.value
         #expect(name == ProviderFailure.cancelled.logName)
-        #expect(HangURLStub.waitUntilStopped(timeout: 2))
+        #expect(await HangURLStub.waitUntilStopped(timeout: 2))
     }
 
     @Test func http401429And5xxUseTheExistingFallbackOrder() async throws {
@@ -504,23 +504,42 @@ final class HangURLStub: URLProtocol, @unchecked Sendable {
         started.unlock()
     }
 
-    static func waitUntilStarted(timeout: TimeInterval) -> Bool {
-        wait(timeout: timeout) { didStartFlag }
+    static func waitUntilStarted(timeout: TimeInterval) async -> Bool {
+        await parked(.started, timeout: timeout)
     }
 
-    static func waitUntilStopped(timeout: TimeInterval) -> Bool {
-        wait(timeout: timeout) { didStopFlag }
+    static func waitUntilStopped(timeout: TimeInterval) async -> Bool {
+        await parked(.stopped, timeout: timeout)
     }
 
-    private static func wait(timeout: TimeInterval, until flag: () -> Bool) -> Bool {
+    /// The condition wait runs on its own thread. Calling `lock` from an async function is
+    /// rejected, and waiting on the shared pool keeps the URL task from being scheduled.
+    private static func parked(_ gate: Gate, timeout: TimeInterval) async -> Bool {
+        await withCheckedContinuation { continuation in
+            Thread.detachNewThread {
+                continuation.resume(returning: wait(timeout: timeout, gate: gate))
+            }
+        }
+    }
+
+    private static func wait(timeout: TimeInterval, gate: Gate) -> Bool {
         started.lock()
         defer { started.unlock() }
         let deadline = Date().addingTimeInterval(timeout)
-        while !flag() {
-            if !started.wait(until: deadline) { return flag() }
+        while !isSet(gate) {
+            if !started.wait(until: deadline) { return isSet(gate) }
         }
         return true
     }
+
+    private static func isSet(_ gate: Gate) -> Bool {
+        switch gate {
+        case .started: didStartFlag
+        case .stopped: didStopFlag
+        }
+    }
+
+    private enum Gate { case started, stopped }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

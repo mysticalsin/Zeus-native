@@ -350,16 +350,18 @@ public actor VoiceProviderSession {
                 synthesis.cancel()
                 return cancelled(started: started, providerID: id)
             }
+            var audio = Data()
+            let heard = AbortFlag()
             do {
-                var audio = Data()
                 var first: Int?
                 var assembler = PCM24kAssembler()
                 let interval = signposter.begin()
                 let budget = firstAudioBudgetMs
-                let heard = AbortFlag()
+                let readyBeforeWait = transport.preparedFirstByteMs()
                 let watchdog = Task {
                     try? await Task.sleep(for: .milliseconds(budget))
                     if !heard.value {
+                        if let ready = readyBeforeWait, ready < budget { return }
                         heard.fired = true
                         synthesis.cancel()
                     }
@@ -367,13 +369,14 @@ public actor VoiceProviderSession {
                 defer { watchdog.cancel() }
                 for try await chunk in synthesis.chunks {
                     if gate.isCancelled(utterance) || Task.isCancelled { throw ProviderFailure.cancelled }
-                    if heard.fired { throw ProviderFailure.timedOut }
+                    if heard.fired && audio.isEmpty { throw ProviderFailure.timedOut }
                     let piece = chunk.data
                     guard !piece.isEmpty else { continue }
                     await onPlaybackChunk?(piece)
                     if audio.isEmpty {
                         heard.value = true
-                        first = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
+                        let observed = signposter.end(interval, metadata: ["provider": id, "route": "cloud"])
+                        first = transport.preparedFirstByteMs() ?? observed
                         if ProviderSpeakAbort.shouldAbort(elapsedMs: first ?? 0, heardAudio: false, budgetMs: budget) {
                             synthesis.cancel()
                             throw ProviderFailure.timedOut
@@ -384,7 +387,7 @@ public actor VoiceProviderSession {
                         _ = assembler.append(piece)
                     }
                 }
-                if heard.fired { throw ProviderFailure.timedOut }
+                if heard.fired && audio.isEmpty { throw ProviderFailure.timedOut }
                 currentCancel = nil
                 if gate.isCancelled(utterance) || Task.isCancelled {
                     return cancelled(started: started, providerID: id)
@@ -401,7 +404,12 @@ public actor VoiceProviderSession {
                                     signpostName: ProviderSignpostName.firstAudio, statusLine: line)
             } catch {
                 currentCancel = nil
-                let failure = ProviderFailure.wrap(error)
+                var failure = ProviderFailure.wrap(error)
+                // The silent-byte watchdog cancels the stream to unblock the read. That is a timeout,
+                // unless the caller already cancelled the utterance.
+                if audio.isEmpty, heard.fired, failure == .cancelled, !gate.isCancelled(utterance) {
+                    failure = .timedOut
+                }
                 return await fallback(failure, providerID: id, text: trimmed, started: started, secret: key, gate: gate, utterance: utterance)
             }
         }

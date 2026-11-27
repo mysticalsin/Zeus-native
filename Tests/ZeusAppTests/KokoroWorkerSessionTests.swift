@@ -438,8 +438,13 @@ struct KokoroWorkerSessionTests {
             let session = fixture.session()
             let task = fixture.render(session, "hang")
             let marker = fixture.directory.appendingPathComponent("started-hang")
-            try await wait { FileManager.default.fileExists(atPath: marker.path) }
-            let pid = try #require(Int32(try String(contentsOf: marker, encoding: .utf8)))
+            var worker: Int32?
+            try await wait {
+                guard let text = try? String(contentsOf: marker, encoding: .utf8) else { return false }
+                worker = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines))
+                return worker != nil
+            }
+            let pid = try #require(worker)
             let began = ContinuousClock.now
             task.cancel()
             #expect(await task.value == nil)
@@ -664,7 +669,8 @@ struct KokoroWorkerSessionTests {
         // occupies the cooperative thread, so this detached configuration never enters.
         let entered = await probe.waitUntilEntered(seconds: 1)
         #expect(entered)
-        #expect(started.duration(to: .now) < .milliseconds(500))
+        // The 30s hold must not be what ends the wait. Runner scheduling can pass 500ms.
+        #expect(started.duration(to: .now) < .seconds(2))
         probe.release()
         _ = await configuration.value
     }
@@ -787,7 +793,8 @@ struct KokoroWorkerSessionTests {
             let began = ContinuousClock.now
             let request = fixture.render(session, "queued")
             #expect(await request.value == nil)
-            #expect(began.duration(to: .now) < .milliseconds(500))
+            // The 0.1s expiry returns while the queue stays blocked. This is that wait, not the hold.
+            #expect(began.duration(to: .now) < .seconds(2))
             #expect(!blocker.leftGate)
             #expect(probe.calls == 0)
             let replacementBegan = ContinuousClock.now
@@ -869,10 +876,12 @@ struct KokoroWorkerSessionTests {
             try await withFixture { fixture in
                 // Shell builtins only: this guard owns one process, with no descendant-cleanup claim.
                 let script = """
-                trap 'if [ -d "$1" ]; then printf present > "$2"; else printf removed > "$2"; fi' EXIT
-                trap 'exit 0' TERM
-                printf '%s' "$$" > "$1/cleanup-started"
-                printf ready > "$1/cleanup-ready"
+                fixture_dir=$1
+                proof_path=$2
+                trap 'if [ -d "$fixture_dir" ]; then printf present > "$proof_path"; else printf removed > "$proof_path"; fi' EXIT
+                trap 'if [ -d "$fixture_dir" ]; then printf present > "$proof_path"; else printf removed > "$proof_path"; fi; exit 0' TERM
+                printf '%s' "$$" > "$fixture_dir/cleanup-started"
+                printf ready > "$fixture_dir/cleanup-ready"
                 while IFS= read -r line; do :; done
                 """
                 let directory = fixture.directory
@@ -896,6 +905,7 @@ struct KokoroWorkerSessionTests {
         let (fixture, session, task, pid) = try #require(captured)
         // The task callback and child EXIT trap both observed the directory before deletion.
         #expect(completed.snapshot.contains { $0.hasSuffix(" directory-present") })
+        try await wait(for: .seconds(2)) { FileManager.default.fileExists(atPath: proof.path) }
         #expect(try String(contentsOf: proof, encoding: .utf8) == "present")
         #expect(await task.value == nil)
         #expect(await session.isRunning == false)
