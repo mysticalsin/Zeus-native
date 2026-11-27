@@ -52,7 +52,7 @@ GROUPS = {
         core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
              "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "JSONValue.swift", "ZeusPaths.swift",
              "Version.swift") + ["Sources/zeus-bridge/main.swift"],
-        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
+        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests", "PollingWait"),
     ),
     "keychain": (
         core("Keychain/KeychainStore.swift", "Connections/AIConnectionRegistry.swift",
