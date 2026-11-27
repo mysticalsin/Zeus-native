@@ -652,9 +652,35 @@ final class VoiceTurnController {
         VoiceLog.log("route", "rules")
         VoiceLog.log("brain", "engine=local model=none first_token_ms=0 done_ms=0")
         buddy.idle()
-        if speak { say(answer) } else { buddy.showCaption(answer); buddy.hideCaption() }
+        if let plan = LocalAnswerDraw.plan(answer: answer) {
+            showLocalAnswer(plan, speak: speak)
+            if speak { say(answer) }
+            buddy.showCaption(plan.bolt)
+        } else if speak {
+            say(answer)
+        } else {
+            buddy.showCaption(answer)
+            buddy.hideCaption()
+        }
         remember(transcript, answer)
         return TurnResult(spoken: answer)
+    }
+
+    /// Draws the short local answer on the display under the pointer. The caller speaks the full line.
+    private func showLocalAnswer(_ plan: LocalAnswerDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        presenter.reveal(sentence: 0, token: token)
+        buddy.flight(to: boltScreen(plan.guide, shot: shot), label: plan.bolt)
+        explainReveal = Task { @MainActor [weak self] in
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
     }
 
     private func openFound(_ query: String, transcript: String, speak: Bool) async -> TurnResult {

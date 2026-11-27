@@ -112,8 +112,8 @@ GROUPS = {
         tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests", "DriveStepBeatTests"),
     ),
     "explain-showcase": (
-        core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift", "Present/ResearchSourceDraw.swift"),
-        tests("ExplainShowcaseTests", "ResearchSourceDrawTests"),
+        core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift", "Present/ResearchSourceDraw.swift", "Present/LocalAnswerDraw.swift"),
+        tests("ExplainShowcaseTests", "ResearchSourceDrawTests", "LocalAnswerDrawTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Present/CompanionMotionBox.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
