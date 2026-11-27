@@ -48,6 +48,10 @@ final class FacePresenceController {
         var permissions: Permissions = .unwired
         /// False in tests: no one second timer and no enrollment watchdog is scheduled.
         var usesTimers = true
+        /// Fails closed until `live()` installs the system check. Tests pass a synthetic proof and never show a dialog.
+        var presence: @MainActor (FaceTemplateProof.Operation) -> FaceTemplateProof = { operation in
+            FaceTemplateProof(operation: operation, userPresent: false)
+        }
 
         @MainActor
         static func live() -> Environment {
@@ -60,7 +64,8 @@ final class FacePresenceController {
                 sessionState: { FacePresenceController.systemSessionState() },
                 uptime: { ProcessInfo.processInfo.systemUptime },
                 settings: Settings(switchIsOn: { SettingsStore.shared.bool(FacePresenceController.switchID) },
-                                   lockAfterLabel: { SettingsStore.shared.string(FacePresenceController.lockAfterID) }))
+                                   lockAfterLabel: { SettingsStore.shared.string(FacePresenceController.lockAfterID) }),
+                presence: { FaceSystemPresence.proof(for: $0) })
         }
     }
 
@@ -169,7 +174,7 @@ final class FacePresenceController {
     /// Saves the new list and only then adopts it, so a refused or failed save leaves what the owner sees equal to what
     /// is stored. Deleting the last face removes the file and the Keychain key.
     private func commit(_ updated: [FaceRecord]) {
-        guard environment.vault.save(updated) == .saved else { return }
+        guard environment.vault.save(updated, presence: environment.presence(.save)) == .saved else { return }
         faces = updated
         send(.facesChanged(enabledFaces: enabledFaceCount, uptime: environment.uptime()))
     }
@@ -325,7 +330,7 @@ final class FacePresenceController {
         if let result {
             let face = FaceRecord(id: UUID().uuidString, name: nextFaceName(), isEnabled: true, revision: result.revision,
                                   samples: result.samples, threshold: result.threshold)
-            if environment.vault.save(faces + [face]) == .saved {
+            if environment.vault.save(faces + [face], presence: environment.presence(.save)) == .saved {
                 faces.append(face)
                 saved = true
             }
@@ -369,10 +374,11 @@ final class FacePresenceController {
     // MARK: Vault
 
     private func loadVault() {
-        switch environment.vault.load() {
+        switch environment.vault.load(presence: environment.presence(.read)) {
         case .empty: faces = []; vaultReadable = true
         case .faces(let stored): faces = stored; vaultReadable = true
         case .unreadable: faces = []; vaultReadable = false
+        case .needsPresence: break
         }
     }
 

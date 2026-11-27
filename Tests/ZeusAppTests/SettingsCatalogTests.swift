@@ -386,7 +386,7 @@ struct SettingsCatalogTests {
         let vault = FaceVaultStore(directory: directory, keychain: keychain)
         let face = FaceRecord(id: "face-secret-id", name: "Face 1", isEnabled: true, revision: 2,
                               samples: [[0.123456, 0.654321, 0.111111], [0.222222, 0.333333, 0.444444]], threshold: 0.3)
-        #expect(vault.save([face]) == .saved)
+        #expect(vault.save([face], presence: .synthetic(.save, userPresent: true)) == .saved)
 
         let data = try store.exportJSON()
         let text = String(decoding: data, as: UTF8.self)

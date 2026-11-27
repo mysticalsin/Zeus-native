@@ -78,7 +78,8 @@ struct FacePresenceControllerTests {
                     cameraAccess: { [unowned self] in camera },
                     askCamera: { [unowned self] in asks += 1; camera = cameraAfterAsk },
                     openCameraSettings: { [unowned self] in settingsOpens += 1 }),
-                usesTimers: false)
+                usesTimers: false,
+                presence: { FaceTemplateProof.synthetic($0, userPresent: true) })
             controller = FacePresenceController(environment: environment)
         }
 
@@ -90,7 +91,7 @@ struct FacePresenceControllerTests {
         }
 
         func enroll(_ ids: String...) {
-            #expect(vault.save(ids.map { record($0) }) == .saved)
+            #expect(vault.save(ids.map { record($0) }, presence: .synthetic(.save, userPresent: true)) == .saved)
         }
 
         /// The owner's switch turned on through the setting, as the card does.
@@ -489,7 +490,7 @@ struct FacePresenceControllerTests {
         #expect(face.isEnabled)
         #expect(face.revision == Rig.revision)
         #expect(face.samples.count == 10)
-        #expect(rig.vault.load() == .faces([face]))
+        #expect(rig.vault.load(presence: .synthetic(.read, userPresent: true)) == .faces([face]))
         #expect(rig.controller.machine.state == .watching(since: rig.clock))
         #expect(rig.source.running)
     }
@@ -508,7 +509,7 @@ struct FacePresenceControllerTests {
         rig.controller.checkEnrollmentWindow()
         #expect(rig.controller.machine.state == .paused(.noFace))
         #expect(rig.controller.faces.isEmpty)
-        #expect(rig.vault.load() == .empty)
+        #expect(rig.vault.load(presence: .synthetic(.read, userPresent: true)) == .empty)
         #expect(!rig.source.running)
     }
 
@@ -545,7 +546,7 @@ struct FacePresenceControllerTests {
             await rig.feed(.success(rig.seeOwner(embedding: vector)), run: run)
         }
         #expect(rig.controller.faces.isEmpty)
-        #expect(rig.vault.load() == .empty)
+        #expect(rig.vault.load(presence: .synthetic(.read, userPresent: true)) == .empty)
         #expect(rig.controller.machine.state == .paused(.screenLocked))
     }
 
@@ -593,7 +594,7 @@ struct FacePresenceControllerTests {
         rig.controller.setFace("1", enabled: false)
         #expect(rig.controller.enabledFaceCount == 1)
         #expect(rig.controller.machine.state == .watching(since: rig.clock))
-        if case .faces(let stored) = rig.vault.load() {
+        if case .faces(let stored) = rig.vault.load(presence: .synthetic(.read, userPresent: true)) {
             #expect(stored.first { $0.id == "1" }?.isEnabled == false)
         } else { Issue.record("vault should hold the faces") }
 
@@ -611,7 +612,7 @@ struct FacePresenceControllerTests {
         #expect(rig.controller.faces.isEmpty)
         #expect(rig.controller.machine.state == .paused(.noFace))
         // The last face gone: file and key are gone with it.
-        #expect(rig.vault.load() == .empty)
+        #expect(rig.vault.load(presence: .synthetic(.read, userPresent: true)) == .empty)
         #expect(!FileManager.default.fileExists(atPath: rig.vault.url.path))
         #expect(rig.keychain.get(FaceVaultStore.keyAccount) == nil)
     }

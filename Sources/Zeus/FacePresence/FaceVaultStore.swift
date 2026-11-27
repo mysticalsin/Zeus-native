@@ -16,12 +16,16 @@ struct FaceVaultStore: Sendable {
         case empty
         case faces([FaceRecord])
         case unreadable
+        /// The caller did not bring a confirmed proof for a read, so the file stayed closed.
+        case needsPresence
     }
 
     enum SaveResult: Equatable {
         case saved
         /// The stored file could not be read, so it was left as it is.
         case refusedUnreadable
+        /// The caller did not bring a confirmed proof for a save, so nothing was written.
+        case needsPresence
         /// The key or the file could not be written. Nothing the owner can open was left behind.
         case failed
     }
@@ -35,7 +39,12 @@ struct FaceVaultStore: Sendable {
         self.keychain = keychain
     }
 
-    func load() -> LoadResult {
+    func load(presence: FaceTemplateProof) -> LoadResult {
+        guard presence.allows(.read) else { return .needsPresence }
+        return read()
+    }
+
+    private func read() -> LoadResult {
         guard FileManager.default.fileExists(atPath: url.path) else { return .empty }
         guard let bytes = try? Data(contentsOf: url),
               let key = keychain.get(Self.keyAccount).flatMap({ FaceVault.key(fromBase64: $0) }),
@@ -45,8 +54,10 @@ struct FaceVaultStore: Sendable {
     }
 
     /// Stores exactly `faces`. An empty list removes the file and the key. Refuses when the stored vault is unreadable.
-    func save(_ faces: [FaceRecord]) -> SaveResult {
-        if load() == .unreadable { return .refusedUnreadable }
+    /// A proof for a read, or a proof that the person was not present, leaves the file and the key as they were.
+    func save(_ faces: [FaceRecord], presence: FaceTemplateProof) -> SaveResult {
+        guard presence.allows(.save) else { return .needsPresence }
+        if read() == .unreadable { return .refusedUnreadable }
         guard !faces.isEmpty else { return erase() ? .saved : .failed }
         let key: Data
         if let stored = keychain.get(Self.keyAccount).flatMap({ FaceVault.key(fromBase64: $0) }) {
