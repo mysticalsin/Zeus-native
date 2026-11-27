@@ -24,7 +24,7 @@ ZeusFlight zeus_visual_flight_tangent(double from_x, double from_y, double to_x,
 ZeusPixels zeus_visual_pixel_size(double width, double height, double scale);
 
 typedef struct ZeusInkBox ZeusInkBox;
-ZeusInkBox *zeus_visual_ink_new(void);
+ZeusInkBox *_Nonnull zeus_visual_ink_new(void);
 void zeus_visual_ink_free(ZeusInkBox *ink);
 void zeus_visual_ink_reset(ZeusInkBox *ink);
 int32_t zeus_visual_ink_add(ZeusInkBox *ink, double x, double y, double time);

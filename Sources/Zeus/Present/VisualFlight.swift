@@ -6,8 +6,8 @@ import ZeusCore
 enum VisualFlight {
     static func plan(from: CGPoint, to: CGPoint, departureTangent: CGPoint? = nil, reducedMotion: Bool) -> CompanionFlight {
         let raw = zeus_visual_flight_tangent(
-            Double(from.x), Double(from.y), Double(to.x), Double(to.y), reducedMotion ? 1 : 0,
-            Double(departureTangent?.x ?? 0), Double(departureTangent?.y ?? 0), departureTangent == nil ? 0 : 1)
+            Double(from.x), Double(from.y), Double(to.x), Double(to.y), Int32(reducedMotion ? 1 : 0),
+            Double(departureTangent?.x ?? 0), Double(departureTangent?.y ?? 0), Int32(departureTangent == nil ? 0 : 1))
         return CompanionFlight(
             from: CGPoint(x: raw.from_x, y: raw.from_y),
             control: CGPoint(x: raw.control_x, y: raw.control_y),
