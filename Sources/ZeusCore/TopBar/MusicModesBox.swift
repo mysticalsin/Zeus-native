@@ -56,11 +56,12 @@ public enum MusicModesBox {
 
     /// Reads `readScript`'s answer. Music says `true|false` and `off|one|all`. Spotify says two booleans.
     /// Nil for no answer, an empty or malformed one, or a word the player does not use. Case is ignored.
+    /// `MusicModesAnswerBox` removes named blanks at the edges. A zero-width space stays, so it is still a field.
     public static func parse(_ output: String?, player: Player) -> MusicModes? {
         guard let output else { return nil }
-        let fields = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fields = MusicModesAnswerBox.trimmedText(output)
             .components(separatedBy: separator)
-            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .map { MusicModesAnswerBox.trimmedText($0).lowercased() }
         guard fields.count == 2, let shuffle = bool(fields[0]) else { return nil }
         let mode: RepeatMode?
         switch player {
