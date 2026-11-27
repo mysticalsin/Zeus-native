@@ -141,7 +141,16 @@ final class VoiceTurnController {
                 self.armAhead(text)
             }
         }
-        FastActions.shared.onLateProblem = { [weak self] text in self?.say(text) }
+        FastActions.shared.onLateProblem = { [weak self] text in
+            guard let self else { return }
+            if let visual = ActionMissDraw.from(line: text) {
+                self.showActionMiss(visual, speak: true)
+                self.say(text)
+                self.buddy.showCaption(visual.boltCaption(at: 0))
+            } else {
+                self.say(text)
+            }
+        }
         // Perf rule: nothing warms at launch. The talk key going down warms the brain connection, the lean
         // `claude` process and the voice (`KeyDownWarmer`, `Speaker.prewarm`) while Tony is still speaking.
         BrainWarmScheduler.shared.start()
@@ -962,6 +971,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws an action that did not finish, under the pointer.
+    /// The caller speaks the full line. An answer failure stays on its own card.
+    private func showActionMiss(_ plan: ActionMissDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyActionMiss(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyActionMiss(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyActionMiss(_ plan: ActionMissDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws the live wait line on the display under the pointer.
     /// The caller speaks the full line. The Play Demo thinking step stays its own script.
     private func showThinking(_ plan: ThinkingDraw, speak: Bool) {
@@ -1754,7 +1795,16 @@ final class VoiceTurnController {
             VoiceLog.logContent("error", problem, prefix: "action problem: ")
             ZeusSound.play(.voiceError)
             let spoken = SpokenFailure.line(problem)
-            if speak { say(spoken) } else { buddy.showCaption(spoken); buddy.hideCaption() }
+            if let visual = ActionMissDraw.from(line: spoken) {
+                showActionMiss(visual, speak: speak)
+                if speak { say(spoken) } else { buddy.showCaption(spoken); buddy.hideCaption() }
+                buddy.showCaption(visual.boltCaption(at: 0))
+            } else if speak {
+                say(spoken)
+            } else {
+                buddy.showCaption(spoken)
+                buddy.hideCaption()
+            }
         }
         remember(transcript, plan.ack ?? plan.summary)
         if problem == nil { ZeusSound.play(.voiceDone) }
