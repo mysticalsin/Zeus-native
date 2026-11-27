@@ -116,10 +116,11 @@ GROUPS = {
         core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift", "Present/ResearchSourceDraw.swift", "Present/LocalAnswerDraw.swift",
              "Present/TodoListDraw.swift", "Present/CalendarEventDraw.swift", "Present/AgentStartDraw.swift",
              "Present/TodayBoardDraw.swift", "Present/RoutineSavedDraw.swift", "Present/MemoryKeptDraw.swift",
+             "Present/WatchDraw.swift",
              "Explanation/ExplanationEquationGeometryBox.swift", "Explanation/ExplanationEquationGeometry.swift"),
         tests("ExplainShowcaseTests", "ResearchSourceDrawTests", "LocalAnswerDrawTests", "TodoListDrawTests",
               "CalendarEventDrawTests", "AgentStartDrawTests", "TodayBoardDrawTests", "RoutineSavedDrawTests",
-              "MemoryKeptDrawTests"),
+              "MemoryKeptDrawTests", "WatchDrawTests"),
     ),
     "recordly-geometry": (
         core("BuddyVisibility.swift", "Present/CompanionMotionBox.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",

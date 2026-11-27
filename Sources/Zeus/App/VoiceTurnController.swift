@@ -1275,12 +1275,57 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    private static func watchWait(_ watch: ZeusWatch) -> String {
+        switch watch.trigger {
+        case .shellTest: "Build finishes"
+        case .windowShows: "Appears"
+        case .windowGone: "Goes away"
+        }
+    }
+
+    /// Draws a watch on the display under the pointer. The caller speaks the full line.
+    /// Stopping names no target. The shell test stays off the card.
+    private func showWatch(_ plan: WatchDraw, reply: String, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else {
+            if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+            return
+        }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyWatch(plan, at: 0, shot: shot)
+        if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyWatch(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyWatch(_ plan: WatchDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     private func handleWatch(_ transcript: String, speak: Bool) -> TurnResult? {
         if transcript.lowercased().contains("stop watching") {
             ZeusWatchRunner.shared.stopAll()
             let reply = "Stopped watching."
             buddy.idle()
-            if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+            showWatch(WatchDraw.stopped(), reply: reply, speak: speak)
             return TurnResult(spoken: reply)
         }
         guard let watch = ZeusWatchVoice.parse(transcript) else { return nil }
@@ -1288,7 +1333,14 @@ final class VoiceTurnController {
         ZeusWatchRunner.shared.startWatch(watch)
         let reply = "I'll watch for that."
         buddy.idle()
-        if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+        if let plan = WatchDraw.plan(label: watch.label, waiting: Self.watchWait(watch)) {
+            showWatch(plan, reply: reply, speak: speak)
+        } else if speak {
+            say(reply)
+        } else {
+            buddy.showCaption(reply)
+            buddy.hideCaption()
+        }
         return TurnResult(spoken: reply)
     }
 
