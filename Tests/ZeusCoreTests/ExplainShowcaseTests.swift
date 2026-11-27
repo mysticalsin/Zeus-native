@@ -83,6 +83,29 @@ import Testing
         #expect(showcase.draw.marks.last?.at == 2)
     }
 
+    @Test func theBoltCaptionFollowsTheSpokenBeat() throws {
+        let still = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
+        let first = still.boltCaption(at: 0)
+        let second = still.boltCaption(at: ExplainBeatSchedule.gap)
+        let third = still.boltCaption(at: ExplainBeatSchedule.gap * 2)
+        #expect(first != second)
+        #expect(second != third)
+        #expect(first.count <= 40)
+        #expect(second.count <= 40)
+        #expect(third.count <= 40)
+        #expect(still.sentences[0].hasPrefix(first))
+        #expect(still.sentences[1].hasPrefix(second))
+        #expect(still.sentences[2].hasPrefix(third))
+        #expect(still.boltCaption(at: .nan) == first)
+        #expect(still.boltCaption(at: -1) == first)
+        let moving = try #require(ExplainShowcase.plan(for: "explain how the Tesla car can fly"))
+        #expect(moving.boltCaption(at: 0) == moving.boltCaption(at: .nan))
+        #expect(moving.sentences[0].hasPrefix(moving.boltCaption(at: 0)))
+        let later = moving.boltCaption(at: ExplainBeatSchedule.gap * 4)
+        #expect(later != moving.boltCaption(at: 0))
+        #expect(moving.sentences.contains { $0.hasPrefix(later) })
+    }
+
     @Test func aStillExplainMovesTheBoltWithEachBeat() throws {
         let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
         #expect(showcase.travels == false)

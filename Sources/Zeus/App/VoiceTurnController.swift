@@ -777,9 +777,8 @@ final class VoiceTurnController {
         VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
         // Leave listening before the pen flies. idle() clears a flight, so it has to run first.
         buddy.idle()
-        let penLabel = PointerGuideCaptionSplit.oneLine(plan.sentences.first ?? "") ?? "Here"
         if plan.travels, ready {
-            showPen(plan.penFrame(at: 0), shot: shot, token: token, label: penLabel)
+            showPen(plan.penFrame(at: 0), shot: shot, token: token, label: plan.boltCaption(at: 0))
             explainReveal = Task { @MainActor [weak self] in
                 var shown = 0
                 while !Task.isCancelled {
@@ -788,7 +787,7 @@ final class VoiceTurnController {
                     guard let frame = plan.penFrame(at: elapsed, audioStarts: self.explainAudioStarts) else { return }
                     if frame.pointCount != shown {
                         shown = frame.pointCount
-                        self.showPen(frame, shot: shot, token: token, label: penLabel)
+                        self.showPen(frame, shot: shot, token: token, label: plan.boltCaption(at: elapsed))
                     }
                     if frame.finished { break }
                     try? await Task.sleep(for: .milliseconds(40))
@@ -799,13 +798,14 @@ final class VoiceTurnController {
         } else if ready {
             let beats = plan.schedule.indexes
             if let first = beats.first { surface.reveal(sentence: first, token: token) }
-            flyGuide(plan, at: 0, shot: shot, label: penLabel)
+            flyGuide(plan, at: 0, shot: shot, label: plan.boltCaption(at: 0))
             explainReveal = Task { @MainActor [weak self] in
                 for (offset, beat) in beats.dropFirst().enumerated() {
                     try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
                     guard !Task.isCancelled else { return }
+                    let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
                     self?.presenter.reveal(sentence: beat, token: token)
-                    self?.flyGuide(plan, at: Double(offset + 1) * ExplainBeatSchedule.gap, shot: shot, label: penLabel)
+                    self?.flyGuide(plan, at: elapsed, shot: shot, label: plan.boltCaption(at: elapsed))
                 }
                 guard let self, !Task.isCancelled else { return }
                 await self.finishExplainDrawing(token: token, speak: speak)

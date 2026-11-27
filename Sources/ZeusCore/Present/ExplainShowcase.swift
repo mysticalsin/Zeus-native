@@ -48,6 +48,20 @@ public struct ExplainShowcase: Equatable, Sendable {
                                schedule: ExplainBeatSchedule(indexes: indexes), stroke: stroke)
     }
 
+    /// The short line beside the bolt for the sentence that is visible at `elapsed`.
+    /// A negative or non-finite time stays on the first sentence. The line is at most 40 characters.
+    public func boltCaption(at elapsed: TimeInterval) -> String {
+        let beat: Int
+        if travels {
+            beat = penFrame(at: elapsed)?.beat ?? 0
+        } else {
+            beat = max(schedule.revealed(at: elapsed).count - 1, 0)
+        }
+        guard !sentences.isEmpty else { return "Here" }
+        let index = min(max(beat, 0), sentences.count - 1)
+        return Self.shortLine(sentences[index])
+    }
+
     /// Where the bolt sits at `elapsed`. A moving ask follows the pen tip. A still ask
     /// sits on the newest mark: a ring, then an arrow, then the ink, then a card.
     public func guideBolt(at elapsed: TimeInterval) -> TalkDraw.Point? {
@@ -245,6 +259,19 @@ public struct ExplainShowcase: Equatable, Sendable {
         if asked == "question" { return "question" }
         let marked = asked.hasSuffix("?") ? asked : asked + "?"
         return String(marked.prefix(TalkDraw.maxTextCharacters))
+    }
+
+    /// One caption line, matching the bolt's 40-character limit.
+    private static func shortLine(_ raw: String) -> String {
+        var current = ""
+        for word in raw.split(whereSeparator: \.isWhitespace) {
+            let piece = String(word)
+            let next = current.isEmpty ? piece : current + " " + piece
+            if next.count > 40 { break }
+            current = next
+        }
+        let line = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        return line.isEmpty ? "Here" : line
     }
 
     private static func leading(_ label: String) -> String {
