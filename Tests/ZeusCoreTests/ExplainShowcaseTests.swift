@@ -221,6 +221,33 @@ import Testing
         #expect(showcase.guideBolt(at: 0) == frame.bolt)
     }
 
+    @Test func aPlainEquationIsDrawnAsWritten() throws {
+        let showcase = try #require(ExplainShowcase.plan(for: "Explain E = mc^2"))
+        #expect(showcase.travels == false)
+        #expect(showcase.sentences[0] == "The relation is E = mc^2.")
+        #expect(showcase.sentences[1].contains("does not prove"))
+        let cards = showcase.draw.marks.compactMap { mark -> String? in
+            if case .card(_, let text) = mark.shape { return text }
+            return nil
+        }
+        #expect(cards == ["E = mc^2"])
+        let frame = try #require(showcase.builtFrame(at: 0))
+        let drawn = frame.marks.compactMap { mark -> String? in
+            if case .card(_, let text) = mark.shape { return text }
+            return nil
+        }
+        #expect(drawn == ["E = mc^2"])
+        let how = try #require(ExplainShowcase.plan(for: "explain how E = mc^2"))
+        #expect(how.sentences[0] == "The relation is E = mc^2.")
+        let tex = try #require(ExplainShowcase.plan(for: "explain $E = mc^2"))
+        #expect(tex.sentences[0].hasPrefix("The relation is") == false)
+        let cardsOfTex = tex.draw.marks.compactMap { mark -> String? in
+            if case .card(_, let text) = mark.shape { return text }
+            return nil
+        }
+        #expect(cardsOfTex.allSatisfy { !$0.contains("$") && !$0.contains("=") })
+    }
+
     @Test func aCommandOrABareExplainProducesNoShowcase() {
         #expect(ExplainShowcase.plan(for: "what time is it") == nil)
         #expect(ExplainShowcase.plan(for: "open Safari") == nil)

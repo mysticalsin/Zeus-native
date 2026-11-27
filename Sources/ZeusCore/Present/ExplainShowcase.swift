@@ -34,6 +34,7 @@ public struct ExplainShowcase: Equatable, Sendable {
 
     /// Nil for a command, or for "explain" with no subject.
     public static func plan(for request: String) -> ExplainShowcase? {
+        if let equation = equationShowcase(for: request) { return equation }
         guard let subject = subject(in: request) else { return nil }
         let pieces = parts(of: subject)
         let start = clip(pieces.start)
@@ -226,6 +227,40 @@ public struct ExplainShowcase: Equatable, Sendable {
             return max(1, Int(scaled))
         }
         return (axis(width), axis(height))
+    }
+
+    /// A plain relation such as "E = mc^2" is drawn as that line. The usual explain
+    /// fold turns "=" and "^" into spaces, so this check reads the request first.
+    /// TeX introducers stay on the ordinary plan. The box still grows beside the line.
+    private static func equationShowcase(for request: String) -> ExplainShowcase? {
+        guard let line = equationLine(in: request) else { return nil }
+        let shown = String(line.prefix(TalkDraw.maxTextCharacters))
+        let sentences = [
+            "The relation is \(shown).",
+            "Each character stays on one line. The drawing does not prove it.",
+        ]
+        let marks = [
+            TalkDraw.Mark(shape: .ink(stillBox), at: 0),
+            TalkDraw.Mark(shape: .ring(center: .init(x: 320, y: 320), radius: 36), at: 0),
+            TalkDraw.Mark(shape: .card(origin: .init(x: 180, y: 160), text: shown), at: 0),
+        ]
+        guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
+        let indexes = Array(Set(draw.marks.map(\.at))).sorted()
+        return ExplainShowcase(sentences: sentences, draw: draw, travels: false,
+                               schedule: ExplainBeatSchedule(indexes: indexes), stroke: stillBox)
+    }
+
+    private static func equationLine(in request: String) -> String? {
+        let folded = request.replacingOccurrences(of: "\u{2019}", with: "'")
+            .replacingOccurrences(of: "\u{2018}", with: "'")
+        let lower = folded.lowercased()
+        for lead in leads where lower.hasPrefix(lead) {
+            let rest = folded.dropFirst(lead.count).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard rest.contains("="), rest.count <= 240 else { continue }
+            guard case .block = ExplanationEquationGeometry.layout(rest) else { continue }
+            return String(rest)
+        }
+        return nil
     }
 
     private static let leads = [
