@@ -1259,6 +1259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ResearchRunner.shared.say = { [weak self] text in self?.voice.say(text) }
         ResearchRunner.shared.showSources = { [weak self] plan, speak in self?.voice.showResearch(plan, speak: speak) }
         ResearchRunner.shared.showReportSaved = { [weak self] plan, line, speak in self?.voice.showReportSaved(plan, line: line, speak: speak) }
+        ResearchRunner.shared.showReportMiss = { [weak self] plan, line, speak in self?.voice.showReportMiss(plan, line: line, speak: speak) }
         ResearchRunner.shared.showResearchAsk = { [weak self] plan, line, speak in self?.voice.showResearchAsk(plan, line: line, speak: speak) }
         earbudsNotch.topBar = topBar
         earbudsNotch.say = { [weak self] text in self?.voice.say(text) }
