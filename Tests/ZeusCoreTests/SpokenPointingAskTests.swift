@@ -78,6 +78,20 @@ import Testing
         #expect(shown?.bolt == "Point at Password settings")
     }
 
+    @Test func aMissingControlStaysOffTheModel() {
+        #expect(SpokenPointingAsk.blocksModel("point at the File menu"))
+        #expect(SpokenPointingAsk.held("point at the File menu") == SpokenPointingAsk.notFound)
+        #expect(SpokenPointingAsk.notFound.bolt == "Not found")
+        #expect(SpokenPointingAsk.blocksModel("open Safari") == false)
+        #expect(SpokenPointingAsk.held("open Safari") == nil)
+        #expect(SpokenPointingAsk.held("show me how a car can fly") == nil)
+        #expect(SpokenPointingAsk.blocksModel("point at the password"))
+        #expect(SpokenPointingAsk.isAsk("point at the password") == false)
+        #expect(SpokenPointingAsk.held("point at the password") == SpokenPointingAsk.secret)
+        #expect(SpokenPointingAsk.held("highlight the API key")?.bolt == "Secret")
+        #expect(SpokenPointingAsk.held("point at Password settings") == SpokenPointingAsk.notFound)
+    }
+
     @Test func anExplainHowStaysOffThisPath() {
         #expect(SpokenPointingAsk.isAsk("show me how a car can fly") == false)
         #expect(SpokenPointingAsk.show(in: "show me how a car can fly", candidates: [file]) == nil)

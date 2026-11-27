@@ -1519,30 +1519,38 @@ final class VoiceTurnController {
 
     /// A spoken "point at" or "show me" becomes one allowlisted guide. The bolt is drawn
     /// whether or not captions or spoken replies are on. Speech uses the speak-replies setting.
+    /// A miss stays on this path: the model does not invent a point. A bare secret is not pointed at.
     private func pointSpokenAsk(_ transcript: String, speak: Bool) -> TurnResult? {
-        guard SpokenPointingAsk.isAsk(transcript) else { return nil }
+        guard SpokenPointingAsk.blocksModel(transcript) else { return nil }
         let snapshot = AXSnapshotter.shared.latest ?? AXSnapshotter.shared.capture(budget: 0.2)
-        guard let snapshot else { return nil }
-        var candidates: [PointingProposalCandidate] = []
-        var frames: [String: CGRect] = [:]
-        var number = 1
-        for element in snapshot.elements {
-            guard number <= 99 else { break }
-            guard let label = element.label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty,
-                  !element.isSecure, element.frame.width > 0, element.frame.height > 0 else { continue }
-            let id = "t\(number)"
-            candidates.append(PointingProposalCandidate(id: id, isSecure: false, label: label))
-            frames[id] = element.frame
-            number += 1
+        if let snapshot {
+            var candidates: [PointingProposalCandidate] = []
+            var frames: [String: CGRect] = [:]
+            var number = 1
+            for element in snapshot.elements {
+                guard number <= 99 else { break }
+                guard let label = element.label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty,
+                      !element.isSecure, element.frame.width > 0, element.frame.height > 0 else { continue }
+                let id = "t\(number)"
+                candidates.append(PointingProposalCandidate(id: id, isSecure: false, label: label))
+                frames[id] = element.frame
+                number += 1
+            }
+            if let show = SpokenPointingAsk.show(in: transcript, candidates: candidates),
+               let frame = frames[show.targetID],
+               let screen = axFrameOnScreen(frame), screen.width > 0, screen.height > 0 {
+                if speak { say(show.spoken) }
+                let center = CGPoint(x: screen.midX, y: screen.midY)
+                buddy.point(to: center, label: show.bolt, ring: screen)
+                remember(transcript, show.spoken)
+                return TurnResult(spoken: show.spoken)
+            }
         }
-        guard let show = SpokenPointingAsk.show(in: transcript, candidates: candidates),
-              let frame = frames[show.targetID],
-              let screen = axFrameOnScreen(frame), screen.width > 0, screen.height > 0 else { return nil }
-        if speak { say(show.spoken) }
-        let center = CGPoint(x: screen.midX, y: screen.midY)
-        buddy.point(to: center, label: show.bolt, ring: screen)
-        remember(transcript, show.spoken)
-        return TurnResult(spoken: show.spoken)
+        guard let held = SpokenPointingAsk.held(transcript) else { return nil }
+        if speak { say(held.spoken) }
+        buddy.showCaption(held.bolt)
+        remember(transcript, held.spoken)
+        return TurnResult(spoken: held.spoken)
     }
 
     private func axFrameOnScreen(_ frame: CGRect) -> CGRect? {

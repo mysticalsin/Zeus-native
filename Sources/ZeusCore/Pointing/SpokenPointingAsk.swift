@@ -16,9 +16,41 @@ public enum SpokenPointingAsk {
         }
     }
 
+    /// What to say when the point stays off the guide.
+    public struct Held: Equatable, Sendable {
+        public var spoken: String
+        public var bolt: String
+
+        public init(spoken: String, bolt: String) {
+            self.spoken = spoken
+            self.bolt = bolt
+        }
+    }
+
+    public static let notFound = Held(
+        spoken: "I couldn't find that on screen, so I'll keep going.",
+        bolt: "Not found"
+    )
+    public static let secret = Held(
+        spoken: "I won't point at that.",
+        bolt: "Secret"
+    )
+
     /// True when the words ask to point at something on screen.
     public static func isAsk(_ utterance: String) -> Bool {
         askedLabel(in: utterance) != nil
+    }
+
+    /// The model must not invent a point. True for a guide ask, and for a bare secret point ask.
+    public static func blocksModel(_ utterance: String) -> Bool {
+        isAsk(utterance) || isBareSecretAsk(utterance)
+    }
+
+    /// The line to speak when `show` did not draw a guide. Nil when these words are not a point ask.
+    public static func held(_ utterance: String) -> Held? {
+        if isBareSecretAsk(utterance) { return secret }
+        if isAsk(utterance) { return notFound }
+        return nil
     }
 
     /// The guide to draw, after the allowlist admits one click target. Nil when the words
@@ -61,6 +93,12 @@ public enum SpokenPointingAsk {
     ]
 
     private static func askedLabel(in utterance: String) -> (verb: String, phrase: String)? {
+        guard let asked = asked(in: utterance), !isBareSecret(asked.phrase) else { return nil }
+        return asked
+    }
+
+    /// The point phrase, including a bare secret. Nil for schemes, "how", and anything that is not a point.
+    private static func asked(in utterance: String) -> (verb: String, phrase: String)? {
         let raw = utterance.lowercased()
         if raw.contains("://") || raw.contains("javascript:") || raw.contains("data:") || raw.contains("file:")
             || raw.contains("mailto:") || raw.contains("about:") || raw.contains("blob:") {
@@ -75,10 +113,14 @@ public enum SpokenPointingAsk {
             while let first = words.first, ["the", "a", "an"].contains(first) { words.removeFirst() }
             rest = words.joined(separator: " ")
             guard !rest.isEmpty, rest.count <= 80 else { return nil }
-            if isBareSecret(rest) { return nil }
             return (lead.verb, rest)
         }
         return nil
+    }
+
+    private static func isBareSecretAsk(_ utterance: String) -> Bool {
+        guard let asked = asked(in: utterance) else { return false }
+        return isBareSecret(asked.phrase)
     }
 
     private static func best(_ phrase: String, in candidates: [PointingProposalCandidate]) -> PointingProposalCandidate? {
