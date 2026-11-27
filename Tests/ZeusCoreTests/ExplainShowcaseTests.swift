@@ -131,6 +131,10 @@ import Testing
         let pixels = ExplainShowcase.pixelSize(width: 1440, height: 900, scale: 2)
         #expect(pixels.width == 2880)
         #expect(pixels.height == 1800)
+        #expect(ExplainShowcase.pixelSize(width: 100.4, height: 0.2, scale: 2) == (width: 201, height: 1))
+        #expect(ExplainShowcase.pixelSize(width: 10, height: 10, scale: 0.5) == (width: 10, height: 10))
+        #expect(ExplainShowcase.pixelSize(width: .nan, height: .infinity, scale: .nan) == (width: 1, height: Int(Int32.max)))
+        #expect(ExplainShowcase.pixelSize(width: -.infinity, height: 0, scale: 2) == (width: 1, height: 1))
         let fitted = showcase.scaled(toWidth: 640, toHeight: 360)
         #expect(fitted.marks.count == showcase.draw.marks.count)
         guard case .ink(let points) = fitted.marks.first(where: {

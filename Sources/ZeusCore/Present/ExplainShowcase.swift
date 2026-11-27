@@ -150,9 +150,17 @@ public struct ExplainShowcase: Equatable, Sendable {
     }
 
     /// Pixel size of a display frame at `scale` backing, the same numbers the talk presenter uses.
+    /// A non-finite edge is one pixel, except positive infinity, which is the largest 32-bit pixel count.
     public static func pixelSize(width: Double, height: Double, scale: Double) -> (width: Int, height: Int) {
-        let factor = max(scale, 1)
-        return (max(1, Int((width * factor).rounded())), max(1, Int((height * factor).rounded())))
+        let factor = scale.isFinite ? max(scale, 1) : 1
+        func axis(_ value: Double) -> Int {
+            guard value.isFinite else { return value > 0 ? Int(Int32.max) : 1 }
+            let scaled = (value * factor).rounded()
+            guard scaled.isFinite else { return scaled > 0 ? Int(Int32.max) : 1 }
+            if scaled >= Double(Int32.max) { return Int(Int32.max) }
+            return max(1, Int(scaled))
+        }
+        return (axis(width), axis(height))
     }
 
     private static let leads = [
