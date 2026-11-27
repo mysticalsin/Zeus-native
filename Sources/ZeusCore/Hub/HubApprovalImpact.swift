@@ -54,8 +54,8 @@ public struct HubApprovalImpact: Equatable, Sendable {
         if let url = input?["url"]?.stringValue {
             found.noteWord(url)
         }
-        let full = input?["command"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let shown = command?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let full = input?["command"]?.stringValue.map(HubApprovalCommandBox.trimmedCommand)
+        let shown = command.map(HubApprovalCommandBox.trimmedCommand)
         if let full, !full.isEmpty {
             found.consume(full)
         } else if let shown, !shown.isEmpty {
