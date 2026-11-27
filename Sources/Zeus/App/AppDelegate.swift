@@ -338,7 +338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey.onListenAccessMissing = { [weak self] in
                 if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
-            hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
+            hotkey.onBlocked = { [weak self] message in self?.voice?.keysBlocked(message) }
             // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one. Every event reads
             // the value the sync points stored (start, access granted, a Chat or shortcut change, VoiceOver, any setting), so the
             // key path asks neither the system for access nor Carbon for the hot key again.
