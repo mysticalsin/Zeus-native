@@ -188,7 +188,7 @@ public enum ZeusCLI {
             op = .ask
             rest = words
         }
-        let text = rest.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = ZeusCommandBox.trimmedText(rest.joined(separator: " "))
         switch op {
         case .ask, .say:
             if text.isEmpty { throw ZeusCLIError.usage("\(op.rawValue) needs some text") }
@@ -246,7 +246,7 @@ public enum ZeusCLI {
         guard parts.count == 2 else { return text }
         let sub = parts[0].lowercased()
         guard sub == "dictate-file" || sub == "wake-file" else { return text }
-        let path = DebugAudioPath.resolve(parts[1].trimmingCharacters(in: .whitespacesAndNewlines))
+        let path = DebugAudioPath.resolve(ZeusCommandBox.trimmedText(parts[1]))
         return "\(parts[0]) \(path)"
     }
 
