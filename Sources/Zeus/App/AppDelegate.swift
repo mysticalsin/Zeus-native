@@ -1250,7 +1250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DriveController.shared.hideSpark = { [weak self] in self?.buddy.hideCaption() }
         BrowserAgentRunner.shared.notch = notch
         BrowserAgentRunner.shared.chrome = voice?.chrome
-        BrowserAgentRunner.shared.say = { [weak self] text in self?.voice.say(text) }
+        BrowserAgentRunner.shared.say = { [weak self] text in self?.voice.browserSaid(text) }
         BrowserAgentRunner.shared.showSpark = { [weak self] text in self?.buddy.showCaption(text) }
         BrowserAgentRunner.shared.hideSpark = { [weak self] in self?.buddy.hideCaption() }
         CodeActions.shared.notch = notch
