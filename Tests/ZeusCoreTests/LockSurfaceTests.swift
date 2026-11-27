@@ -21,7 +21,7 @@ struct LockSurfaceTests {
             .scene(full),
             .display(display),
             .symbolsLoaded(missing: []),
-            .symbolsLoaded(missing: ["SLSSpaceCreate"]),
+            .symbolsLoaded(missing: ["WindowSpaceCreate"]),
             .opened(1, failedStep: nil),
             .opened(1, failedStep: "windowNumber"),
             .closed(1, failedStep: nil),
@@ -93,12 +93,12 @@ struct LockSurfaceTests {
     @Test func aMissingSymbolIsUnavailable() {
         let booted = launched()
         #expect(booted.effects == [.loadSymbols])
-        let (next, effects) = LockSurface.reduce(booted.state, .symbolsLoaded(missing: ["SLSSpaceCreate"]))
+        let (next, effects) = LockSurface.reduce(booted.state, .symbolsLoaded(missing: ["WindowSpaceCreate"]))
         #expect(effects == [])
-        #expect(next.phase == .unavailable(.missingSymbols(["SLSSpaceCreate"])))
+        #expect(next.phase == .unavailable(.missingSymbols(["WindowSpaceCreate"])))
         let (later, more) = LockSurface.reduce(next, .presence(visible))
         #expect(more == [])
-        #expect(later.phase == .unavailable(.missingSymbols(["SLSSpaceCreate"])))
+        #expect(later.phase == .unavailable(.missingSymbols(["WindowSpaceCreate"])))
     }
 
     @Test(arguments: [14, 15, 28])
@@ -121,7 +121,7 @@ struct LockSurfaceTests {
         let (ready, effects) = LockSurface.reduce(launched().state, .symbolsLoaded(missing: []))
         #expect(effects == [])
         #expect(ready.phase == .ready)
-        let (same, more) = LockSurface.reduce(ready, .symbolsLoaded(missing: ["SLSSpaceCreate"]))
+        let (same, more) = LockSurface.reduce(ready, .symbolsLoaded(missing: ["WindowSpaceCreate"]))
         #expect(more == [])
         #expect(same.phase == .ready)
     }

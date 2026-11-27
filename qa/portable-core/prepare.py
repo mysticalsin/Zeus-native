@@ -46,7 +46,7 @@ GROUPS = {
     ),
     "socket-safety": (
         core("UnixSocket.swift", "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "ZeusPaths.swift"),
-        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests"),
+        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests", "PollingWait"),
     ),
     "bridge-transport": (
         core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
@@ -61,7 +61,7 @@ GROUPS = {
     ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift", "Wiki/SensitiveInfoScanner.swift",
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
              "SecondBrain/SecondBrain.swift", "SecondBrain/VaultPathBoundary.swift", "JSONValue.swift",
@@ -69,7 +69,7 @@ GROUPS = {
         tests("WikiExportTests"),
     ),
     "dictation-insertion": (
-        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift"),
+        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift", "Dictation/WarmFieldInsertBox.swift"),
         tests("TextInsertionReceiptTests", "WarmFieldInsertTests"),
     ),
     "polyglot": (
@@ -115,7 +115,7 @@ GROUPS = {
         tests("ExplainShowcaseTests"),
     ),
     "recordly-geometry": (
-        core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
+        core("BuddyVisibility.swift", "Present/CompanionMotionBox.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
              "Recordly/RecordlyCursorLog.swift", "Recordly/RecordlyZoomRegions.swift", "Recordly/RecordlyExportPlan.swift",
              "Recordly/RecordlyExportSettings.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
@@ -133,7 +133,7 @@ GROUPS = {
              "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
              "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",
              "Pointing/PointingStaleTarget.swift", "Pointing/PointingShortcutConflicts.swift", "Pointing/ShowMeKey.swift",
-             "Pointing/PointingInkTrail.swift", "Pointing/PointingTraceSpans.swift"),
+             "Pointing/PointingInkTrail.swift", "Pointing/PointingInkTrailBox.swift", "Pointing/PointingTraceSpans.swift"),
         tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
               "ExplanationProtocolV2Tests", "ExplanationProtocolV3Tests", "PointingCardAnchorsTests", "PointingProviderTests", "PointingStrokeTargetingTests", "PointingDeixisTests",
               "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
@@ -144,7 +144,7 @@ GROUPS = {
         tests("RightOptionHoldTests"),
     ),
     "buddy": (
-        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
+        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CompanionMotionBox.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "agent-choice-dismiss": (
@@ -154,7 +154,7 @@ GROUPS = {
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
     # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
@@ -176,7 +176,7 @@ GROUPS = {
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift",
              "Wiki/WikiStore.swift", "Wiki/SensitiveInfoScanner.swift"),
         tests("WikiTests"),
     ),
@@ -265,6 +265,10 @@ def write_excerpts(root, group, manifest):
     elif group == "recordly-geometry":
         text, evidence = section(CORE + "Present/CompanionMotion.swift", "public struct CompanionSpring:",
                                  "/// One frame of a flight.")
+        pieces.append(text)
+        manifest["excerpts"].append(evidence)
+        text, evidence = section(CORE + "Present/CompanionMotion.swift", "private extension CGPoint {",
+                                 "private extension CompanionFlight {")
         pieces.append(text)
         manifest["excerpts"].append(evidence)
     if pieces:
