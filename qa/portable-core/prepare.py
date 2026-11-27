@@ -161,9 +161,10 @@ GROUPS = {
     "agent-choice-dismiss": (
         core("AgentChoiceDismiss.swift", "JSONValue.swift", "FacePresence/FaceTemplateProof.swift",
              "Earbuds/EarbudsCuePolicy.swift", "Earbuds/EarbudsCuePolicyBox.swift",
-             "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift"),
+             "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift",
+             "BrowserAgent/WebAddress.swift"),
         tests("AgentChoiceDismissTests", "FaceTemplateProofTests", "EarbudsCuePolicyTests", "EarbudsCuePolicyBoxTests",
-              "EarbudsModeSpeechTests"),
+              "EarbudsModeSpeechTests", "BrowserWebURLTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",

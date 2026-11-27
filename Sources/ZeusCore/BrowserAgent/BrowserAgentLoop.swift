@@ -208,18 +208,7 @@ public enum BrowserAgentOp: Equatable, Sendable {
 
     /// An http(s) URL, with https:// added when the scheme is missing. Anything else is nil.
     public static func webURL(_ raw: String) -> String? {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.contains("://") {
-            let lowered = text.lowercased()
-            guard !lowered.hasPrefix("javascript:"), !lowered.hasPrefix("data:") else { return nil }
-            let head = lowered.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
-            let name = head.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
-            guard name == "localhost" || text.contains(".") else { return nil }
-            text = "https://" + text
-        }
-        guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
-              url.host?.isEmpty == false else { return nil }
-        return text
+        WebAddress.page(raw)
     }
 }
 
