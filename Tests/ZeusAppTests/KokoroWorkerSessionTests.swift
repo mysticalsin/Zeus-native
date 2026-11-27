@@ -664,7 +664,8 @@ struct KokoroWorkerSessionTests {
         // occupies the cooperative thread, so this detached configuration never enters.
         let entered = await probe.waitUntilEntered(seconds: 1)
         #expect(entered)
-        #expect(started.duration(to: .now) < .milliseconds(500))
+        // The 30s hold must not be what ends the wait. Runner scheduling can pass 500ms.
+        #expect(started.duration(to: .now) < .seconds(2))
         probe.release()
         _ = await configuration.value
     }
@@ -787,7 +788,8 @@ struct KokoroWorkerSessionTests {
             let began = ContinuousClock.now
             let request = fixture.render(session, "queued")
             #expect(await request.value == nil)
-            #expect(began.duration(to: .now) < .milliseconds(500))
+            // The 0.1s expiry returns while the queue stays blocked. This is that wait, not the hold.
+            #expect(began.duration(to: .now) < .seconds(2))
             #expect(!blocker.leftGate)
             #expect(probe.calls == 0)
             let replacementBegan = ContinuousClock.now
