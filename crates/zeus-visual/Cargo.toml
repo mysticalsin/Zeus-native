@@ -1,0 +1,10 @@
+[package]
+name = "zeus-visual"
+version = "0.1.0"
+edition = "2021"
+description = "Pointing, companion flight, and explain-frame math for the Zeus Mac app."
+license = "MIT"
+
+[lib]
+name = "zeus_visual"
+path = "src/lib.rs"

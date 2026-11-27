@@ -1,5 +1,6 @@
 .build/
 build/
+target/
 *.xcodeproj/xcuserdata/
 .swiftpm/
 extension/node_modules/
