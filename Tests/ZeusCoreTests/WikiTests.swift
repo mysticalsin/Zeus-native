@@ -75,6 +75,11 @@ import Testing
         #expect(other.hasPrefix("topic-t-"))
         #expect(WikiStore.isValidID(other))
         #expect(other != WikiCompiler.topicID(forTitle: "月次会議"))
+        let zeroWidth = WikiCompiler.topicID(forTitle: "\u{200B}")
+        #expect(zeroWidth.hasPrefix("topic-t-"))
+        #expect(zeroWidth != "topic-meetings")
+        #expect(zeroWidth == WikiCompiler.topicID(forTitle: " \u{200B}\n"))
+        #expect(WikiCompiler.topicID(forTitle: "\u{200B}週次会議") != other)
     }
 
     // MARK: Compiler

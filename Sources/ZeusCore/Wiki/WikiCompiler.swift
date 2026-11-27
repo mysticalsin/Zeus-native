@@ -10,6 +10,7 @@ public enum WikiCompiler {
 
     /// One topic per meeting title, ignoring case, accents, punctuation and number-only words (dates, counts),
     /// so "Weekly sync 11/07" and "Weekly sync 11/14" share a page. Always safe as a file name.
+    /// A zero-width space stays. The blank check is read from `WikiCompilerBox`.
     public static func topicID(forTitle title: String) -> String {
         let folded = title.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
         var words: [String] = []
@@ -22,7 +23,7 @@ public enum WikiCompiler {
                 current.unicodeScalars.append(scalar)
             } else {
                 if !current.isEmpty { words.append(current); current = "" }
-                if !scalar.isASCII && !CharacterSet.whitespacesAndNewlines.contains(scalar) { hasNonASCII = true }
+                if !scalar.isASCII && !WikiCompilerBox.blankScalars.contains(scalar) { hasNonASCII = true }
             }
         }
         if !current.isEmpty { words.append(current) }
@@ -31,7 +32,7 @@ public enum WikiCompiler {
         if slug.count > 60 { slug = String(slug.prefix(60)) }
         if slug.isEmpty {
             // Titles in other scripts have no ASCII words; a stable hash keeps them apart.
-            slug = hasNonASCII ? "t-" + stableHash(folded.trimmingCharacters(in: .whitespacesAndNewlines)) : defaultTopic
+            slug = hasNonASCII ? "t-" + stableHash(WikiCompilerBox.trimmedTitle(folded)) : defaultTopic
         }
         return "topic-" + slug
     }
