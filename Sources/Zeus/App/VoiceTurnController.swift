@@ -1181,6 +1181,8 @@ final class VoiceTurnController {
         guard let cmd = UserMemoryCommands.parse(transcript) else { return nil }
         let persistence = UserMemoryPersistence.shared
         var reply: String
+        var shown: MemoryKeptDraw?
+        var pendingFact: String?
         // Logged instead of the reply: the reply can quote stored personal memories.
         var logOutcome = "handled"
         do {
@@ -1193,8 +1195,13 @@ final class VoiceTurnController {
                 case .storedRule, .storedFact:
                     reply = "Got it. I'll remember that."
                     changed = true
-                case .rejectedSensitive: reply = "I can't store sensitive things like that."
-                case .rejectedScreenSource: reply = "I only remember what you tell me, not what's on screen."
+                    pendingFact = text
+                case .rejectedSensitive:
+                    reply = "I can't store sensitive things like that."
+                    shown = MemoryKeptDraw.refused()
+                case .rejectedScreenSource:
+                    reply = "I only remember what you tell me, not what's on screen."
+                    shown = MemoryKeptDraw.refused()
                 }
             case .forget(let phrase):
                 // "that" alone is the bare command; a named phrase never reaches here as "that".
@@ -1216,6 +1223,8 @@ final class VoiceTurnController {
                 do { try persistence.save(store) } catch {
                     VoiceLog.logContent("error", error.localizedDescription, prefix: "memory save: ")
                     reply = "I couldn't save that, so nothing changed."
+                    pendingFact = nil
+                    shown = nil
                     logOutcome = "save failed"
                 }
             }
@@ -1225,10 +1234,45 @@ final class VoiceTurnController {
             logOutcome = "load failed"
         }
         VoiceLog.log("memory", logOutcome)
+        if let pendingFact, let kept = MemoryKeptDraw.plan(fact: pendingFact) { shown = kept }
         buddy.idle()
+        if let shown { showMemoryKept(shown, speak: speak) }
         if speak { say(reply) } else { buddy.showCaption(reply); buddy.hideCaption() }
+        if let shown { buddy.showCaption(shown.boltCaption(at: 0)) }
         remember(transcript, reply)
         return TurnResult(spoken: reply)
+    }
+
+    /// Draws a kept memory, or the refusal, on the display under the pointer.
+    /// The caller speaks the full line. A refusal card has no fact on it.
+    private func showMemoryKept(_ plan: MemoryKeptDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyMemoryKept(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyMemoryKept(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyMemoryKept(_ plan: MemoryKeptDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
     private func handleWatch(_ transcript: String, speak: Bool) -> TurnResult? {
