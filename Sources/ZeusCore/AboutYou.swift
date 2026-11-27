@@ -77,7 +77,7 @@ public struct AboutYouProfile: Equatable, Sendable {
         self.notes = notes
     }
 
-    private func clean(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private func clean(_ text: String) -> String { AboutYouBox.trimmedField(text) }
 
     /// Name is the only required answer.
     public var isComplete: Bool { !clean(name).isEmpty }
