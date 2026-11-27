@@ -1156,14 +1156,20 @@ final class VoiceTurnController {
                         return nil
                     }
                 case .presentCard:
-                    let shown = PresentCard.parse(action.payload)?.shown()
-                    if shown != nil { pointed = true }
+                    let beats = PresentCard.parse(action.payload)?.beats() ?? []
+                    if !beats.isEmpty { pointed = true }
                     task = Task { @MainActor in
-                        guard let shown else { return nil }
-                        if speak { self.say(shown.spoken) }
+                        guard let first = beats.first else { return nil }
                         let anchor = NSEvent.mouseLocation
                         let ring = CGRect(x: anchor.x - 28, y: anchor.y - 18, width: 56, height: 36)
-                        self.buddy.point(to: anchor, label: shown.bolt, ring: ring)
+                        self.buddy.point(to: anchor, label: first.bolt, ring: ring)
+                        if speak {
+                            for beat in beats {
+                                self.speaker.speak(Self.voiced(beat.spoken), onStart: { [weak self] in
+                                    self?.buddy.showCaption(beat.bolt)
+                                })
+                            }
+                        }
                         return nil
                     }
                 default:

@@ -11,6 +11,15 @@ import Testing
         #expect(PointerGuideCaptionSplit.boltText(shown?.bolt ?? "") == shown?.bolt)
     }
 
+    @Test func aStepsCardIsBuiltOneStepAtATime() {
+        let card = PresentCard(kind: .steps, title: "Export", lines: ["Open File", "Pick format"])
+        let beats = card.beats()
+        #expect(beats.map(\.spoken) == ["Export.", "Open File.", "Pick format."])
+        #expect(beats.map(\.bolt) == ["Export", "Open File", "Pick format"])
+        #expect(beats.allSatisfy { PointerGuideCaptionSplit.boltText($0.bolt) == $0.bolt })
+        #expect(PresentCard(kind: .note, title: "  ", lines: [" ", ""]).beats().isEmpty)
+    }
+
     @Test func aLongCardKeepsTheShortBolt() {
         let card = PresentCard(kind: .steps, title: "Share this window",
                                lines: ["Click the green button in the toolbar", "Choose the window"])
