@@ -5,13 +5,7 @@ import Foundation
 /// zero-width joiners is dropped, one joiner between other scalars stays, and line, paragraph and
 /// space separators fold to one U+0020. Private-use and unassigned scalars are dropped. The result
 /// is trimmed, and past 32 characters the last one is an ellipsis. Nothing left is "Earbuds".
-
-public enum EarbudsPart: Equatable, Hashable, Sendable {
-    case left
-    case right
-    case `case`
-    case single
-}
+/// `EarbudsPart` is the battery list in `EarbudsBattery`. This file reads that one declaration.
 
 public enum EarbudsLevel: Equatable, Sendable {
     case unknown
