@@ -47,7 +47,7 @@ public struct MorningBrief: Equatable, Sendable {
                              calendar: Calendar = .current) -> MorningBrief {
         let hour = calendar.component(.hour, from: now)
         let part = hour < 12 ? "Good morning" : (hour < 18 ? "Good afternoon" : "Good evening")
-        let trimmed = name?.trimmingCharacters(in: .whitespaces) ?? ""
+        let trimmed = MorningBriefNameBox.trimmedName(name ?? "")
         let greeting = trimmed.isEmpty ? part : "\(part), \(trimmed.split(separator: " ").first.map(String.init) ?? trimmed)"
 
         let dayStart = calendar.startOfDay(for: now)
