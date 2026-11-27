@@ -666,6 +666,47 @@ final class VoiceTurnController {
         return TurnResult(spoken: answer)
     }
 
+    /// A clock time for a timed event, or "All day" when the request named a day and no hour.
+    private static func eventWhen(_ event: CalendarQuickAdd.Parsed) -> String {
+        if event.isAllDay { return "All day" }
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return formatter.string(from: event.start)
+    }
+
+    /// Draws a calendar event on the display under the pointer: the word Calendar, then the title, then the time.
+    /// The caller speaks the full line. The marks still appear when that speech is off.
+    private func showCalendarEvent(_ plan: CalendarEventDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCalendarEvent(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCalendarEvent(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCalendarEvent(_ plan: CalendarEventDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws added to-dos on the display under the pointer, one title at a time.
     /// The caller speaks the full line. The marks still appear when that speech is off.
     private func showTodoList(_ plan: TodoListDraw, speak: Bool) {
@@ -810,7 +851,18 @@ final class VoiceTurnController {
             IntelligenceCenter.shared.announce(engine: engine, summary: plan.summary)
             AvatarStatus.shared.flash(.done, for: 1.5)
             if let ack = plan.ack, !ack.isEmpty, let self {
-                if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                if case .addEvent(let text) = plan.intent,
+                   let parsed = CalendarQuickAdd.parse(text), parsed.hadDate,
+                   let visual = CalendarEventDraw.plan(title: parsed.title, when: Self.eventWhen(parsed)) {
+                    self.showCalendarEvent(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if speak {
+                    self.say(ack)
+                } else {
+                    self.buddy.showCaption(ack)
+                    self.buddy.hideCaption()
+                }
             }
         }
         fast.signposter.endInterval("fast action", interval)
