@@ -56,14 +56,16 @@ public struct AgentQuestion: Equatable, Sendable {
 
 public enum AgentPlan {
     /// The Markdown plan in an `ExitPlanMode` input.
+    /// A plan is kept only when `AgentCardsBox` keeps it. A zero-width space stays.
+    /// Named blanks around a plan are removed.
     public static func text(_ input: JSONValue?) -> String? {
-        let plan = input?["plan"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let plan = input?["plan"]?.stringValue.map(AgentCardsBox.trimmed)
         return plan?.isEmpty == false ? plan : nil
     }
 
     /// What Claude reads when the plan is sent back for more work.
     public static func feedbackMessage(_ feedback: String) -> String {
-        let trimmed = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = AgentCardsBox.trimmed(feedback)
         return trimmed.isEmpty
             ? "The user did not approve this plan yet. Keep planning and ask what to change."
             : "The user did not approve this plan yet. Revise it with this feedback: \(trimmed)"
