@@ -586,7 +586,13 @@ final class VoiceTurnController {
 
         if let spoken = await LearnedSteps.handle(transcript) {
             buddy.idle()
-            say(spoken)
+            if let visual = Self.shortcutVisual(transcript: transcript, spoken: spoken) {
+                showShortcut(visual, speak: true)
+                say(spoken)
+                buddy.showCaption(visual.boltCaption(at: 0))
+            } else {
+                say(spoken)
+            }
             return TurnResult(spoken: spoken)
         }
         if let selected = TextInserter.selectedText(),
@@ -932,6 +938,48 @@ final class VoiceTurnController {
         case .ask(let question, let engine): return askBack(question, engine: engine, transcript: transcript, speak: speak)
         case .miss: return nil
         }
+    }
+
+    /// The card for a shortcut Zeus just saved, refused, or replayed.
+    private static func shortcutVisual(transcript: String, spoken: String) -> ShortcutDraw? {
+        if spoken == "Done." { return ShortcutDraw.done() }
+        guard let parsed = NamedShortcutPhrase.parse(transcript) else { return nil }
+        if spoken.hasPrefix("Saved ") {
+            return ShortcutDraw.saved(phrase: parsed.phrase, steps: parsed.steps)
+        }
+        return ShortcutDraw.notSaved(phrase: parsed.phrase)
+    }
+
+    /// Draws a shortcut on the display under the pointer while Zeus says it.
+    /// The caller speaks the full line.
+    private func showShortcut(_ plan: ShortcutDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyShortcut(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyShortcut(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyShortcut(_ plan: ShortcutDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
     /// Draws a found file on the display under the pointer while Zeus says it is opening.
