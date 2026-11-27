@@ -505,29 +505,41 @@ final class HangURLStub: URLProtocol, @unchecked Sendable {
     }
 
     static func waitUntilStarted(timeout: TimeInterval) async -> Bool {
-        await poll(timeout: timeout) { didStartFlag }
+        await parked(.started, timeout: timeout)
     }
 
     static func waitUntilStopped(timeout: TimeInterval) async -> Bool {
-        await poll(timeout: timeout) { didStopFlag }
+        await parked(.stopped, timeout: timeout)
     }
 
-    /// Polls without holding a cooperative thread. A blocking condition wait keeps the
-    /// URL task from being scheduled, so the stub never starts and never stops.
-    private static func poll(timeout: TimeInterval, until flag: () -> Bool) async -> Bool {
-        let steps = max(1, Int(timeout / 0.02))
-        for _ in 0..<steps {
-            started.lock()
-            let ready = flag()
-            started.unlock()
-            if ready { return true }
-            try? await Task.sleep(for: .milliseconds(20))
+    /// The condition wait runs on its own thread. Calling `lock` from an async function is
+    /// rejected, and waiting on the shared pool keeps the URL task from being scheduled.
+    private static func parked(_ gate: Gate, timeout: TimeInterval) async -> Bool {
+        await withCheckedContinuation { continuation in
+            Thread.detachNewThread {
+                continuation.resume(returning: wait(timeout: timeout, gate: gate))
+            }
         }
-        started.lock()
-        let ready = flag()
-        started.unlock()
-        return ready
     }
+
+    private static func wait(timeout: TimeInterval, gate: Gate) -> Bool {
+        started.lock()
+        defer { started.unlock() }
+        let deadline = Date().addingTimeInterval(timeout)
+        while !isSet(gate) {
+            if !started.wait(until: deadline) { return isSet(gate) }
+        }
+        return true
+    }
+
+    private static func isSet(_ gate: Gate) -> Bool {
+        switch gate {
+        case .started: didStartFlag
+        case .stopped: didStopFlag
+        }
+    }
+
+    private enum Gate { case started, stopped }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
