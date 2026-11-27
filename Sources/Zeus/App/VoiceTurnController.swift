@@ -136,6 +136,7 @@ final class VoiceTurnController {
                 if !self.liveWords.visible.isEmpty {
                     self.buddy.showCaption(self.liveWords.visible)
                 }
+                // A matching command is armed here and runs only if these words are still the final ones.
                 FastPath.shared.partial(text)
                 self.armAhead(text)
             }
@@ -652,6 +653,9 @@ final class VoiceTurnController {
     /// brief phrases (`LocalTurns`), then the decision engine (Jev). nil means "LLM".
     private func understand(_ transcript: String, finalAt: ContinuousClock.Instant, speak: Bool) async -> TurnResult? {
         let fast = FastPath.shared
+        if let plan = fast.confirmedPlan(for: transcript) {
+            return await perform(plan, engine: "Rules", transcript: transcript, finalAt: finalAt, speak: speak)
+        }
         switch fast.rules(transcript) {
         case .hit(let plan, let engine): return await perform(plan, engine: engine, transcript: transcript, finalAt: finalAt, speak: speak)
         case .ask(let question, let engine): return askBack(question, engine: engine, transcript: transcript, speak: speak)
