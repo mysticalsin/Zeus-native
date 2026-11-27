@@ -62,7 +62,7 @@ public struct PrivateActionReceipt: Equatable, Sendable, Identifiable {
     /// The fixed title is allowed to contain short ordinary words. A line that is not that title
     /// and still contains the secret is a leak.
     public func publishes(_ secret: String) -> Bool {
-        let needle = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        let needle = PrivateActionReceiptBox.trimmedSecret(secret)
         guard needle.count >= 8 else { return false }
         let visible = [title, notchLine, undoLabel, sharedBody ?? ""]
         return visible.contains { field in
@@ -117,7 +117,7 @@ public struct PrivateActionLedger: Equatable, Sendable {
     @discardableResult
     public mutating func record(kind: PrivateActionKind, withheld: [String], restore: String, token: String,
                                  share: Bool = false, id: UUID = UUID()) -> PrivateActionReceipt? {
-        let secrets = withheld.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let secrets = withheld.map { PrivateActionReceiptBox.trimmedSecret($0) }.filter { !$0.isEmpty }
         guard !secrets.isEmpty else { return nil }
         let receipt = PrivateActionReceipt(id: id, kind: kind, visibility: share ? .shared : .private)
         guard secrets.allSatisfy({ !receipt.publishes($0) }) else { return nil }
