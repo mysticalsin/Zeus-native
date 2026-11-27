@@ -28,9 +28,29 @@ pub extern "C" fn zeus_visual_flight(
     to_y: f64,
     reduced_motion: i32,
 ) -> ZeusFlight {
-    let flight = Flight::plan(
+    zeus_visual_flight_tangent(from_x, from_y, to_x, to_y, reduced_motion, 0.0, 0.0, 0)
+}
+
+#[no_mangle]
+pub extern "C" fn zeus_visual_flight_tangent(
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
+    reduced_motion: i32,
+    tangent_x: f64,
+    tangent_y: f64,
+    has_tangent: i32,
+) -> ZeusFlight {
+    let departure = if has_tangent != 0 {
+        Some(crate::Point::new(tangent_x, tangent_y))
+    } else {
+        None
+    };
+    let flight = Flight::plan_with_tangent(
         crate::Point::new(from_x, from_y),
         crate::Point::new(to_x, to_y),
+        departure,
         reduced_motion != 0,
     );
     ZeusFlight {

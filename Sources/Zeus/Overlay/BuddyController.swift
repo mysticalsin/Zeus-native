@@ -457,7 +457,7 @@ final class BuddyController: NSObject {
 
     private func startReturn(now: CFTimeInterval) {
         let home = followTarget()
-        let curve = CompanionFlight.plan(from: model.position, to: home, departureTangent: landingTangent, reducedMotion: Motion.reduced)
+        let curve = VisualFlight.plan(from: model.position, to: home, departureTangent: landingTangent, reducedMotion: Motion.reduced)
         flight = ActiveFlight(curve: curve, start: now, returning: true, mouseAtStart: NSEvent.mouseLocation)
         model.mode = .returning
     }

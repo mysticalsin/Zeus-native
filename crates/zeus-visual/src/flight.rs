@@ -76,9 +76,18 @@ impl Flight {
     }
 
     pub fn plan(from: Point, to: Point, reduced_motion: bool) -> Self {
+        Self::plan_with_tangent(from, to, None, reduced_motion)
+    }
+
+    /// `departure` is the direction the companion is already facing. It becomes the control
+    /// arm so a return home does not snap the rotation.
+    pub fn plan_with_tangent(from: Point, to: Point, departure: Option<Point>, reduced_motion: bool) -> Self {
         let distance = (to.x - from.x).hypot(to.y - from.y);
         let lift = (0.2 * distance).min(80.0);
-        let control = Point::new((from.x + to.x) / 2.0, (from.y + to.y) / 2.0 + lift);
+        let control = match unit(departure) {
+            Some(tangent) if lift > 0.0 => Point::new(from.x + tangent.x * lift, from.y + tangent.y * lift),
+            _ => Point::new((from.x + to.x) / 2.0, (from.y + to.y) / 2.0 + lift),
+        };
         Self {
             from,
             control,
@@ -132,6 +141,16 @@ pub struct FlightSample {
     pub progress: f64,
 }
 
+fn unit(vector: Option<Point>) -> Option<Point> {
+    let vector = vector?;
+    let length = vector.x.hypot(vector.y);
+    if !length.is_finite() || length <= 0.001 {
+        None
+    } else {
+        Some(Point::new(vector.x / length, vector.y / length))
+    }
+}
+
 fn linear(time: f64, duration: f64) -> f64 {
     if duration <= 0.0 {
         1.0
@@ -168,6 +187,9 @@ mod tests {
         assert!((flight.duration - 0.75).abs() < 1e-12);
         assert!((flight.control.y - 80.0).abs() < 1e-12);
         assert!((flight.control.x - 300.0).abs() < 1e-12);
+        let turned = Flight::plan_with_tangent(Point::ZERO, Point::new(100.0, 0.0), Some(Point::new(0.0, 4.0)), false);
+        assert!((turned.control.x).abs() < 1e-12);
+        assert!((turned.control.y - 20.0).abs() < 1e-12);
     }
 
     #[test]

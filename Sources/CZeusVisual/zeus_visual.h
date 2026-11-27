@@ -20,6 +20,7 @@ typedef struct ZeusPixels {
 } ZeusPixels;
 
 ZeusFlight zeus_visual_flight(double from_x, double from_y, double to_x, double to_y, int32_t reduced_motion);
+ZeusFlight zeus_visual_flight_tangent(double from_x, double from_y, double to_x, double to_y, int32_t reduced_motion, double tangent_x, double tangent_y, int32_t has_tangent);
 ZeusPixels zeus_visual_pixel_size(double width, double height, double scale);
 
 #endif
