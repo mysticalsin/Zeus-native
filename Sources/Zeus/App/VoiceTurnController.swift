@@ -947,6 +947,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws the two names Zeus is asking about, under the pointer.
+    /// The caller speaks the full question.
+    private func showChoice(_ plan: ChoiceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyChoice(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyChoice(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyChoice(_ plan: ChoiceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws a spoken approval verdict on the display under the pointer.
     /// The caller speaks the full line. The approval prompt stays its own cue.
     private func showApproval(_ plan: ApprovalDraw, speak: Bool) {
@@ -1541,7 +1573,16 @@ final class VoiceTurnController {
     private func askBack(_ question: String, engine: String, transcript: String, speak: Bool) -> TurnResult {
         VoiceLog.logContent("route", question, prefix: "fast via \(engine) asks: ")
         buddy.idle()
-        if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
+        if let visual = ChoiceDraw.from(question: question) {
+            showChoice(visual, speak: speak)
+            if speak { say(question) } else { buddy.showCaption(question); buddy.hideCaption() }
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else if speak {
+            say(question)
+        } else {
+            buddy.showCaption(question)
+            buddy.hideCaption()
+        }
         remember(transcript, question)
         return TurnResult(spoken: question)
     }
