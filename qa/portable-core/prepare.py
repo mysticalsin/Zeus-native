@@ -70,8 +70,9 @@ GROUPS = {
     ),
     "dictation-insertion": (
         core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift", "Dictation/WarmFieldInsertBox.swift",
+             "Dictation/DictationWingText.swift",
              "Edit/SelectionEdit.swift", "Edit/SelectionEditBox.swift"),
-        tests("TextInsertionReceiptTests", "WarmFieldInsertTests", "SelectionEditBoxTests"),
+        tests("TextInsertionReceiptTests", "WarmFieldInsertTests", "SelectionEditBoxTests", "DictationWingTextTests"),
     ),
     "polyglot": (
         core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),

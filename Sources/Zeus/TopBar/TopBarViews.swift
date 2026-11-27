@@ -1538,7 +1538,13 @@ struct ClosedWings: View {
                     Image(systemName: topBar.dictationModeSymbol).font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.cloudPrimary)
                 }
             } right: {
-                if topBar.dictationPhase == .listening {
+                if let words = DictationWingText.line(listening: topBar.dictationPhase == .listening, partial: topBar.dictationPartial) {
+                    Text(words)
+                        .font(TopBarStyle.label(11, .medium))
+                        .foregroundStyle(Theme.cloudPrimary)
+                        .lineLimit(1)
+                        .frame(width: 180, alignment: .trailing)
+                } else if topBar.dictationPhase == .listening {
                     DictationWave(levels: topBar.dictationLevels, color: TopBarStyle.rec)
                 } else {
                     ProgressView().controlSize(.mini).tint(Theme.cloudPrimary)
@@ -1607,7 +1613,8 @@ struct ClosedWings: View {
             }
         // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
         case .avatar(let state): return state == .idle ? NotchClosedBodyLayout.idleMascotExtra : 14
-        case .dictation: return 60
+        case .dictation:
+            return DictationWingText.line(listening: topBar.dictationPhase == .listening, partial: topBar.dictationPartial) == nil ? 60 : 190
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }
             return ScribeController.shared.topBarFeedback() != nil ? 300 : 110
