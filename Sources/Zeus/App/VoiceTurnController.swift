@@ -916,6 +916,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws a timer on the display under the pointer. The caller speaks the full line.
+    /// Cancelling shows only Cancelled.
+    private func showTimer(_ plan: TimerDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTimer(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTimer(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTimer(_ plan: TimerDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Runs a fast action. The action starts first; the spoken ack follows in parallel.
     private func perform(_ plan: FastActions.Plan, engine: String, transcript: String,
                          finalAt: ContinuousClock.Instant, speak: Bool) async -> TurnResult {
@@ -943,6 +975,10 @@ final class VoiceTurnController {
                     self.showAgentStart(visual, speak: speak)
                     if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
                     self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if case .timer(let seconds) = plan.intent, let visual = TimerDraw.plan(seconds: seconds) {
+                    self.showTimer(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if speak {
                     self.say(ack)
                 } else {
@@ -958,6 +994,11 @@ final class VoiceTurnController {
         // ("Play", a bare verb) and report it as if it had been spoken. Report what was actually
         // said, which is nothing.
         var result = TurnResult(spoken: plan.ack ?? "", actions: ["fast \(plan.intent.intentLabel) via \(engine): \(plan.summary)"])
+        if problem == nil, case .cancelTimer = plan.intent {
+            let visual = TimerDraw.cancelled()
+            showTimer(visual, speak: speak)
+            buddy.showCaption(visual.boltCaption(at: 0))
+        }
         if let problem {
             result.problems.append(problem)
             AvatarStatus.shared.flash(.error, for: 2)
