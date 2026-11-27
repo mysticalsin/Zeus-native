@@ -24,4 +24,7 @@ public struct FaceTemplateProof: Equatable, Sendable {
     public func allows(_ operation: Operation) -> Bool {
         userPresent && self.operation == operation
     }
+
+    /// Removing the vault is a save. A read proof, or an absent person, leaves the file and the key alone.
+    public var allowsErase: Bool { allows(.save) }
 }

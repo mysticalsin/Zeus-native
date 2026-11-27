@@ -159,8 +159,8 @@ GROUPS = {
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "agent-choice-dismiss": (
-        core("AgentChoiceDismiss.swift", "JSONValue.swift"),
-        tests("AgentChoiceDismissTests"),
+        core("AgentChoiceDismiss.swift", "JSONValue.swift", "FacePresence/FaceTemplateProof.swift"),
+        tests("AgentChoiceDismissTests", "FaceTemplateProofTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",

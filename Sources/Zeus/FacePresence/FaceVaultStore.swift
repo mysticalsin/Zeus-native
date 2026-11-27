@@ -58,7 +58,7 @@ struct FaceVaultStore: Sendable {
     func save(_ faces: [FaceRecord], presence: FaceTemplateProof) -> SaveResult {
         guard presence.allows(.save) else { return .needsPresence }
         if read() == .unreadable { return .refusedUnreadable }
-        guard !faces.isEmpty else { return erase() ? .saved : .failed }
+        guard !faces.isEmpty else { return erase(presence: presence) ? .saved : .failed }
         let key: Data
         if let stored = keychain.get(Self.keyAccount).flatMap({ FaceVault.key(fromBase64: $0) }) {
             key = stored
@@ -74,10 +74,12 @@ struct FaceVaultStore: Sendable {
         return .saved
     }
 
-    /// Removes the file, then the key. The only way out of an unreadable vault, and only when the owner asks.
+    /// Removes the file, then the key. The only way out of an unreadable vault, and only when a confirmed
+    /// save proof says the person is here. A read proof or an absent person leaves both in place.
     /// True when both are gone afterwards.
     @discardableResult
-    func erase() -> Bool {
+    func erase(presence: FaceTemplateProof) -> Bool {
+        guard presence.allowsErase else { return false }
         let manager = FileManager.default
         if manager.fileExists(atPath: url.path) {
             do { try manager.removeItem(at: url) } catch { return false }

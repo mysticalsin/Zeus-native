@@ -15,6 +15,12 @@ struct FaceTemplateProofTests {
         #expect(!proof.allows(.save))
     }
 
+    @Test func erasingTheVaultRequiresAConfirmedSave() {
+        #expect(FaceTemplateProof.synthetic(.save, userPresent: true).allowsErase)
+        #expect(!FaceTemplateProof.synthetic(.read, userPresent: true).allowsErase)
+        #expect(!FaceTemplateProof.synthetic(.save, userPresent: false).allowsErase)
+    }
+
     @Test func anAbsentPersonAllowsNeitherOperation() {
         #expect(!FaceTemplateProof.synthetic(.save, userPresent: false).allows(.save))
         #expect(!FaceTemplateProof.synthetic(.read, userPresent: false).allows(.read))
