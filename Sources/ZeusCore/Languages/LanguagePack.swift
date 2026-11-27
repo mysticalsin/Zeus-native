@@ -305,7 +305,7 @@ public enum AppLanguagePin {
     public static let englishChoice = "English"
 
     public static func resolve(stored: String?, systemLanguages: [String]) -> LanguagePackID {
-        let choice = stored?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let choice = stored.map(AppLanguagePinBox.trimmedChoice)
         if choice == englishChoice { return .english }
         return pack(matching: systemLanguages) ?? .english
     }
