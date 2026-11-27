@@ -24,9 +24,10 @@ public struct TodoList: Codable, Equatable, Sendable {
 
     public var open: [TodoItem] { items.filter { !$0.done } }
 
+    /// Named blanks at the edges are removed. A zero-width space stays, so it is still a title.
     @discardableResult
     public mutating func add(_ title: String, due: String? = nil) -> TodoItem? {
-        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = TodoBox.trimmed(title)
         guard !clean.isEmpty else { return nil }
         let item = TodoItem(title: clean, due: due)
         items.append(item)
@@ -45,8 +46,9 @@ public struct TodoList: Codable, Equatable, Sendable {
         items[index].due = due
     }
 
+    /// Named blanks at the edges are removed. A zero-width space stays, so it is still a title.
     public mutating func rename(_ id: UUID, _ title: String) {
-        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = TodoBox.trimmed(title)
         guard !clean.isEmpty, let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].title = clean
     }
@@ -164,7 +166,7 @@ public enum TodoMarkdown {
 /// "call Anna tomorrow", "pay rent by friday", "ship it due 2026-11-03": the title and a due day.
 public enum TodoQuickAdd {
     public static func parse(_ text: String, now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)) -> (title: String, due: String?) {
-        let original = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let original = TodoBox.trimmed(text)
         let greg = storedCalendar(calendar)
         var words = text.split(whereSeparator: \.isWhitespace).map(String.init)
         var due: Date?
@@ -197,7 +199,7 @@ public enum TodoQuickAdd {
                 if let end = words.indices.last, lead.contains(lower(end)) { words.removeLast() }
             }
         }
-        let title = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        let title = TodoBox.trimmed(words.joined(separator: " ")).trimmingCharacters(in: .punctuationCharacters)
         guard let due else { return (title, nil) }
         let stored = dayString(due, calendar: greg)
         // QA20: "buy milk" was saved as 0784-06-02. A stored day is always Gregorian, and a year
