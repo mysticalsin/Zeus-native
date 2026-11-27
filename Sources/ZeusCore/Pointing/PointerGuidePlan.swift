@@ -46,7 +46,7 @@ public struct PointerGuideRect: Equatable, Sendable, Codable {
     public var cgRect: CGRect { CGRect(x: x, y: y, width: width, height: height) }
 
     public func contains(_ point: PointerGuidePoint) -> Bool {
-        cgRect.contains(point.cgPoint)
+        HitRect.contains(point.cgPoint, in: cgRect)
     }
 
     public var center: PointerGuidePoint {

@@ -150,8 +150,18 @@ public struct RingSession: Equatable, Sendable {
     }
 }
 
-/// Picks the accessibility frame a point belongs to. The smallest frame that contains the
-/// point wins. A point that sits between controls is left alone.
+/// The right and top edges count as inside. An empty rect matches nothing.
+enum HitRect {
+    static func contains(_ point: CGPoint, in rect: CGRect) -> Bool {
+        let frame = rect.standardized
+        guard frame.width > 0, frame.height > 0, point.x.isFinite, point.y.isFinite else { return false }
+        return point.x >= frame.minX && point.x <= frame.maxX && point.y >= frame.minY && point.y <= frame.maxY
+    }
+}
+
+/// Picks the accessibility frame a point belongs to. The smallest frame that covers the
+/// point wins, including that frame's far edge. A point that sits between controls is left alone.
+/// When two frames of the same size share an edge, the frame whose near edge it is wins.
 public enum ElementSnap {
     public static func best(
         axFrames: [CGRect],
@@ -161,8 +171,16 @@ public enum ElementSnap {
     ) -> CGRect? {
         guard let axPoint = mapper.convert(screenPoint, from: .screen, to: .ax, context: MapContext()) else { return nil }
         let usable = axFrames.filter { $0.width > 0 && $0.height > 0 && $0.origin.x.isFinite && $0.origin.y.isFinite }
-        let containing = usable.filter { $0.contains(axPoint) }
-        return containing.min(by: { $0.width * $0.height < $1.width * $1.height })
+        let containing = usable.filter { HitRect.contains(axPoint, in: $0) }
+        return containing.min { a, b in
+            let areaA = a.width * a.height
+            let areaB = b.width * b.height
+            if areaA != areaB { return areaA < areaB }
+            let aOwnsNearEdge = a.contains(axPoint)
+            let bOwnsNearEdge = b.contains(axPoint)
+            if aOwnsNearEdge != bOwnsNearEdge { return aOwnsNearEdge }
+            return false
+        }
     }
 }
 

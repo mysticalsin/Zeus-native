@@ -86,7 +86,15 @@ final class BuddyController: NSObject {
         }) {
             mouseMonitors.append(local)
         }
-        let dismiss: (NSEvent) -> Void = { [weak self] _ in MainActor.assumeIsolated { self?.clearRing() } }
+        let dismiss: (NSEvent) -> Void = { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                // A left click while the bolt is showing belongs to the guide. That monitor
+                // advances a hit and keeps a miss on the same step.
+                if event.type == .leftMouseDown, self.model.mode == .pointing { return }
+                self.clearRing()
+            }
+        }
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown], handler: dismiss) {
             mouseMonitors.append(global)
         }
@@ -262,7 +270,7 @@ final class BuddyController: NSObject {
         }
     }
 
-    private var pointingClickMonitor: Any?
+    private var pointingClickMonitors: [Any] = []
 
     /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame that contains
     /// the point wins, so the ring hugs that control. A point between controls keeps the coordinate.
@@ -483,18 +491,28 @@ final class BuddyController: NSObject {
 
     private func startPointingClickMonitor() {
         stopPointingClickMonitor()
-        pointingClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+        let handle: (NSEvent) -> Void = { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.model.mode == .pointing else { return }
                 if self.onPointingClick?(NSEvent.mouseLocation) == true { return }
-                self.idle()
+                self.clearRing()
+                self.stopPointingClickMonitor()
             }
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: handle) {
+            pointingClickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { event in
+            handle(event)
+            return event
+        }) {
+            pointingClickMonitors.append(local)
         }
     }
 
     private func stopPointingClickMonitor() {
-        if let pointingClickMonitor { NSEvent.removeMonitor(pointingClickMonitor) }
-        pointingClickMonitor = nil
+        pointingClickMonitors.forEach(NSEvent.removeMonitor)
+        pointingClickMonitors.removeAll()
     }
 
     // MARK: Geometry

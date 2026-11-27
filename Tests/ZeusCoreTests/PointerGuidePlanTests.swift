@@ -48,6 +48,25 @@ struct PointerGuidePlanTests {
         #expect(guide.current?.id == "export")
     }
 
+    @Test func aClickOnTheFarEdgeOfTheRingAdvances() throws {
+        var guide = try plan(named: "file-then-export")
+        let first = try #require(guide.current)
+        let edge = PointerGuidePoint(x: first.ring.x + first.ring.width, y: first.ring.y + first.ring.height / 2)
+        let advanced = guide.click(at: edge)
+        guard case .step(let next) = advanced else {
+            Issue.record("a click on the ring's far edge stayed put")
+            return
+        }
+        #expect(next.id == "export")
+        var fresh = try plan(named: "file-then-export")
+        let past = fresh.click(at: PointerGuidePoint(x: edge.x + 1, y: edge.y))
+        guard case .waiting = past else {
+            Issue.record("a click past the ring advanced")
+            return
+        }
+        #expect(fresh.index == 0)
+    }
+
     @Test func aClickOutsideTheRingStaysOnTheCurrentStep() throws {
         var guide = try plan(named: "file-then-export")
         let missed = guide.click(at: PointerGuidePoint(x: 0, y: 0))

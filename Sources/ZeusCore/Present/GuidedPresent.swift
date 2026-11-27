@@ -49,7 +49,7 @@ public enum GuidedPresent {
     }
 
     public static func clickHits(_ click: CGPoint, target: ResolvedTarget) -> Bool {
-        if let rect = target.hitRect { return rect.contains(click) }
+        if let rect = target.hitRect { return HitRect.contains(click, in: rect) }
         return hypot(click.x - target.screenPoint.x, click.y - target.screenPoint.y) <= 60
     }
 
