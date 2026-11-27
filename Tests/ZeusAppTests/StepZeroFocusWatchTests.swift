@@ -225,9 +225,9 @@ final class StepZeroFocusWatch: @unchecked Sendable {
     #if canImport(Darwin)
     private var fileInstalled: Bool { fileSource != nil }
 
-    private static let eventMask: DispatchSource.FileSystemEvent = [
-        .write, .extend, .attrib, .link, .rename, .delete,
-    ]
+    private static var eventMask: DispatchSource.FileSystemEvent {
+        [.write, .extend, .attrib, .link, .rename, .delete]
+    }
 
     nonisolated static func folderHandler(
         source: any DispatchSourceFileSystemObject,
