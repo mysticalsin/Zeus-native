@@ -24,11 +24,25 @@ import Testing
         #expect(SpokenPointingAsk.show(in: "point at Password", candidates: [password]) == nil)
     }
 
+    @Test func anExactSecretDoesNotFallThroughToANeighbor() {
+        let settings = PointingProposalCandidate(id: "t6", isSecure: false, label: "Password settings")
+        #expect(SpokenPointingAsk.show(in: "point at Password", candidates: [password, settings]) == nil)
+        let shown = SpokenPointingAsk.show(in: "point at Password settings", candidates: [password, settings])
+        #expect(shown?.targetID == "t6")
+    }
+
+    @Test func aBareSecretNameIsRefusedEvenWhenTheFieldIsNotMarkedSecure() {
+        let apiKey = PointingProposalCandidate(id: "t7", isSecure: false, label: "API key")
+        #expect(SpokenPointingAsk.show(in: "show me the API key", candidates: [apiKey, file]) == nil)
+    }
+
     @Test func anOpenOrALinkIsNotAPointingAsk() {
         let candidates = [file]
         #expect(SpokenPointingAsk.show(in: "open Safari", candidates: candidates) == nil)
         #expect(SpokenPointingAsk.show(in: "point at javascript:alert(1)", candidates: candidates) == nil)
         #expect(SpokenPointingAsk.show(in: "show me https://example.com", candidates: candidates) == nil)
+        #expect(SpokenPointingAsk.show(in: "point at data:text/html,hello", candidates: candidates) == nil)
+        #expect(SpokenPointingAsk.show(in: "show me file:notes", candidates: candidates) == nil)
     }
 
     @Test func anExplainHowStaysOffThisPath() {

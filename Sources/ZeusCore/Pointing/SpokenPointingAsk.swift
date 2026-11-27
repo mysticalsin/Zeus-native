@@ -54,7 +54,9 @@ public enum SpokenPointingAsk {
 
     private static func askedLabel(in utterance: String) -> String? {
         let raw = utterance.lowercased()
-        if raw.contains("://") || raw.contains("javascript:") { return nil }
+        if raw.contains("://") || raw.contains("javascript:") || raw.contains("data:") || raw.contains("file:") {
+            return nil
+        }
         let key = normalized(utterance)
         guard !key.isEmpty else { return nil }
         for lead in leads where key.hasPrefix(lead) {
@@ -72,6 +74,11 @@ public enum SpokenPointingAsk {
     private static func best(_ phrase: String, in candidates: [PointingProposalCandidate]) -> PointingProposalCandidate? {
         let need = tokens(phrase)
         guard !need.isEmpty else { return nil }
+        let exact = candidates.filter { candidate in
+            let name = candidate.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !name.isEmpty && tokens(name) == need
+        }
+        if exact.contains(where: { $0.isSecure || isBareSecret($0.label) }) { return nil }
         let matches = candidates.filter { candidate in
             guard !candidate.isSecure else { return false }
             let name = candidate.label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,6 +93,15 @@ public enum SpokenPointingAsk {
             if a.label.count != b.label.count { return a.label.count < b.label.count }
             return false
         }.first
+    }
+
+    /// A label that is only a secret word or a secret phrase. A longer control such as
+    /// "Change password" is not this, so a point at that button can still land.
+    private static func isBareSecret(_ label: String) -> Bool {
+        let words = tokens(label)
+        let phrase = words.joined(separator: " ")
+        if DriveStep.secretPhrases.contains(phrase) { return true }
+        return !words.isEmpty && words.allSatisfy { DriveStep.secretWords.contains($0) }
     }
 
     private static func contains(_ words: [String], phrase: [String]) -> Bool {
