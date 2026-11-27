@@ -1230,6 +1230,10 @@ final class VoiceTurnController {
                 drawBegun = true
                 drawActive = presenter.begin(draw, shot: shot, token: drawToken)
                 VoiceLog.log("draw", "marks=\(draw.marks.count)")
+                // Sentences already handed out will not get another start. Show their marks now.
+                for index in TalkDrawReveal.catchUp(spokenSentences: spokenSentenceCount) {
+                    presenter.reveal(sentence: index, token: drawToken)
+                }
             case .text(let text):
                 guard !haltedForHallucination, !haltedForPersonaLimit else { break }
                 var sanitizedDelta = ResponseSanitizer.stripArtifacts(text)
@@ -1261,8 +1265,10 @@ final class VoiceTurnController {
                     }
                     if speak {
                         let index = spokenSentenceCount - 1
-                        let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
+                        let reveal = revealCallback(index, token: drawToken)
                         speaker.speak(Self.voiced(sentence), onStart: reveal)
+                    } else if let index = TalkDrawReveal.sentenceReady(index: spokenSentenceCount - 1, speak: false, drawingReady: drawBegun) {
+                        presenter.reveal(sentence: index, token: drawToken)
                     }
                     buddy.showCaption(Self.captionTail(spoken))
                 }
@@ -1381,11 +1387,15 @@ final class VoiceTurnController {
                 VoiceLog.log("brain", "engine=\(race.winnerID ?? "?") done_ms=\(max(0, Int(Date().timeIntervalSince(started) * 1000)))")
             }
             parser.finish().forEach(handle)
-            if let rest = splitter.flush(), speak {
+            if let rest = splitter.flush() {
                 let index = spokenSentenceCount
                 spokenSentenceCount += 1
-                let reveal = revealCallback(index, token: drawBegun ? drawToken : nil)
-                speaker.speak(Self.voiced(rest), onStart: reveal)
+                if speak {
+                    let reveal = revealCallback(index, token: drawToken)
+                    speaker.speak(Self.voiced(rest), onStart: reveal)
+                } else if let ready = TalkDrawReveal.sentenceReady(index: index, speak: false, drawingReady: drawBegun) {
+                    presenter.reveal(sentence: ready, token: drawToken)
+                }
             }
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()

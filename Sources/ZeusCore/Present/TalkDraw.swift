@@ -129,3 +129,23 @@ public enum TalkDrawParser {
         return .init(x: x, y: y)
     }
 }
+
+/// When a streamed talk drawing shows each sentence's marks.
+///
+/// Speech reveals a sentence when that sentence starts to play. With speech off, the same
+/// sentence still appears as soon as the drawing exists. Sentences that were already handed
+/// out when the drawing arrives are caught up, because their start will not come again.
+public enum TalkDrawReveal {
+    /// Without speech, the marks for a ready sentence appear once the drawing exists.
+    /// Speech reveals from the speaker, so this stays nil.
+    public static func sentenceReady(index: Int, speak: Bool, drawingReady: Bool) -> Int? {
+        guard !speak, drawingReady, index >= 0 else { return nil }
+        return index
+    }
+
+    /// Sentence indexes already handed out when the drawing starts.
+    public static func catchUp(spokenSentences: Int) -> [Int] {
+        guard spokenSentences > 0 else { return [] }
+        return Array(0..<spokenSentences)
+    }
+}

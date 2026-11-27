@@ -124,6 +124,17 @@ import Testing
         #expect(!walk.explanation.lowercased().contains("question"))
     }
 
+    @Test func aDrawingStillAppearsWhenSpeechIsOff() {
+        #expect(TalkDrawReveal.sentenceReady(index: 0, speak: false, drawingReady: true) == 0)
+        #expect(TalkDrawReveal.sentenceReady(index: 2, speak: false, drawingReady: true) == 2)
+        #expect(TalkDrawReveal.sentenceReady(index: 0, speak: false, drawingReady: false) == nil)
+        #expect(TalkDrawReveal.sentenceReady(index: 1, speak: true, drawingReady: true) == nil)
+        #expect(TalkDrawReveal.sentenceReady(index: -1, speak: false, drawingReady: true) == nil)
+        #expect(TalkDrawReveal.catchUp(spokenSentences: 0) == [])
+        #expect(TalkDrawReveal.catchUp(spokenSentences: -3) == [])
+        #expect(TalkDrawReveal.catchUp(spokenSentences: 3) == [0, 1, 2])
+    }
+
     @Test func aStillQuestionDrawsTheBoxOneSideAtATime() throws {
         let showcase = try #require(ExplainShowcase.plan(for: "explain how photosynthesis works"))
         #expect(showcase.travels == false)
