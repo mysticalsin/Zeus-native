@@ -260,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.voiceTurn) { FastActions.shared.topBar = topBar }
         if on(.appIndex) { AppIndex.shared.start() }
         if on(.projectScanner) { ProjectScanner.shared.start() }
-        if on(.topBarServices) { topBarServices.onTimerFinished = { [weak self] in self?.voice?.say("Time's up.") } }
+        if on(.topBarServices) { topBarServices.onTimerFinished = { [weak self] in self?.voice?.timerFinished() } }
         if on(.macControl) { startMacControl() }
         if on(.avatarFeed) { startAvatarFeed() }
         if on(.shortcuts) { registerShortcuts() }
