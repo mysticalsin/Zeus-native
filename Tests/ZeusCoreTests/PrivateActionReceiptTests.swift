@@ -95,27 +95,26 @@ struct PrivateActionReceiptTests {
     }
 
     @Test func bareUUndoesOnlyTheClosedNotchReceipt() {
-        let claim = PrivateActionLedger.claimsUndo
-        #expect(claim(characters: "u", command: false, shift: false, option: false, control: false,
-                       decisionRowVisible: false, receiptVisible: true, panelOpen: false))
-        #expect(claim(characters: "U", command: false, shift: false, option: false, control: false,
-                       decisionRowVisible: false, receiptVisible: true, panelOpen: false))
-        #expect(!claim(characters: "u", command: true, shift: false, option: false, control: false,
-                        decisionRowVisible: false, receiptVisible: true, panelOpen: false))
-        #expect(!claim(characters: "u", command: false, shift: true, option: false, control: false,
-                        decisionRowVisible: false, receiptVisible: true, panelOpen: false))
-        #expect(!claim(characters: "u", command: false, shift: false, option: true, control: false,
-                        decisionRowVisible: false, receiptVisible: true, panelOpen: false))
-        #expect(!claim(characters: "u", command: false, shift: false, option: false, control: true,
-                        decisionRowVisible: false, receiptVisible: true, panelOpen: false))
-        #expect(!claim(characters: "u", command: false, shift: false, option: false, control: false,
-                        decisionRowVisible: true, receiptVisible: true, panelOpen: false))
-        #expect(!claim(characters: "u", command: false, shift: false, option: false, control: false,
-                        decisionRowVisible: false, receiptVisible: false, panelOpen: false))
-        #expect(!claim(characters: "u", command: false, shift: false, option: false, control: false,
-                        decisionRowVisible: false, receiptVisible: true, panelOpen: true))
-        #expect(!claim(characters: "z", command: false, shift: false, option: false, control: false,
-                        decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: false, option: false, control: false,
+                                                decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(PrivateActionLedger.claimsUndo(characters: "U", command: false, shift: false, option: false, control: false,
+                                                decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: true, shift: false, option: false, control: false,
+                                                 decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: true, option: false, control: false,
+                                                 decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: false, option: true, control: false,
+                                                 decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: false, option: false, control: true,
+                                                 decisionRowVisible: false, receiptVisible: true, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: false, option: false, control: false,
+                                                 decisionRowVisible: true, receiptVisible: true, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: false, option: false, control: false,
+                                                 decisionRowVisible: false, receiptVisible: false, panelOpen: false))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "u", command: false, shift: false, option: false, control: false,
+                                                 decisionRowVisible: false, receiptVisible: true, panelOpen: true))
+        #expect(!PrivateActionLedger.claimsUndo(characters: "z", command: false, shift: false, option: false, control: false,
+                                                 decisionRowVisible: false, receiptVisible: true, panelOpen: false))
     }
 
     @Test func receiptNamesStayOnTheNotchControls() {
