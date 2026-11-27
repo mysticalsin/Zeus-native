@@ -971,6 +971,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws a start, command, or drive Zeus left alone, under the pointer.
+    /// The caller speaks the full line. A spoken approval verdict is not this card.
+    private func showLeftAlone(_ plan: LeftAloneDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyLeftAlone(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyLeftAlone(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyLeftAlone(_ plan: LeftAloneDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws the Calendar grant an event needs, under the pointer.
     /// The caller speaks the full line. An event that was added is not this card.
     private func showCalendarAccess(_ plan: CalendarAccessDraw, speak: Bool) {
@@ -1008,6 +1040,10 @@ final class VoiceTurnController {
         let spoken = SpokenFailure.line(problem)
         if let visual = DriveAccessDraw.from(line: problem) ?? DriveAccessDraw.from(line: spoken) {
             showDriveAccess(visual, speak: true)
+            say(spoken)
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else if let visual = LeftAloneDraw.from(line: spoken) {
+            showLeftAlone(visual, speak: true)
             say(spoken)
             buddy.showCaption(visual.boltCaption(at: 0))
         } else {
