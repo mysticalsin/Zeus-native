@@ -1,4 +1,5 @@
 import AppKit
+import ZeusCore
 
 /// Plays the ZEUS experience end to end with scripted data, so the look can be judged before
 /// voice and agent hooks are wired: listen → think → fly + strike → agent peek → approval
@@ -8,12 +9,15 @@ final class DemoDirector {
     private let buddy: BuddyController
     private let notch: NotchController
     private let statusItemFrame: () -> CGRect?
+    private let say: (String) -> Void
     private var task: Task<Void, Never>?
 
-    init(buddy: BuddyController, notch: NotchController, statusItemFrame: @escaping () -> CGRect?) {
+    init(buddy: BuddyController, notch: NotchController, statusItemFrame: @escaping () -> CGRect?,
+         say: @escaping (String) -> Void = { _ in }) {
         self.buddy = buddy
         self.notch = notch
         self.statusItemFrame = statusItemFrame
+        self.say = say
     }
 
     func play() {
@@ -43,7 +47,9 @@ final class DemoDirector {
         let mainFrame = (NSScreen.main ?? NSScreen.screens[0]).frame
         let iconTarget = statusItemFrame().map { CGPoint(x: $0.midX, y: $0.minY - 6) }
             ?? CGPoint(x: mainFrame.midX, y: mainFrame.midY)
-        buddy.point(to: iconTarget, label: "that's me up here, click the bolt anytime")
+        let menuBar = PlayDemoScript.menuBar
+        say(menuBar.spoken)
+        buddy.point(to: iconTarget, label: menuBar.bolt)
         guard await pause(7.5) else { return }
 
         // 3. A coding agent starts work; the notch peeks.

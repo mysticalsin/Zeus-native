@@ -225,10 +225,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.proactive) { ProactiveController.shared.start() }
         if on(.stickiesRestore) { StickiesController.shared.restore() }
         if on(.routines) { RoutineRunner.shared.start() }
-        demo = DemoDirector(buddy: buddy, notch: notch) { [weak self] in
+        demo = DemoDirector(buddy: buddy, notch: notch, statusItemFrame: { [weak self] in
             guard let item = self?.statusItem else { return nil }
             return item.button?.window?.frame
-        }
+        }, say: { [weak self] text in
+            self?.voice?.say(text)
+        })
 
         // Real agent events from Claude Code hooks. The socket starts only after `commandHandler`
         // is wired below so `zeus debug dictate-file` never runs while launch is still wiring handlers.
