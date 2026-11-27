@@ -4421,6 +4421,38 @@ final class VoiceTurnController {
         PresentPointMapping.screenPoint(x: x, y: y, screen: screen, in: shots)
     }
 
+    /// Draws a secret Zeus will not point at, under the pointer.
+    /// The caller speaks the full line. A missing control stays on the spark.
+    private func showPointSecret(_ plan: PointSecretDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPointSecret(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPointSecret(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPointSecret(_ plan: PointSecretDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// A spoken "point at" or "show me" becomes one allowlisted guide. The bolt is drawn
     /// whether or not captions or spoken replies are on. Speech uses the speak-replies setting.
     /// A miss stays on this path: the model does not invent a point. A bare secret is not pointed at.
@@ -4451,8 +4483,14 @@ final class VoiceTurnController {
             }
         }
         guard let held = SpokenPointingAsk.held(transcript) else { return nil }
-        if speak { say(held.spoken) }
-        buddy.showCaption(held.bolt)
+        if let visual = PointSecretDraw.from(line: held.spoken) {
+            showPointSecret(visual, speak: speak)
+            if speak { say(held.spoken) }
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else {
+            if speak { say(held.spoken) }
+            buddy.showCaption(held.bolt)
+        }
         remember(transcript, held.spoken)
         return TurnResult(spoken: held.spoken)
     }
