@@ -174,6 +174,8 @@ private final class MarkCaptureView: NSView {
 
 private struct MarkCanvas: View {
     let screen: MarkScreen
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     private var model: MarkModel { .shared }
 
     var body: some View {
@@ -183,13 +185,18 @@ private struct MarkCanvas: View {
         let trail = model.trail
         let ink = model.inkColor ?? Theme.bolt
         let pins = model.pins
+        let stroke = PointingInkVariant.resolve(reduceMotion: reduceMotion, reduceTransparency: reduceTransparency).stroke
         Canvas { context, _ in
             func local(_ p: CGPoint) -> CGPoint { MarkLayout.local(p, on: screen) }
-            for stroke in strokes where stroke.count > 1 {
+            for drawn in strokes where drawn.count > 1 {
                 var path = Path()
-                path.addLines(stroke.map(local))
-                context.stroke(path, with: .color(ink.opacity(0.35)), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
-                context.stroke(path, with: .color(ink), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                path.addLines(drawn.map(local))
+                if stroke.haloWidth > 0, stroke.haloOpacity > 0 {
+                    context.stroke(path, with: .color(ink.opacity(stroke.haloOpacity)),
+                                   style: StrokeStyle(lineWidth: CGFloat(stroke.haloWidth), lineCap: .round, lineJoin: .round))
+                }
+                context.stroke(path, with: .color(ink.opacity(stroke.coreOpacity)),
+                               style: StrokeStyle(lineWidth: CGFloat(stroke.coreWidth), lineCap: .round, lineJoin: .round))
             }
             if trail.count > 1 {
                 for i in 1..<trail.count {
@@ -197,8 +204,9 @@ private struct MarkCanvas: View {
                     segment.move(to: local(trail[i - 1]))
                     segment.addLine(to: local(trail[i]))
                     let fade = Double(i) / Double(trail.count)
-                    context.stroke(segment, with: .color(Theme.bolt.opacity(0.15 + 0.75 * fade)),
-                                   style: StrokeStyle(lineWidth: 2 + 4 * fade, lineCap: .round))
+                    let sample = PointingInkVariant.trail(place: fade, reduceMotion: reduceMotion, reduceTransparency: reduceTransparency)
+                    context.stroke(segment, with: .color(Theme.bolt.opacity(sample.opacity)),
+                                   style: StrokeStyle(lineWidth: CGFloat(sample.width), lineCap: .round))
                 }
                 if let head = trail.last {
                     let p = local(head)
