@@ -916,6 +916,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws a terminal on the display under the pointer while it opens.
+    /// The caller speaks the full line. A named project appears on the next beat.
+    private func showTerminal(_ plan: TerminalOpenDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTerminal(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTerminal(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTerminal(_ plan: TerminalOpenDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws quit, hide, or a missing app on the display under the pointer.
     /// The caller speaks the full line.
     private func showAppClose(_ plan: AppCloseDraw, speak: Bool) {
@@ -1242,6 +1274,10 @@ final class VoiceTurnController {
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if let visual = AppCloseDraw.from(summary: plan.summary) {
                     self.showAppClose(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if case .openTerminal = plan.intent, let visual = TerminalOpenDraw.from(summary: plan.summary) {
+                    self.showTerminal(visual, speak: speak)
                     if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if speak {
