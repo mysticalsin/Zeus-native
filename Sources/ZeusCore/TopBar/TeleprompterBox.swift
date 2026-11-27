@@ -59,21 +59,22 @@ public enum TeleprompterBox {
     /// Cue titles and the paragraphs between them. Blank lines split paragraphs.
     /// A line whose first character is `#` is a cue. Hashes and surrounding spaces are not part of the title.
     /// A cue with no title is dropped.
+    /// `TeleprompterLineBox` removes named blanks at the edges. A zero-width space stays, so it is still a line.
     public static func blocks(in text: String) -> [Block] {
         var result: [Block] = []
         var paragraph: [String] = []
         func flush() {
-            let joined = paragraph.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            let joined = TeleprompterLineBox.trimmedLine(paragraph.joined(separator: " "))
             if !joined.isEmpty {
                 result.append(Block(id: result.count, isCue: false, text: joined))
             }
             paragraph = []
         }
         for raw in text.components(separatedBy: .newlines) {
-            let line = raw.trimmingCharacters(in: .whitespaces)
+            let line = TeleprompterLineBox.trimmedLine(raw)
             if line.hasPrefix("#") {
                 flush()
-                let title = line.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces)
+                let title = TeleprompterLineBox.trimmedLine(String(line.drop { $0 == "#" }))
                 if !title.isEmpty {
                     result.append(Block(id: result.count, isCue: true, text: title))
                 }
