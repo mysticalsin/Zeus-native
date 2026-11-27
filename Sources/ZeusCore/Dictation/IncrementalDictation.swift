@@ -116,8 +116,9 @@ public struct ChunkScheduler: Equatable, Sendable {
 
 /// Puts chunk transcripts back together in recording order.
 public enum ChunkTranscriptJoiner {
+    /// A zero-width space stays in a part. The blank check is read from `ChunkTranscriptJoinerBox`.
     public static func join(_ parts: [String]) -> String {
-        parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        parts.map { ChunkTranscriptJoinerBox.trimmedPart($0) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
     }
