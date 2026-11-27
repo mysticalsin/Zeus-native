@@ -132,6 +132,37 @@ public struct PointingActionTools: Equatable, Sendable {
 
     public init() {}
 
+    /// Runs one gate decision. A refusal, a guide, a host question, or an open-app
+    /// decision does not touch the sink. Insert and clipboard go through `submit`.
+    public mutating func offer(_ decision: PointingProposalDecision, sink: any PointingActionSink) -> PointingActionPhase {
+        switch decision {
+        case .proceed(let proposal, let risk):
+            guard proposal.tool == .insertText, let text = proposal.arguments["text"] else { return phase }
+            return submit(request(proposal, text: text, risk: risk), sink: sink)
+        case .confirm(let proposal, let risk):
+            guard let text = proposal.arguments["text"] else { return phase }
+            switch proposal.tool {
+            case .insertText, .clipboardWrite:
+                return submit(request(proposal, text: text, risk: risk, kind: proposal.tool == .clipboardWrite ? .writeClipboard : .insertText), sink: sink)
+            default:
+                return phase
+            }
+        case .refused, .guide, .askHost:
+            return phase
+        }
+    }
+
+    private func request(_ proposal: PointingProposal, text: String, risk: DriveStep.Risk, kind: PointingActionRequest.Kind = .insertText) -> PointingActionRequest {
+        let mapped: PointingActionRequest.Risk
+        switch risk {
+        case .safe: mapped = .safe
+        case .undoable: mapped = .undoable
+        case .risky: mapped = .risky
+        case .destructive: mapped = .destructive
+        }
+        return PointingActionRequest(id: proposal.id, kind: kind, summary: proposal.summary, text: text, risk: mapped)
+    }
+
     public mutating func submit(_ request: PointingActionRequest, sink: any PointingActionSink) -> PointingActionPhase {
         armed = nil
         if let refusal = Self.refusal(for: request) {

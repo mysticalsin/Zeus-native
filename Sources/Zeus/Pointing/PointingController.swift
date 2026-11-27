@@ -64,6 +64,11 @@ final class PointingController {
         var sendScreenshot: () -> Bool = { PointingSettings.sendScreenshot }
         var drawWhileHeld: () -> Bool = { PointingSettings.drawWhileHeld }
         var textEntryEnabled: () -> Bool = { PointingSettings.textEntry }
+        /// Opens an allowlisted app. Tests replace this. A refused proposal never reaches it.
+        var openBundle: (String) -> Bool = { bundle in
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { return false }
+            return NSWorkspace.shared.open(url)
+        }
         /// One `[ZEUS] pointing-trace` line per turn. Offsets only; never text or image data.
         var log: (String) -> Void = { line in NSLog("%@", line) }
     }
@@ -107,6 +112,7 @@ final class PointingController {
     let textEntry = PointingTextEntry()
     let watcher = PointingTargetWatcher()
     private(set) var session = PointingSession()
+    private var actionTools = PointingActionTools()
     private(set) var metrics = Metrics()
     private(set) var trace = PointingTrace()
     private(set) var candidatesForTest: [PointingTargetCandidate] = []
@@ -739,6 +745,22 @@ final class PointingController {
             metrics.flightUsedFallback = fallback
             admitLiveGuide(id: ring.id, bolt: bolt, caption: caption)
         }
+    }
+
+    /// The allowlist runs first. A refusal does not insert, copy, or open an app.
+    @discardableResult
+    func performProposals(_ drafts: [PointingProposalDraft], candidates: [PointingProposalCandidate],
+                          focusedSecure: Bool, sink: any PointingActionSink) -> [PointingProposalDecision] {
+        let decisions = PointingProposalGate.decide(
+            drafts, candidates: candidates, focusedFieldIsSecure: focusedSecure, admittedThisTurn: 0)
+        for decision in decisions {
+            _ = actionTools.offer(decision, sink: sink)
+            if case .proceed(let proposal, _) = decision, proposal.tool == .openApp,
+               let bundle = proposal.arguments["bundleID"] {
+                _ = services.openBundle(bundle)
+            }
+        }
+        return decisions
     }
 
     /// A click on the admitted ring moves to the next step. A miss stays on this step.
