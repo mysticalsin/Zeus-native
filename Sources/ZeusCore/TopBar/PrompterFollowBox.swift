@@ -106,22 +106,23 @@ public enum PrompterFollowBox {
 
     /// Headings stay as cues. Formatting and links are dropped. List items become their own paragraphs.
     /// A plain file only turns Windows newlines into Unix newlines.
+    /// `PrompterScriptBox` removes named blanks at the edges. A zero-width space stays, so it is still a line.
     public static func importScript(from text: String, isMarkdown: Bool) -> String {
         guard isMarkdown else { return text.replacingOccurrences(of: "\r\n", with: "\n") }
         var lines: [String] = []
         var inCode = false
         for raw in text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
-            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            let trimmed = PrompterScriptBox.trimmedText(raw)
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") { inCode.toggle(); continue }
             if inCode { continue }
             if trimmed.hasPrefix("#") {
-                let title = trimmed.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces)
+                let title = PrompterScriptBox.trimmedText(String(trimmed.drop { $0 == "#" }))
                 lines.append(title.isEmpty ? "" : "# " + inline(title))
                 continue
             }
             if trimmed.hasPrefix("---") || trimmed.hasPrefix("***") || trimmed.hasPrefix("<!--") { lines.append(""); continue }
             var line = trimmed
-            if line.hasPrefix(">") { line = String(line.dropFirst()).trimmingCharacters(in: .whitespaces) }
+            if line.hasPrefix(">") { line = PrompterScriptBox.trimmedText(String(line.dropFirst())) }
             if let marker = line.first, "-*+".contains(marker), line.dropFirst().first == " " {
                 line = String(line.dropFirst(2))
                 lines.append("")
@@ -133,9 +134,8 @@ public enum PrompterFollowBox {
             }
             lines.append(inline(line))
         }
-        return lines.joined(separator: "\n")
-            .replacingOccurrences(of: "\n\n\n+", with: "\n\n", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return PrompterScriptBox.trimmedText(lines.joined(separator: "\n")
+            .replacingOccurrences(of: "\n\n\n+", with: "\n\n", options: .regularExpression))
     }
 
     /// Drops emphasis markers, inline code ticks, and images, and keeps link text.
@@ -145,7 +145,7 @@ public enum PrompterFollowBox {
         result = result.replacingOccurrences(of: "\\[([^\\]]*)\\]\\([^)]*\\)", with: "$1", options: .regularExpression)
         for marker in ["**", "__", "`", "~~"] { result = result.replacingOccurrences(of: marker, with: "") }
         result = result.replacingOccurrences(of: "(?<![\\p{L}\\p{N}])[*_]([^*_]+)[*_](?![\\p{L}\\p{N}])", with: "$1", options: .regularExpression)
-        return result.trimmingCharacters(in: .whitespaces)
+        return PrompterScriptBox.trimmedText(result)
     }
 
     public static func isMarkdown(pathExtension: String) -> Bool {
