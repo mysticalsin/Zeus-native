@@ -88,7 +88,7 @@ public struct Routine: Codable, Equatable, Identifiable, Sendable {
     }
 
     public func isDue(now: Date, calendar: Calendar = .current) -> Bool {
-        enabled && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        enabled && !RoutinePromptBox.trimmedText(prompt).isEmpty
             && schedule.missed(lastRun: lastRun, created: created, now: now, calendar: calendar) != nil
     }
 }
