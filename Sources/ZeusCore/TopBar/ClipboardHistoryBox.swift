@@ -12,8 +12,9 @@ public enum ClipboardHistoryBox {
     public static let fileNameLimit = 3
 
     /// False for a blank copy, or one past `textLimit`.
+    /// `ClipboardTextBox` removes named blanks. A zero-width space stays, so it can be added.
     public static func canAddText(_ text: String) -> Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && text.count <= textLimit
+        !ClipboardTextBox.trimmedText(text).isEmpty && text.count <= textLimit
     }
 
     /// An image copy needs a saved file name. A name of spaces still counts.
@@ -40,12 +41,12 @@ public enum ClipboardHistoryBox {
     /// One line for the notch list. Newlines become spaces, and a line past the cap ends with an ellipsis.
     public static func preview(_ text: String) -> String {
         let flat = text.split(whereSeparator: \.isNewline).joined(separator: " ")
-        let trimmed = flat.trimmingCharacters(in: .whitespaces)
+        let trimmed = ClipboardTextBox.trimmedText(flat)
         return trimmed.count > previewLimit ? String(trimmed.prefix(previewLimit - 1)) + "…" : trimmed
     }
 
     public static func isLink(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = ClipboardTextBox.trimmedText(text)
         guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else { return false }
         return scheme == "http" || scheme == "https" || scheme == "mailto"
     }
@@ -93,9 +94,9 @@ public enum ClipboardHistoryBox {
         return pinned.lastIndex(where: { !$0 })
     }
 
-    /// Blank after trimming spaces means the whole list. Newlines are not trimmed here.
+    /// Blank after the named blanks are removed means the whole list.
     public static func normalizedSearch(_ query: String) -> String {
-        query.trimmingCharacters(in: .whitespaces)
+        ClipboardTextBox.trimmedText(query)
     }
 
     public static func matchesSearch(text: String, query: String) -> Bool {
