@@ -81,6 +81,7 @@ jobs:
           cargo build --release --manifest-path crates/zeus-visual/Cargo.toml
           mkdir -p Sources/CZeusVisual/lib
           cp crates/zeus-visual/target/release/libzeus_visual.a Sources/CZeusVisual/lib/
+          sh tools/hide-visual-personality.sh Sources/CZeusVisual/lib/libzeus_visual.a
       - name: Native build
         id: build
         run: |
