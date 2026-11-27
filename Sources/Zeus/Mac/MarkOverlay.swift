@@ -177,16 +177,20 @@ private struct MarkCanvas: View {
     private var model: MarkModel { .shared }
 
     var body: some View {
+        // Read the live ink here. A read that happens only inside Canvas is not observed, so the
+        // stroke would stay at whatever was on screen when the panel was built.
+        let strokes = model.strokes
+        let trail = model.trail
+        let ink = model.inkColor ?? Theme.bolt
+        let pins = model.pins
         Canvas { context, _ in
             func local(_ p: CGPoint) -> CGPoint { MarkLayout.local(p, on: screen) }
-            for stroke in model.strokes where stroke.count > 1 {
+            for stroke in strokes where stroke.count > 1 {
                 var path = Path()
                 path.addLines(stroke.map(local))
-                let ink = model.inkColor ?? Theme.bolt
                 context.stroke(path, with: .color(ink.opacity(0.35)), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
                 context.stroke(path, with: .color(ink), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
             }
-            let trail = model.trail
             if trail.count > 1 {
                 for i in 1..<trail.count {
                     var segment = Path()
@@ -204,6 +208,6 @@ private struct MarkCanvas: View {
         }
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(MarkLayout { [screen] }.place(model.pins).map(\.accessibilityLabel).joined(separator: ", "))
+        .accessibilityLabel(MarkLayout { [screen] }.place(pins).map(\.accessibilityLabel).joined(separator: ", "))
     }
 }
