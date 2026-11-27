@@ -285,8 +285,9 @@ public struct BotAvatarSpec: Equatable, Sendable {
 
     /// FNV-1a over the trimmed, lowercased name, finished with a splitmix mix so near-identical
     /// names ("agent-1", "agent-2") still land on different shapes.
+    /// `BotAvatarSpecBox` removes named blanks at the edges. A zero-width space stays.
     static func hash(_ name: String) -> UInt64 {
-        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let key = BotAvatarSpecBox.trimmed(name).lowercased()
         var h: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in key.utf8 {
             h ^= UInt64(byte)
@@ -311,8 +312,10 @@ public struct BotAvatarSpec: Equatable, Sendable {
         Double((hash(name) >> 11) & 0xFFFF) / 65536
     }
 
+    /// A missing name, or a name of only the five named blanks, reads as "Agent".
+    /// A zero-width space stays, so a name of only U+200B is not read as "Agent".
     public static func accessibilityLabel(agent: String?, state: BotAvatarState) -> String {
-        let trimmed = agent?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let trimmed = agent.map(BotAvatarSpecBox.trimmed) ?? ""
         return "\(trimmed.isEmpty ? "Agent" : trimmed) avatar, \(state.spokenName)"
     }
 }
