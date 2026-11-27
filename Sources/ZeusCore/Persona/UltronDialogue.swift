@@ -104,7 +104,7 @@ public enum UltronPersonaSource {
     public static func promptBlock(markdown: String?, fallback: String) -> String {
         guard let markdown, let begin = markdown.range(of: beginMarker),
               let end = markdown.range(of: endMarker, range: begin.upperBound..<markdown.endIndex) else { return fallback }
-        let block = markdown[begin.upperBound..<end.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        let block = UltronPersonaSourceBox.trimmedBlock(String(markdown[begin.upperBound..<end.lowerBound]))
         return block.isEmpty ? fallback : block
     }
 }
