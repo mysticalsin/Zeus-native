@@ -64,7 +64,8 @@ final class DemoDirector {
         show(PlayDemoScript.menuBar, at: iconTarget)
         guard await pause(7.5) else { return }
 
-        // 3. A coding agent starts work; the notch peeks.
+        // 3. A coding agent starts work; the notch peeks and the voice says so.
+        narrate(PlayDemoScript.building)
         notch.startSession(id: "cc", agent: "Claude Code", project: "zeus", task: "npm run build")
         guard await pause(3.2) else { return }
 
@@ -77,6 +78,8 @@ final class DemoDirector {
         guard await pause(0.6) else { return }
         if let approve = notch.approveButtonPoint {
             show(PlayDemoScript.approval, at: approve)
+        } else {
+            narrate(PlayDemoScript.approvalMissing)
         }
         let decision = await verdict
         guard !Task.isCancelled else { return }

@@ -35,6 +35,19 @@ import Testing
         #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
     }
 
+    @Test func aStartedBuildAndAMissingApproveAreSpokenAndShown() {
+        for step in [PlayDemoScript.building, PlayDemoScript.approvalMissing] {
+            #expect(PlayDemoScript.ready(step))
+            #expect(step.showsOnScreen)
+            #expect(PointerGuideCaptionSplit.boltText(step.bolt) == step.bolt)
+            #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
+        }
+        #expect(PlayDemoScript.building.bolt == "Building")
+        #expect(PlayDemoScript.approvalMissing.bolt == "Not found")
+        #expect(PlayDemoScript.building.spoken == "Claude Code started the build. I'll point at Approve when it asks.")
+        #expect(PlayDemoScript.approvalMissing.spoken == "I couldn't find Approve on screen, so I'll keep going.")
+    }
+
     @Test func theBuildOutcomeIsSpokenAndShown() {
         for step in [PlayDemoScript.allowed, PlayDemoScript.denied] {
             #expect(PlayDemoScript.ready(step))

@@ -46,6 +46,18 @@ public enum PlayDemoScript {
         showsOnScreen: true
     )
 
+    public static let building = Step(
+        spoken: "Claude Code started the build. I'll point at Approve when it asks.",
+        bolt: "Building",
+        showsOnScreen: true
+    )
+
+    public static let approvalMissing = Step(
+        spoken: "I couldn't find Approve on screen, so I'll keep going.",
+        bolt: "Not found",
+        showsOnScreen: true
+    )
+
     public static let approval = Step(
         spoken: "This needs you. Approve or deny, or just say ok.",
         bolt: "Approve or deny, or say ok",
