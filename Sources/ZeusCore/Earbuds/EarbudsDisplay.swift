@@ -208,8 +208,9 @@ public enum EarbudsName {
 }
 
 public enum EarbudsWords {
-    public static func cueStatus(_ cue: EarbudsCueFacts) -> [EarbudsCueLine] {
+    public static func cueStatus(_ cue: EarbudsCueFacts, hideDetails: Bool = false) -> [EarbudsCueLine] {
         if !cue.connected { return [EarbudsCueLine(text: "Disconnected")] }
+        if hideDetails { return [EarbudsCueLine(text: "Connected")] }
         let lines = ordered(cue.parts).compactMap(cueLine)
         return lines.isEmpty ? [EarbudsCueLine(text: "Connected")] : lines
     }
@@ -443,9 +444,12 @@ public enum EarbudsPanelModel {
         let nameSource: String
         let parts: [EarbudsPanelPart]
         let showMode: Bool
+        let hidCharge: Bool
         if let presence {
             nameSource = presence.name
-            parts = EarbudsWords.panelParts(presence.parts)
+            let revealed = EarbudsWords.panelParts(presence.parts)
+            hidCharge = hideDetails && !revealed.isEmpty
+            parts = hideDetails ? [] : revealed
             if let mode {
                 showMode = EarbudsMatch.same(
                     id: presence.id, name: presence.name, outputUID: mode.outputUID, outputName: mode.outputName
@@ -456,12 +460,13 @@ public enum EarbudsPanelModel {
         } else if let mode {
             nameSource = mode.outputName
             parts = []
+            hidCharge = false
             showMode = true
         } else {
             return nil
         }
         let capsules = showMode ? mode.map { EarbudsWords.modeCapsules($0.status) } ?? [] : []
-        if parts.isEmpty && capsules.isEmpty { return nil }
+        if parts.isEmpty && capsules.isEmpty && !hidCharge { return nil }
         return EarbudsPanelGroup(
             name: EarbudsName.display(nameSource, hideDetails: hideDetails),
             parts: parts,

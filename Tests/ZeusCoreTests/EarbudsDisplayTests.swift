@@ -65,6 +65,8 @@ struct EarbudsDisplayTests {
         let panel = EarbudsPanelModel.make(presence: shown(), mode: nil, hideDetails: true)
         #expect(panel?.name == "Earbuds")
         #expect(panel?.name.contains("Pro") == false)
+        #expect(panel?.parts.isEmpty == true)
+        #expect(EarbudsWords.cueStatus(cue, hideDetails: true) == [EarbudsCueLine(text: "Connected")])
     }
 
     @Test func cueStatusMixesKnownLevelsAndNeverDrawsZero() {
