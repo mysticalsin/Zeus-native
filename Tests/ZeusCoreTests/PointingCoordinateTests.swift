@@ -40,6 +40,15 @@ struct PointingCoordinateTests {
         #expect(area == CGRect(x: -1920, y: 1040, width: 100, height: 40))
     }
 
+    @Test func aScreenNumberThisTurnDoesNotHaveIsNotTheFirstShot() {
+        #expect(PresentScreenIndex.offset(screen: nil, count: 2) == 0)
+        #expect(PresentScreenIndex.offset(screen: 1, count: 2) == 0)
+        #expect(PresentScreenIndex.offset(screen: 2, count: 2) == 1)
+        #expect(PresentScreenIndex.offset(screen: 3, count: 2) == nil)
+        #expect(PresentScreenIndex.offset(screen: 0, count: 2) == nil)
+        #expect(PresentScreenIndex.offset(screen: 1, count: 0) == nil)
+    }
+
     @Test func retinaDisplayDownscaledToTheDeliveredImage() throws {
         let (geometry, display) = try capture(Self.main, full: .init(width: 2880, height: 1800), delivered: .init(width: 1440, height: 900))
         // AX frame: 100 right of the left edge, 50 below the top.

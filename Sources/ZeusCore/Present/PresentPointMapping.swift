@@ -20,9 +20,8 @@ public enum PresentPointMapping {
     public static func screenPoint(
         x: Int, y: Int, screen: Int?, in shots: [ScreenShot]
     ) -> CGPoint? {
-        guard !shots.isEmpty else { return nil }
-        let index = (screen ?? 1) - 1
-        let shot = shots.indices.contains(index) ? shots[index] : shots[0]
+        guard let index = PresentScreenIndex.offset(screen: screen, count: shots.count) else { return nil }
+        let shot = shots[index]
         let mapper = mapper(from: shots)
         let displayID = shots.firstIndex(where: { $0.displayFrame == shot.displayFrame }).map { $0 + 1 } ?? 1
         let capture = CaptureMap(displayID: displayID, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)
@@ -34,9 +33,9 @@ public enum PresentPointMapping {
     public static func screenRect(
         x: Int, y: Int, width: Int, height: Int, screen: Int?, in shots: [ScreenShot]
     ) -> CGRect? {
-        guard width > 0, height > 0, !shots.isEmpty else { return nil }
-        let index = (screen ?? 1) - 1
-        let shot = shots.indices.contains(index) ? shots[index] : shots[0]
+        guard width > 0, height > 0,
+              let index = PresentScreenIndex.offset(screen: screen, count: shots.count) else { return nil }
+        let shot = shots[index]
         let mapper = mapper(from: shots)
         let displayID = shots.firstIndex(where: { $0.displayFrame == shot.displayFrame }).map { $0 + 1 } ?? 1
         let capture = CaptureMap(displayID: displayID, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)

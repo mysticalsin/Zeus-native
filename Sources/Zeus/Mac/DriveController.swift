@@ -425,8 +425,10 @@ final class DriveController {
         guard let x = target.x, let y = target.y else { return .failure(.notFound(Self.name(target))) }
         let point: CGPoint
         if !screenshots.isEmpty {
-            let index = (target.screen ?? 1) - 1
-            point = ScreenCapture.globalPoint(x: x, y: y, on: screenshots.indices.contains(index) ? screenshots[index] : screenshots[0])
+            guard let index = PresentScreenIndex.offset(screen: target.screen, count: screenshots.count) else {
+                return .failure(.notFound(Self.name(target)))
+            }
+            point = ScreenCapture.globalPoint(x: x, y: y, on: screenshots[index])
         } else {
             // No screenshot this turn: x, y are points from the top-left of the main screen.
             let height = NSScreen.screens.first?.frame.height ?? 0
