@@ -38,9 +38,10 @@ final class VisualInk {
         let strokeCount = xs.withUnsafeMutableBufferPointer { xsBuf in
             ys.withUnsafeMutableBufferPointer { ysBuf in
                 lengths.withUnsafeMutableBufferPointer { lengthsBuf in
-                    zeus_visual_ink_smoothed(
-                        box, xsBuf.baseAddress, ysBuf.baseAddress, lengthsBuf.baseAddress,
-                        Int32(lengths.count), Int32(xs.count))
+                    guard let xsPtr = xsBuf.baseAddress, let ysPtr = ysBuf.baseAddress,
+                          let lengthsPtr = lengthsBuf.baseAddress else { return Int32(0) }
+                    return zeus_visual_ink_smoothed(
+                        box, xsPtr, ysPtr, lengthsPtr, Int32(lengths.count), Int32(xs.count))
                 }
             }
         }
