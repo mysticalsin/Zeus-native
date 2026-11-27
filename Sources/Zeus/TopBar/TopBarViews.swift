@@ -1599,7 +1599,7 @@ struct ClosedWings: View {
         case .actionReceipt: return 150
         case .cue(let cue):
             switch cue {
-            case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake: return 150
+            case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake, .earbuds: return 150
             case .permission: return 230
             case .shortcut, .rain: return 70
             case .volume, .brightness, .keyboardBacklight: return 58
@@ -1642,6 +1642,7 @@ struct ClosedWings: View {
         case .screenshot: ("camera.fill", Theme.bolt)
         case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
         case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
+        case .earbuds(_, let connected): (connected ? "headphones" : "speaker.slash", connected ? Theme.leaf : Theme.cloudSecondary)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1681,6 +1682,8 @@ struct ClosedWings: View {
         case .flingSent(let count, let to):
             Text("Sent \(count) to \(to)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .flingProblem(let text):
+            Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .earbuds(let text, _):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)

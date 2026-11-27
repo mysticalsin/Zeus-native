@@ -162,11 +162,11 @@ GROUPS = {
     "agent-choice-dismiss": (
         core("AgentChoiceDismiss.swift", "JSONValue.swift", "FacePresence/FaceTemplateProof.swift",
              "Earbuds/EarbudsCuePolicy.swift", "Earbuds/EarbudsCuePolicyBox.swift",
-             "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift",
+             "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift", "Earbuds/EarbudsNotchCue.swift",
              "BrowserAgent/WebAddress.swift", "BrowserAgent/BrowserAgentStepBeat.swift",
              "FacePresence/SpoofCuesBox.swift", "FacePresence/SpoofCues.swift", "FacePresence/FaceMatch.swift"),
         tests("AgentChoiceDismissTests", "FaceTemplateProofTests", "EarbudsCuePolicyTests", "EarbudsCuePolicyBoxTests",
-              "EarbudsModeSpeechTests", "BrowserWebURLTests", "BrowserAgentStepBeatTests", "FaceMatchCeilingTests"),
+              "EarbudsModeSpeechTests", "BrowserWebURLTests", "BrowserAgentStepBeatTests", "EarbudsNotchCueTests", "FaceMatchCeilingTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",

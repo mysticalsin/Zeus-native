@@ -275,6 +275,8 @@ public enum NotchCue: Equatable, Sendable {
     case flingSent(count: Int, to: String)
     /// A Fling send or receive did not work; the text says what to do.
     case flingProblem(String)
+    /// Earbuds connected or disconnected. The text is the short notch line.
+    case earbuds(text: String, connected: Bool)
 
     /// How long the cue stays before the notch settles again.
     public var duration: TimeInterval {
@@ -292,6 +294,7 @@ public enum NotchCue: Equatable, Sendable {
         case .keepAwake: 4.0
         case .screenshot: 2.5
         case .flingProblem: 4.0
+        case .earbuds(_, let connected): connected ? EarbudsCuePolicy.connectedDuration : EarbudsCuePolicy.disconnectedDuration
         default: 2.2
         }
     }

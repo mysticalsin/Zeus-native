@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var agentServer: AgentEventServer!
     private var commands: CommandCenter!
     private let topBar = TopBarModel()
+    private let earbudsNotch = EarbudsNotchPresenter()
+    private let earbudsWatch = EarbudsOutputWatch()
     private var topBarServices: TopBarServices!
     private var dictation: DictationController!
     private var teleprompter: TeleprompterController!
@@ -1179,6 +1181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if now.timeIntervalSince(lastMeetingCheck) >= 2 {
             lastMeetingCheck = now
             MeetingState.refresh(ownMicInUse: topBar.isDictating || AvatarStatus.shared.current == .listening)
+            earbudsWatch.poll()
             let agents = Dictionary(grouping: notch.model.sessions, by: \.agent).map { "\($0.key) · \($0.value.count)" }.sorted()
             options.statusOverrides["diag.agents"] = agents.isEmpty ? (false, "None yet") : (true, agents.joined(separator: ", "))
         }
@@ -1252,6 +1255,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ResearchRunner.shared.notch = notch
         ResearchRunner.shared.say = { [weak self] text in self?.voice.say(text) }
         ResearchRunner.shared.showSources = { [weak self] plan, speak in self?.voice.showResearch(plan, speak: speak) }
+        earbudsNotch.topBar = topBar
+        earbudsNotch.say = { [weak self] text in self?.voice.say(text) }
+        earbudsNotch.hideDetails = { MeetingState.hideDetails }
+        earbudsWatch.present = { [weak self] facts, id, speak in
+            self?.earbudsNotch.present(facts, id: id, speak: speak)
+        }
         WalkthroughController.shared.buddy = buddy
         WalkthroughController.shared.say = { [weak self] text in self?.voice.say(text) }
         AnnotationController.shared.onMark = { [weak self] prompt, shots in
