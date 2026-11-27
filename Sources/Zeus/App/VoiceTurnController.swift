@@ -790,8 +790,8 @@ final class VoiceTurnController {
                     if frame.finished { break }
                     try? await Task.sleep(for: .milliseconds(40))
                 }
-                guard !Task.isCancelled else { return }
-                self?.presenter.answerFinished(token: token)
+                guard let self, !Task.isCancelled else { return }
+                await self.finishExplainDrawing(token: token, speak: speak)
             }
         } else {
             let beats = plan.schedule.indexes
@@ -802,8 +802,8 @@ final class VoiceTurnController {
                     guard !Task.isCancelled else { return }
                     self?.presenter.reveal(sentence: beat, token: token)
                 }
-                guard !Task.isCancelled else { return }
-                self?.presenter.answerFinished(token: token)
+                guard let self, !Task.isCancelled else { return }
+                await self.finishExplainDrawing(token: token, speak: speak)
             }
         }
         if speak {
@@ -820,6 +820,17 @@ final class VoiceTurnController {
         remember(transcript, spoken)
         ZeusSound.play(.voiceDone)
         return TurnResult(spoken: spoken)
+    }
+
+    /// The marks stay up through the last spoken sentence, then the presenter keeps them a few seconds.
+    private func finishExplainDrawing(token: UUID, speak: Bool) async {
+        if speak {
+            while speaker.isSpeaking {
+                if Task.isCancelled { return }
+                try? await Task.sleep(for: .milliseconds(80))
+            }
+        }
+        presenter.answerFinished(token: token)
     }
 
     private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID, label: String) {

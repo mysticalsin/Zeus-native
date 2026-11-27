@@ -9,3 +9,7 @@ license = "MIT"
 name = "zeus_visual"
 path = "src/lib.rs"
 crate-type = ["lib", "staticlib"]
+
+# The Mac app links this archive from Swift. Unwind would leave rust_eh_personality undefined.
+[profile.release]
+panic = "abort"
