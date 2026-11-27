@@ -666,6 +666,38 @@ final class VoiceTurnController {
         return TurnResult(spoken: answer)
     }
 
+    /// Draws a coding-agent start on the display under the pointer: Building, then the tool, then the task.
+    /// The caller speaks the full line. The marks still appear when that speech is off.
+    private func showAgentStart(_ plan: AgentStartDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAgentStart(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAgentStart(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAgentStart(_ plan: AgentStartDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// A clock time for a timed event, or "All day" when the request named a day and no hour.
     private static func eventWhen(_ event: CalendarQuickAdd.Parsed) -> String {
         if event.isAllDay { return "All day" }
@@ -855,6 +887,12 @@ final class VoiceTurnController {
                    let parsed = CalendarQuickAdd.parse(text), parsed.hadDate,
                    let visual = CalendarEventDraw.plan(title: parsed.title, when: Self.eventWhen(parsed)) {
                     self.showCalendarEvent(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if case .codeAgent(let tool, let project, let task) = plan.intent,
+                          let visual = AgentStartDraw.plan(tool: (tool ?? CodingTool.preferred()).title,
+                                                           project: project, task: task) {
+                    self.showAgentStart(visual, speak: speak)
                     if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if speak {
