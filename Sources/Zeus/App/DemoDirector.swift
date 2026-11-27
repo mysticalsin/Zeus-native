@@ -25,8 +25,15 @@ final class DemoDirector {
         task = Task { await run() }
     }
 
-    private func show(_ step: PlayDemoScript.Step, at point: CGPoint) {
+    /// The voice gets the sentence. The spark caption gets the short line.
+    private func narrate(_ step: PlayDemoScript.Step) {
         say(step.spoken)
+        buddy.showCaption(step.bolt)
+        buddy.hideCaption()
+    }
+
+    private func show(_ step: PlayDemoScript.Step, at point: CGPoint) {
+        narrate(step)
         buddy.point(to: point, label: step.bolt)
     }
 
@@ -42,11 +49,11 @@ final class DemoDirector {
         buddy.idle()
         guard await pause(1.2) else { return }
 
-        // 1. Voice turn: hold the key, talk, release. The spark shows the mode and the voice says it.
-        say(PlayDemoScript.listening.spoken)
+        // 1. Voice turn: hold the key, talk, release. The spark shows the short label and the voice says the sentence.
+        narrate(PlayDemoScript.listening)
         buddy.listen()
         guard await pause(2.6) else { return }
-        say(PlayDemoScript.thinking.spoken)
+        narrate(PlayDemoScript.thinking)
         buddy.think()
         guard await pause(1.2) else { return }
 
@@ -74,12 +81,14 @@ final class DemoDirector {
         let decision = await verdict
         guard !Task.isCancelled else { return }
 
-        // 5. Outcome.
+        // 5. Outcome. The notch shows the result and the voice says which way it went.
         if decision == .allow {
+            narrate(PlayDemoScript.allowed)
             notch.update(sessionID: "cc", status: .working, task: "npm run build")
             guard await pause(2.4) else { return }
             notch.update(sessionID: "cc", status: .done, task: "build finished in 41 s")
         } else {
+            narrate(PlayDemoScript.denied)
             notch.update(sessionID: "cc", status: .done, task: "denied: rm -rf dist")
         }
         guard await pause(2.0) else { return }

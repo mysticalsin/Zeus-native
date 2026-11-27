@@ -34,6 +34,18 @@ public enum PlayDemoScript {
         showsOnScreen: true
     )
 
+    public static let allowed = Step(
+        spoken: "Allowed. The build is running, and I'll show you when it finishes.",
+        bolt: "Allowed",
+        showsOnScreen: true
+    )
+
+    public static let denied = Step(
+        spoken: "Denied. I left that command alone, so nothing was removed.",
+        bolt: "Denied",
+        showsOnScreen: true
+    )
+
     public static let approval = Step(
         spoken: "This needs you. Approve or deny, or just say ok.",
         bolt: "Approve or deny, or say ok",

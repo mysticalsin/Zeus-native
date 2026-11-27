@@ -35,6 +35,19 @@ import Testing
         #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
     }
 
+    @Test func theBuildOutcomeIsSpokenAndShown() {
+        for step in [PlayDemoScript.allowed, PlayDemoScript.denied] {
+            #expect(PlayDemoScript.ready(step))
+            #expect(step.showsOnScreen)
+            #expect(PointerGuideCaptionSplit.boltText(step.bolt) == step.bolt)
+            #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
+        }
+        #expect(PlayDemoScript.allowed.bolt == "Allowed")
+        #expect(PlayDemoScript.denied.bolt == "Denied")
+        #expect(PlayDemoScript.allowed.spoken == "Allowed. The build is running, and I'll show you when it finishes.")
+        #expect(PlayDemoScript.denied.spoken == "Denied. I left that command alone, so nothing was removed.")
+    }
+
     @Test func aStepThatIsNotDrawnIsNotReady() {
         let spokenOnly = PlayDemoScript.Step(
             spoken: "Click the bolt anytime",
