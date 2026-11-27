@@ -772,6 +772,8 @@ final class VoiceTurnController {
         drawActive = true
         explainBegan = Date()
         VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
+        // Leave listening before the pen flies. idle() clears a flight, so it has to run first.
+        buddy.idle()
         if plan.travels {
             showPen(plan.penFrame(at: 0), shot: shot, token: token)
             explainReveal = Task { @MainActor [weak self] in
@@ -803,7 +805,6 @@ final class VoiceTurnController {
                 self?.presenter.answerFinished(token: token)
             }
         }
-        buddy.idle()
         if speak {
             for (index, sentence) in plan.sentences.enumerated() {
                 speaker.speak(Self.voiced(sentence), onStart: { [weak self] in
