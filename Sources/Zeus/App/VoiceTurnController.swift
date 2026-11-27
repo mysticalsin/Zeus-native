@@ -916,6 +916,48 @@ final class VoiceTurnController {
         }
     }
 
+    private static func projectAppTitle(_ app: FastIntent.ProjectApp) -> String {
+        switch app {
+        case .vscode: "VS Code"
+        case .cursor: "Cursor"
+        case .xcode: "Xcode"
+        case .finder: "Finder"
+        case .terminal: "Terminal"
+        }
+    }
+
+    /// Draws a project open on the display under the pointer: Open, then the project, then the app.
+    /// The caller speaks the full line.
+    private func showProjectOpen(_ plan: ProjectOpenDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyProjectOpen(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyProjectOpen(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyProjectOpen(_ plan: ProjectOpenDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws a timer on the display under the pointer. The caller speaks the full line.
     /// Cancelling shows only Cancelled.
     private func showTimer(_ plan: TimerDraw, speak: Bool) {
@@ -977,6 +1019,11 @@ final class VoiceTurnController {
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if case .timer(let seconds) = plan.intent, let visual = TimerDraw.plan(seconds: seconds) {
                     self.showTimer(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if case .openProject(let name, let app) = plan.intent,
+                          let visual = ProjectOpenDraw.plan(name: name, app: Self.projectAppTitle(app)) {
+                    self.showProjectOpen(visual, speak: speak)
                     if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if speak {
