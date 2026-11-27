@@ -159,7 +159,7 @@ public struct HandsWorld: Equatable, Sendable {
     }
 
     public func element(_ label: String) -> HandsElement? {
-        let key = label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let key = HandsActBox.trimmedLabel(label).lowercased()
         return elements.first { $0.label.lowercased() == key }
     }
 
