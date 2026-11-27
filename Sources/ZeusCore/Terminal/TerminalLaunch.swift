@@ -35,7 +35,7 @@ public enum CodingTool: String, CaseIterable, Codable, Sendable {
     /// The argument list that starts an interactive session whose first prompt is `task`.
     /// A task that starts with "-" would be read as an option, so it gets a lead-in word.
     public func arguments(task: String) -> [String] {
-        let text = task.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = TerminalLaunchBox.trimmedTask(task)
         guard !text.isEmpty else { return [] }
         let prompt = text.hasPrefix("-") ? "Task: " + text : text
         switch self {
