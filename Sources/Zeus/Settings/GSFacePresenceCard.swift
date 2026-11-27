@@ -24,9 +24,16 @@ struct FacePresenceCardModel: Equatable {
     /// What VoiceOver reads for the status row, "Face presence status: Away, 1 minute 42 seconds left".
     var statusAccessibilityLabel: String { status.accessibilityText }
 
-    static func make(machine: FacePresenceMachine, faces: [FaceRecord], lockAfterLabel: String, uptime: Double) -> FacePresenceCardModel {
-        FacePresenceCardModel(
-            status: machine.status(at: uptime),
+    static func make(machine: FacePresenceMachine, faces: [FaceRecord], lockAfterLabel: String, uptime: Double,
+                     enrollmentLine: String? = nil) -> FacePresenceCardModel {
+        let enrolling: Bool
+        if case .enrolling = machine.state { enrolling = true } else { enrolling = false }
+        var status = machine.status(at: uptime)
+        if let line = EnrollmentCoach.shown(enrolling: enrolling, line: enrollmentLine) {
+            status = status.withHint(line)
+        }
+        return FacePresenceCardModel(
+            status: status,
             faces: faces.map { FaceRow(id: $0.id, name: $0.name, isEnabled: $0.isEnabled) },
             enrollEnabled: machine.canEnroll,
             // A stored label that is not one of the five reads as the default, as the lock rule does.
@@ -110,7 +117,8 @@ struct GSFacePresenceCardHost: View {
         GSFacePresenceCard(
             model: FacePresenceCardModel.make(machine: controller.machine, faces: controller.faces,
                                               lockAfterLabel: store.string(FacePresenceController.lockAfterID),
-                                              uptime: ProcessInfo.processInfo.systemUptime),
+                                              uptime: ProcessInfo.processInfo.systemUptime,
+                                              enrollmentLine: controller.enrollmentLine),
             isOn: store.boolBinding(FacePresenceController.switchID),
             lockAfter: store.stringBinding(FacePresenceController.lockAfterID),
             setFace: { controller.setFace($0, enabled: $1) },

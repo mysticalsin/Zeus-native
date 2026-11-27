@@ -89,6 +89,8 @@ final class FacePresenceController {
     @ObservationIgnored private var spoofWindow = SpoofCues.Window()
     @ObservationIgnored private var previousFace: CGRect?
     @ObservationIgnored private var visionFailures = 0
+    /// The latest enrollment line: "3 of 10." or why the last frame was turned down. Cleared when enrollment ends.
+    var enrollmentLine: String?
     @ObservationIgnored private var enrollment: EnrollmentSession?
     @ObservationIgnored private var enrollmentWatchdog: Task<Void, Never>?
     @ObservationIgnored private(set) var consentTask: Task<Void, Never>?
@@ -228,6 +230,7 @@ final class FacePresenceController {
             environment.permissions.openCameraSettings()
         case .beginEnrollment(let token):
             spoofWindow.reset()
+            enrollmentLine = nil
             enrollment = EnrollmentSession(token: token, plan: EnrollmentPlan(revision: environment.featurePrintRevision,
                                                                               startedAt: environment.uptime()))
             watchEnrollmentWindow()
@@ -320,7 +323,9 @@ final class FacePresenceController {
         switch outcome {
         case .completed(let result): finishEnrollment(token: token, result: result)
         case .expired: finishEnrollment(token: token, result: nil)
-        case .accepted, .refused, .finished: break
+        case .accepted(let count): enrollmentLine = EnrollmentCoach.progress(accepted: count)
+        case .refused(let reason): enrollmentLine = EnrollmentCoach.line(reason)
+        case .finished: break
         }
     }
 
@@ -341,6 +346,7 @@ final class FacePresenceController {
 
     private func endEnrollmentSession() {
         enrollment = nil
+        enrollmentLine = nil
         enrollmentWatchdog?.cancel()
         enrollmentWatchdog = nil
     }

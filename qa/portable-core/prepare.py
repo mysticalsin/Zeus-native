@@ -165,9 +165,11 @@ GROUPS = {
              "Earbuds/EarbudsCuePolicy.swift", "Earbuds/EarbudsCuePolicyBox.swift",
              "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift", "Earbuds/EarbudsNotchCue.swift",
              "BrowserAgent/WebAddress.swift", "BrowserAgent/BrowserAgentStepBeat.swift",
-             "FacePresence/SpoofCuesBox.swift", "FacePresence/SpoofCues.swift", "FacePresence/FaceMatch.swift"),
+             "FacePresence/SpoofCuesBox.swift", "FacePresence/SpoofCues.swift", "FacePresence/FaceMatch.swift",
+             "FacePresence/EnrollmentPlan.swift", "FacePresence/EnrollmentCoach.swift"),
         tests("AgentChoiceDismissTests", "FaceTemplateProofTests", "EarbudsCuePolicyTests", "EarbudsCuePolicyBoxTests",
-              "EarbudsModeSpeechTests", "BrowserWebURLTests", "BrowserAgentStepBeatTests", "EarbudsNotchCueTests", "FaceMatchCeilingTests"),
+              "EarbudsModeSpeechTests", "BrowserWebURLTests", "BrowserAgentStepBeatTests", "EarbudsNotchCueTests", "FaceMatchCeilingTests",
+              "EnrollmentCoachTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",

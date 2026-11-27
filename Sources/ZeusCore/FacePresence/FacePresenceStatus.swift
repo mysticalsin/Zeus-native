@@ -66,4 +66,11 @@ public struct FacePresenceStatus: Equatable, Sendable {
     private static func plain(_ word: String, _ symbol: String, _ state: FacePresenceMachine.State) -> FacePresenceStatus {
         FacePresenceStatus(word: word, symbol: symbol, countdown: nil, accessibilityText: "Face presence status: \(word)", hint: hint(for: state))
     }
+
+    /// The same status with a different hint. Used while a face is being learned, so the row can say why a frame
+    /// was kept or turned down without changing the word or the symbol.
+    public func withHint(_ hint: String) -> FacePresenceStatus {
+        FacePresenceStatus(word: word, symbol: symbol, countdown: countdown,
+                           accessibilityText: accessibilityText, hint: hint)
+    }
 }
