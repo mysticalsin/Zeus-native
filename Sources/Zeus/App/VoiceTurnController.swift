@@ -1072,13 +1072,13 @@ final class VoiceTurnController {
             switch output {
             case .tag(.point(let target?)):
                 if let point = globalPoint(x: target.x, y: target.y, screen: target.screen, in: shots) {
-                    buddy.point(to: point, label: target.label ?? "right here")
+                    buddy.point(to: point, label: Self.pointLabel(target.label, fallback: "right here"))
                     pointed = true
                 }
             case .tag(.highlight(let area)):
                 if let point = globalPoint(x: area.x + area.width / 2, y: area.y + area.height / 2,
                                            screen: area.screen, in: shots) {
-                    buddy.point(to: point, label: area.label ?? "this area")
+                    buddy.point(to: point, label: Self.pointLabel(area.label, fallback: "this area"))
                     pointed = true
                 }
             case .tag(.action(let action)):
@@ -1129,7 +1129,8 @@ final class VoiceTurnController {
                     let card = PresentCard.parse(action.payload)
                     task = Task { @MainActor in
                         guard let card else { return nil }
-                        let body = ([card.title] + card.lines).joined(separator: "\n")
+                        let joined = ([card.title] + card.lines.prefix(2)).joined(separator: "\n")
+                        let body = PointerGuideCaptionSplit.boltText(joined) ?? Self.pointLabel(card.title, fallback: "Here")
                         self.buddy.showCaption(body)
                         self.buddy.hideCaption()
                         return nil
@@ -1450,6 +1451,12 @@ final class VoiceTurnController {
     }
 
     /// The last ~240 characters of the reply, cut at a word boundary.
+    /// The words drawn beside a point. At most three short lines. A line that is too long stays off.
+    static func pointLabel(_ raw: String?, fallback: String) -> String {
+        guard let raw, let text = PointerGuideCaptionSplit.boltText(raw) else { return fallback }
+        return text
+    }
+
     static func captionTail(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 240 else { return trimmed }
