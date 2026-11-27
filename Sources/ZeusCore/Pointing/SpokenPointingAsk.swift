@@ -62,7 +62,8 @@ public enum SpokenPointingAsk {
 
     private static func askedLabel(in utterance: String) -> (verb: String, phrase: String)? {
         let raw = utterance.lowercased()
-        if raw.contains("://") || raw.contains("javascript:") || raw.contains("data:") || raw.contains("file:") {
+        if raw.contains("://") || raw.contains("javascript:") || raw.contains("data:") || raw.contains("file:")
+            || raw.contains("mailto:") || raw.contains("about:") || raw.contains("blob:") {
             return nil
         }
         let key = normalized(utterance)
@@ -74,6 +75,7 @@ public enum SpokenPointingAsk {
             while let first = words.first, ["the", "a", "an"].contains(first) { words.removeFirst() }
             rest = words.joined(separator: " ")
             guard !rest.isEmpty, rest.count <= 80 else { return nil }
+            if isBareSecret(rest) { return nil }
             return (lead.verb, rest)
         }
         return nil

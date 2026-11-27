@@ -55,6 +55,27 @@ import Testing
         #expect(SpokenPointingAsk.show(in: "show me https://example.com", candidates: candidates) == nil)
         #expect(SpokenPointingAsk.show(in: "point at data:text/html,hello", candidates: candidates) == nil)
         #expect(SpokenPointingAsk.show(in: "show me file:notes", candidates: candidates) == nil)
+        let mailto = PointingProposalCandidate(id: "t9", isSecure: false, label: "Mailto File")
+        #expect(SpokenPointingAsk.show(in: "point at mailto:File", candidates: [mailto]) == nil)
+        #expect(SpokenPointingAsk.show(in: "highlight about:This Mac", candidates: [
+            PointingProposalCandidate(id: "t10", isSecure: false, label: "About This Mac"),
+        ]) == nil)
+        #expect(SpokenPointingAsk.show(in: "outline blob:File", candidates: [file]) == nil)
+        let about = SpokenPointingAsk.show(in: "point at About This Mac", candidates: [
+            PointingProposalCandidate(id: "t10", isSecure: false, label: "About This Mac"),
+        ])
+        #expect(about?.targetID == "t10")
+    }
+
+    @Test func aBareSecretAskDoesNotRingALongerControl() {
+        let settings = PointingProposalCandidate(id: "t6", isSecure: false, label: "Password settings")
+        #expect(SpokenPointingAsk.show(in: "point at the password", candidates: [settings]) == nil)
+        #expect(SpokenPointingAsk.show(in: "highlight the API key", candidates: [
+            PointingProposalCandidate(id: "t8", isSecure: false, label: "API key help"),
+        ]) == nil)
+        let shown = SpokenPointingAsk.show(in: "point at Password settings", candidates: [settings])
+        #expect(shown?.targetID == "t6")
+        #expect(shown?.bolt == "Point at Password settings")
     }
 
     @Test func anExplainHowStaysOffThisPath() {
