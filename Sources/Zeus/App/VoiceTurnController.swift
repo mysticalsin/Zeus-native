@@ -971,6 +971,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws the fuller answer on the display under the pointer.
+    /// The caller speaks the intro. A blank first sentence is not drawn.
+    private func showFullerAnswer(_ plan: FullerAnswerDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFullerAnswer(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFullerAnswer(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFullerAnswer(_ plan: FullerAnswerDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws a refused volume change on the display under the pointer.
     /// The caller speaks the full line. A change the notch shows is not this card.
     private func showVolumeBlock(_ plan: VolumeBlockDraw, speak: Bool) {
@@ -2911,6 +2943,10 @@ final class VoiceTurnController {
         VoiceLog.logContent("spoken", clean, prefix: "deep: ")
         buddy.showCaption("Here is the fuller answer. " + Self.captionTail(clean))
         buddy.hideCaption()
+        if let visual = FullerAnswerDraw.plan(sentence: sentences.first ?? "") {
+            showFullerAnswer(visual, speak: speakIt)
+            buddy.showCaption(visual.boltCaption(at: 0))
+        }
         if speakIt, SettingsStore.shared.bool("voice.speakReplies") {
             speaker.speak("Here is the fuller answer.")
             for sentence in sentences.prefix(4) { speaker.speak(Self.voiced(sentence)) }
