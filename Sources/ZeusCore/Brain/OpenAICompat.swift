@@ -12,13 +12,13 @@ public enum OpenAICompat {
     public static func parse(chunk: String) -> [Piece] {
         var pieces: [Piece] = []
         for raw in chunk.split(separator: "\n", omittingEmptySubsequences: true) {
-            let line = raw.trimmingCharacters(in: .whitespaces)
+            let line = OpenAICompatLineBox.trimmedLine(String(raw))
             if line.isEmpty || line.hasPrefix(":") { continue }
             if !line.hasPrefix("data:") {
                 if let message = errorMessage(in: line) { pieces.append(.failure(message)) }
                 continue
             }
-            let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            let payload = OpenAICompatLineBox.trimmedLine(String(line.dropFirst(5)))
             if payload == "[DONE]" {
                 pieces.append(.done)
                 continue
