@@ -93,6 +93,21 @@ struct PointingSessionTests {
         if case .failed = lost.state {} else { Issue.record("expected failed") }
     }
 
+    @Test func aCaptionsTurnCanAdmitTheGuide() throws {
+        var session = listening()
+        session.send(.keyUp)
+        #expect(session.state == .processing)
+        session.send(.firstPlaybackStart)
+        #expect(session.state == .speaking)
+        let plan = PointerGuideAdmission.step(
+            id: "ring", bolt: CGPoint(x: 80, y: 40),
+            ring: CGRect(x: 60, y: 20, width: 40, height: 30),
+            caption: "Click File", reduceMotion: true)
+        let admitted = session.admitGuide(try #require(plan))
+        #expect(admitted.to == .guiding)
+        #expect(session.guide?.current?.caption == "Click File")
+    }
+
     @Test func guidanceClickStaysOnTheGuide() {
         var session = listening()
         session.send(.keyUp); session.send(.firstPlaybackStart)

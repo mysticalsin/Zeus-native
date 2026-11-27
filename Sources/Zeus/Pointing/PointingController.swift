@@ -781,6 +781,8 @@ final class PointingController {
 
     private func admitLiveGuide(id: String, bolt: CGPoint, caption: String, imageCenter: ExplanationVector3,
                                 radius: Double, capture: ExplanationCaptureContext) {
+        // Captions-only turns never play audio, so they are still processing when the ring appears.
+        if session.state == .processing { _ = session.send(.firstPlaybackStart) }
         guard session.state == .speaking else { return }
         let ring: CGRect
         if let mapped = capture.geometry.globalRing(center: imageCenter, radius: radius, current: capture.currentDisplay) {

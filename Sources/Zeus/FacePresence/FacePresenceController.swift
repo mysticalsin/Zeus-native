@@ -378,7 +378,7 @@ final class FacePresenceController {
         case .empty: faces = []; vaultReadable = true
         case .faces(let stored): faces = stored; vaultReadable = true
         case .unreadable: faces = []; vaultReadable = false
-        case .needsPresence: break
+        case .needsPresence: faces = []; vaultReadable = false
         }
     }
 
