@@ -120,6 +120,9 @@ struct BrowserAgentLoopTests {
         #expect(error(#"{"op":"click","index":2.5}"#) != nil)
         #expect(error(#"{"op":"open","url":"javascript:alert(1)"}"#) != nil)
         #expect(error(#"{"op":"open","url":"file:///etc/passwd"}"#) != nil)
+        #expect(BrowserAgentOp.webURL("localhost:3000") == "https://localhost:3000")
+        #expect(BrowserAgentOp.webURL("localhost") == "https://localhost")
+        #expect(BrowserAgentOp.webURL("not a page") == nil)
         #expect(error(#"{"op":"scroll","direction":"sideways"}"#) != nil)
         #expect(error(#"{"op":"ask_user"}"#) == .missing("question"))
     }

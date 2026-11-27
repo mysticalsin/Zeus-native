@@ -27,7 +27,10 @@ private final class FakeSpeaker: LineSpeaking {
 private final class FakePresenter: TalkVisualPresenting {
     let log: TurnLog
     init(_ log: TurnLog) { self.log = log }
-    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) { log.events.append("begin marks=\(draw.marks.count) w=\(shot.pixelWidth)") }
+    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) -> Bool {
+        log.events.append("begin marks=\(draw.marks.count) w=\(shot.pixelWidth)")
+        return true
+    }
     func reveal(sentence: Int, token: UUID) { log.events.append("reveal \(sentence)") }
     func answerFinished(token: UUID) { log.events.append("finished") }
     func clear() { log.events.append("clear") }

@@ -264,8 +264,9 @@ final class BuddyController: NSObject {
 
     private var pointingClickMonitor: Any?
 
-    /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame under the
-    /// point wins over the raw coordinate. Decorative: this does not move the system pointer.
+    /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame that contains
+    /// the point wins, so the ring hugs that control. A point between controls keeps the coordinate.
+    /// An explicit ring is drawn as given. Decorative: this does not move the system pointer.
     func point(to point: CGPoint, label: String, ring explicitRing: CGRect? = nil) {
         guard CompanionSpring.tracksPointer(showPolicy) else { return }
         wake()

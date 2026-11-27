@@ -151,7 +151,7 @@ public struct RingSession: Equatable, Sendable {
 }
 
 /// Picks the accessibility frame a point belongs to. The smallest frame that contains the
-/// point wins. Otherwise the nearest center inside the ring budget.
+/// point wins. A point that sits between controls is left alone.
 public enum ElementSnap {
     public static func best(
         axFrames: [CGRect],
@@ -162,17 +162,7 @@ public enum ElementSnap {
         guard let axPoint = mapper.convert(screenPoint, from: .screen, to: .ax, context: MapContext()) else { return nil }
         let usable = axFrames.filter { $0.width > 0 && $0.height > 0 && $0.origin.x.isFinite && $0.origin.y.isFinite }
         let containing = usable.filter { $0.contains(axPoint) }
-        if let tightest = containing.min(by: { $0.width * $0.height < $1.width * $1.height }) {
-            return tightest
-        }
-        guard let budget = mapper.ringPointTolerance(displayID: displayID) else { return nil }
-        let ranked = usable.compactMap { frame -> (CGRect, Double)? in
-            let center = CGPoint(x: frame.midX, y: frame.midY)
-            guard let screen = mapper.convert(center, from: .ax, to: .screen, context: MapContext()) else { return nil }
-            return (frame, hypot(screen.x - screenPoint.x, screen.y - screenPoint.y))
-        }
-        guard let nearest = ranked.min(by: { $0.1 < $1.1 }), nearest.1 <= budget else { return nil }
-        return nearest.0
+        return containing.min(by: { $0.width * $0.height < $1.width * $1.height })
     }
 }
 

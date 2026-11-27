@@ -771,7 +771,7 @@ final class PointingController {
         guard session.state == .guiding, session.guide != nil else { return false }
         let transition = session.guideClick(at: PointerGuidePoint(x: screen.x, y: screen.y))
         if transition.effects.contains(.showGuideStep), let step = session.guide?.current {
-            let caption = PointerGuideCaptionSplit.boltText(step.caption) ?? step.caption
+            let caption = PointerGuideCaptionSplit.boltText(step.caption) ?? "Here"
             _ = marker.flight(CGPoint(x: step.bolt.x, y: step.bolt.y), caption)
         } else if transition.to == .idle {
             marker.idle()
@@ -784,12 +784,8 @@ final class PointingController {
         // Captions-only turns never play audio, so they are still processing when the ring appears.
         if session.state == .processing { _ = session.send(.firstPlaybackStart) }
         guard session.state == .speaking else { return }
-        let ring: CGRect
-        if let mapped = capture.geometry.globalRing(center: imageCenter, radius: radius, current: capture.currentDisplay) {
-            ring = CGRect(x: mapped.x, y: mapped.y, width: mapped.width, height: mapped.height)
-        } else {
-            ring = CGRect(x: bolt.x - 28, y: bolt.y - 18, width: 56, height: 36)
-        }
+        guard let mapped = capture.geometry.globalRing(center: imageCenter, radius: radius, current: capture.currentDisplay) else { return }
+        let ring = CGRect(x: mapped.x, y: mapped.y, width: mapped.width, height: mapped.height)
         guard let plan = PointerGuideAdmission.step(id: id, bolt: bolt, ring: ring, caption: caption, reduceMotion: explanation.reduceMotion) else { return }
         _ = session.admitGuide(plan)
     }

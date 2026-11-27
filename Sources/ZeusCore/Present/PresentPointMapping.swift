@@ -30,6 +30,20 @@ public enum PresentPointMapping {
         return mapper.convert(CGPoint(x: x, y: y), from: .pixel, to: .screen, context: ctx)
     }
 
+    /// A `[HIGHLIGHT]` rectangle in screenshot pixels, as an AppKit rect on that display.
+    public static func screenRect(
+        x: Int, y: Int, width: Int, height: Int, screen: Int?, in shots: [ScreenShot]
+    ) -> CGRect? {
+        guard width > 0, height > 0, !shots.isEmpty else { return nil }
+        let index = (screen ?? 1) - 1
+        let shot = shots.indices.contains(index) ? shots[index] : shots[0]
+        let mapper = mapper(from: shots)
+        let displayID = shots.firstIndex(where: { $0.displayFrame == shot.displayFrame }).map { $0 + 1 } ?? 1
+        let capture = CaptureMap(displayID: displayID, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)
+        let ctx = MapContext(displayID: displayID, capture: capture)
+        return mapper.convert(CGRect(x: x, y: y, width: width, height: height), from: .pixel, to: .screen, context: ctx)
+    }
+
     /// Center of an AX element in AppKit global points.
     public static func screenCenter(of element: AXSnapshotElement, mapper: ScreenCoordinateMapper) -> CGPoint? {
         let mid = CGPoint(x: element.frame.midX, y: element.frame.midY)

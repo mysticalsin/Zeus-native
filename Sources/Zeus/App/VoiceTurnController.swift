@@ -768,14 +768,14 @@ final class VoiceTurnController {
         let draw = plan.scaled(toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
         let token = UUID()
         let surface = presenter
-        surface.begin(draw, shot: shot, token: token)
-        drawActive = true
+        let ready = surface.begin(draw, shot: shot, token: token)
+        drawActive = ready
         explainBegan = Date()
         VoiceLog.log("draw", "explain marks=\(draw.marks.count) pen=\(plan.stroke.count) display=\(Int(shot.displayFrame.width))x\(Int(shot.displayFrame.height))")
         // Leave listening before the pen flies. idle() clears a flight, so it has to run first.
         buddy.idle()
         let penLabel = PointerGuideCaptionSplit.oneLine(plan.sentences.first ?? "") ?? "Here"
-        if plan.travels {
+        if plan.travels, ready {
             showPen(plan.penFrame(at: 0), shot: shot, token: token, label: penLabel)
             explainReveal = Task { @MainActor [weak self] in
                 var shown = 0
@@ -793,7 +793,7 @@ final class VoiceTurnController {
                 guard let self, !Task.isCancelled else { return }
                 await self.finishExplainDrawing(token: token, speak: speak)
             }
-        } else {
+        } else if ready {
             let beats = plan.schedule.indexes
             if let first = beats.first { surface.reveal(sentence: first, token: token) }
             explainReveal = Task { @MainActor [weak self] in
@@ -836,7 +836,7 @@ final class VoiceTurnController {
     private func showPen(_ frame: ExplainPenFrame?, shot: ScreenShot, token: UUID, label: String) {
         guard let frame else { return }
         let scaled = ExplainShowcase.scaled(frame.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
-        presenter.showFrame(scaled, token: token)
+        guard presenter.showFrame(scaled, token: token) else { return }
         let bolt = boltScreen(frame.bolt, shot: shot)
         buddy.flight(to: bolt, label: label)
     }
@@ -1089,9 +1089,10 @@ final class VoiceTurnController {
                     pointed = true
                 }
             case .tag(.highlight(let area)):
-                if let point = globalPoint(x: area.x + area.width / 2, y: area.y + area.height / 2,
-                                           screen: area.screen, in: shots) {
-                    buddy.point(to: point, label: Self.pointLabel(area.label, fallback: "this area"))
+                if let ring = PresentPointMapping.screenRect(x: area.x, y: area.y, width: area.width, height: area.height,
+                                                             screen: area.screen, in: shots) {
+                    buddy.point(to: CGPoint(x: ring.midX, y: ring.midY),
+                                label: Self.pointLabel(area.label, fallback: "this area"), ring: ring)
                     pointed = true
                 }
             case .tag(.action(let action)):
@@ -1164,9 +1165,8 @@ final class VoiceTurnController {
                       TalkSightPolicy.drawAllowed(winner: winnerID, request: request,
                                                   supportsNoSessionPersistence: supportsNoSessionPersistence(),
                                                   drawInstructions: ZeusPrompt.drawInstructions()) else { break }
-                presenter.begin(draw, shot: shot, token: drawToken)
                 drawBegun = true
-                drawActive = true
+                drawActive = presenter.begin(draw, shot: shot, token: drawToken)
                 VoiceLog.log("draw", "marks=\(draw.marks.count)")
             case .text(let text):
                 guard !haltedForHallucination, !haltedForPersonaLimit else { break }

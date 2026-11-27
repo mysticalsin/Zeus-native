@@ -36,6 +36,8 @@ struct PointingCoordinateTests {
         #expect(topLeft == CGPoint(x: -1920, y: 1080))
         let center = mapper.convert(CGPoint(x: 960, y: 540), from: .pixel, to: .screen, context: ctx)
         #expect(center == CGPoint(x: -960, y: 540))
+        let area = mapper.convert(CGRect(x: 0, y: 0, width: 100, height: 40), from: .pixel, to: .screen, context: ctx)
+        #expect(area == CGRect(x: -1920, y: 1040, width: 100, height: 40))
     }
 
     @Test func retinaDisplayDownscaledToTheDeliveredImage() throws {

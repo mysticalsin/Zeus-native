@@ -171,6 +171,9 @@ import Testing
         #expect(chosen == button)
         let outside = CGPoint(x: 900, y: 20)
         #expect(ElementSnap.best(axFrames: [button], around: outside, displayID: 1, mapper: hd) == nil)
+        // Ten points past the button's right edge used to snap onto that button.
+        let beside = hd.convert(CGPoint(x: 130, y: 62), from: .ax, to: .screen, context: MapContext())!
+        #expect(ElementSnap.best(axFrames: [button], around: beside, displayID: 1, mapper: hd) == nil)
     }
 
     @Test func presentProbeReportsTheFixture() {
