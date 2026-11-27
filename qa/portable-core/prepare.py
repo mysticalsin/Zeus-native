@@ -163,10 +163,10 @@ GROUPS = {
         core("AgentChoiceDismiss.swift", "JSONValue.swift", "FacePresence/FaceTemplateProof.swift",
              "Earbuds/EarbudsCuePolicy.swift", "Earbuds/EarbudsCuePolicyBox.swift",
              "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift",
-             "BrowserAgent/WebAddress.swift",
+             "BrowserAgent/WebAddress.swift", "BrowserAgent/BrowserAgentStepBeat.swift",
              "FacePresence/SpoofCuesBox.swift", "FacePresence/SpoofCues.swift", "FacePresence/FaceMatch.swift"),
         tests("AgentChoiceDismissTests", "FaceTemplateProofTests", "EarbudsCuePolicyTests", "EarbudsCuePolicyBoxTests",
-              "EarbudsModeSpeechTests", "BrowserWebURLTests", "FaceMatchCeilingTests"),
+              "EarbudsModeSpeechTests", "BrowserWebURLTests", "BrowserAgentStepBeatTests", "FaceMatchCeilingTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",

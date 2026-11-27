@@ -7,8 +7,10 @@ import ZeusCore
 /// one-shot to the brain the router picks (the CLI logins Tony already has: Claude, Codex, Gemini,
 /// Cursor Agent, Grok, Ollama; or the Any LLM endpoint), pinned to ModelCap's fast tier. A notch
 /// card shows the goal, step n/max and what it is doing, with a Stop button; Esc or saying "stop"
-/// ends it too. Risky steps always wait for Tony's yes on their own card; the rest go through the
-/// per-site consent the indexed actions already use.
+/// ends it too. A real step is also spoken, and the spark keeps that step's short line. Looking
+/// and waiting for approval stay on the spark without a second speech. Risky steps always wait
+/// for Tony's yes on their own card; the rest go through the per-site consent the indexed actions
+/// already use.
 @MainActor
 final class BrowserAgentRunner {
     static let shared = BrowserAgentRunner()
@@ -18,6 +20,10 @@ final class BrowserAgentRunner {
     var chrome: ChromeActions?
     /// Speaks and captions a line (VoiceTurnController.say).
     var say: (String) -> Void = { _ in }
+    /// The short line beside the spark while a step runs.
+    var showSpark: (String) -> Void = { _ in }
+    /// Clears the step line when the run ends.
+    var hideSpark: () -> Void = {}
 
     private(set) var isRunning = false
     private let stopFlag = StopFlag()
@@ -112,7 +118,7 @@ final class BrowserAgentRunner {
             },
             shouldStop: { flag.isSet },
             progress: { @MainActor [weak self] progress in
-                self?.showCard(step: progress.step, maxSteps: progress.maxSteps, action: progress.action)
+                self?.narrate(progress, speak: speak)
             }
         )
         let task = Task { () -> BrowserAgentOutcome in
@@ -207,6 +213,14 @@ final class BrowserAgentRunner {
 
     // MARK: Card and voice
 
+    /// The notch card names the step. A real step is spoken, and the spark keeps the short line.
+    private func narrate(_ progress: BrowserAgentProgress, speak: Bool) {
+        showCard(step: progress.step, maxSteps: progress.maxSteps, action: progress.action)
+        let beat = BrowserAgentStepBeat.make(step: progress.step, maxSteps: progress.maxSteps, action: progress.action)
+        if speak, let spoken = beat.spoken { say(spoken) }
+        showSpark(beat.bolt)
+    }
+
     private func showCard(step: Int, maxSteps: Int, action: String) {
         guard let notch else { return }
         let project = "step \(step)/\(maxSteps) · \(goal.count > 48 ? String(goal.prefix(47)) + "…" : goal)"
@@ -242,6 +256,7 @@ final class BrowserAgentRunner {
             }
         }
         AvatarStatus.shared.flash(outcome.succeeded ? .done : .error, for: 2)
+        hideSpark()
         if speak { say(spoken) }
         return outcome
     }
