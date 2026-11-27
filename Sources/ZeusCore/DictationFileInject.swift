@@ -60,7 +60,7 @@ public enum DictationFileInject {
         if let failureMessage, !failureMessage.isEmpty {
             return "ERROR \(failureMessage)"
         }
-        let trimmed = resultText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = DictationFileInjectBox.trimmedText(resultText)
         guard inserted, !trimmed.isEmpty else { return "ERROR nothing inserted" }
         return "ok"
     }
@@ -76,8 +76,8 @@ public enum DictationFileInject {
     public static func fieldMatches(_ field: String?, expected: String) -> Bool {
         guard let field, !field.isEmpty else { return false }
         let cleanedField = field.lowercased().replacingOccurrences(of: ".", with: "")
-        let cleanedExpected = expected.lowercased().replacingOccurrences(of: ".", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedExpected = DictationFileInjectBox.trimmedText(
+            expected.lowercased().replacingOccurrences(of: ".", with: ""))
         guard cleanedExpected.count >= 4 else { return false }
         return cleanedField.contains(cleanedExpected)
     }
