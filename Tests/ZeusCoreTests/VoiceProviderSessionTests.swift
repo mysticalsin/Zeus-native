@@ -231,6 +231,7 @@ private final class FakeLocalVoice: LocalVoiceSpeaking, @unchecked Sendable {
 private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var seen: [ProviderHTTPRequest] = []
+    private var firstByteMs: Int?
     var streamStatus = 200
     var streamError: ProviderFailure?
     var holdStreams = false
@@ -261,6 +262,11 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
         return ProviderHTTPResponse(status: 200, body: Data("{}".utf8))
     }
 
+    func preparedFirstByteMs() -> Int? {
+        lock.lock(); defer { lock.unlock() }
+        return firstByteMs
+    }
+
     func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error> {
         remember(request)
         let status = streamStatus
@@ -277,9 +283,14 @@ private final class ScriptedVoiceTransport: ProviderHTTPTransport, @unchecked Se
             }
             continuation.yield(.status(status))
             if (200...299).contains(status) {
+                self.noteFirstByte(0)
                 continuation.yield(.chunk(VoiceProviderFakeAudio.wavSilence()))
             }
             continuation.finish()
         }
+    }
+
+    private func noteFirstByte(_ ms: Int) {
+        lock.lock(); if firstByteMs == nil { firstByteMs = ms }; lock.unlock()
     }
 }

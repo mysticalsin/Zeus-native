@@ -421,6 +421,7 @@ private final class JourneyTransport: ProviderHTTPTransport, @unchecked Sendable
     private var seen: [ProviderHTTPRequest] = []
     private var flight = 0
     private var overlap = 0
+    private var firstByteMs: Int?
     var validateStatus = 200
     var speakStatus = 200
     var holdStreams = false
@@ -453,18 +454,30 @@ private final class JourneyTransport: ProviderHTTPTransport, @unchecked Sendable
         return ProviderHTTPResponse(status: 200, body: Data("{}".utf8))
     }
 
+    func preparedFirstByteMs() -> Int? {
+        lock.lock(); defer { lock.unlock() }
+        return firstByteMs
+    }
+
     func stream(_ request: ProviderHTTPRequest) -> AsyncThrowingStream<ProviderStreamEvent, Error> {
         remember(request)
         lock.lock()
         flight += 1
         if flight > overlap { overlap = flight }
-        lock.unlock()
         let status = speakStatus
         let hold = holdStreams
         let down = offline
         let cut = truncate
         let junk = invalidAudio
         let delay = delayMs
+        lock.unlock()
+        if delay == 0, !hold, !down {
+            defer { endFlight() }
+            return AsyncThrowingStream { continuation in
+                self.emit(status: status, cut: cut, junk: junk, delay: 0, continuation: continuation)
+            }
+        }
+        let started = ContinuousClock.now
         return AsyncThrowingStream { continuation in
             let task = Task {
                 defer { self.endFlight() }
@@ -478,27 +491,38 @@ private final class JourneyTransport: ProviderHTTPTransport, @unchecked Sendable
                     continuation.finish(throwing: ProviderFailure.cancelled)
                     return
                 }
-                continuation.yield(.status(status))
-                guard (200...299).contains(status) else {
-                    continuation.finish()
-                    return
-                }
-                if junk {
-                    continuation.yield(.chunk(Data("NOPE".utf8)))
-                    continuation.finish()
-                    return
-                }
-                let wav = VoiceProviderFakeAudio.wavSilence()
-                if cut {
-                    continuation.yield(.chunk(Data(wav.prefix(8))))
-                    continuation.finish(throwing: ProviderFailure.invalidResponse)
-                    return
-                }
-                continuation.yield(.chunk(wav))
-                continuation.finish()
+                self.emit(status: status, cut: cut, junk: junk, delay: ProviderClock.milliseconds(since: started), continuation: continuation)
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    private func emit(status: Int, cut: Bool, junk: Bool, delay: Int, continuation: AsyncThrowingStream<ProviderStreamEvent, Error>.Continuation) {
+        continuation.yield(.status(status))
+        guard (200...299).contains(status) else {
+            continuation.finish()
+            return
+        }
+        if junk {
+            noteFirstByte(delay)
+            continuation.yield(.chunk(Data("NOPE".utf8)))
+            continuation.finish()
+            return
+        }
+        let wav = VoiceProviderFakeAudio.wavSilence()
+        if cut {
+            noteFirstByte(delay)
+            continuation.yield(.chunk(Data(wav.prefix(8))))
+            continuation.finish(throwing: ProviderFailure.invalidResponse)
+            return
+        }
+        noteFirstByte(delay)
+        continuation.yield(.chunk(wav))
+        continuation.finish()
+    }
+
+    private func noteFirstByte(_ ms: Int) {
+        lock.lock(); if firstByteMs == nil { firstByteMs = ms }; lock.unlock()
     }
 
     private func remember(_ request: ProviderHTTPRequest) {
