@@ -130,7 +130,7 @@ final class PointingController {
     private var stale: PointingStaleTarget?
     private var watchedQuartzPoint: CGPoint?
     private var staleWork: Task<Void, Never>?
-    private var inkTrail = PointingInkTrail()
+    private var inkTrail = VisualInk()
     private var traceEmitted = true
     private var systemObservers: [NSObjectProtocol] = []
 
@@ -546,7 +546,7 @@ final class PointingController {
     private func startInk() {
         guard !MarkOverlay.shared.capturesMouse else { return }
         inkOwner = true
-        inkTrail = PointingInkTrail()
+        inkTrail.reset()
         MarkModel.shared.strokes = []
         MarkModel.shared.inkColor = PointingInkColor.current()
         // Click-through on purpose: the overlay never takes mouse events, so the app under the
@@ -560,7 +560,7 @@ final class PointingController {
         MarkOverlay.shared.hide()
         MarkModel.shared.strokes = []
         MarkModel.shared.inkColor = nil
-        inkTrail = PointingInkTrail()
+        inkTrail.reset()
     }
 
     /// Test seam for the self-test: a synthetic press, drag and release become pointer samples.
