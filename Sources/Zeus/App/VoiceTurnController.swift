@@ -955,6 +955,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws the screen-recording notice on the display under the pointer.
+    /// The caller speaks the full line. Other sentences are not this card.
+    private func showScreenSight(_ plan: ScreenSightDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyScreenSight(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyScreenSight(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyScreenSight(_ plan: ScreenSightDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws a named agent's kept note on the display under the pointer.
     /// The caller speaks the full line. A refusal card has no note on it.
     private func showAgentNote(_ plan: AgentNoteDraw, speak: Bool) {
@@ -2464,12 +2496,24 @@ final class VoiceTurnController {
             buddy.showCaption(Self.captionTail(spoken))
             buddy.hideCaption()
             // No Screen Recording: one log line and one plain notice per launch, never a permission prompt mid-turn.
-            if owesSightNotice, let notice = sightNotice.take(permissionGranted: false) {
+            let sightLine = owesSightNotice ? sightNotice.take(permissionGranted: false) : nil
+            if sightLine != nil {
                 VoiceLog.log("screen", "Screen Recording is off, so Zeus cannot see the screen; owner told once this launch")
                 NSLog("[ZEUS] screen sight: Screen Recording permission is off (told the owner once this launch)")
-                if speak { speaker.speak(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }
             }
             if !pointed { buddy.idle() }
+            if let notice = sightLine {
+                if let visual = ScreenSightDraw.from(message: notice) {
+                    showScreenSight(visual, speak: speak)
+                    if speak { speaker.speak(notice) } else { buddy.showCaption(notice); buddy.hideCaption() }
+                    buddy.showCaption(visual.boltCaption(at: 0))
+                } else if speak {
+                    speaker.speak(notice)
+                } else {
+                    buddy.showCaption(notice)
+                    buddy.hideCaption()
+                }
+            }
             if !result.actions.isEmpty { AvatarStatus.shared.flash(.done, for: 2) }
             // Defense in depth: a tag or control code split oddly across streamed chunks could
             // dodge the per-chunk pass above; run it once more now that the full reply is in hand.
