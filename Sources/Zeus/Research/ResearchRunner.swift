@@ -21,6 +21,8 @@ final class ResearchRunner {
     var showSources: (ResearchSourceDraw, Bool) -> Void = { _, _ in }
     /// Draws a saved report when there are no source sites. The voice says the line.
     var showReportSaved: (ReportSavedDraw, String, Bool) -> Void = { _, _, _ in }
+    /// Draws the ask when there is nothing to research. The voice says the line.
+    var showResearchAsk: (ResearchAskDraw, String, Bool) -> Void = { _, _, _ in }
 
     private(set) var isRunning = false
     private var task: Task<(ResearchReport.Parsed?, String, String?), Never>?
@@ -184,6 +186,8 @@ final class ResearchRunner {
             if speak, !outcome.spoken.isEmpty { say(outcome.spoken) }
         } else if let saved = ReportSavedDraw.from(line: outcome.spoken) {
             showReportSaved(saved, outcome.spoken, speak && !outcome.spoken.isEmpty)
+        } else if let ask = ResearchAskDraw.from(line: outcome.spoken) {
+            showResearchAsk(ask, outcome.spoken, speak && !outcome.spoken.isEmpty)
         } else if speak, !outcome.spoken.isEmpty {
             say(outcome.spoken)
         }
