@@ -124,6 +124,19 @@ import Testing
         #expect(only.guideBolt(at: 0) == nil)
     }
 
+    @Test func aRingWithNoSizeDoesNotTakeTheBolt() {
+        let card = TalkDraw.Mark(shape: .card(origin: .init(x: 40, y: 50), text: "Here"), at: 0)
+        for radius in [0.0, -4, .nan, .infinity] {
+            let ring = TalkDraw.Mark(shape: .ring(center: .init(x: 10, y: 12), radius: radius), at: 0)
+            let showcase = ExplainShowcase(
+                sentences: ["Here."],
+                draw: TalkDraw(screen: 1, marks: [ring, card]),
+                travels: false,
+                schedule: ExplainBeatSchedule(indexes: [0]))
+            #expect(showcase.guideBolt(at: 0) == TalkDraw.Point(x: 40, y: 50))
+        }
+    }
+
     @Test func aMovingExplainKeepsTheBoltOnThePenTip() throws {
         let showcase = try #require(ExplainShowcase.plan(for: Self.tesla))
         let frame = try #require(showcase.penFrame(at: 0))

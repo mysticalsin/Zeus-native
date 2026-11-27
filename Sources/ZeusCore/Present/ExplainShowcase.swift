@@ -83,7 +83,8 @@ public struct ExplainShowcase: Equatable, Sendable {
     private static func anchor(of mark: TalkDraw.Mark) -> TalkDraw.Point? {
         let point: TalkDraw.Point
         switch mark.shape {
-        case .ring(let center, _):
+        case .ring(let center, let radius):
+            guard radius.isFinite, radius > 0 else { return nil }
             point = center
         case .arrow(let from, let to):
             point = .init(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
