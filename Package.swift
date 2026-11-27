@@ -40,10 +40,10 @@ let package = Package(
             "CZeusVisual",
             .product(name: "FluidAudio", package: "FluidAudio"),
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
-        ], linkerSettings: visualLink, resources: [
+        ], resources: [
             .copy("Avatar/Poses"), .copy("Avatar/Anim"), .copy("Fonts"),
             .copy("Onboarding/Media"), .copy("Integrations/Brands"), .copy("Sounds"), .copy("Personality"),
-        ]),
+        ], linkerSettings: visualLink),
         .executableTarget(name: "zeus-hook", dependencies: ["ZeusCore"]),
         .executableTarget(name: "zeus-bridge", dependencies: ["ZeusCore"]),
         // Installed as `zeus` (a `zeus` target would clash with `Zeus` on a case-insensitive disk).
