@@ -96,7 +96,7 @@ public struct ZeusWatchRegistry: Codable, Equatable, Sendable {
     public mutating func add(_ watch: ZeusWatch) { watches.append(watch) }
 
     public mutating func stop(label: String) {
-        let needle = label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let needle = ZeusWatchBox.trimmedLabel(label).lowercased()
         watches.removeAll { $0.label.lowercased().contains(needle) || (needle == "watching" && !$0.label.isEmpty) }
         if needle == "watching" || needle == "all" { watches.removeAll() }
     }
