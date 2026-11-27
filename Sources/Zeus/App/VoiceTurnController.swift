@@ -955,6 +955,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws a spoken answer failure on the display under the pointer.
+    /// The caller speaks the full line. Other sentences are not this card.
+    private func showAnswerFail(_ plan: AnswerFailDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAnswerFail(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAnswerFail(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAnswerFail(_ plan: AnswerFailDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws the screen-recording notice on the display under the pointer.
     /// The caller speaks the full line. Other sentences are not this card.
     private func showScreenSight(_ plan: ScreenSightDraw, speak: Bool) {
@@ -2539,7 +2571,16 @@ final class VoiceTurnController {
             ZeusSound.play(.voiceError)
             AvatarStatus.shared.flash(.error, for: 3)
             result.error = message
-            if speak { say(message) } else { buddy.showCaption(message); buddy.hideCaption() }
+            if let visual = AnswerFailDraw.from(message: message) {
+                showAnswerFail(visual, speak: speak)
+                if speak { say(message) } else { buddy.showCaption(message); buddy.hideCaption() }
+                buddy.showCaption(visual.boltCaption(at: 0))
+            } else if speak {
+                say(message)
+            } else {
+                buddy.showCaption(message)
+                buddy.hideCaption()
+            }
         }
         result.spoken = PersonaReplyClamp.clamp(ResponseSanitizer.sanitize(spoken), transcript: transcript,
                                                  personality: ZeusPersonality.current())
