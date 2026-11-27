@@ -438,8 +438,13 @@ struct KokoroWorkerSessionTests {
             let session = fixture.session()
             let task = fixture.render(session, "hang")
             let marker = fixture.directory.appendingPathComponent("started-hang")
-            try await wait { FileManager.default.fileExists(atPath: marker.path) }
-            let pid = try #require(Int32(try String(contentsOf: marker, encoding: .utf8)))
+            var worker: Int32?
+            try await wait {
+                guard let text = try? String(contentsOf: marker, encoding: .utf8) else { return false }
+                worker = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines))
+                return worker != nil
+            }
+            let pid = try #require(worker)
             let began = ContinuousClock.now
             task.cancel()
             #expect(await task.value == nil)

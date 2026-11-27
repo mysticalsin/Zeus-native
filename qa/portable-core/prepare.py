@@ -61,7 +61,7 @@ GROUPS = {
     ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift", "Wiki/SensitiveInfoScanner.swift",
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
              "SecondBrain/SecondBrain.swift", "SecondBrain/VaultPathBoundary.swift", "JSONValue.swift",
@@ -155,7 +155,7 @@ GROUPS = {
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
     # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
@@ -177,7 +177,7 @@ GROUPS = {
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift",
              "Wiki/WikiStore.swift", "Wiki/SensitiveInfoScanner.swift"),
         tests("WikiTests"),
     ),
