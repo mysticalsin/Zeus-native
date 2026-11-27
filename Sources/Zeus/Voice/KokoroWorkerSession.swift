@@ -395,6 +395,9 @@ actor KokoroWorkerSession {
             return true
         }
         process.terminate()
+        // terminate() can wait on a busy run loop. Deliver SIGTERM now so an
+        // EXIT trap runs before the SIGKILL backstop.
+        if process.processIdentifier > 0 { _ = kill(process.processIdentifier, SIGTERM) }
         for _ in 0..<25 where process.isRunning { try? await Task.sleep(for: .milliseconds(10)) }
         if process.isRunning { _ = kill(process.processIdentifier, SIGKILL) }
         for _ in 0..<100 where process.isRunning { try? await Task.sleep(for: .milliseconds(10)) }

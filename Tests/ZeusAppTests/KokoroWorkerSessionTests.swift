@@ -876,10 +876,12 @@ struct KokoroWorkerSessionTests {
             try await withFixture { fixture in
                 // Shell builtins only: this guard owns one process, with no descendant-cleanup claim.
                 let script = """
-                trap 'if [ -d "$1" ]; then printf present > "$2"; else printf removed > "$2"; fi' EXIT
-                trap 'exit 0' TERM
-                printf '%s' "$$" > "$1/cleanup-started"
-                printf ready > "$1/cleanup-ready"
+                fixture_dir=$1
+                proof_path=$2
+                trap 'if [ -d "$fixture_dir" ]; then printf present > "$proof_path"; else printf removed > "$proof_path"; fi' EXIT
+                trap 'if [ -d "$fixture_dir" ]; then printf present > "$proof_path"; else printf removed > "$proof_path"; fi; exit 0' TERM
+                printf '%s' "$$" > "$fixture_dir/cleanup-started"
+                printf ready > "$fixture_dir/cleanup-ready"
                 while IFS= read -r line; do :; done
                 """
                 let directory = fixture.directory
@@ -903,6 +905,7 @@ struct KokoroWorkerSessionTests {
         let (fixture, session, task, pid) = try #require(captured)
         // The task callback and child EXIT trap both observed the directory before deletion.
         #expect(completed.snapshot.contains { $0.hasSuffix(" directory-present") })
+        try await wait(for: .seconds(2)) { FileManager.default.fileExists(atPath: proof.path) }
         #expect(try String(contentsOf: proof, encoding: .utf8) == "present")
         #expect(await task.value == nil)
         #expect(await session.isRunning == false)
