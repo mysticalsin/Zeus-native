@@ -743,7 +743,8 @@ final class PointingController {
             flightLaunched = true
             metrics.flightStartAt = services.now()
             metrics.flightUsedFallback = fallback
-            admitLiveGuide(id: ring.id, bolt: bolt, caption: caption)
+            admitLiveGuide(id: ring.id, bolt: bolt, caption: caption, imageCenter: ring.transform.position,
+                           radius: ring.geometry.radius ?? 22, capture: capture)
         }
     }
 
@@ -778,9 +779,15 @@ final class PointingController {
         return true
     }
 
-    private func admitLiveGuide(id: String, bolt: CGPoint, caption: String) {
+    private func admitLiveGuide(id: String, bolt: CGPoint, caption: String, imageCenter: ExplanationVector3,
+                                radius: Double, capture: ExplanationCaptureContext) {
         guard session.state == .speaking else { return }
-        let ring = CGRect(x: bolt.x - 28, y: bolt.y - 18, width: 56, height: 36)
+        let ring: CGRect
+        if let mapped = capture.geometry.globalRing(center: imageCenter, radius: radius, current: capture.currentDisplay) {
+            ring = CGRect(x: mapped.x, y: mapped.y, width: mapped.width, height: mapped.height)
+        } else {
+            ring = CGRect(x: bolt.x - 28, y: bolt.y - 18, width: 56, height: 36)
+        }
         guard let plan = PointerGuideAdmission.step(id: id, bolt: bolt, ring: ring, caption: caption, reduceMotion: explanation.reduceMotion) else { return }
         _ = session.admitGuide(plan)
     }

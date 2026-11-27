@@ -16,6 +16,8 @@ struct ExplanationCoordinatesTests {
         #expect(mapped.x == -1170) // (400 + 100) * 1920/1280, NOT stretched across the full display.
         #expect(mapped.y == 580)
         #expect(capture.imagePoint(fromGlobal: mapped, current: screen) == point)
+        let ring = try #require(capture.globalRing(center: point, radius: 10, current: screen))
+        #expect(ring == .init(x: -1200, y: 550, width: 60, height: 60))
         #expect(capture.imagePoint(fromGlobal: .init(x: -1919, y: 879), current: screen) == nil)
     }
     @Test func backingScaleDoesNotReplaceDeliveredScreenshotPixelDimensions() throws {
