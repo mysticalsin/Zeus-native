@@ -2,6 +2,19 @@ import Testing
 @testable import ZeusCore
 
 @Suite struct PlayDemoScriptTests {
+    @Test func theListeningAndThinkingBeatsAreSpokenAndShown() {
+        for step in [PlayDemoScript.listening, PlayDemoScript.thinking] {
+            #expect(PlayDemoScript.ready(step))
+            #expect(step.showsOnScreen)
+            #expect(PointerGuideCaptionSplit.boltText(step.bolt) == step.bolt)
+            #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
+        }
+        #expect(PlayDemoScript.listening.bolt == "Listening")
+        #expect(PlayDemoScript.thinking.bolt == "Thinking")
+        #expect(PlayDemoScript.listening.spoken == "Hold the talk key, then speak. I'll listen.")
+        #expect(PlayDemoScript.thinking.spoken == "One moment. I'm working out what to show you.")
+    }
+
     @Test func theMenuBarDemoIsSpokenAndShown() {
         let step = PlayDemoScript.menuBar
         #expect(PlayDemoScript.ready(step))

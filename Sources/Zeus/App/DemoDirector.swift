@@ -42,9 +42,11 @@ final class DemoDirector {
         buddy.idle()
         guard await pause(1.2) else { return }
 
-        // 1. Voice turn: hold the key, talk, release.
+        // 1. Voice turn: hold the key, talk, release. The spark shows the mode and the voice says it.
+        say(PlayDemoScript.listening.spoken)
         buddy.listen()
         guard await pause(2.6) else { return }
+        say(PlayDemoScript.thinking.spoken)
         buddy.think()
         guard await pause(1.2) else { return }
 

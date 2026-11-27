@@ -16,6 +16,18 @@ public enum PlayDemoScript {
         }
     }
 
+    public static let listening = Step(
+        spoken: "Hold the talk key, then speak. I'll listen.",
+        bolt: "Listening",
+        showsOnScreen: true
+    )
+
+    public static let thinking = Step(
+        spoken: "One moment. I'm working out what to show you.",
+        bolt: "Thinking",
+        showsOnScreen: true
+    )
+
     public static let menuBar = Step(
         spoken: "That's me up here. Click the bolt anytime.",
         bolt: "Click the bolt anytime",
