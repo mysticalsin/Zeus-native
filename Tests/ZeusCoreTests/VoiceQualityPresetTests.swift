@@ -293,11 +293,11 @@ struct VoiceQualityPresetTests {
                 return VoiceQualityError.publicName(error)
             }
         }
-        #expect(HangURLStub.waitUntilStarted(timeout: 3))
+        #expect(await HangURLStub.waitUntilStarted(timeout: 3))
         synthesis.cancel()
         let name = await finished.value
         #expect(name == ProviderFailure.cancelled.logName)
-        #expect(HangURLStub.waitUntilStopped(timeout: 2))
+        #expect(await HangURLStub.waitUntilStopped(timeout: 2))
     }
 
     @Test func http401429And5xxUseTheExistingFallbackOrder() async throws {
@@ -504,22 +504,29 @@ final class HangURLStub: URLProtocol, @unchecked Sendable {
         started.unlock()
     }
 
-    static func waitUntilStarted(timeout: TimeInterval) -> Bool {
-        wait(timeout: timeout) { didStartFlag }
+    static func waitUntilStarted(timeout: TimeInterval) async -> Bool {
+        await poll(timeout: timeout) { didStartFlag }
     }
 
-    static func waitUntilStopped(timeout: TimeInterval) -> Bool {
-        wait(timeout: timeout) { didStopFlag }
+    static func waitUntilStopped(timeout: TimeInterval) async -> Bool {
+        await poll(timeout: timeout) { didStopFlag }
     }
 
-    private static func wait(timeout: TimeInterval, until flag: () -> Bool) -> Bool {
-        started.lock()
-        defer { started.unlock() }
-        let deadline = Date().addingTimeInterval(timeout)
-        while !flag() {
-            if !started.wait(until: deadline) { return flag() }
+    /// Polls without holding a cooperative thread. A blocking condition wait keeps the
+    /// URL task from being scheduled, so the stub never starts and never stops.
+    private static func poll(timeout: TimeInterval, until flag: () -> Bool) async -> Bool {
+        let steps = max(1, Int(timeout / 0.02))
+        for _ in 0..<steps {
+            started.lock()
+            let ready = flag()
+            started.unlock()
+            if ready { return true }
+            try? await Task.sleep(for: .milliseconds(20))
         }
-        return true
+        started.lock()
+        let ready = flag()
+        started.unlock()
+        return ready
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
