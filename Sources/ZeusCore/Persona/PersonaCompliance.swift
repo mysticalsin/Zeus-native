@@ -71,7 +71,7 @@ public enum PersonaCompliance {
     private static func strip(hedgeIn sentence: String) -> String {
         guard let regex = hedgePattern else { return sentence }
         let trailingSpace = String(sentence.reversed().prefix { $0.isWhitespace }.reversed())
-        let core = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+        let core = PersonaComplianceBox.trimmedSentence(sentence)
         let range = NSRange(core.startIndex..., in: core)
         guard let match = regex.firstMatch(in: core, range: range), let whole = Range(match.range, in: core) else {
             return sentence
