@@ -64,6 +64,24 @@ public enum PlayDemoScript {
         showsOnScreen: true
     )
 
+    public static let panel = Step(
+        spoken: "Codex and Cursor are working too. I'll open the panel.",
+        bolt: "More agents",
+        showsOnScreen: true
+    )
+
+    public static let peek = Step(
+        spoken: "Here's Codex. It's writing tests for checkout.",
+        bolt: "Codex",
+        showsOnScreen: true
+    )
+
+    public static let closed = Step(
+        spoken: "That's the tour. I'll put the notch away.",
+        bolt: "Closed",
+        showsOnScreen: true
+    )
+
     /// Ready when the step is drawn and the bolt line is a caption the overlay can show.
     public static func ready(_ step: Step) -> Bool {
         guard step.showsOnScreen, !step.spoken.isEmpty else { return false }

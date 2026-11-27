@@ -96,15 +96,18 @@ final class DemoDirector {
         }
         guard await pause(2.0) else { return }
 
-        // 6. More agents, then the full panel.
+        // 6. More agents, then the full panel, one peek, then close. Each beat is spoken.
         notch.startSession(id: "codex", agent: "Codex", project: "website", task: "write tests for checkout")
         notch.startSession(id: "cursor", agent: "Cursor", project: "api", task: "refactor auth middleware")
         notch.update(sessionID: "cursor", status: .done)
+        narrate(PlayDemoScript.panel)
         notch.show(.panel)
         guard await pause(6.0) else { return }
         notch.model.peekSessionID = "codex"
+        narrate(PlayDemoScript.peek)
         notch.show(.peek)
         guard await pause(1.5) else { return }
+        narrate(PlayDemoScript.closed)
         notch.show(.closed)
     }
 }

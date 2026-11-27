@@ -61,6 +61,21 @@ import Testing
         #expect(PlayDemoScript.denied.spoken == "Denied. I left that command alone, so nothing was removed.")
     }
 
+    @Test func thePanelPeekAndCloseAreSpokenAndShown() {
+        for step in [PlayDemoScript.panel, PlayDemoScript.peek, PlayDemoScript.closed] {
+            #expect(PlayDemoScript.ready(step))
+            #expect(step.showsOnScreen)
+            #expect(PointerGuideCaptionSplit.boltText(step.bolt) == step.bolt)
+            #expect(PointerGuideCaptionSplit.boltText(step.spoken) == nil)
+        }
+        #expect(PlayDemoScript.panel.bolt == "More agents")
+        #expect(PlayDemoScript.peek.bolt == "Codex")
+        #expect(PlayDemoScript.closed.bolt == "Closed")
+        #expect(PlayDemoScript.panel.spoken == "Codex and Cursor are working too. I'll open the panel.")
+        #expect(PlayDemoScript.peek.spoken == "Here's Codex. It's writing tests for checkout.")
+        #expect(PlayDemoScript.closed.spoken == "That's the tour. I'll put the notch away.")
+    }
+
     @Test func aStepThatIsNotDrawnIsNotReady() {
         let spokenOnly = PlayDemoScript.Step(
             spoken: "Click the bolt anytime",
