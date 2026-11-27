@@ -105,11 +105,11 @@ GROUPS = {
               "ScribeDetectorPlanTests", "ScribeMeetingCardDesignTests"),
     ),
     "presentation": (
-        core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
+        core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift", "Mac/DriveStepBeat.swift",
              "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Voice/MiddleBarTone.swift",
              "ThemeTokens.swift", "Performance/DisplayAnimationPolicy.swift",
              "TopBar/RecordingFeedback.swift"),
-        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
+        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests", "DriveStepBeatTests"),
     ),
     "explain-showcase": (
         core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift", "Present/ResearchSourceDraw.swift"),

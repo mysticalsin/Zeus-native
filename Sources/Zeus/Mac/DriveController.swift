@@ -21,6 +21,11 @@ final class DriveController {
     /// What a readClipboard step read, for {clipboard} in later steps of the same plan.
     private var clipboardText: String?
     weak var notch: NotchController?
+    /// Speaks a step as it runs.
+    var say: (String) -> Void = { _ in }
+    /// The short line beside the spark while the step runs.
+    var showSpark: (String) -> Void = { _ in }
+    var hideSpark: () -> Void = {}
 
     static var autonomy: DriveAutonomy {
         DriveAutonomy(rawValue: UserDefaults.standard.string(forKey: DriveAutonomy.settingsKey) ?? "") ?? .default
@@ -43,6 +48,7 @@ final class DriveController {
             isDriving = false
             clipboardText = nil
             stopEscWatch()
+            hideSpark()
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(600))
                 if !self.isDriving { MarkModel.shared.trail = []; MarkOverlay.shared.hide() }
@@ -67,6 +73,9 @@ final class DriveController {
             let step = clipboardText.map { planned.filling(clipboard: $0) } ?? planned
             // The approval card contains the content; the system log must not copy typed text or labels.
             log("step \(index + 1)/\(plan.steps.count)")
+            let beat = DriveStepBeat.make(index: index + 1, count: plan.steps.count, step: step)
+            if let spoken = beat.spoken { say(spoken) }
+            showSpark(beat.bolt)
             var failure = await run(step, screenshots: screenshots, relocate: resnapshotted)
             if let error = failure, error.retrySafe, !shouldStop {
                 log("step \(index + 1): \(error.kind.rawValue), nothing done; once more after a new snapshot")

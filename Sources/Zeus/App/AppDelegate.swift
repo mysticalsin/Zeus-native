@@ -1245,6 +1245,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Show-me drawing, drive mode and walkthroughs share the notch, the spark and the voice.
     private func startMacControl() {
         DriveController.shared.notch = notch
+        DriveController.shared.say = { [weak self] text in self?.voice.say(text) }
+        DriveController.shared.showSpark = { [weak self] text in self?.buddy.showCaption(text) }
+        DriveController.shared.hideSpark = { [weak self] in self?.buddy.hideCaption() }
         BrowserAgentRunner.shared.notch = notch
         BrowserAgentRunner.shared.chrome = voice?.chrome
         BrowserAgentRunner.shared.say = { [weak self] text in self?.voice.say(text) }
