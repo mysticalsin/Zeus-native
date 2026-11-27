@@ -916,6 +916,38 @@ final class VoiceTurnController {
         }
     }
 
+    /// Draws a media key on the display under the pointer: Media, then the action.
+    /// The caller speaks the full line.
+    private func showMedia(_ plan: MediaDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyMedia(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyMedia(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyMedia(_ plan: MediaDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// Draws an app open or switch on the display under the pointer. The caller speaks the full line.
     /// A site summary is left for the site card.
     private func showAppLaunch(_ plan: AppLaunchDraw, speak: Bool) {
@@ -1132,6 +1164,10 @@ final class VoiceTurnController {
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if case .openApp = plan.intent, let visual = AppLaunchDraw.from(summary: plan.summary) {
                     self.showAppLaunch(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if case .media(let command) = plan.intent, let visual = MediaDraw.plan(action: command.rawValue) {
+                    self.showMedia(visual, speak: speak)
                     if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
                     self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if speak {
