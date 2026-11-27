@@ -51,30 +51,50 @@ public struct ExplainShowcase: Equatable, Sendable {
     /// Where the bolt sits at `elapsed`. A moving ask follows the pen tip. A still ask
     /// sits on the newest mark: a ring, then an arrow, then the ink, then a card.
     public func guideBolt(at elapsed: TimeInterval) -> TalkDraw.Point? {
-        if travels { return penFrame(at: elapsed)?.bolt }
+        if travels {
+            guard let bolt = penFrame(at: elapsed)?.bolt, Self.finite(bolt) else { return nil }
+            return bolt
+        }
         let shown = Set(schedule.revealed(at: elapsed))
         let marks = draw.marks.filter { shown.contains($0.at) }
         guard let beat = marks.map(\.at).max() else { return nil }
         let atBeat = marks.filter { $0.at == beat }
-        for mark in atBeat {
-            if case .ring = mark.shape { return Self.anchor(of: mark) }
+        let placed = atBeat.compactMap { mark -> (Int, TalkDraw.Point)? in
+            guard let point = Self.anchor(of: mark) else { return nil }
+            return (Self.preference(mark), point)
         }
-        for mark in atBeat {
-            if case .arrow = mark.shape { return Self.anchor(of: mark) }
+        return placed.min { $0.0 < $1.0 }?.1
+    }
+
+    /// A ring is the place to land. An arrow, the ink, then a card follow.
+    private static func preference(_ mark: TalkDraw.Mark) -> Int {
+        switch mark.shape {
+        case .ring: return 0
+        case .arrow: return 1
+        case .ink: return 2
+        case .card: return 3
         }
-        for mark in atBeat {
-            if case .ink = mark.shape { return Self.anchor(of: mark) }
-        }
-        return atBeat.last.flatMap(Self.anchor(of:))
+    }
+
+    private static func finite(_ point: TalkDraw.Point) -> Bool {
+        point.x.isFinite && point.y.isFinite
     }
 
     private static func anchor(of mark: TalkDraw.Mark) -> TalkDraw.Point? {
+        let point: TalkDraw.Point
         switch mark.shape {
-        case .ring(let center, _): return center
-        case .arrow(let from, let to): return .init(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
-        case .ink(let points): return points.last
-        case .card(let origin, _): return origin
+        case .ring(let center, _):
+            point = center
+        case .arrow(let from, let to):
+            point = .init(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+        case .ink(let points):
+            guard let last = points.last else { return nil }
+            point = last
+        case .card(let origin, _):
+            point = origin
         }
+        guard finite(point) else { return nil }
+        return point
     }
 
     /// The ink visible at `elapsed`. Without audio, one new point every `ExplainBeatSchedule.gap`.

@@ -109,6 +109,21 @@ import Testing
         #expect(schedule.revealed(at: huge) == [0, 1, 2])
     }
 
+    @Test func aNonFiniteMarkDoesNotMoveTheBolt() {
+        let broken = TalkDraw.Mark(shape: .ring(center: .init(x: .nan, y: 12), radius: 8), at: 0)
+        let card = TalkDraw.Mark(shape: .card(origin: .init(x: 40, y: 50), text: "Here"), at: 0)
+        let draw = TalkDraw(screen: 1, marks: [broken, card])
+        let showcase = ExplainShowcase(
+            sentences: ["Here."], draw: draw, travels: false, schedule: ExplainBeatSchedule(indexes: [0]))
+        #expect(showcase.guideBolt(at: 0) == TalkDraw.Point(x: 40, y: 50))
+        let only = ExplainShowcase(
+            sentences: ["Here."],
+            draw: TalkDraw(screen: 1, marks: [broken]),
+            travels: false,
+            schedule: ExplainBeatSchedule(indexes: [0]))
+        #expect(only.guideBolt(at: 0) == nil)
+    }
+
     @Test func aMovingExplainKeepsTheBoltOnThePenTip() throws {
         let showcase = try #require(ExplainShowcase.plan(for: Self.tesla))
         let frame = try #require(showcase.penFrame(at: 0))
