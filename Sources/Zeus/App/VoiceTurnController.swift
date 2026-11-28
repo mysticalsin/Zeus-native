@@ -10592,6 +10592,87 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Narration, or a spoken "how is narration set", says the voice, microphone, caption mode, and Whisper. Names stay unspoken.
+    func sayExplainHear() {
+        presentExplainHear(speak: true)
+    }
+
+    private func answerExplainHear(speak: Bool) -> TurnResult {
+        presentExplainHear(speak: speak)
+        return TurnResult(spoken: explainHearLine())
+    }
+
+    private func presentExplainHear(speak: Bool) {
+        let parts = explainHearParts()
+        let line = ExplainHearAsk.line(voice: parts.voice, mic: parts.mic, caption: parts.caption, whisper: parts.whisper)
+        let plan = ExplainHearDraw.plan(voice: parts.voice, mic: parts.mic, caption: parts.caption, whisper: parts.whisper)
+        buddy.idle()
+        showExplainHear(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved narration voice, the open explanation's microphone, caption mode, and Whisper.
+    /// An empty device list is not a scan. A voice name and a device name are never spoken.
+    private func explainHearParts() -> (voice: String, mic: String, caption: String, whisper: String) {
+        let stored = UserDefaults.standard.string(forKey: ExplanationSystemVoices.preferenceKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let voice: String
+        if stored.isEmpty {
+            voice = "System default"
+        } else if ExplanationSystemVoices.installed().contains(where: { $0.id == stored }) {
+            voice = "Chosen"
+        } else {
+            voice = "Unavailable"
+        }
+        let uid = ExplainHearVoice.microphoneUID()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let mic: String
+        if uid.isEmpty {
+            mic = "System default"
+        } else {
+            let devices = MicrophoneListModel.shared.devices
+            if devices.isEmpty || devices.contains(where: { $0.uid == uid }) { mic = "Chosen" }
+            else { mic = "Unavailable" }
+        }
+        return (voice, mic, ExplainHearVoice.captionOn() ? "On" : "Off", ExplainHearVoice.whisperOn() ? "On" : "Off")
+    }
+
+    private func explainHearLine() -> String {
+        let parts = explainHearParts()
+        return ExplainHearAsk.line(voice: parts.voice, mic: parts.mic, caption: parts.caption, whisper: parts.whisper)
+    }
+
+    /// Draws Narrate, then the four choices. The caller speaks the full line.
+    private func showExplainHear(_ plan: ExplainHearDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyExplainHear(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyExplainHear(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyExplainHear(_ plan: ExplainHearDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11589,6 +11670,11 @@ final class VoiceTurnController {
         }
         if VocabSetupAsk.matches(transcript) {
             let result = answerVocabSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ExplainHearAsk.matches(transcript) {
+            let result = answerExplainHear(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
