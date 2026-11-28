@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// Dictation speaks whether it is enabled, whether its sounds play, and whether voice commands use that engine.
+enum DictateSwitchVoice {
+    static var speakSwitch: () -> Void = {}
+}
+
 /// The Engine picker: every speech-to-text engine, grouped "On this Mac" and "Cloud", each with
 /// its status and one click to Download, Add key or Use. Shown on the Murmure and Dictation pages.
 struct SpeechEngineCard: View {
@@ -20,6 +25,10 @@ struct SpeechEngineCard: View {
                 compactBody
             } else {
                 fullBody
+            }
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether dictation is enabled") { DictateSwitchVoice.speakSwitch() }
             }
             GSDivider()
             if compact, let navigation {
