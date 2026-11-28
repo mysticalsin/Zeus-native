@@ -424,7 +424,10 @@ private struct AppearancePage: View {
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the notch light") { HaloStyle.speakLight() }
             }
             GSRow(symbol: "sparkles", title: "Entrance animation") {
-                GSPopup(selection: HaloChoices.entranceTitle, options: HaloChoices.entrances).popupLabel("Entrance animation")
+                HStack(spacing: 8) {
+                    GSPopup(selection: HaloChoices.entranceTitle, options: HaloChoices.entrances).popupLabel("Entrance animation")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the halo entrance") { HaloEntranceVoice.speakEntrance() }
+                }
             }
             GSDivider()
             GSRow(symbol: "bolt.fill", title: "Entrance intensity") {
@@ -1344,6 +1347,11 @@ enum HudExtraVoice {
 /// The four extra agent sounds speak their switches. Nothing is played.
 enum ExtraSoundVoice {
     static var speakExtra: () -> Void = {}
+}
+
+/// The halo entrance speaks the animation. It does not play it or change it.
+enum HaloEntranceVoice {
+    static var speakEntrance: () -> Void = {}
 }
 
 /// Location, Full Disk Access, and key access speak their states. Nothing is requested.

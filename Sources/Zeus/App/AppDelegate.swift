@@ -423,6 +423,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             LocalAccessVoice.speakLocal = { [weak self] in self?.voice.sayLocalAccess() }
             FastPathVoice.speakPath = { [weak self] in self?.voice.sayFastPath() }
             FlickSetupVoice.speakFlick = { [weak self] in self?.voice.sayFlickSetup() }
+            HaloEntranceVoice.speakEntrance = { [weak self] in self?.voice.sayHaloEntrance() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }
