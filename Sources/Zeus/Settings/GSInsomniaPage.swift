@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The hotspot speaks whether a name is set and whether a password is saved. The name and the password stay unspoken.
+enum HotspotSetupVoice {
+    static var speakHotspot: () -> Void = {}
+}
+
 /// The Insomnia cards speak lid-closed mode, mute, and Low Power Mode. They do not install the rule.
 enum InsomniaSetupVoice {
     static var speakSetup: () -> Void = {}
@@ -94,6 +99,10 @@ struct InsomniaSettingsPage: View {
             }
         }
         GSCard("Hotspot") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the hotspot is set") { HotspotSetupVoice.speakHotspot() }
+            }
             GSRow(symbol: "personalhotspot", title: "iPhone hotspot", text: "If the network drops while the lid is closed, Zeus tries to join it. macOS needs Location access for Zeus to see Wi-Fi names.") {
                 field("iPhone name", text: Binding(get: { insomnia.hotspotSSID }, set: { insomnia.hotspotSSID = $0 }))
             }

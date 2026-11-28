@@ -9679,6 +9679,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The hotspot, or a spoken "how is the hotspot set", says whether a name and a password are saved. Neither is spoken.
+    func sayHotspotSetup() {
+        presentHotspotSetup(speak: true)
+    }
+
+    private func answerHotspotSetup(speak: Bool) -> TurnResult {
+        presentHotspotSetup(speak: speak)
+        return TurnResult(spoken: hotspotSetupLine())
+    }
+
+    private func presentHotspotSetup(speak: Bool) {
+        let parts = hotspotSetupParts()
+        let line = HotspotSetupAsk.line(name: parts.name, password: parts.password)
+        let plan = HotspotSetupDraw.plan(name: parts.name, password: parts.password)
+        buddy.idle()
+        showHotspotSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether a name is stored, and whether launch already found a password. Reading them does not join a network or open the Keychain.
+    private func hotspotSetupParts() -> (name: String, password: String) {
+        let insomnia = InsomniaController.shared
+        let named = insomnia.hotspotSSID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : "Chosen"
+        return (named, insomnia.hasHotspotPassword ? "Saved" : "None")
+    }
+
+    private func hotspotSetupLine() -> String {
+        let parts = hotspotSetupParts()
+        return HotspotSetupAsk.line(name: parts.name, password: parts.password)
+    }
+
+    /// Draws Hotspot, then the name and the password. The caller speaks the full line.
+    private func showHotspotSetup(_ plan: HotspotSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHotspotSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHotspotSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHotspotSetup(_ plan: HotspotSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10606,6 +10669,11 @@ final class VoiceTurnController {
         }
         if TilingGapAsk.matches(transcript) {
             let result = answerTilingGaps(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HotspotSetupAsk.matches(transcript) {
+            let result = answerHotspotSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
