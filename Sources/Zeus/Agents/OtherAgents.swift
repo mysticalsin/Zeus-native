@@ -81,6 +81,11 @@ enum AgentHookInstaller {
     }
 }
 
+/// The other-agent rows speak whether each one shows in the notch. They do not connect or remove a hook.
+enum HookShowVoice {
+    static var speakHooks: () -> Void = {}
+}
+
 /// Settings rows to connect each agent.
 @MainActor
 @Observable
@@ -109,6 +114,10 @@ struct OtherAgentsSection: View {
 
     var body: some View {
         Section("Other agents") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which other agents show in the notch") { HookShowVoice.speakHooks() }
+            }
             ForEach(AgentHookConfig.Agent.allCases, id: \.self) { agent in
                 Toggle(isOn: Binding(get: { state.installed[agent] == true }, set: { state.set(agent, on: $0) })) {
                     VStack(alignment: .leading, spacing: 2) {
