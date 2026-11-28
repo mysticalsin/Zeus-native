@@ -1093,6 +1093,74 @@ final class VoiceTurnController {
         buddy.showCaption(plan.boltCaption(at: 0))
     }
 
+    /// The Home agents card, or a spoken "what are my agents doing", says who is running and draws it.
+    func sayAgents() {
+        presentAgents(speak: true)
+    }
+
+    private func answerAgents(speak: Bool) -> TurnResult {
+        presentAgents(speak: speak)
+        return TurnResult(spoken: agentStatusLine())
+    }
+
+    private func presentAgents(speak: Bool) {
+        let sessions = notch.model.sessions
+        if sessions.isEmpty {
+            presentNoAgents(speak: speak)
+            return
+        }
+        if sessions.count == 1, let session = sessions.first,
+           let line = AgentStatusAsk.line(name: session.agent, state: Self.agentState(session.status)),
+           let plan = AgentStatusDraw.plan(name: session.agent, state: Self.agentState(session.status)) {
+            buddy.idle()
+            showAgentStatus(plan, speak: speak)
+            if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+            buddy.showCaption(plan.boltCaption(at: 0))
+            return
+        }
+        let working = sessions.filter { $0.status == .working }.count
+        guard let line = AgentStatusAsk.line(count: sessions.count, working: working),
+              let plan = AgentStatusDraw.plan(count: sessions.count, working: working) else {
+            presentNoAgents(speak: speak)
+            return
+        }
+        buddy.idle()
+        showAgentStatus(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func agentStatusLine() -> String {
+        let sessions = notch.model.sessions
+        if sessions.isEmpty { return AgentStatusAsk.none }
+        if sessions.count == 1, let session = sessions.first,
+           let line = AgentStatusAsk.line(name: session.agent, state: Self.agentState(session.status)) {
+            return line
+        }
+        let working = sessions.filter { $0.status == .working }.count
+        return AgentStatusAsk.line(count: sessions.count, working: working) ?? AgentStatusAsk.none
+    }
+
+    private static func agentState(_ state: AgentRunState) -> String {
+        switch state {
+        case .working: "Working"
+        case .idle: "Idle"
+        case .needsYou: "Needs you"
+        case .done: "Done"
+        case .failed: "Failed"
+        case .stalled: "Stalled"
+        }
+    }
+
+    private func presentNoAgents(speak: Bool) {
+        let line = AgentStatusAsk.none
+        let plan = AgentStatusDraw.none()
+        buddy.idle()
+        showAgentStatus(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -1849,6 +1917,38 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws who is running: Agents, then the name or the count, then the state.
+    /// The caller speaks the full line.
+    private func showAgentStatus(_ plan: AgentStatusDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAgentStatus(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAgentStatus(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAgentStatus(_ plan: AgentStatusDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2191,6 +2291,11 @@ final class VoiceTurnController {
         }
         if NoteAsk.matches(transcript) {
             let result = answerNote(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if AgentStatusAsk.matches(transcript) {
+            let result = answerAgents(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -609,7 +609,8 @@ struct HomeWidgetCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     caption("Agents", agentSummary)
-                    Spacer()
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say who's working") { topBar.speakAgents() }
                     GlanceRoundButton(symbol: "arrow.up.right", filled: true, label: "Open Agents") { topBar.selectedTab = .agents }
                 }
                 Spacer(minLength: 0)
