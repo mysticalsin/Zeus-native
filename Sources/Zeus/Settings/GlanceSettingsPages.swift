@@ -8,6 +8,11 @@ enum DayToDayVoice {
     static var speakDay: () -> Void = {}
 }
 
+/// The Agent notifications card speaks errors, the stall, and quiet while sharing. It does not ask macOS.
+enum NotifySetupVoice {
+    static var speakNotices: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -755,6 +760,10 @@ private struct GSNotificationsPage: View {
         GSPageHeading(section: .notifications, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Agent notifications") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how agent notices are set") { NotifySetupVoice.speakNotices() }
+            }
             // The old Permission requests and Finished tasks switches had no reader: nothing ever checked them. An agent
             // waits for the answer to a request, so it always shows; finished-task banners follow "Show system notifications".
             GSRow(symbol: "hand.raised", title: "Permission requests", text: "Always shown on the notch, because the agent waits for your answer.") {

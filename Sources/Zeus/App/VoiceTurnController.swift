@@ -5882,6 +5882,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Agent notifications card, or a spoken "how's agent notices set", says the three choices. It does not ask macOS.
+    func sayNotifySetup() {
+        presentNotifySetup(speak: true)
+    }
+
+    private func answerNotifySetup(speak: Bool) -> TurnResult {
+        presentNotifySetup(speak: speak)
+        return TurnResult(spoken: notifySetupLine())
+    }
+
+    private func presentNotifySetup(speak: Bool) {
+        let parts = notifySetupParts()
+        let line = NotifySetupAsk.line(errors: parts.errors, stuck: parts.stuck, quiet: parts.quiet)
+        let plan = NotifySetupDraw.plan(errors: parts.errors, stuck: parts.stuck, quiet: parts.quiet)
+        buddy.idle()
+        showNotifySetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Errors, the stall menu, and quiet while sharing. An unset value follows the page default.
+    /// Reading them does not ask macOS, and a notification title stays off the card.
+    private func notifySetupParts() -> (errors: String, stuck: String, quiet: String) {
+        let store = SettingsStore.shared
+        let errors = store.bool("notify.errors") ? "On" : "Off"
+        let quiet = ExtraPreferences.shared.quietWhileSharing ? "On" : "Off"
+        return (errors, store.string("notify.stallMinutes"), quiet)
+    }
+
+    private func notifySetupLine() -> String {
+        let parts = notifySetupParts()
+        return NotifySetupAsk.line(errors: parts.errors, stuck: parts.stuck, quiet: parts.quiet)
+    }
+
+    /// Draws Notify, then errors, the stall, and quiet while sharing. The caller speaks the full line.
+    private func showNotifySetup(_ plan: NotifySetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNotifySetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNotifySetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNotifySetup(_ plan: NotifySetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6519,6 +6584,11 @@ final class VoiceTurnController {
         }
         if CodingSetupAsk.matches(transcript) {
             let result = answerCodingSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NotifySetupAsk.matches(transcript) {
+            let result = answerNotifySetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
