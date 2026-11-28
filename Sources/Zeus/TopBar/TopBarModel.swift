@@ -335,6 +335,8 @@ final class TopBarModel {
     var speakRecording: () -> Void = {}
     /// The Appearance page speaks whether the Mac is using Dark Mode.
     var speakDarkMode: () -> Void = {}
+    /// The Tiling page speaks the same word it shows.
+    var speakTiling: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {
