@@ -10330,6 +10330,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// What always asks, or a spoken "what always asks", says the extra-word count and the built-in list. The words stay unspoken.
+    func sayAskWords() {
+        presentAskWords(speak: true)
+    }
+
+    private func answerAskWords(speak: Bool) -> TurnResult {
+        presentAskWords(speak: speak)
+        return TurnResult(spoken: askWordsLine())
+    }
+
+    private func presentAskWords(speak: Bool) {
+        let parts = askWordsParts()
+        let line = AskWordsAsk.line(extra: parts.extra, builtIn: parts.builtIn)
+        let plan = AskWordsDraw.plan(extra: parts.extra, builtIn: parts.builtIn)
+        buddy.idle()
+        showAskWords(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// How many extra words are stored. Reading them does not start a web task or speak the words.
+    private func askWordsParts() -> (extra: String, builtIn: String) {
+        let count = min(AskWordsAsk.extraCount(SettingsStore.shared.string("browserAgent.alwaysAsk")), 99)
+        return (String(count), "Always")
+    }
+
+    private func askWordsLine() -> String {
+        let parts = askWordsParts()
+        return AskWordsAsk.line(extra: parts.extra, builtIn: parts.builtIn)
+    }
+
+    /// Draws Ask, then the extra count and the built-in list. The caller speaks the full line.
+    private func showAskWords(_ plan: AskWordsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAskWords(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAskWords(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAskWords(_ plan: AskWordsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11307,6 +11369,11 @@ final class VoiceTurnController {
         }
         if FreezeSetupAsk.matches(transcript) {
             let result = answerFreezeSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if AskWordsAsk.matches(transcript) {
+            let result = answerAskWords(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

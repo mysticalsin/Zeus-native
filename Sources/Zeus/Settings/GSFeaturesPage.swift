@@ -17,6 +17,11 @@ enum BrowserAgentVoice {
     static var speakAgent: () -> Void = {}
 }
 
+/// The extra ask-words speak the count and the built-in list. The words stay unspoken, and no task starts.
+enum AskWordsVoice {
+    static var speakAsk: () -> Void = {}
+}
+
 /// The Coding in the terminal card speaks the agent and the terminal. It does not start a session.
 enum CodingSetupVoice {
     static var speakSetup: () -> Void = {}
@@ -84,6 +89,10 @@ struct FeaturesSettingsPage: View {
                 GSPopup(selection: store.stringBinding("browserAgent.maxSteps"), options: FeatureSettings.browserStepChoices.map(String.init))
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what always asks") { AskWordsVoice.speakAsk() }
+            }
             GSRow(symbol: "hand.raised", title: "Always ask before", text: "Words on a button or link, separated by commas. Buying, sending, deleting and posting always ask already.") {
                 GSTextInput(text: store.stringBinding("browserAgent.alwaysAsk"), placeholder: "e.g. apply, invite", label: "Always ask before")
             }
