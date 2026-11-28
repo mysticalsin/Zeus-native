@@ -7695,6 +7695,62 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The microphone, speech recognition and the camera, or a spoken "which voice permissions", say those three. They do not ask macOS.
+    func sayAccessSet() {
+        presentAccessSet(speak: true)
+    }
+
+    private func answerAccessSet(speak: Bool) -> TurnResult {
+        presentAccessSet(speak: speak)
+        return TurnResult(spoken: accessSetLine())
+    }
+
+    private func presentAccessSet(speak: Bool) {
+        let parts = AccessVoice.parts()
+        let line = AccessSetAsk.line(mic: parts.mic, speech: parts.speech, camera: parts.camera)
+        let plan = AccessSetDraw.plan(mic: parts.mic, speech: parts.speech, camera: parts.camera)
+        buddy.idle()
+        showAccessSet(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func accessSetLine() -> String {
+        let parts = AccessVoice.parts()
+        return AccessSetAsk.line(mic: parts.mic, speech: parts.speech, camera: parts.camera)
+    }
+
+    /// Draws Allow, then the microphone, speech recognition and the camera. The caller speaks the full line.
+    private func showAccessSet(_ plan: AccessSetDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAccessSet(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAccessSet(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAccessSet(_ plan: AccessSetDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8467,6 +8523,11 @@ final class VoiceTurnController {
         }
         if SpeakerSetupAsk.matches(transcript) {
             let result = answerSpeakerSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if AccessSetAsk.matches(transcript) {
+            let result = answerAccessSet(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

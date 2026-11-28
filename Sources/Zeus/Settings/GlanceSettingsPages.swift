@@ -1308,6 +1308,24 @@ private struct LicensePage: View {
 
 // MARK: Permissions
 
+/// Microphone, speech recognition and the camera speak their states. Nothing is requested.
+enum AccessVoice {
+    static var speakAccess: () -> Void = {}
+
+    /// The three Access rows. Reading them does not raise a prompt.
+    static func parts() -> (mic: String, speech: String, camera: String) {
+        func word(_ state: PermissionState) -> String {
+            switch state {
+            case .authorized: "Allowed"
+            case .denied: "Denied"
+            case .notDetermined: "Not asked yet"
+            }
+        }
+        let camera = PermissionsModel.CaptureAccess.live.camera()
+        return (word(VoicePermissions.mic), word(VoicePermissions.speech), word(camera))
+    }
+}
+
 private struct PermissionsPage: View {
     let context: GSContext
     var body: some View {
@@ -1322,6 +1340,10 @@ private struct PermissionsPage: View {
             }
         if let sweep = context.sweep { allowAll(sweep) }
         GSCard("Access") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the microphone, speech and camera permissions") { AccessVoice.speakAccess() }
+            }
             perm("accessibility", "Accessibility", "Shortcuts, volume, brightness and agents", context.services.granted(.accessibility)) { context.permissions.request(.accessibility) }
             GSDivider()
             perm("location", "Location", "Local weather and rain alerts", context.services.locationAllowed) { context.services.allowLocation() }
