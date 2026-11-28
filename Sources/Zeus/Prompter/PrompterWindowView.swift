@@ -6,6 +6,11 @@ enum PrompterRollVoice {
     static var speakRoll: () -> Void = {}
 }
 
+/// The prompter window speaks how dim it is and where it sits. It does not dim or move the window.
+enum PrompterWindowVoice {
+    static var speakWindow: () -> Void = {}
+}
+
 struct PrompterActions {
     let toggle: () -> Void
     let restart: () -> Void
@@ -245,6 +250,7 @@ struct PrompterWindowView: View {
             GlyphButton(symbol: "circle.lefthalf.filled", size: 10, label: "Dim (\(Int((model.opacity * 100).rounded())) percent)") {
                 model.dimStep()
             }
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how dim the prompter is") { PrompterWindowVoice.speakWindow() }
             Spacer(minLength: 4)
             if let notice = model.notice {
                 Text(notice).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet).lineLimit(1).truncationMode(.tail)

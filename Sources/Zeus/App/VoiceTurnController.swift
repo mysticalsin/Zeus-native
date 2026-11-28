@@ -13809,6 +13809,73 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The prompter window, or a spoken "how dim is the prompter", says the dim and where the window sits.
+    func sayPrompterWindow() {
+        presentPrompterWindow(speak: true)
+    }
+
+    private func answerPrompterWindow(speak: Bool) -> TurnResult {
+        presentPrompterWindow(speak: speak)
+        return TurnResult(spoken: prompterWindowLine())
+    }
+
+    private func presentPrompterWindow(speak: Bool) {
+        let parts = prompterWindowParts()
+        let line = PrompterWindowAsk.line(dim: parts.dim, place: parts.place)
+        let plan = PrompterWindowDraw.plan(dim: parts.dim, place: parts.place)
+        buddy.idle()
+        showPrompterWindow(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved dim and display. Reading them does not dim the window, move it, or say a display name.
+    private func prompterWindowParts() -> (dim: String, place: String) {
+        let defaults = UserDefaults.standard
+        let stored = defaults.object(forKey: "prompterWindow.opacity") as? Double ?? 1
+        let opacity = stored.isFinite ? min(max(stored, 0.3), 1) : 1
+        let dim = Int((opacity * 100).rounded())
+        let display = defaults.string(forKey: "prompterWindow.display") ?? PrompterPlacement.camera
+        let place = display == PrompterPlacement.camera ? "Camera" : "Chosen"
+        return (String(dim), place)
+    }
+
+    private func prompterWindowLine() -> String {
+        let parts = prompterWindowParts()
+        return PrompterWindowAsk.line(dim: parts.dim, place: parts.place)
+    }
+
+    /// Draws Window, then the dim and the place. The caller speaks the full line.
+    private func showPrompterWindow(_ plan: PrompterWindowDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPrompterWindow(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPrompterWindow(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPrompterWindow(_ plan: PrompterWindowDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -15046,6 +15113,11 @@ final class VoiceTurnController {
         }
         if FlingNearbyAsk.matches(transcript) {
             let result = answerFlingNearby(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PrompterWindowAsk.matches(transcript) {
+            let result = answerPrompterWindow(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
