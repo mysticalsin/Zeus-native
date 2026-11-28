@@ -394,6 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             VoiceGlowSettings.speakGlow = { [weak self] in self?.voice.sayVoiceGlow() }
             DictationRecordVoice.speakRecord = { [weak self] in self?.voice.sayDictationRecord() }
             InsomniaSetupVoice.speakNudge = { [weak self] in self?.voice.sayAgentNudge() }
+            HomeFrameVoice.speakFrame = { [weak self] in self?.voice.sayHomeFrame() }
             BeamerSetupVoice.continuityOn = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }

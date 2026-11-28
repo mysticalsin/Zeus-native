@@ -18,6 +18,11 @@ enum WeatherPlaceVoice {
     static var speakPlace: () -> Void = {}
 }
 
+/// The Home style and Physical finish rows speak the frame. They do not change the card pictures.
+enum HomeFrameVoice {
+    static var speakFrame: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -268,7 +273,10 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "rectangle.3.group", title: "Home style", text: "The frame of the Home band: cards, no frame, or no frame with colour.") {
-                GSPopup(selection: SettingsStore.binding("appearance.homeStyle"), options: SettingsCatalog.option("appearance.homeStyle")?.choices ?? []).popupLabel("Home style")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("appearance.homeStyle"), options: SettingsCatalog.option("appearance.homeStyle")?.choices ?? []).popupLabel("Home style")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home frame") { HomeFrameVoice.speakFrame() }
+                }
             }
             GSDivider()
             GSRow(symbol: "square.stack.3d.up", title: "Customize Physical", text: "In the Physical theme, give Home its own finish instead of the card finish.") {

@@ -6748,6 +6748,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Home frame row, or a spoken "how's the home frame", says the frame and the Physical finish. It does not change the pictures.
+    func sayHomeFrame() {
+        presentHomeFrame(speak: true)
+    }
+
+    private func answerHomeFrame(speak: Bool) -> TurnResult {
+        presentHomeFrame(speak: speak)
+        return TurnResult(spoken: homeFrameLine())
+    }
+
+    private func presentHomeFrame(speak: Bool) {
+        let parts = homeFrameParts()
+        let line = HomeFrameAsk.line(frame: parts.frame, finish: parts.finish)
+        let plan = HomeFrameDraw.plan(frame: parts.frame, finish: parts.finish)
+        buddy.idle()
+        showHomeFrame(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Home style menu and the Physical finish menu. An old "Same everywhere" shows as Same all.
+    /// Reading them does not change the card pictures.
+    private func homeFrameParts() -> (frame: String, finish: String) {
+        let store = SettingsStore.shared
+        let raw = store.string("appearance.physicalFinish")
+        let finish = raw == "Same everywhere" ? "Same all" : raw
+        return (store.string("appearance.homeStyle"), finish)
+    }
+
+    private func homeFrameLine() -> String {
+        let parts = homeFrameParts()
+        return HomeFrameAsk.line(frame: parts.frame, finish: parts.finish)
+    }
+
+    /// Draws Frame, then the Home frame and the Physical finish. The caller speaks the full line.
+    private func showHomeFrame(_ plan: HomeFrameDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHomeFrame(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHomeFrame(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHomeFrame(_ plan: HomeFrameDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7450,6 +7515,11 @@ final class VoiceTurnController {
         }
         if AgentNudgeAsk.matches(transcript) {
             let result = answerAgentNudge(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HomeFrameAsk.matches(transcript) {
+            let result = answerHomeFrame(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
