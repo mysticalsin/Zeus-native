@@ -8820,6 +8820,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Proactive notices, or a spoken "how's proactive set", say the morning brief and due to-dos. They do not show a brief.
+    func sayProactiveSetup() {
+        presentProactiveSetup(speak: true)
+    }
+
+    private func answerProactiveSetup(speak: Bool) -> TurnResult {
+        presentProactiveSetup(speak: speak)
+        return TurnResult(spoken: proactiveSetupLine())
+    }
+
+    private func presentProactiveSetup(speak: Bool) {
+        let parts = proactiveSetupParts()
+        let line = ProactiveSetupAsk.line(brief: parts.brief, due: parts.due)
+        let plan = ProactiveSetupDraw.plan(brief: parts.brief, due: parts.due)
+        buddy.idle()
+        showProactiveSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The morning brief and due to-dos. Both start off. Reading them does not show a brief or schedule a notice.
+    private func proactiveSetupParts() -> (brief: String, due: String) {
+        let settings = ProactiveSettings.shared
+        return (settings.morningBrief ? "On" : "Off", settings.dueNudges ? "On" : "Off")
+    }
+
+    private func proactiveSetupLine() -> String {
+        let parts = proactiveSetupParts()
+        return ProactiveSetupAsk.line(brief: parts.brief, due: parts.due)
+    }
+
+    /// Draws Ahead, then the morning brief and due to-dos. The caller speaks the full line.
+    private func showProactiveSetup(_ plan: ProactiveSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyProactiveSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyProactiveSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyProactiveSetup(_ plan: ProactiveSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9682,6 +9744,11 @@ final class VoiceTurnController {
         }
         if ExplainSetupAsk.matches(transcript) {
             let result = answerExplainSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ProactiveSetupAsk.matches(transcript) {
+            let result = answerProactiveSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
