@@ -10673,6 +10673,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The pointing trail, or a spoken "how is the pointing trail set", says pointing, the ink, screenshots, and typed questions.
+    func sayPointTrail() {
+        presentPointTrail(speak: true)
+    }
+
+    private func answerPointTrail(speak: Bool) -> TurnResult {
+        presentPointTrail(speak: speak)
+        return TurnResult(spoken: pointTrailLine())
+    }
+
+    private func presentPointTrail(speak: Bool) {
+        let parts = pointTrailParts()
+        let line = PointTrailAsk.line(point: parts.point, ink: parts.ink, shot: parts.shot, type: parts.type)
+        let plan = PointTrailDraw.plan(point: parts.point, ink: parts.ink, shot: parts.shot, type: parts.type)
+        buddy.idle()
+        showPointTrail(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Pointing, the trail, screenshots, and typed questions. Reading them does not start a turn or send a picture.
+    private func pointTrailParts() -> (point: String, ink: String, shot: String, type: String) {
+        func flag(_ on: Bool) -> String { on ? "On" : "Off" }
+        return (flag(PointingSettings.enabled), flag(PointingSettings.drawWhileHeld),
+                flag(PointingSettings.sendScreenshot), flag(PointingSettings.textEntry))
+    }
+
+    private func pointTrailLine() -> String {
+        let parts = pointTrailParts()
+        return PointTrailAsk.line(point: parts.point, ink: parts.ink, shot: parts.shot, type: parts.type)
+    }
+
+    /// Draws Trail, then the four switches. The caller speaks the full line.
+    private func showPointTrail(_ plan: PointTrailDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPointTrail(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPointTrail(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPointTrail(_ plan: PointTrailDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11675,6 +11738,11 @@ final class VoiceTurnController {
         }
         if ExplainHearAsk.matches(transcript) {
             let result = answerExplainHear(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PointTrailAsk.matches(transcript) {
+            let result = answerPointTrail(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -30,6 +30,8 @@ enum PointingSettings {
 
     /// The Assistant menu speaks which keys point. It does not start a pointing turn.
     static var speakKeys: () -> Void = {}
+    /// The trail row speaks pointing, the ink, screenshots, and typed questions. It does not start a turn.
+    static var speakTrail: () -> Void = {}
 }
 
 /// Feeds the keyboard stream to `PointingKeyGesture` and reports what the hold did. It owns no

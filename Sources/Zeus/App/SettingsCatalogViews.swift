@@ -129,6 +129,11 @@ struct SettingOptionRow: View {
     @ViewBuilder private var control: some View {
         switch option.kind {
         case .toggle:
+            if option.id == "pointing.enabled" {
+                Button { PointingSettings.speakTrail() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say how the pointing trail is set")
+            }
             if option.id == "general.launchAtLogin" {
                 GlassToggle(isOn: Binding(get: { store.bool(option.id) },
                                           set: { store.set(option.id, $0 ? "true" : "false") }), label: option.title)
