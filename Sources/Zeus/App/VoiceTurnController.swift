@@ -5220,6 +5220,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The language row, or a spoken "how's dictation set", says the language, the key, and the engine. It does not start dictation.
+    func sayDictationSetup() {
+        presentDictationSetup(speak: true)
+    }
+
+    private func answerDictationSetup(speak: Bool) -> TurnResult {
+        presentDictationSetup(speak: speak)
+        return TurnResult(spoken: dictationSetupLine())
+    }
+
+    private func presentDictationSetup(speak: Bool) {
+        let setup = dictationSetupWords()
+        let line = DictationSetupAsk.line(language: setup.language, key: setup.key, engine: setup.engine)
+        let plan = DictationSetupDraw.plan(language: setup.language, key: setup.key, engine: setup.engine)
+        buddy.idle()
+        showDictationSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same titles the menus use. An unknown stored value uses Automatic, Hold to speak, and Parakeet v3.
+    private func dictationSetupWords() -> (language: String, key: String, engine: String) {
+        let settings = DictationSettings.shared
+        return (settings.language.title, settings.selectedBehavior.title, settings.engine.title)
+    }
+
+    private func dictationSetupLine() -> String {
+        let setup = dictationSetupWords()
+        return DictationSetupAsk.line(language: setup.language, key: setup.key, engine: setup.engine)
+    }
+
+    /// Draws Dictation, then the language, the key, and the engine. The caller speaks the full line.
+    private func showDictationSetup(_ plan: DictationSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDictationSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDictationSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDictationSetup(_ plan: DictationSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5807,6 +5869,11 @@ final class VoiceTurnController {
         }
         if CueSoundsAsk.matches(transcript) {
             let result = answerCueSounds(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DictationSetupAsk.matches(transcript) {
+            let result = answerDictationSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

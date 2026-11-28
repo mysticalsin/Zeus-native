@@ -1031,9 +1031,12 @@ private struct MurmurePage: View {
                         isOn: Binding(get: { settings.sounds }, set: { settings.sounds = $0 }))
             GSDivider()
             GSRow(symbol: "globe", title: "Dictation language", text: "Automatic follows macOS, and chosen languages go to Whisper.", detail: "Parakeet applies a script hint where supported.") {
-                GSPopup(selection: Binding(get: { settings.language.title },
-                                           set: { value in settings.language = DictationLanguage(persistedValue: value) }),
-                        options: DictationLanguage.allCases.map(\.title)).popupLabel("Dictation language")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { settings.language.title },
+                                               set: { value in settings.language = DictationLanguage(persistedValue: value) }),
+                            options: DictationLanguage.allCases.map(\.title)).popupLabel("Dictation language")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how dictation is set") { DictationSettings.speakSetup() }
+                }
             }
             GSDivider()
             GSRow(symbol: "doc.on.clipboard", title: "Copy last dictation") {
