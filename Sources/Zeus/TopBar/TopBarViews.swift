@@ -1175,6 +1175,7 @@ struct ShelfPage: View {
                     .font(.system(size: 26, weight: .semibold)).foregroundStyle(topBar.shelfTargeted ? Theme.bolt : Theme.cloudSecondary)
                     .scaleEffect(topBar.shelfTargeted && !Motion.reduced ? 1.12 : 1)
                 Text("Drop files here").font(TopBarStyle.label(11.5, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's on the shelf") { topBar.speakShelf() }
                 Text("Drag them out again, AirDrop, or transcribe audio")
                     .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet).multilineTextAlignment(.center)
             }

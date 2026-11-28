@@ -2537,6 +2537,80 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The shelf page, or a spoken "what's on my shelf", says the files and draws them.
+    func sayShelf() {
+        presentShelf(speak: true)
+    }
+
+    private func answerShelf(speak: Bool) -> TurnResult {
+        presentShelf(speak: speak)
+        return TurnResult(spoken: shelfLine())
+    }
+
+    private func newestShelfName() -> (count: Int, name: String) {
+        let items = (notch.topBar?.shelf ?? []).sorted { $0.addedAt > $1.addedAt }
+        return (items.count, items.first?.name ?? "")
+    }
+
+    private func presentShelf(speak: Bool) {
+        let facts = newestShelfName()
+        guard let line = ShelfAsk.line(count: facts.count, name: facts.name),
+              let plan = ShelfDraw.plan(count: facts.count, name: facts.name) else {
+            presentShelfEmpty(speak: speak)
+            return
+        }
+        buddy.idle()
+        showShelf(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func shelfLine() -> String {
+        let facts = newestShelfName()
+        return ShelfAsk.line(count: facts.count, name: facts.name) ?? ShelfAsk.empty
+    }
+
+    private func presentShelfEmpty(speak: Bool) {
+        let line = ShelfAsk.empty
+        let plan = ShelfDraw.empty()
+        buddy.idle()
+        showShelf(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the shelf: Shelf, then the count or the name, then the newest name.
+    /// The caller speaks the full line.
+    private func showShelf(_ plan: ShelfDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyShelf(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyShelf(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyShelf(_ plan: ShelfDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2919,6 +2993,11 @@ final class VoiceTurnController {
         }
         if AgendaAsk.matches(transcript) {
             let result = answerAgenda(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ShelfAsk.matches(transcript) {
+            let result = answerShelf(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

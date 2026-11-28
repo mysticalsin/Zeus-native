@@ -319,6 +319,8 @@ final class TopBarModel {
     var speakTodoCount: () -> Void = {}
     /// The agenda list speaks what is still coming up.
     var speakAgenda: () -> Void = {}
+    /// The shelf page speaks the files that are already sitting there.
+    var speakShelf: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {
