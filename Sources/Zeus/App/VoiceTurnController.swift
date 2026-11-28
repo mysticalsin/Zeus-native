@@ -11768,6 +11768,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The second brain, or a spoken "how is the second brain set", says whether a vault is connected and how it may be used.
+    func sayBrainSetup() {
+        presentBrainSetup(speak: true)
+    }
+
+    private func answerBrainSetup(speak: Bool) -> TurnResult {
+        presentBrainSetup(speak: speak)
+        return TurnResult(spoken: brainSetupLine())
+    }
+
+    private func presentBrainSetup(speak: Bool) {
+        let parts = brainSetupParts()
+        let line = BrainSetupAsk.line(link: parts.link, access: parts.access)
+        let plan = BrainSetupDraw.plan(link: parts.link, access: parts.access)
+        buddy.idle()
+        showBrainSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved vault connection. The name and the path stay unspoken. Reading it does not connect or disconnect.
+    private func brainSetupParts() -> (link: String, access: String) {
+        guard let data = UserDefaults.standard.data(forKey: "todo.connection"),
+              let connection = try? JSONDecoder().decode(BrainConnection.self, from: data) else {
+            return ("None", "None")
+        }
+        let access = connection.access == .readWrite ? "Write" : "Read"
+        return ("Set", access)
+    }
+
+    private func brainSetupLine() -> String {
+        let parts = brainSetupParts()
+        return BrainSetupAsk.line(link: parts.link, access: parts.access)
+    }
+
+    /// Draws Brain, then the link and the access. The caller speaks the full line.
+    private func showBrainSetup(_ plan: BrainSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyBrainSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyBrainSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyBrainSetup(_ plan: BrainSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12850,6 +12916,11 @@ final class VoiceTurnController {
         }
         if TodoSetupAsk.matches(transcript) {
             let result = answerTodoSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if BrainSetupAsk.matches(transcript) {
+            let result = answerBrainSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

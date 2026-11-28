@@ -11,6 +11,11 @@ enum TodoSetupVoice {
     static var speakTodos: () -> Void = {}
 }
 
+/// The second brain speaks whether a vault is connected and how it may be used. The path stays unspoken.
+enum BrainSetupVoice {
+    static var speakBrain: () -> Void = {}
+}
+
 struct TodoSettingsPage: View {
     var topBar: TopBarModel?
 
@@ -116,6 +121,12 @@ struct MemorySettingsPage: View {
     var body: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Second brain") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { BrainSetupVoice.speakBrain() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how the second brain is set")
+                }
                 GlassRow(title: "Vault folder",
                          note: model.connection.map { "\($0.source.name) · \($0.source.path)" }
                             ?? "Choose an Obsidian vault or Markdown folder to connect.") {
