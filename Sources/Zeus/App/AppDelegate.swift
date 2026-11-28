@@ -385,6 +385,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FlingVoice.speakReceive = { [weak self] in self?.voice.sayReceiveSetup() }
             BeamerSetupVoice.speakSetup = { [weak self] in self?.voice.sayBeamerSetup() }
             PolyglotSettings.speakCaptions = { [weak self] in self?.voice.sayCaptionSetup() }
+            PolyglotSettings.speakChord = { [weak self] in self?.voice.sayPolyglotChord() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

@@ -11,6 +11,8 @@ final class PolyglotSettings {
     static var speakSetup: () -> Void = {}
     /// The Captions card speaks the original line and the size. It does not pop the captions out.
     static var speakCaptions: () -> Void = {}
+    /// The shortcut and engine speak the key and which engine hears. They do not start Polyglot.
+    static var speakChord: () -> Void = {}
 
     @ObservationIgnored private let defaults = UserDefaults.standard
     /// Control + Option + T: no clash with Zeus's Option + Command talk chord.

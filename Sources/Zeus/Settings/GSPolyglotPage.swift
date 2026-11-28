@@ -56,6 +56,10 @@ struct PolyglotSettingsPage: View {
             }
         }
         GSCard("Shortcut") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Polyglot key and engine") { PolyglotSettings.speakChord() }
+            }
             ShortcutRecorderRow(symbol: "keyboard", title: "Start or stop Polyglot",
                                 text: "Click, then press any key or chord. It works from any app.",
                                 shortcut: settings.hotkey, defaultValue: PolyglotSettings.defaultHotkey, allowsOff: true,
@@ -65,6 +69,10 @@ struct PolyglotSettingsPage: View {
             GSInfo(text: "You can also say \u{201C}Hey Zeus, translate\u{201D} or \u{201C}start Polyglot\u{201D}.")
         }
         GSCard("Engine") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Polyglot key and engine") { PolyglotSettings.speakChord() }
+            }
             GSRow(symbol: "cpu", title: "Speech to text",
                   text: "Parakeet v3 hears 25 European languages and detects them itself. Without it, Apple's on-device recognizer is used. Download Parakeet in Settings, Dictation.") {
                 GSStatus(ok: true, text: polyglot.engineName.isEmpty ? "Chosen at start" : polyglot.engineName)
