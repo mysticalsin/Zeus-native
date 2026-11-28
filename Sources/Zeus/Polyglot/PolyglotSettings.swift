@@ -7,6 +7,8 @@ import ZeusCore
 @Observable
 final class PolyglotSettings {
     static let shared = PolyglotSettings()
+    /// The Polyglot card speaks whether it is on, where it listens, and the language. It does not start translation.
+    static var speakSetup: () -> Void = {}
 
     @ObservationIgnored private let defaults = UserDefaults.standard
     /// Control + Option + T: no clash with Zeus's Option + Command talk chord.

@@ -13,6 +13,10 @@ struct PolyglotSettingsPage: View {
         GSPageHeading(section: .polyglot, subtitle: "Understand any language, live, on this Mac.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Polyglot") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Polyglot is set") { PolyglotSettings.speakSetup() }
+            }
             GSToggleRow(symbol: "globe", title: "Enable Polyglot",
                         text: "Adds live captions to the notch and the shortcut below. Speech and translation run on this Mac.",
                         isOn: Binding(get: { settings.enabled }, set: { settings.enabled = $0 }))
