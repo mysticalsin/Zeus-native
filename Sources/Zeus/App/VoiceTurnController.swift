@@ -6346,6 +6346,77 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Weather card, or a spoken "where's the forecast from", says the city and the units. It does not fetch a forecast.
+    func sayWeatherPlace() {
+        presentWeatherPlace(speak: true)
+    }
+
+    private func answerWeatherPlace(speak: Bool) -> TurnResult {
+        presentWeatherPlace(speak: speak)
+        return TurnResult(spoken: weatherPlaceLine())
+    }
+
+    private func presentWeatherPlace(speak: Bool) {
+        let parts = weatherPlaceParts()
+        let line = WeatherPlaceAsk.line(place: parts.place, units: parts.units)
+        let plan = WeatherPlaceDraw.plan(place: parts.place, units: parts.units)
+        buddy.idle()
+        showWeatherPlace(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The city field and the units menu. An empty city is None. A missing units key follows the page: Celsius outside the US.
+    /// Reading them does not fetch a forecast.
+    private func weatherPlaceParts() -> (place: String, units: String) {
+        let raw = UserDefaults.standard.string(forKey: "topBar.weatherCity") ?? ""
+        let flat = raw.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let place = flat.isEmpty ? "None" : flat
+        let celsius: Bool
+        if let stored = UserDefaults.standard.object(forKey: "topBar.celsius") as? Bool {
+            celsius = stored
+        } else {
+            celsius = Locale.current.measurementSystem != .us
+        }
+        return (place, celsius ? "\u{00B0}C" : "\u{00B0}F")
+    }
+
+    private func weatherPlaceLine() -> String {
+        let parts = weatherPlaceParts()
+        return WeatherPlaceAsk.line(place: parts.place, units: parts.units)
+    }
+
+    /// Draws Forecast, then the place and the units. The caller speaks the full line.
+    private func showWeatherPlace(_ plan: WeatherPlaceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyWeatherPlace(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyWeatherPlace(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyWeatherPlace(_ plan: WeatherPlaceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7018,6 +7089,11 @@ final class VoiceTurnController {
         }
         if HomeStylesAsk.matches(transcript) {
             let result = answerHomeStyles(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if WeatherPlaceAsk.matches(transcript) {
+            let result = answerWeatherPlace(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

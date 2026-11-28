@@ -13,6 +13,11 @@ enum NotifySetupVoice {
     static var speakNotices: () -> Void = {}
 }
 
+/// The Weather card speaks the city and the units. It does not fetch a forecast.
+enum WeatherPlaceVoice {
+    static var speakPlace: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -608,6 +613,10 @@ private struct TopBarTabsCard: View {
                 if full { GSInfo(text: "The row holds \(GlanceTopBar.maxTabs) tabs.") }
             }
             GSCard("Weather") {
+                HStack {
+                    Spacer(minLength: 0)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the forecast is from") { WeatherPlaceVoice.speakPlace() }
+                }
                 GSRow(symbol: "location.magnifyingglass", title: "City", text: "Only the city name is sent.", detail: "Forecasts come from Open-Meteo. Press Return to apply the city.") {
                     TextField("City", text: Binding(get: { topBar.weatherCity }, set: { topBar.weatherCity = $0 }))
                         .textFieldStyle(.plain)
