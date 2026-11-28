@@ -12891,6 +12891,81 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Shuffle and repeat, or a spoken "is shuffle on", say the modes the player has already reported.
+    func sayPlaybackMode() {
+        presentPlaybackMode(speak: true)
+    }
+
+    private func answerPlaybackMode(speak: Bool) -> TurnResult {
+        presentPlaybackMode(speak: speak)
+        return TurnResult(spoken: playbackModeLine())
+    }
+
+    private func presentPlaybackMode(speak: Bool) {
+        let parts = playbackModeParts()
+        let line = PlaybackModeAsk.line(shuffle: parts.shuffle, repeatMode: parts.repeatMode)
+        let plan = PlaybackModeDraw.plan(shuffle: parts.shuffle, repeatMode: parts.repeatMode)
+        buddy.idle()
+        showPlaybackMode(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The cached shuffle and repeat. A missing report stays unknown. Reading them does not change playback or ask Automation.
+    private func playbackModeParts() -> (shuffle: String, repeatMode: String) {
+        let modes = notch.topBar?.musicModes ?? MusicModes()
+        let shuffle: String
+        switch modes.shuffle {
+        case true: shuffle = "On"
+        case false: shuffle = "Off"
+        case nil: shuffle = "Unknown"
+        }
+        let repeatMode: String
+        switch modes.repeatMode {
+        case .off: repeatMode = "Off"
+        case .all: repeatMode = "All"
+        case .one: repeatMode = "One"
+        case nil: repeatMode = "Unknown"
+        }
+        return (shuffle, repeatMode)
+    }
+
+    private func playbackModeLine() -> String {
+        let parts = playbackModeParts()
+        return PlaybackModeAsk.line(shuffle: parts.shuffle, repeatMode: parts.repeatMode)
+    }
+
+    /// Draws Modes, then shuffle and repeat. The caller speaks the full line.
+    private func showPlaybackMode(_ plan: PlaybackModeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPlaybackMode(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPlaybackMode(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPlaybackMode(_ plan: PlaybackModeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14058,6 +14133,11 @@ final class VoiceTurnController {
         }
         if FocusLengthAsk.matches(transcript) {
             let result = answerFocusLength(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PlaybackModeAsk.matches(transcript) {
+            let result = answerPlaybackMode(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

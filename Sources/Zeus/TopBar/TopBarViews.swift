@@ -550,6 +550,11 @@ struct PageSwitcher<Key: Hashable, Page: View>: View {
     }
 }
 
+/// Shuffle and repeat speak the modes the player has reported. They do not change playback.
+enum PlaybackModeVoice {
+    static var speakModes: () -> Void = {}
+}
+
 struct MusicControls: View {
     let topBar: TopBarModel
     var size: CGFloat = 13
@@ -622,6 +627,7 @@ struct MusicPage: View {
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if earbuds are connected") { topBar.speakEarbuds() }
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the sound is going") { topBar.speakOutput() }
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's playing") { sayTrack() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say shuffle and repeat") { PlaybackModeVoice.speakModes() }
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         if showLyrics {
