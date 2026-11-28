@@ -7274,6 +7274,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Lock and wake, or a spoken "how's lock and wake set", says the switch and whether each chime is built in or chosen. It does not play a chime.
+    func sayLockChimes() {
+        presentLockChimes(speak: true)
+    }
+
+    private func answerLockChimes(speak: Bool) -> TurnResult {
+        presentLockChimes(speak: speak)
+        return TurnResult(spoken: lockChimeLine())
+    }
+
+    private func presentLockChimes(speak: Bool) {
+        let parts = lockChimeParts()
+        let line = LockChimeAsk.line(work: parts.work, lock: parts.lock, wake: parts.wake)
+        let plan = LockChimeDraw.plan(work: parts.work, lock: parts.lock, wake: parts.wake)
+        buddy.idle()
+        showLockChimes(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The lock and wake switch, and Built-in when a path is empty. A chosen file is named only as Chosen.
+    /// Reading them does not play a chime.
+    private func lockChimeParts() -> (work: String, lock: String, wake: String) {
+        let store = SettingsStore.shared
+        func kind(_ id: String) -> String {
+            store.string(id).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Built-in" : "Chosen"
+        }
+        return (store.bool(ChimeSettingsKey.enabled) ? "On" : "Off", kind(ChimeSettingsKey.closePath), kind(ChimeSettingsKey.openPath))
+    }
+
+    private func lockChimeLine() -> String {
+        let parts = lockChimeParts()
+        return LockChimeAsk.line(work: parts.work, lock: parts.lock, wake: parts.wake)
+    }
+
+    /// Draws Chimes, then the switch, the lock sound, and the wake sound. The caller speaks the full line.
+    private func showLockChimes(_ plan: LockChimeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyLockChimes(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyLockChimes(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyLockChimes(_ plan: LockChimeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8016,6 +8082,11 @@ final class VoiceTurnController {
         }
         if VoiceStyleAsk.matches(transcript) {
             let result = answerVoiceStyle(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if LockChimeAsk.matches(transcript) {
+            let result = answerLockChimes(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
