@@ -315,6 +315,8 @@ final class TopBarModel {
     var speakNextReminderAccess: () -> Void = {}
     /// The Alerts page speaks how many notifications are waiting.
     var speakAlerts: () -> Void = {}
+    /// The To-do page speaks how many are still open.
+    var speakTodoCount: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

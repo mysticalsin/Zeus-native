@@ -1339,6 +1339,58 @@ final class VoiceTurnController {
         buddy.showCaption(plan.boltCaption(at: 0))
     }
 
+    /// The To-do page, or a spoken "how many to-dos", says the open count and draws it.
+    func sayTodoCount() {
+        presentTodoCount(speak: true)
+    }
+
+    private func answerTodoCount(speak: Bool) -> TurnResult {
+        presentTodoCount(speak: speak)
+        return TurnResult(spoken: todoCountLine())
+    }
+
+    private func presentTodoCount(speak: Bool) {
+        let todo = TodoController.shared
+        let open = todo.open.count
+        if todo.items.isEmpty {
+            presentTodoCountState(.none, speak: speak)
+            return
+        }
+        if open == 0 {
+            presentTodoCountState(.clear, speak: speak)
+            return
+        }
+        let overdue = min(todo.overdueCount, open)
+        guard let line = TodoCountAsk.line(open: open, overdue: overdue),
+              let plan = TodoCountDraw.plan(open: open, overdue: overdue) else {
+            presentTodoCountState(.none, speak: speak)
+            return
+        }
+        buddy.idle()
+        showTodoCount(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func todoCountLine() -> String {
+        let todo = TodoController.shared
+        if todo.items.isEmpty { return TodoCountAsk.none }
+        let open = todo.open.count
+        if open == 0 { return TodoCountAsk.done }
+        return TodoCountAsk.line(open: open, overdue: min(todo.overdueCount, open)) ?? TodoCountAsk.none
+    }
+
+    private enum TodoCountCard { case none, clear }
+
+    private func presentTodoCountState(_ card: TodoCountCard, speak: Bool) {
+        let line = card == .none ? TodoCountAsk.none : TodoCountAsk.done
+        let plan = card == .none ? TodoCountDraw.none() : TodoCountDraw.clear()
+        buddy.idle()
+        showTodoCount(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -2221,6 +2273,38 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the open to-do count: To-dos, then the count, then Open or the overdue count.
+    /// The caller speaks the full line.
+    private func showTodoCount(_ plan: TodoCountDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTodoCount(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTodoCount(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTodoCount(_ plan: TodoCountDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2583,6 +2667,11 @@ final class VoiceTurnController {
         }
         if AlertStatusAsk.matches(transcript) {
             let result = answerAlerts(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TodoCountAsk.matches(transcript) {
+            let result = answerTodoCount(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

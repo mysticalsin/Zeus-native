@@ -24,6 +24,7 @@ struct TodoPage: View {
                     todo.toggleVoice()
                 }
                 GlyphButton(symbol: "plus", size: 12, tint: Theme.accent, label: "Add") { todo.submitDraft() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many to-dos") { topBar.speakTodoCount() }
             }
             let suggestions = Array(todo.suggestions.prefix(3))
             let headerHeight = Self.headerHeight(voiceError: todo.voiceError != nil, warning: todo.warning != nil, suggestions: suggestions.count)
