@@ -7,6 +7,11 @@ enum PrompterSetupVoice {
     static var speakSetup: () -> Void = {}
 }
 
+/// The Browser agent card speaks whether it may work, the step limit, and which browser. It does not start a task.
+enum BrowserAgentVoice {
+    static var speakAgent: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -44,6 +49,10 @@ struct FeaturesSettingsPage: View {
             GSToggleRow(symbol: "timer", title: "Count down before rolling", text: "A short countdown before the text starts scrolling, so you can get ready.", isOn: prompter($countdown))
         }
         GSCard("Browser agent") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the browser agent is set") { BrowserAgentVoice.speakAgent() }
+            }
             GSToggleRow(symbol: "globe", title: "Let Zeus work in Chrome", text: "Web tasks you ask for, step by step, with a card you can stop. Passwords and card fields are always left to you.",
                         isOn: store.boolBinding("browserAgent.enabled"))
             GSDivider()
