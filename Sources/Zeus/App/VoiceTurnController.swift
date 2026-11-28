@@ -6684,6 +6684,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Agents in tmux card, or a spoken "how's the nudge set", says the switch and the wait. It does not send a nudge.
+    func sayAgentNudge() {
+        presentAgentNudge(speak: true)
+    }
+
+    private func answerAgentNudge(speak: Bool) -> TurnResult {
+        presentAgentNudge(speak: speak)
+        return TurnResult(spoken: agentNudgeLine())
+    }
+
+    private func presentAgentNudge(speak: Bool) {
+        let parts = agentNudgeParts()
+        let line = AgentNudgeAsk.line(work: parts.work, after: parts.after)
+        let plan = AgentNudgeDraw.plan(work: parts.work, after: parts.after)
+        buddy.idle()
+        showAgentNudge(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The nudge switch and the Stalled after menu. A missing switch is off. A missing wait is 10 min.
+    /// Reading them does not send a nudge or read the hotspot.
+    private func agentNudgeParts() -> (work: String, after: String) {
+        let work = (UserDefaults.standard.object(forKey: "insomnia.nudge") as? Bool ?? false) ? "On" : "Off"
+        let minutes = UserDefaults.standard.object(forKey: "insomnia.nudgeMinutes") as? Int ?? 10
+        return (work, "\(minutes) min")
+    }
+
+    private func agentNudgeLine() -> String {
+        let parts = agentNudgeParts()
+        return AgentNudgeAsk.line(work: parts.work, after: parts.after)
+    }
+
+    /// Draws Nudge, then the switch and the wait. The caller speaks the full line.
+    private func showAgentNudge(_ plan: AgentNudgeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAgentNudge(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAgentNudge(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAgentNudge(_ plan: AgentNudgeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7381,6 +7445,11 @@ final class VoiceTurnController {
         }
         if DictationRecordAsk.matches(transcript) {
             let result = answerDictationRecord(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if AgentNudgeAsk.matches(transcript) {
+            let result = answerAgentNudge(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

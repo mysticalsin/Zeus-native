@@ -4,6 +4,8 @@ import ZeusCore
 /// The Insomnia cards speak lid-closed mode, mute, and Low Power Mode. They do not install the rule.
 enum InsomniaSetupVoice {
     static var speakSetup: () -> Void = {}
+    /// The Agents in tmux card speaks the nudge and the wait. It does not send a nudge.
+    static var speakNudge: () -> Void = {}
 }
 
 /// Drafts for the Insomnia page (this toolchain has no SwiftUI `@State` macro).
@@ -115,6 +117,10 @@ struct InsomniaSettingsPage: View {
             }
         }
         GSCard("Agents in tmux") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the agent nudge is set") { InsomniaSetupVoice.speakNudge() }
+            }
             GSToggleRow(symbol: "arrow.uturn.right", title: "Nudge stalled agents", text: "Every 2 minutes Zeus looks at tmux panes running claude, codex, gemini, cursor-agent or node. One that has not changed for the time below gets \"continue\" and Enter, once per stall. Plain shells are never touched.",
                         isOn: Binding(get: { insomnia.nudgeAgents }, set: { insomnia.nudgeAgents = $0 }))
             GSDivider()
