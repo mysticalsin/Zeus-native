@@ -4909,6 +4909,10 @@ final class VoiceTurnController {
                 showAnswerFail(visual, speak: speak)
                 if speak { say(message) } else { buddy.showCaption(message); buddy.hideCaption() }
                 buddy.showCaption(visual.boltCaption(at: 0))
+            } else if let visual = ClaudeToolDraw.from(line: message) {
+                showClaudeTool(visual, speak: speak)
+                if speak { say(message) } else { buddy.showCaption(message); buddy.hideCaption() }
+                buddy.showCaption(visual.boltCaption(at: 0))
             } else if speak {
                 say(message)
             } else {
@@ -5269,6 +5273,38 @@ final class VoiceTurnController {
         case "ollama": ModelCap.httpModel(.ollama, tier: .fast) ?? "-"
         default: "-"
         }
+    }
+
+    /// Draws the missing Claude command-line tool, under the pointer.
+    /// The caller speaks the full line. A spoken answer failure is not this card.
+    private func showClaudeTool(_ plan: ClaudeToolDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyClaudeTool(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyClaudeTool(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyClaudeTool(_ plan: ClaudeToolDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
     /// One sentence, at most 10 words (persona rule, item 5, QA7). Never reads the raw error text
