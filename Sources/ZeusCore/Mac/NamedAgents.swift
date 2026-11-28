@@ -107,7 +107,7 @@ public enum AgentRouter {
     }
 
     public static func route(_ transcript: String, agents: [AgentProfile]) -> Route? {
-        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = AgentRouterTranscriptBox.trimmedTranscript(transcript)
         let lower = text.lowercased()
         for agent in agents {
             let name = agent.name.lowercased()
