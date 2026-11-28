@@ -15,6 +15,8 @@ final class InsomniaController {
 
     /// The Insomnia page speaks the lid line it shows.
     var speakLid: () -> Void = {}
+    /// The Insomnia page speaks the heat word it shows.
+    var speakHeat: () -> Void = {}
 
     enum EntryMode: String, CaseIterable, Identifiable {
         case length = "For", until = "Until"
