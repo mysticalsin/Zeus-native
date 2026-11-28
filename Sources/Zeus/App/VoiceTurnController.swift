@@ -10530,6 +10530,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The vocabulary, or a spoken "how is the vocabulary set", says how many words and replacements are saved. The words stay unspoken.
+    func sayVocabSetup() {
+        presentVocabSetup(speak: true)
+    }
+
+    private func answerVocabSetup(speak: Bool) -> TurnResult {
+        presentVocabSetup(speak: speak)
+        return TurnResult(spoken: vocabSetupLine())
+    }
+
+    private func presentVocabSetup(speak: Bool) {
+        let parts = vocabSetupParts()
+        let line = VocabSetupAsk.line(words: parts.words, fixes: parts.fixes)
+        let plan = VocabSetupDraw.plan(words: parts.words, fixes: parts.fixes)
+        buddy.idle()
+        showVocabSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved word count and replacement count. Reading them does not save the vocabulary or speak a word.
+    private func vocabSetupParts() -> (words: String, fixes: String) {
+        let vocabulary = DictationHub.shared.controller?.vocabulary ?? Vocabulary()
+        return (String(min(vocabulary.words.count, 999)), String(min(vocabulary.replacements.count, 999)))
+    }
+
+    private func vocabSetupLine() -> String {
+        let parts = vocabSetupParts()
+        return VocabSetupAsk.line(words: parts.words, fixes: parts.fixes)
+    }
+
+    /// Draws Terms, then the two counts. The caller speaks the full line.
+    private func showVocabSetup(_ plan: VocabSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVocabSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVocabSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVocabSetup(_ plan: VocabSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11522,6 +11584,11 @@ final class VoiceTurnController {
         }
         if SeparateBrowserAsk.matches(transcript) {
             let result = answerSeparateBrowser(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VocabSetupAsk.matches(transcript) {
+            let result = answerVocabSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

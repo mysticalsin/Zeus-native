@@ -23,6 +23,11 @@ enum DictateHearVoice {
     static var speakHear: () -> Void = {}
 }
 
+/// The vocabulary speaks how many words and replacements are saved. The words stay unspoken.
+enum VocabSetupVoice {
+    static var speakVocab: () -> Void = {}
+}
+
 /// History speaks how long a dictation is kept. It does not open history or delete anything.
 enum DictationKeepVoice {
     static var speakKeep: () -> Void = {}
@@ -338,6 +343,10 @@ struct DictationSettingsPage: View {
 
     @ViewBuilder private var vocabularyCard: some View {
         GSCard("Vocabulary") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the vocabulary is set") { VocabSetupVoice.speakVocab() }
+            }
             Text("Names and words to listen for, separated by commas. Replacements fix what is heard: write one per line as heard -> written.")
                 .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
             editorBox("Words", Binding(get: { page.wordsText }, set: { page.wordsText = $0 }), height: 64)
