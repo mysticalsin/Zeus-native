@@ -479,7 +479,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // on-device wake detection, and launch never prompts for a permission.
         if on(.wakeWord) { WakeWordController.shared.start(voice: voice, topBar: topBar) }
         // Face presence: off until the owner turns it on; with it on, launch reads the vault and opens no camera.
-        if on(.facePresence) { FacePresenceController.shared.start(permissions: .live(permissions)) }
+        if on(.facePresence) {
+            FacePresenceController.shared.speakFace = { [weak self] in self?.voice.sayFace() }
+            FacePresenceController.shared.start(permissions: .live(permissions))
+        }
 
         if on(.panelUI), let preferences {
             panel = MenuBarPanel(

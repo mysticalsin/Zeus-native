@@ -4055,6 +4055,67 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Privacy card, or a spoken "how's face presence", says the status word the card shows.
+    func sayFace() {
+        presentFace(speak: true)
+    }
+
+    private func answerFace(speak: Bool) -> TurnResult {
+        presentFace(speak: speak)
+        return TurnResult(spoken: faceLine())
+    }
+
+    private func presentFace(speak: Bool) {
+        let word = faceWord()
+        let line = FaceAsk.line(word: word)
+        let plan = FaceDraw.plan(word: word)
+        buddy.idle()
+        showFace(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same word the status row shows. A face name is not read.
+    private func faceWord() -> String {
+        let controller = FacePresenceController.shared
+        return controller.machine.status(at: controller.environment.uptime()).word
+    }
+
+    private func faceLine() -> String {
+        FaceAsk.line(word: faceWord())
+    }
+
+    /// Draws Face, then the page word. The caller speaks the full line.
+    private func showFace(_ plan: FaceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFace(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFace(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFace(_ plan: FaceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4547,6 +4608,11 @@ final class VoiceTurnController {
         }
         if HeyZeusAsk.matches(transcript) {
             let result = answerHeyZeus(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FaceAsk.matches(transcript) {
+            let result = answerFace(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

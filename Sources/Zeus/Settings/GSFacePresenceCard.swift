@@ -51,6 +51,7 @@ struct GSFacePresenceCard: View {
     var setFace: (String, Bool) -> Void = { _, _ in }
     var deleteFace: (String) -> Void = { _ in }
     var enroll: () -> Void = {}
+    var speak: () -> Void = {}
 
     var body: some View {
         GSCard("Face presence") {
@@ -58,10 +59,13 @@ struct GSFacePresenceCard: View {
             GSDivider()
             GSRow(symbol: model.status.symbol, title: "Status") {
                 // The word changes in place, with tabular numerals so the countdown does not shift. Nothing animates.
-                Text(model.status.word)
-                    .font(GS.rowTitle.monospacedDigit())
-                    .foregroundStyle(GS.text)
-                    .accessibilityLabel(model.statusAccessibilityLabel)
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether you are present") { speak() }
+                    Text(model.status.word)
+                        .font(GS.rowTitle.monospacedDigit())
+                        .foregroundStyle(GS.text)
+                        .accessibilityLabel(model.statusAccessibilityLabel)
+                }
             }
             if let hint = model.status.hint {
                 Text(hint)
@@ -123,7 +127,8 @@ struct GSFacePresenceCardHost: View {
             lockAfter: store.stringBinding(FacePresenceController.lockAfterID),
             setFace: { controller.setFace($0, enabled: $1) },
             deleteFace: { controller.deleteFace($0) },
-            enroll: { controller.enroll() })
+            enroll: { controller.enroll() },
+            speak: { controller.speakFace() })
     }
 }
 

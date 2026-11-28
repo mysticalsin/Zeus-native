@@ -77,6 +77,8 @@ final class FacePresenceController {
     // MARK: State
 
     private(set) var machine = FacePresenceMachine()
+    /// The Privacy card speaks the status word it shows. A face name stays off that line.
+    var speakFace: () -> Void = {}
     /// The faces in the vault, enabled or not. Embeddings never leave this type except as `EnrolledFace` for matching.
     private(set) var faces: [FaceRecord] = []
     private(set) var vaultReadable = true
