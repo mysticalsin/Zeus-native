@@ -23,7 +23,7 @@ public struct SentenceSplitter: Sendable {
                 if following == nil { break }
             }
             if endsSentence || character == "\n" {
-                let sentence = buffer[start...index].trimmingCharacters(in: .whitespacesAndNewlines)
+                let sentence = SplitSentenceBox.trimmedSentence(String(buffer[start...index]))
                 if sentence.count > 1 { sentences.append(sentence) }
                 start = next
             }
