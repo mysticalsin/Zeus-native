@@ -8,6 +8,11 @@ enum DictationModeVoice {
     static var speakMode: () -> Void = {}
 }
 
+/// The Recording card speaks the pill, the check, pause music, and typing. It does not start dictation.
+enum DictationRecordVoice {
+    static var speakRecord: () -> Void = {}
+}
+
 /// Draft text for the Dictation page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -60,6 +65,10 @@ struct DictationSettingsPage: View {
         GSPageHeading(section: .dictation, subtitle: "Speak anywhere. Choose how it is written.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Recording") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how recording is set") { DictationRecordVoice.speakRecord() }
+            }
             GSToggleRow(symbol: "mic", title: "Dictation", text: "Hold the key to speak. Release to write it where your cursor is.",
                         isOn: Binding(get: { settings.enabled }, set: { settings.enabled = $0 }))
             GSDivider()

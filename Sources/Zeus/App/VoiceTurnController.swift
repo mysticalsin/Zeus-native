@@ -6613,6 +6613,77 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Recording card, or a spoken "how's recording set", says the four switches. It does not start dictation.
+    func sayDictationRecord() {
+        presentDictationRecord(speak: true)
+    }
+
+    private func answerDictationRecord(speak: Bool) -> TurnResult {
+        presentDictationRecord(speak: speak)
+        return TurnResult(spoken: dictationRecordLine())
+    }
+
+    private func presentDictationRecord(speak: Bool) {
+        let parts = dictationRecordParts()
+        let line = DictationRecordAsk.line(pill: parts.pill, check: parts.check, music: parts.music, type: parts.type)
+        let plan = DictationRecordDraw.plan(pill: parts.pill, check: parts.check, music: parts.music, type: parts.type)
+        buddy.idle()
+        showDictationRecord(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The pill, the check, pause music, and type instead of paste. A missing key follows the page default.
+    /// Reading them does not start dictation.
+    private func dictationRecordParts() -> (pill: String, check: String, music: String, type: String) {
+        func flag(_ key: String, default fallback: Bool) -> String {
+            let stored = UserDefaults.standard.object(forKey: key) as? Bool ?? fallback
+            return stored ? "On" : "Off"
+        }
+        return (
+            flag(RecorderPill.enabledKey, default: true),
+            flag("dictation.preview", default: false),
+            flag("dictation.pauseMedia", default: true),
+            flag("dictation.alwaysType", default: false)
+        )
+    }
+
+    private func dictationRecordLine() -> String {
+        let parts = dictationRecordParts()
+        return DictationRecordAsk.line(pill: parts.pill, check: parts.check, music: parts.music, type: parts.type)
+    }
+
+    /// Draws Record, then the four switches. The caller speaks the full line.
+    private func showDictationRecord(_ plan: DictationRecordDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDictationRecord(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDictationRecord(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDictationRecord(_ plan: DictationRecordDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7305,6 +7376,11 @@ final class VoiceTurnController {
         }
         if VoiceGlowAsk.matches(transcript) {
             let result = answerVoiceGlow(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DictationRecordAsk.matches(transcript) {
+            let result = answerDictationRecord(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
