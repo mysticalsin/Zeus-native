@@ -10454,6 +10454,82 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The separate browser, or a spoken "how is the separate browser set", says uv, browser-use, Chromium, and the site limit. Nothing is downloaded.
+    func saySeparateBrowser() {
+        presentSeparateBrowser(speak: true)
+    }
+
+    private func answerSeparateBrowser(speak: Bool) -> TurnResult {
+        presentSeparateBrowser(speak: speak)
+        return TurnResult(spoken: separateBrowserLine())
+    }
+
+    private func presentSeparateBrowser(speak: Bool) {
+        let parts = separateBrowserParts()
+        let line = SeparateBrowserAsk.line(uv: parts.uv, package: parts.package, browser: parts.browser, sites: parts.sites)
+        let plan = SeparateBrowserDraw.plan(uv: parts.uv, package: parts.package, browser: parts.browser, sites: parts.sites)
+        buddy.idle()
+        showSeparateBrowser(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The status already on the page, and the site count. Reading them does not download, launch, or speak a path or a site.
+    private func separateBrowserParts() -> (uv: String, package: String, browser: String, sites: String) {
+        let tool: (Bool) -> String = { $0 ? "Ready" : "Missing" }
+        let uv: String
+        let package: String
+        let browser: String
+        if let status = BrowserUseSetupModel.shared.status {
+            uv = tool(status.uvPath != nil)
+            package = tool(status.packageCached)
+            browser = tool(status.browserPath != nil)
+        } else {
+            uv = "Not checked"
+            package = "Not checked"
+            browser = "Not checked"
+        }
+        let count = SeparateBrowserAsk.siteCount(SettingsStore.shared.string("browserAgent.allowedDomains"))
+        let sites = count == 0 ? "Any" : String(min(count, 99))
+        return (uv, package, browser, sites)
+    }
+
+    private func separateBrowserLine() -> String {
+        let parts = separateBrowserParts()
+        return SeparateBrowserAsk.line(uv: parts.uv, package: parts.package, browser: parts.browser, sites: parts.sites)
+    }
+
+    /// Draws Separate, then uv, browser-use, Chromium, and the sites. The caller speaks the full line.
+    private func showSeparateBrowser(_ plan: SeparateBrowserDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flySeparateBrowser(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flySeparateBrowser(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flySeparateBrowser(_ plan: SeparateBrowserDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11441,6 +11517,11 @@ final class VoiceTurnController {
         }
         if LeftOutAsk.matches(transcript) {
             let result = answerLeftOut(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if SeparateBrowserAsk.matches(transcript) {
+            let result = answerSeparateBrowser(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

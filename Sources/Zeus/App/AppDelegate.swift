@@ -451,6 +451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FreezeSetupVoice.speakFreeze = { [weak self] in self?.voice.sayFreezeSetup() }
             AskWordsVoice.speakAsk = { [weak self] in self?.voice.sayAskWords() }
             LeftOutVoice.speakLeft = { [weak self] in self?.voice.sayLeftOut() }
+            SeparateBrowserVoice.speakBrowser = { [weak self] in self?.voice.saySeparateBrowser() }
             OfferSetupVoice.claudeConnected = { [weak self] in self?.guideServices.isConnected(.claude) ?? false }
             OfferSetupVoice.codexConnected = { [weak self] in self?.guideServices.isConnected(.codex) ?? false }
             MusicLightsVoice.wingsOn = { [weak self] in
