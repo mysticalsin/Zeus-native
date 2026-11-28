@@ -90,6 +90,6 @@ public enum BrainToday {
         text = text.replacingOccurrences(of: #"[📅⏳🛫✅⏫🔺🔼🔽]\s*\d{4}-\d{2}-\d{2}"#, with: "", options: .regularExpression)
         text = text.replacingOccurrences(of: #"[⏫🔺🔼🔽]"#, with: "", options: .regularExpression)
         text = text.replacingOccurrences(of: #"\[\[([^\]|]+)\|?([^\]]*)\]\]"#, with: "$1", options: .regularExpression)
-        return text.trimmingCharacters(in: .whitespaces)
+        return BrainTodayTitleBox.trimmedTitle(text)
     }
 }
