@@ -53,7 +53,7 @@ public enum ScreenAwareness {
         if let tab, let page = tab.text, !page.isEmpty {
             chunks.append(page)
         }
-        if let ax = axSummary?.trimmingCharacters(in: .whitespacesAndNewlines), !ax.isEmpty {
+        if let ax = axSummary.map(ScreenAwarenessBox.trimmedSummary), !ax.isEmpty {
             chunks.append(ax)
         }
         let text = chunks.joined(separator: "\n")
