@@ -2446,6 +2446,97 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The agenda list, or a spoken "what's on my agenda", says what is left and draws it.
+    func sayAgenda() {
+        presentAgenda(speak: true)
+    }
+
+    private func answerAgenda(speak: Bool) -> TurnResult {
+        presentAgenda(speak: speak)
+        return TurnResult(spoken: agendaLine())
+    }
+
+    private func upcomingAgenda(now: Date = Date()) -> [TopBarModel.CalendarItem] {
+        (notch.topBar?.events ?? []).filter { $0.end > now && AgendaAsk.cardTitle($0.title, limit: 200) != nil }
+            .sorted { $0.start < $1.start }
+    }
+
+    private func presentAgenda(speak: Bool) {
+        let items = upcomingAgenda()
+        if items.isEmpty {
+            if notch.topBar?.calendarAccess == .denied {
+                presentAgendaState(.access, speak: speak)
+            } else {
+                presentAgendaState(.clear, speak: speak)
+            }
+            return
+        }
+        let first = items[0]
+        let when = NextEventAsk.whenLine(first.start, allDay: first.isAllDay)
+        guard let line = AgendaAsk.line(count: items.count, title: first.title, when: when, allDay: first.isAllDay),
+              let plan = AgendaDraw.plan(count: items.count, title: first.title, when: when, allDay: first.isAllDay) else {
+            presentAgendaState(.clear, speak: speak)
+            return
+        }
+        buddy.idle()
+        showAgenda(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func agendaLine() -> String {
+        let items = upcomingAgenda()
+        if items.isEmpty {
+            return notch.topBar?.calendarAccess == .denied ? AgendaAsk.access : AgendaAsk.clear
+        }
+        let first = items[0]
+        let when = NextEventAsk.whenLine(first.start, allDay: first.isAllDay)
+        return AgendaAsk.line(count: items.count, title: first.title, when: when, allDay: first.isAllDay) ?? AgendaAsk.clear
+    }
+
+    private enum AgendaCard { case clear, access }
+
+    private func presentAgendaState(_ card: AgendaCard, speak: Bool) {
+        let line = card == .clear ? AgendaAsk.clear : AgendaAsk.access
+        let plan = card == .clear ? AgendaDraw.clear() : AgendaDraw.access()
+        buddy.idle()
+        showAgenda(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the agenda: Agenda, then the title or the count, then the time or the next title.
+    /// The caller speaks the full line.
+    private func showAgenda(_ plan: AgendaDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyAgenda(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyAgenda(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyAgenda(_ plan: AgendaDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2823,6 +2914,11 @@ final class VoiceTurnController {
         }
         if BrightnessLevelAsk.matches(transcript) {
             let result = answerBrightness(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if AgendaAsk.matches(transcript) {
+            let result = answerAgenda(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

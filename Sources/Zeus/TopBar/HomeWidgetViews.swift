@@ -375,7 +375,7 @@ struct HomeWidgetCard: View {
     }
 
     private var calendarAgenda: some View {
-        AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar })
+        AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar }, say: { topBar.speakAgenda() })
     }
 
     // MARK: Clock (analog, digital, elastic, blue halo)
@@ -958,6 +958,7 @@ struct MiniMonth: View {
 struct AgendaList: View {
     let events: [TopBarModel.CalendarItem]
     let open: () -> Void
+    var say: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -967,6 +968,7 @@ struct AgendaList: View {
                     Text(events.isEmpty ? "Nothing coming up" : "\(events.count) coming up").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
                 Spacer()
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the agenda") { say() }
                 GlanceRoundButton(symbol: "arrow.up.right", size: 24, filled: true, label: "Open Calendar", action: open)
             }
             ForEach(events.prefix(2)) { event in
