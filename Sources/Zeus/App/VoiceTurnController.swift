@@ -10073,6 +10073,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Command-line control, or a spoken "how is command line control set", says the switch and the reset notice. Nothing is changed.
+    func sayCommandSetup() {
+        presentCommandSetup(speak: true)
+    }
+
+    private func answerCommandSetup(speak: Bool) -> TurnResult {
+        presentCommandSetup(speak: speak)
+        return TurnResult(spoken: commandSetupLine())
+    }
+
+    private func presentCommandSetup(speak: Bool) {
+        let parts = commandSetupParts()
+        let line = CommandSetupAsk.line(control: parts.control, notice: parts.notice)
+        let plan = CommandSetupDraw.plan(control: parts.control, notice: parts.notice)
+        buddy.idle()
+        showCommandSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether the switch is on, and whether the reset notice is still stored. Reading them does not turn it on or dismiss the notice.
+    private func commandSetupParts() -> (control: String, notice: String) {
+        let control = CLIGateStore.isEnabled(Keychain.store) ? "On" : "Off"
+        let notice = CLIGateStore.noticePending(defaults: .standard) ? "Waiting" : "Clear"
+        return (control, notice)
+    }
+
+    private func commandSetupLine() -> String {
+        let parts = commandSetupParts()
+        return CommandSetupAsk.line(control: parts.control, notice: parts.notice)
+    }
+
+    /// Draws Command, then the switch and the notice. The caller speaks the full line.
+    private func showCommandSetup(_ plan: CommandSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCommandSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCommandSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCommandSetup(_ plan: CommandSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11030,6 +11093,11 @@ final class VoiceTurnController {
         }
         if DictateHearAsk.matches(transcript) {
             let result = answerDictateHear(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CommandSetupAsk.matches(transcript) {
+            let result = answerCommandSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

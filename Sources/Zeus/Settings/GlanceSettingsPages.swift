@@ -1653,6 +1653,11 @@ private struct PermissionsPage: View {
 
 // MARK: Privacy
 
+/// Command-line control speaks the switch and the reset notice. It does not turn the switch on or dismiss the notice.
+enum CommandSetupVoice {
+    static var speakCommand: () -> Void = {}
+}
+
 private struct PrivacyPage: View {
     let context: GSContext
     @AppStorage(DriveAutonomy.settingsKey) private var driveAutonomy = DriveAutonomy.default.rawValue
@@ -1705,6 +1710,10 @@ private struct PrivacyPage: View {
             }
         }
         GSCard("Command line") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how command-line control is set") { CommandSetupVoice.speakCommand() }
+            }
             if cliAccess.noticePending {
                 GSRow(symbol: "info.circle", title: "Command-line control was reset",
                       text: "This setting lives in your Keychain, and Zeus turned it off once.", detail: "Turn it on again below if you use the zeus command.") {
