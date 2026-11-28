@@ -6941,6 +6941,78 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Everyday actions rows, or a spoken "which everyday lights", say which are on. They do not change them.
+    func sayEverydayLights() {
+        presentEverydayLights(speak: true)
+    }
+
+    private func answerEverydayLights(speak: Bool) -> TurnResult {
+        presentEverydayLights(speak: speak)
+        return TurnResult(spoken: everydayLightsLine())
+    }
+
+    private func presentEverydayLights(speak: Bool) {
+        let words = everydayLightWords()
+        let line = EverydayLightsAsk.line(words: words)
+        let plan = EverydayLightsDraw.plan(words: words)
+        buddy.idle()
+        showEverydayLights(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Battery through caps, for each light that is on. An unset value follows the catalog default, on.
+    /// Reading them does not change the lights.
+    private func everydayLightWords() -> [String] {
+        let store = SettingsStore.shared
+        let pairs = [
+            ("lights.battery", "Battery"),
+            ("lights.rain", "Rain"),
+            ("lights.timer", "Timer"),
+            ("lights.micGlow", "Mic"),
+            ("lights.reminderGlow", "Reminder"),
+            ("lights.copy", "Copy"),
+            ("lights.shelf", "Shelf"),
+            ("lights.capsLock", "Caps"),
+        ]
+        return pairs.compactMap { store.bool($0.0) ? $0.1 : nil }
+    }
+
+    private func everydayLightsLine() -> String {
+        EverydayLightsAsk.line(words: everydayLightWords())
+    }
+
+    /// Draws Moments, then up to four lights that are on, or None. The caller speaks the full line.
+    private func showEverydayLights(_ plan: EverydayLightsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyEverydayLights(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyEverydayLights(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyEverydayLights(_ plan: EverydayLightsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7658,6 +7730,11 @@ final class VoiceTurnController {
         }
         if NotchCloseAsk.matches(transcript) {
             let result = answerNotchClose(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if EverydayLightsAsk.matches(transcript) {
+            let result = answerEverydayLights(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -33,6 +33,11 @@ enum NotchCloseVoice {
     static var speakClose: () -> Void = {}
 }
 
+/// The Everyday actions rows speak which lights are on. They do not change them.
+enum EverydayLightsVoice {
+    static var speakLights: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -424,6 +429,10 @@ private struct AppearancePage: View {
             GSToggleRow(symbol: "dot.radiowaves.left.and.right", title: "Light wave to the screen edges", text: "A wave of light leaves the notch when an agent starts or finishes.", detail: "The wave ripples across the screen and fades.", isOn: bool("halo.edgeWave"))
         }
         GSCard("Small moments, softly signaled") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which everyday lights are on") { EverydayLightsVoice.speakLights() }
+            }
             Text("Keep the visual feedback you find useful.").font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
             Text("Everyday actions").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary).padding(.top, 8)
             light("lights.battery", "battery.100.bolt", "Green gauge when plugged in", "Shows the battery level when power changes.")
