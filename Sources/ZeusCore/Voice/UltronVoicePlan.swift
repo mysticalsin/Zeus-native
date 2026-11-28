@@ -67,7 +67,7 @@ public enum UltronVoicePlan {
     /// Playback is allowed only when AUDIBLE-OK is a non-empty value other than "0".
     /// Absent (silent mode, every swarm lane) means Preview renders a file and does not play it.
     public static func previewPlaysAudio(audibleOK: String?) -> Bool {
-        let value = audibleOK?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let value = PreviewAudibleBox.trimmedAudible(audibleOK ?? "")
         return !value.isEmpty && value != "0" && value.lowercased() != "false"
     }
 }
