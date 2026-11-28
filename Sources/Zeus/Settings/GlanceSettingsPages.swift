@@ -38,6 +38,11 @@ enum EverydayLightsVoice {
     static var speakLights: () -> Void = {}
 }
 
+/// The halo arm and island rows speak those two choices. They do not change the light picture.
+enum HaloArmVoice {
+    static var speakArm: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -413,7 +418,10 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "arrow.left.and.right", title: "Halo arm width") {
-                GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the halo arm") { HaloArmVoice.speakArm() }
+                }
             }
             GSDivider()
             GSRow(symbol: "rectangle.dashed", title: "Island background",

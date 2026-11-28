@@ -7013,6 +7013,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The halo arm row, or a spoken "how's the halo arm", says the arm and the island. It does not change the light.
+    func sayHaloArm() {
+        presentHaloArm(speak: true)
+    }
+
+    private func answerHaloArm(speak: Bool) -> TurnResult {
+        presentHaloArm(speak: speak)
+        return TurnResult(spoken: haloArmLine())
+    }
+
+    private func presentHaloArm(speak: Bool) {
+        let parts = haloArmParts()
+        let line = HaloArmAsk.line(arm: parts.arm, island: parts.island)
+        let plan = HaloArmDraw.plan(arm: parts.arm, island: parts.island)
+        buddy.idle()
+        showHaloArm(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The arm menu and the island menu. An unset value follows the catalog default.
+    /// Reading them does not change the light picture.
+    private func haloArmParts() -> (arm: String, island: String) {
+        let store = SettingsStore.shared
+        return (store.string("halo.armWidth"), store.string(NotchBackground.settingID))
+    }
+
+    private func haloArmLine() -> String {
+        let parts = haloArmParts()
+        return HaloArmAsk.line(arm: parts.arm, island: parts.island)
+    }
+
+    /// Draws Reach, then the arm and the island. The caller speaks the full line.
+    private func showHaloArm(_ plan: HaloArmDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHaloArm(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHaloArm(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHaloArm(_ plan: HaloArmDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7735,6 +7798,11 @@ final class VoiceTurnController {
         }
         if EverydayLightsAsk.matches(transcript) {
             let result = answerEverydayLights(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HaloArmAsk.matches(transcript) {
+            let result = answerHaloArm(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
