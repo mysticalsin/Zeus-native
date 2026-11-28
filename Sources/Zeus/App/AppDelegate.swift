@@ -404,6 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ChromeLinkVoice.speakLink = { [weak self] in self?.voice.sayChromeLink() }
             MemoryLearnVoice.speakLearn = { [weak self] in self?.voice.sayMemoryLearn() }
             ChatHubVoice.speakHub = { [weak self] in self?.voice.sayChatHub() }
+            CalendarPageVoice.speakPage = { [weak self] in self?.voice.sayCalendarPage() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

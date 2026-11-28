@@ -13284,6 +13284,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The calendar page, or a spoken "is the calendar on today", says the picked day and whether an event is open.
+    func sayCalendarPage() {
+        presentCalendarPage(speak: true)
+    }
+
+    private func answerCalendarPage(speak: Bool) -> TurnResult {
+        presentCalendarPage(speak: speak)
+        return TurnResult(spoken: calendarPageLine())
+    }
+
+    private func presentCalendarPage(speak: Bool) {
+        let parts = calendarPageParts()
+        let line = CalendarPageAsk.line(day: parts.day, panel: parts.panel)
+        let plan = CalendarPageDraw.plan(day: parts.day, panel: parts.panel)
+        buddy.idle()
+        showCalendarPage(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The picked day and the open event panel. Reading them does not fetch events or add one.
+    private func calendarPageParts() -> (day: String, panel: String) {
+        guard let bar = notch.topBar else { return ("Today", "Closed") }
+        let today = ZeusDates.calendar().isDate(bar.calendarDay, inSameDayAs: Date())
+        return (today ? "Today" : "Other", bar.calendarDetailID == nil ? "Closed" : "Open")
+    }
+
+    private func calendarPageLine() -> String {
+        let parts = calendarPageParts()
+        return CalendarPageAsk.line(day: parts.day, panel: parts.panel)
+    }
+
+    /// Draws Day, then the picked day and the event panel. The caller speaks the full line.
+    private func showCalendarPage(_ plan: CalendarPageDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCalendarPage(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCalendarPage(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCalendarPage(_ plan: CalendarPageDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14481,6 +14544,11 @@ final class VoiceTurnController {
         }
         if ChatHubAsk.matches(transcript) {
             let result = answerChatHub(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CalendarPageAsk.matches(transcript) {
+            let result = answerCalendarPage(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -713,11 +713,20 @@ struct OutputDeviceMenu: View {
     }
 }
 
+/// The calendar page speaks whether the picked day is today and whether an event is open. It does not add an event.
+enum CalendarPageVoice {
+    static var speakPage: () -> Void = {}
+}
+
 struct CalendarPage: View {
     let topBar: TopBarModel
 
     var body: some View {
         VStack(spacing: 8) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which day the calendar is showing") { CalendarPageVoice.speakPage() }
+            }
             QuickAddEventBar(topBar: topBar)
             if topBar.calendarAccess == .denied {
                 AccessPrompt(symbol: "calendar", title: "See and add events",
