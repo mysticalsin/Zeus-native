@@ -603,6 +603,11 @@ private struct AppearancePage: View {
     }
 }
 
+/// The world clock and countdown speak the city choice, whether a title is set, and the day. The words stay unspoken.
+enum HomeLaterVoice {
+    static var speakLater: () -> Void = {}
+}
+
 /// The Home backdrop speaks the drawing and whether it moves. It does not change the backdrop.
 enum HomeBackdropVoice {
     static var speakBackdrop: () -> Void = {}
@@ -638,6 +643,10 @@ private struct HomeAppearanceCard: View {
             GSDivider()
             style("calendar", "Calendar style", "home.variant.calendar")
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the world clock and countdown are set") { HomeLaterVoice.speakLater() }
+            }
             GSRow(symbol: "globe", title: "World clock cities", text: "Time zone names, like Europe/London.") {
                 GSTextInput(text: SettingsStore.binding("home.worldClock.zones"), placeholder: "Europe/London, Asia/Tokyo", label: "World clock cities")
             }

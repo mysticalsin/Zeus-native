@@ -9742,6 +9742,75 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The world clock and countdown, or a spoken "how is the world clock set", say the city choice, the title, and the day. The title and the city list stay unspoken.
+    func sayHomeLater() {
+        presentHomeLater(speak: true)
+    }
+
+    private func answerHomeLater(speak: Bool) -> TurnResult {
+        presentHomeLater(speak: speak)
+        return TurnResult(spoken: homeLaterLine())
+    }
+
+    private func presentHomeLater(speak: Bool) {
+        let parts = homeLaterParts()
+        let line = HomeLaterAsk.line(cities: parts.cities, title: parts.title, day: parts.day)
+        let plan = HomeLaterDraw.plan(cities: parts.cities, title: parts.title, day: parts.day)
+        buddy.idle()
+        showHomeLater(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The stored city list, title, and day. Reading them does not change Home or speak the title.
+    private func homeLaterParts() -> (cities: String, title: String, day: String) {
+        let store = SettingsStore.shared
+        let zones = store.string("home.worldClock.zones").trimmingCharacters(in: .whitespacesAndNewlines)
+        let cities: String
+        if zones.isEmpty { cities = "None" }
+        else if zones == HomeLaterAsk.defaultCities { cities = "Default" }
+        else { cities = "Custom" }
+        let title = store.string("home.countdown.title").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : "Set"
+        let dayRaw = store.string("home.countdown.date").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (cities, title, dayRaw.isEmpty ? "None" : dayRaw)
+    }
+
+    private func homeLaterLine() -> String {
+        let parts = homeLaterParts()
+        return HomeLaterAsk.line(cities: parts.cities, title: parts.title, day: parts.day)
+    }
+
+    /// Draws Later, then the cities, the title, and the day. The caller speaks the full line.
+    private func showHomeLater(_ plan: HomeLaterDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHomeLater(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHomeLater(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHomeLater(_ plan: HomeLaterDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10674,6 +10743,11 @@ final class VoiceTurnController {
         }
         if HotspotSetupAsk.matches(transcript) {
             let result = answerHotspotSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HomeLaterAsk.matches(transcript) {
+            let result = answerHomeLater(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
