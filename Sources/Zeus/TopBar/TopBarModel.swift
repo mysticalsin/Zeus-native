@@ -79,6 +79,13 @@ final class TopBarModel {
     var calendarDetailID: String?
     var quickAddText = ""
     var quickAddNote: String?
+    /// The notch Add button speaks and draws the result. The voice command uses its own path.
+    var speakQuickAdd: (QuickAddSpeech) -> Void = { _ in }
+
+    enum QuickAddSpeech {
+        case added(CalendarQuickAdd.Parsed)
+        case problem(String)
+    }
     /// Reads a stretch of days from the calendar (wired by the services; empty without access).
     var fetchEvents: (Date, Date) -> [CalendarItem] = { _, _ in [] }
     /// Saves an event; asks for Calendar access only here, the first time (wired by the services).

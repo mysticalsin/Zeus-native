@@ -959,6 +959,32 @@ final class VoiceTurnController {
         return formatter.string(from: event.start)
     }
 
+    /// The notch added an event. The screen shows Calendar, then the title, then the time, while Zeus says so.
+    func sayAddedEvent(_ event: CalendarQuickAdd.Parsed) {
+        let when = Self.eventWhen(event)
+        let line = "Added \(event.title) to your calendar."
+        guard let plan = CalendarEventDraw.plan(title: event.title, when: when) else {
+            say(line)
+            return
+        }
+        showCalendarEvent(plan, speak: true)
+        say(line)
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// A notch add that did not finish. Access and calendar failures use their cards. Other notes stay on the field.
+    func sayCalendarProblem(_ line: String) {
+        if let visual = CalendarAccessDraw.from(line: line) {
+            showCalendarAccess(visual, speak: true)
+            say(line)
+            buddy.showCaption(visual.boltCaption(at: 0))
+        } else if let visual = CalendarFailDraw.from(line: line) {
+            showCalendarFail(visual, speak: true)
+            say(line)
+            buddy.showCaption(visual.boltCaption(at: 0))
+        }
+    }
+
     /// Draws a calendar event on the display under the pointer: the word Calendar, then the title, then the time.
     /// The caller speaks the full line. The marks still appear when that speech is off.
     private func showCalendarEvent(_ plan: CalendarEventDraw, speak: Bool) {

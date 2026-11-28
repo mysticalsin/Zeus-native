@@ -753,7 +753,14 @@ private struct QuickAddEventBar: View {
     private func submit() {
         let text = topBar.quickAddText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        Task { @MainActor in _ = await topBar.addEvent(from: text) }
+        Task { @MainActor in
+            let problem = await topBar.addEvent(from: text)
+            if let problem {
+                topBar.speakQuickAdd(.problem(problem))
+            } else if let parsed = CalendarQuickAdd.parse(text) {
+                topBar.speakQuickAdd(.added(parsed))
+            }
+        }
     }
 }
 
