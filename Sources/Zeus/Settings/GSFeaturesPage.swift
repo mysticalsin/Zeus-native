@@ -12,6 +12,11 @@ enum BrowserAgentVoice {
     static var speakAgent: () -> Void = {}
 }
 
+/// The Coding in the terminal card speaks the agent and the terminal. It does not start a session.
+enum CodingSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -75,6 +80,10 @@ struct FeaturesSettingsPage: View {
             }
         }
         GSCard("Coding in the terminal") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how coding is set") { CodingSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "chevron.left.forwardslash.chevron.right", title: "Default coding agent", text: "Used when you say \u{201C}fix the login bug in zeus\u{201D} without naming one.") {
                 GSPopup(selection: Binding(get: { CodingTool(rawValue: codingTool)?.title ?? CodingTool.claude.title },
                                            set: { title in codingTool = (CodingTool.allCases.first { $0.title == title } ?? .claude).rawValue }),
