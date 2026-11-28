@@ -12966,6 +12966,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The reminder chips, or a spoken "which reminders are showing", say the open list and a waiting due time.
+    func sayReminderList() {
+        presentReminderList(speak: true)
+    }
+
+    private func answerReminderList(speak: Bool) -> TurnResult {
+        presentReminderList(speak: speak)
+        return TurnResult(spoken: reminderListLine())
+    }
+
+    private func presentReminderList(speak: Bool) {
+        let parts = reminderListParts()
+        let line = ReminderListAsk.line(list: parts.list, due: parts.due)
+        let plan = ReminderListDraw.plan(list: parts.list, due: parts.due)
+        buddy.idle()
+        showReminderList(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The chips already on the Reminders page. Reading them does not fetch reminders or ask for access.
+    private func reminderListParts() -> (list: String, due: String) {
+        let reminders = RemindersController.shared
+        return (reminders.filter.rawValue, reminders.pendingDue?.rawValue ?? "None")
+    }
+
+    private func reminderListLine() -> String {
+        let parts = reminderListParts()
+        return ReminderListAsk.line(list: parts.list, due: parts.due)
+    }
+
+    /// Draws Lists, then the open list and the due chip. The caller speaks the full line.
+    private func showReminderList(_ plan: ReminderListDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyReminderList(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyReminderList(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyReminderList(_ plan: ReminderListDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14138,6 +14200,11 @@ final class VoiceTurnController {
         }
         if PlaybackModeAsk.matches(transcript) {
             let result = answerPlaybackMode(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ReminderListAsk.matches(transcript) {
+            let result = answerReminderList(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

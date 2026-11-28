@@ -189,6 +189,11 @@ struct TodayPage: View {
 
 // MARK: Reminders
 
+/// The reminder chips speak the open list and a waiting due time. They do not read or add a reminder.
+enum ReminderListVoice {
+    static var speakList: () -> Void = {}
+}
+
 struct RemindersPage: View {
     let topBar: TopBarModel
     @Bindable var reminders: RemindersController
@@ -205,6 +210,7 @@ struct RemindersPage: View {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the next reminder") { sayNextReminder() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which reminders are showing") { ReminderListVoice.speakList() }
                         ForEach(ReminderFilter.allCases) { filter in
                             ReminderChip(title: filter.rawValue, count: reminders.count(for: filter), selected: reminders.filter == filter) { reminders.filter = filter }
                         }

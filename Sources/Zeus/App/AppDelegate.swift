@@ -397,6 +397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ModelCapVoice.speakCap = { [weak self] in self?.voice.sayModelCap() }
             FocusLengthVoice.speakLength = { [weak self] in self?.voice.sayFocusLength() }
             PlaybackModeVoice.speakModes = { [weak self] in self?.voice.sayPlaybackMode() }
+            ReminderListVoice.speakList = { [weak self] in self?.voice.sayReminderList() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
