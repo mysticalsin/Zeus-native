@@ -98,7 +98,7 @@ public struct ChatConversation: Codable, Equatable, Identifiable, Sendable {
     }
 
     public func matches(_ query: String) -> Bool {
-        let needle = query.trimmingCharacters(in: .whitespaces)
+        let needle = ChatQueryBox.trimmedQuery(query)
         guard !needle.isEmpty else { return true }
         return displayTitle.localizedCaseInsensitiveContains(needle)
             || messages.contains { $0.text.localizedCaseInsensitiveContains(needle) }
