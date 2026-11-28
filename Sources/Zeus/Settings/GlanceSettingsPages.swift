@@ -132,6 +132,10 @@ private struct GeneralPage: View {
         }
         GSSetupCard(openGuide: openGuide)
         GSCard("Keep awake") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how keep awake is set") { KeepAwakeSession.speakSetup() }
+            }
             GSRow(symbol: "timer", title: "Session length", text: "How long the cup on Home keeps the Mac awake.") {
                 GSPopup(selection: Binding(
                     get: { KeepAwakeLength.label(keepAwake.homeMinutes) },

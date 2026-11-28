@@ -10,6 +10,8 @@ import ZeusCore
 @MainActor @Observable
 final class KeepAwakeSession {
     static let shared = KeepAwakeSession()
+    /// The Keep awake card speaks the length, the battery floor, and heat. It does not start a session.
+    static var speakSetup: () -> Void = {}
 
     /// Preset minutes offered in Settings / Home.
     static let presets = KeepAwakeLength.short

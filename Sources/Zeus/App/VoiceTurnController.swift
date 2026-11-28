@@ -5617,6 +5617,77 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Keep awake card, or a spoken "how's keep awake set", says the three limits. It does not start a session.
+    func sayKeepAwakeSetup() {
+        presentKeepAwakeSetup(speak: true)
+    }
+
+    private func answerKeepAwakeSetup(speak: Bool) -> TurnResult {
+        presentKeepAwakeSetup(speak: speak)
+        return TurnResult(spoken: keepAwakeSetupLine())
+    }
+
+    private func presentKeepAwakeSetup(speak: Bool) {
+        let parts = keepAwakeSetupParts()
+        let line = KeepAwakeSetupAsk.line(length: parts.length, floor: parts.floor, heat: parts.heat)
+        let plan = KeepAwakeSetupDraw.plan(length: parts.length, floor: parts.floor, heat: parts.heat)
+        buddy.idle()
+        showKeepAwakeSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same reads as the Keep awake card. A missing key keeps the page default.
+    /// Reading them does not start a session or take a power assertion.
+    private func keepAwakeSetupParts() -> (length: String, floor: String, heat: String) {
+        let defaults = UserDefaults.standard
+        let minutes: Int?
+        if let stored = defaults.object(forKey: "keepAwake.homeMinutes") as? Int {
+            minutes = stored > 0 ? stored : nil
+        } else {
+            minutes = 30
+        }
+        let floor = defaults.object(forKey: "keepAwake.batteryFloor") as? Int ?? 10
+        let hot = defaults.object(forKey: "keepAwake.endWhenHot") as? Bool ?? true
+        return (KeepAwakeLength.label(minutes), KeepAwakeRules.floorLabel(floor), hot ? "On" : "Off")
+    }
+
+    private func keepAwakeSetupLine() -> String {
+        let parts = keepAwakeSetupParts()
+        return KeepAwakeSetupAsk.line(length: parts.length, floor: parts.floor, heat: parts.heat)
+    }
+
+    /// Draws Limits, then the length, the floor, and heat. The caller speaks the full line.
+    private func showKeepAwakeSetup(_ plan: KeepAwakeSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyKeepAwakeSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyKeepAwakeSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyKeepAwakeSetup(_ plan: KeepAwakeSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6234,6 +6305,11 @@ final class VoiceTurnController {
         }
         if PolyglotSetupAsk.matches(transcript) {
             let result = answerPolyglotSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if KeepAwakeSetupAsk.matches(transcript) {
+            let result = answerKeepAwakeSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
