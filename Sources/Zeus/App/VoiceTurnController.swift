@@ -9482,6 +9482,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Per-app sound, or a spoken "is per-app sound on", says the switch and whether any saved apps are shaped. Nothing is tapped.
+    func sayBandSetup() {
+        presentBandSetup(speak: true)
+    }
+
+    private func answerBandSetup(speak: Bool) -> TurnResult {
+        presentBandSetup(speak: speak)
+        return TurnResult(spoken: bandSetupLine())
+    }
+
+    private func presentBandSetup(speak: Bool) {
+        let parts = bandSetupParts()
+        let line = BandSetupAsk.line(shape: parts.shape, saved: parts.saved, shaped: parts.shaped)
+        let plan = BandSetupDraw.plan(shape: parts.shape, saved: parts.saved, shaped: parts.shaped)
+        buddy.idle()
+        showBandSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The switch and the saved book. Reading the book does not start a tap or speak an app name.
+    private func bandSetupParts() -> (shape: String, saved: String, shaped: String) {
+        let shape = SettingsStore.shared.bool("audio.equaliser") ? "On" : "Off"
+        let decoded = AppSoundBook.decode(UserDefaults.standard.data(forKey: AppSoundBook.storageKey))
+        if decoded.failed { return (shape, "Unreadable", "None") }
+        if decoded.book.apps.isEmpty { return (shape, "None", "None") }
+        let shaped = decoded.book.apps.values.contains { $0.shapes } ? "Some" : "None"
+        return (shape, "Chosen", shaped)
+    }
+
+    private func bandSetupLine() -> String {
+        let parts = bandSetupParts()
+        return BandSetupAsk.line(shape: parts.shape, saved: parts.saved, shaped: parts.shaped)
+    }
+
+    /// Draws Bands, then the switch, the saved list, and whether any are shaped. The caller speaks the full line.
+    private func showBandSetup(_ plan: BandSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyBandSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyBandSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyBandSetup(_ plan: BandSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10394,6 +10460,11 @@ final class VoiceTurnController {
         }
         if HaloWashAsk.matches(transcript) {
             let result = answerHaloWash(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if BandSetupAsk.matches(transcript) {
+            let result = answerBandSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
