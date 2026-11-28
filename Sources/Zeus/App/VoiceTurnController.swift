@@ -9811,6 +9811,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Voice keys, or a spoken "which voice keys are saved", say whether each cloud voice has a key. The keys stay unspoken.
+    func sayVoiceKeys() {
+        presentVoiceKeys(speak: true)
+    }
+
+    private func answerVoiceKeys(speak: Bool) -> TurnResult {
+        presentVoiceKeys(speak: speak)
+        return TurnResult(spoken: voiceKeyLine())
+    }
+
+    private func presentVoiceKeys(speak: Bool) {
+        let parts = voiceKeyParts()
+        let line = VoiceKeyAsk.line(eleven: parts.eleven, openAI: parts.openAI, gemini: parts.gemini)
+        let plan = VoiceKeyDraw.plan(eleven: parts.eleven, openAI: parts.openAI, gemini: parts.gemini)
+        buddy.idle()
+        showVoiceKeys(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved flags the voice page already shows. Reading them does not save, remove, or speak a key.
+    private func voiceKeyParts() -> (eleven: String, openAI: String, gemini: String) {
+        let voice = VoiceSettings.shared
+        func mark(_ saved: Bool) -> String { saved ? "Saved" : "None" }
+        return (mark(voice.elevenKeySaved), mark(voice.openAIKeySaved), mark(voice.geminiKeySaved))
+    }
+
+    private func voiceKeyLine() -> String {
+        let parts = voiceKeyParts()
+        return VoiceKeyAsk.line(eleven: parts.eleven, openAI: parts.openAI, gemini: parts.gemini)
+    }
+
+    /// Draws Keys, then ElevenLabs, OpenAI, and Gemini. The caller speaks the full line.
+    private func showVoiceKeys(_ plan: VoiceKeyDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVoiceKeys(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVoiceKeys(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVoiceKeys(_ plan: VoiceKeyDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10748,6 +10811,11 @@ final class VoiceTurnController {
         }
         if HomeLaterAsk.matches(transcript) {
             let result = answerHomeLater(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VoiceKeyAsk.matches(transcript) {
+            let result = answerVoiceKeys(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

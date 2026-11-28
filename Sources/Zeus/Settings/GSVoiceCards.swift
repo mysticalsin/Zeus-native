@@ -6,6 +6,11 @@ enum VoiceStyleVoice {
     static var speakStyle: () -> Void = {}
 }
 
+/// The cloud voice keys speak whether ElevenLabs, OpenAI, and Gemini are saved. The keys stay unspoken.
+enum VoiceKeyVoice {
+    static var speakKeys: () -> Void = {}
+}
+
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
     let navigation: GSNavigation
@@ -21,6 +26,10 @@ struct ZeusVoiceCards: View {
 
     var body: some View {
         GSCard {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which voice keys are saved") { VoiceKeyVoice.speakKeys() }
+            }
             GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus uses ElevenLabs only when you pick it below." : "Optional cloud voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain. A saved key does not select this voice.") {
                 HStack(spacing: 10) {
                     SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
