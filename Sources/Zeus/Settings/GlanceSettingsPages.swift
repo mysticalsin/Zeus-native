@@ -1206,6 +1206,10 @@ private struct VoicePage: View {
         }
         WakeWordCard()
         GSCard("Approval keywords") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how approval words are set") { KeywordSetupVoice.speakWords() }
+            }
             GSToggleRow(symbol: "waveform", title: "Listen for approval keywords",
                         text: "This opens the microphone only while a card is waiting.", detail: "Say a keyword such as yes or no. Off until you turn it on.",
                         isOn: bool("voice.answers"))
@@ -1366,12 +1370,17 @@ enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
 }
 
-/// New chats speak whether Claude Code and Codex are offered and connected. Nothing is connected or changed.
+/// Approval keywords speak listening and whether each list is still the default. Custom words stay unspoken.
+enum KeywordSetupVoice {
+    static var speakWords: () -> Void = {}
+}
+
 /// Privacy speaks project details, synced lyrics, and Chrome media. It does not fetch or change them.
 enum ShareSetupVoice {
     static var speakShare: () -> Void = {}
 }
 
+/// New chats speak whether Claude Code and Codex are offered and connected. Nothing is connected or changed.
 enum OfferSetupVoice {
     static var speakOffer: () -> Void = {}
     static var claudeConnected: () -> Bool = { false }

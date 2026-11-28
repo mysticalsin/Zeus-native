@@ -430,6 +430,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ScriptSetupVoice.speakScript = { [weak self] in self?.voice.sayScriptSetup() }
             OfferSetupVoice.speakOffer = { [weak self] in self?.voice.sayOfferSetup() }
             ShareSetupVoice.speakShare = { [weak self] in self?.voice.sayShareSetup() }
+            KeywordSetupVoice.speakWords = { [weak self] in self?.voice.sayKeywordSetup() }
             OfferSetupVoice.claudeConnected = { [weak self] in self?.guideServices.isConnected(.claude) ?? false }
             OfferSetupVoice.codexConnected = { [weak self] in self?.guideServices.isConnected(.codex) ?? false }
             MusicLightsVoice.wingsOn = { [weak self] in
