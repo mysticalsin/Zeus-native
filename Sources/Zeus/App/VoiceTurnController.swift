@@ -9874,6 +9874,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Update settings, or a spoken "are automatic updates on", say the check and whether a feed is set. Nothing is fetched.
+    func sayUpdateSetup() {
+        presentUpdateSetup(speak: true)
+    }
+
+    private func answerUpdateSetup(speak: Bool) -> TurnResult {
+        presentUpdateSetup(speak: speak)
+        return TurnResult(spoken: updateSetupLine())
+    }
+
+    private func presentUpdateSetup(speak: Bool) {
+        let parts = updateSetupParts()
+        let line = UpdateSetupAsk.line(check: parts.check, feed: parts.feed)
+        let plan = UpdateSetupDraw.plan(check: parts.check, feed: parts.feed)
+        buddy.idle()
+        showUpdateSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether automatic checks are on, and whether a feed address is stored. Reading them does not fetch or speak the address.
+    private func updateSetupParts() -> (check: String, feed: String) {
+        let store = SettingsStore.shared
+        let feed = store.string("about.updateFeedURL").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : "Set"
+        return (store.bool("about.autoUpdate") ? "On" : "Off", feed)
+    }
+
+    private func updateSetupLine() -> String {
+        let parts = updateSetupParts()
+        return UpdateSetupAsk.line(check: parts.check, feed: parts.feed)
+    }
+
+    /// Draws Updates, then the check and the feed. The caller speaks the full line.
+    private func showUpdateSetup(_ plan: UpdateSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyUpdateSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyUpdateSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyUpdateSetup(_ plan: UpdateSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10816,6 +10879,11 @@ final class VoiceTurnController {
         }
         if VoiceKeyAsk.matches(transcript) {
             let result = answerVoiceKeys(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if UpdateSetupAsk.matches(transcript) {
+            let result = answerUpdateSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

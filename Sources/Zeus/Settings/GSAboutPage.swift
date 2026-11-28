@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Updates speak whether automatic checks are on and whether a feed is set. The address stays unspoken, and nothing is fetched.
+enum UpdateSetupVoice {
+    static var speakUpdates: () -> Void = {}
+}
+
 /// The links the About page offers. A link that is nil is not drawn.
 enum AboutLinks {
     /// Set this to the owner's LinkedIn profile URL; the button stays hidden while it is nil.
@@ -60,6 +65,10 @@ struct AboutPage: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         GSCard {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how updates are set") { UpdateSetupVoice.speakUpdates() }
+            }
             GSRow(symbol: "arrow.triangle.2.circlepath", title: "Check for Updates",
                   text: checked ? "Checked. An available update appears at the top of this page." : nil) {
                 Button("Check now") {
