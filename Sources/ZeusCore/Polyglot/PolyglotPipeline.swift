@@ -364,7 +364,7 @@ public actor PolyglotPipeline {
             let answers = try await translator.translate(batch.requests, from: batch.language, to: destination)
             guard revision == targetRevision, content == contentRevision else { return }
             // An empty answer means the translator had nothing for that line: leave it as heard, never blank.
-            for (request, answer) in zip(batch.requests, answers) where !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            for (request, answer) in zip(batch.requests, answers) where !PolyglotAnswerBox.trimmedAnswer(answer).isEmpty {
                 emit(.translated(id: request.id, text: answer, target: destination))
             }
         } catch {
