@@ -103,7 +103,7 @@ public struct ScribeExtractiveNotesGenerator: ScribeNotesGenerator {
 
     public func generate(from transcript: ScribeTranscript) throws -> ScribeGeneratedNotes {
         let lines = transcript.finalSegments
-            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { ScribeNotesLineBox.trimmedLine($0.text) }
             .filter { !$0.isEmpty }
 
         var decisions: [String] = []
