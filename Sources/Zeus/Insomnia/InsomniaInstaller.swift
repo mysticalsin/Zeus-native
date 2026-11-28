@@ -127,7 +127,7 @@ struct InsomniaInstaller: Sendable {
     private static func failure(_ result: InsomniaCommandResult) -> Outcome? {
         guard !result.ok else { return nil }
         if result.stderr.contains("-128") { return .cancelled }
-        let detail = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        let detail = InsomniaFailureDetailBox.trimmedFailure(result.stderr)
         return .failed(detail.isEmpty ? "The admin step failed (exit \(result.status))." : detail)
     }
 }
