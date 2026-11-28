@@ -13,6 +13,7 @@ struct RecordlyPage: View {
         VStack(spacing: 6) {
             HStack {
                 Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many screens") { topBar.speakScreens() }
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if recording") { topBar.speakRecording() }
             }
             HStack(spacing: 8) {

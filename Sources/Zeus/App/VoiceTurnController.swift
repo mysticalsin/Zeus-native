@@ -3352,6 +3352,82 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Recordly page, or a spoken "how many screens", says the count and the display in use.
+    func sayScreens() {
+        presentScreens(speak: true)
+    }
+
+    private func answerScreens(speak: Bool) -> TurnResult {
+        presentScreens(speak: speak)
+        return TurnResult(spoken: screensLine())
+    }
+
+    /// The displays attached now, and the name of the one under the pointer.
+    private func screenFacts() -> (count: Int, name: String) {
+        let screens = NSScreen.screens
+        let pointer = NSEvent.mouseLocation
+        let current = screens.first { $0.frame.contains(pointer) } ?? NSScreen.main ?? screens.first
+        return (screens.count, current?.localizedName ?? "")
+    }
+
+    private func presentScreens(speak: Bool) {
+        let facts = screenFacts()
+        guard let line = ScreenCountAsk.line(count: facts.count, name: facts.name),
+              let plan = ScreenCountDraw.plan(count: facts.count, name: facts.name) else {
+            presentScreensUnseen(speak: speak)
+            return
+        }
+        buddy.idle()
+        showScreens(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func screensLine() -> String {
+        let facts = screenFacts()
+        return ScreenCountAsk.line(count: facts.count, name: facts.name) ?? ScreenCountAsk.unseen
+    }
+
+    private func presentScreensUnseen(speak: Bool) {
+        let line = ScreenCountAsk.unseen
+        let plan = ScreenCountDraw.unseen()
+        buddy.idle()
+        showScreens(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the displays: Screens, then the count or the name. The caller speaks the full line.
+    private func showScreens(_ plan: ScreenCountDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyScreens(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyScreens(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyScreens(_ plan: ScreenCountDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3789,6 +3865,11 @@ final class VoiceTurnController {
         }
         if TilingStatusAsk.matches(transcript) {
             let result = answerTiling(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ScreenCountAsk.matches(transcript) {
+            let result = answerScreens(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

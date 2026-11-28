@@ -337,6 +337,8 @@ final class TopBarModel {
     var speakDarkMode: () -> Void = {}
     /// The Tiling page speaks the same word it shows.
     var speakTiling: () -> Void = {}
+    /// The Recordly page speaks how many displays are attached.
+    var speakScreens: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

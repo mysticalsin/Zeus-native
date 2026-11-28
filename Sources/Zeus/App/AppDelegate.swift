@@ -342,6 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakRecording = { [weak self] in self?.voice.sayRecording() }
             topBar.speakDarkMode = { [weak self] in self?.voice.sayDarkMode() }
             topBar.speakTiling = { [weak self] in self?.voice.sayTiling() }
+            topBar.speakScreens = { [weak self] in self?.voice.sayScreens() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
