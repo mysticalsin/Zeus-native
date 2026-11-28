@@ -11900,6 +11900,73 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Cursor and Gemini offers, or a spoken "are cursor and gemini offered", say whether each can start a new chat.
+    func sayExtraOffer() {
+        presentExtraOffer(speak: true)
+    }
+
+    private func answerExtraOffer(speak: Bool) -> TurnResult {
+        presentExtraOffer(speak: speak)
+        return TurnResult(spoken: extraOfferLine())
+    }
+
+    private func presentExtraOffer(speak: Bool) {
+        let parts = extraOfferParts()
+        let line = ExtraOfferAsk.line(cursor: parts.cursor, gemini: parts.gemini)
+        let plan = ExtraOfferDraw.plan(cursor: parts.cursor, gemini: parts.gemini)
+        buddy.idle()
+        showExtraOffer(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The two extra offers. A missing value is on, the same as the page, and a tool that is not on this Mac stays off.
+    /// Looking for the app or command does not connect it, and the path is not spoken.
+    private func extraOfferParts() -> (cursor: String, gemini: String) {
+        func shown(_ provider: AIProvider) -> String {
+            let stored = (UserDefaults.standard.object(forKey: provider.offerKey) as? Bool) ?? true
+            let present = AIProviderDetector.detect(provider).isInstalled
+            return stored && present ? "On" : "Off"
+        }
+        return (shown(.cursor), shown(.gemini))
+    }
+
+    private func extraOfferLine() -> String {
+        let parts = extraOfferParts()
+        return ExtraOfferAsk.line(cursor: parts.cursor, gemini: parts.gemini)
+    }
+
+    /// Draws More, then the two offers. The caller speaks the full line.
+    private func showExtraOffer(_ plan: ExtraOfferDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyExtraOffer(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyExtraOffer(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyExtraOffer(_ plan: ExtraOfferDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12992,6 +13059,11 @@ final class VoiceTurnController {
         }
         if AgentFinishAsk.matches(transcript) {
             let result = answerAgentFinish(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ExtraOfferAsk.matches(transcript) {
+            let result = answerExtraOffer(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

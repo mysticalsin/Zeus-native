@@ -482,6 +482,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             TodoSetupVoice.speakTodos = { [weak self] in self?.voice.sayTodoSetup() }
             BrainSetupVoice.speakBrain = { [weak self] in self?.voice.sayBrainSetup() }
             AgentFinishVoice.speakFinish = { [weak self] in self?.voice.sayAgentFinish() }
+            ExtraOfferVoice.speakOffers = { [weak self] in self?.voice.sayExtraOffer() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }

@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Cursor and Gemini new-chat offers. Claude Code and Codex stay on their own ask. Nothing is connected.
+enum ExtraOfferVoice {
+    static var speakOffers: () -> Void = {}
+}
+
 /// Settings > Integrations: every AI Zeus can follow or hand work to, each with its own mark,
 /// Connect, Check again, a status and "Offer for new chats". Installed tools are found by looking
 /// for files and local ports only.
@@ -34,6 +39,10 @@ struct AIConnectionsPage: View {
         AnyLLMCard(services: services)
         DirectConnectionsCard()
         GSCard("Available apps") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether Cursor and Gemini are offered") { ExtraOfferVoice.speakOffers() }
+            }
             let shown = AIProvider.allCases.filter { provider in
                 guard provider.supportsNewChats else { return false }
                 return model.installed(provider) || model.status(provider, services: services) != .notInstalled
