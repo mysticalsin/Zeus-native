@@ -28,6 +28,11 @@ enum ScreenCornerVoice {
     static var speakCorners: () -> Void = {}
 }
 
+/// The Card details card speaks auto-hide and the close delay. It does not close the notch.
+enum NotchCloseVoice {
+    static var speakClose: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -338,6 +343,10 @@ private struct AppearancePage: View {
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the notch closes") { NotchCloseVoice.speakClose() }
+            }
             GSToggleRow(symbol: "rectangle.topthird.inset.filled", title: "Hide the notch automatically", text: "Closes when you move the pointer away.", isOn: bool("notch.autoHide"))
             GSDivider()
             GSRow(symbol: "timer", title: "Delay before closing") {
