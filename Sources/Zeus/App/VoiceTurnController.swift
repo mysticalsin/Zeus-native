@@ -14004,6 +14004,67 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The music lyrics, or a spoken "are the lyrics showing", says whether they are on screen and whether the playhead is being dragged.
+    func sayLyricShow() {
+        presentLyricShow(speak: true)
+    }
+
+    private func answerLyricShow(speak: Bool) -> TurnResult {
+        presentLyricShow(speak: speak)
+        return TurnResult(spoken: lyricShowLine())
+    }
+
+    private func presentLyricShow(speak: Bool) {
+        let parts = lyricShowParts()
+        let line = LyricShowAsk.line(show: parts.show, scrub: parts.scrub)
+        let plan = LyricShowDraw.plan(show: parts.show, scrub: parts.scrub)
+        buddy.idle()
+        showLyricShow(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether lyrics are on the Music page, and whether a finger is on the playhead. Reading them does not seek or toggle lyrics.
+    private func lyricShowParts() -> (show: String, scrub: String) {
+        (LyricsToggle.liveShow ? "On" : "Off", ScrubState.shared.fraction == nil ? "Off" : "On")
+    }
+
+    private func lyricShowLine() -> String {
+        let parts = lyricShowParts()
+        return LyricShowAsk.line(show: parts.show, scrub: parts.scrub)
+    }
+
+    /// Draws Lyrics, then showing and the playhead. The caller speaks the full line.
+    private func showLyricShow(_ plan: LyricShowDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyLyricShow(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyLyricShow(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyLyricShow(_ plan: LyricShowDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -15256,6 +15317,11 @@ final class VoiceTurnController {
         }
         if ChatPaneAsk.matches(transcript) {
             let result = answerChatPane(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if LyricShowAsk.matches(transcript) {
+            let result = answerLyricShow(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

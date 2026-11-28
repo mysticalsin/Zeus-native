@@ -420,6 +420,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return ChatModel.shared.conversations.filter(\.pinned).count
             }
             ChatPaneVoice.speakPane = { [weak self] in self?.voice.sayChatPane() }
+            LyricShowVoice.speakLyrics = { [weak self] in self?.voice.sayLyricShow() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

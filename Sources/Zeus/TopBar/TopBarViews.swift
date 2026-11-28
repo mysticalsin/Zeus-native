@@ -561,6 +561,11 @@ enum PlaybackModeVoice {
     static var speakModes: () -> Void = {}
 }
 
+/// Lyrics speak whether they are on screen and whether the playhead is being dragged. They do not seek.
+enum LyricShowVoice {
+    static var speakLyrics: () -> Void = {}
+}
+
 struct MusicControls: View {
     let topBar: TopBarModel
     var size: CGFloat = 13
@@ -603,6 +608,9 @@ struct MusicControls: View {
 final class LyricsToggle: ObservableObject {
     /// Snapshots draw the page with the lyrics already showing.
     static var snapshotShow = false
+    /// Whether the Music page is showing lyrics right now. The page writes this; voice only reads it.
+    static var liveShow = false
+    static func remember(_ showing: Bool) { liveShow = showing }
     @Published var show = TopBarStyle.isSnapshot && LyricsToggle.snapshotShow
 }
 
@@ -619,6 +627,7 @@ struct MusicPage: View {
         let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
         // Lyrics a source cannot give are not shown, even if the toggle was on for the last one.
         let showLyrics = lyricsToggle.show && shown.contains(.lyrics)
+        let _ = LyricsToggle.remember(showLyrics)
         HStack(spacing: 14) {
             AlbumTile(playing: topBar.nowPlaying, size: 132)
             VStack(alignment: .leading, spacing: 8) {
@@ -634,6 +643,7 @@ struct MusicPage: View {
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the sound is going") { topBar.speakOutput() }
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's playing") { sayTrack() }
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say shuffle and repeat") { PlaybackModeVoice.speakModes() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether lyrics are showing") { LyricShowVoice.speakLyrics() }
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         if showLyrics {
@@ -686,8 +696,8 @@ struct MusicPage: View {
             }
         }
         .padding(.vertical, 6)
-        .onAppear { topBar.musicPageVisible = true }
-        .onDisappear { topBar.musicPageVisible = false }
+        .onAppear { topBar.musicPageVisible = true; LyricsToggle.liveShow = lyricsToggle.show && NowPlayingDisplay.visibleControls(for: topBar.nowPlaying).contains(.lyrics) }
+        .onDisappear { topBar.musicPageVisible = false; LyricsToggle.liveShow = false }
     }
 
     private func sayTrack() {
