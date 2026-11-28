@@ -2437,6 +2437,10 @@ final class VoiceTurnController {
                 showMissingPiece(visual, speak: true)
                 say(spoken)
                 buddy.showCaption(visual.boltCaption(at: 0))
+            } else if let visual = FieldMissDraw.from(line: spoken) {
+                showFieldMiss(visual, speak: true)
+                say(spoken)
+                buddy.showCaption(visual.boltCaption(at: 0))
             } else {
                 say(spoken)
             }
@@ -2950,6 +2954,38 @@ final class VoiceTurnController {
     }
 
     private func flyMissingPiece(_ plan: MissingPieceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
+    /// Draws a named field Zeus could not find, under the pointer.
+    /// The caller speaks the full line. A page with no text field is not this card.
+    private func showFieldMiss(_ plan: FieldMissDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFieldMiss(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFieldMiss(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFieldMiss(_ plan: FieldMissDraw, at elapsed: TimeInterval, shot: ScreenShot) {
         guard let bolt = plan.guideBolt(at: elapsed) else { return }
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
