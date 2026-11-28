@@ -969,6 +969,45 @@ final class VoiceTurnController {
         buddy.showCaption(plan.boltCaption(at: 0))
     }
 
+    /// The Home countdown, or a spoken "what's the countdown", says the count and draws it.
+    func sayCountdown(title: String, days: Int) {
+        presentCountdown(title: title, days: days, speak: true)
+    }
+
+    /// No countdown date is set. The screen shows Countdown, then None.
+    func sayNoCountdown() {
+        presentNoCountdown(speak: true)
+    }
+
+    private func answerCountdown(speak: Bool) -> TurnResult {
+        let title = SettingsStore.shared.string("home.countdown.title")
+        guard let target = TodoQuickAdd.day(SettingsStore.shared.string("home.countdown.date")) else {
+            presentNoCountdown(speak: speak)
+            return TurnResult(spoken: CountdownAsk.none)
+        }
+        let days = CountdownAsk.days(to: target, now: Date(), calendar: ZeusDates.calendar())
+        presentCountdown(title: title, days: days, speak: speak)
+        return TurnResult(spoken: CountdownAsk.line(title: title, days: days))
+    }
+
+    private func presentCountdown(title: String, days: Int, speak: Bool) {
+        let line = CountdownAsk.line(title: title, days: days)
+        let plan = CountdownDraw.plan(title: title, days: days)
+        buddy.idle()
+        showCountdown(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNoCountdown(speak: Bool) {
+        let line = CountdownAsk.none
+        let plan = CountdownDraw.none()
+        buddy.idle()
+        showCountdown(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -1632,6 +1671,37 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the Home countdown: Countdown, then the title, then the count. The caller speaks the full line.
+    private func showCountdown(_ plan: CountdownDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCountdown(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCountdown(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCountdown(_ plan: CountdownDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1959,6 +2029,11 @@ final class VoiceTurnController {
         }
         if let city = CityTimeAsk.city(in: transcript) {
             let result = answerCityTime(city, speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CountdownAsk.matches(transcript) {
+            let result = answerCountdown(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -511,8 +511,14 @@ struct HomeWidgetCard: View {
         return GlanceCard(tint: kind.tint) {
             VStack(alignment: .leading, spacing: 0) {
                 if let target {
-                    let days = CountdownMath.days(to: target, now: Date(), calendar: ZeusDates.calendar())
-                    caption(title.isEmpty ? "Countdown" : title, target.formatted(ZeusDates.style.weekday(.abbreviated).day().month(.abbreviated)))
+                    let days = CountdownAsk.days(to: target, now: Date(), calendar: ZeusDates.calendar())
+                    HStack(alignment: .top) {
+                        caption(title.isEmpty ? "Countdown" : title, target.formatted(ZeusDates.style.weekday(.abbreviated).day().month(.abbreviated)))
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the countdown") {
+                            topBar.speakCountdown(title, days)
+                        }
+                    }
                     Spacer(minLength: 0)
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         Text("\(abs(days))").font(GlanceType.numeral).monospacedDigit().foregroundStyle(.white)
@@ -520,7 +526,13 @@ struct HomeWidgetCard: View {
                     }
                     .accessibilityElement(children: .combine)
                 } else {
-                    caption("Countdown", "Pick a date in Settings")
+                    HStack(alignment: .top) {
+                        caption("Countdown", "Pick a date in Settings")
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the countdown") {
+                            topBar.speakNoCountdown()
+                        }
+                    }
                     Spacer(minLength: 0)
                     Text("Appearance › Home").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.4))
                 }

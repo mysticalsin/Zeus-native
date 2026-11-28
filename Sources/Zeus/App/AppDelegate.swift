@@ -313,6 +313,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakWorldClock = { [weak self] readings in
                 self?.voice.sayWorldClock(readings)
             }
+            topBar.speakCountdown = { [weak self] title, days in
+                self?.voice.sayCountdown(title: title, days: days)
+            }
+            topBar.speakNoCountdown = { [weak self] in self?.voice.sayNoCountdown() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
