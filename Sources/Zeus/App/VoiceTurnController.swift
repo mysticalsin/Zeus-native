@@ -2305,6 +2305,80 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// A spoken "what's the volume" says the level and draws it. Changing the volume stays silent.
+    private func answerVolume(speak: Bool) -> TurnResult {
+        presentVolume(speak: speak)
+        return TurnResult(spoken: volumeLine())
+    }
+
+    private func presentVolume(speak: Bool) {
+        guard let device = SystemVolume.defaultOutput(),
+              let raw = SystemVolume.volume(device),
+              let percent = VolumeLevelAsk.percent(of: Double(raw)) else {
+            presentVolumeUnread(speak: speak)
+            return
+        }
+        let muted = SystemVolumeControl.isMuted(device: device) || percent == 0
+        guard let line = VolumeLevelAsk.line(percent: percent, muted: muted),
+              let plan = VolumeLevelDraw.plan(percent: percent, muted: muted) else {
+            presentVolumeUnread(speak: speak)
+            return
+        }
+        buddy.idle()
+        showVolumeLevel(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func volumeLine() -> String {
+        guard let device = SystemVolume.defaultOutput(),
+              let raw = SystemVolume.volume(device),
+              let percent = VolumeLevelAsk.percent(of: Double(raw)) else { return VolumeLevelAsk.unread }
+        let muted = SystemVolumeControl.isMuted(device: device) || percent == 0
+        return VolumeLevelAsk.line(percent: percent, muted: muted) ?? VolumeLevelAsk.unread
+    }
+
+    private func presentVolumeUnread(speak: Bool) {
+        let line = VolumeLevelAsk.unread
+        let plan = VolumeLevelDraw.unread()
+        buddy.idle()
+        showVolumeLevel(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the volume: Volume, then the percent, then On. Muted is Volume, then Muted.
+    /// The caller speaks the full line.
+    private func showVolumeLevel(_ plan: VolumeLevelDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVolumeLevel(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVolumeLevel(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVolumeLevel(_ plan: VolumeLevelDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2672,6 +2746,11 @@ final class VoiceTurnController {
         }
         if TodoCountAsk.matches(transcript) {
             let result = answerTodoCount(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VolumeLevelAsk.matches(transcript) {
+            let result = answerVolume(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
