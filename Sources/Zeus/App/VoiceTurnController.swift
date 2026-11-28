@@ -6417,6 +6417,73 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Insomnia cards, or a spoken "how's insomnia set", say the three switches. They do not install the rule.
+    func sayInsomniaSetup() {
+        presentInsomniaSetup(speak: true)
+    }
+
+    private func answerInsomniaSetup(speak: Bool) -> TurnResult {
+        presentInsomniaSetup(speak: speak)
+        return TurnResult(spoken: insomniaSetupLine())
+    }
+
+    private func presentInsomniaSetup(speak: Bool) {
+        let parts = insomniaSetupParts()
+        let line = InsomniaSetupAsk.line(lid: parts.lid, mute: parts.mute, power: parts.power)
+        let plan = InsomniaSetupDraw.plan(lid: parts.lid, mute: parts.mute, power: parts.power)
+        buddy.idle()
+        showInsomniaSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same stored switches the Insomnia page keeps. A missing key follows the page default, on.
+    /// Reading them does not install the admin rule, close the lid, or read the hotspot.
+    private func insomniaSetupParts() -> (lid: String, mute: String, power: String) {
+        let defaults = UserDefaults.standard
+        func on(_ key: String) -> String {
+            let stored = defaults.object(forKey: key) as? Bool ?? true
+            return stored ? "On" : "Off"
+        }
+        return (on("insomnia.lidClosed"), on("insomnia.mute"), on("insomnia.lowPower"))
+    }
+
+    private func insomniaSetupLine() -> String {
+        let parts = insomniaSetupParts()
+        return InsomniaSetupAsk.line(lid: parts.lid, mute: parts.mute, power: parts.power)
+    }
+
+    /// Draws Sleep, then lid-closed mode, mute, and Low Power Mode. The caller speaks the full line.
+    private func showInsomniaSetup(_ plan: InsomniaSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyInsomniaSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyInsomniaSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyInsomniaSetup(_ plan: InsomniaSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7094,6 +7161,11 @@ final class VoiceTurnController {
         }
         if WeatherPlaceAsk.matches(transcript) {
             let result = answerWeatherPlace(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if InsomniaSetupAsk.matches(transcript) {
+            let result = answerInsomniaSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

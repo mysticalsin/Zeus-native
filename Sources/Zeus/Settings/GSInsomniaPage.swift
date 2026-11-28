@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The Insomnia cards speak lid-closed mode, mute, and Low Power Mode. They do not install the rule.
+enum InsomniaSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Drafts for the Insomnia page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -23,6 +28,10 @@ struct InsomniaSettingsPage: View {
         GSPageHeading(section: .insomnia, subtitle: "Close the lid. Your agents keep working.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Lid-closed mode") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Insomnia is set") { InsomniaSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "lock.shield", title: "Admin rule", text: insomnia.setup.text) {
                 HStack(spacing: 10) {
                     GSStatus(ok: insomnia.setup.isReady, text: insomnia.setup.isReady ? "Set up" : "Not set up")

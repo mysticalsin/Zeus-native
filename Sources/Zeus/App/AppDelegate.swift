@@ -389,6 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
             WeatherPlaceVoice.speakPlace = { [weak self] in self?.voice.sayWeatherPlace() }
+            InsomniaSetupVoice.speakSetup = { [weak self] in self?.voice.sayInsomniaSetup() }
             BeamerSetupVoice.continuityOn = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
