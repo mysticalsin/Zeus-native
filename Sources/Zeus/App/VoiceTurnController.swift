@@ -8882,6 +8882,79 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Automation, or a spoken "how's automation set", says Music, Spotify, Keynote, and PowerPoint. It does not ask macOS.
+    func sayScriptSetup() {
+        presentScriptSetup(speak: true)
+    }
+
+    private func answerScriptSetup(speak: Bool) -> TurnResult {
+        presentScriptSetup(speak: speak)
+        return TurnResult(spoken: scriptSetupLine())
+    }
+
+    private func presentScriptSetup(speak: Bool) {
+        let parts = scriptSetupParts()
+        let line = ScriptSetupAsk.line(music: parts.music, spotify: parts.spotify, keynote: parts.keynote, powerpoint: parts.powerpoint)
+        let plan = ScriptSetupDraw.plan(music: parts.music, spotify: parts.spotify, keynote: parts.keynote, powerpoint: parts.powerpoint)
+        buddy.idle()
+        showScriptSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The four scripted apps. A check never asks. An app that is not running is off.
+    private func scriptSetupParts() -> (music: String, spotify: String, keynote: String, powerpoint: String) {
+        func word(_ id: String) -> String {
+            switch Automation.gate(id) {
+            case .granted: "Allowed"
+            case .notAsked: "Checking"
+            case .denied, .appNotRunning: "Off"
+            }
+        }
+        return (
+            word("com.apple.Music"),
+            word("com.spotify.client"),
+            word("com.apple.iWork.Keynote"),
+            word("com.microsoft.Powerpoint")
+        )
+    }
+
+    private func scriptSetupLine() -> String {
+        let parts = scriptSetupParts()
+        return ScriptSetupAsk.line(music: parts.music, spotify: parts.spotify, keynote: parts.keynote, powerpoint: parts.powerpoint)
+    }
+
+    /// Draws Script, then the four apps. The caller speaks the full line.
+    private func showScriptSetup(_ plan: ScriptSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyScriptSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyScriptSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyScriptSetup(_ plan: ScriptSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9749,6 +9822,11 @@ final class VoiceTurnController {
         }
         if ProactiveSetupAsk.matches(transcript) {
             let result = answerProactiveSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ScriptSetupAsk.matches(transcript) {
+            let result = answerScriptSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

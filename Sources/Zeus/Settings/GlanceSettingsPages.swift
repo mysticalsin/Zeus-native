@@ -1362,6 +1362,11 @@ enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
 }
 
+/// Automation speaks Music, Spotify, Keynote, and PowerPoint. It does not ask macOS.
+enum ScriptSetupVoice {
+    static var speakScript: () -> Void = {}
+}
+
 /// Location, Full Disk Access, and key access speak their states. Nothing is requested.
 enum LocalAccessVoice {
     static var speakLocal: () -> Void = {}
@@ -1453,6 +1458,10 @@ private struct PermissionsPage: View {
                 }
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which apps Zeus can script") { ScriptSetupVoice.speakScript() }
+            }
             GSRow(symbol: "music.note", title: "Automation",
                   text: context.permissions.automationMessage
                     ?? "Control playback and read slide notes while those apps are open.", detail: "macOS asks about each app only while it is open.") {
