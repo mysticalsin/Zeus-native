@@ -338,7 +338,7 @@ struct HomeWidgetCard: View {
     }
 
     private func calendarMonth(compact: Bool) -> some View {
-        MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar })
+        MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar }, sayDate: { sayTheDate() })
     }
 
     private var calendarWeek: some View {
@@ -614,6 +614,11 @@ struct HomeWidgetCard: View {
         }
     }
 
+    private func sayTheDate() {
+        let parts = DateAsk.parts(now: Date(), timeZone: .current)
+        topBar.speakDate(parts.weekday, parts.date)
+    }
+
     private func sayWorld(at now: Date) {
         let readings = WorldClockZones.parse(SettingsStore.shared.string("home.worldClock.zones")).prefix(3).map { zone in
             let parts = CityTimeAsk.parts(now: now, timeZone: zone)
@@ -887,6 +892,7 @@ struct AnalogClock: View {
 struct MiniMonth: View {
     let events: [TopBarModel.CalendarItem]
     let open: () -> Void
+    var sayDate: () -> Void = {}
 
     var body: some View {
         let calendar = ZeusDates.calendar()
@@ -897,7 +903,8 @@ struct MiniMonth: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(ZeusDates.string(now, template: "MMMM")).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Color.white.opacity(0.78))
-                Spacer()
+                Spacer(minLength: 4)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the date") { sayDate() }
                 Button(action: open) {
                     Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.white.opacity(0.6))
                 }

@@ -317,6 +317,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice.sayCountdown(title: title, days: days)
             }
             topBar.speakNoCountdown = { [weak self] in self?.voice.sayNoCountdown() }
+            topBar.speakDate = { [weak self] weekday, date in
+                self?.voice.sayDate(weekday: weekday, date: date)
+            }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

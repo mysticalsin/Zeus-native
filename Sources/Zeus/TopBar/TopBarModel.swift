@@ -299,6 +299,8 @@ final class TopBarModel {
     /// The Home countdown speaks the count that is already shown.
     var speakCountdown: (_ title: String, _ days: Int) -> Void = { _, _ in }
     var speakNoCountdown: () -> Void = {}
+    /// The month card speaks the calendar date that is already shown.
+    var speakDate: (_ weekday: String, _ date: String) -> Void = { _, _ in }
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {
