@@ -4549,6 +4549,66 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Shortcuts, or a spoken "what's the chat shortcut", says how the chat window opens. It does not open the window.
+    func sayChatShortcut() {
+        presentChatShortcut(speak: true)
+    }
+
+    private func answerChatShortcut(speak: Bool) -> TurnResult {
+        presentChatShortcut(speak: speak)
+        return TurnResult(spoken: chatShortcutLine())
+    }
+
+    private func presentChatShortcut(speak: Bool) {
+        let word = chatShortcutWord()
+        let line = ChatShortcutAsk.line(word: word)
+        let plan = ChatShortcutDraw.plan(word: word)
+        buddy.idle()
+        showChatShortcut(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same title the Shortcuts menu shows.
+    private func chatShortcutWord() -> String {
+        ChatHotkeyMonitor.shared.hotkey.menuTitle
+    }
+
+    private func chatShortcutLine() -> String {
+        ChatShortcutAsk.line(word: chatShortcutWord())
+    }
+
+    /// Draws Chat, then the shortcut. The caller speaks the full line.
+    private func showChatShortcut(_ plan: ChatShortcutDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyChatShortcut(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyChatShortcut(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyChatShortcut(_ plan: ChatShortcutDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5081,6 +5141,11 @@ final class VoiceTurnController {
         }
         if PointingKeysAsk.matches(transcript) {
             let result = answerPointingKeys(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ChatShortcutAsk.matches(transcript) {
+            let result = answerChatShortcut(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -41,6 +41,8 @@ final class ChatHotkeyMonitor {
     var onPress: () -> Void = {}
     /// Called after the choice changes, so the talk chord can yield to it or take Control-Option-Space back.
     var onChange: () -> Void = {}
+    /// The Shortcuts menu speaks the chat shortcut. It does not open the chat window.
+    static var speakChat: () -> Void = {}
 
     private convenience init() {
         let defaults = UserDefaults.standard

@@ -756,17 +756,8 @@ private struct ShortcutsPage: View {
     @State private var secondTalkRefusal: String?
     @State private var secondTalkRevision = 0
 
-    /// The Chat choices as the catalog names them.
-    private static func title(_ key: ChatHotkey) -> String {
-        switch key {
-        case .off: "Off"
-        case .controlOptionSpace: "Control-Option-Space"
-        case .optionSpace: "Option-Space"
-        case .optionShiftSpace: "Option-Shift-Space"
-        case .commandShiftSpace: "Command-Shift-Space"
-        case .controlOptionC: "Control-Option-C"
-        }
-    }
+    /// The Chat choices as the menu names them.
+    private static func title(_ key: ChatHotkey) -> String { key.menuTitle }
 
     /// What the page reads from the keys right now: the chord, the Chat clash and the sentences for the Talk row.
     private struct Routing {
@@ -858,14 +849,17 @@ private struct ShortcutsPage: View {
             GSDivider()
             GSRow(symbol: "bubble.left.and.bubble.right", title: "Open the chat window",
                   text: "Opens the chat window from any app.") {
-                GSPopup(selection: Binding(get: { Self.title(chat) },
-                                           set: { value in
-                                               guard let new = ChatHotkey.allCases.first(where: { Self.title($0) == value }) else { return }
-                                               ChatHotkeyMonitor.shared.set(new)
-                                               chat = new
-                                               chatProblem = ChatHotkeyMonitor.shared.problem
-                                           }),
-                        options: ChatHotkey.allCases.map { Self.title($0) }, label: "Open the chat window shortcut")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the chat shortcut") { ChatHotkeyMonitor.speakChat() }
+                    GSPopup(selection: Binding(get: { Self.title(chat) },
+                                               set: { value in
+                                                   guard let new = ChatHotkey.allCases.first(where: { Self.title($0) == value }) else { return }
+                                                   ChatHotkeyMonitor.shared.set(new)
+                                                   chat = new
+                                                   chatProblem = ChatHotkeyMonitor.shared.problem
+                                               }),
+                            options: ChatHotkey.allCases.map { Self.title($0) }, label: "Open the chat window shortcut")
+                }
             }
             if let clash {
                 HStack(alignment: .firstTextBaseline, spacing: 9) {
