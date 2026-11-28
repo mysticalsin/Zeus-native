@@ -6,12 +6,28 @@ import ZeusCore
 /// Zeus-only Settings pages: To-do, Memory (second brain), Prompter, Agents, Stickies, Routines.
 /// Each one persists real values — no stubs. No @State (toolchain).
 
+/// To-do settings speak the notch tab, the Reminders mirror, and learning. Nothing is added or cleared.
+enum TodoSetupVoice {
+    static var speakTodos: () -> Void = {}
+}
+
+/// The second brain speaks whether a vault is connected and how it may be used. The path stays unspoken.
+enum BrainSetupVoice {
+    static var speakBrain: () -> Void = {}
+}
+
 struct TodoSettingsPage: View {
     var topBar: TopBarModel?
 
     var body: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "To-do tab") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { TodoSetupVoice.speakTodos() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how to-dos are set")
+                }
                 GlassRow(title: "Show in the notch", note: "Adds the To-do tab beside Home.") {
                     GlassToggle(isOn: Binding(
                         get: { topBar?.layout.contains(.todo) ?? true },
@@ -105,6 +121,12 @@ struct MemorySettingsPage: View {
     var body: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Second brain") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { BrainSetupVoice.speakBrain() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how the second brain is set")
+                }
                 GlassRow(title: "Vault folder",
                          note: model.connection.map { "\($0.source.name) · \($0.source.path)" }
                             ?? "Choose an Obsidian vault or Markdown folder to connect.") {
@@ -199,6 +221,11 @@ struct StickiesSettingsPage: View {
     }
 }
 
+/// The keep-awake options speak the display hold and whether agents keep the Mac awake. They do not start a session.
+enum AwakeHoldVoice {
+    static var speakHold: () -> Void = {}
+}
+
 struct KeepAwakeSettingsPage: View {
     private var session: KeepAwakeSession { .shared }
 
@@ -212,7 +239,7 @@ struct KeepAwakeSettingsPage: View {
                 GlassRow(title: "Start", note: "Blocks idle sleep. The screen can still lock unless display keep-awake is on.") {
                     HStack(spacing: 6) {
                         ForEach(KeepAwakeSession.presets, id: \.self) { minutes in
-                            Button(KeepAwakeLength.label(minutes)) { session.start(minutes: minutes) }
+                            Button(KeepAwakeLength.label(minutes)) { session.beginSpoken(minutes: minutes) }
                                 .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                         }
                     }
@@ -221,10 +248,10 @@ struct KeepAwakeSettingsPage: View {
                 GlassRow(title: "Longer", note: "Indefinitely runs until you end it or a battery or heat rule does.") {
                     HStack(spacing: 6) {
                         ForEach(KeepAwakeSession.longPresets, id: \.self) { minutes in
-                            Button(KeepAwakeLength.label(minutes)) { session.start(minutes: minutes) }
+                            Button(KeepAwakeLength.label(minutes)) { session.beginSpoken(minutes: minutes) }
                                 .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                         }
-                        Button(KeepAwakeLength.label(nil)) { session.start(minutes: nil) }
+                        Button(KeepAwakeLength.label(nil)) { session.beginSpoken(minutes: nil) }
                             .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                     }
                 }
@@ -236,7 +263,7 @@ struct KeepAwakeSettingsPage: View {
                                 Button("+15 min") { session.add(minutes: 15) }
                                     .buttonStyle(GlassButtonStyle(kind: .primary, compact: true))
                             }
-                            Button("End now") { session.end() }
+                            Button("End now") { session.endSpoken() }
                                 .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                         }
                     }
@@ -265,6 +292,12 @@ struct KeepAwakeSettingsPage: View {
                 }
             }
             GlassCard(title: "Options") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { AwakeHoldVoice.speakHold() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say the keep awake options")
+                }
                 GlassRow(title: "Also keep the display awake", note: "Uses a separate display assertion. Releases when the session ends.") {
                     GlassToggle(isOn: Binding(
                         get: { session.keepDisplay },

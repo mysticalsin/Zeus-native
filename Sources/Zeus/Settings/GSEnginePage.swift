@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// Jev speaks whether it is on, whether a key is saved, and whether a limit is set. It does not read the key or the amount.
+enum JevSetupVoice {
+    static var speakJev: () -> Void = {}
+}
+
 /// Draft for the Jev key field (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -35,7 +40,10 @@ struct EnginePage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Instant commands") {
             GSRow(symbol: "bolt", title: "Jev", text: center.jevReadiness.statusText) {
-                GSStatus(ok: center.jevReadiness == .ready, text: center.jevReadiness == .ready ? "On" : "Off")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Jev is set") { JevSetupVoice.speakJev() }
+                    GSStatus(ok: center.jevReadiness == .ready, text: center.jevReadiness == .ready ? "On" : "Off")
+                }
             }
             GSDivider()
             if testMode {

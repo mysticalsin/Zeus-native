@@ -91,6 +91,8 @@ public enum SoundCatalog {
     }
 
     public static func styleNames(for slot: SoundSlot) -> [String] { styles(for: slot).map(\.style) }
+    /// The four cue rows speak their styles. They do not play a preview.
+    public static var speakCues: () -> Void = {}
 
     public static var everySpec: [SoundSpec] { SoundSlot.allCases.flatMap(styles(for:)) }
 }

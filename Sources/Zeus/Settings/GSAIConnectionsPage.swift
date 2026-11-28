@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Cursor and Gemini new-chat offers. Claude Code and Codex stay on their own ask. Nothing is connected.
+enum ExtraOfferVoice {
+    static var speakOffers: () -> Void = {}
+}
+
 /// Settings > Integrations: every AI Zeus can follow or hand work to, each with its own mark,
 /// Connect, Check again, a status and "Offer for new chats". Installed tools are found by looking
 /// for files and local ports only.
@@ -34,6 +39,10 @@ struct AIConnectionsPage: View {
         AnyLLMCard(services: services)
         DirectConnectionsCard()
         GSCard("Available apps") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether Cursor and Gemini are offered") { ExtraOfferVoice.speakOffers() }
+            }
             let shown = AIProvider.allCases.filter { provider in
                 guard provider.supportsNewChats else { return false }
                 return model.installed(provider) || model.status(provider, services: services) != .notInstalled
@@ -139,7 +148,11 @@ private struct InstallRow: View {
 }
 
 /// The "Any LLM" card: an OpenAI compatible endpoint. The key goes to the Keychain once and is
-/// never shown again.
+/// never shown again. The speaker says whether an address, a model, and a key are set. It does not test or save.
+enum GatewayVoice {
+    static var speakGateway: () -> Void = {}
+}
+
 private struct AnyLLMCard: View {
     let services: OnboardingServices
     private var model: AIConnections { AIConnections.shared }
@@ -147,6 +160,10 @@ private struct AnyLLMCard: View {
 
     var body: some View {
         GSCard("Any LLM") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Any LLM is set") { GatewayVoice.speakGateway() }
+            }
             HStack(spacing: 0) {
                 BrandMark(provider: .anyLLM, side: 26).frame(width: 42, alignment: .leading).accessibilityHidden(true)
                 GSRow(title: "OpenAI compatible endpoint", text: "OpenRouter, vLLM, a company gateway or any server that speaks the same API.") {

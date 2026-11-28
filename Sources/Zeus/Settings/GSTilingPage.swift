@@ -1,6 +1,21 @@
 import SwiftUI
 import ZeusCore
 
+/// The Arrange card speaks whether tiling is on, which keys it uses, and the focus ring. It does not move a window.
+enum TilingSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
+/// The Layout card speaks the two gaps and the default split. It does not move a window.
+enum TilingGapVoice {
+    static var speakGaps: () -> Void = {}
+}
+
+/// The left-out list speaks whether any apps are excluded and how many. Bundle ids stay unspoken.
+enum LeftOutVoice {
+    static var speakLeft: () -> Void = {}
+}
+
 /// Settings › Tiling: the switch, the keys, the gaps and the split. Every row is a catalog row
 /// (`scripts/gen-settings-catalog.py`) read through `FeatureSettings`; nothing here moves a window.
 @MainActor
@@ -11,6 +26,10 @@ struct TilingSettingsPage: View {
         GSPageHeading(section: .tiling, subtitle: "Arrange your windows from the keyboard.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Arrange") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how tiling is set") { TilingSetupVoice.speakSetup() }
+            }
             GSToggleRow(symbol: "rectangle.split.2x2", title: "Arrange my windows from the keyboard",
                         text: "Snaps the windows on each screen into a tidy grid. Keys move focus, swap windows and flip a split. Off until you turn it on.",
                         isOn: store.boolBinding("tiling.enabled"))
@@ -26,6 +45,10 @@ struct TilingSettingsPage: View {
             GSInfo(text: "Moving windows uses Accessibility. Zeus never asks for it from here: allow it in Permissions.")
         }
         GSCard("Layout") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the tiling gaps are set") { TilingGapVoice.speakGaps() }
+            }
             sliderRow("tiling.innerGap", symbol: "arrow.left.and.right", title: "Gap between windows",
                       text: "Space between two tiled windows.", unit: "points")
             GSDivider()
@@ -40,6 +63,10 @@ struct TilingSettingsPage: View {
                         text: "A thin ring around the window the tiling keys act on.", isOn: store.boolBinding("tiling.focusBorder"))
         }
         GSCard("Left out") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which apps tiling leaves out") { LeftOutVoice.speakLeft() }
+            }
             GSRow(symbol: "minus.circle", title: "Apps Zeus never tiles",
                   text: "Bundle ids, separated by commas. Their windows are left where they are.") {
                 GSTextInput(text: store.stringBinding("tiling.excludedApps"), placeholder: "e.g. com.example.app", label: "Apps Zeus never tiles")

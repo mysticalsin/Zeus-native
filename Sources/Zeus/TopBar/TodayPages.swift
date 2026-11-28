@@ -189,6 +189,11 @@ struct TodayPage: View {
 
 // MARK: Reminders
 
+/// The reminder chips speak the open list and a waiting due time. They do not read or add a reminder.
+enum ReminderListVoice {
+    static var speakList: () -> Void = {}
+}
+
 struct RemindersPage: View {
     let topBar: TopBarModel
     @Bindable var reminders: RemindersController
@@ -204,6 +209,8 @@ struct RemindersPage: View {
             } else {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the next reminder") { sayNextReminder() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which reminders are showing") { ReminderListVoice.speakList() }
                         ForEach(ReminderFilter.allCases) { filter in
                             ReminderChip(title: filter.rawValue, count: reminders.count(for: filter), selected: reminders.filter == filter) { reminders.filter = filter }
                         }
@@ -266,6 +273,19 @@ struct RemindersPage: View {
         }
         .onAppear { reminders.refresh() }
     }
+
+    private func sayNextReminder() {
+        if !reminders.allowed && reminders.items.isEmpty {
+            topBar.speakNextReminderAccess()
+            return
+        }
+        guard let item = reminders.items.first(where: { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            topBar.speakNoNextReminder()
+            return
+        }
+        let when = item.due.map { ReminderAsk.whenLine($0, hasTime: item.hasTime) } ?? ""
+        topBar.speakNextReminder(item.title, when)
+    }
 }
 
 // MARK: Notifications
@@ -275,6 +295,11 @@ struct NotificationsPage: View {
     @Bindable var notifications: NotificationsController
 
     var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many notifications") { topBar.speakAlerts() }
+            }
         Group {
             if !notifications.enabled {
                 GlanceEmpty(symbol: "bell.badge.fill", tint: Theme.bolt,
@@ -307,6 +332,7 @@ struct NotificationsPage: View {
             }
         }
         .onAppear { notifications.refresh() }
+        }
         .task(id: notifications.enabled) {
             // Fresh while the tab is open; stops when it closes.
             while notifications.enabled, !Task.isCancelled {

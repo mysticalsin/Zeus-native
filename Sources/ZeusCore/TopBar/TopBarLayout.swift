@@ -239,6 +239,11 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
               let raw = try? JSONDecoder().decode([String].self, from: data) else { return .standard }
         return TopBarLayout(tabs: raw.compactMap(TopBarTab.init(rawValue:)))
     }
+
+    /// The titles on the open notch, Home first. The app replaces this with the live row.
+    public static var liveTitles: () -> [String] = { TopBarLayout.standard.trimmedToRow().tabs.map(\.title) }
+    /// The Top bar tabs card speaks that row. It does not switch a tab.
+    public static var speakTabs: () -> Void = {}
 }
 
 /// Small events that light up the closed notch for a moment ("every move, made visible").
@@ -275,6 +280,8 @@ public enum NotchCue: Equatable, Sendable {
     case flingSent(count: Int, to: String)
     /// A Fling send or receive did not work; the text says what to do.
     case flingProblem(String)
+    /// Earbuds connected or disconnected. The text is the short notch line.
+    case earbuds(text: String, connected: Bool)
 
     /// How long the cue stays before the notch settles again.
     public var duration: TimeInterval {
@@ -292,6 +299,7 @@ public enum NotchCue: Equatable, Sendable {
         case .keepAwake: 4.0
         case .screenshot: 2.5
         case .flingProblem: 4.0
+        case .earbuds(_, let connected): connected ? EarbudsCuePolicy.connectedDuration : EarbudsCuePolicy.disconnectedDuration
         default: 2.2
         }
     }

@@ -19,7 +19,7 @@ public struct ExplanationOffMainSSEReader: AsyncSequence, Sendable {
         sceneID: UUID,
         baseRevision: Int,
         profile: ExplanationWireProfile = .v1
-    ) where Bytes: AsyncSequence & Sendable, Bytes.Element == UInt8, Bytes.Failure == any Error {
+    ) where Bytes: AsyncSequence & Sendable, Bytes.Element == UInt8 {
         let (demand, demandContinuation) = AsyncStream<Void>.makeStream()
         let (events, eventContinuation) = AsyncThrowingStream<ExplanationEvent, any Error>.makeStream(
             bufferingPolicy: .bufferingOldest(1))
@@ -58,7 +58,7 @@ public struct ExplanationOffMainSSEReader: AsyncSequence, Sendable {
         sceneID: UUID,
         baseRevision: Int,
         profile: ExplanationWireProfile
-    ) async where Bytes: AsyncSequence & Sendable, Bytes.Element == UInt8, Bytes.Failure == any Error {
+    ) async where Bytes: AsyncSequence & Sendable, Bytes.Element == UInt8 {
         do {
             var parser = try ExplanationCompletionStream(sessionID: sessionID, turnID: turnID, sceneID: sceneID,
                                                          baseRevision: baseRevision, profile: profile)
@@ -97,7 +97,7 @@ public struct ExplanationOffMainSSEReader: AsyncSequence, Sendable {
         line: inout Data,
         pending: inout [ExplanationEvent],
         bytes: inout Iterator
-    ) async throws -> ExplanationEvent? where Iterator: AsyncIteratorProtocol, Iterator.Element == UInt8, Iterator.Failure == any Error {
+    ) async throws -> ExplanationEvent? where Iterator: AsyncIteratorProtocol, Iterator.Element == UInt8 {
         if !pending.isEmpty { return pending.removeFirst() }
         while true {
             try Task.checkCancellation()

@@ -171,6 +171,21 @@ import Testing
         #expect(chosen == button)
         let outside = CGPoint(x: 900, y: 20)
         #expect(ElementSnap.best(axFrames: [button], around: outside, displayID: 1, mapper: hd) == nil)
+        // Ten points past the button's right edge used to snap onto that button.
+        let beside = hd.convert(CGPoint(x: 130, y: 62), from: .ax, to: .screen, context: MapContext())!
+        #expect(ElementSnap.best(axFrames: [button], around: beside, displayID: 1, mapper: hd) == nil)
+    }
+
+    @Test func snapKeepsAPointOnTheControlsOuterEdge() {
+        let window = CGRect(x: 0, y: 0, width: 400, height: 300)
+        let button = CGRect(x: 40, y: 50, width: 80, height: 24)
+        let right = hd.convert(CGPoint(x: 120, y: 62), from: .ax, to: .screen, context: MapContext())!
+        #expect(ElementSnap.best(axFrames: [window, button], around: right, displayID: 1, mapper: hd) == button)
+        let top = hd.convert(CGPoint(x: 80, y: 74), from: .ax, to: .screen, context: MapContext())!
+        #expect(ElementSnap.best(axFrames: [window, button], around: top, displayID: 1, mapper: hd) == button)
+        let neighbor = CGRect(x: 120, y: 50, width: 80, height: 24)
+        let shared = hd.convert(CGPoint(x: 120, y: 62), from: .ax, to: .screen, context: MapContext())!
+        #expect(ElementSnap.best(axFrames: [button, neighbor], around: shared, displayID: 1, mapper: hd) == neighbor)
     }
 
     @Test func presentProbeReportsTheFixture() {

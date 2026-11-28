@@ -27,7 +27,10 @@ private final class FakeSpeaker: LineSpeaking {
 private final class FakePresenter: TalkVisualPresenting {
     let log: TurnLog
     init(_ log: TurnLog) { self.log = log }
-    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) { log.events.append("begin marks=\(draw.marks.count) w=\(shot.pixelWidth)") }
+    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) -> Bool {
+        log.events.append("begin marks=\(draw.marks.count) w=\(shot.pixelWidth)")
+        return true
+    }
     func reveal(sentence: Int, token: UUID) { log.events.append("reveal \(sentence)") }
     func answerFinished(token: UUID) { log.events.append("finished") }
     func clear() { log.events.append("clear") }
@@ -310,6 +313,20 @@ struct TalkVisualTurnTests {
         .init(shape: .ring(center: .init(x: 100, y: 100), radius: 20), at: 0),
         .init(shape: .ring(center: .init(x: 300, y: 200), radius: 20), at: 1),
     ])
+
+    @Test func clearingTheDrawingStopsThatPenAndANewerTurnKeepsItsOwn() {
+        let drawing = presenter()
+        defer { drawing.clear() }
+        let first = UUID()
+        #expect(drawing.begin(Self.draw, shot: Self.shots[0], token: first))
+        #expect(!drawing.penShouldStop(first))
+        drawing.clear()
+        #expect(drawing.penShouldStop(first))
+        let second = UUID()
+        #expect(drawing.begin(Self.draw, shot: Self.shots[0], token: second))
+        #expect(!drawing.penShouldStop(first))
+        #expect(!drawing.penShouldStop(second))
+    }
 
     @Test func anOldTurnCannotRevealOrArmTheHideAgainstANewTurnsCapture() {
         let drawing = presenter()

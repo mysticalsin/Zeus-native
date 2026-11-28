@@ -41,6 +41,20 @@ struct FastPathTests {
         #expect(site.summary == "Open youtube.com")
     }
 
+    @Test @MainActor func aRevisedPartialDoesNotConfirmTheOldApp() {
+        let fast = FastPath(actions: FastActions(apps: Self.index))
+        fast.partial("open slack")
+        fast.partial("open calculator")
+        let revised = fast.confirmedPlan(for: "open calculator")
+        #expect(revised == nil)
+        fast.partial("open slack")
+        let confirmed = fast.confirmedPlan(for: "open slack")
+        #expect(confirmed?.summary.hasSuffix("Slack") == true)
+        fast.partial("\u{200B}open slack")
+        let marked = fast.confirmedPlan(for: "open slack")
+        #expect(marked == nil)
+    }
+
     @Test func spotifyPlayLabels() {
         #expect(SpotifyAXFinder.playTarget("Play Daft Punk") == "Daft Punk")
         #expect(SpotifyAXFinder.playTarget("Tocar Anitta") == "Anitta")

@@ -1,12 +1,21 @@
 import SwiftUI
 import ZeusCore
 
+/// Lock and wake speaks the switch and whether each chime is built in or a chosen file. It does not play a chime.
+enum LockChimeVoice {
+    static var speakChimes: () -> Void = {}
+}
+
 /// Settings > Sounds. The lock and wake chimes, with a file the owner already has on this Mac.
 struct LockWakeChimesCard: View {
     private var store: SettingsStore { SettingsStore.shared }
 
     var body: some View {
         GSCard("Lock and wake") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how lock and wake is set") { LockChimeVoice.speakChimes() }
+            }
             GSToggleRow(symbol: "lock.laptopcomputer", title: "Lock and wake chimes",
                         text: "A soft chime when the Mac locks or sleeps, and another when it wakes. Quiet while Sound feedback is off, during a meeting, or when Focus status is not available. Zeus does not ask for Focus.",
                         isOn: store.boolBinding(ChimeSettingsKey.enabled))

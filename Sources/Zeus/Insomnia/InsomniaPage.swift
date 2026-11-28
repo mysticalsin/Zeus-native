@@ -203,9 +203,9 @@ private struct InsomniaStatus: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            line("laptopcomputer", "Lid", insomnia.lidText)
+            line("laptopcomputer", "Lid", insomnia.lidText, speaker: StatusSpeaker(label: "Say the lid") { insomnia.speakLid() })
             line("battery.75percent", "Battery", insomnia.batteryText)
-            line("thermometer.medium", "Heat", insomnia.heatText)
+            line("thermometer.medium", "Heat", insomnia.heatText, speaker: StatusSpeaker(label: "Say the heat") { insomnia.speakHeat() })
             line("flag.checkered", "Ended", insomnia.endText)
             line("snowflake", "Frozen apps", "\(insomnia.frozenCount)")
             line("personalhotspot", "Hotspot", insomnia.hotspotSSID.isEmpty ? "Not set" : insomnia.hotspotStatus)
@@ -227,15 +227,24 @@ private struct InsomniaStatus: View {
         }
     }
 
-    private func line(_ symbol: String, _ title: String, _ value: String) -> some View {
+    private func line(_ symbol: String, _ title: String, _ value: String, speaker: StatusSpeaker? = nil) -> some View {
         HStack(spacing: 6) {
             Image(systemName: symbol).font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Theme.cloudQuiet).frame(width: 14)
             Text(title).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
+            if let speaker {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: speaker.label) { speaker.action() }
+            }
             Spacer(minLength: 6)
             Text(value).font(TopBarStyle.label(10.5, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).truncationMode(.middle)
         }
         .accessibilityElement(children: .combine)
     }
+}
+
+/// A speaker on one status row. The action is the page's say callback.
+private struct StatusSpeaker {
+    var label: String
+    var action: () -> Void
 }
 
 private struct InsomniaChip: View {

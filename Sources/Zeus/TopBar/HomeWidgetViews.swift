@@ -182,9 +182,15 @@ struct HomeWidgetCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .top) {
                         caption("Focus", running ? (timer.phase == .rest ? "Break" : "Focusing") : "Ready")
-                        Spacer()
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time left") { topBar.speakTimeLeft() }
                         GlanceRoundButton(symbol: running ? "stop.fill" : "play.fill", filled: true, label: running ? "Stop focus" : "Start focus") {
-                            if running { topBar.focus.stop() } else { topBar.focus.start() }
+                            if running {
+                                if topBar.focus.isPlainTimer { topBar.focus.stop() }
+                                else { topBar.speakFocus(topBar.endFocusSession()) }
+                            } else {
+                                topBar.speakFocus(topBar.beginFocus())
+                            }
                         }
                     }
                     Spacer(minLength: 0)
@@ -322,7 +328,8 @@ struct HomeWidgetCard: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 caption("Calendar", subtitle)
-                Spacer()
+                Spacer(minLength: 4)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's next") { sayNext() }
                 openCalendar()
             }
             Spacer(minLength: 0)
@@ -332,7 +339,7 @@ struct HomeWidgetCard: View {
     }
 
     private func calendarMonth(compact: Bool) -> some View {
-        MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar })
+        MiniMonth(events: topBar.events + topBar.calendarEvents, open: { topBar.selectedTab = .calendar }, sayDate: { sayTheDate() })
     }
 
     private var calendarWeek: some View {
@@ -345,6 +352,7 @@ struct HomeWidgetCard: View {
             HStack(alignment: .top) {
                 caption("This week", "\(calendar.component(.weekOfYear, from: today)) · \(ZeusDates.string(today, template: "MMMM"))")
                 Spacer()
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say this week") { topBar.speakWeek() }
                 openCalendar()
             }
             Spacer(minLength: 0)
@@ -368,7 +376,7 @@ struct HomeWidgetCard: View {
     }
 
     private var calendarAgenda: some View {
-        AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar })
+        AgendaList(events: upcoming, open: { topBar.selectedTab = .calendar }, say: { topBar.speakAgenda() })
     }
 
     // MARK: Clock (analog, digital, elastic, blue halo)
@@ -392,17 +400,22 @@ struct HomeWidgetCard: View {
                     Text(context.date.formatted(ZeusDates.style.hour().minute())).font(.system(size: 22, weight: .light).monospacedDigit()).foregroundStyle(.white)
                     Text(ZeusDates.string(context.date, template: "EEEMMMd")).font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
+                .accessibilityElement(children: .combine)
                 Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
             }
-            .frame(maxHeight: .infinity)
-            .accessibilityElement(children: .combine)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
     private var clockDigital: some View {
         TickingView(interval: 1) { context in
             VStack(alignment: .leading, spacing: 0) {
-                caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                HStack(alignment: .top) {
+                    caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
+                }
                 Spacer(minLength: 0)
                 Text(context.date.formatted(ZeusDates.style.hour().minute())).font(GlanceType.numeral).monospacedDigit().foregroundStyle(.white)
             }
@@ -415,7 +428,11 @@ struct HomeWidgetCard: View {
             // A spring on every second: the digits squash, stretch and settle.
             let kick = animatesFreely ? exp(-5 * fraction) * cos(20 * fraction) : 0
             VStack(alignment: .leading, spacing: 0) {
-                caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                HStack(alignment: .top) {
+                    caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
+                }
                 Spacer(minLength: 0)
                 HStack(alignment: .lastTextBaseline, spacing: 2) {
                     Text(context.date.formatted(ZeusDates.style.hour().minute())).font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
@@ -438,7 +455,11 @@ struct HomeWidgetCard: View {
                 .frame(width: 84, height: 84)
                 .accessibilityElement(children: .combine)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ZeusDates.string(context.date, template: "EEEE")).font(GlanceType.media).foregroundStyle(.white)
+                    HStack(alignment: .top, spacing: 4) {
+                        Text(ZeusDates.string(context.date, template: "EEEE")).font(GlanceType.media).foregroundStyle(.white)
+                        Spacer(minLength: 0)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
+                    }
                     Text(ZeusDates.string(context.date, template: "MMMd")).font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
                 Spacer(minLength: 0)
@@ -454,7 +475,11 @@ struct HomeWidgetCard: View {
         return GlanceCard(tint: kind.tint) {
             TickingView(interval: 1) { context in
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("World clock").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.70))
+                    HStack(alignment: .top) {
+                        Text("World clock").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.70))
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the world clock") { sayWorld(at: context.date) }
+                    }
                     Spacer(minLength: 0)
                     ForEach(zones.prefix(3), id: \.identifier) { zone in
                         HStack {
@@ -488,8 +513,14 @@ struct HomeWidgetCard: View {
         return GlanceCard(tint: kind.tint) {
             VStack(alignment: .leading, spacing: 0) {
                 if let target {
-                    let days = CountdownMath.days(to: target, now: Date(), calendar: ZeusDates.calendar())
-                    caption(title.isEmpty ? "Countdown" : title, target.formatted(ZeusDates.style.weekday(.abbreviated).day().month(.abbreviated)))
+                    let days = CountdownAsk.days(to: target, now: Date(), calendar: ZeusDates.calendar())
+                    HStack(alignment: .top) {
+                        caption(title.isEmpty ? "Countdown" : title, target.formatted(ZeusDates.style.weekday(.abbreviated).day().month(.abbreviated)))
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the countdown") {
+                            topBar.speakCountdown(title, days)
+                        }
+                    }
                     Spacer(minLength: 0)
                     HStack(alignment: .lastTextBaseline, spacing: 6) {
                         Text("\(abs(days))").font(GlanceType.numeral).monospacedDigit().foregroundStyle(.white)
@@ -497,7 +528,13 @@ struct HomeWidgetCard: View {
                     }
                     .accessibilityElement(children: .combine)
                 } else {
-                    caption("Countdown", "Pick a date in Settings")
+                    HStack(alignment: .top) {
+                        caption("Countdown", "Pick a date in Settings")
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the countdown") {
+                            topBar.speakNoCountdown()
+                        }
+                    }
                     Spacer(minLength: 0)
                     Text("Appearance › Home").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.4))
                 }
@@ -511,7 +548,11 @@ struct HomeWidgetCard: View {
         let text = topBar.note.trimmingCharacters(in: .whitespacesAndNewlines)
         return GlanceCard(tint: kind.tint) {
             VStack(alignment: .leading, spacing: 4) {
-                caption("Note", text.isEmpty ? "Pinned to Home" : "Pinned")
+                HStack(alignment: .top) {
+                    caption("Note", text.isEmpty ? "Pinned to Home" : "Pinned")
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Read my note") { sayNote() }
+                }
                 if text.isEmpty {
                     Spacer(minLength: 0)
                     Text("Write one in the field below").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.4))
@@ -538,7 +579,11 @@ struct HomeWidgetCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let level = topBar.battery?.level {
                     let charging = topBar.battery?.charging == true
-                    caption("Battery", charging ? "Charging" : (topBar.battery?.pluggedIn == true ? "Plugged in" : "On battery"))
+                    HStack(alignment: .top) {
+                        caption("Battery", charging ? "Charging" : (topBar.battery?.pluggedIn == true ? "Plugged in" : "On battery"))
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the battery") { sayBattery() }
+                    }
                     Spacer(minLength: 0)
                     HStack(alignment: .lastTextBaseline) {
                         Text("\(level)%").font(GlanceType.numeral).monospacedDigit().foregroundStyle(level <= 20 && !charging ? Theme.danger : .white)
@@ -548,7 +593,11 @@ struct HomeWidgetCard: View {
                     }
                     ProgressBarLine(fraction: Double(level) / 100, tint: level <= 20 && !charging ? Theme.danger : Theme.leaf).padding(.top, 6)
                 } else {
-                    caption("Battery", "No battery on this Mac")
+                    HStack(alignment: .top) {
+                        caption("Battery", "No battery on this Mac")
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the battery") { sayBattery() }
+                    }
                     Spacer(minLength: 0)
                 }
             }
@@ -562,12 +611,59 @@ struct HomeWidgetCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     caption("Agents", agentSummary)
-                    Spacer()
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say who's working") { topBar.speakAgents() }
                     GlanceRoundButton(symbol: "arrow.up.right", filled: true, label: "Open Agents") { topBar.selectedTab = .agents }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
             }
+        }
+    }
+
+    private func sayNote() {
+        let text = topBar.note
+        if NoteAsk.refuses(text) {
+            topBar.speakSecretNote()
+        } else if NoteAsk.line(text) == nil {
+            topBar.speakNoNote()
+        } else {
+            topBar.speakNote(text)
+        }
+    }
+
+    private func sayTheDate() {
+        let parts = DateAsk.parts(now: Date(), timeZone: .current)
+        topBar.speakDate(parts.weekday, parts.date)
+    }
+
+    private func sayWorld(at now: Date) {
+        let readings = WorldClockZones.parse(SettingsStore.shared.string("home.worldClock.zones")).prefix(3).map { zone in
+            let parts = CityTimeAsk.parts(now: now, timeZone: zone)
+            return CityTimeReading(city: CityTimeAsk.placeName(for: zone), time: parts.time, period: parts.period)
+        }
+        topBar.speakWorldClock(Array(readings))
+    }
+
+    private func sayClock() {
+        let parts = ClockAsk.parts(now: Date(), timeZone: .current)
+        topBar.speakClock(parts.time, parts.period)
+    }
+
+    private func sayNext() {
+        guard let event = topBar.nextEvent() else {
+            topBar.speakNoNextEvent()
+            return
+        }
+        let when = NextEventAsk.whenLine(event.start, allDay: event.isAllDay)
+        topBar.speakNextEvent(event.title, when, event.isAllDay)
+    }
+
+    private func sayBattery() {
+        if let battery = topBar.battery {
+            topBar.speakBattery(battery.level, battery.charging, battery.pluggedIn)
+        } else {
+            topBar.speakNoBattery()
         }
     }
 }
@@ -814,6 +910,7 @@ struct AnalogClock: View {
 struct MiniMonth: View {
     let events: [TopBarModel.CalendarItem]
     let open: () -> Void
+    var sayDate: () -> Void = {}
 
     var body: some View {
         let calendar = ZeusDates.calendar()
@@ -824,7 +921,8 @@ struct MiniMonth: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(ZeusDates.string(now, template: "MMMM")).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Color.white.opacity(0.78))
-                Spacer()
+                Spacer(minLength: 4)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the date") { sayDate() }
                 Button(action: open) {
                     Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.white.opacity(0.6))
                 }
@@ -861,6 +959,7 @@ struct MiniMonth: View {
 struct AgendaList: View {
     let events: [TopBarModel.CalendarItem]
     let open: () -> Void
+    var say: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -870,6 +969,7 @@ struct AgendaList: View {
                     Text(events.isEmpty ? "Nothing coming up" : "\(events.count) coming up").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
                 Spacer()
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the agenda") { say() }
                 GlanceRoundButton(symbol: "arrow.up.right", size: 24, filled: true, label: "Open Calendar", action: open)
             }
             ForEach(events.prefix(2)) { event in

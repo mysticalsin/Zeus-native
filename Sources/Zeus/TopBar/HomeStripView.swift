@@ -50,7 +50,7 @@ struct HomeStripView: View {
                     chipButton("plus", "Add 15 minutes") { session.add(minutes: 15) }
                 }
                 chipButton("xmark", "End keep-awake") {
-                    session.end()
+                    session.endSpoken()
                     topBar.keepAwake = false
                 }
             }

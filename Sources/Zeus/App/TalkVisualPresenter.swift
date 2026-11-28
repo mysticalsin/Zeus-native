@@ -8,7 +8,7 @@ import ZeusCore
 protocol TalkVisualPresenting: AnyObject {
     /// A draw tag arrived for this capture. Nothing is shown yet.
     /// `token` names the turn; later calls with another token (a late callback of an earlier turn) are ignored.
-    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID)
+    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) -> Bool
     /// The line for this sentence index has started to play: show its marks.
     func reveal(sentence: Int, token: UUID)
     /// The last sentence has finished playing: hide the marks soon.
@@ -16,11 +16,16 @@ protocol TalkVisualPresenting: AnyObject {
     /// Hide everything now.
     func clear()
     /// Replace the visible marks with this frame so a pen stroke can grow one point at a time.
-    func showFrame(_ draw: TalkDraw, token: UUID)
+    /// False when this turn has no matching display, so the caller does not fly a pen over nothing.
+    func showFrame(_ draw: TalkDraw, token: UUID) -> Bool
+    /// The pen for `token` should go home. True when that drawing was cleared, or it still owns
+    /// the turn and the latest frame could not be drawn. A newer turn does not count.
+    func penShouldStop(_ token: UUID) -> Bool
 }
 
 extension TalkVisualPresenting {
-    func showFrame(_ draw: TalkDraw, token: UUID) {}
+    func showFrame(_ draw: TalkDraw, token: UUID) -> Bool { false }
+    func penShouldStop(_ token: UUID) -> Bool { false }
 }
 
 /// Draws the marks of one talk answer on the display it was captured from. The marks of a sentence appear
@@ -40,6 +45,8 @@ final class TalkVisualPresenter: TalkVisualPresenting {
     private var shown: [ExplanationObject] = []
     private var hideTask: Task<Void, Never>?
     private var token: UUID?
+    /// The token `clear` just removed, until a newer drawing replaces it.
+    private var abandoned: UUID?
     private var identity: (session: UUID, scene: UUID, revision: Int)?
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     private var shot: ScreenShot?
@@ -63,25 +70,29 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         }
     }
 
-    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) {
+    @discardableResult
+    func begin(_ draw: TalkDraw, shot: ScreenShot, token: UUID) -> Bool {
         clear()
         // The shot carries no display id: the screen whose frame it was taken from is the one to draw on.
         guard let screen = screens().first(where: { Self.sameFrame($0.frame, shot.displayFrame) }),
               let geometry = try? TalkDrawScene.geometry(shot: shot, displayID: screen.id, backingScale: screen.scale,
                                                          captureID: UUID()) else {
             VoiceLog.log("draw", "skipped: no screen matches the capture")
-            return
+            return false
         }
         capture = ExplanationCaptureContext(geometry: geometry, currentDisplay: geometry.display)
         self.token = token
+        abandoned = nil
         self.shot = shot
         identity = (UUID(), UUID(), 0)
         pending = TalkDrawScene.objects(draw, shot: shot, captureID: geometry.captureID)
         watchForStaleScreen()
+        return true
     }
 
-    func showFrame(_ draw: TalkDraw, token: UUID) {
-        guard token == self.token, let capture, let shot, var identity else { return }
+    @discardableResult
+    func showFrame(_ draw: TalkDraw, token: UUID) -> Bool {
+        guard token == self.token, let capture, let shot, var identity else { return false }
         hideTask?.cancel()
         hideTask = nil
         let grouped = TalkDrawScene.objects(draw, shot: shot, captureID: capture.geometry.captureID)
@@ -93,9 +104,15 @@ final class TalkVisualPresenter: TalkVisualPresenting {
                                      canvasSize: capture.geometry.imageSize,
                                      captureID: capture.geometry.captureID,
                                      objects: Dictionary(shown.map { ($0.id, $0) }, uniquingKeysWith: { $1 }))
-        if !overlay.present(scene: scene, capture: capture, reduceMotion: reduceMotion()) {
+        guard overlay.present(scene: scene, capture: capture, reduceMotion: reduceMotion()) else {
             VoiceLog.log("draw", "pen frame could not be drawn")
+            return false
         }
+        return true
+    }
+
+    func penShouldStop(_ token: UUID) -> Bool {
+        self.token == token || (self.token == nil && abandoned == token)
     }
 
     func reveal(sentence: Int, token: UUID) {
@@ -132,6 +149,7 @@ final class TalkVisualPresenter: TalkVisualPresenting {
         overlay.hide()
         capture = nil
         shot = nil
+        abandoned = token
         token = nil
         identity = nil
         pending = [:]

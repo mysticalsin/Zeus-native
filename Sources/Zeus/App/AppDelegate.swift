@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var agentServer: AgentEventServer!
     private var commands: CommandCenter!
     private let topBar = TopBarModel()
+    private let earbudsNotch = EarbudsNotchPresenter()
+    private let earbudsWatch = EarbudsOutputWatch()
     private var topBarServices: TopBarServices!
     private var dictation: DictationController!
     private var teleprompter: TeleprompterController!
@@ -164,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Continuity: a cue from Zeus when Beamer moves your keyboard to another machine.
         if on(.beamer) {
+            BeamerModel.shared.speakPlace = { [weak self] in self?.voice.sayBeamerPlace() }
             BeamerModel.shared.onCrossing = { [weak self] crossed in self?.topBar.flash(.entrance(.sweep, crossed ? .cyan : .mint)) }
             BeamerModel.shared.startBackgroundWatch()
             BeamerModel.shared.startIfWanted()
@@ -202,13 +205,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A session that ends (time, battery, heat) also lets the Home cup's display hold go.
         KeepAwakeSession.shared.onEnd = { [weak self] in self?.topBar.keepAwake = false }
         KeepAwakeSession.shared.onNotice = { [weak self] text in self?.topBar.show(.keepAwake(text)) }
+        KeepAwakeSession.shared.speak = { [weak self] speech in self?.voice.sayKeepAwake(speech) }
         // Insomnia: undo a lid-closed session a crash left behind, and read whether the admin rule is set up.
         if on(.insomniaLaunch), !TopBarStyle.isSnapshot { InsomniaController.shared.launch() }
         topBar.openSettings = { [weak self] in self?.showSettings() }
         topBar.openPermissions = { [weak self] in self?.showPermissions() }
         // Typed chat: one store behind the notch Chat tab and the floating window.
-        if on(.chatBrain) { ChatModel.shared.brain = ClaudeCLIProvider() }
+        if on(.chatBrain) {
+            ChatModel.shared.brain = ClaudeCLIProvider()
+            ChatModel.shared.speakChats = { [weak self] in self?.voice.sayChats() }
+        }
         if on(.chatWindow) {
+            ChatModel.shared.speakChats = { [weak self] in self?.voice.sayChats() }
             ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() }
             chatWindow?.makeExplanation = { [weak self] in self?.visualExplanation() }
             chatWindow?.stopExplanation = { [weak self] in self?.explanation?.stop() }
@@ -220,15 +228,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Usage and limits from the agents' local logs; a cue when a limit gets close.
         if on(.usage) {
             UsageModel.shared.onAlert = { [weak self] text in self?.topBar.show(.usageAlert(text)) }
+            UsageModel.shared.speakToday = { [weak self] in self?.voice.sayUsage() }
             UsageModel.shared.start()
         }
         if on(.proactive) { ProactiveController.shared.start() }
         if on(.stickiesRestore) { StickiesController.shared.restore() }
         if on(.routines) { RoutineRunner.shared.start() }
-        demo = DemoDirector(buddy: buddy, notch: notch) { [weak self] in
+        demo = DemoDirector(buddy: buddy, notch: notch, statusItemFrame: { [weak self] in
             guard let item = self?.statusItem else { return nil }
             return item.button?.window?.frame
-        }
+        }, say: { [weak self] text in
+            self?.voice?.say(text)
+        })
 
         // Real agent events from Claude Code hooks. The socket starts only after `commandHandler`
         // is wired below so `zeus debug dictate-file` never runs while launch is still wiring handlers.
@@ -256,7 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if on(.voiceTurn) { FastActions.shared.topBar = topBar }
         if on(.appIndex) { AppIndex.shared.start() }
         if on(.projectScanner) { ProjectScanner.shared.start() }
-        if on(.topBarServices) { topBarServices.onTimerFinished = { [weak self] in self?.voice?.say("Time's up.") } }
+        if on(.topBarServices) { topBarServices.onTimerFinished = { [weak self] in self?.voice?.timerFinished() } }
         if on(.macControl) { startMacControl() }
         if on(.avatarFeed) { startAvatarFeed() }
         if on(.shortcuts) { registerShortcuts() }
@@ -282,7 +293,248 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // The notch mic: same dictation as the key, pasted where you were typing.
         if on(.voiceTurn) {
-            topBar.speakBrief = { [weak self] text in self?.voice.say(text) }
+            topBar.speakBrief = { [weak self] text in self?.voice.sayTodayBrief(text) }
+            topBar.speakNowPlaying = { [weak self] title, artist, playing in
+                self?.voice.sayNowPlaying(title: title, artist: artist, playing: playing)
+            }
+            topBar.speakNothingPlaying = { [weak self] in self?.voice.sayNothingPlaying() }
+            topBar.speakWeather = { [weak self] degrees, phrase, place in
+                self?.voice.sayWeather(degrees: degrees, phrase: phrase, place: place)
+            }
+            topBar.speakWeatherNotReady = { [weak self] in self?.voice.sayWeatherNotReady() }
+            topBar.speakBattery = { [weak self] level, charging, pluggedIn in
+                self?.voice.sayBattery(level: level, charging: charging, pluggedIn: pluggedIn)
+            }
+            topBar.speakNoBattery = { [weak self] in self?.voice.sayNoBattery() }
+            RemindersController.shared.speakAdded = { [weak self] result in self?.voice.sayReminder(result) }
+            topBar.speakMeeting = { [weak self] title, place in self?.voice.sayMeeting(title: title, place: place) }
+            topBar.speakNoMeeting = { [weak self] in self?.voice.sayNoMeeting() }
+            topBar.speakNextEvent = { [weak self] title, when, allDay in
+                self?.voice.sayNextEvent(title: title, when: when, allDay: allDay)
+            }
+            topBar.speakNoNextEvent = { [weak self] in self?.voice.sayNoNextEvent() }
+            topBar.speakClock = { [weak self] time, period in
+                self?.voice.sayClock(time: time, period: period)
+            }
+            topBar.speakWorldClock = { [weak self] readings in
+                self?.voice.sayWorldClock(readings)
+            }
+            topBar.speakCountdown = { [weak self] title, days in
+                self?.voice.sayCountdown(title: title, days: days)
+            }
+            topBar.speakNoCountdown = { [weak self] in self?.voice.sayNoCountdown() }
+            topBar.speakDate = { [weak self] weekday, date in
+                self?.voice.sayDate(weekday: weekday, date: date)
+            }
+            topBar.speakNote = { [weak self] text in self?.voice.sayNote(text) }
+            topBar.speakNoNote = { [weak self] in self?.voice.sayNoNote() }
+            topBar.speakSecretNote = { [weak self] in self?.voice.saySecretNote() }
+            topBar.speakAgents = { [weak self] in self?.voice.sayAgents() }
+            topBar.speakTimeLeft = { [weak self] in self?.voice.sayTimeLeft() }
+            topBar.speakNextReminder = { [weak self] title, when in
+                self?.voice.sayNextReminder(title: title, when: when)
+            }
+            topBar.speakNoNextReminder = { [weak self] in self?.voice.sayNoNextReminder() }
+            topBar.speakNextReminderAccess = { [weak self] in self?.voice.sayNextReminderAccess() }
+            topBar.speakAlerts = { [weak self] in self?.voice.sayAlerts() }
+            topBar.speakTodoCount = { [weak self] in self?.voice.sayTodoCount() }
+            topBar.speakAgenda = { [weak self] in self?.voice.sayAgenda() }
+            topBar.speakShelf = { [weak self] in self?.voice.sayShelf() }
+            topBar.speakRain = { [weak self] in self?.voice.sayRain() }
+            topBar.speakWeek = { [weak self] in self?.voice.sayWeek() }
+            topBar.speakClipboard = { [weak self] in self?.voice.sayClipboard() }
+            topBar.speakRounds = { [weak self] in self?.voice.sayRounds() }
+            topBar.speakWords = { [weak self] in self?.voice.sayWords() }
+            topBar.speakDictation = { [weak self] in self?.voice.sayDictation() }
+            topBar.speakPolyglot = { [weak self] in self?.voice.sayPolyglot() }
+            topBar.speakRecording = { [weak self] in self?.voice.sayRecording() }
+            topBar.speakDarkMode = { [weak self] in self?.voice.sayDarkMode() }
+            topBar.speakTiling = { [weak self] in self?.voice.sayTiling() }
+            topBar.speakScreens = { [weak self] in self?.voice.sayScreens() }
+            topBar.speakEarbuds = { [weak self] in self?.voice.sayEarbuds() }
+            topBar.speakOutput = { [weak self] in self?.voice.sayOutput() }
+            topBar.speakScript = { [weak self] in self?.voice.sayScript() }
+            InsomniaController.shared.speakLid = { [weak self] in self?.voice.sayLid() }
+            InsomniaController.shared.speakHeat = { [weak self] in self?.voice.sayHeat() }
+            WakeWordController.shared.speakWake = { [weak self] in self?.voice.sayHeyZeus() }
+            VoiceSettings.shared.speakVoice = { [weak self] in self?.voice.sayVoiceChoice() }
+            LicenseManager.shared.speakLicense = { [weak self] in self?.voice.sayLicense() }
+            PermissionsModel.speakScreen = { [weak self] in self?.voice.sayScreenRecording() }
+            DriveController.speakDrive = { [weak self] in self?.voice.sayDriveAutonomy() }
+            NotchController.speakNotch = { [weak self] in self?.voice.sayNotchPlace() }
+            NotchController.speakOpen = { [weak self] in self?.voice.sayNotchOpen() }
+            HaloStyle.speakLight = { [weak self] in self?.voice.sayHaloLight() }
+            HomeSlots.speakHome = { [weak self] in self?.voice.sayHomeCards() }
+            SystemHUDSettings.speakLights = { [weak self] in self?.voice.sayNotchLights() }
+            TopBarLayout.liveTitles = { [weak self] in
+                self?.topBar.layout.trimmedToRow().tabs.map(\.title) ?? TopBarLayout.standard.trimmedToRow().tabs.map(\.title)
+            }
+            TopBarLayout.speakTabs = { [weak self] in self?.voice.sayTopBarTabs() }
+            SoundCatalog.speakCues = { [weak self] in self?.voice.sayCueSounds() }
+            DictationSettings.speakSetup = { [weak self] in self?.voice.sayDictationSetup() }
+            ExtraPreferences.speakVoiceCues = { [weak self] in self?.voice.sayVoiceCues() }
+            DayToDayVoice.speakDay = { [weak self] in self?.voice.sayDayToDay() }
+            PrompterSetupVoice.speakSetup = { [weak self] in self?.voice.sayPrompterSetup() }
+            BrowserAgentVoice.speakAgent = { [weak self] in self?.voice.sayBrowserAgent() }
+            PolyglotSettings.speakSetup = { [weak self] in self?.voice.sayPolyglotSetup() }
+            KeepAwakeSession.speakSetup = { [weak self] in self?.voice.sayKeepAwakeSetup() }
+            FlingVoice.speakFling = { [weak self] in self?.voice.sayFlingSetup() }
+            TilingSetupVoice.speakSetup = { [weak self] in self?.voice.sayTilingSetup() }
+            CodingSetupVoice.speakSetup = { [weak self] in self?.voice.sayCodingSetup() }
+            NotifySetupVoice.speakNotices = { [weak self] in self?.voice.sayNotifySetup() }
+            FlingVoice.speakReceive = { [weak self] in self?.voice.sayReceiveSetup() }
+            BeamerSetupVoice.speakSetup = { [weak self] in self?.voice.sayBeamerSetup() }
+            PolyglotSettings.speakCaptions = { [weak self] in self?.voice.sayCaptionSetup() }
+            PolyglotSettings.speakChord = { [weak self] in self?.voice.sayPolyglotChord() }
+            AwakeHoldVoice.speakHold = { [weak self] in self?.voice.sayAwakeHold() }
+            LiveTouchVoice.speakTouch = { [weak self] in self?.voice.sayLiveTouch() }
+            PointerGlideVoice.speakGlide = { [weak self] in self?.voice.sayPointerGlide() }
+            RoutineListVoice.speakList = { [weak self] in self?.voice.sayRoutineList() }
+            RecordlyCaptureVoice.speakCapture = { [weak self] in self?.voice.sayRecordlyCapture() }
+            AnswerPathVoice.speakPath = { [weak self] in self?.voice.sayAnswerPath() }
+            AskFinishVoice.speakAsks = { [weak self] in self?.voice.sayAskFinish() }
+            ShareSeenVoice.speakSeen = { [weak self] in self?.voice.sayShareSeen() }
+            ModelCapVoice.speakCap = { [weak self] in self?.voice.sayModelCap() }
+            FocusLengthVoice.speakLength = { [weak self] in self?.voice.sayFocusLength() }
+            PlaybackModeVoice.speakModes = { [weak self] in self?.voice.sayPlaybackMode() }
+            ReminderListVoice.speakList = { [weak self] in self?.voice.sayReminderList() }
+            ClipboardFilterVoice.speakFilter = { [weak self] in self?.voice.sayClipboardFilter() }
+            ChromeLinkVoice.bridgeOn = { [weak self] in self?.permissions.chromeHostInstalled ?? false }
+            ChromeLinkVoice.extensionOn = { [weak self] in self?.permissions.chromeConnected ?? false }
+            ChromeLinkVoice.speakLink = { [weak self] in self?.voice.sayChromeLink() }
+            MemoryLearnVoice.speakLearn = { [weak self] in self?.voice.sayMemoryLearn() }
+            ChatHubVoice.speakHub = { [weak self] in self?.voice.sayChatHub() }
+            CalendarPageVoice.speakPage = { [weak self] in self?.voice.sayCalendarPage() }
+            ShelfStackVoice.speakStacks = { [weak self] in self?.voice.sayShelfStacks() }
+            OpenPageVoice.speakPage = { [weak self] in self?.voice.sayOpenPage() }
+            TodoShownVoice.speakList = { [weak self] in self?.voice.sayTodoShown() }
+            FocusClockVoice.speakClock = { [weak self] in self?.voice.sayFocusClock() }
+            QuickTodoVoice.speakKey = { [weak self] in self?.voice.sayQuickTodo() }
+            PrompterRollVoice.speakRoll = { [weak self] in self?.voice.sayPrompterRoll() }
+            FlingNearbyVoice.speakNearby = { [weak self] in self?.voice.sayFlingNearby() }
+            PrompterWindowVoice.speakWindow = { [weak self] in self?.voice.sayPrompterWindow() }
+            TeachYouVoice.speakYou = { [weak self] in self?.voice.sayTeachYou() }
+            ChatPaneVoice.windowOpen = { [weak self] in self?.chatWindow?.isShowing ?? false }
+            ChatPaneVoice.pinnedCount = { [weak self] in
+                guard self?.chatWindow != nil else { return 0 }
+                return ChatModel.shared.conversations.filter(\.pinned).count
+            }
+            ChatPaneVoice.speakPane = { [weak self] in self?.voice.sayChatPane() }
+            LyricShowVoice.speakLyrics = { [weak self] in self?.voice.sayLyricShow() }
+            UsageMeterVoice.speakMeter = { [weak self] in self?.voice.sayUsageMeter() }
+            ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
+            OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
+            HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
+            WeatherPlaceVoice.speakPlace = { [weak self] in self?.voice.sayWeatherPlace() }
+            InsomniaSetupVoice.speakSetup = { [weak self] in self?.voice.sayInsomniaSetup() }
+            DictationModeVoice.speakMode = { [weak self] in self?.voice.sayDictationMode() }
+            VoiceGlowSettings.speakGlow = { [weak self] in self?.voice.sayVoiceGlow() }
+            DictationRecordVoice.speakRecord = { [weak self] in self?.voice.sayDictationRecord() }
+            InsomniaSetupVoice.speakNudge = { [weak self] in self?.voice.sayAgentNudge() }
+            HomeFrameVoice.speakFrame = { [weak self] in self?.voice.sayHomeFrame() }
+            ScreenCornerVoice.speakCorners = { [weak self] in self?.voice.sayScreenCorners() }
+            NotchCloseVoice.speakClose = { [weak self] in self?.voice.sayNotchClose() }
+            EverydayLightsVoice.speakLights = { [weak self] in self?.voice.sayEverydayLights() }
+            HaloArmVoice.speakArm = { [weak self] in self?.voice.sayHaloArm() }
+            MusicLightsVoice.speakLights = { [weak self] in self?.voice.sayMusicLights() }
+            RunningCardVoice.speakCard = { [weak self] in self?.voice.sayRunningCard() }
+            VoiceStyleVoice.speakStyle = { [weak self] in self?.voice.sayVoiceStyle() }
+            LockChimeVoice.speakChimes = { [weak self] in self?.voice.sayLockChimes() }
+            FacePresenceSetVoice.speakSet = { [weak self] in self?.voice.sayFacePresenceSet() }
+            ResearchSetupVoice.speakSetup = { [weak self] in self?.voice.sayResearchSetup() }
+            ScribeSetupVoice.speakSetup = { [weak self] in self?.voice.sayScribeSetup() }
+            LanguagePackVoice.speakPacks = { [weak self] in self?.voice.sayLanguagePacks() }
+            SpeakerSetupVoice.speakSetup = { [weak self] in self?.voice.saySpeakerSetup() }
+            AccessVoice.speakAccess = { [weak self] in self?.voice.sayAccessSet() }
+            ExtraSoundVoice.speakExtra = { [weak self] in self?.voice.sayExtraSounds() }
+            HudExtraVoice.speakExtras = { [weak self] in self?.voice.sayHudExtras() }
+            WavesSetupVoice.speakWaves = { [weak self] in self?.voice.sayWavesSetup() }
+            NotchlessVoice.speakShape = { [weak self] in self?.voice.sayNotchless() }
+            HomeBackdropVoice.speakBackdrop = { [weak self] in self?.voice.sayHomeBackdrop() }
+            DictationSoundVoice.speakSound = { [weak self] in self?.voice.sayDictationSound() }
+            DictationKeepVoice.speakKeep = { [weak self] in self?.voice.sayDictationKeep() }
+            GrantVoice.speakGrants = { [weak self] in self?.voice.sayGrantSet() }
+            JevSetupVoice.speakJev = { [weak self] in self?.voice.sayJevSetup() }
+            PickerSetupVoice.speakPicker = { [weak self] in self?.voice.sayPickerSetup() }
+            DefaultAgentVoice.speakAgent = { [weak self] in self?.voice.sayDefaultAgent() }
+            LocalAccessVoice.speakLocal = { [weak self] in self?.voice.sayLocalAccess() }
+            FastPathVoice.speakPath = { [weak self] in self?.voice.sayFastPath() }
+            FlickSetupVoice.speakFlick = { [weak self] in self?.voice.sayFlickSetup() }
+            HaloEntranceVoice.speakEntrance = { [weak self] in self?.voice.sayHaloEntrance() }
+            TalkMicVoice.speakMic = { [weak self] in self?.voice.sayTalkMic() }
+            ExplainSetupVoice.speakSetup = { [weak self] in self?.voice.sayExplainSetup() }
+            ProactiveSetupVoice.speakSetup = { [weak self] in self?.voice.sayProactiveSetup() }
+            ScriptSetupVoice.speakScript = { [weak self] in self?.voice.sayScriptSetup() }
+            OfferSetupVoice.speakOffer = { [weak self] in self?.voice.sayOfferSetup() }
+            ShareSetupVoice.speakShare = { [weak self] in self?.voice.sayShareSetup() }
+            KeywordSetupVoice.speakWords = { [weak self] in self?.voice.sayKeywordSetup() }
+            BannerSetupVoice.speakBanners = { [weak self] in self?.voice.sayBannerSetup() }
+            FeedbackSetupVoice.speakFeedback = { [weak self] in self?.voice.sayFeedbackSetup() }
+            DictateSwitchVoice.speakSwitch = { [weak self] in self?.voice.sayDictateSwitch() }
+            ArrivalLightsVoice.speakLights = { [weak self] in self?.voice.sayArrivalLights() }
+            HaloWashVoice.speakWash = { [weak self] in self?.voice.sayHaloWash() }
+            BandSetupVoice.speakBands = { [weak self] in self?.voice.sayBandSetup() }
+            HaloMeasureVoice.speakMeasure = { [weak self] in self?.voice.sayHaloMeasure() }
+            TilingGapVoice.speakGaps = { [weak self] in self?.voice.sayTilingGaps() }
+            HotspotSetupVoice.speakHotspot = { [weak self] in self?.voice.sayHotspotSetup() }
+            HomeLaterVoice.speakLater = { [weak self] in self?.voice.sayHomeLater() }
+            VoiceKeyVoice.speakKeys = { [weak self] in self?.voice.sayVoiceKeys() }
+            UpdateSetupVoice.speakUpdates = { [weak self] in self?.voice.sayUpdateSetup() }
+            VoiceTuneVoice.speakTune = { [weak self] in self?.voice.sayVoiceTune() }
+            DictateHearVoice.speakHear = { [weak self] in self?.voice.sayDictateHear() }
+            CommandSetupVoice.speakCommand = { [weak self] in self?.voice.sayCommandSetup() }
+            NotchFitVoice.speakFit = { [weak self] in self?.voice.sayNotchFit() }
+            QuietSetupVoice.speakQuiet = { [weak self] in self?.voice.sayQuietSetup() }
+            FreezeSetupVoice.speakFreeze = { [weak self] in self?.voice.sayFreezeSetup() }
+            AskWordsVoice.speakAsk = { [weak self] in self?.voice.sayAskWords() }
+            LeftOutVoice.speakLeft = { [weak self] in self?.voice.sayLeftOut() }
+            SeparateBrowserVoice.speakBrowser = { [weak self] in self?.voice.saySeparateBrowser() }
+            VocabSetupVoice.speakVocab = { [weak self] in self?.voice.sayVocabSetup() }
+            ExplainHearVoice.speakHear = { [weak self] in self?.voice.sayExplainHear() }
+            ExplainHearVoice.captionOn = { [weak self] in self?.explanation?.muted == true }
+            ExplainHearVoice.microphoneUID = { [weak self] in self?.explanation?.deviceUID }
+            ExplainHearVoice.whisperOn = { [weak self] in self?.explanation?.useInstalledWhisper == true }
+            OfferSetupVoice.claudeConnected = { [weak self] in self?.guideServices.isConnected(.claude) ?? false }
+            OfferSetupVoice.codexConnected = { [weak self] in self?.guideServices.isConnected(.codex) ?? false }
+            MusicLightsVoice.wingsOn = { [weak self] in
+                self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
+            }
+            BeamerSetupVoice.continuityOn = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
+            PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
+            PointingSettings.speakTrail = { [weak self] in self?.voice.sayPointTrail() }
+            TalkSightVoice.speakSight = { [weak self] in self?.voice.sayTalkSight() }
+            DrawnSizeVoice.speakSize = { [weak self] in self?.voice.sayDrawnSize() }
+            PointingSettings.speakRoute = { [weak self] in self?.voice.sayPointRoute() }
+            CompanionVoice.speakCompanion = { [weak self] in self?.voice.sayCompanion() }
+            GatewayVoice.speakGateway = { [weak self] in self?.voice.sayGateway() }
+            AssistantSettings.speakModel = { [weak self] in self?.voice.sayChatModel() }
+            KokoroSetupVoice.speakKokoro = { [weak self] in self?.voice.sayKokoroSetup() }
+            CloudVoiceVoice.speakCloud = { [weak self] in self?.voice.sayCloudVoice() }
+            FlingPeerVoice.speakPeers = { [weak self] in self?.voice.sayFlingPeers() }
+            VisualReadyVoice.speakReady = { [weak self] in self?.voice.sayVisualReady() }
+            ShowMeVoice.speakShow = { [weak self] in self?.voice.sayShowMe() }
+            LivesVoice.speakLives = { [weak self] in self?.voice.sayLives() }
+            TalkHoldVoice.speakHold = { [weak self] in self?.voice.sayTalkHold() }
+            ExtraKeyVoice.speakExtra = { [weak self] in self?.voice.sayExtraKey() }
+            TodoSetupVoice.speakTodos = { [weak self] in self?.voice.sayTodoSetup() }
+            BrainSetupVoice.speakBrain = { [weak self] in self?.voice.sayBrainSetup() }
+            AgentFinishVoice.speakFinish = { [weak self] in self?.voice.sayAgentFinish() }
+            ExtraOfferVoice.speakOffers = { [weak self] in self?.voice.sayExtraOffer() }
+            HookShowVoice.speakHooks = { [weak self] in self?.voice.sayHookShow() }
+            RecordlyExportVoice.speakExport = { [weak self] in self?.voice.sayRecordlyExport() }
+            PasteSetupVoice.speakPaste = { [weak self] in self?.voice.sayPasteSetup() }
+            ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
+            AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
+            NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }
+            CardFinish.speakLook = { [weak self] in self?.voice.sayCardStyle() }
+            BuddyPreference.speakShow = { [weak self] in self?.voice.sayPointerBuddy() }
+            topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
+            topBar.speakQuickAdd = { [weak self] speech in
+                switch speech {
+                case .added(let event): self?.voice.sayAddedEvent(event)
+                case .problem(let line): self?.voice.sayCalendarProblem(line)
+                }
+            }
             WelcomeBackCoordinator.shared.speak = { [weak self] text in self?.voice.say(text) }
         }
         if on(.shortcuts) {
@@ -334,7 +586,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey.onListenAccessMissing = { [weak self] in
                 if let cue = KeyAccessNotice.cue(granted: false) { self?.topBar.show(.permission(cue.text, pane: cue.pane)) }
             }
-            hotkey.onBlocked = { [weak self] message in self?.voice?.say(message) }
+            hotkey.onBlocked = { [weak self] message in self?.voice?.keysBlocked(message) }
             // Space may join the bare Control-Option hold (the talk chord); the dictation key never has one. Every event reads
             // the value the sync points stored (start, access granted, a Chat or shortcut change, VoiceOver, any setting), so the
             // key path asks neither the system for access nor Carbon for the hot key again.
@@ -399,7 +651,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // on-device wake detection, and launch never prompts for a permission.
         if on(.wakeWord) { WakeWordController.shared.start(voice: voice, topBar: topBar) }
         // Face presence: off until the owner turns it on; with it on, launch reads the vault and opens no camera.
-        if on(.facePresence) { FacePresenceController.shared.start(permissions: .live(permissions)) }
+        if on(.facePresence) {
+            FacePresenceController.shared.speakFace = { [weak self] in self?.voice.sayFace() }
+            FacePresenceController.shared.start(permissions: .live(permissions))
+        }
 
         if on(.panelUI), let preferences {
             panel = MenuBarPanel(
@@ -797,6 +1052,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.topBar.show(.permission("Pointing needs Input Monitoring or Accessibility to see the hold keys.", pane: "Privacy_ListenEvent"))
         }
         self.pointing = pointing; pointingProviders = providers
+        buddy.onPointingClick = { [weak pointing] point in
+            if WalkthroughController.shared.isRunning { return true }
+            return pointing?.guideClick(at: point) ?? false
+        }
         return pointing
     }
 
@@ -1013,6 +1272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastHidden: Bool?
     private var chimePolicy = AgentChimePolicy()
     private var lastApprovalSeen = false
+    private var approvalBoltShown = false
     private var lastFailed = 0
     private var feedTicks = 0
     private var lastMeetingCheck = Date.distantPast
@@ -1114,6 +1374,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Points at Approve and says the same line as Play Demo. A missing button shows "Not found".
+    private func showLiveApproval() {
+        let found = notch.approveButtonPoint != nil
+        let step = PlayDemoScript.liveApproval(approveButtonFound: found)
+        if let point = notch.approveButtonPoint {
+            buddy.point(to: point, label: step.bolt)
+        } else {
+            buddy.showCaption(step.bolt)
+        }
+        voice?.say(step.spoken)
+    }
+
     private func playAgentChime(_ cue: AgentChimePolicy.Cue?) {
         switch cue {
         case .start: ZeusSound.play(.start)
@@ -1130,7 +1402,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let approval = notch.model.approval != nil
         let now = Date()
         playAgentChime(chimePolicy.approval(visible: approval, at: now))
-        if approval != lastApprovalSeen { lastApprovalSeen = approval; registerShortcuts() }
+        if approval != lastApprovalSeen {
+            if approval, demo?.isPlaying != true {
+                showLiveApproval()
+                approvalBoltShown = true
+            } else if !approval, approvalBoltShown {
+                approvalBoltShown = false
+                buddy.idle()
+            }
+            lastApprovalSeen = approval
+            registerShortcuts()
+        }
         let startEnabled = SettingsStore.shared.bool("sound.agentStart")
         for session in notch.model.sessions {
             playAgentChime(chimePolicy.session(session.id, status: session.status, at: now, startEnabled: startEnabled))
@@ -1150,6 +1432,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if now.timeIntervalSince(lastMeetingCheck) >= 2 {
             lastMeetingCheck = now
             MeetingState.refresh(ownMicInUse: topBar.isDictating || AvatarStatus.shared.current == .listening)
+            earbudsWatch.poll()
             let agents = Dictionary(grouping: notch.model.sessions, by: \.agent).map { "\($0.key) · \($0.value.count)" }.sorted()
             options.statusOverrides["diag.agents"] = agents.isEmpty ? (false, "None yet") : (true, agents.joined(separator: ", "))
         }
@@ -1213,15 +1496,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Show-me drawing, drive mode and walkthroughs share the notch, the spark and the voice.
     private func startMacControl() {
         DriveController.shared.notch = notch
+        DriveController.shared.say = { [weak self] text in self?.voice.say(text) }
+        DriveController.shared.showSpark = { [weak self] text in self?.buddy.showCaption(text) }
+        DriveController.shared.hideSpark = { [weak self] in self?.buddy.hideCaption() }
         BrowserAgentRunner.shared.notch = notch
         BrowserAgentRunner.shared.chrome = voice?.chrome
-        BrowserAgentRunner.shared.say = { [weak self] text in self?.voice.say(text) }
+        BrowserAgentRunner.shared.say = { [weak self] text in self?.voice.browserSaid(text) }
+        BrowserAgentRunner.shared.showSpark = { [weak self] text in self?.buddy.showCaption(text) }
+        BrowserAgentRunner.shared.hideSpark = { [weak self] in self?.buddy.hideCaption() }
         CodeActions.shared.notch = notch
         CodeActions.shared.say = { [weak self] text in self?.voice.say(text) }
         ResearchRunner.shared.notch = notch
         ResearchRunner.shared.say = { [weak self] text in self?.voice.say(text) }
+        ResearchRunner.shared.showSources = { [weak self] plan, speak in self?.voice.showResearch(plan, speak: speak) }
+        ResearchRunner.shared.showReportSaved = { [weak self] plan, line, speak in self?.voice.showReportSaved(plan, line: line, speak: speak) }
+        ResearchRunner.shared.showReportMiss = { [weak self] plan, line, speak in self?.voice.showReportMiss(plan, line: line, speak: speak) }
+        ResearchRunner.shared.showResearchAsk = { [weak self] plan, line, speak in self?.voice.showResearchAsk(plan, line: line, speak: speak) }
+        ResearchRunner.shared.showAnswerFail = { [weak self] plan, line, speak in self?.voice.showResearchFailure(plan, line: line, speak: speak) }
+        ResearchRunner.shared.showClaudeTool = { [weak self] plan, line, speak in self?.voice.showResearchClaudeTool(plan, line: line, speak: speak) }
+        earbudsNotch.topBar = topBar
+        earbudsNotch.say = { [weak self] text in self?.voice.say(text) }
+        earbudsNotch.hideDetails = { MeetingState.hideDetails }
+        earbudsWatch.present = { [weak self] facts, id, speak in
+            self?.earbudsNotch.present(facts, id: id, speak: speak)
+        }
         WalkthroughController.shared.buddy = buddy
-        WalkthroughController.shared.say = { [weak self] text in self?.voice.say(text) }
+        WalkthroughController.shared.say = { [weak self] text in self?.voice.walkthroughSaid(text) }
         AnnotationController.shared.onMark = { [weak self] prompt, shots in
             guard let self else { return }
             Task { @MainActor in _ = await self.voice?.annotationTurn(prompt, screenshots: shots) }

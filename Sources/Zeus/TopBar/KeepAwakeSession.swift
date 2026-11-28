@@ -10,6 +10,8 @@ import ZeusCore
 @MainActor @Observable
 final class KeepAwakeSession {
     static let shared = KeepAwakeSession()
+    /// The Keep awake card speaks the length, the battery floor, and heat. It does not start a session.
+    static var speakSetup: () -> Void = {}
 
     /// Preset minutes offered in Settings / Home.
     static let presets = KeepAwakeLength.short
@@ -25,6 +27,16 @@ final class KeepAwakeSession {
     private(set) var remaining: TimeInterval = 0
     /// Why the last session stopped by itself. Cleared when a new one starts or you end one.
     private(set) var lastEnd: KeepAwakeRules.EndReason?
+    /// Speaks and draws a session the person started or ended. Battery and heat notices stay on the notch.
+    var speak: (Speech) -> Void = { _ in }
+
+    enum Speech: Equatable {
+        case length(Int)
+        case openEnded
+        case stopped
+        case done
+        case notOn
+    }
     /// When true, also keep the display awake for the session.
     var keepDisplay = UserDefaults.standard.bool(forKey: "keepAwake.display") {
         didSet { if !TopBarStyle.isSnapshot { UserDefaults.standard.set(keepDisplay, forKey: "keepAwake.display") }; reassert() }
@@ -90,6 +102,23 @@ final class KeepAwakeSession {
         evaluate()
     }
 
+    /// Starts a session and says how long it will hold.
+    func beginSpoken(minutes: Int?) {
+        start(minutes: minutes)
+        if let minutes { speak(.length(max(1, minutes))) }
+        else { speak(.openEnded) }
+    }
+
+    /// Ends a session by hand and says so. An idle session says it is not on.
+    func endSpoken() {
+        guard isActive else {
+            speak(.notOn)
+            return
+        }
+        end()
+        speak(.stopped)
+    }
+
     func add(minutes: Int) {
         guard isActive else { start(minutes: minutes); return }
         guard !isOpenEnded else { return }
@@ -144,7 +173,8 @@ final class KeepAwakeSession {
         case .end(let reason):
             stop()
             lastEnd = reason
-            if reason != .timeUp { onNotice(reason.text) }
+            if reason == .timeUp { speak(.done) }
+            else { onNotice(reason.text) }
         }
     }
 

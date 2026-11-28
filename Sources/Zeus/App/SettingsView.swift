@@ -150,6 +150,26 @@ final class SettingsNavigation {
     }
 }
 
+/// Show me speaks circling on the screen and whether safe steps run without asking. It does not start a mark.
+enum ShowMeVoice {
+    static var speakShow: () -> Void = {}
+}
+
+/// Where Zeus lives speaks the menu bar icon and the date calendar. It does not hide the icon.
+enum LivesVoice {
+    static var speakLives: () -> Void = {}
+}
+
+/// The talk key and bolt captions. The key is not changed and listening does not start.
+enum TalkHoldVoice {
+    static var speakHold: () -> Void = {}
+}
+
+/// Quick cues and the cursor anchor. The buddy's show rule stays its own ask. Nothing is moved.
+enum LiveTouchVoice {
+    static var speakTouch: () -> Void = {}
+}
+
 struct SettingsView: View {
     let connections: ConnectionsModel
     let preferences: Preferences
@@ -296,6 +316,12 @@ struct SettingsView: View {
     private var general: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Talk to ZEUS") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { TalkHoldVoice.speakHold() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say the talk key and captions")
+                }
                 GlassRow(title: "Talk key", note: (DictationSettings.shared.enabled && DictationSettings.shared.key == preferences.pushToTalk ? "Double-tap it, then speak. Holding the same key dictates." : "Hold it, ask, let go. ZEUS answers out loud and points.")) {
                     ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
                 }
@@ -305,6 +331,12 @@ struct SettingsView: View {
                 }
             }
             GlassCard(title: "Where ZEUS lives") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { LivesVoice.speakLives() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say the menu bar icon and the calendar")
+                }
                 GlassRow(title: "Show ZEUS in the menu bar",
                          note: preferences.showMenuBarIcon ? nil : "To get back here, open ZEUS again from Applications or Spotlight.") {
                     GlassToggle(isOn: Binding(get: { preferences.showMenuBarIcon }, set: { preferences.showMenuBarIcon = $0 }), label: "Menu bar icon")
@@ -320,6 +352,12 @@ struct SettingsView: View {
                 }
             }
             GlassCard(title: "Show me and drive") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { ShowMeVoice.speakShow() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how show me is set")
+                }
                 GlassRow(title: "Draw on screen", note: "Hold the left Control key, then circle or underline anything. ZEUS answers about that spot.") {
                     GlassToggle(isOn: $annotateEnabled, label: "Show me")
                 }
@@ -349,6 +387,12 @@ struct SettingsView: View {
                     }
                 }
                 GlassCard(title: "Live touches") {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button { LiveTouchVoice.speakTouch() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say the quick cues and whether Zeus sits next to the cursor")
+                    }
                     GlassRow(title: "Quick cues", note: "Copy, caps lock, volume and battery flash beside the notch.") {
                         GlassToggle(isOn: Binding(get: { topBar.cuesEnabled }, set: { topBar.cuesEnabled = $0 }), label: "Quick cues")
                     }
@@ -413,6 +457,12 @@ struct SettingsView: View {
                     }
                 }
                 GlassCard(title: "Chrome") {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button { ChromeLinkVoice.speakLink() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say how Chrome is connected")
+                    }
                     GlassRow(title: "Bridge", note: permissions.chromeMessage, icon: ("globe", Color(hex: 0x4285F4))) {
                         HStack(spacing: 8) {
                             GlassStatus(ok: permissions.chromeHostInstalled, text: permissions.chromeHostInstalled ? "Registered" : "Off")
@@ -573,6 +623,11 @@ private struct TopBarSettings: View {
     }
 }
 
+/// Dictation paste speaks whether the clipboard is put back and how many apps are typed into. It does not write or name the apps.
+enum PasteSetupVoice {
+    static var speakPaste: () -> Void = {}
+}
+
 /// Dictation: key, modes, vocabulary, history.
 private struct DictationSettingsView: View {
     let topBar: TopBarModel
@@ -648,6 +703,12 @@ private struct DictationSettingsView: View {
                 }
             }
             GlassCard(title: "Pasting and history") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { PasteSetupVoice.speakPaste() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how dictation pastes")
+                }
                 GlassRow(title: "Put the clipboard back after pasting") {
                     GlassToggle(isOn: Binding(get: { settings.restoreClipboard }, set: { settings.restoreClipboard = $0 }), label: "Restore clipboard")
                 }

@@ -29,6 +29,32 @@ struct PointingCoordinateTests {
                 "got \(r)", sourceLocation: sourceLocation)
     }
 
+    @Test func screenshotTopLeftLandsOnTheTopLeftOfThatDisplay() {
+        let capture = CaptureMap(displayID: 2, pixelWidth: 1920, pixelHeight: 1080)
+        let ctx = MapContext(displayID: 2, capture: capture)
+        let topLeft = mapper.convert(CGPoint(x: 0, y: 0), from: .pixel, to: .screen, context: ctx)
+        #expect(topLeft == CGPoint(x: -1920, y: 1080))
+        let center = mapper.convert(CGPoint(x: 960, y: 540), from: .pixel, to: .screen, context: ctx)
+        #expect(center == CGPoint(x: -960, y: 540))
+        let area = mapper.convert(CGRect(x: 0, y: 0, width: 100, height: 40), from: .pixel, to: .screen, context: ctx)
+        #expect(area == CGRect(x: -1920, y: 1040, width: 100, height: 40))
+    }
+
+    @Test func aScreenNumberThisTurnDoesNotHaveIsNotTheFirstShot() {
+        #expect(PresentScreenIndex.offset(screen: nil, count: 2) == 0)
+        #expect(PresentScreenIndex.offset(screen: 1, count: 2) == 0)
+        #expect(PresentScreenIndex.offset(screen: 2, count: 2) == 1)
+        #expect(PresentScreenIndex.offset(screen: 3, count: 2) == nil)
+        #expect(PresentScreenIndex.offset(screen: 0, count: 2) == nil)
+        #expect(PresentScreenIndex.offset(screen: 1, count: 0) == nil)
+        #expect(PresentPixelBounds.contains(x: 0, y: 0, width: 100, height: 80))
+        #expect(PresentPixelBounds.contains(x: 99, y: 79, width: 100, height: 80))
+        #expect(!PresentPixelBounds.contains(x: 100, y: 40, width: 100, height: 80))
+        #expect(!PresentPixelBounds.contains(x: -1, y: 0, width: 100, height: 80))
+        #expect(PresentPixelBounds.intersects(x: -10, y: 4, width: 20, height: 8, imageWidth: 100, imageHeight: 80))
+        #expect(!PresentPixelBounds.intersects(x: 100, y: 0, width: 10, height: 10, imageWidth: 100, imageHeight: 80))
+    }
+
     @Test func retinaDisplayDownscaledToTheDeliveredImage() throws {
         let (geometry, display) = try capture(Self.main, full: .init(width: 2880, height: 1800), delivered: .init(width: 1440, height: 900))
         // AX frame: 100 right of the left edge, 50 below the top.

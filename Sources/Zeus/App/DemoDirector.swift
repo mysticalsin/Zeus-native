@@ -1,4 +1,5 @@
 import AppKit
+import ZeusCore
 
 /// Plays the ZEUS experience end to end with scripted data, so the look can be judged before
 /// voice and agent hooks are wired: listen → think → fly + strike → agent peek → approval
@@ -8,17 +9,40 @@ final class DemoDirector {
     private let buddy: BuddyController
     private let notch: NotchController
     private let statusItemFrame: () -> CGRect?
+    private let say: (String) -> Void
     private var task: Task<Void, Never>?
+    private var playing = false
 
-    init(buddy: BuddyController, notch: NotchController, statusItemFrame: @escaping () -> CGRect?) {
+    /// True while Play Demo is running, so a live approval cue does not speak over it.
+    var isPlaying: Bool { playing }
+
+    init(buddy: BuddyController, notch: NotchController, statusItemFrame: @escaping () -> CGRect?,
+         say: @escaping (String) -> Void = { _ in }) {
         self.buddy = buddy
         self.notch = notch
         self.statusItemFrame = statusItemFrame
+        self.say = say
     }
 
     func play() {
         task?.cancel()
-        task = Task { await run() }
+        playing = true
+        task = Task {
+            await run()
+            if !Task.isCancelled { playing = false }
+        }
+    }
+
+    /// The voice gets the sentence. The spark caption gets the short line.
+    private func narrate(_ step: PlayDemoScript.Step) {
+        say(step.spoken)
+        buddy.showCaption(step.bolt)
+        buddy.hideCaption()
+    }
+
+    private func show(_ step: PlayDemoScript.Step, at point: CGPoint) {
+        narrate(step)
+        buddy.point(to: point, label: step.bolt)
     }
 
     private func pause(_ seconds: Double) async -> Bool {
@@ -33,9 +57,11 @@ final class DemoDirector {
         buddy.idle()
         guard await pause(1.2) else { return }
 
-        // 1. Voice turn: hold the key, talk, release.
+        // 1. Voice turn: hold the key, talk, release. The spark shows the short label and the voice says the sentence.
+        narrate(PlayDemoScript.listening)
         buddy.listen()
         guard await pause(2.6) else { return }
+        narrate(PlayDemoScript.thinking)
         buddy.think()
         guard await pause(1.2) else { return }
 
@@ -43,10 +69,11 @@ final class DemoDirector {
         let mainFrame = (NSScreen.main ?? NSScreen.screens[0]).frame
         let iconTarget = statusItemFrame().map { CGPoint(x: $0.midX, y: $0.minY - 6) }
             ?? CGPoint(x: mainFrame.midX, y: mainFrame.midY)
-        buddy.point(to: iconTarget, label: "that's me up here, click the bolt anytime")
+        show(PlayDemoScript.menuBar, at: iconTarget)
         guard await pause(7.5) else { return }
 
-        // 3. A coding agent starts work; the notch peeks.
+        // 3. A coding agent starts work; the notch peeks and the voice says so.
+        narrate(PlayDemoScript.building)
         notch.startSession(id: "cc", agent: "Claude Code", project: "zeus", task: "npm run build")
         guard await pause(3.2) else { return }
 
@@ -58,30 +85,37 @@ final class DemoDirector {
         notch.update(sessionID: "cc", status: .needsYou)
         guard await pause(0.6) else { return }
         if let approve = notch.approveButtonPoint {
-            buddy.point(to: approve, label: "approve or deny, or just say ok")
+            show(PlayDemoScript.approval, at: approve)
+        } else {
+            narrate(PlayDemoScript.approvalMissing)
         }
         let decision = await verdict
         guard !Task.isCancelled else { return }
 
-        // 5. Outcome.
+        // 5. Outcome. The notch shows the result and the voice says which way it went.
         if decision == .allow {
+            narrate(PlayDemoScript.allowed)
             notch.update(sessionID: "cc", status: .working, task: "npm run build")
             guard await pause(2.4) else { return }
             notch.update(sessionID: "cc", status: .done, task: "build finished in 41 s")
         } else {
+            narrate(PlayDemoScript.denied)
             notch.update(sessionID: "cc", status: .done, task: "denied: rm -rf dist")
         }
         guard await pause(2.0) else { return }
 
-        // 6. More agents, then the full panel.
+        // 6. More agents, then the full panel, one peek, then close. Each beat is spoken.
         notch.startSession(id: "codex", agent: "Codex", project: "website", task: "write tests for checkout")
         notch.startSession(id: "cursor", agent: "Cursor", project: "api", task: "refactor auth middleware")
         notch.update(sessionID: "cursor", status: .done)
+        narrate(PlayDemoScript.panel)
         notch.show(.panel)
         guard await pause(6.0) else { return }
         notch.model.peekSessionID = "codex"
+        narrate(PlayDemoScript.peek)
         notch.show(.peek)
         guard await pause(1.5) else { return }
+        narrate(PlayDemoScript.closed)
         notch.show(.closed)
     }
 }

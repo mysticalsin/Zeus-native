@@ -2,6 +2,13 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// The Zeus and Beamer card speaks start, the crossing light, and the Continuity tab. It does not start Beamer.
+enum BeamerSetupVoice {
+    static var speakSetup: () -> Void = {}
+    /// Whether the open notch already shows the Continuity tab. Reading it does not move the keyboard.
+    static var continuityOn: () -> Bool = { false }
+}
+
 /// Settings › Beamer: install and open Beamer, see its machines, pause crossing, and decide how
 /// Zeus shows it. Beamer (uk.co.kalkman.beamer) shares one keyboard and mouse across Macs and PCs;
 /// docs/BEAMER.md says what Zeus can and cannot steer.
@@ -72,6 +79,10 @@ struct BeamerSettingsPage: View {
             GSInfo(text: "Beamer pairs Macs, Windows, Linux, iPhone and Android machines. An iPad uses Apple\u{2019}s Universal Control (System Settings \u{203A} Displays), which no app can steer. Zeus shows Continuity for the machines Beamer has.")
         }
         GSCard("Zeus and Beamer") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Beamer is set") { BeamerSetupVoice.speakSetup() }
+            }
             GSToggleRow(symbol: "power", title: "Start Beamer when Zeus starts", text: "Opens it hidden in the menu bar. Beamer\u{2019}s own \u{201C}Start at login\u{201D} switch is in Beamer\u{2019}s settings.", isOn: store.boolBinding("beamer.autoStart"))
             GSDivider()
             GSToggleRow(symbol: "light.max", title: "Light the notch when control crosses", text: "A cue from Zeus when your keyboard and mouse move to another machine, and when they come back. Needs Accessibility to read Beamer.", isOn: store.boolBinding("beamer.cue"))

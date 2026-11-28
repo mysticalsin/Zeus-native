@@ -13,6 +13,11 @@ import ZeusCore
 final class InsomniaController {
     static let shared = InsomniaController()
 
+    /// The Insomnia page speaks the lid line it shows.
+    var speakLid: () -> Void = {}
+    /// The Insomnia page speaks the heat word it shows.
+    var speakHeat: () -> Void = {}
+
     enum EntryMode: String, CaseIterable, Identifiable {
         case length = "For", until = "Until"
         var id: String { rawValue }
@@ -143,11 +148,11 @@ final class InsomniaController {
         message = nil
         armFailure = nil
         save(minutes ?? 0, "insomnia.minutes")
-        session.start(minutes: minutes)
+        session.beginSpoken(minutes: minutes)
         if lidClosedMode { armLid() }
     }
 
-    func stop() { session.end() }
+    func stop() { session.endSpoken() }
 
     func add(minutes: Int) {
         session.add(minutes: minutes)

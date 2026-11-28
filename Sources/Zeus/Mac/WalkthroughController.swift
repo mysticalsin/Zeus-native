@@ -8,8 +8,8 @@ final class WalkthroughController {
     private(set) var session: WalkthroughSession?
     private var shots: [ScreenShot] = []
     private var resolved: GuidedPresent.ResolvedTarget?
-    private var clickMonitor: Any?
-    private var escMonitor: Any?
+    private var clickMonitors: [Any] = []
+    private var escMonitors: [Any] = []
     private var autoAdvance: Task<Void, Never>?
     private var clickAdvance: Task<Void, Never>?
     weak var buddy: BuddyController?
@@ -21,13 +21,30 @@ final class WalkthroughController {
         stop()
         session = WalkthroughSession(walkthrough)
         shots = screenshots
-        clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { _ in
+        let click: (NSEvent) -> Void = { _ in
             MainActor.assumeIsolated { WalkthroughController.shared.clicked(at: NSEvent.mouseLocation) }
         }
-        if AccessibilityGate.trusted {
-            escMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
-                if event.keyCode == 53 { MainActor.assumeIsolated { WalkthroughController.shared.cancel() } }
-            }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: click) {
+            clickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { event in
+            click(event)
+            return event
+        }) {
+            clickMonitors.append(local)
+        }
+        let escape: (NSEvent) -> Void = { event in
+            if event.keyCode == 53 { MainActor.assumeIsolated { WalkthroughController.shared.cancel() } }
+        }
+        if AccessibilityGate.trusted,
+           let global = NSEvent.addGlobalMonitorForEvents(matching: .keyDown, handler: escape) {
+            escMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in
+            escape(event)
+            return event
+        }) {
+            escMonitors.append(local)
         }
         NSLog("[ZEUS] walkthrough: start \"%@\" steps=%d", walkthrough.title, walkthrough.steps.count)
         present()
@@ -50,8 +67,8 @@ final class WalkthroughController {
         guard isRunning else { return }
         session?.cancel()
         NSLog("[ZEUS] walkthrough: cancelled")
-        say?("Okay, tour stopped.")
         stop()
+        say?("Okay, tour stopped.")
     }
 
     private func clicked(at point: CGPoint) {
@@ -81,8 +98,8 @@ final class WalkthroughController {
         self.session = session
         if session.state == .finished {
             NSLog("[ZEUS] walkthrough: finished")
-            say?("That's it, you're done.")
             stop()
+            say?("That's it, you're done.")
         } else {
             present()
         }
@@ -96,11 +113,17 @@ final class WalkthroughController {
         let snapshot = AXSnapshotter.shared.latest
         resolved = GuidedPresent.resolve(step: step, shots: shots, snapshot: snapshot)
         NSLog("[ZEUS] walkthrough: %@", session.progress)
+        let cue = step.cue(progress: session.progress, found: resolved != nil)
         if let target = resolved {
-            buddy?.point(to: target.screenPoint, label: target.label)
+            let label = PointerGuideCaptionSplit.boltText(target.label)
+                ?? PointerGuideCaptionSplit.boltText(step.say)
+                ?? "Here"
+            buddy?.point(to: target.screenPoint, label: label, ring: target.hitRect)
+        } else if let bolt = cue.bolt {
+            buddy?.showCaption(bolt)
         }
-        say?("\(session.progress). \(step.say)")
-        if !step.waitForClick || (step.target == nil && step.targetLabel == nil) {
+        say?(cue.spoken)
+        if !step.holdsForClick(found: resolved != nil) {
             let revision = session.revision
             autoAdvance = Task { @MainActor in
                 try? await Task.sleep(for: .seconds(4 + Double(step.say.count) / 15))
@@ -114,9 +137,9 @@ final class WalkthroughController {
         autoAdvance?.cancel()
         clickAdvance?.cancel()
         clickAdvance = nil
-        [clickMonitor, escMonitor].compactMap { $0 }.forEach(NSEvent.removeMonitor)
-        clickMonitor = nil
-        escMonitor = nil
+        (clickMonitors + escMonitors).forEach(NSEvent.removeMonitor)
+        clickMonitors.removeAll()
+        escMonitors.removeAll()
         buddy?.idle()
         session = nil
         resolved = nil

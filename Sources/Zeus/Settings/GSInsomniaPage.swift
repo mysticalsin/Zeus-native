@@ -1,6 +1,23 @@
 import SwiftUI
 import ZeusCore
 
+/// The hotspot speaks whether a name is set and whether a password is saved. The name and the password stay unspoken.
+enum HotspotSetupVoice {
+    static var speakHotspot: () -> Void = {}
+}
+
+/// The lid-closed rule speaks whether it is ready and how many apps freeze. Names stay unspoken, and the rule is not installed.
+enum FreezeSetupVoice {
+    static var speakFreeze: () -> Void = {}
+}
+
+/// The Insomnia cards speak lid-closed mode, mute, and Low Power Mode. They do not install the rule.
+enum InsomniaSetupVoice {
+    static var speakSetup: () -> Void = {}
+    /// The Agents in tmux card speaks the nudge and the wait. It does not send a nudge.
+    static var speakNudge: () -> Void = {}
+}
+
 /// Drafts for the Insomnia page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -23,6 +40,10 @@ struct InsomniaSettingsPage: View {
         GSPageHeading(section: .insomnia, subtitle: "Close the lid. Your agents keep working.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Lid-closed mode") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Insomnia is set") { InsomniaSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "lock.shield", title: "Admin rule", text: insomnia.setup.text) {
                 HStack(spacing: 10) {
                     GSStatus(ok: insomnia.setup.isReady, text: insomnia.setup.isReady ? "Set up" : "Not set up")
@@ -53,6 +74,10 @@ struct InsomniaSettingsPage: View {
                         isOn: Binding(get: { insomnia.lowPowerOnBattery && ruleReady }, set: { insomnia.lowPowerOnBattery = $0 }))
                 .disabled(!ruleReady).opacity(ruleReady ? 1 : 0.55)
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the lid-closed rule is set") { FreezeSetupVoice.speakFreeze() }
+            }
             GSRow(symbol: "snowflake", title: "Freeze these apps", text: "Paused while the lid is closed, resumed when it opens. Zeus, terminals, editors and agents are never frozen.") {
                 Button(page.pickerOpen ? "Done" : "Add from running apps") {
                     page.running = insomnia.freezableRunningApps()
@@ -83,6 +108,10 @@ struct InsomniaSettingsPage: View {
             }
         }
         GSCard("Hotspot") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the hotspot is set") { HotspotSetupVoice.speakHotspot() }
+            }
             GSRow(symbol: "personalhotspot", title: "iPhone hotspot", text: "If the network drops while the lid is closed, Zeus tries to join it. macOS needs Location access for Zeus to see Wi-Fi names.") {
                 field("iPhone name", text: Binding(get: { insomnia.hotspotSSID }, set: { insomnia.hotspotSSID = $0 }))
             }
@@ -106,6 +135,10 @@ struct InsomniaSettingsPage: View {
             }
         }
         GSCard("Agents in tmux") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the agent nudge is set") { InsomniaSetupVoice.speakNudge() }
+            }
             GSToggleRow(symbol: "arrow.uturn.right", title: "Nudge stalled agents", text: "Every 2 minutes Zeus looks at tmux panes running claude, codex, gemini, cursor-agent or node. One that has not changed for the time below gets \"continue\" and Enter, once per stall. Plain shells are never touched.",
                         isOn: Binding(get: { insomnia.nudgeAgents }, set: { insomnia.nudgeAgents = $0 }))
             GSDivider()

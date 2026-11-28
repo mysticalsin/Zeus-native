@@ -86,7 +86,15 @@ final class BuddyController: NSObject {
         }) {
             mouseMonitors.append(local)
         }
-        let dismiss: (NSEvent) -> Void = { [weak self] _ in MainActor.assumeIsolated { self?.clearRing() } }
+        let dismiss: (NSEvent) -> Void = { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                // A left click while the bolt is showing belongs to the guide. That monitor
+                // advances a hit and keeps a miss on the same step.
+                if event.type == .leftMouseDown, self.model.mode == .pointing { return }
+                self.clearRing()
+            }
+        }
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown], handler: dismiss) {
             mouseMonitors.append(global)
         }
@@ -262,27 +270,35 @@ final class BuddyController: NSObject {
         }
     }
 
-    private var pointingClickMonitor: Any?
+    private var pointingClickMonitors: [Any] = []
 
-    /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame under the
-    /// point wins over the raw coordinate. Decorative: this does not move the system pointer.
-    func point(to point: CGPoint, label: String) {
+    /// Fly to `point` (global AppKit coordinates) and ring it. An accessibility frame that contains
+    /// the point wins, so the ring hugs that control. A point between controls keeps the coordinate.
+    /// An explicit ring is drawn as given. Decorative: this does not move the system pointer.
+    func point(to point: CGPoint, label: String, ring explicitRing: CGRect? = nil) {
         guard CompanionSpring.tracksPointer(showPolicy) else { return }
         wake()
         resetPointing()
         startPointingClickMonitor()
         AvatarStatus.shared.set(\.turn, .pointing)
+        if let explicitRing, explicitRing.width > 0, explicitRing.height > 0 {
+            let center = CGPoint(x: explicitRing.midX, y: explicitRing.midY)
+            let curve = VisualFlight.plan(from: model.position, to: center, reducedMotion: Motion.reduced)
+            launch(curve, label: label, ring: explicitRing)
+            return
+        }
         let mapper = presentMapper()
         if let display = mapper.display(containing: point),
            let snapshot = AXSnapshotter.shared.latest,
            let frame = ElementSnap.best(axFrames: snapshot.elements.map(\.frame), around: point, displayID: display.id, mapper: mapper),
            let plan = ShowMeWhere.plan(from: model.position, axFrame: frame, displayID: display.id, mapper: mapper, label: label, reducedMotion: Motion.reduced),
            let screenRect = mapper.convert(plan.ring.frame, from: .overlay, to: .screen, context: MapContext(displayID: display.id)) {
-            launch(plan.flight, label: label, ring: screenRect)
+            let curve = VisualFlight.plan(from: model.position, to: plan.screenTarget, reducedMotion: Motion.reduced)
+            launch(curve, label: label, ring: screenRect)
             return
         }
         let target = clampedToScreen(point)
-        let curve = CompanionFlight.plan(from: model.position, to: target, reducedMotion: Motion.reduced)
+        let curve = VisualFlight.plan(from: model.position, to: target, reducedMotion: Motion.reduced)
         launch(curve, label: label, ring: CGRect(x: target.x - 22, y: target.y - 22, width: 44, height: 44))
     }
 
@@ -296,7 +312,7 @@ final class BuddyController: NSObject {
         resetPointing()
         startPointingClickMonitor()
         AvatarStatus.shared.set(\.turn, .pointing)
-        let curve = CompanionFlight.plan(from: model.position, to: clampedToScreen(point), reducedMotion: Motion.reduced)
+        let curve = VisualFlight.plan(from: model.position, to: clampedToScreen(point), reducedMotion: Motion.reduced)
         let began = CACurrentMediaTime()
         flight = ActiveFlight(curve: curve, start: began, returning: false, mouseAtStart: NSEvent.mouseLocation)
         pointing = Pointing(target: curve.to, label: CompanionPointingLabel(text: label, beganAt: 0, reduceMotion: Motion.reduced))
@@ -312,6 +328,9 @@ final class BuddyController: NSObject {
         self.ring.show(TargetRing(displayID: 0, center: CGPoint(x: rect.midX, y: rect.midY), frame: rect, label: label))
         model.mode = .flying
     }
+
+    /// A click while the companion is pointing. Return true when a guide consumed it.
+    var onPointingClick: (@MainActor (CGPoint) -> Bool)?
 
     /// The next click or key removes the ring and sends the companion home.
     private func clearRing() {
@@ -456,7 +475,7 @@ final class BuddyController: NSObject {
 
     private func startReturn(now: CFTimeInterval) {
         let home = followTarget()
-        let curve = CompanionFlight.plan(from: model.position, to: home, departureTangent: landingTangent, reducedMotion: Motion.reduced)
+        let curve = VisualFlight.plan(from: model.position, to: home, departureTangent: landingTangent, reducedMotion: Motion.reduced)
         flight = ActiveFlight(curve: curve, start: now, returning: true, mouseAtStart: NSEvent.mouseLocation)
         model.mode = .returning
     }
@@ -472,17 +491,28 @@ final class BuddyController: NSObject {
 
     private func startPointingClickMonitor() {
         stopPointingClickMonitor()
-        pointingClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+        let handle: (NSEvent) -> Void = { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.model.mode == .pointing else { return }
-                self.idle()
+                if self.onPointingClick?(NSEvent.mouseLocation) == true { return }
+                self.clearRing()
+                self.stopPointingClickMonitor()
             }
+        }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: handle) {
+            pointingClickMonitors.append(global)
+        }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { event in
+            handle(event)
+            return event
+        }) {
+            pointingClickMonitors.append(local)
         }
     }
 
     private func stopPointingClickMonitor() {
-        if let pointingClickMonitor { NSEvent.removeMonitor(pointingClickMonitor) }
-        pointingClickMonitor = nil
+        pointingClickMonitors.forEach(NSEvent.removeMonitor)
+        pointingClickMonitors.removeAll()
     }
 
     // MARK: Geometry

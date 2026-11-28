@@ -98,18 +98,23 @@ public enum ExplanationCardPlacement {
     /// The card's size for one tier, or nil when the diagram would fall below the readable scale.
     static func sizing(for content: ExplanationCardContent, tier: ExplanationCardTier, maxHeight: Double) -> Size? {
         guard let width = tierWidths[tier] else { return nil }
+        let diagram = content.visual.flatMap { visual -> ExplanationSize2? in
+            guard visual.width.isFinite, visual.height.isFinite, visual.width > 0, visual.height > 0 else { return nil }
+            return visual
+        }
         // The 3D view is nonessential beside a diagram: only the full tier keeps it.
-        let showsWorld = content.hasWorld && (content.visual == nil || tier == .full)
+        // A diagram that is not a real size is left off, so the caption and world can still show.
+        let showsWorld = content.hasWorld && (diagram == nil || tier == .full)
         let worldHeight = showsWorld ? (tier == .full ? 220.0 : tier == .compact ? 190.0 : 170.0) : 0
         let lines = captionLines(characters: content.captionCharacters, width: width)
         guard lines <= maxCaptionLines else { return nil }
         let captionHeight = lines == 0 ? 0 : Double(lines) * captionLineHeight + captionPadding
+        if diagram == nil && worldHeight == 0 && captionHeight == 0 { return nil }
         var fixed = headerHeight + bottomPadding
         if worldHeight > 0 { fixed += sectionGap + worldHeight }
         if captionHeight > 0 { fixed += sectionGap + captionHeight }
         var scale = 1.0, visualHeight = 0.0
-        if let visual = content.visual {
-            guard visual.width.isFinite, visual.height.isFinite, visual.width > 0, visual.height > 0 else { return nil }
+        if let visual = diagram {
             fixed += sectionGap
             scale = min(maximumVisualScale, (width - 2 * sidePadding) / visual.width, (maxHeight - fixed) / visual.height)
             guard scale >= minimumVisualScale else { return nil }
@@ -118,7 +123,7 @@ public enum ExplanationCardPlacement {
         let height = fixed + visualHeight
         guard height <= maxHeight else { return nil }
         return Size(width: width, height: height, scale: scale, showsWorld: showsWorld,
-                    visual: content.visual.map { ExplanationSize2(width: $0.width * scale, height: $0.height * scale) },
+                    visual: diagram.map { ExplanationSize2(width: $0.width * scale, height: $0.height * scale) },
                     worldHeight: worldHeight, captionHeight: captionHeight)
     }
 

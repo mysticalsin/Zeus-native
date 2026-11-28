@@ -4,6 +4,7 @@ import Observation
 import Speech
 import EventKit
 import ApplicationServices
+import CoreLocation
 import ZeusCore
 
 /// macOS privacy access ZEUS can ask for, plus Claude Code and Chrome connections.
@@ -54,6 +55,8 @@ final class PermissionsModel {
     var chromeMessage: String?
 
     private static let screenRequestKey = "permissions.screenCapture.requested"
+    /// The Screen Recording row speaks whether Zeus can see the screen. It does not ask macOS.
+    static var speakScreen: () -> Void = {}
 
     /// Explicit permission boundary. Tests inject state and requests instead of displaying OS prompts.
     @MainActor
@@ -160,6 +163,28 @@ final class PermissionsModel {
         refreshAutomationOnly()
         refreshInstallFlagsInBackground()
         Task { chromeConnected = await ChromeBridge.isConnected() }
+    }
+
+    /// Accessibility, Calendar, and Reminders as the Access card would show them. Reading does not ask.
+    static func grantWords() -> (access: String, calendar: String, reminders: String) {
+        func flag(_ on: Bool) -> String { on ? "Allowed" : "Off" }
+        return (
+            flag(AXIsProcessTrusted()),
+            flag(EKEventStore.authorizationStatus(for: .event) == .fullAccess),
+            flag(EKEventStore.authorizationStatus(for: .reminder) == .fullAccess)
+        )
+    }
+
+    /// Location, Full Disk Access, and keys from other apps, as the Access card would show them. Reading does not ask.
+    static func localGrantWords() -> (place: String, disk: String, keys: String) {
+        let status = CLLocationManager().authorizationStatus
+        let place = (status == .authorizedAlways || status == .authorized) ? "Allowed" : "Off"
+        let disk = OnboardingServices.hasFullDiskAccess() ? "Allowed" : "Off"
+        let keys: String
+        if KeyListenAccess.accessibility { keys = "Accessibility" }
+        else if KeyListenAccess.inputMonitoring { keys = "Input Monitoring" }
+        else { keys = "Not allowed" }
+        return (place, disk, keys)
     }
 
     private func refreshAutomationOnly() {

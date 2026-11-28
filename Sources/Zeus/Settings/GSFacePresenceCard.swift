@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The face-presence settings speak the switch and the lock wait. They do not open the camera or lock the Mac.
+enum FacePresenceSetVoice {
+    static var speakSet: () -> Void = {}
+}
+
 /// What the Face presence card shows, as plain values: one status, one row per enrolled face, whether Enroll can be
 /// tapped and which lock choice is picked. Built from the machine and the vault records, so the view has no rules.
 /// Faces carry a name and a switch only: no sample or embedding reaches a view.
@@ -24,9 +29,16 @@ struct FacePresenceCardModel: Equatable {
     /// What VoiceOver reads for the status row, "Face presence status: Away, 1 minute 42 seconds left".
     var statusAccessibilityLabel: String { status.accessibilityText }
 
-    static func make(machine: FacePresenceMachine, faces: [FaceRecord], lockAfterLabel: String, uptime: Double) -> FacePresenceCardModel {
-        FacePresenceCardModel(
-            status: machine.status(at: uptime),
+    static func make(machine: FacePresenceMachine, faces: [FaceRecord], lockAfterLabel: String, uptime: Double,
+                     enrollmentLine: String? = nil) -> FacePresenceCardModel {
+        let enrolling: Bool
+        if case .enrolling = machine.state { enrolling = true } else { enrolling = false }
+        var status = machine.status(at: uptime)
+        if let line = EnrollmentCoach.shown(enrolling: enrolling, line: enrollmentLine) {
+            status = status.withHint(line)
+        }
+        return FacePresenceCardModel(
+            status: status,
             faces: faces.map { FaceRow(id: $0.id, name: $0.name, isEnabled: $0.isEnabled) },
             enrollEnabled: machine.canEnroll,
             // A stored label that is not one of the five reads as the default, as the lock rule does.
@@ -44,17 +56,25 @@ struct GSFacePresenceCard: View {
     var setFace: (String, Bool) -> Void = { _, _ in }
     var deleteFace: (String) -> Void = { _ in }
     var enroll: () -> Void = {}
+    var speak: () -> Void = {}
 
     var body: some View {
         GSCard("Face presence") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how face presence is set") { FacePresenceSetVoice.speakSet() }
+            }
             GSToggleRow(symbol: "person.crop.circle", title: "Face presence", isOn: $isOn)
             GSDivider()
             GSRow(symbol: model.status.symbol, title: "Status") {
                 // The word changes in place, with tabular numerals so the countdown does not shift. Nothing animates.
-                Text(model.status.word)
-                    .font(GS.rowTitle.monospacedDigit())
-                    .foregroundStyle(GS.text)
-                    .accessibilityLabel(model.statusAccessibilityLabel)
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether you are present") { speak() }
+                    Text(model.status.word)
+                        .font(GS.rowTitle.monospacedDigit())
+                        .foregroundStyle(GS.text)
+                        .accessibilityLabel(model.statusAccessibilityLabel)
+                }
             }
             if let hint = model.status.hint {
                 Text(hint)
@@ -110,12 +130,14 @@ struct GSFacePresenceCardHost: View {
         GSFacePresenceCard(
             model: FacePresenceCardModel.make(machine: controller.machine, faces: controller.faces,
                                               lockAfterLabel: store.string(FacePresenceController.lockAfterID),
-                                              uptime: ProcessInfo.processInfo.systemUptime),
+                                              uptime: ProcessInfo.processInfo.systemUptime,
+                                              enrollmentLine: controller.enrollmentLine),
             isOn: store.boolBinding(FacePresenceController.switchID),
             lockAfter: store.stringBinding(FacePresenceController.lockAfterID),
             setFace: { controller.setFace($0, enabled: $1) },
             deleteFace: { controller.deleteFace($0) },
-            enroll: { controller.enroll() })
+            enroll: { controller.enroll() },
+            speak: { controller.speakFace() })
     }
 }
 

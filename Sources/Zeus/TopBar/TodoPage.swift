@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// The to-do list speaks whether done items are shown and whether voice add is on. It does not add or clear one.
+enum TodoShownVoice {
+    static var speakList: () -> Void = {}
+}
+
 /// The To-do tab: one input line on top, the list underneath, Glance's compact row style.
 struct TodoPage: View {
     let topBar: TopBarModel
@@ -24,6 +29,8 @@ struct TodoPage: View {
                     todo.toggleVoice()
                 }
                 GlyphButton(symbol: "plus", size: 12, tint: Theme.accent, label: "Add") { todo.submitDraft() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many to-dos") { topBar.speakTodoCount() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether done to-dos are shown") { TodoShownVoice.speakList() }
             }
             let suggestions = Array(todo.suggestions.prefix(3))
             let headerHeight = Self.headerHeight(voiceError: todo.voiceError != nil, warning: todo.warning != nil, suggestions: suggestions.count)

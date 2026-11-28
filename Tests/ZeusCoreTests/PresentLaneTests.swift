@@ -64,6 +64,9 @@ struct GuidedPresentTests {
             screenPoint: CGPoint(x: 500, y: 400), label: "Save", waitForClick: true,
             hitRect: CGRect(x: 476, y: 376, width: 48, height: 48))
         #expect(GuidedPresent.clickHits(CGPoint(x: 500, y: 400), target: target))
+        #expect(GuidedPresent.clickHits(CGPoint(x: 524, y: 400), target: target))
+        #expect(GuidedPresent.clickHits(CGPoint(x: 500, y: 424), target: target))
+        #expect(!GuidedPresent.clickHits(CGPoint(x: 525, y: 400), target: target))
         #expect(!GuidedPresent.clickHits(CGPoint(x: 600, y: 400), target: target))
         _ = shot
     }

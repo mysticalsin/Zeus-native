@@ -67,6 +67,17 @@ public enum OnDeviceSpeechAcceptance {
         recorder.tryAct(on: "open calculator")
         if recorder.actions != 2 { problems.append("finalize") }
 
+        var session = PartialActionSession()
+        session.observe("open slack")
+        if !session.arm("open slack") { problems.append("arm") }
+        session.observe("open calculator")
+        if session.arm("open slack") { problems.append("revised") }
+        if case .runArmed = session.finish("open calculator") { problems.append("dropped") }
+        var matching = PartialActionSession()
+        matching.observe("\u{200B}open")
+        if !matching.arm("\u{200B}open") { problems.append("zwsp-arm") }
+        if matching.finish("open") != .droppedArmed { problems.append("zwsp-final") }
+
         if !OnDeviceSpeechPolicy.requiresOnDevice(supportsOnDevice: true) { problems.append("ondevice") }
         if OnDeviceSpeechPolicy.requiresOnDevice(supportsOnDevice: false) { problems.append("offdevice") }
 

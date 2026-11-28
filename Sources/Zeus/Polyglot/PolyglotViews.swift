@@ -168,6 +168,8 @@ struct PolyglotPage: View {
                             Text(status).font(TopBarStyle.label(12.5, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
                             Text(detail).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet).lineLimit(1)
                         }
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if Polyglot is on") { topBar.speakPolyglot() }
                     }
                     HStack(spacing: 6) {
                         ForEach(PolyglotSource.allCases) { source in sourceButton(source, settings: settings) }

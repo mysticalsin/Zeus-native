@@ -59,11 +59,14 @@ struct EarbudsDisplayTests {
             EarbudsPartReading(part: .left, level: .fresh(80)),
         ])
         let spoken = EarbudsWords.spoken(cue, hideDetails: true)
-        #expect(spoken == "Earbuds connected. Left 80 percent.")
+        #expect(spoken == "Earbuds connected.")
         #expect(!spoken.contains("Secret"))
+        #expect(!spoken.contains("80"))
         let panel = EarbudsPanelModel.make(presence: shown(), mode: nil, hideDetails: true)
         #expect(panel?.name == "Earbuds")
         #expect(panel?.name.contains("Pro") == false)
+        #expect(panel?.parts.isEmpty == true)
+        #expect(EarbudsWords.cueStatus(cue, hideDetails: true) == [EarbudsCueLine(text: "Connected")])
     }
 
     @Test func cueStatusMixesKnownLevelsAndNeverDrawsZero() {
@@ -193,7 +196,8 @@ struct EarbudsDisplayTests {
         #expect(EarbudsWords.modeTitle(.adaptive) == "Adaptive")
         #expect(EarbudsWords.spoken(.changed(.noiseCancelling)) == "Noise cancelling on.")
         #expect(EarbudsWords.spoken(.stayed(.transparency)) == "Listening mode stayed on Transparency.")
-        #expect(EarbudsWords.spoken(.changed(.off)) == "Off on.")
+        #expect(EarbudsWords.spoken(.changed(.off)) == "Listening mode off.")
+        #expect(EarbudsWords.spoken(.stayed(.off)) == "Listening mode stayed off.")
         #expect(EarbudsWords.spoken(.stayed(.adaptive)) == "Listening mode stayed on Adaptive.")
     }
 

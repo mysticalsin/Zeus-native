@@ -4,9 +4,10 @@ import Foundation
 ///
 /// Beats are revealed in order, one `ExplainBeatSchedule.gap` apart, including when no voice
 /// engine starts. A motion ask (fly, move, path, and the words listed below) draws an open pen
-/// stroke that grows across those beats. The words name the mechanism and say the drawing does
-/// not prove the asked end happens. Canvas is 1280 by 720 screenshot pixels, top-left origin.
-/// No model call, no screenshot, and no provider key.
+/// stroke that grows across those beats. A still ask draws its box during the first sentence,
+/// one side at a time, then the arrow, then the card. The words name the mechanism and say the
+/// drawing does not prove the asked end happens. Canvas is 1280 by 720 screenshot pixels,
+/// top-left origin. No model call, no screenshot, and no provider key.
 public struct ExplainShowcase: Equatable, Sendable {
     public static let canvasWidth = 1280.0
     public static let canvasHeight = 720.0
@@ -16,8 +17,8 @@ public struct ExplainShowcase: Equatable, Sendable {
     /// True when the mechanism beat is an open traveling stroke rather than a closed box.
     public var travels: Bool
     public var schedule: ExplainBeatSchedule
-    /// Open stroke in canvas pixels. Empty when the ask is not about motion. The pen shows a
-    /// prefix of this, one new point at a time.
+    /// Open stroke, or the still box, in canvas pixels. A moving ask shows a prefix one point
+    /// per beat. A still ask draws this box during the first sentence, one side at a time.
     public var stroke: [TalkDraw.Point]
 
     public init(sentences: [String], draw: TalkDraw, travels: Bool, schedule: ExplainBeatSchedule,
@@ -33,19 +34,113 @@ public struct ExplainShowcase: Equatable, Sendable {
 
     /// Nil for a command, or for "explain" with no subject.
     public static func plan(for request: String) -> ExplainShowcase? {
+        if let equation = equationShowcase(for: request) { return equation }
         guard let subject = subject(in: request) else { return nil }
         let pieces = parts(of: subject)
         let start = clip(pieces.start)
         let asked = clip(pieces.asked)
         guard !start.isEmpty, !asked.isEmpty else { return nil }
         let motion = asksMotion(subject)
-        let sentences = motion ? motionSentences(start: start, asked: asked) : stillSentences(start: start)
-        let stroke = motion ? motionStroke : []
+        let sentences = motion ? motionSentences(start: start, asked: asked) : stillSentences(start: start, asked: asked)
+        let stroke = motion ? motionStroke : stillBox
         let marks = motion ? motionMarks(asked: asked, stroke: stroke) : stillMarks(start: start, asked: asked)
         guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
         let indexes = Array(Set(draw.marks.map(\.at))).sorted()
         return ExplainShowcase(sentences: sentences, draw: draw, travels: motion,
                                schedule: ExplainBeatSchedule(indexes: indexes), stroke: stroke)
+    }
+
+    /// The short line beside the bolt for the sentence that is visible at `elapsed`.
+    /// A negative or non-finite time stays on the first sentence. The line is at most 40 characters.
+    public func boltCaption(at elapsed: TimeInterval) -> String {
+        let beat: Int
+        if travels {
+            beat = penFrame(at: elapsed)?.beat ?? 0
+        } else {
+            beat = max(schedule.revealed(at: elapsed).count - 1, 0)
+        }
+        guard !sentences.isEmpty else { return "Here" }
+        let index = min(max(beat, 0), sentences.count - 1)
+        return Self.shortLine(sentences[index])
+    }
+
+    /// Where the bolt sits at `elapsed`. A moving ask follows the pen tip. A still ask
+    /// sits on the newest mark: a ring, then an arrow, then the ink, then a card.
+    public func guideBolt(at elapsed: TimeInterval) -> TalkDraw.Point? {
+        if travels {
+            guard let bolt = penFrame(at: elapsed)?.bolt, Self.finite(bolt) else { return nil }
+            return bolt
+        }
+        let shown = Set(schedule.revealed(at: elapsed))
+        let marks = draw.marks.filter { shown.contains($0.at) }
+        guard let beat = marks.map(\.at).max() else { return nil }
+        let atBeat = marks.filter { $0.at == beat }
+        let placed = atBeat.compactMap { mark -> (Int, TalkDraw.Point)? in
+            guard let point = Self.anchor(of: mark) else { return nil }
+            return (Self.preference(mark), point)
+        }
+        return placed.min { $0.0 < $1.0 }?.1
+    }
+
+    /// A ring is the place to land. An arrow, the ink, then a card follow.
+    private static func preference(_ mark: TalkDraw.Mark) -> Int {
+        switch mark.shape {
+        case .ring: return 0
+        case .arrow: return 1
+        case .ink: return 2
+        case .card: return 3
+        }
+    }
+
+    private static func finite(_ point: TalkDraw.Point) -> Bool {
+        point.x.isFinite && point.y.isFinite
+    }
+
+    private static func anchor(of mark: TalkDraw.Mark) -> TalkDraw.Point? {
+        let point: TalkDraw.Point
+        switch mark.shape {
+        case .ring(let center, let radius):
+            guard radius.isFinite, radius > 0 else { return nil }
+            point = center
+        case .arrow(let from, let to):
+            point = .init(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+        case .ink(let points):
+            guard let last = points.last else { return nil }
+            point = last
+        case .card(let origin, _):
+            point = origin
+        }
+        guard finite(point) else { return nil }
+        return point
+    }
+
+    /// The still box drawn so far, plus the beats that are already due. Nil for a moving ask.
+    /// The first sentence draws one side at a time. Later sentences keep the closed box and add
+    /// the arrow, then the card. A negative or non-finite time stays on the first side.
+    public func builtFrame(at elapsed: TimeInterval) -> TalkDraw? {
+        guard !travels, stroke.count >= 2 else { return nil }
+        let time = elapsed.isFinite && elapsed > 0 ? elapsed : 0
+        let shown = Set(schedule.revealed(at: time))
+        var marks = draw.marks.filter { shown.contains($0.at) && !Self.isInk($0) }
+        let count = builtInkCount(at: time)
+        marks.insert(.init(shape: .ink(Array(stroke.prefix(count))), at: 0), at: 0)
+        return TalkDrawParser.parse(TalkDraw(screen: draw.screen, marks: marks).json)
+    }
+
+    /// How many box corners are on screen at `elapsed`. Two at the start of the first sentence,
+    /// the whole box by the end of that sentence.
+    public func builtInkCount(at elapsed: TimeInterval) -> Int {
+        guard !travels, stroke.count >= 2 else { return 0 }
+        let time = elapsed.isFinite && elapsed > 0 ? elapsed : 0
+        let steps = stroke.count - 1
+        let span = min(time, ExplainBeatSchedule.gap)
+        let done = Int((span / ExplainBeatSchedule.gap * Double(steps)).rounded(.down))
+        return min(stroke.count, max(2, done + 2))
+    }
+
+    private static func isInk(_ mark: TalkDraw.Mark) -> Bool {
+        if case .ink = mark.shape { return true }
+        return false
     }
 
     /// The ink visible at `elapsed`. Without audio, one new point every `ExplainBeatSchedule.gap`.
@@ -121,9 +216,51 @@ public struct ExplainShowcase: Equatable, Sendable {
     }
 
     /// Pixel size of a display frame at `scale` backing, the same numbers the talk presenter uses.
+    /// A non-finite edge is one pixel, except positive infinity, which is the largest 32-bit pixel count.
     public static func pixelSize(width: Double, height: Double, scale: Double) -> (width: Int, height: Int) {
-        let factor = max(scale, 1)
-        return (max(1, Int((width * factor).rounded())), max(1, Int((height * factor).rounded())))
+        let factor = scale.isFinite ? max(scale, 1) : 1
+        func axis(_ value: Double) -> Int {
+            guard value.isFinite else { return value > 0 ? Int(Int32.max) : 1 }
+            let scaled = (value * factor).rounded()
+            guard scaled.isFinite else { return scaled > 0 ? Int(Int32.max) : 1 }
+            if scaled >= Double(Int32.max) { return Int(Int32.max) }
+            return max(1, Int(scaled))
+        }
+        return (axis(width), axis(height))
+    }
+
+    /// A plain relation such as "E = mc^2" is drawn as that line. The usual explain
+    /// fold turns "=" and "^" into spaces, so this check reads the request first.
+    /// TeX introducers stay on the ordinary plan. The box still grows beside the line.
+    private static func equationShowcase(for request: String) -> ExplainShowcase? {
+        guard let line = equationLine(in: request) else { return nil }
+        let shown = String(line.prefix(TalkDraw.maxTextCharacters))
+        let sentences = [
+            "The relation is \(shown).",
+            "Each character stays on one line. The drawing does not prove it.",
+        ]
+        let marks = [
+            TalkDraw.Mark(shape: .ink(stillBox), at: 0),
+            TalkDraw.Mark(shape: .ring(center: .init(x: 320, y: 320), radius: 36), at: 0),
+            TalkDraw.Mark(shape: .card(origin: .init(x: 180, y: 160), text: shown), at: 0),
+        ]
+        guard let draw = TalkDrawParser.parse(TalkDraw(screen: 1, marks: marks).json) else { return nil }
+        let indexes = Array(Set(draw.marks.map(\.at))).sorted()
+        return ExplainShowcase(sentences: sentences, draw: draw, travels: false,
+                               schedule: ExplainBeatSchedule(indexes: indexes), stroke: stillBox)
+    }
+
+    private static func equationLine(in request: String) -> String? {
+        let folded = request.replacingOccurrences(of: "\u{2019}", with: "'")
+            .replacingOccurrences(of: "\u{2018}", with: "'")
+        let lower = folded.lowercased()
+        for lead in leads where lower.hasPrefix(lead) {
+            let rest = folded.dropFirst(lead.count).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard rest.contains("="), rest.count <= 240 else { continue }
+            guard case .block = ExplanationEquationGeometry.layout(rest) else { continue }
+            return String(rest)
+        }
+        return nil
     }
 
     private static let leads = [
@@ -169,8 +306,14 @@ public struct ExplainShowcase: Equatable, Sendable {
             let asked = bare(String(subject[range.upperBound...]))
             if !start.isEmpty, !asked.isEmpty { return (start, asked) }
         }
+        let words = subject.split(separator: " ").map(String.init)
+        if words.count >= 2, let last = words.last, ["works", "work", "happens", "happen"].contains(last) {
+            let start = bare(words.dropLast().joined(separator: " "))
+            if !start.isEmpty { return (start, last) }
+        }
         let start = bare(subject)
-        return (start.isEmpty ? subject : start, "question")
+        let named = start.isEmpty ? subject : start
+        return (named, named)
     }
 
     private static func bare(_ text: String) -> String {
@@ -189,9 +332,17 @@ public struct ExplainShowcase: Equatable, Sendable {
         return String(marked.prefix(TalkDraw.maxTextCharacters))
     }
 
-    private static func leading(_ label: String) -> String {
-        guard let first = label.first else { return label }
-        return first.uppercased() + label.dropFirst()
+    /// One caption line, matching the bolt's 40-character limit.
+    private static func shortLine(_ raw: String) -> String {
+        var current = ""
+        for word in raw.split(whereSeparator: \.isWhitespace) {
+            let piece = String(word)
+            let next = current.isEmpty ? piece : current + " " + piece
+            if next.count > 40 { break }
+            current = next
+        }
+        let line = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        return line.isEmpty ? "Here" : line
     }
 
     /// The mechanism is an upward force the sketch does not contain. No registry source is invented.
@@ -204,13 +355,23 @@ public struct ExplainShowcase: Equatable, Sendable {
         ]
     }
 
-    private static func stillSentences(start: String) -> [String] {
-        [
-            "\(leading(start)) is the start of the explanation.",
-            "The next mark is the change you asked to see.",
+    private static func stillSentences(start: String, asked: String) -> [String] {
+        let change = asked == start
+            ? "The arrow marks the change you asked to see."
+            : "Next is how \(start) \(asked)."
+        return [
+            "You asked about \(start).",
+            change,
             "The drawing does not prove that the end happens.",
         ]
     }
+
+    /// Closed box. The live still path shows a prefix during the first sentence, one side at a time.
+    private static let stillBox: [TalkDraw.Point] = [
+        .init(x: 180, y: 220), .init(x: 460, y: 220),
+        .init(x: 460, y: 420), .init(x: 180, y: 420),
+        .init(x: 180, y: 220),
+    ]
 
     /// One open stroke. The live pen shows a prefix, one new point at a time. Not a closed box.
     private static let motionStroke: [TalkDraw.Point] = [
@@ -229,13 +390,8 @@ public struct ExplainShowcase: Equatable, Sendable {
     }
 
     private static func stillMarks(start: String, asked: String) -> [TalkDraw.Mark] {
-        let box = [
-            TalkDraw.Point(x: 180, y: 220), TalkDraw.Point(x: 460, y: 220),
-            TalkDraw.Point(x: 460, y: 420), TalkDraw.Point(x: 180, y: 420),
-            TalkDraw.Point(x: 180, y: 220),
-        ]
         return [
-            .init(shape: .ink(box), at: 0),
+            .init(shape: .ink(stillBox), at: 0),
             .init(shape: .ring(center: .init(x: 320, y: 320), radius: 36), at: 0),
             .init(shape: .card(origin: .init(x: 180, y: 160), text: start), at: 0),
             .init(shape: .arrow(from: .init(x: 480, y: 320), to: .init(x: 900, y: 320)), at: 1),
@@ -283,9 +439,16 @@ public struct ExplainBeatSchedule: Equatable, Sendable {
     }
 
     /// Beats whose start time is at or before `elapsed`. Later beats stay hidden.
+    /// A negative or non-finite time stays on the first beat.
     public func revealed(at elapsed: TimeInterval) -> [Int] {
-        let safe = max(0, elapsed)
-        let steps = safe == 0 ? 0 : Int((safe / Self.gap).rounded(.down))
+        guard elapsed.isFinite, elapsed > 0 else {
+            return Array(indexes.prefix(1))
+        }
+        let raw = elapsed / Self.gap
+        if !raw.isFinite || raw >= Double(indexes.count) {
+            return indexes
+        }
+        let steps = Int(raw.rounded(.down))
         let count = min(indexes.count, steps + 1)
         return Array(indexes.prefix(max(count, 1)))
     }

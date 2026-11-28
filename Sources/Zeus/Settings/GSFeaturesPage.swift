@@ -2,6 +2,46 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// The fast path speaks whether simple commands run at once. It does not run a command or change the switch.
+enum FastPathVoice {
+    static var speakPath: () -> Void = {}
+}
+
+/// The Teleprompter card speaks which of its five switches are on. It does not change them.
+enum PrompterSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
+/// The Browser agent card speaks whether it may work, the step limit, and which browser. It does not start a task.
+enum BrowserAgentVoice {
+    static var speakAgent: () -> Void = {}
+}
+
+/// The extra ask-words speak the count and the built-in list. The words stay unspoken, and no task starts.
+enum AskWordsVoice {
+    static var speakAsk: () -> Void = {}
+}
+
+/// The Coding in the terminal card speaks the agent and the terminal. It does not start a session.
+enum CodingSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
+/// The Research card speaks the depth and whether reports use the default folder. It does not start research.
+enum ResearchSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
+/// The Scribe card speaks when a meeting starts and what holds an automatic start. It does not start a meeting.
+enum ScribeSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
+/// The model cap speaks the Sonnet ceiling and whether a pin is saved. The pin text stays unspoken.
+enum ModelCapVoice {
+    static var speakCap: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -18,11 +58,19 @@ struct FeaturesSettingsPage: View {
         GSPageHeading(section: .features, subtitle: "What Zeus does on its own, and how far it may go.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Instant commands") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the fast path is set") { FastPathVoice.speakPath() }
+            }
             GSToggleRow(symbol: "bolt", title: "Fast path", text: "Simple commands (open an app, volume, timers, to-dos, Beamer) run the moment you finish speaking. Off sends every command to the AI.",
                         isOn: store.boolBinding("fastPath.enabled"))
             GSInfo(text: "Which engine understands you, and its monthly cost cap, are on the Engine page.")
         }
         GSCard("Teleprompter") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the prompter is set") { PrompterSetupVoice.speakSetup() }
+            }
             GSToggleRow(symbol: "play.rectangle", title: "Follow my presentation", text: "Opens the prompter on its own when a Keynote or PowerPoint slideshow starts, with each slide\u{2019}s notes.",
                         isOn: prompter($followPresentation))
             GSDivider()
@@ -35,6 +83,10 @@ struct FeaturesSettingsPage: View {
             GSToggleRow(symbol: "timer", title: "Count down before rolling", text: "A short countdown before the text starts scrolling, so you can get ready.", isOn: prompter($countdown))
         }
         GSCard("Browser agent") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the browser agent is set") { BrowserAgentVoice.speakAgent() }
+            }
             GSToggleRow(symbol: "globe", title: "Let Zeus work in Chrome", text: "Web tasks you ask for, step by step, with a card you can stop. Passwords and card fields are always left to you.",
                         isOn: store.boolBinding("browserAgent.enabled"))
             GSDivider()
@@ -42,6 +94,10 @@ struct FeaturesSettingsPage: View {
                 GSPopup(selection: store.stringBinding("browserAgent.maxSteps"), options: FeatureSettings.browserStepChoices.map(String.init))
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what always asks") { AskWordsVoice.speakAsk() }
+            }
             GSRow(symbol: "hand.raised", title: "Always ask before", text: "Words on a button or link, separated by commas. Buying, sending, deleting and posting always ask already.") {
                 GSTextInput(text: store.stringBinding("browserAgent.alwaysAsk"), placeholder: "e.g. apply, invite", label: "Always ask before")
             }
@@ -57,6 +113,10 @@ struct FeaturesSettingsPage: View {
             }
         }
         GSCard("Coding in the terminal") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how coding is set") { CodingSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "chevron.left.forwardslash.chevron.right", title: "Default coding agent", text: "Used when you say \u{201C}fix the login bug in zeus\u{201D} without naming one.") {
                 GSPopup(selection: Binding(get: { CodingTool(rawValue: codingTool)?.title ?? CodingTool.claude.title },
                                            set: { title in codingTool = (CodingTool.allCases.first { $0.title == title } ?? .claude).rawValue }),
@@ -72,6 +132,10 @@ struct FeaturesSettingsPage: View {
         scribeCard
         SpeakerRecognitionCard()
         GSCard("Research") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how research is set") { ResearchSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "magnifyingglass", title: "Depth", text: "Quick takes a few searches. Deep reads many sources and takes minutes. You can always say \u{201C}deep research\u{201D}.") {
                 GSPopup(selection: store.stringBinding("research.depth"), options: FeatureSettings.researchDepthChoices)
             }
@@ -84,6 +148,10 @@ struct FeaturesSettingsPage: View {
             }
         }
         GSCard("Models Zeus uses") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the model cap") { ModelCapVoice.speakCap() }
+            }
             ForEach(Array(RouterEngine.allCases.enumerated()), id: \.element) { index, engine in
                 if index > 0 { GSDivider() }
                 HStack(spacing: 0) {
@@ -167,6 +235,10 @@ struct ScribeAutoStartCard: View {
     var body: some View {
         let mode = ScribeAutoStartMode.parse(selection.wrappedValue)
         GSCard("Scribe") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Scribe is set") { ScribeSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts") {
                 GlassSegmented(options: ScribeAutoStartMode.allCases.map { ($0.title, $0.title) }, selection: selection)
                     .padding(.trailing, 13.5)

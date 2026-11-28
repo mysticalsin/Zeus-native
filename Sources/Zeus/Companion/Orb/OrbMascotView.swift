@@ -17,14 +17,13 @@ struct OrbMascotView: NSViewRepresentable {
               let renderer = try? OrbMetalRenderer(device: device, bands: OrbPlaybackMeter.shared) else {
             return StillDisc()
         }
-        let view = MTKView(frame: .zero, device: device)
+        let view = ClearMTKView(frame: .zero, device: device)
         view.colorPixelFormat = .bgra8Unorm
         view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         view.framebufferOnly = true
         view.isPaused = paused
         view.enableSetNeedsDisplay = false
         view.preferredFramesPerSecond = 120
-        view.isOpaque = false
         view.layer?.isOpaque = false
         renderer.setVisualState(visualState)
         renderer.setReduceMotion(reduceMotion)
@@ -42,6 +41,12 @@ struct OrbMascotView: NSViewRepresentable {
     final class Coordinator {
         var renderer: OrbMetalRenderer?
     }
+}
+
+/// `NSView.isOpaque` is read-only. A clear drawable still needs the view to say it is not opaque,
+/// or AppKit paints a solid plate behind the particles.
+private final class ClearMTKView: MTKView {
+    override var isOpaque: Bool { false }
 }
 
 /// Stand-in when Metal is absent. It does not step the simulation.

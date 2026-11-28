@@ -25,6 +25,29 @@ public enum CoordinateSpace: String, Codable, Sendable, Equatable, CaseIterable 
     case overlay
 }
 
+/// Which screenshot a 1-based screen number names. Nil is the cursor's screen, shot 1.
+/// A number this turn does not have is not shot 1.
+public enum PresentScreenIndex {
+    public static func offset(screen: Int?, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        let index = (screen ?? 1) - 1
+        guard (0..<count).contains(index) else { return nil }
+        return index
+    }
+}
+
+/// Screenshot pixels. A point past the image is not pulled back onto it.
+public enum PresentPixelBounds {
+    public static func contains(x: Int, y: Int, width: Int, height: Int) -> Bool {
+        width > 0 && height > 0 && x >= 0 && y >= 0 && x < width && y < height
+    }
+
+    public static func intersects(x: Int, y: Int, width: Int, height: Int, imageWidth: Int, imageHeight: Int) -> Bool {
+        guard width > 0, height > 0, imageWidth > 0, imageHeight > 0 else { return false }
+        return x + width > 0 && y + height > 0 && x < imageWidth && y < imageHeight
+    }
+}
+
 /// How close a ring or trail must land, in physical pixels.
 /// 24 px at 1080p (scale 1). 48 px at 4K: scale 2, or a panel at least 3840 px wide.
 public enum PresentTolerance {

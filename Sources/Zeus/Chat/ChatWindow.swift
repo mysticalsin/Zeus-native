@@ -46,6 +46,9 @@ final class ChatWindowController {
     func toggle() {
         if let window, window.isVisible, window.isKeyWindow { window.orderOut(nil) } else { show() }
     }
+
+    /// Whether the floating window is already on screen. Reading this does not open it.
+    var isShowing: Bool { window?.isVisible == true }
 }
 
 final class ChatPanel: NSPanel {
@@ -59,6 +62,13 @@ final class ChatPanel: NSPanel {
     override func orderOut(_ sender: Any?) { onHide(); super.orderOut(sender) }
     override func close() { onHide(); super.close() }
     override func miniaturize(_ sender: Any?) { onHide(); super.miniaturize(sender) }
+}
+
+/// The floating chat window speaks whether it is open and how many chats are pinned. It does not open the window.
+enum ChatPaneVoice {
+    static var speakPane: () -> Void = {}
+    static var windowOpen: () -> Bool = { false }
+    static var pinnedCount: () -> Int = { 0 }
 }
 
 struct ChatWindowView: View {
@@ -117,6 +127,7 @@ private struct ChatSidebar: View {
                 TextField("Search", text: Binding(get: { chat.search }, set: { chat.search = $0 }))
                     .textFieldStyle(.plain).font(TopBarStyle.label(12)).foregroundStyle(Theme.cloudPrimary)
                 GlyphButton(symbol: "square.and.pencil", size: 11, tint: Theme.bolt, label: "New chat") { chat.newChat() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether the chat window is open") { ChatPaneVoice.speakPane() }
             }
             .padding(.horizontal, 8)
             .frame(height: 30)

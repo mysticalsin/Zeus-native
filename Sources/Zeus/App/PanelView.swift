@@ -1,6 +1,14 @@
 import SwiftUI
 import ZeusCore
 
+/// The Chrome card speaks whether the bridge is registered and whether the extension is loaded.
+/// It does not connect Chrome or ping the extension.
+enum ChromeLinkVoice {
+    static var speakLink: () -> Void = {}
+    static var bridgeOn: () -> Bool = { false }
+    static var extensionOn: () -> Bool = { false }
+}
+
 struct PanelView: View {
     let connections: ConnectionsModel
     let permissions: PermissionsModel
@@ -64,6 +72,12 @@ struct PanelView: View {
             }
 
             Card(title: "Chrome") {
+                HStack {
+                    Spacer()
+                    Button { ChromeLinkVoice.speakLink() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Say how Chrome is connected")
+                }
                 StatusRow(name: "Bridge", ok: permissions.chromeHostInstalled,
                           detail: permissions.chromeHostInstalled ? "Registered" : "Off")
                     .accessibilityElement(children: .combine)
@@ -97,11 +111,16 @@ struct PanelView: View {
 
             // P0 item I ("Zeus next to the cursor"): a quick toggle here, in Settings and
             // `zeus debug presence on|off`, since all three write the same `presence.nearCursor`.
-            Toggle("Show Zeus next to cursor", isOn: SettingsStore.shared.boolBinding(CursorPresenceController.settingID))
-                .toggleStyle(.switch)
-                .font(Glass.body)
-                .foregroundStyle(Theme.cloudPrimary)
-                .tint(OB.controlAccent)
+            HStack(spacing: 8) {
+                Toggle("Show Zeus next to cursor", isOn: SettingsStore.shared.boolBinding(CursorPresenceController.settingID))
+                    .toggleStyle(.switch)
+                    .font(Glass.body)
+                    .foregroundStyle(Theme.cloudPrimary)
+                    .tint(OB.controlAccent)
+                Button { LiveTouchVoice.speakTouch() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Say the quick cues and whether Zeus sits next to the cursor")
+            }
 
             // The same switch as "Show Zeus in screen shares" in the "..." menu and Settings.
             Toggle(isOn: SettingsStore.shared.boolBinding(ZeusScreenSharePolicy.showInSharingKey)) {

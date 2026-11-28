@@ -38,6 +38,25 @@ struct ExplanationCardPlacementTests {
 
     // MARK: protected regions
 
+    @Test func aBrokenDiagramDoesNotHideTheSpokenCard() throws {
+        for size in [
+            ExplanationSize2(width: .nan, height: 200),
+            ExplanationSize2(width: .infinity, height: 200),
+            ExplanationSize2(width: 0, height: 200),
+            ExplanationSize2(width: -4, height: 200),
+        ] {
+            let content = ExplanationCardContent(visual: size, hasWorld: false, captionCharacters: 40)
+            let layout = Placement.place(request(roomy, anchor: rect(700, 400, 100, 40), content: content))
+            let frame = try #require(layout.frame)
+            #expect(layout.rung != .speechOnly)
+            #expect(layout.visualSize == nil)
+            #expect(layout.captionHeight > 0)
+            #expect(frame.width > 0 && frame.height > 0)
+        }
+        let empty = ExplanationCardContent(visual: .init(width: .nan, height: .nan), hasWorld: false, captionCharacters: 0)
+        #expect(Placement.place(request(roomy, anchor: nil, content: empty)).rung == .speechOnly)
+    }
+
     @Test func cardPlacementPrefersTheRightOfTheSubjectWithAShortConnector() throws {
         let subject = rect(700, 400, 100, 40)
         let layout = Placement.place(request(roomy, anchor: subject, protected: [subject]))

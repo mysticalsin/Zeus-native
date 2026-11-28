@@ -79,6 +79,13 @@ final class TopBarModel {
     var calendarDetailID: String?
     var quickAddText = ""
     var quickAddNote: String?
+    /// The notch Add button speaks and draws the result. The voice command uses its own path.
+    var speakQuickAdd: (QuickAddSpeech) -> Void = { _ in }
+
+    enum QuickAddSpeech {
+        case added(CalendarQuickAdd.Parsed)
+        case problem(String)
+    }
     /// Reads a stretch of days from the calendar (wired by the services; empty without access).
     var fetchEvents: (Date, Date) -> [CalendarItem] = { _, _ in [] }
     /// Saves an event; asks for Calendar access only here, the first time (wired by the services).
@@ -270,6 +277,147 @@ final class TopBarModel {
     var onOpenTab: (TopBarTab) -> Void = { _ in }
     /// Speaks the daily brief in ZEUS's voice.
     var speakBrief: (String) -> Void = { _ in }
+    /// The Music page speaks the track that is on, or that nothing is playing.
+    var speakNowPlaying: (_ title: String, _ artist: String, _ playing: Bool) -> Void = { _, _, _ in }
+    var speakNothingPlaying: () -> Void = {}
+    /// The Weather page speaks the forecast that is already loaded.
+    var speakWeather: (_ degrees: Int, _ phrase: String, _ place: String) -> Void = { _, _, _ in }
+    var speakWeatherNotReady: () -> Void = {}
+    /// The Home battery card speaks the charge that is already shown.
+    var speakBattery: (_ level: Int, _ charging: Bool, _ pluggedIn: Bool) -> Void = { _, _, _ in }
+    var speakNoBattery: () -> Void = {}
+    /// Joining a meeting speaks the title and opens the link.
+    var speakMeeting: (_ title: String, _ place: String) -> Void = { _, _ in }
+    var speakNoMeeting: () -> Void = {}
+    /// The Home calendar card speaks the next event.
+    var speakNextEvent: (_ title: String, _ when: String, _ allDay: Bool) -> Void = { _, _, _ in }
+    var speakNoNextEvent: () -> Void = {}
+    /// The Home clock speaks the wall time that is already shown.
+    var speakClock: (_ time: String, _ period: String) -> Void = { _, _ in }
+    /// The Home world clock speaks the cities that are already shown.
+    var speakWorldClock: ([CityTimeReading]) -> Void = { _ in }
+    /// The Home countdown speaks the count that is already shown.
+    var speakCountdown: (_ title: String, _ days: Int) -> Void = { _, _ in }
+    var speakNoCountdown: () -> Void = {}
+    /// The month card speaks the calendar date that is already shown.
+    var speakDate: (_ weekday: String, _ date: String) -> Void = { _, _ in }
+    /// The Home note speaks the words that are already pinned.
+    var speakNote: (String) -> Void = { _ in }
+    var speakNoNote: () -> Void = {}
+    var speakSecretNote: () -> Void = {}
+    /// The Home agents card speaks who is running.
+    var speakAgents: () -> Void = {}
+    /// The focus card speaks the time still left.
+    var speakTimeLeft: () -> Void = {}
+    /// The Reminders page speaks the next reminder.
+    var speakNextReminder: (_ title: String, _ when: String) -> Void = { _, _ in }
+    var speakNoNextReminder: () -> Void = {}
+    var speakNextReminderAccess: () -> Void = {}
+    /// The Alerts page speaks how many notifications are waiting.
+    var speakAlerts: () -> Void = {}
+    /// The To-do page speaks how many are still open.
+    var speakTodoCount: () -> Void = {}
+    /// The agenda list speaks what is still coming up.
+    var speakAgenda: () -> Void = {}
+    /// The shelf page speaks the files that are already sitting there.
+    var speakShelf: () -> Void = {}
+    /// The weather page speaks whether rain is coming.
+    var speakRain: () -> Void = {}
+    /// The week grid speaks the week number and how many events it holds.
+    var speakWeek: () -> Void = {}
+    /// The clipboard page speaks how many clips are kept, never the words on them.
+    var speakClipboard: () -> Void = {}
+    /// The Focus page speaks how many rounds finished today.
+    var speakRounds: () -> Void = {}
+    /// The dictation page speaks how many words were dictated today, never the words.
+    var speakWords: () -> Void = {}
+    /// The dictation page speaks whether dictation is on. The words being heard stay off.
+    var speakDictation: () -> Void = {}
+    /// The Polyglot page speaks whether live translation is on. Captions stay off.
+    var speakPolyglot: () -> Void = {}
+    /// The Scribe and Recordly pages speak whether a recording is running.
+    var speakRecording: () -> Void = {}
+    /// The Appearance page speaks whether the Mac is using Dark Mode.
+    var speakDarkMode: () -> Void = {}
+    /// The Tiling page speaks the same word it shows.
+    var speakTiling: () -> Void = {}
+    /// The Recordly page speaks how many displays are attached.
+    var speakScreens: () -> Void = {}
+    /// The Music page speaks whether the sound output is earbuds.
+    var speakEarbuds: () -> Void = {}
+    /// The Music page speaks the output the menu marks.
+    var speakOutput: () -> Void = {}
+    /// The teleprompter speaks the counts, or the status word while it rolls. The script text stays off.
+    var speakScript: () -> Void = {}
+
+    /// The next meeting that still has time and a join link.
+    func nextMeeting(now: Date = Date()) -> CalendarItem? {
+        events.filter { $0.meetingURL != nil && $0.end > now }.min { $0.start < $1.start }
+    }
+
+    /// The next event that has not ended. A timed event comes before an all-day one.
+    func nextEvent(now: Date = Date()) -> CalendarItem? {
+        let open = events.filter { $0.end > now }.sorted { $0.start < $1.start }
+        return open.first { !$0.isAllDay } ?? open.first
+    }
+
+    /// Opens the meeting link and says which one it is.
+    func join(_ event: CalendarItem, announce: Bool = true) {
+        guard let url = event.meetingURL else {
+            if announce { speakNoMeeting() }
+            return
+        }
+        openURL(url)
+        if announce { speakMeeting(event.title, MeetingAsk.place(of: url)) }
+    }
+    /// A focus session speaks and draws. A plain countdown stays on the timer path.
+    var speakFocus: (FocusSpeech) -> Void = { _ in }
+
+    enum FocusSpeech: Equatable {
+        case length(seconds: Int, breakTime: Bool)
+        case paused
+        case stopped(breakTime: Bool)
+        case notRunning
+        case focusDone
+        case breakOver
+    }
+
+    /// Starts a focus round. A plain countdown is cleared first so this round can take a break.
+    @discardableResult
+    func beginFocus(seconds: Int? = nil) -> FocusSpeech {
+        if focus.isPlainTimer { focus.stop() }
+        if let seconds {
+            focus.focusLength = Double(min(max(seconds, 1), FocusTimer.longestMinutes * 60))
+        }
+        focus.start()
+        return .length(seconds: Int(focus.focusLength.rounded()), breakTime: false)
+    }
+
+    /// Pauses the focus or the break. A plain countdown is left alone.
+    @discardableResult
+    func pauseFocusSession() -> FocusSpeech {
+        guard !focus.isPlainTimer else { return .notRunning }
+        if focus.isRunning { focus.pause() }
+        return focus.isPaused ? .paused : .notRunning
+    }
+
+    /// Continues a paused focus or break.
+    @discardableResult
+    func resumeFocusSession() -> FocusSpeech {
+        guard focus.isPaused, !focus.isPlainTimer else { return .notRunning }
+        focus.resume()
+        let seconds = max(0, Int(focus.remaining().rounded()))
+        return .length(seconds: seconds, breakTime: focus.phase == .rest)
+    }
+
+    /// Stops a focus or a break. A plain countdown is left alone.
+    @discardableResult
+    func endFocusSession() -> FocusSpeech {
+        guard focus.phase != .idle, !focus.isPlainTimer else { return .notRunning }
+        let breakTime = focus.phase == .rest
+        focus.stop()
+        return .stopped(breakTime: breakTime)
+    }
     var openSettings: () -> Void = {}
     /// Opens Settings > Permissions, the only in-app place a permission is asked for.
     var openPermissions: () -> Void = {}
@@ -340,8 +488,9 @@ final class TopBarModel {
         liveMusicWings = defaults.object(forKey: "topBar.musicWings") as? Bool ?? true
         weatherCity = defaults.string(forKey: "topBar.weatherCity") ?? ""
         useCelsius = defaults.object(forKey: "topBar.celsius") as? Bool ?? (Locale.current.measurementSystem != .us)
-        note = defaults.string(forKey: "topBar.note") ?? ""
-        noteBaseline = note
+        let savedNote = defaults.string(forKey: "topBar.note") ?? ""
+        note = savedNote
+        noteBaseline = savedNote
         selectedModeKey = defaults.string(forKey: "dictation.mode") ?? "voice"
         script = defaults.string(forKey: "prompter.script") ?? Self.sampleScript
         roll = PrompterRoll(speed: defaults.object(forKey: "prompter.speed") as? Double ?? 32,

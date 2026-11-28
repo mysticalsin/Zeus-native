@@ -15,6 +15,10 @@ struct ScribePage: View {
 
     private var pageBody: some View {
         VStack(spacing: 6) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if recording") { topBar.speakRecording() }
+            }
             // Persistent until the person retries or dismisses it; the controller also announces it.
             // At most one storage banner is shown, the most urgent first; the rest are counted, and each
             // appears as the one above it is dismissed or resolved, so the fixed page never overflows.

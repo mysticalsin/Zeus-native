@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Per-app sound speaks the switch, whether any apps are saved, and whether any are shaped. Names stay unspoken.
+enum BandSetupVoice {
+    static var speakBands: () -> Void = {}
+}
+
 // Settings > Sounds > "Per-app sound": the owner's switch, one line that says what the equaliser is doing, and a row
 // per app with its own shape switch, volume and ten bands. The card only asks the controller; it never starts one.
 
@@ -116,6 +121,10 @@ struct GSEqualiserCard: View {
     var body: some View {
         let status = status
         GSCard(EqualiserCardActions.cardTitle) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how per-app sound is set") { BandSetupVoice.speakBands() }
+            }
             GSToggleRow(
                 symbol: "slider.vertical.3", title: EqualiserCardActions.switchTitle,
                 text: EqualiserCardActions.switchText, isOn: $isOn)

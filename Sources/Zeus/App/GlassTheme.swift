@@ -599,6 +599,8 @@ enum CardFinish: String, CaseIterable {
 
     /// The saved Card style name as a finish. Unknown or empty names fall back to Liquid Glass.
     static func resolve(_ name: String) -> CardFinish { CardFinish(rawValue: name) ?? .liquidGlass }
+    /// The Your look pictures speak the selected style. They do not change it.
+    static var speakLook: () -> Void = {}
 
     /// Open-notch card corner radius and inset, measured from Glance's open panel.
     static let radius: CGFloat = 20

@@ -115,6 +115,16 @@ import Testing
         #expect(placed.map(\.local) == [CGPoint(x: 20, y: 870), CGPoint(x: 100, y: 451)])
     }
 
+    @Test func aPointOnTheOuterEdgeIsPlaced() {
+        let only = screen("only", CGRect(x: 0, y: 0, width: 100, height: 80))
+        let layout = MarkLayout { [only] }
+        let placed = layout.place([
+            MarkPin(number: 1, title: "Right", point: CGPoint(x: 100, y: 20)),
+            MarkPin(number: 2, title: "Top", point: CGPoint(x: 40, y: 80)),
+        ])
+        #expect(placed.map(\.local) == [CGPoint(x: 100, y: 60), CGPoint(x: 40, y: 0)])
+    }
+
     @Test func aPointOnTheMinCornerAndTheMaxCornerIsPlaced() {
         let side = screen("side", CGRect(x: -120, y: -40, width: 100, height: 80))
         let layout = MarkLayout { [side] }

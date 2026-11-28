@@ -48,6 +48,10 @@ final class FacePresenceController {
         var permissions: Permissions = .unwired
         /// False in tests: no one second timer and no enrollment watchdog is scheduled.
         var usesTimers = true
+        /// Fails closed until `live()` installs the system check. Tests pass a synthetic proof and never show a dialog.
+        var presence: @MainActor (FaceTemplateProof.Operation) -> FaceTemplateProof = { operation in
+            FaceTemplateProof(operation: operation, userPresent: false)
+        }
 
         @MainActor
         static func live() -> Environment {
@@ -60,7 +64,8 @@ final class FacePresenceController {
                 sessionState: { FacePresenceController.systemSessionState() },
                 uptime: { ProcessInfo.processInfo.systemUptime },
                 settings: Settings(switchIsOn: { SettingsStore.shared.bool(FacePresenceController.switchID) },
-                                   lockAfterLabel: { SettingsStore.shared.string(FacePresenceController.lockAfterID) }))
+                                   lockAfterLabel: { SettingsStore.shared.string(FacePresenceController.lockAfterID) }),
+                presence: { FaceSystemPresence.proof(for: $0) })
         }
     }
 
@@ -72,6 +77,8 @@ final class FacePresenceController {
     // MARK: State
 
     private(set) var machine = FacePresenceMachine()
+    /// The Privacy card speaks the status word it shows. A face name stays off that line.
+    var speakFace: () -> Void = {}
     /// The faces in the vault, enabled or not. Embeddings never leave this type except as `EnrolledFace` for matching.
     private(set) var faces: [FaceRecord] = []
     private(set) var vaultReadable = true
@@ -84,6 +91,8 @@ final class FacePresenceController {
     @ObservationIgnored private var spoofWindow = SpoofCues.Window()
     @ObservationIgnored private var previousFace: CGRect?
     @ObservationIgnored private var visionFailures = 0
+    /// The latest enrollment line: "3 of 10." or why the last frame was turned down. Cleared when enrollment ends.
+    var enrollmentLine: String?
     @ObservationIgnored private var enrollment: EnrollmentSession?
     @ObservationIgnored private var enrollmentWatchdog: Task<Void, Never>?
     @ObservationIgnored private(set) var consentTask: Task<Void, Never>?
@@ -169,7 +178,7 @@ final class FacePresenceController {
     /// Saves the new list and only then adopts it, so a refused or failed save leaves what the owner sees equal to what
     /// is stored. Deleting the last face removes the file and the Keychain key.
     private func commit(_ updated: [FaceRecord]) {
-        guard environment.vault.save(updated) == .saved else { return }
+        guard environment.vault.save(updated, presence: environment.presence(.save)) == .saved else { return }
         faces = updated
         send(.facesChanged(enabledFaces: enabledFaceCount, uptime: environment.uptime()))
     }
@@ -223,6 +232,7 @@ final class FacePresenceController {
             environment.permissions.openCameraSettings()
         case .beginEnrollment(let token):
             spoofWindow.reset()
+            enrollmentLine = nil
             enrollment = EnrollmentSession(token: token, plan: EnrollmentPlan(revision: environment.featurePrintRevision,
                                                                               startedAt: environment.uptime()))
             watchEnrollmentWindow()
@@ -315,7 +325,9 @@ final class FacePresenceController {
         switch outcome {
         case .completed(let result): finishEnrollment(token: token, result: result)
         case .expired: finishEnrollment(token: token, result: nil)
-        case .accepted, .refused, .finished: break
+        case .accepted(let count): enrollmentLine = EnrollmentCoach.progress(accepted: count)
+        case .refused(let reason): enrollmentLine = EnrollmentCoach.line(reason)
+        case .finished: break
         }
     }
 
@@ -325,7 +337,7 @@ final class FacePresenceController {
         if let result {
             let face = FaceRecord(id: UUID().uuidString, name: nextFaceName(), isEnabled: true, revision: result.revision,
                                   samples: result.samples, threshold: result.threshold)
-            if environment.vault.save(faces + [face]) == .saved {
+            if environment.vault.save(faces + [face], presence: environment.presence(.save)) == .saved {
                 faces.append(face)
                 saved = true
             }
@@ -336,6 +348,7 @@ final class FacePresenceController {
 
     private func endEnrollmentSession() {
         enrollment = nil
+        enrollmentLine = nil
         enrollmentWatchdog?.cancel()
         enrollmentWatchdog = nil
     }
@@ -369,10 +382,11 @@ final class FacePresenceController {
     // MARK: Vault
 
     private func loadVault() {
-        switch environment.vault.load() {
+        switch environment.vault.load(presence: environment.presence(.read)) {
         case .empty: faces = []; vaultReadable = true
         case .faces(let stored): faces = stored; vaultReadable = true
         case .unreadable: faces = []; vaultReadable = false
+        case .needsPresence: faces = []; vaultReadable = false
         }
     }
 

@@ -90,7 +90,7 @@ import Testing
 
 final class PersonaSpeakHitCounter: URLProtocol, @unchecked Sendable {
     private static let lock = NSLock()
-    private static var hits = 0
+    nonisolated(unsafe) private static var hits = 0
     static func reset() { lock.lock(); hits = 0; lock.unlock() }
     static var count: Int { lock.lock(); defer { lock.unlock() }; return hits }
 

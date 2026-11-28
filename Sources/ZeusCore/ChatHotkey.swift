@@ -14,6 +14,18 @@ public enum ChatHotkey: String, CaseIterable, Codable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
+    /// The title the Shortcuts menu shows.
+    public var menuTitle: String {
+        switch self {
+        case .off: "Off"
+        case .controlOptionSpace: "Control-Option-Space"
+        case .optionSpace: "Option-Space"
+        case .optionShiftSpace: "Option-Shift-Space"
+        case .commandShiftSpace: "Command-Shift-Space"
+        case .controlOptionC: "Control-Option-C"
+        }
+    }
+
     /// Carbon virtual key code (kVK_Space = 49, kVK_ANSI_C = 8).
     public var keyCode: UInt32? {
         switch self {

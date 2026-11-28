@@ -2,6 +2,11 @@ import Observation
 import SwiftUI
 import ZeusCore
 
+/// The separate browser speaks uv, browser-use, Chromium, and whether sites are limited. Nothing is downloaded.
+enum SeparateBrowserVoice {
+    static var speakBrowser: () -> Void = {}
+}
+
 /// What the "Separate browser (browser-use)" option needs, and the button that fetches it.
 @MainActor
 @Observable
@@ -44,6 +49,10 @@ struct GSBrowserUseRows: View {
 
     var body: some View {
         let status = model.status
+        HStack {
+            Spacer(minLength: 0)
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the separate browser is set") { SeparateBrowserVoice.speakBrowser() }
+        }
         GSRow(symbol: "checklist", title: "Separate browser setup",
               text: "Zeus runs a separate browser in its own profile. Nothing is downloaded until you press Set up.") {
             HStack(spacing: 8) {

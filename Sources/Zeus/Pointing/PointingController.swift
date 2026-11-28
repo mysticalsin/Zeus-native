@@ -64,6 +64,11 @@ final class PointingController {
         var sendScreenshot: () -> Bool = { PointingSettings.sendScreenshot }
         var drawWhileHeld: () -> Bool = { PointingSettings.drawWhileHeld }
         var textEntryEnabled: () -> Bool = { PointingSettings.textEntry }
+        /// Opens an allowlisted app. Tests replace this. A refused proposal never reaches it.
+        var openBundle: (String) -> Bool = { bundle in
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { return false }
+            return NSWorkspace.shared.open(url)
+        }
         /// One `[ZEUS] pointing-trace` line per turn. Offsets only; never text or image data.
         var log: (String) -> Void = { line in NSLog("%@", line) }
     }
@@ -107,6 +112,7 @@ final class PointingController {
     let textEntry = PointingTextEntry()
     let watcher = PointingTargetWatcher()
     private(set) var session = PointingSession()
+    private var actionTools = PointingActionTools()
     private(set) var metrics = Metrics()
     private(set) var trace = PointingTrace()
     private(set) var candidatesForTest: [PointingTargetCandidate] = []
@@ -130,7 +136,7 @@ final class PointingController {
     private var stale: PointingStaleTarget?
     private var watchedQuartzPoint: CGPoint?
     private var staleWork: Task<Void, Never>?
-    private var inkTrail = PointingInkTrail()
+    private var inkTrail = VisualInk()
     private var traceEmitted = true
     private var systemObservers: [NSObjectProtocol] = []
 
@@ -546,7 +552,7 @@ final class PointingController {
     private func startInk() {
         guard !MarkOverlay.shared.capturesMouse else { return }
         inkOwner = true
-        inkTrail = PointingInkTrail()
+        inkTrail.reset()
         MarkModel.shared.strokes = []
         MarkModel.shared.inkColor = PointingInkColor.current()
         // Click-through on purpose: the overlay never takes mouse events, so the app under the
@@ -560,7 +566,7 @@ final class PointingController {
         MarkOverlay.shared.hide()
         MarkModel.shared.strokes = []
         MarkModel.shared.inkColor = nil
-        inkTrail = PointingInkTrail()
+        inkTrail.reset()
     }
 
     /// Test seam for the self-test: a synthetic press, drag and release become pointer samples.
@@ -729,13 +735,59 @@ final class PointingController {
         guard let ring = marks.filter({ $0.geometry.kind == .ring }).min(by: { $0.id < $1.id }),
               let global = capture.geometry.globalPoint(fromImage: .init(x: ring.transform.position.x, y: ring.transform.position.y),
                                                         current: capture.currentDisplay) else { return }
-        let text = marks.filter { $0.geometry.kind == .label }.min(by: { $0.id < $1.id })?.text ?? "Here"
-        startWatching(atGlobal: CGPoint(x: global.x, y: global.y))
-        if marker.flight(CGPoint(x: global.x, y: global.y), String(text.prefix(40))) {
+        let raw = marks.filter { $0.geometry.kind == .label }.min(by: { $0.id < $1.id })?.text ?? "Here"
+        let caption = PointerGuideCaptionSplit.boltText(raw) ?? "Here"
+        let bolt = CGPoint(x: global.x, y: global.y)
+        startWatching(atGlobal: bolt)
+        if marker.flight(bolt, caption) {
             flightLaunched = true
             metrics.flightStartAt = services.now()
             metrics.flightUsedFallback = fallback
+            admitLiveGuide(id: ring.id, bolt: bolt, caption: caption, imageCenter: ring.transform.position,
+                           radius: ring.geometry.radius ?? 22, capture: capture)
         }
+    }
+
+    /// The allowlist runs first. A refusal does not insert, copy, or open an app.
+    @discardableResult
+    func performProposals(_ drafts: [PointingProposalDraft], candidates: [PointingProposalCandidate],
+                          focusedSecure: Bool, sink: any PointingActionSink) -> [PointingProposalDecision] {
+        let decisions = PointingProposalGate.decide(
+            drafts, candidates: candidates, focusedFieldIsSecure: focusedSecure, admittedThisTurn: 0)
+        for decision in decisions {
+            _ = actionTools.offer(decision, sink: sink)
+            if case .proceed(let proposal, _) = decision, proposal.tool == .openApp,
+               let bundle = proposal.arguments["bundleID"] {
+                _ = services.openBundle(bundle)
+            }
+        }
+        return decisions
+    }
+
+    /// A click on the admitted ring moves to the next step. A miss stays on this step.
+    /// Returns true when a guide is up, so the companion does not treat the click as a dismissal.
+    @discardableResult
+    func guideClick(at screen: CGPoint) -> Bool {
+        guard session.state == .guiding, session.guide != nil else { return false }
+        let transition = session.guideClick(at: PointerGuidePoint(x: screen.x, y: screen.y))
+        if transition.effects.contains(.showGuideStep), let step = session.guide?.current {
+            let caption = PointerGuideCaptionSplit.boltText(step.caption) ?? "Here"
+            _ = marker.flight(CGPoint(x: step.bolt.x, y: step.bolt.y), caption)
+        } else if transition.to == .idle {
+            marker.idle()
+        }
+        return true
+    }
+
+    private func admitLiveGuide(id: String, bolt: CGPoint, caption: String, imageCenter: ExplanationVector3,
+                                radius: Double, capture: ExplanationCaptureContext) {
+        // Captions-only turns never play audio, so they are still processing when the ring appears.
+        if session.state == .processing { _ = session.send(.firstPlaybackStart) }
+        guard session.state == .speaking else { return }
+        guard let mapped = capture.geometry.globalRing(center: imageCenter, radius: radius, current: capture.currentDisplay) else { return }
+        let ring = CGRect(x: mapped.x, y: mapped.y, width: mapped.width, height: mapped.height)
+        guard let plan = PointerGuideAdmission.step(id: id, bolt: bolt, ring: ring, caption: caption, reduceMotion: explanation.reduceMotion) else { return }
+        _ = session.admitGuide(plan)
     }
 
     private func turnEnded(_ error: Error?) {
@@ -747,7 +799,7 @@ final class PointingController {
         // Speech finished (or captions only). If the flight never left, send it now.
         if !flightLaunched, let scene = explanation.scene { revealed(scene, fallback: true) }
         if !flightLaunched { marker.idle() }
-        _ = session.send(.turnCompleted)
+        if session.state != .guiding { _ = session.send(.turnCompleted) }
         emitTrace(.completed)
     }
 

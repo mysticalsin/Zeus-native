@@ -19,8 +19,8 @@ struct DefaultOutputWatchTests {
     @Test func removingOneKeepsTheOther() {
         let log = InstallLog()
         let watch = DefaultOutputWatch(installer: log.installer())
-        let left = Counter()
-        let right = Counter()
+        let left = OutputWatchCounter()
+        let right = OutputWatchCounter()
         let first = watch.subscribe { left.add() }
         _ = watch.subscribe { right.add() }
         watch.unsubscribe(first)
@@ -50,8 +50,8 @@ struct DefaultOutputWatchTests {
     @Test func aChangeReachesEverySubscriberOnce() {
         let log = InstallLog()
         let watch = DefaultOutputWatch(installer: log.installer())
-        let left = Counter()
-        let right = Counter()
+        let left = OutputWatchCounter()
+        let right = OutputWatchCounter()
         _ = watch.subscribe { left.add() }
         _ = watch.subscribe { right.add() }
         log.emit()
@@ -61,7 +61,7 @@ struct DefaultOutputWatchTests {
     }
 }
 
-private final class Counter: @unchecked Sendable {
+private final class OutputWatchCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
 

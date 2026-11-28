@@ -33,7 +33,7 @@ import Testing
 
     private func reader<Bytes>(
         _ bytes: Bytes
-    ) -> ExplanationOffMainSSEReader where Bytes: AsyncSequence & Sendable, Bytes.Element == UInt8, Bytes.Failure == any Error {
+    ) -> ExplanationOffMainSSEReader where Bytes: AsyncSequence & Sendable, Bytes.Element == UInt8 {
         ExplanationOffMainSSEReader(bytes: bytes, sessionID: session, turnID: turn, sceneID: scene, baseRevision: 0)
     }
 

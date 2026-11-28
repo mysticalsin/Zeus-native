@@ -6,6 +6,11 @@ import SwiftUI
 import UserNotifications
 import ZeusCore
 
+/// Proactive notices speak the morning brief and due to-dos. They do not show a brief or schedule a notice.
+enum ProactiveSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Proactive settings. Both start off. The morning brief does not raise the calendar prompt. Due nudges still ask for reminders.
 @MainActor
 @Observable
@@ -209,6 +214,10 @@ struct ProactiveSettingsSection: View {
 
     var body: some View {
         Section("Proactive") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how proactive is set") { ProactiveSetupVoice.speakSetup() }
+            }
             Toggle("Morning brief at the first unlock of the day",
                    isOn: Binding(get: { settings.morningBrief }, set: { ProactiveController.shared.setMorningBrief($0) }))
             Toggle("Notify me when a to-do is due",

@@ -21,6 +21,19 @@ enum PointingSettings {
         shortcutChoices[FeatureSettings.pointingShortcutName(defaults: defaults)] ?? .controlOption
     }
     static var shortcut: Shortcut { resolvedShortcut() }
+
+    /// The same title the Pointing keys menu shows. An unknown stored value uses Control-Option.
+    static var shortcutName: String {
+        let stored = FeatureSettings.pointingShortcutName()
+        return shortcutChoices[stored] == nil ? "Control-Option" : stored
+    }
+
+    /// The Assistant menu speaks which keys point. It does not start a pointing turn.
+    static var speakKeys: () -> Void = {}
+    /// The trail row speaks pointing, the ink, screenshots, and typed questions. It does not start a turn.
+    static var speakTrail: () -> Void = {}
+    /// The provider row speaks who pointing asks, and whether dictation uses Fn and Control. It does not read a key.
+    static var speakRoute: () -> Void = {}
 }
 
 /// Feeds the keyboard stream to `PointingKeyGesture` and reports what the hold did. It owns no

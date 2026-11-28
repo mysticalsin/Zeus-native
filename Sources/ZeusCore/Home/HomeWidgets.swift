@@ -100,6 +100,10 @@ public struct HomeSlots: Equatable, Sendable {
     }
 
     public static let settingIDs = ["home.widget.1", "home.widget.2", "home.widget.3", "home.widget.4"]
+    /// The Home card speaks the four widgets. It does not change them.
+    public static var speakHome: () -> Void = {}
+    /// The Home style rows speak clock, music, weather, and calendar. They do not change the cards.
+    public static var speakStyles: () -> Void = {}
 
     public static func settingID(slot: Int) -> String { settingIDs[min(max(slot, 1), count) - 1] }
 

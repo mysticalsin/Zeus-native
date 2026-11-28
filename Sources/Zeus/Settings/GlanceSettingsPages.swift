@@ -3,6 +3,70 @@ import Observation
 import SwiftUI
 import ZeusCore
 
+/// The Day to day card speaks which of its six switches are on. It does not change them.
+enum DayToDayVoice {
+    static var speakDay: () -> Void = {}
+}
+
+/// The Agent notifications card speaks errors, the stall, and quiet while sharing. It does not ask macOS.
+enum NotifySetupVoice {
+    static var speakNotices: () -> Void = {}
+}
+
+/// Screen sharing speaks the share switch, the hide switch, and whether shares show Zeus. It does not change them.
+enum ShareSeenVoice {
+    static var speakSeen: () -> Void = {}
+}
+
+/// Permission requests and finished-agent banners. It does not ask macOS for notification permission.
+enum AskFinishVoice {
+    static var speakAsks: () -> Void = {}
+}
+
+/// The Weather card speaks the city and the units. It does not fetch a forecast.
+enum WeatherPlaceVoice {
+    static var speakPlace: () -> Void = {}
+}
+
+/// The Home style and Physical finish rows speak the frame. They do not change the card pictures.
+enum HomeFrameVoice {
+    static var speakFrame: () -> Void = {}
+}
+
+/// The Screen card speaks the bottom-corner rounding and the size. It does not move a window.
+enum ScreenCornerVoice {
+    static var speakCorners: () -> Void = {}
+}
+
+/// The Card details card speaks auto-hide and the close delay. It does not close the notch.
+enum NotchCloseVoice {
+    static var speakClose: () -> Void = {}
+}
+
+/// The Everyday actions rows speak which lights are on. They do not change them.
+enum EverydayLightsVoice {
+    static var speakLights: () -> Void = {}
+}
+
+/// The halo arm and island rows speak those two choices. They do not change the light picture.
+enum HaloArmVoice {
+    static var speakArm: () -> Void = {}
+}
+
+/// The Music rows speak the four music lights. They do not start playback.
+enum MusicLightsVoice {
+    static var speakLights: () -> Void = {}
+    /// The live music-wave switch. A missing key is on, the same as the notch.
+    static var wingsOn: () -> Bool = {
+        UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true
+    }
+}
+
+/// The Running card speaks the look, how the notch opens, and the hover delay. It does not open the notch.
+enum RunningCardVoice {
+    static var speakCard: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -95,10 +159,15 @@ private struct GeneralPage: View {
         // Window appearance and Language are not rows: the windows are drawn dark only and Zeus speaks English only.
         GSCard("Your defaults") {
             GSRow(symbol: "display.2", title: "Show the notch on") {
-                GSPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue)).popupLabel("Show the notch on")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the notch is") { NotchController.speakNotch() }
+                    GSPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue)).popupLabel("Show the notch on")
+                }
             }
             GSDivider()
-            GSRow(symbol: "bubble.left.and.bubble.right", title: "Default agent", text: "For new conversations opened from the notch.")
+            GSRow(symbol: "bubble.left.and.bubble.right", title: "Default agent", text: "For new conversations opened from the notch.") {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the default agent") { DefaultAgentVoice.speakAgent() }
+            }
             HStack(spacing: 12) {
                 agentChoice("Codex")
                 agentChoice("Claude Code")
@@ -106,6 +175,10 @@ private struct GeneralPage: View {
             .padding(.bottom, 8)
         }
         GSCard("Day to day") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's on day to day") { DayToDayVoice.speakDay() }
+            }
             GSToggleRow(symbol: "power", title: "Launch Zeus at login", text: "Ready as soon as you sign in to your Mac.", isOn: bool("general.launchAtLogin"))
             GSDivider()
             GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working while the screen can still lock.", detail: "Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))
@@ -120,6 +193,10 @@ private struct GeneralPage: View {
         }
         GSSetupCard(openGuide: openGuide)
         GSCard("Keep awake") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how keep awake is set") { KeepAwakeSession.speakSetup() }
+            }
             GSRow(symbol: "timer", title: "Session length", text: "How long the cup on Home keeps the Mac awake.") {
                 GSPopup(selection: Binding(
                     get: { KeepAwakeLength.label(keepAwake.homeMinutes) },
@@ -229,10 +306,23 @@ private struct AppearancePage: View {
                 style("Dashboard B", "")
             }
             .padding(.bottom, 10)
-            GSInfo(text: "Changes apply instantly.")
+            HStack(spacing: 8) {
+                GSInfo(text: "Changes apply instantly.")
+                Spacer(minLength: 8)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the card style") { CardFinish.speakLook() }
+            }
+            GSDivider()
+            GSRow(symbol: "circle.lefthalf.filled", title: "Dark Mode", text: "Whether the Mac is using Dark Mode.") {
+                Button("Say it") { context.topBar?.speakDarkMode() }
+                    .buttonStyle(GSButtonStyle())
+                    .disabled(context.topBar == nil)
+            }
             GSDivider()
             GSRow(symbol: "rectangle.3.group", title: "Home style", text: "The frame of the Home band: cards, no frame, or no frame with colour.") {
-                GSPopup(selection: SettingsStore.binding("appearance.homeStyle"), options: SettingsCatalog.option("appearance.homeStyle")?.choices ?? []).popupLabel("Home style")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("appearance.homeStyle"), options: SettingsCatalog.option("appearance.homeStyle")?.choices ?? []).popupLabel("Home style")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home frame") { HomeFrameVoice.speakFrame() }
+                }
             }
             GSDivider()
             GSRow(symbol: "square.stack.3d.up", title: "Customize Physical", text: "In the Physical theme, give Home its own finish instead of the card finish.") {
@@ -240,6 +330,10 @@ private struct AppearancePage: View {
             }
         }
         GSCard("Top bar") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the closed notch is set") { NotchFitVoice.speakFit() }
+            }
             GSRow(symbol: "arrow.up.and.down", title: "Top bar position",
                   text: "Lowers the closed notch with its light, ticker and wings.", detail: "The open panel and the screen edge light stay at the top, on every display.") {
                 HStack(spacing: 10) {
@@ -260,6 +354,10 @@ private struct AppearancePage: View {
                     .ownedJourneyControl("settings.appearance.topBarPositionReset")
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether screen sharing hides Zeus") { ShareSeenVoice.speakSeen() }
+            }
             GSToggleRow(symbol: store.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash",
                         title: "Show Zeus in screen shares",
                         text: "People sharing your screen can see Zeus when this is on.", detail: "Off keeps Zeus out of screen sharing and screenshots, including during meetings.",
@@ -267,13 +365,20 @@ private struct AppearancePage: View {
         }
         if let drawnNotchCard = DrawnNotchCardModel(context: context, navigation: navigation) { DrawnNotchCard(model: drawnNotchCard) }
         GSCard("Running card") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the running card is set") { RunningCardVoice.speakCard() }
+            }
             HStack(spacing: 12) {
                 runningTheme("Wave", "")
                 runningTheme("Essentials", "")
             }
             GSDivider()
             GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens the notch after the delay.", detail: "Click opens it only when you click the notch.") {
-                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the notch opens") { NotchController.speakOpen() }
+                }
             }
             GSDivider()
             // The delay only applies to hover, so it is subdued while the trigger is Click.
@@ -286,6 +391,10 @@ private struct AppearancePage: View {
         }
         HomeAppearanceCard()
         GSCard("Card details and behavior") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the notch closes") { NotchCloseVoice.speakClose() }
+            }
             GSToggleRow(symbol: "rectangle.topthird.inset.filled", title: "Hide the notch automatically", text: "Closes when you move the pointer away.", isOn: bool("notch.autoHide"))
             GSDivider()
             GSRow(symbol: "timer", title: "Delay before closing") {
@@ -295,20 +404,30 @@ private struct AppearancePage: View {
         GSCard("Zeus beside the pointer") {
             GSRow(symbol: "cursorarrow.rays", title: "Show Zeus beside the pointer",
                   text: "He stays out of the way until you call him, then fades out.", detail: "He appears for a talk shortcut, a voice turn or when he points, then fades after about 2 seconds.") {
-                GSPopup(selection: Binding(get: { BuddyPreference.shared.show.title },
-                                           set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
-                        options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { BuddyPreference.shared.show.title },
+                                               set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
+                            options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say when Zeus appears") { BuddyPreference.speakShow() }
+                }
             }
             GSInfo(text: "The More button (three dots) on the notch has the same choice for a quick change.")
             GSDivider()
             GSRow(symbol: "circle.circle", title: "Persona and mascot",
-                  text: "Classic keeps this mascot. Orb is an optional particle mascot and a spoken-reply personality. It stays off until you choose it.") {
-                GSPopup(selection: Binding(get: { PersonaSetting.shared.displayName },
-                                           set: { PersonaSetting.shared.select(displayName: $0) }),
-                        options: PersonaSetting.choices, label: "Persona and mascot")
+                  text: "Classic keeps this mascot; Orb stays off until you choose it.") {
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { PersonaSetting.shared.displayName },
+                                               set: { PersonaSetting.shared.select(displayName: $0) }),
+                            options: PersonaSetting.choices, label: "Persona and mascot")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the companion and the agent face") { CompanionVoice.speakCompanion() }
+                }
             }
         }
         GSCard("A face for your agents") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the companion and the agent face") { CompanionVoice.speakCompanion() }
+            }
             HStack(spacing: 12) {
                 avatar("Glyphs", "", mascot: false)
                 avatar("Zeus", "", mascot: true)
@@ -325,10 +444,21 @@ private struct AppearancePage: View {
                 }
             }
             .padding(.bottom, 6)
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the notch light") { HaloStyle.speakLight() }
+            }
             GSRow(symbol: "sparkles", title: "Entrance animation") {
-                GSPopup(selection: HaloChoices.entranceTitle, options: HaloChoices.entrances).popupLabel("Entrance animation")
+                HStack(spacing: 8) {
+                    GSPopup(selection: HaloChoices.entranceTitle, options: HaloChoices.entrances).popupLabel("Entrance animation")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the halo entrance") { HaloEntranceVoice.speakEntrance() }
+                }
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the halo is measured") { HaloMeasureVoice.speakMeasure() }
+            }
             GSRow(symbol: "bolt.fill", title: "Entrance intensity") {
                 OBTickSlider(value: Binding(get: { min(max(store.double("halo.intensity"), 50), 150) }, set: { store.set("halo.intensity", String(Int($0))) }), range: 50...150, step: 10)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Entrance intensity")
@@ -340,7 +470,10 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "arrow.left.and.right", title: "Halo arm width") {
-                GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("halo.armWidth"), options: HaloChoices.armWidths).popupLabel("Halo arm width")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the halo arm") { HaloArmVoice.speakArm() }
+                }
             }
             GSDivider()
             GSRow(symbol: "rectangle.dashed", title: "Island background",
@@ -353,9 +486,17 @@ private struct AppearancePage: View {
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Light thickness")
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the halo meets the screen") { HaloWashVoice.speakWash() }
+            }
             GSToggleRow(symbol: "dot.radiowaves.left.and.right", title: "Light wave to the screen edges", text: "A wave of light leaves the notch when an agent starts or finishes.", detail: "The wave ripples across the screen and fades.", isOn: bool("halo.edgeWave"))
         }
         GSCard("Small moments, softly signaled") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which everyday lights are on") { EverydayLightsVoice.speakLights() }
+            }
             Text("Keep the visual feedback you find useful.").font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
             Text("Everyday actions").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary).padding(.top, 8)
             light("lights.battery", "battery.100.bolt", "Green gauge when plugged in", "Shows the battery level when power changes.")
@@ -365,12 +506,21 @@ private struct AppearancePage: View {
             light("lights.reminderGlow", "checklist", "Glow when a reminder is added", nil)
             light("lights.copy", "doc.on.doc", "Light sweep on copy", "A white sweep confirms a copy.")
             light("lights.shelf", "tray.and.arrow.down", "Intake light when files land", "A brief glow for Shelf drops.")
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the arrival lights are set") { ArrivalLightsVoice.speakLights() }
+            }
             AirDropPermissionRow()
             GSDivider()
             ScreenshotPermissionRow()
             GSDivider()
             light("lights.capsLock", "capslock", "Case-key lights (Caps Lock and Shift)", "Shows Caps Lock changes and Shift held on its own.", last: true)
-            Text("Music").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary).padding(.top, 14)
+            HStack {
+                Text("Music").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary)
+                Spacer(minLength: 8)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which music lights are on") { MusicLightsVoice.speakLights() }
+            }
+            .padding(.top, 14)
             GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
@@ -378,7 +528,10 @@ private struct AppearancePage: View {
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
             GSDivider()
             GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum.", detail: "Add the tab under Top bar tabs, further down this page.") {
-                GSPopup(selection: SettingsStore.binding("waves.style"), options: WaveStyle.allCases.map(\.rawValue)).popupLabel("Waves style")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("waves.style"), options: WaveStyle.allCases.map(\.rawValue)).popupLabel("Waves style")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the waves are set") { WavesSetupVoice.speakWaves() }
+                }
             }
             GSDivider()
             GSRow(symbol: "slider.horizontal.3", title: "Sensitivity") {
@@ -399,6 +552,10 @@ private struct AppearancePage: View {
 
     private var screenCard: some View {
         GSCard("Screen") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the screen corners are set") { ScreenCornerVoice.speakCorners() }
+            }
             GSToggleRow(symbol: "rectangle.roundedbottom", title: "Round the bottom screen corners",
                         text: "Rounds the bottom corners of a notched display to match the top.", detail: "The rounded corners are click-through.",
                         isOn: bool("screen.roundBottomCorners"))
@@ -412,14 +569,22 @@ private struct AppearancePage: View {
     private var musicSourceCard: some View {
         GSCard("Music source") {
             GSRow(symbol: "music.note.list", title: "Show music from") {
-                GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
-                        options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which player the notch shows") { NowPlayingHub.speakSource() }
+                    GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
+                            options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
+                }
             }
         }
     }
 
     private var hudCard: some View {
         GSCard("Volume, brightness and keys") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which notch lights are on") { SystemHUDSettings.speakLights() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which other notch lights are on") { HudExtraVoice.speakExtras() }
+            }
             light("lights.hud.volume", "speaker.wave.2", "Volume in the notch", "Level glow and wings when the output volume changes.")
             light("lights.hud.brightness", "sun.max", "Brightness in the notch", "Level glow when the built-in display brightness changes.")
             light("lights.hud.keyboard", "light.max", "Keyboard backlight in the notch", "Level glow when keyboard illumination changes. Skipped on Macs without a backlight.")
@@ -463,19 +628,37 @@ private struct AppearancePage: View {
     }
 }
 
+/// The world clock and countdown speak the city choice, whether a title is set, and the day. The words stay unspoken.
+enum HomeLaterVoice {
+    static var speakLater: () -> Void = {}
+}
+
+/// The Home backdrop speaks the drawing and whether it moves. It does not change the backdrop.
+enum HomeBackdropVoice {
+    static var speakBackdrop: () -> Void = {}
+}
+
 /// Home: which widget each of the four cards shows, its style, the backdrop. The same choices as Customize Home on the notch.
 private struct HomeAppearanceCard: View {
     private let symbols = ["1.square", "2.square", "3.square", "4.square"]
 
     var body: some View {
         GSCard("Home") {
-            Text("Choose what the four Home cards show. Long-press Home or open the More menu (three dots) to change them right on the notch.")
-                .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 8)
+            HStack(alignment: .top, spacing: 8) {
+                Text("Choose what the four Home cards show. Long-press Home or open the More menu (three dots) to change them right on the notch.")
+                    .font(GS.rowText).foregroundStyle(GS.secondary)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home cards") { HomeSlots.speakHome() }
+            }
+            .padding(.bottom, 8)
             ForEach(1...4, id: \.self) { slot in
                 GSRow(symbol: symbols[slot - 1], title: "Card \(slot)") {
                     GSPopup(selection: SettingsStore.binding(HomeSlots.settingID(slot: slot)), options: SettingsCatalog.option(HomeSlots.settingIDs[slot - 1])?.choices ?? [])
                 }
                 GSDivider()
+            }
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home styles") { HomeSlots.speakStyles() }
             }
             style("clock", "Clock style", "home.variant.clock")
             GSDivider()
@@ -485,6 +668,10 @@ private struct HomeAppearanceCard: View {
             GSDivider()
             style("calendar", "Calendar style", "home.variant.calendar")
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the world clock and countdown are set") { HomeLaterVoice.speakLater() }
+            }
             GSRow(symbol: "globe", title: "World clock cities", text: "Time zone names, like Europe/London.") {
                 GSTextInput(text: SettingsStore.binding("home.worldClock.zones"), placeholder: "Europe/London, Asia/Tokyo", label: "World clock cities")
             }
@@ -498,6 +685,10 @@ private struct HomeAppearanceCard: View {
             }
         }
         GSCard("Home backdrop") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home backdrop") { HomeBackdropVoice.speakBackdrop() }
+            }
             let current = HomeBackdrop.resolve(SettingsStore.shared.string(HomeBackdrop.settingID))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                 ForEach(HomeBackdrop.allCases) { backdrop in
@@ -527,8 +718,12 @@ private struct TopBarTabsCard: View {
         if let topBar = context.topBar {
             let full = topBar.layout.isFull()
             GSCard("Top bar tabs") {
-                Text("Choose which pages the open notch shows and in what order. Home always comes first.")
-                    .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
+                HStack(alignment: .top, spacing: 8) {
+                    Text("Choose which pages the open notch shows and in what order. Home always comes first.")
+                        .font(GS.rowText).foregroundStyle(GS.secondary)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which tabs are on") { TopBarLayout.speakTabs() }
+                }
+                .padding(.bottom, 4)
                 ForEach(Array(TopBarTab.allCases.enumerated()), id: \.element.id) { index, tab in
                     if index > 0 { GSDivider() }
                     let shown = topBar.layout.contains(tab)
@@ -548,6 +743,10 @@ private struct TopBarTabsCard: View {
                 if full { GSInfo(text: "The row holds \(GlanceTopBar.maxTabs) tabs.") }
             }
             GSCard("Weather") {
+                HStack {
+                    Spacer(minLength: 0)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the forecast is from") { WeatherPlaceVoice.speakPlace() }
+                }
                 GSRow(symbol: "location.magnifyingglass", title: "City", text: "Only the city name is sent.", detail: "Forecasts come from Open-Meteo. Press Return to apply the city.") {
                     TextField("City", text: Binding(get: { topBar.weatherCity }, set: { topBar.weatherCity = $0 }))
                         .textFieldStyle(.plain)
@@ -587,6 +786,10 @@ private struct SoundsPage: View {
         GSPageHeading(section: .sounds, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Sound feedback") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how sound feedback is set") { FeedbackSetupVoice.speakFeedback() }
+            }
             GSToggleRow(symbol: "speaker.wave.2", title: "Sound feedback", text: "Short sounds when agents start, ask and finish.",
                         isOn: Binding(get: { ExtraPreferences.shared.soundsOn }, set: { ExtraPreferences.shared.soundsOn = $0 }))
             GSDivider()
@@ -602,6 +805,10 @@ private struct SoundsPage: View {
             .disabled(!ExtraPreferences.shared.soundsOn)
             .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         GSCard("Your cues") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the cue sounds") { SoundCatalog.speakCues() }
+            }
             cue("play.circle", "Run start", "When an agent starts a new task.", "sound.startStyle", SoundStyles.runStart, .start)
             GSDivider()
             cue("hand.raised", "Requests", "When an agent needs a permission or an answer.", "sound.approvalStyle", SoundStyles.requests, .approval)
@@ -610,6 +817,10 @@ private struct SoundsPage: View {
             GSDivider()
             cue("checkmark.seal", "Completion", "The chime for a task completed successfully.", "sound.doneStyle", SoundStyles.done, .done)
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which extra sounds") { ExtraSoundVoice.speakExtra() }
+            }
             GSToggleRow(symbol: "timer", title: "Timer alarms", text: "A sound when a focus round ends.", isOn: bool("sound.timer"))
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.octagon", title: "Failure sound", text: "A short sound when an agent turn fails.", isOn: bool("sound.failure"))
@@ -620,6 +831,10 @@ private struct SoundsPage: View {
         }
         // These switches still gate playback (ZeusSound.play), whatever style a cue above is set to.
         GSCard("Which events play a sound") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which events play a sound") { ExtraPreferences.speakEvents() }
+            }
             GSToggleRow(symbol: "hand.raised", title: "Play the Requests cue", text: "When an agent needs a permission or an answer.",
                         isOn: Binding(get: { ExtraPreferences.shared.soundApproval }, set: { ExtraPreferences.shared.soundApproval = $0 }))
             GSDivider()
@@ -631,6 +846,10 @@ private struct SoundsPage: View {
         .disabled(!ExtraPreferences.shared.soundsOn)
         .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         GSCard("Voice cues") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which voice cues play") { ExtraPreferences.speakVoiceCues() }
+            }
             voiceCue("ear", "Zeus is listening", "Hey Zeus heard, or the talk key went down.", \.soundListenStart, .listenStart)
             GSDivider()
             voiceCue("ear.badge.checkmark", "Zeus stopped listening", "You let go, or went quiet.", \.soundListenStop, .listenStop)
@@ -696,10 +915,17 @@ private struct GSNotificationsPage: View {
         GSPageHeading(section: .notifications, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Agent notifications") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how agent notices are set") { NotifySetupVoice.speakNotices() }
+            }
             // The old Permission requests and Finished tasks switches had no reader: nothing ever checked them. An agent
             // waits for the answer to a request, so it always shows; finished-task banners follow "Show system notifications".
             GSRow(symbol: "hand.raised", title: "Permission requests", text: "Always shown on the notch, because the agent waits for your answer.") {
-                GSStatus(ok: true, text: "Always on")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how permission requests and finished agents show") { AskFinishVoice.speakAsks() }
+                    GSStatus(ok: true, text: "Always on")
+                }
             }
             GSDivider()
             GSRow(symbol: "checkmark.circle", title: "Finished tasks", text: "A macOS banner when an agent finishes, if Show system notifications below is on.")
@@ -716,6 +942,10 @@ private struct GSNotificationsPage: View {
                         isOn: Binding(get: { ExtraPreferences.shared.quietWhileSharing }, set: { ExtraPreferences.shared.quietWhileSharing = $0 }))
         }
         GSCard("System notifications") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how system notifications are set") { BannerSetupVoice.speakBanners() }
+            }
             GSRow(symbol: "bell.badge", title: "Show system notifications", text: systemNotifications.permissionNote) {
                 HStack(spacing: 10) {
                     Toggle("Show system notifications", isOn: Binding(
@@ -739,6 +969,11 @@ private struct GSNotificationsPage: View {
 
 // MARK: Shortcuts
 
+/// The second talk key and the dictation shortcut. Nothing is recorded and listening does not start.
+enum ExtraKeyVoice {
+    static var speakExtra: () -> Void = {}
+}
+
 private struct ShortcutsPage: View {
     /// Mirrors the Chat choice for SwiftUI: the monitor itself is not observable.
     @State private var chat = ChatHotkeyMonitor.shared.hotkey
@@ -747,17 +982,8 @@ private struct ShortcutsPage: View {
     @State private var secondTalkRefusal: String?
     @State private var secondTalkRevision = 0
 
-    /// The Chat choices as the catalog names them.
-    private static func title(_ key: ChatHotkey) -> String {
-        switch key {
-        case .off: "Off"
-        case .controlOptionSpace: "Control-Option-Space"
-        case .optionSpace: "Option-Space"
-        case .optionShiftSpace: "Option-Shift-Space"
-        case .commandShiftSpace: "Command-Shift-Space"
-        case .controlOptionC: "Control-Option-C"
-        }
-    }
+    /// The Chat choices as the menu names them.
+    private static func title(_ key: ChatHotkey) -> String { key.menuTitle }
 
     /// What the page reads from the keys right now: the chord, the Chat clash and the sentences for the Talk row.
     private struct Routing {
@@ -833,6 +1059,10 @@ private struct ShortcutsPage: View {
                 if let new = $0 { Preferences.shared.chooseTalkKey(new) }
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the second talk key and the dictation shortcut") { ExtraKeyVoice.speakExtra() }
+            }
             ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
                                 text: "Hold to talk, let go to send, and double-tap to keep listening.", detail: "Left Option and Right Option with a letter still type as usual.",
                                 shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
@@ -849,14 +1079,17 @@ private struct ShortcutsPage: View {
             GSDivider()
             GSRow(symbol: "bubble.left.and.bubble.right", title: "Open the chat window",
                   text: "Opens the chat window from any app.") {
-                GSPopup(selection: Binding(get: { Self.title(chat) },
-                                           set: { value in
-                                               guard let new = ChatHotkey.allCases.first(where: { Self.title($0) == value }) else { return }
-                                               ChatHotkeyMonitor.shared.set(new)
-                                               chat = new
-                                               chatProblem = ChatHotkeyMonitor.shared.problem
-                                           }),
-                        options: ChatHotkey.allCases.map { Self.title($0) }, label: "Open the chat window shortcut")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the chat shortcut") { ChatHotkeyMonitor.speakChat() }
+                    GSPopup(selection: Binding(get: { Self.title(chat) },
+                                               set: { value in
+                                                   guard let new = ChatHotkey.allCases.first(where: { Self.title($0) == value }) else { return }
+                                                   ChatHotkeyMonitor.shared.set(new)
+                                                   chat = new
+                                                   chatProblem = ChatHotkeyMonitor.shared.problem
+                                               }),
+                            options: ChatHotkey.allCases.map { Self.title($0) }, label: "Open the chat window shortcut")
+                }
             }
             if let clash {
                 HStack(alignment: .firstTextBaseline, spacing: 9) {
@@ -889,6 +1122,10 @@ private struct ShortcutsPage: View {
             }
         }
         GSCard("Keyboard shortcut") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the agent picker shortcut") { PickerSetupVoice.speakPicker() }
+            }
             GSRow(symbol: "rectangle.and.hand.point.up.left", title: "Open the agent picker") {
                 GSPopup(selection: Binding(get: { ExtraPreferences.shared.openNotch.title },
                                            set: { value in ExtraPreferences.shared.openNotch = ShortcutPreset.allCases.first { $0.title == value } ?? .optionCommandZ }),
@@ -948,6 +1185,10 @@ private struct IntegrationsPage: View {
             }
         }
         GSCard("Available apps") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which agents are offered") { OfferSetupVoice.speakOffer() }
+            }
             GSToggleRow(symbol: "plus.bubble", title: "Offer Claude Code for new chats", isOn: bool("integrations.offerClaude"))
             GSDivider()
             GSToggleRow(symbol: "plus.bubble", title: "Offer Codex for new chats", isOn: bool("integrations.offerCodex"))
@@ -995,9 +1236,12 @@ private struct MurmurePage: View {
                         isOn: Binding(get: { settings.sounds }, set: { settings.sounds = $0 }))
             GSDivider()
             GSRow(symbol: "globe", title: "Dictation language", text: "Automatic follows macOS, and chosen languages go to Whisper.", detail: "Parakeet applies a script hint where supported.") {
-                GSPopup(selection: Binding(get: { settings.language.title },
-                                           set: { value in settings.language = DictationLanguage(persistedValue: value) }),
-                        options: DictationLanguage.allCases.map(\.title)).popupLabel("Dictation language")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { settings.language.title },
+                                               set: { value in settings.language = DictationLanguage(persistedValue: value) }),
+                            options: DictationLanguage.allCases.map(\.title)).popupLabel("Dictation language")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how dictation is set") { DictationSettings.speakSetup() }
+                }
             }
             GSDivider()
             GSRow(symbol: "doc.on.clipboard", title: "Copy last dictation") {
@@ -1020,14 +1264,30 @@ private struct VoicePage: View {
             .padding(.bottom, -GS.cardGap)
         ZeusVoiceCards(navigation: navigation)
         GSCard("Talk to Zeus") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how talk sight is set") { TalkSightVoice.speakSight() }
+            }
             ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
             GSDivider()
             TalkMicrophoneRow()
+            GSDivider()
+            GSToggleRow(symbol: "eye", title: "Let Zeus see my screen when I talk",
+                        text: "Each question can include the screen, so Zeus can see what you see.", detail: "Off answers without looking. The screenshot is never saved.",
+                        isOn: bool("talk.seeScreen"))
+            GSDivider()
+            GSToggleRow(symbol: "pencil.and.outline", title: "Draw on the screen while Zeus answers",
+                        text: "Zeus can ring, arrow, or label what it talks about.", detail: "Off draws nothing. Marks leave a few seconds after the answer.",
+                        isOn: bool("talk.drawOnScreen"))
             GSDivider()
             KeyAccessLinkRow(navigation: navigation)
         }
         WakeWordCard()
         GSCard("Approval keywords") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how approval words are set") { KeywordSetupVoice.speakWords() }
+            }
             GSToggleRow(symbol: "waveform", title: "Listen for approval keywords",
                         text: "This opens the microphone only while a card is waiting.", detail: "Say a keyword such as yes or no. Off until you turn it on.",
                         isOn: bool("voice.answers"))
@@ -1068,12 +1328,15 @@ private struct TalkMicrophoneRow: View {
     var body: some View {
         GSRow(symbol: "mic.circle", title: "Microphone",
               text: "Automatic uses the system input, so a headset can win.", detail: "This Mac's microphone keeps a headset from switching mode. Dictation has its own.") {
-            GSPopup(selection: Binding(get: { choice.title(devices: devices) },
-                                       set: { title in
-                                           guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
-                                           store.set(TalkMicrophoneChoice.settingID, new.stored)
-                                       }),
-                    options: choice.options(devices: devices), label: "Talk microphone")
+            HStack(spacing: 8) {
+                GSPopup(selection: Binding(get: { choice.title(devices: devices) },
+                                           set: { title in
+                                               guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
+                                               store.set(TalkMicrophoneChoice.settingID, new.stored)
+                                           }),
+                        options: choice.options(devices: devices), label: "Talk microphone")
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the talk microphone") { TalkMicVoice.speakMic() }
+            }
         }
         .onAppear { Task { MicrophoneTester.shared.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } }
     }
@@ -1085,9 +1348,14 @@ private struct WakeWordCard: View {
 
     var body: some View {
         GSCard("Hey Zeus") {
-            GSToggleRow(symbol: "ear", title: "Listen for \u{201C}Hey Zeus\u{201D}",
-                        text: "Nothing is sent while Zeus waits for the phrase.", detail: "Say the phrase, then your request. Off until you turn it on.",
-                        isOn: Binding(get: { wake.enabled }, set: { wake.enabled = $0 }))
+            GSRow(symbol: "ear", title: "Listen for \u{201C}Hey Zeus\u{201D}",
+                  text: "Nothing is sent while Zeus waits for the phrase.", detail: "Say the phrase, then your request. Off until you turn it on.") {
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether Hey Zeus is on") { wake.speakWake() }
+                    Toggle("Listen for Hey Zeus", isOn: Binding(get: { wake.enabled }, set: { wake.enabled = $0 }))
+                        .toggleStyle(GSToggleStyle()).labelsHidden()
+                }
+            }
             if wake.enabled {
                 GSDivider()
                 GSRow(symbol: wake.listening ? "waveform" : "pause.circle", title: "Status", text: statusNote) {
@@ -1115,9 +1383,11 @@ private struct LicensePage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Your license") {
             GSRow(symbol: "key", title: status, text: license.isLicensed ? "Your license is kept across updates." : "A one-time purchase for two Macs.") {
-                // Partial credential cleanup must keep its explanation and retry visible.
-                if license.isLicensed || license.deactivationError != nil {
-                    GSDeactivateLicenseControl()
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether Zeus is licensed") { license.speakLicense() }
+                    if license.isLicensed || license.deactivationError != nil {
+                        GSDeactivateLicenseControl()
+                    }
                 }
             }
             if !license.isLicensed {
@@ -1148,18 +1418,130 @@ private struct LicensePage: View {
         }
     }
 
-    private var status: String {
-        switch license.status {
-        case .licensed(_, let daysLeft?): daysLeft <= 1 ? "Zeus is yours \u{00B7} last day" : "Zeus is yours \u{00B7} \(daysLeft) days left"
-        case .licensed: "Zeus is yours."
-        case .trial(let days): days <= 1 ? "Trial \u{00B7} last day" : "Trial \u{00B7} \(days) days left"
-        case .trialEnded, .expired: "Your free trial has ended."
-        case .revoked: "This license was turned off."
-        }
-    }
+    private var status: String { license.statusTitle }
 }
 
 // MARK: Permissions
+
+/// The waves speak the style and whether system audio is allowed. They do not ask or start the spectrum.
+enum WavesSetupVoice {
+    static var speakWaves: () -> Void = {}
+}
+
+/// The other notch lights speak mute, the system HUD, the edge, peeks, and an added event. They do not change them.
+enum HudExtraVoice {
+    static var speakExtras: () -> Void = {}
+}
+
+/// The four extra agent sounds speak their switches. Nothing is played.
+enum ExtraSoundVoice {
+    static var speakExtra: () -> Void = {}
+}
+
+/// The talk microphone speaks Automatic, this Mac, a chosen input, or unavailable. It does not start listening.
+enum TalkMicVoice {
+    static var speakMic: () -> Void = {}
+}
+
+/// Whether talk can see the screen, and whether it draws while answering. Nothing is captured.
+enum TalkSightVoice {
+    static var speakSight: () -> Void = {}
+}
+
+/// The companion and the agent face. Nothing is changed.
+enum CompanionVoice {
+    static var speakCompanion: () -> Void = {}
+}
+
+/// The halo entrance speaks the animation. It does not play it or change it.
+enum HaloEntranceVoice {
+    static var speakEntrance: () -> Void = {}
+}
+
+/// The halo measures speak strength, speed, and thickness. They do not play the entrance.
+enum HaloMeasureVoice {
+    static var speakMeasure: () -> Void = {}
+}
+
+/// The halo wash speaks the wallpaper match and the edge wave. It does not sample the desktop or flash the wave.
+enum HaloWashVoice {
+    static var speakWash: () -> Void = {}
+}
+
+/// Arrival lights speak the AirDrop glow, the screenshot cue, and whether those folders were asked. Nothing is listed.
+enum ArrivalLightsVoice {
+    static var speakLights: () -> Void = {}
+}
+
+/// Sound feedback speaks the master switch and the cue volume. It does not play a sound.
+enum FeedbackSetupVoice {
+    static var speakFeedback: () -> Void = {}
+}
+
+/// System banners speak the Zeus switch, banner dismiss, and whether any apps are chosen. App names stay unspoken.
+enum BannerSetupVoice {
+    static var speakBanners: () -> Void = {}
+}
+
+/// Approval keywords speak listening and whether each list is still the default. Custom words stay unspoken.
+enum KeywordSetupVoice {
+    static var speakWords: () -> Void = {}
+}
+
+/// Privacy speaks project details, synced lyrics, and Chrome media. It does not fetch or change them.
+enum ShareSetupVoice {
+    static var speakShare: () -> Void = {}
+}
+
+/// New chats speak whether Claude Code and Codex are offered and connected. Nothing is connected or changed.
+enum OfferSetupVoice {
+    static var speakOffer: () -> Void = {}
+    static var claudeConnected: () -> Bool = { false }
+    static var codexConnected: () -> Bool = { false }
+}
+
+/// Automation speaks Music, Spotify, Keynote, and PowerPoint. It does not ask macOS.
+enum ScriptSetupVoice {
+    static var speakScript: () -> Void = {}
+}
+
+/// Location, Full Disk Access, and key access speak their states. Nothing is requested.
+enum LocalAccessVoice {
+    static var speakLocal: () -> Void = {}
+}
+
+/// The default agent for a new chat speaks Claude Code or Codex. It does not open a chat.
+enum DefaultAgentVoice {
+    static var speakAgent: () -> Void = {}
+}
+
+/// The agent picker shortcut and keyboard answers speak together. They do not change a shortcut.
+enum PickerSetupVoice {
+    static var speakPicker: () -> Void = {}
+}
+
+/// Accessibility, Calendar, and Reminders speak their states. Nothing is requested.
+enum GrantVoice {
+    static var speakGrants: () -> Void = {}
+}
+
+/// Microphone, speech recognition and the camera speak their states. Nothing is requested.
+enum AccessVoice {
+    static var speakAccess: () -> Void = {}
+
+    /// The three Access rows. Reading them does not raise a prompt.
+    static func parts() -> (mic: String, speech: String, camera: String) {
+        func word(_ state: PermissionState) -> String {
+            switch state {
+            case .authorized: "Allowed"
+            case .denied: "Denied"
+            case .notDetermined: "Not asked yet"
+            }
+        }
+        let camera = PermissionsModel.CaptureAccess.live.camera()
+        return (word(VoicePermissions.mic), word(VoicePermissions.speech), word(camera))
+    }
+}
 
 private struct PermissionsPage: View {
     let context: GSContext
@@ -1175,6 +1557,12 @@ private struct PermissionsPage: View {
             }
         if let sweep = context.sweep { allowAll(sweep) }
         GSCard("Access") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the microphone, speech and camera permissions") { AccessVoice.speakAccess() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say accessibility, calendar and reminders") { GrantVoice.speakGrants() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say location, disk and key access") { LocalAccessVoice.speakLocal() }
+            }
             perm("accessibility", "Accessibility", "Shortcuts, volume, brightness and agents", context.services.granted(.accessibility)) { context.permissions.request(.accessibility) }
             GSDivider()
             perm("location", "Location", "Local weather and rain alerts", context.services.locationAllowed) { context.services.allowLocation() }
@@ -1195,7 +1583,7 @@ private struct PermissionsPage: View {
                 context.permissions.request(.camera)
             }
             GSDivider()
-            capturePerm("rectangle.dashed.badge.record", "Screen Recording", "Screenshots during a turn and system audio for Waves", context.permissions.screenPermissionState, .screen) {
+            capturePerm("rectangle.dashed.badge.record", "Screen Recording", "Screenshots during a turn and system audio for Waves", context.permissions.screenPermissionState, .screen, speak: { PermissionsModel.speakScreen() }) {
                 context.permissions.request(.screen)
             }
             GSDivider()
@@ -1208,6 +1596,10 @@ private struct PermissionsPage: View {
                 }
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which apps Zeus can script") { ScriptSetupVoice.speakScript() }
+            }
             GSRow(symbol: "music.note", title: "Automation",
                   text: context.permissions.automationMessage
                     ?? "Control playback and read slide notes while those apps are open.", detail: "macOS asks about each app only while it is open.") {
@@ -1289,16 +1681,21 @@ private struct PermissionsPage: View {
     }
 
     /// Camera and Screen Recording: request-only (never starts capture).
-    private func capturePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, allow: @escaping () -> Void) -> some View {
+    private func capturePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, speak: (() -> Void)? = nil, allow: @escaping () -> Void) -> some View {
         GSRow(symbol: symbol, title: title, text: state == .denied ? "Turn \(title) on under Privacy in System Settings." : text) {
-            switch state {
-            case .authorized: GSStatus(ok: true, text: "Allowed")
-            case .notDetermined:
-                Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
-            case .denied:
-                HStack(spacing: 10) {
-                    GSStatus(ok: false, text: "Denied")
-                    Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+            HStack(spacing: 8) {
+                if let speak {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether the screen can be seen") { speak() }
+                }
+                switch state {
+                case .authorized: GSStatus(ok: true, text: "Allowed")
+                case .notDetermined:
+                    Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
+                case .denied:
+                    HStack(spacing: 10) {
+                        GSStatus(ok: false, text: "Denied")
+                        Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+                    }
                 }
             }
         }
@@ -1314,6 +1711,16 @@ private struct PermissionsPage: View {
 }
 
 // MARK: Privacy
+
+/// The closed notch speaks its drop and the waves' sensitivity. It does not move the bar.
+enum NotchFitVoice {
+    static var speakFit: () -> Void = {}
+}
+
+/// Command-line control speaks the switch and the reset notice. It does not turn the switch on or dismiss the notice.
+enum CommandSetupVoice {
+    static var speakCommand: () -> Void = {}
+}
 
 private struct PrivacyPage: View {
     let context: GSContext
@@ -1334,6 +1741,10 @@ private struct PrivacyPage: View {
                         text: "Turn off to hide commands and project names on cards.", detail: "Meeting mode hides them too.", isOn: bool("privacy.details"))
         }
         GSCard("Music") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what Zeus shares") { ShareSetupVoice.speakShare() }
+            }
             GSToggleRow(symbol: "text.quote", title: "Synced lyrics",
                         text: "Sends the song title and artist to fetch lyrics kept on this Mac.", detail: "Off until you turn it on.",
                         isOn: bool("privacy.lyrics"))
@@ -1356,10 +1767,17 @@ private struct PrivacyPage: View {
             GSDivider()
             GSRow(symbol: "cursorarrow.motionlines", title: "When Zeus may drive your Mac",
                   text: (DriveAutonomy(rawValue: driveAutonomy) ?? .default).explanation) {
-                GSPopup(selection: autonomyTitle, options: DriveAutonomy.allCases.map(\.title)).popupLabel("When Zeus may drive your Mac")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say when Zeus may drive") { DriveController.speakDrive() }
+                    GSPopup(selection: autonomyTitle, options: DriveAutonomy.allCases.map(\.title)).popupLabel("When Zeus may drive your Mac")
+                }
             }
         }
         GSCard("Command line") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how command-line control is set") { CommandSetupVoice.speakCommand() }
+            }
             if cliAccess.noticePending {
                 GSRow(symbol: "info.circle", title: "Command-line control was reset",
                       text: "This setting lives in your Keychain, and Zeus turned it off once.", detail: "Turn it on again below if you use the zeus command.") {

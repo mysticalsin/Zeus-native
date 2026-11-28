@@ -9,6 +9,8 @@ import ZeusCore
 @Observable
 final class DictationSettings {
     static let shared = DictationSettings()
+    /// The language row speaks the language, the key, and the engine. It does not start dictation.
+    static var speakSetup: () -> Void = {}
     private let defaults: UserDefaults
 
     var enabled: Bool { didSet { defaults.set(enabled, forKey: "dictation.enabled") } }

@@ -17,6 +17,34 @@ public struct Walkthrough: Equatable, Sendable {
             self.targetLabel = targetLabel
             self.waitForClick = waitForClick
         }
+
+        /// A click wait needs a ring on screen. A missing control does not hold the tour.
+        public func holdsForClick(found: Bool) -> Bool {
+            found && waitForClick && (target != nil || targetLabel != nil)
+        }
+
+        /// What to say, and the spark line when the control is not on screen.
+        /// A found control keeps its own ring label, so `bolt` is nil.
+        public struct Cue: Equatable, Sendable {
+            public var spoken: String
+            public var bolt: String?
+
+            public init(spoken: String, bolt: String?) {
+                self.spoken = spoken
+                self.bolt = bolt
+            }
+        }
+
+        public func cue(progress: String, found: Bool) -> Cue {
+            let missing = !holdsForClick(found: found) && waitForClick && (target != nil || targetLabel != nil)
+            if missing {
+                return Cue(
+                    spoken: "\(progress). \(say) I couldn't find that on screen, so I'll keep going.",
+                    bolt: "Not found"
+                )
+            }
+            return Cue(spoken: "\(progress). \(say)", bolt: nil)
+        }
     }
 
     public static let maxSteps = 15

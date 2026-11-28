@@ -34,6 +34,29 @@ import Testing
         #expect(!advanced)
     }
 
+    @Test func aMissingControlIsSpokenAndShown() {
+        let step = Walkthrough.Step(say: "Click File", targetLabel: "File", waitForClick: true)
+        let session = WalkthroughSession(Walkthrough(title: "Share", steps: [step]))
+        let missing = step.cue(progress: session.progress, found: false)
+        #expect(missing.bolt == "Not found")
+        #expect(missing.spoken == "Step 1 of 1. Click File I couldn't find that on screen, so I'll keep going.")
+        let found = step.cue(progress: session.progress, found: true)
+        #expect(found.bolt == nil)
+        #expect(found.spoken == "Step 1 of 1. Click File")
+        let told = Walkthrough.Step(say: "Now look", waitForClick: false)
+        #expect(told.cue(progress: session.progress, found: false).bolt == nil)
+    }
+
+    @Test func aMissingControlDoesNotHoldTheTour() {
+        let named = Walkthrough.Step(say: "Click File", targetLabel: "File", waitForClick: true)
+        let pointed = Walkthrough.Step(say: "Click here", target: PointTarget(x: 10, y: 20), waitForClick: true)
+        let told = Walkthrough.Step(say: "Now look", waitForClick: false)
+        #expect(!named.holdsForClick(found: false))
+        #expect(named.holdsForClick(found: true))
+        #expect(pointed.holdsForClick(found: true))
+        #expect(!told.holdsForClick(found: true))
+    }
+
     @Test func stoppedAndEmptyToursCannotAdvance() {
         var session = WalkthroughSession(tour)
         let timer = session.revision

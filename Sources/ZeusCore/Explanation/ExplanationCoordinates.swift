@@ -61,6 +61,24 @@ public struct ExplanationCaptureGeometry: Codable, Equatable, Sendable {
                      y: display.frame.y + display.frame.height - y * display.frame.height / fullImageSize.height)
     }
 
+    /// The on-screen rectangle of a ring drawn at `center` with `radius` in delivered image pixels.
+    /// The click target uses this rectangle so it matches the ring the owner sees.
+    public func globalRing(center: ExplanationVector3, radius: Double, current: ExplanationDisplayContext) -> ExplanationRect? {
+        guard radius.isFinite, radius > 0,
+              let origin = globalPoint(fromImage: center, current: current) else { return nil }
+        let probe = min(radius, 1)
+        func span(_ dx: Double, _ dy: Double) -> Double? {
+            guard let point = globalPoint(fromImage: .init(x: center.x + dx, y: center.y + dy), current: current) else { return nil }
+            let delta = dx != 0 ? abs(point.x - origin.x) : abs(point.y - origin.y)
+            let step = max(abs(dx), abs(dy))
+            guard step > 0, delta > 0 else { return nil }
+            return delta / step * radius
+        }
+        guard let halfW = span(probe, 0) ?? span(-probe, 0),
+              let halfH = span(0, probe) ?? span(0, -probe) else { return nil }
+        return ExplanationRect(x: origin.x - halfW, y: origin.y - halfH, width: halfW * 2, height: halfH * 2)
+    }
+
     /// Inverse hit test. Points outside the actual crop are not silently clamped to it.
     public func imagePoint(fromGlobal point: ExplanationVector3, current: ExplanationDisplayContext) -> ExplanationVector3? {
         guard display == current, ExplanationCoordinateValidation.point(point) else { return nil }

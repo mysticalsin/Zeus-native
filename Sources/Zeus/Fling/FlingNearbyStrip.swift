@@ -4,6 +4,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import ZeusCore
 
+/// The nearby strip speaks whether Fling is looking and how many Macs are showing. It does not turn Fling on.
+enum FlingNearbyVoice {
+    static var speakNearby: () -> Void = {}
+}
+
 /// The strip above the Shelf's files: off, refused, or the Macs nearby with AirDrop last.
 struct FlingNearbyStrip: View {
     let fling: any FlingSending
@@ -12,10 +17,13 @@ struct FlingNearbyStrip: View {
     static func avatarID(_ peerID: String) -> String { "fling.avatar.\(peerID)" }
 
     var body: some View {
-        Group {
-            if !fling.isEnabled { offRow }
-            else if fling.localNetworkDenied { deniedRow }
-            else { peersRow }
+        HStack(spacing: 6) {
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many Macs are nearby") { FlingNearbyVoice.speakNearby() }
+            Group {
+                if !fling.isEnabled { offRow }
+                else if fling.localNetworkDenied { deniedRow }
+                else { peersRow }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

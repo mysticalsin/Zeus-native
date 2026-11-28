@@ -74,6 +74,8 @@ final class BuddyPreference {
         }
     }
     @ObservationIgnored var onChange: ((BuddyShow) -> Void)?
+    /// The pointer row speaks when Zeus appears. It does not change that choice.
+    static var speakShow: () -> Void = {}
 
     private init() { show = BuddyShow.stored(UserDefaults.standard.string(forKey: BuddyShow.defaultsKey)) }
 }

@@ -6,6 +6,8 @@ import ZeusCore
 struct BuddyOverlayView: View {
     let model: BuddyModel
     let screenFrame: CGRect
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private func local(_ point: CGPoint) -> CGPoint {
         CGPoint(x: point.x - screenFrame.minX, y: screenFrame.maxY - point.y)
@@ -14,14 +16,16 @@ struct BuddyOverlayView: View {
     var body: some View {
         let spark = local(model.position)
         let strike = local(model.strikeCenter)
+        let marker = PointingInkVariant.resolve(reduceMotion: reduceMotion, reduceTransparency: reduceTransparency).marker
+        let ringGlow = marker.glowPulses ? model.glow : marker.glowRadius
 
         ZStack(alignment: .topLeading) {
             if let ring = model.ringFrame {
                 let origin = local(CGPoint(x: ring.minX, y: ring.maxY))
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Theme.bolt, lineWidth: 2)
+                    .stroke(Theme.bolt.opacity(marker.ringOpacity), lineWidth: CGFloat(marker.ringWidth))
                     .frame(width: ring.width, height: ring.height)
-                    .shadow(color: Theme.bolt.opacity(0.8), radius: model.glow)
+                    .shadow(color: Theme.bolt.opacity(ringGlow > 0 ? 0.8 : 0), radius: CGFloat(ringGlow))
                     .offset(x: origin.x, y: origin.y)
             }
 

@@ -50,15 +50,9 @@ enum ScreenCapture {
     }
 
     /// Screenshot pixels (top-left origin) → global AppKit point (bottom-left origin).
-    static func globalPoint(x: Int, y: Int, on shot: ScreenShot) -> CGPoint {
-        if let mapped = PresentPointMapping.screenPoint(x: x, y: y, screen: 1, in: [shot]) { return mapped }
-        let frame = shot.displayFrame
-        let px = min(max(Double(x), 0), Double(shot.pixelWidth))
-        let py = min(max(Double(y), 0), Double(shot.pixelHeight))
-        return CGPoint(
-            x: frame.minX + px * frame.width / Double(shot.pixelWidth),
-            y: frame.maxY - py * frame.height / Double(shot.pixelHeight)
-        )
+    /// A pixel outside the image is not pulled back onto it.
+    static func globalPoint(x: Int, y: Int, on shot: ScreenShot) -> CGPoint? {
+        PresentPointMapping.screenPoint(x: x, y: y, screen: 1, in: [shot])
     }
 }
 

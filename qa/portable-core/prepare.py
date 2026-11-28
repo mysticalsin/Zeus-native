@@ -46,13 +46,13 @@ GROUPS = {
     ),
     "socket-safety": (
         core("UnixSocket.swift", "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "ZeusPaths.swift"),
-        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests"),
+        tests("UnixSocketSafetyTests", "PeerCredentialsTests", "PeerBinaryRuleTests", "PollingWait"),
     ),
     "bridge-transport": (
         core("Bridge.swift", "BridgePendingReplies.swift", "NativeMessageIO.swift", "UnixSocket.swift",
              "PeerCredentials.swift", "PeerSigning.swift", "PeerBinaryRule.swift", "JSONValue.swift", "ZeusPaths.swift",
              "Version.swift") + ["Sources/zeus-bridge/main.swift"],
-        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests"),
+        tests("NativeMessagingFrameTests", "NativeMessageIOTests", "BridgePendingRepliesTests", "NativeHostProcessTests", "PollingWait"),
     ),
     "keychain": (
         core("Keychain/KeychainStore.swift", "Connections/AIConnectionRegistry.swift",
@@ -61,7 +61,7 @@ GROUPS = {
     ),
     "wiki-export": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift", "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift",
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift", "Wiki/SensitiveInfoScanner.swift",
              "Wiki/WikiExportModels.swift", "Wiki/WikiExportVault.swift", "Wiki/WikiExportMCP.swift",
              "Wiki/WikiExportJournal.swift", "Wiki/WikiExportTransaction.swift",
              "SecondBrain/SecondBrain.swift", "SecondBrain/VaultPathBoundary.swift", "JSONValue.swift",
@@ -69,8 +69,10 @@ GROUPS = {
         tests("WikiExportTests"),
     ),
     "dictation-insertion": (
-        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift"),
-        tests("TextInsertionReceiptTests", "WarmFieldInsertTests"),
+        core("Dictation/TextInsertionReceipt.swift", "Dictation/WarmFieldInsert.swift", "Dictation/WarmFieldInsertBox.swift",
+             "Dictation/DictationWingText.swift",
+             "Edit/SelectionEdit.swift", "Edit/SelectionEditBox.swift"),
+        tests("TextInsertionReceiptTests", "WarmFieldInsertTests", "SelectionEditBoxTests", "DictationWingTextTests"),
     ),
     "polyglot": (
         core("Polyglot/PolyglotModels.swift", "Polyglot/PolyglotPinPolicy.swift", "Polyglot/PolyglotPipeline.swift", "Polyglot/PolyglotSegmenter.swift"),
@@ -104,18 +106,29 @@ GROUPS = {
               "ScribeDetectorPlanTests", "ScribeMeetingCardDesignTests"),
     ),
     "presentation": (
-        core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift",
+        core("JSONValue.swift", "Mac/Walkthrough.swift", "Mac/MacActionNumbers.swift", "Mac/DrivePlan.swift", "Mac/DriveStepBeat.swift",
              "Present/SpeechTimeline.swift", "Voice/AssistantBeam.swift", "Voice/MiddleBarTone.swift",
              "ThemeTokens.swift", "Performance/DisplayAnimationPolicy.swift",
              "TopBar/RecordingFeedback.swift"),
-        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests"),
+        tests("WalkthroughRevisionTests", "SpeechTimelineTests", "MacActionNumberTests", "AssistantBeamTests", "DisplayAnimationPolicyTests", "DriveStepBeatTests"),
     ),
     "explain-showcase": (
-        core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift"),
-        tests("ExplainShowcaseTests"),
+        core("Present/TalkDraw.swift", "Present/ExplainShowcase.swift", "Present/ResearchSourceDraw.swift", "Present/LocalAnswerDraw.swift",
+             "Present/TodoListDraw.swift", "Present/CalendarEventDraw.swift", "Present/AgentStartDraw.swift",
+             "Present/TodayBoardDraw.swift", "Present/RoutineSavedDraw.swift",              "Present/MemoryKeptDraw.swift",
+             "Present/WatchDraw.swift", "Present/TimerDraw.swift",              "Present/ProjectOpenDraw.swift",
+             "Present/SiteOpenDraw.swift", "Present/TranslationDraw.swift", "Present/AppLaunchDraw.swift",
+             "Present/MediaDraw.swift", "Present/ResearchStartDraw.swift", "Present/AppCloseDraw.swift",
+             "Present/TerminalOpenDraw.swift", "Present/SpotifyPlayDraw.swift", "Present/BeamerDraw.swift", "Present/FileFoundDraw.swift", "Present/ShortcutDraw.swift", "Present/ApprovalDraw.swift", "Present/ChoiceDraw.swift", "Present/StopAllDraw.swift", "Present/AgentNoteDraw.swift", "Present/ScreenSightDraw.swift", "Present/AnswerFailDraw.swift", "Present/HearDraw.swift", "Present/ThinkingDraw.swift", "Present/ActionMissDraw.swift", "Present/ControlOffDraw.swift", "Present/VolumeBlockDraw.swift", "Present/FullerAnswerDraw.swift", "Present/TimerFinishedDraw.swift", "Present/LockFailDraw.swift", "Present/DriveAccessDraw.swift", "Present/CalendarAccessDraw.swift", "Present/LeftAloneDraw.swift", "Present/ProjectMissDraw.swift", "Present/TourFailDraw.swift", "Present/ShellBlockDraw.swift", "Present/TodoMissDraw.swift", "Present/RunUnclearDraw.swift", "Present/LinkMissDraw.swift", "Present/StepMissDraw.swift", "Present/TypeSkipDraw.swift", "Present/SendSkipDraw.swift", "Present/PageStaleDraw.swift", "Present/StepLimitDraw.swift", "Present/LoopStopDraw.swift", "Present/UnsureStopDraw.swift", "Present/BadPlanDraw.swift", "Present/StuckDraw.swift", "Present/TourDoneDraw.swift", "Present/SecretFieldDraw.swift", "Present/VoiceOverDraw.swift", "Present/ReportSavedDraw.swift", "Present/MemoryUnchangedDraw.swift", "Present/NoAIDraw.swift", "Present/ResearchAskDraw.swift", "Present/EarlyStopDraw.swift", "Present/TourStopDraw.swift", "Present/NotReadyDraw.swift", "Present/TabOpenDraw.swift", "Present/AgentOffDraw.swift", "Present/DeclinedStopDraw.swift", "Present/MemoryUnreadDraw.swift", "Present/BrowserSetupDraw.swift", "Present/NoGoalDraw.swift", "Present/ClickLeftDraw.swift", "Present/TabHistoryDraw.swift", "Present/UnusableStepsDraw.swift", "Present/BeamerMissDraw.swift", "Present/CalendarFailDraw.swift", "Present/PageUntouchedDraw.swift", "Present/PointSecretDraw.swift", "Present/ReportMissDraw.swift", "Present/ScreenStaleDraw.swift", "Present/TodoDoneDraw.swift", "Present/VaultMissDraw.swift", "Present/EndpointMissDraw.swift", "Present/ScrollRangeDraw.swift", "Present/PageListDraw.swift", "Present/SwitchReadDraw.swift", "Present/ForgetAskDraw.swift", "Present/BrowserStoppedDraw.swift", "Present/KeyUnknownDraw.swift", "Present/FindMissDraw.swift", "Present/FolderMissDraw.swift", "Present/PolyglotOffDraw.swift", "Present/WentAwayDraw.swift", "Present/ClaudeToolDraw.swift", "Present/CantDirectDraw.swift", "Present/WindowMissDraw.swift", "Present/SpotifyPressDraw.swift", "Present/MenuMissDraw.swift", "Present/AskLeftDraw.swift", "Present/DocumentMissDraw.swift", "Present/PageBlockDraw.swift", "Present/TabMissDraw.swift", "Present/AssistantMissDraw.swift", "Present/NoTabDraw.swift", "Present/DocumentGoneDraw.swift", "Present/PageTargetDraw.swift", "Present/NoFieldDraw.swift", "Present/ClickOffDraw.swift", "Present/ClickMissDraw.swift", "Present/ElementMissDraw.swift", "Present/ChoiceMissDraw.swift", "Present/NotFieldDraw.swift", "Present/MissingPieceDraw.swift", "Present/FieldMissDraw.swift", "Present/NoTimerDraw.swift", "Present/ForgetMissDraw.swift", "Present/ForgotDraw.swift", "Present/ResearchBusyDraw.swift", "Present/DriveBusyDraw.swift", "Present/PresentStepsDraw.swift", "Present/NowPlayingDraw.swift", "Present/FocusSessionDraw.swift", "Present/WeatherDraw.swift", "Present/KeepAwakeDraw.swift", "Present/BatteryDraw.swift", "Present/ReminderDraw.swift", "Present/MeetingDraw.swift", "Present/NextEventDraw.swift", "Present/ClockDraw.swift", "Present/CityTimeDraw.swift", "Present/CountdownDraw.swift", "Present/DateDraw.swift", "Present/NoteDraw.swift", "Present/AgentStatusDraw.swift", "Present/TimerLeftDraw.swift", "Present/NextReminderDraw.swift", "Present/AlertStatusDraw.swift", "Present/TodoCountDraw.swift", "Present/VolumeLevelDraw.swift", "Present/BrightnessLevelDraw.swift", "Present/AgendaDraw.swift", "Present/ShelfDraw.swift", "Present/RainDraw.swift", "Present/WeekDraw.swift", "Present/ClipboardCountDraw.swift", "Present/FrontAppDraw.swift", "Present/CapsLockDraw.swift", "Present/FocusRoundsDraw.swift", "Present/DictationWordsDraw.swift", "Present/RecordingStatusDraw.swift", "Present/DarkModeDraw.swift", "Present/TilingStatusDraw.swift", "Present/ScreenCountDraw.swift", "Present/EarbudsStatusDraw.swift", "Present/UsageTodayDraw.swift", "Present/PrompterDraw.swift", "Present/LidStatusDraw.swift", "Present/OutputDraw.swift", "Present/DictationLiveDraw.swift", "Present/PolyglotStatusDraw.swift", "Present/ChatCountDraw.swift", "Present/HeatDraw.swift", "Present/HeyZeusDraw.swift", "Present/FaceDraw.swift", "Present/BeamerPlaceDraw.swift", "Present/VoiceChoiceDraw.swift", "Present/LicenseDraw.swift", "Present/ScreenRecordingDraw.swift", "Present/DriveAutonomyDraw.swift", "Present/NotchPlaceDraw.swift", "Present/PointingKeysDraw.swift", "Present/ChatShortcutDraw.swift", "Present/ProviderDraw.swift", "Present/MusicSourceDraw.swift", "Present/CardStyleDraw.swift", "Present/PointerBuddyDraw.swift", "Present/NotchOpenDraw.swift", "Present/HaloLightDraw.swift", "Present/HomeCardsDraw.swift", "Present/NotchLightsDraw.swift", "Present/TopBarTabsDraw.swift", "Present/CueSoundsDraw.swift", "Present/DictationSetupDraw.swift", "Present/VoiceCuesDraw.swift", "Present/DayToDayDraw.swift", "Present/PrompterSetupDraw.swift", "Present/BrowserAgentDraw.swift", "Present/PolyglotSetupDraw.swift", "Present/KeepAwakeSetupDraw.swift", "Present/FlingSetupDraw.swift", "Present/TilingSetupDraw.swift", "Present/CodingSetupDraw.swift", "Present/NotifySetupDraw.swift", "Present/ReceiveSetupDraw.swift", "Present/BeamerSetupDraw.swift", "Present/CaptionSetupDraw.swift", "Present/SoundEventsDraw.swift", "Present/OtherAppsDraw.swift", "Present/HomeStylesDraw.swift", "Present/WeatherPlaceDraw.swift", "Present/InsomniaSetupDraw.swift", "Present/DictationModeDraw.swift", "Present/VoiceGlowDraw.swift", "Present/DictationRecordDraw.swift", "Present/AgentNudgeDraw.swift", "Present/HomeFrameDraw.swift", "Present/ScreenCornerDraw.swift", "Present/NotchCloseDraw.swift", "Present/EverydayLightsDraw.swift", "Present/HaloArmDraw.swift", "Present/MusicLightsDraw.swift", "Present/RunningCardDraw.swift", "Present/VoiceStyleDraw.swift", "Present/LockChimeDraw.swift", "Present/FacePresenceSetDraw.swift", "Present/ResearchSetupDraw.swift", "Present/ScribeSetupDraw.swift", "Present/LanguagePackDraw.swift", "Present/SpeakerSetupDraw.swift", "Present/AccessSetDraw.swift", "Present/ExtraSoundsDraw.swift", "Present/HudExtrasDraw.swift", "Present/WavesSetupDraw.swift", "Present/NotchlessDraw.swift", "Present/HomeBackdropDraw.swift", "Present/DictationSoundDraw.swift", "Present/DictationKeepDraw.swift", "Present/GrantSetDraw.swift", "Present/JevSetupDraw.swift", "Present/PickerSetupDraw.swift", "Present/DefaultAgentDraw.swift", "Present/LocalAccessDraw.swift", "Present/FastPathDraw.swift", "Present/FlickSetupDraw.swift", "Present/HaloEntranceDraw.swift", "Present/TalkMicDraw.swift", "Present/ExplainSetupDraw.swift", "Present/ProactiveSetupDraw.swift", "Present/ScriptSetupDraw.swift", "Present/OfferSetupDraw.swift", "Present/ShareSetupDraw.swift", "Present/KeywordSetupDraw.swift", "Present/BannerSetupDraw.swift", "Present/FeedbackSetupDraw.swift", "Present/DictateSwitchDraw.swift", "Present/ArrivalLightsDraw.swift", "Present/HaloWashDraw.swift", "Present/BandSetupDraw.swift", "Present/HaloMeasureDraw.swift", "Present/TilingGapDraw.swift", "Present/HotspotSetupDraw.swift", "Present/HomeLaterDraw.swift", "Present/VoiceKeyDraw.swift", "Present/UpdateSetupDraw.swift", "Present/VoiceTuneDraw.swift", "Present/DictateHearDraw.swift", "Present/CommandSetupDraw.swift", "Present/NotchFitDraw.swift", "Present/QuietSetupDraw.swift", "Present/FreezeSetupDraw.swift", "Present/AskWordsDraw.swift", "Present/LeftOutDraw.swift", "Present/SeparateBrowserDraw.swift", "Present/VocabSetupDraw.swift", "Present/ExplainHearDraw.swift", "Present/PointTrailDraw.swift", "Present/TalkSightDraw.swift", "Present/DrawnSizeDraw.swift", "Present/PointRouteDraw.swift", "Present/CompanionDraw.swift", "Present/GatewayDraw.swift", "Present/ChatModelDraw.swift", "Present/KokoroSetupDraw.swift", "Present/CloudVoiceDraw.swift", "Present/FlingPeerDraw.swift", "Present/VisualReadyDraw.swift", "Present/ShowMeDraw.swift", "Present/LivesDraw.swift", "Present/TalkHoldDraw.swift", "Present/ExtraKeyDraw.swift", "Present/TodoSetupDraw.swift", "Present/BrainSetupDraw.swift", "Present/AgentFinishDraw.swift", "Present/ExtraOfferDraw.swift", "Present/HookShowDraw.swift", "Present/RecordlyExportDraw.swift", "Present/PasteSetupDraw.swift", "Present/PolyglotChordDraw.swift", "Present/AwakeHoldDraw.swift", "Present/LiveTouchDraw.swift", "Present/PointerGlideDraw.swift", "Present/RoutineListDraw.swift", "Present/RecordlyCaptureDraw.swift", "Present/AnswerPathDraw.swift", "Present/AskFinishDraw.swift", "Present/ShareSeenDraw.swift", "Present/ModelCapDraw.swift", "Present/FocusLengthDraw.swift", "Present/PlaybackModeDraw.swift", "Present/ReminderListDraw.swift", "Present/ClipboardFilterDraw.swift", "Present/ChromeLinkDraw.swift", "Present/MemoryLearnDraw.swift", "Present/ChatHubDraw.swift", "Present/CalendarPageDraw.swift", "Present/ShelfStackDraw.swift", "Present/OpenPageDraw.swift", "Present/TodoShownDraw.swift", "Present/FocusClockDraw.swift", "Present/QuickTodoDraw.swift", "Present/PrompterRollDraw.swift", "Present/FlingNearbyDraw.swift", "Present/PrompterWindowDraw.swift", "Present/TeachYouDraw.swift", "Present/ChatPaneDraw.swift", "Present/LyricShowDraw.swift", "Present/UsageMeterDraw.swift",
+             "Explanation/ExplanationEquationGeometryBox.swift", "Explanation/ExplanationEquationGeometry.swift"),
+        tests("ExplainShowcaseTests", "ResearchSourceDrawTests", "LocalAnswerDrawTests", "TodoListDrawTests",
+              "CalendarEventDrawTests", "AgentStartDrawTests", "TodayBoardDrawTests", "RoutineSavedDrawTests",
+              "MemoryKeptDrawTests", "WatchDrawTests", "TimerDrawTests", "ProjectOpenDrawTests",
+              "SiteOpenDrawTests", "TranslationDrawTests", "AppLaunchDrawTests", "MediaDrawTests",
+              "ResearchStartDrawTests", "AppCloseDrawTests", "TerminalOpenDrawTests", "SpotifyPlayDrawTests", "BeamerDrawTests", "FileFoundDrawTests", "ShortcutDrawTests", "ApprovalDrawTests", "ChoiceDrawTests", "StopAllDrawTests", "AgentNoteDrawTests", "ScreenSightDrawTests", "AnswerFailDrawTests", "HearDrawTests", "ThinkingDrawTests", "ActionMissDrawTests", "ControlOffDrawTests", "VolumeBlockDrawTests", "FullerAnswerDrawTests", "TimerFinishedDrawTests", "LockFailDrawTests", "DriveAccessDrawTests", "CalendarAccessDrawTests", "LeftAloneDrawTests", "ProjectMissDrawTests", "TourFailDrawTests", "ShellBlockDrawTests", "TodoMissDrawTests", "RunUnclearDrawTests", "LinkMissDrawTests", "StepMissDrawTests", "TypeSkipDrawTests", "SendSkipDrawTests", "PageStaleDrawTests", "StepLimitDrawTests", "LoopStopDrawTests", "UnsureStopDrawTests", "BadPlanDrawTests", "StuckDrawTests", "TourDoneDrawTests", "SecretFieldDrawTests", "VoiceOverDrawTests", "ReportSavedDrawTests", "MemoryUnchangedDrawTests", "NoAIDrawTests", "ResearchAskDrawTests", "EarlyStopDrawTests", "TourStopDrawTests", "NotReadyDrawTests", "TabOpenDrawTests", "AgentOffDrawTests", "DeclinedStopDrawTests", "MemoryUnreadDrawTests", "BrowserSetupDrawTests", "NoGoalDrawTests", "ClickLeftDrawTests", "TabHistoryDrawTests", "UnusableStepsDrawTests", "BeamerMissDrawTests", "CalendarFailDrawTests", "PageUntouchedDrawTests", "PointSecretDrawTests", "ReportMissDrawTests", "ScreenStaleDrawTests", "TodoDoneDrawTests", "VaultMissDrawTests", "EndpointMissDrawTests", "ScrollRangeDrawTests", "PageListDrawTests", "SwitchReadDrawTests", "ForgetAskDrawTests", "BrowserStoppedDrawTests", "KeyUnknownDrawTests", "FindMissDrawTests", "FolderMissDrawTests", "PolyglotOffDrawTests", "WentAwayDrawTests", "ClaudeToolDrawTests", "CantDirectDrawTests", "WindowMissDrawTests", "SpotifyPressDrawTests", "MenuMissDrawTests", "AskLeftDrawTests", "DocumentMissDrawTests", "PageBlockDrawTests", "TabMissDrawTests", "AssistantMissDrawTests", "NoTabDrawTests", "DocumentGoneDrawTests", "PageTargetDrawTests", "NoFieldDrawTests", "ClickOffDrawTests", "ClickMissDrawTests", "ElementMissDrawTests", "ChoiceMissDrawTests", "NotFieldDrawTests", "MissingPieceDrawTests", "FieldMissDrawTests", "NoTimerDrawTests", "ForgetMissDrawTests", "ForgotDrawTests", "ResearchBusyDrawTests", "DriveBusyDrawTests", "PresentStepsDrawTests", "NowPlayingDrawTests", "FocusSessionDrawTests", "WeatherDrawTests", "KeepAwakeDrawTests", "BatteryDrawTests", "ReminderDrawTests", "MeetingDrawTests", "NextEventDrawTests", "ClockDrawTests", "CityTimeDrawTests", "CountdownDrawTests", "DateDrawTests", "NoteDrawTests", "AgentStatusDrawTests", "TimerLeftDrawTests", "NextReminderDrawTests", "AlertStatusDrawTests", "TodoCountDrawTests", "VolumeLevelDrawTests", "BrightnessLevelDrawTests", "AgendaDrawTests", "ShelfDrawTests", "RainDrawTests", "WeekDrawTests", "ClipboardCountDrawTests", "FrontAppDrawTests", "CapsLockDrawTests", "FocusRoundsDrawTests", "DictationWordsDrawTests", "RecordingStatusDrawTests", "DarkModeDrawTests", "TilingStatusDrawTests", "ScreenCountDrawTests", "EarbudsStatusDrawTests", "UsageTodayDrawTests", "PrompterDrawTests", "LidStatusDrawTests", "OutputDrawTests", "DictationLiveDrawTests", "PolyglotStatusDrawTests", "ChatCountDrawTests", "HeatDrawTests", "HeyZeusDrawTests", "FaceDrawTests", "BeamerPlaceDrawTests", "VoiceChoiceDrawTests", "LicenseDrawTests", "ScreenRecordingDrawTests", "DriveAutonomyDrawTests", "NotchPlaceDrawTests", "PointingKeysDrawTests", "ChatShortcutDrawTests", "ProviderDrawTests", "MusicSourceDrawTests", "CardStyleDrawTests", "PointerBuddyDrawTests", "NotchOpenDrawTests", "HaloLightDrawTests", "HomeCardsDrawTests", "NotchLightsDrawTests", "TopBarTabsDrawTests", "CueSoundsDrawTests", "DictationSetupDrawTests", "VoiceCuesDrawTests", "DayToDayDrawTests", "PrompterSetupDrawTests", "BrowserAgentDrawTests", "PolyglotSetupDrawTests", "KeepAwakeSetupDrawTests", "FlingSetupDrawTests", "TilingSetupDrawTests", "CodingSetupDrawTests", "NotifySetupDrawTests", "ReceiveSetupDrawTests", "BeamerSetupDrawTests", "CaptionSetupDrawTests", "SoundEventsDrawTests", "OtherAppsDrawTests", "HomeStylesDrawTests", "WeatherPlaceDrawTests", "InsomniaSetupDrawTests", "DictationModeDrawTests", "VoiceGlowDrawTests", "DictationRecordDrawTests", "AgentNudgeDrawTests", "HomeFrameDrawTests", "ScreenCornerDrawTests", "NotchCloseDrawTests", "EverydayLightsDrawTests", "HaloArmDrawTests", "MusicLightsDrawTests", "RunningCardDrawTests", "VoiceStyleDrawTests", "LockChimeDrawTests", "FacePresenceSetDrawTests", "ResearchSetupDrawTests", "ScribeSetupDrawTests", "LanguagePackDrawTests", "SpeakerSetupDrawTests", "AccessSetDrawTests", "ExtraSoundsDrawTests", "HudExtrasDrawTests", "WavesSetupDrawTests", "NotchlessDrawTests", "HomeBackdropDrawTests", "DictationSoundDrawTests", "DictationKeepDrawTests", "GrantSetDrawTests", "JevSetupDrawTests", "PickerSetupDrawTests", "DefaultAgentDrawTests", "LocalAccessDrawTests", "FastPathDrawTests", "FlickSetupDrawTests", "HaloEntranceDrawTests", "TalkMicDrawTests", "ExplainSetupDrawTests", "ProactiveSetupDrawTests", "ScriptSetupDrawTests", "OfferSetupDrawTests", "ShareSetupDrawTests", "KeywordSetupDrawTests", "BannerSetupDrawTests", "FeedbackSetupDrawTests", "DictateSwitchDrawTests", "ArrivalLightsDrawTests", "HaloWashDrawTests", "BandSetupDrawTests", "HaloMeasureDrawTests", "TilingGapDrawTests", "HotspotSetupDrawTests", "HomeLaterDrawTests", "VoiceKeyDrawTests", "UpdateSetupDrawTests", "VoiceTuneDrawTests", "DictateHearDrawTests", "CommandSetupDrawTests", "NotchFitDrawTests", "QuietSetupDrawTests", "FreezeSetupDrawTests", "AskWordsDrawTests", "LeftOutDrawTests", "SeparateBrowserDrawTests", "VocabSetupDrawTests", "ExplainHearDrawTests", "PointTrailDrawTests", "TalkSightDrawTests", "DrawnSizeDrawTests", "PointRouteDrawTests", "CompanionDrawTests", "GatewayDrawTests", "ChatModelDrawTests", "KokoroSetupDrawTests", "CloudVoiceDrawTests", "FlingPeerDrawTests", "VisualReadyDrawTests", "ShowMeDrawTests", "LivesDrawTests", "TalkHoldDrawTests", "ExtraKeyDrawTests", "TodoSetupDrawTests", "BrainSetupDrawTests", "AgentFinishDrawTests", "ExtraOfferDrawTests", "HookShowDrawTests", "RecordlyExportDrawTests", "PasteSetupDrawTests", "PolyglotChordDrawTests", "AwakeHoldDrawTests", "LiveTouchDrawTests", "PointerGlideDrawTests", "RoutineListDrawTests", "RecordlyCaptureDrawTests", "AnswerPathDrawTests", "AskFinishDrawTests", "ShareSeenDrawTests", "ModelCapDrawTests", "FocusLengthDrawTests", "PlaybackModeDrawTests", "ReminderListDrawTests", "ClipboardFilterDrawTests", "ChromeLinkDrawTests", "MemoryLearnDrawTests", "ChatHubDrawTests", "CalendarPageDrawTests", "ShelfStackDrawTests", "OpenPageDrawTests", "TodoShownDrawTests", "FocusClockDrawTests", "QuickTodoDrawTests", "PrompterRollDrawTests", "FlingNearbyDrawTests", "PrompterWindowDrawTests", "TeachYouDrawTests", "ChatPaneDrawTests", "LyricShowDrawTests", "UsageMeterDrawTests"),
     ),
     "recordly-geometry": (
-        core("BuddyVisibility.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
+        core("BuddyVisibility.swift", "Present/CompanionMotionBox.swift", "Recordly/RecordlyCursorFollowPath.swift", "Recordly/RecordlyCursorSmoother.swift",
              "Recordly/RecordlyCursorLog.swift", "Recordly/RecordlyZoomRegions.swift", "Recordly/RecordlyExportPlan.swift",
              "Recordly/RecordlyExportSettings.swift"),
         tests("RecordlyCursorFollowTests", "RecordlyExportPlanTests"),
@@ -128,33 +141,51 @@ GROUPS = {
              "Explanation/ExplanationStream.swift", "Explanation/ExplanationCompletionStream.swift",
              "Explanation/ExplanationAnthropicStream.swift", "Explanation/ExplanationCoordinates.swift",
              "Explanation/ExplanationChartMath.swift", "Pointing/PointingCardAnchors.swift", "Shortcut.swift", "Present/SpatialTrail.swift", "Present/CoordinateMapper.swift",
-             "KeyFacts.swift", "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift", "Pointing/PointingTrace.swift",
+             "BuddyVisibility.swift", "Present/CompanionMotion.swift", "Present/CompanionMotionBox.swift",
+             "Present/CompanionPointing.swift",
+             "KeyFacts.swift", "Pointing/PointingKeyGesture.swift", "Pointing/PointingSession.swift",
+             "Pointing/PointerGuidePlan.swift", "Pointing/PointerGuideCaption.swift",
+             "Pointing/PointingProposal.swift", "Pointing/PointingActionTools.swift",
+             "Pointing/PointingActionToolsBox.swift", "Mac/DrivePlan.swift", "Mac/MacActionNumbers.swift",
+             "Mac/AXSnapshot.swift", "Mac/AXSnapshotBox.swift", "JSONValue.swift", "Pointing/PointingTrace.swift",
              "Pointing/PointingContext.swift", "Pointing/PointingSceneResolver.swift",
              "Pointing/PointingProviderSelection.swift", "Pointing/PointingSpeechAlignment.swift",
              "ChatHotkey.swift", "Pointing/PointingStrokeTargeting.swift", "Pointing/PointingDeixis.swift",
              "Pointing/PointingStaleTarget.swift", "Pointing/PointingShortcutConflicts.swift", "Pointing/ShowMeKey.swift",
-             "Pointing/PointingInkTrail.swift", "Pointing/PointingTraceSpans.swift"),
-        tests("PointingKeyGestureTests", "PointingSessionTests", "PointingTraceTests", "PointingCoordinateTests",
+             "Pointing/PointingInkTrail.swift", "Pointing/PointingInkTrailBox.swift", "Pointing/PointingInkVariant.swift", "Pointing/PointingTraceSpans.swift",
+             "Pointing/MarkLayout.swift", "Present/PlayDemoScript.swift", "Present/PresentCard.swift",
+             "Pointing/SpokenPointingAsk.swift"),
+        tests("PointingKeyGestureTests", "PointingSessionTests", "PointerGuidePlanTests",
+              "PointerGuideCaptionTests", "PointingProposalValidationTests", "PointingProposalOfferTests",
+              "PointingTraceTests", "PointingCoordinateTests",
               "ExplanationProtocolV2Tests", "ExplanationProtocolV3Tests", "PointingCardAnchorsTests", "PointingProviderTests", "PointingStrokeTargetingTests", "PointingDeixisTests",
-              "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests",
-              "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests", "ShowMeKeyTests"),
+              "PointingStaleTargetTests", "ShortcutConflictsPointingTests", "PointingInkTrailTests", "PointingInkVariantTests",
+              "PointingTraceSpansTests", "PointingRobustnessTests", "PointingOverlayGeometryTests", "ShowMeKeyTests",
+              "MarkLayoutTests", "PlayDemoScriptTests", "PresentCardShownTests", "SpokenPointingAskTests"),
     ),
     "right-option-hold": (
         core("Shortcut.swift", "ChatHotkey.swift", "VoiceKey.swift", "Voice/RightOptionHold.swift"),
         tests("RightOptionHoldTests"),
     ),
     "buddy": (
-        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CoordinateMapper.swift"),
+        core("BuddyVisibility.swift", "Present/CompanionPointing.swift", "Present/CompanionMotion.swift", "Present/CompanionMotionBox.swift", "Present/CoordinateMapper.swift"),
         tests("CompanionPointingTests", "CompanionMotionTests"),
     ),
     "agent-choice-dismiss": (
-        core("AgentChoiceDismiss.swift", "JSONValue.swift"),
-        tests("AgentChoiceDismissTests"),
+        core("AgentChoiceDismiss.swift", "JSONValue.swift", "FacePresence/FaceTemplateProof.swift",
+             "Earbuds/EarbudsCuePolicy.swift", "Earbuds/EarbudsCuePolicyBox.swift",
+             "Earbuds/EarbudsBattery.swift", "Earbuds/EarbudsDisplay.swift", "Earbuds/EarbudsNotchCue.swift",
+             "BrowserAgent/WebAddress.swift", "BrowserAgent/BrowserAgentStepBeat.swift",
+             "FacePresence/SpoofCuesBox.swift", "FacePresence/SpoofCues.swift", "FacePresence/FaceMatch.swift",
+             "FacePresence/EnrollmentPlan.swift", "FacePresence/EnrollmentCoach.swift"),
+        tests("AgentChoiceDismissTests", "FaceTemplateProofTests", "EarbudsCuePolicyTests", "EarbudsCuePolicyBoxTests",
+              "EarbudsModeSpeechTests", "BrowserWebURLTests", "BrowserAgentStepBeatTests", "EarbudsNotchCueTests", "FaceMatchCeilingTests",
+              "EnrollmentCoachTests"),
     ),
     "wiki-relationships": (
         core("MeetingCopilot.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
              "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Scribe/ScribeSession.swift", "Scribe/ScribeRecapNavigation.swift",
-             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
+             "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift", "Wiki/SensitiveInfoScanner.swift", "Wiki/WikiRelationships.swift", "Wiki/WikiGraph.swift"),
         tests("WikiRelationshipsTests", "ScribeRecapNavigationTests", "WikiGraphTests"),
     ),
     # The filter maths takes its lock from the Apple SDK, so this group runs on an Apple platform only.
@@ -176,7 +207,7 @@ GROUPS = {
     # Optional: the Linux Foundation replaceItemAt limitation affects persistence tests here.
     "wiki": (
         core("MeetingCopilot.swift", "ZeusPaths.swift", "Scribe/ScribeCapture.swift", "Scribe/ScribeNotes.swift",
-             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift",
+             "Scribe/ScribeTranscript.swift", "Scribe/ScribeSpeakerBookModel.swift", "Wiki/WikiPage.swift", "Wiki/WikiCompiler.swift", "Wiki/WikiCompilerBox.swift",
              "Wiki/WikiStore.swift", "Wiki/SensitiveInfoScanner.swift"),
         tests("WikiTests"),
     ),
@@ -267,6 +298,10 @@ def write_excerpts(root, group, manifest):
                                  "/// One frame of a flight.")
         pieces.append(text)
         manifest["excerpts"].append(evidence)
+        text, evidence = section(CORE + "Present/CompanionMotion.swift", "private extension CGPoint {",
+                                 "private extension CompanionFlight {")
+        pieces.append(text)
+        manifest["excerpts"].append(evidence)
     if pieces:
         imports = ["Foundation"]
         # These exact declarations use CoreGraphics extensions on Apple SDKs.
@@ -296,7 +331,7 @@ def prepare(output, group, *, platform_name=None):
         target.write_bytes(data)
         manifest["files"].append({"source": source, "sha256": digest(data)})
     write_excerpts(root, group, manifest)
-    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe") and platform_name == "linux"
+    compatibility = group in ("recordly-geometry", "buddy", "pointing", "scribe", "agent-choice-dismiss") and platform_name == "linux"
     extra_target = ''
     products = ''
     core_dependencies = '[]'

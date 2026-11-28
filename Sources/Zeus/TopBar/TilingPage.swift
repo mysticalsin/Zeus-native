@@ -52,6 +52,7 @@ private struct TilingControls: View {
             Image(systemName: "rectangle.split.2x2.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.accent)
             Text("Tiling").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
             Spacer(minLength: 0)
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say tiling") { topBar.speakTiling() }
             if phase == .running || phase == .paused {
                 GlyphButton(symbol: phase == .paused ? "play.fill" : "pause.fill", size: 10,
                             label: phase == .paused ? "Resume tiling" : "Pause tiling") { tiling.togglePause() }

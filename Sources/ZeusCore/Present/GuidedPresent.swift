@@ -36,8 +36,8 @@ public enum GuidedPresent {
               let point = PresentPointMapping.screenPoint(x: target.x, y: target.y, screen: target.screen, in: shots) else {
             return nil
         }
-        let shotIndex = (step.target?.screen ?? 1) - 1
-        let shot = shots.indices.contains(shotIndex) ? shots[shotIndex] : shots[0]
+        guard let shotIndex = PresentScreenIndex.offset(screen: target.screen, count: shots.count) else { return nil }
+        let shot = shots[shotIndex]
         let tol = PresentPointMapping.ringTolerancePoints(for: shot)
         let rect = CGRect(x: point.x - tol, y: point.y - tol, width: tol * 2, height: tol * 2)
         return ResolvedTarget(
@@ -49,7 +49,7 @@ public enum GuidedPresent {
     }
 
     public static func clickHits(_ click: CGPoint, target: ResolvedTarget) -> Bool {
-        if let rect = target.hitRect { return rect.contains(click) }
+        if let rect = target.hitRect { return HitRect.contains(click, in: rect) }
         return hypot(click.x - target.screenPoint.x, click.y - target.screenPoint.y) <= 60
     }
 

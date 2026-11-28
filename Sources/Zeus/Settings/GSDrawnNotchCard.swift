@@ -1,6 +1,16 @@
 import SwiftUI
 import ZeusCore
 
+/// The notchless shape speaks Pill or Notch and whether it is shown. It does not change the shape or calibrate.
+enum NotchlessVoice {
+    static var speakShape: () -> Void = {}
+}
+
+/// The drawn notch size speaks width, height, and place. It does not start calibration.
+enum DrawnSizeVoice {
+    static var speakSize: () -> Void = {}
+}
+
 /// What the "Displays without a notch" card shows and sends, apart from drawing it. The pure rules and the
 /// calibration state live in ZeusCore and `DrawnNotchModel`; this reads them, picks the rows and forwards the
 /// owner's actions as events. It is the only sender of calibration controls.
@@ -95,6 +105,10 @@ struct DrawnNotchCard: View {
 
     var body: some View {
         GSCard("Displays without a notch") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how big the drawn notch is") { DrawnSizeVoice.speakSize() }
+            }
             let rows = model.rows
             ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 if index > 0 { GSDivider() }
@@ -110,8 +124,11 @@ struct DrawnNotchCard: View {
         switch row {
         case .shape(let style):
             GSRow(symbol: "rectangle.topthird.inset.filled", title: "Shape") {
-                GSSegmentedChoice(label: "Shape", options: [("Pill", NotchlessStyle.pill), ("Notch", .drawn)],
-                                  selection: style, onSelect: model.choose)
+                HStack(spacing: 8) {
+                    GSSegmentedChoice(label: "Shape", options: [("Pill", NotchlessStyle.pill), ("Notch", .drawn)],
+                                      selection: style, onSelect: model.choose)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the notchless shape") { NotchlessVoice.speakShape() }
+                }
             }
         case .size(let text):
             GSRow(symbol: "arrow.up.left.and.arrow.down.right", title: "Size") {

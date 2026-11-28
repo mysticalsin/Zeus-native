@@ -249,6 +249,11 @@ struct ProgressLine: View {
 
 // MARK: Header
 
+/// The open notch speaks the page, the more menu, and tab editing. It does not switch a tab.
+enum OpenPageVoice {
+    static var speakPage: () -> Void = {}
+}
+
 /// Tab icons along the top of the open notch, split around the camera housing like the
 /// menu bar itself. The selected tab sits on a sliding pill.
 struct TopBarHeader: View {
@@ -279,6 +284,7 @@ struct TopBarHeader: View {
             .background(Capsule().fill(GlanceTint.capsule))
             .overlay(Capsule().strokeBorder(GlanceTint.capsuleRim, lineWidth: 1))
             Spacer(minLength: 0)
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which tab is open") { OpenPageVoice.speakPage() }
             Button { MoreMenu.show(topBar: topBar) } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 12, weight: .bold))
@@ -550,6 +556,16 @@ struct PageSwitcher<Key: Hashable, Page: View>: View {
     }
 }
 
+/// Shuffle and repeat speak the modes the player has reported. They do not change playback.
+enum PlaybackModeVoice {
+    static var speakModes: () -> Void = {}
+}
+
+/// Lyrics speak whether they are on screen and whether the playhead is being dragged. They do not seek.
+enum LyricShowVoice {
+    static var speakLyrics: () -> Void = {}
+}
+
 struct MusicControls: View {
     let topBar: TopBarModel
     var size: CGFloat = 13
@@ -592,6 +608,9 @@ struct MusicControls: View {
 final class LyricsToggle: ObservableObject {
     /// Snapshots draw the page with the lyrics already showing.
     static var snapshotShow = false
+    /// Whether the Music page is showing lyrics right now. The page writes this; voice only reads it.
+    static var liveShow = false
+    static func remember(_ showing: Bool) { liveShow = showing }
     @Published var show = TopBarStyle.isSnapshot && LyricsToggle.snapshotShow
 }
 
@@ -608,14 +627,23 @@ struct MusicPage: View {
         let shown = NowPlayingDisplay.visibleControls(for: topBar.nowPlaying)
         // Lyrics a source cannot give are not shown, even if the toggle was on for the last one.
         let showLyrics = lyricsToggle.show && shown.contains(.lyrics)
+        let _ = LyricsToggle.remember(showLyrics)
         HStack(spacing: 14) {
             AlbumTile(playing: topBar.nowPlaying, size: 132)
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    if let playing = topBar.nowPlaying {
-                        Text(NowPlayingDisplay.sourceLine(playing.source))
-                            .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
-                            .lineLimit(1).truncationMode(.middle)
+                    HStack(spacing: 8) {
+                        if let playing = topBar.nowPlaying {
+                            Text(NowPlayingDisplay.sourceLine(playing.source))
+                                .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if earbuds are connected") { topBar.speakEarbuds() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the sound is going") { topBar.speakOutput() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's playing") { sayTrack() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say shuffle and repeat") { PlaybackModeVoice.speakModes() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether lyrics are showing") { LyricShowVoice.speakLyrics() }
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         if showLyrics {
@@ -668,8 +696,16 @@ struct MusicPage: View {
             }
         }
         .padding(.vertical, 6)
-        .onAppear { topBar.musicPageVisible = true }
-        .onDisappear { topBar.musicPageVisible = false }
+        .onAppear { topBar.musicPageVisible = true; LyricsToggle.liveShow = lyricsToggle.show && NowPlayingDisplay.visibleControls(for: topBar.nowPlaying).contains(.lyrics) }
+        .onDisappear { topBar.musicPageVisible = false; LyricsToggle.liveShow = false }
+    }
+
+    private func sayTrack() {
+        if let playing = topBar.nowPlaying {
+            topBar.speakNowPlaying(playing.title, playing.artist, playing.isPlaying)
+        } else {
+            topBar.speakNothingPlaying()
+        }
     }
 }
 
@@ -693,11 +729,20 @@ struct OutputDeviceMenu: View {
     }
 }
 
+/// The calendar page speaks whether the picked day is today and whether an event is open. It does not add an event.
+enum CalendarPageVoice {
+    static var speakPage: () -> Void = {}
+}
+
 struct CalendarPage: View {
     let topBar: TopBarModel
 
     var body: some View {
         VStack(spacing: 8) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which day the calendar is showing") { CalendarPageVoice.speakPage() }
+            }
             QuickAddEventBar(topBar: topBar)
             if topBar.calendarAccess == .denied {
                 AccessPrompt(symbol: "calendar", title: "See and add events",
@@ -753,7 +798,14 @@ private struct QuickAddEventBar: View {
     private func submit() {
         let text = topBar.quickAddText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        Task { @MainActor in _ = await topBar.addEvent(from: text) }
+        Task { @MainActor in
+            let problem = await topBar.addEvent(from: text)
+            if let problem {
+                topBar.speakQuickAdd(.problem(problem))
+            } else if let parsed = CalendarQuickAdd.parse(text) {
+                topBar.speakQuickAdd(.added(parsed))
+            }
+        }
     }
 }
 
@@ -844,7 +896,7 @@ private struct CalendarDayList: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(events) { event in
                         Button { topBar.calendarDetailID = event.id } label: {
-                            EventRow(event: event, openURL: topBar.openURL, selected: topBar.calendarDetailID == event.id)
+                            EventRow(event: event, openURL: { _ in topBar.join(event) }, selected: topBar.calendarDetailID == event.id)
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Shows the details.")
@@ -874,8 +926,8 @@ private struct CalendarSidePanel: View {
                 if let notes = event.notes, !notes.isEmpty { detail("note.text", notes) }
                 Spacer(minLength: 0)
                 HStack(spacing: 6) {
-                    if let url = event.meetingURL {
-                        NotchActionButton(title: "Join", tint: Theme.leaf) { topBar.openURL(url) }
+                    if event.meetingURL != nil {
+                        NotchActionButton(title: "Join", tint: Theme.leaf) { topBar.join(event) }
                     }
                     NotchActionButton(title: "Close", tint: Theme.cloudSecondary, filled: false) { topBar.calendarDetailID = nil }
                 }
@@ -954,6 +1006,8 @@ struct WeatherPage: View {
                             .font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
                     }
                     Spacer()
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the weather") { sayForecast() }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if rain is coming") { topBar.speakRain() }
                     GlyphButton(symbol: "arrow.clockwise", size: 11, tint: Theme.cloudSecondary, label: "Refresh weather") { topBar.refreshWeather() }
                 }
                 if let rain = weather.rainSoon() {
@@ -985,6 +1039,16 @@ struct WeatherPage: View {
             }
         }
     }
+
+    private func sayForecast() {
+        guard let weather = topBar.weather else {
+            topBar.speakWeatherNotReady()
+            return
+        }
+        let celsius = weather.temperature
+        let value = topBar.useCelsius ? celsius : celsius * 9 / 5 + 32
+        topBar.speakWeather(Int(value.rounded()), weather.phrase, topBar.weatherPlace)
+    }
 }
 
 /// The Clipboard page's search text (kept here: this toolchain has no @State).
@@ -993,6 +1057,11 @@ struct WeatherPage: View {
 final class ClipboardSearchState {
     static let shared = ClipboardSearchState()
     var query = ""
+}
+
+/// The clipboard chips speak which kind is showing and how many clips are pinned. They do not copy or clear.
+enum ClipboardFilterVoice {
+    static var speakFilter: () -> Void = {}
 }
 
 struct ClipboardPage: View {
@@ -1005,9 +1074,13 @@ struct ClipboardPage: View {
 
     var body: some View {
         if topBar.clipboard.entries.isEmpty {
-            AccessPrompt(symbol: "doc.on.clipboard", title: "Clipboard empty",
-                         detail: "Copy anything. Click an item to copy it again. Passwords that password managers mark as concealed are never kept.",
-                         button: nil) {}
+            VStack(spacing: 8) {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many clips") { topBar.speakClipboard() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which clips are showing") { ClipboardFilterVoice.speakFilter() }
+                AccessPrompt(symbol: "doc.on.clipboard", title: "Clipboard empty",
+                             detail: "Copy anything. Click an item to copy it again. Passwords that password managers mark as concealed are never kept.",
+                             button: nil) {}
+            }
         } else {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
@@ -1033,6 +1106,8 @@ struct ClipboardPage: View {
                             .frame(width: 130, height: 22)
                             .accessibilityLabel("Search the clipboard")
                     }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many clips") { topBar.speakClipboard() }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which clips are showing") { ClipboardFilterVoice.speakFilter() }
                     GlyphButton(symbol: "trash", size: 10, tint: Theme.cloudSecondary, label: "Clear clipboard") {
                         topBar.clipboard.clear()
                     }
@@ -1133,6 +1208,11 @@ private struct ClipboardRow: View {
     }
 }
 
+/// Shelf stacks speak how many files are verified and how many groups there are. Names stay unspoken.
+enum ShelfStackVoice {
+    static var speakStacks: () -> Void = {}
+}
+
 struct ShelfPage: View {
     let topBar: TopBarModel
     /// The stack whose files are laid out in a ribbon, if one is open.
@@ -1145,6 +1225,8 @@ struct ShelfPage: View {
                     .font(.system(size: 26, weight: .semibold)).foregroundStyle(topBar.shelfTargeted ? Theme.bolt : Theme.cloudSecondary)
                     .scaleEffect(topBar.shelfTargeted && !Motion.reduced ? 1.12 : 1)
                 Text("Drop files here").font(TopBarStyle.label(11.5, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's on the shelf") { topBar.speakShelf() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say shelf verification and stacks") { ShelfStackVoice.speakStacks() }
                 Text("Drag them out again, AirDrop, or transcribe audio")
                     .font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet).multilineTextAlignment(.center)
             }
@@ -1228,6 +1310,16 @@ struct ShelfCell: View {
     }
 }
 
+/// The focus page speaks the round length and the break. It does not start a round.
+enum FocusLengthVoice {
+    static var speakLength: () -> Void = {}
+}
+
+/// The focus clock speaks whether it is running and what kind of round is on. It does not start a round.
+enum FocusClockVoice {
+    static var speakClock: () -> Void = {}
+}
+
 struct FocusPage: View {
     let topBar: TopBarModel
 
@@ -1264,7 +1356,13 @@ struct FocusPage: View {
                     topBar.focus.setTime(minutes: max(5, minutes + (direction == .increment ? 5 : -5)))
                 }
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Rounds today: \(timer.roundsToday(at: context.date))").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                    HStack(spacing: 6) {
+                        Text("Rounds today: \(timer.roundsToday(at: context.date))").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                        Spacer(minLength: 0)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many rounds") { topBar.speakRounds() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the focus and break lengths") { FocusLengthVoice.speakLength() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether focus is running") { FocusClockVoice.speakClock() }
+                    }
                     Text("Drag the ring to set the time").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
                     HStack(spacing: 6) {
                         ForEach([15, 25, 50], id: \.self) { minutes in
@@ -1276,12 +1374,19 @@ struct FocusPage: View {
                     }
                     HStack(spacing: 8) {
                         if timer.phase == .idle {
-                            NotchActionButton(title: "Start focus", tint: TopBarStyle.violet) { topBar.focus.start() }
+                            NotchActionButton(title: "Start focus", tint: TopBarStyle.violet) { topBar.speakFocus(topBar.beginFocus()) }
                         } else {
                             NotchActionButton(title: timer.isPaused ? "Resume" : "Pause", tint: TopBarStyle.violet) {
-                                timer.isPaused ? topBar.focus.resume() : topBar.focus.pause()
+                                if topBar.focus.isPlainTimer {
+                                    timer.isPaused ? topBar.focus.resume() : topBar.focus.pause()
+                                } else {
+                                    topBar.speakFocus(timer.isPaused ? topBar.resumeFocusSession() : topBar.pauseFocusSession())
+                                }
                             }
-                            NotchActionButton(title: "Stop", tint: Theme.cloudSecondary, filled: false) { topBar.focus.stop() }
+                            NotchActionButton(title: "Stop", tint: Theme.cloudSecondary, filled: false) {
+                                if topBar.focus.isPlainTimer { topBar.focus.stop() }
+                                else { topBar.speakFocus(topBar.endFocusSession()) }
+                            }
                         }
                     }
                 }
@@ -1318,6 +1423,8 @@ struct DictationPage: View {
                             Text(status).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
                             Text(hint).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet).lineLimit(2)
                         }
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if dictation is on") { topBar.speakDictation() }
                     }
                     Text("MODE").font(TopBarStyle.label(9.5, .bold)).foregroundStyle(Theme.cloudQuiet)
                     FlowChips(modes: topBar.dictationModes, selected: topBar.selectedModeKey) { topBar.selectedModeKey = $0 }
@@ -1335,6 +1442,7 @@ struct DictationPage: View {
                         Text("HISTORY").font(TopBarStyle.label(9.5, .bold)).foregroundStyle(Theme.cloudQuiet)
                         Spacer()
                         Text("\(wordsToday) words today").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many words") { topBar.speakWords() }
                     }
                     if topBar.dictationHistory.isEmpty {
                         Text("Your dictations appear here, on this Mac only.").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudQuiet)
@@ -1538,7 +1646,13 @@ struct ClosedWings: View {
                     Image(systemName: topBar.dictationModeSymbol).font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.cloudPrimary)
                 }
             } right: {
-                if topBar.dictationPhase == .listening {
+                if let words = DictationWingText.line(listening: topBar.dictationPhase == .listening, partial: topBar.dictationPartial) {
+                    Text(words)
+                        .font(TopBarStyle.label(11, .medium))
+                        .foregroundStyle(Theme.cloudPrimary)
+                        .lineLimit(1)
+                        .frame(width: 180, alignment: .trailing)
+                } else if topBar.dictationPhase == .listening {
                     DictationWave(levels: topBar.dictationLevels, color: TopBarStyle.rec)
                 } else {
                     ProgressView().controlSize(.mini).tint(Theme.cloudPrimary)
@@ -1599,7 +1713,7 @@ struct ClosedWings: View {
         case .actionReceipt: return 150
         case .cue(let cue):
             switch cue {
-            case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake: return 150
+            case .copied, .trackChanged, .focusFinished, .dictation, .usageAlert, .decided, .hint, .keepAwake, .earbuds: return 150
             case .permission: return 230
             case .shortcut, .rain: return 70
             case .volume, .brightness, .keyboardBacklight: return 58
@@ -1607,7 +1721,8 @@ struct ClosedWings: View {
             }
         // An idle mascot has no word beside it, so the closed bar hugs the notch and the mascot (finding 24).
         case .avatar(let state): return state == .idle ? NotchClosedBodyLayout.idleMascotExtra : 14
-        case .dictation: return 60
+        case .dictation:
+            return DictationWingText.line(listening: topBar.dictationPhase == .listening, partial: topBar.dictationPartial) == nil ? 60 : 190
         case .recordly:
             if ScribeController.shared.isRecording { return 230 }
             return ScribeController.shared.topBarFeedback() != nil ? 300 : 110
@@ -1642,6 +1757,7 @@ struct ClosedWings: View {
         case .screenshot: ("camera.fill", Theme.bolt)
         case .flingArrived, .flingSent: ("paperplane.fill", Theme.leaf)
         case .flingProblem: ("exclamationmark.triangle.fill", Theme.ember)
+        case .earbuds(_, let connected): (connected ? "headphones" : "speaker.slash", connected ? Theme.leaf : Theme.cloudSecondary)
         }
         Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
             .shadow(color: color.opacity(0.7), radius: 4)
@@ -1681,6 +1797,8 @@ struct ClosedWings: View {
         case .flingSent(let count, let to):
             Text("Sent \(count) to \(to)").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .flingProblem(let text):
+            Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
+        case .earbuds(let text, _):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)
         case .copied(let text), .dictation(let text), .focusFinished(let text), .usageAlert(let text), .hint(let text), .keepAwake(let text):
             Text(text).font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).frame(width: 190, alignment: .trailing)

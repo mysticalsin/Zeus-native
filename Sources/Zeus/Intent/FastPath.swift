@@ -25,7 +25,7 @@ final class FastPath {
     static let log = OSLog(subsystem: "app.zeus.mac", category: "fast")
     let signposter = OSSignposter(subsystem: "app.zeus.mac", category: "fast")
 
-    private var partialGate = PartialActionGate()
+    private var session = PartialActionSession()
 
     init(actions: FastActions = .shared) { self.actions = actions }
 
@@ -34,6 +34,8 @@ final class FastPath {
     func rules(_ transcript: String) -> Result {
         // Settings › Features › Instant commands: off hands every command to the LLM.
         guard FeatureSettings.fastPathEnabled() else { return .miss }
+        // A live partial that has already moved on must not launch the previous command.
+        guard session.allowsToolAction(on: transcript) else { return .miss }
         let started = ContinuousClock.now
         let intent = FastIntent.parse(transcript)
         let parse = ContinuousClock.now - started
@@ -54,6 +56,7 @@ final class FastPath {
 
     func engine(_ transcript: String) async -> Result {
         guard FeatureSettings.fastPathEnabled() else { return .miss }
+        guard session.allowsToolAction(on: transcript) else { return .miss }
         guard FastIntent.mayBeCommand(transcript) else { return .miss }
         let center = IntelligenceCenter.shared
         let started = ContinuousClock.now
@@ -81,14 +84,28 @@ final class FastPath {
         }
     }
 
-    /// Called with each live partial. Feeds the partial-action gate only; nothing is sent to a model.
+    /// Called with each live partial. Arms a local-rules command and sends nothing to a model.
+    /// The command runs later, from `confirmedPlan(for:)`, only if the final words are still it.
     func partial(_ text: String) {
         guard FeatureSettings.fastPathEnabled() else { return }
-        partialGate.observePartial(text)
+        session.observe(text)
+        guard FastIntent.parse(text) != nil else { return }
+        _ = session.arm(text)
+    }
+
+    /// The armed command when the final words are still that partial. Nil leaves the final to the normal chain.
+    /// Resolving the plan happens here, once, so a partial never launches an app.
+    func confirmedPlan(for final: String) -> FastActions.Plan? {
+        let decision = session.finish(final)
+        guard FeatureSettings.fastPathEnabled() else { return nil }
+        guard case .runArmed(let key) = decision, PartialActionGate.key(final) == key else { return nil }
+        guard let intent = FastIntent.parse(final) else { return nil }
+        guard case .plan(let plan) = actions.resolve(intent) else { return nil }
+        return plan
     }
 
     func reset() {
-        partialGate = PartialActionGate()
+        session = PartialActionSession()
     }
 
     // MARK: Helpers

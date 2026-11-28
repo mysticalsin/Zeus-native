@@ -20,14 +20,29 @@ public enum PresentPointMapping {
     public static func screenPoint(
         x: Int, y: Int, screen: Int?, in shots: [ScreenShot]
     ) -> CGPoint? {
-        guard !shots.isEmpty else { return nil }
-        let index = (screen ?? 1) - 1
-        let shot = shots.indices.contains(index) ? shots[index] : shots[0]
+        guard let index = PresentScreenIndex.offset(screen: screen, count: shots.count) else { return nil }
+        let shot = shots[index]
+        guard PresentPixelBounds.contains(x: x, y: y, width: shot.pixelWidth, height: shot.pixelHeight) else { return nil }
         let mapper = mapper(from: shots)
         let displayID = shots.firstIndex(where: { $0.displayFrame == shot.displayFrame }).map { $0 + 1 } ?? 1
         let capture = CaptureMap(displayID: displayID, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)
         let ctx = MapContext(displayID: displayID, capture: capture)
         return mapper.convert(CGPoint(x: x, y: y), from: .pixel, to: .screen, context: ctx)
+    }
+
+    /// A `[HIGHLIGHT]` rectangle in screenshot pixels, as an AppKit rect on that display.
+    public static func screenRect(
+        x: Int, y: Int, width: Int, height: Int, screen: Int?, in shots: [ScreenShot]
+    ) -> CGRect? {
+        guard let index = PresentScreenIndex.offset(screen: screen, count: shots.count) else { return nil }
+        let shot = shots[index]
+        guard PresentPixelBounds.intersects(x: x, y: y, width: width, height: height,
+                                             imageWidth: shot.pixelWidth, imageHeight: shot.pixelHeight) else { return nil }
+        let mapper = mapper(from: shots)
+        let displayID = shots.firstIndex(where: { $0.displayFrame == shot.displayFrame }).map { $0 + 1 } ?? 1
+        let capture = CaptureMap(displayID: displayID, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)
+        let ctx = MapContext(displayID: displayID, capture: capture)
+        return mapper.convert(CGRect(x: x, y: y, width: width, height: height), from: .pixel, to: .screen, context: ctx)
     }
 
     /// Center of an AX element in AppKit global points.

@@ -20,6 +20,10 @@ struct AssistantSettings: View {
     let account: AssistantAccount
     let drafts: SecretDrafts
     private var store: SettingsStore { .shared }
+    /// The Provider menu speaks who answers. It does not read a key.
+    static var speakProvider: () -> Void = {}
+    /// The Model menu speaks the selected model and whether that provider has a key. It does not save one.
+    static var speakModel: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Glass.gap) {
@@ -55,13 +59,23 @@ struct AssistantSettings: View {
             }
             GlassCard(title: "Model") {
                 GlassRow(title: "Provider", note: "Who answers in chat and drafts replies.") {
-                    GlassSegmented(options: [("Claude CLI", "Claude CLI"), ("OpenAI", "OpenAI"), ("Anthropic", "Anthropic")],
-                                   selection: store.stringBinding("assistant.provider"))
+                    HStack(spacing: 6) {
+                        Button { AssistantSettings.speakProvider() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say who answers")
+                        GlassSegmented(options: [("Claude CLI", "Claude CLI"), ("OpenAI", "OpenAI"), ("Anthropic", "Anthropic")],
+                                       selection: store.stringBinding("assistant.provider"))
+                    }
                 }
                 GlassDivider()
                 GlassRow(title: "Model", note: modelNote) {
-                    GlassMenu(options: models.map { ($0, $0) }, selection: Binding(get: { models.contains(store.string("assistant.model")) ? store.string("assistant.model") : models[0] },
-                                                                              set: { store.set("assistant.model", $0) }))
+                    HStack(spacing: 6) {
+                        Button { AssistantSettings.speakModel() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say the chat model")
+                        GlassMenu(options: models.map { ($0, $0) }, selection: Binding(get: { models.contains(store.string("assistant.model")) ? store.string("assistant.model") : models[0] },
+                                                                                  set: { store.set("assistant.model", $0) }))
+                    }
                 }
             }
         }

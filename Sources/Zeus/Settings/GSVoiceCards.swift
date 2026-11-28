@@ -1,6 +1,31 @@
 import SwiftUI
 import ZeusCore
 
+/// The voice style rows speak replies, personality, the orb, and the effect. They do not change the voice.
+enum VoiceStyleVoice {
+    static var speakStyle: () -> Void = {}
+}
+
+/// The cloud voice keys speak whether ElevenLabs, OpenAI, and Gemini are saved. The keys stay unspoken.
+enum VoiceKeyVoice {
+    static var speakKeys: () -> Void = {}
+}
+
+/// Voice tuning speaks quality, effect strength, and Kokoro pace. It does not play a voice.
+enum VoiceTuneVoice {
+    static var speakTune: () -> Void = {}
+}
+
+/// Kokoro speaks whether the model is on this Mac and which of the nine voices is chosen. It does not download or play.
+enum KokoroSetupVoice {
+    static var speakKokoro: () -> Void = {}
+}
+
+/// The named OpenAI and Gemini voices. A missing key stays none. Nothing is played or saved.
+enum CloudVoiceVoice {
+    static var speakCloud: () -> Void = {}
+}
+
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
     let navigation: GSNavigation
@@ -9,13 +34,17 @@ struct ZeusVoiceCards: View {
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
     private var testModel: VoiceTestModel { VoiceTestModel.shared }
     private var preview: VoicePreviewModel { VoicePreviewModel.shared }
-    static let automaticTitle = "Automatic (best working voice)"
+    static let automaticTitle = VoiceChoiceAsk.automatic
     /// Re-read every 30 seconds and on appear, so the OpenAI note and picker flip at the shutdown instant with the window open.
     @State private var now = Date()
     private var openAINote: String? { OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now) }
 
     var body: some View {
         GSCard {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which voice keys are saved") { VoiceKeyVoice.speakKeys() }
+            }
             GSRow(symbol: "key", title: "ElevenLabs key", text: voice.elevenKeySaved ? "Saved in Keychain. Zeus uses ElevenLabs only when you pick it below." : "Optional cloud voice. Create a key at elevenlabs.io, then paste it here. Stored only in your Keychain. A saved key does not select this voice.") {
                 HStack(spacing: 10) {
                     SecureField(voice.elevenKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.elevenKeyDraft }, set: { voice.elevenKeyDraft = $0 }))
@@ -43,9 +72,12 @@ struct ZeusVoiceCards: View {
             GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", text: "Zeus reads its answers aloud instead of only showing them.", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
             GSDivider()
             GSRow(symbol: "theatermasks", title: "Personality") {
-                GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
-                    if let choice = ZeusPersonality.allCases.first(where: { $0.title == title }) { voice.personality = choice }
-                }), options: ZeusPersonality.allCases.map(\.title), label: "Personality")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
+                        if let choice = ZeusPersonality.allCases.first(where: { $0.title == title }) { voice.personality = choice }
+                    }), options: ZeusPersonality.allCases.map(\.title), label: "Personality")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the voice is styled") { VoiceStyleVoice.speakStyle() }
+                }
             }
             GSDivider()
             GSRow(symbol: "circle.dashed", title: "Voice orb style") {
@@ -68,16 +100,23 @@ struct ZeusVoiceCards: View {
             VoiceProvidersCard(embedded: true)
             GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
-                GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
-                    if title == Self.automaticTitle { voice.engineAuto = true }
-                    else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
-                }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which voice") { voice.speakVoice() }
+                    GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
+                        if title == Self.automaticTitle { voice.engineAuto = true }
+                        else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
+                    }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
+                }
             }
             if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
                                                                  effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
                 GSInfo(text: line)
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the voice is tuned") { VoiceTuneVoice.speakTune() }
+            }
             GSRow(symbol: "sparkles", title: "Voice quality", text: voice.elevenQuality.detail) {
                 GSPopup(selection: Binding(get: { voice.elevenQuality.title }, set: { title in
                     if let choice = ElevenLabsQuality.allCases.first(where: { $0.title == title }) { voice.elevenQuality = choice }
@@ -123,6 +162,10 @@ struct ZeusVoiceCards: View {
                 GSInfo(text: line)
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the cloud voices") { CloudVoiceVoice.speakCloud() }
+            }
             GSRow(symbol: "key", title: "OpenAI TTS key", text: openAINote ?? (voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.")) {
                 HStack(spacing: 10) {
                     SecureField(voice.openAIKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.openAIKeyDraft }, set: { voice.openAIKeyDraft = $0 }))
@@ -200,6 +243,10 @@ struct ZeusVoiceCards: View {
             }
             if voice.ttsProvider == .kokoro || voice.kokoroReady || voice.settingUpKokoro {
                 GSDivider()
+                HStack {
+                    Spacer(minLength: 0)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Kokoro is set") { KokoroSetupVoice.speakKokoro() }
+                }
                 GSRow(symbol: "waveform.circle", title: "Kokoro on this Mac", text: kokoroText) {
                     if voice.settingUpKokoro { ProgressView().controlSize(.small) }
                     else if voice.kokoroReady { GSStatus(ok: true, text: "Ready") }

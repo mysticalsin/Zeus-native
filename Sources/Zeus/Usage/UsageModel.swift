@@ -20,6 +20,8 @@ final class UsageModel {
     }
     /// Shown on the closed notch when a limit gets close.
     var onAlert: (String) -> Void = { _ in }
+    /// The Usage page speaks today's tokens. The cost stays off that line.
+    var speakToday: () -> Void = {}
 
     private var snapshot = UsageScanner.Snapshot()
     /// Kept for its read cache: each refresh only reads what the logs gained.

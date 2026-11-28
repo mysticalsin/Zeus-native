@@ -1,6 +1,23 @@
 import SwiftUI
 import ZeusCore
 
+/// The Fling card speaks whether it is on, who can see this Mac, and where arrivals go. It does not turn Fling on.
+enum FlingVoice {
+    static var speakFling: () -> Void = {}
+    /// The Receiving card speaks which arrival switches are on. It does not turn Fling on.
+    static var speakReceive: () -> Void = {}
+}
+
+/// Flick sensitivity speaks Low, Normal, or High. It does not send a file.
+enum FlickSetupVoice {
+    static var speakFlick: () -> Void = {}
+}
+
+/// The name nearby Macs see, and how many Macs are paired. Names stay unspoken. Nothing is removed.
+enum FlingPeerVoice {
+    static var speakPeers: () -> Void = {}
+}
+
 /// Settings › Shelf: the Fling switch, who can see this Mac, where arrivals go, and the paired Macs. Every row is a
 /// catalog row (`scripts/gen-settings-catalog.py`); Fling does nothing until the first switch is on.
 @MainActor
@@ -12,6 +29,10 @@ struct ShelfSettingsPage: View {
         GSPageHeading(section: .shelf, subtitle: "Send files to nearby Macs from the Shelf.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Fling") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Fling is set") { FlingVoice.speakFling() }
+            }
             GSToggleRow(symbol: "paperplane", title: "Send and receive with nearby Macs",
                         text: "Drag files from the Shelf onto a nearby Mac running Zeus. Off until you turn it on. Turning it on makes macOS ask once for Local Network access.",
                         isOn: store.boolBinding("fling.enabled"))
@@ -32,10 +53,17 @@ struct ShelfSettingsPage: View {
             GSDivider()
             GSRow(symbol: "character.cursor.ibeam", title: "Name shown to nearby Macs",
                   text: "Leave empty to use this Mac's name. A paired Mac keeps the name it had when you paired.") {
-                GSTextInput(text: store.stringBinding("fling.deviceName"), placeholder: "This Mac's name", label: "Name shown to nearby Macs")
+                HStack(spacing: 8) {
+                    GSTextInput(text: store.stringBinding("fling.deviceName"), placeholder: "This Mac's name", label: "Name shown to nearby Macs")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Fling name and paired Macs") { FlingPeerVoice.speakPeers() }
+                }
             }
         }
         GSCard("Receiving") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Fling receiving is set") { FlingVoice.speakReceive() }
+            }
             GSToggleRow(symbol: "checkmark.circle", title: "Accept from paired Macs without asking",
                         text: "A Mac that is not paired is never accepted this way.", isOn: store.boolBinding("fling.autoAcceptPaired"))
             GSDivider()
@@ -60,12 +88,19 @@ struct ShelfSettingsPage: View {
         GSCard("Sending") {
             GSRow(symbol: "hand.point.up.left", title: "Flick sensitivity",
                   text: "How fast a drag must be to count as a flick toward a nearby Mac.") {
-                GSPopup(selection: store.stringBinding("fling.flickSensitivity"),
-                        options: SettingsCatalog.option("fling.flickSensitivity")?.choices ?? [], label: "Flick sensitivity")
+                HStack(spacing: 8) {
+                    GSPopup(selection: store.stringBinding("fling.flickSensitivity"),
+                            options: SettingsCatalog.option("fling.flickSensitivity")?.choices ?? [], label: "Flick sensitivity")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the flick sensitivity") { FlickSetupVoice.speakFlick() }
+                }
             }
             GSInfo(text: "Zeus never sends on its own. A send needs a click, a drop or a flick from you.")
         }
         GSCard("Paired Macs") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Fling name and paired Macs") { FlingPeerVoice.speakPeers() }
+            }
             let paired = fling?.pairedMacs ?? []
             if paired.isEmpty {
                 GSEmptyState(symbol: "laptopcomputer.and.iphone", title: "No paired Macs yet",

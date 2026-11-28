@@ -94,6 +94,8 @@ final class BeamerModel {
     static let shared = BeamerModel()
 
     private(set) var status = BeamerStatus.missing
+    /// The Continuity tab speaks where the keyboard is.
+    var speakPlace: () -> Void = {}
     private(set) var busy = false
     var message: String?
     /// Counts overlapping commands, so the first to finish cannot clear `busy` under another.

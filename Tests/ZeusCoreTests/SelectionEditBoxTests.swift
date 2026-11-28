@@ -86,4 +86,14 @@ struct SelectionEditBoxTests {
         #expect(SelectionRewrite.plan(utterance: "insert \u{200B}", selection: "hello")?.after == "\u{200B}")
         #expect(SelectionEditBox.plan(utterance: "   ", selection: "kept") == nil)
     }
+
+    @Test func aSecretSelectionIsNotShownOrRewritten() {
+        #expect(SelectionEditBox.plan(utterance: "make this shorter", selection: "password") == nil)
+        #expect(SelectionEditBox.plan(utterance: "make this shorter", selection: "API key") == nil)
+        #expect(SelectionEditBox.plan(utterance: "insert password", selection: "hello") == nil)
+        #expect(SelectionEditBox.plan(utterance: "reply to this. PIN", selection: "hello") == nil)
+        let note = SelectionEditBox.plan(utterance: "make this shorter", selection: "change the password tomorrow please")
+        #expect(note?.kind == .replace)
+        #expect(note?.before == "change the password tomorrow please")
+    }
 }

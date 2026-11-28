@@ -3,6 +3,36 @@ import Observation
 import SwiftUI
 import ZeusCore
 
+/// The Modes card speaks the built-in mode in use and switch by app. It does not start dictation.
+enum DictationModeVoice {
+    static var speakMode: () -> Void = {}
+}
+
+/// The Recording card speaks the pill, the check, pause music, and typing. It does not start dictation.
+enum DictationRecordVoice {
+    static var speakRecord: () -> Void = {}
+}
+
+/// The start and stop sound speaks the chosen cue. It does not play it or change it.
+enum DictationSoundVoice {
+    static var speakSound: () -> Void = {}
+}
+
+/// Dictation's microphone and cue volume. A device name stays unspoken, and the cue is not played.
+enum DictateHearVoice {
+    static var speakHear: () -> Void = {}
+}
+
+/// The vocabulary speaks how many words and replacements are saved. The words stay unspoken.
+enum VocabSetupVoice {
+    static var speakVocab: () -> Void = {}
+}
+
+/// History speaks how long a dictation is kept. It does not open history or delete anything.
+enum DictationKeepVoice {
+    static var speakKeep: () -> Void = {}
+}
+
 /// Draft text for the Dictation page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -55,6 +85,10 @@ struct DictationSettingsPage: View {
         GSPageHeading(section: .dictation, subtitle: "Speak anywhere. Choose how it is written.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Recording") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how recording is set") { DictationRecordVoice.speakRecord() }
+            }
             GSToggleRow(symbol: "mic", title: "Dictation", text: "Hold the key to speak. Release to write it where your cursor is.",
                         isOn: Binding(get: { settings.enabled }, set: { settings.enabled = $0 }))
             GSDivider()
@@ -92,6 +126,10 @@ struct DictationSettingsPage: View {
         }
         soundCard
         GSCard("Voice glow") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the voice glow is set") { VoiceGlowSettings.speakGlow() }
+            }
             GSToggleRow(symbol: "sparkles", title: "Voice glow", text: "A soft glow on the recorder that rises with your voice and sweeps while it writes.",
                         isOn: Binding(get: { VoiceGlowSettings.shared.enabled }, set: { VoiceGlowSettings.shared.enabled = $0 }))
             GSDivider()
@@ -110,6 +148,10 @@ struct DictationSettingsPage: View {
             }
         }
         GSCard("Microphone") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the dictation microphone") { DictateHearVoice.speakHear() }
+            }
             GSRow(symbol: "mic.circle", title: "Input") {
                 GSPopup(selection: Binding(get: { micName(settings.microphoneUID) },
                                            set: { name in
@@ -144,9 +186,12 @@ struct DictationSettingsPage: View {
     @ViewBuilder private var soundCard: some View {
         GSCard("Sounds") {
             GSRow(symbol: "speaker.wave.2", title: "Start and stop sound", text: Self.cueDetail(settings.cueStyle)) {
-                GSPopup(selection: Binding(get: { settings.cueStyle.title },
-                                           set: { title in settings.cueStyle = DictationCueStyle(saved: title) }),
-                        options: DictationCueStyle.allCases.map(\.title), label: "Dictation start and stop sound")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { settings.cueStyle.title },
+                                               set: { title in settings.cueStyle = DictationCueStyle(saved: title) }),
+                            options: DictationCueStyle.allCases.map(\.title), label: "Dictation start and stop sound")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the dictation sound") { DictationSoundVoice.speakSound() }
+                }
             }
             GSDivider()
             GSRow(symbol: "play.circle", title: "Preview", text: "Plays the start sound, then the stop sound.") {
@@ -203,6 +248,10 @@ struct DictationSettingsPage: View {
     @ViewBuilder private var modesCard: some View {
         let modes = topBar?.dictationModes ?? DictationMode.builtIns
         GSCard("Modes") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the dictation mode") { DictationModeVoice.speakMode() }
+            }
             Text("A mode decides how your words are written. Voice writes exactly what you said. The others tidy it with your own AI first.")
                 .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
             ForEach(Array(modes.enumerated()), id: \.element.key) { index, mode in
@@ -294,6 +343,10 @@ struct DictationSettingsPage: View {
 
     @ViewBuilder private var vocabularyCard: some View {
         GSCard("Vocabulary") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the vocabulary is set") { VocabSetupVoice.speakVocab() }
+            }
             Text("Names and words to listen for, separated by commas. Replacements fix what is heard: write one per line as heard -> written.")
                 .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
             editorBox("Words", Binding(get: { page.wordsText }, set: { page.wordsText = $0 }), height: 64)
@@ -328,8 +381,11 @@ struct DictationSettingsPage: View {
     @ViewBuilder private var historyCard: some View {
         GSCard("History") {
             GSRow(symbol: "clock.arrow.circlepath", title: "Keep for", text: "Each dictation is saved on this Mac with its audio so you can write it again with another mode or engine.") {
-                GSPopup(selection: Binding(get: { Self.keepTitle(settings.keepDays) }, set: { settings.keepDays = Self.keepDays(for: $0) }),
-                        options: Self.keepChoices(including: settings.keepDays), label: "Keep history for")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { Self.keepTitle(settings.keepDays) }, set: { settings.keepDays = Self.keepDays(for: $0) }),
+                            options: Self.keepChoices(including: settings.keepDays), label: "Keep history for")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how long dictation is kept") { DictationKeepVoice.speakKeep() }
+                }
             }
             GSDivider()
             GSRow(symbol: "list.bullet.rectangle", title: "History") {

@@ -2,6 +2,22 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Visual explanation speaks the spoken-request shortcut and whether requests stay on this Mac. It does not start one.
+enum ExplainSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
+/// Narration voice, the explanation microphone, caption mode, and Whisper. Names stay unspoken. Nothing starts.
+enum ExplainHearVoice {
+    static var speakHear: () -> Void = {}
+    /// Caption mode while an explanation is open. Closed means off. Reading it does not stop narration.
+    static var captionOn: () -> Bool = { false }
+    /// The chosen explanation microphone, or nil for the system default. Reading it does not open the mic.
+    static var microphoneUID: () -> String? = { nil }
+    /// Whether a model already loaded by Zeus is used. Reading it does not download one.
+    static var whisperOn: () -> Bool = { false }
+}
+
 /// The real Chat surface. Controls call the production controller; no canned scene
 /// or simulated narration is substituted when a provider/permission is missing.
 @MainActor
@@ -208,10 +224,18 @@ struct ExplanationPane: View {
     }
     private var inputSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how visual explanation is set") { ExplainSetupVoice.speakSetup() }
+            }
             Text(modelDestination).font(.caption.weight(.medium))
             Toggle("Local-only model requests", isOn: Binding(get: { localOnly == "true" }, set: { controller.stop(); localOnly = $0 ? "true" : "false" }))
             Text("Local-only mode refuses remote endpoints. It never substitutes another provider.")
                 .font(.caption2).foregroundStyle(.secondary)
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how narration is set") { ExplainHearVoice.speakHear() }
+            }
             Toggle("Caption mode", isOn: Binding(get: { controller.muted }, set: { controller.setMuted($0) }))
             Text("Caption mode never synthesizes audio. Advance each beat yourself.").font(.caption2).foregroundStyle(.secondary)
             Picker("Narration voice", selection: Binding(get: { voiceIdentifier }, set: {

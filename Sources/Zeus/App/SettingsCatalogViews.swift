@@ -3,6 +3,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import ZeusCore
 
+/// The visual-explanation switch speaks whether it is on and whether an endpoint is ready. It does not start one.
+enum VisualReadyVoice {
+    static var speakReady: () -> Void = {}
+}
+
 /// The sidebar search capsule.
 struct SettingsSearchField: View {
     let navigation: SettingsNavigation
@@ -107,6 +112,11 @@ struct SettingsOptionCards: View {
     }
 }
 
+/// The system pointer speaks the settings switch and the engine. It does not move the pointer.
+enum PointerGlideVoice {
+    static var speakGlide: () -> Void = {}
+}
+
 struct SettingOptionRow: View {
     let option: SettingOption
     private var store: SettingsStore { .shared }
@@ -129,6 +139,26 @@ struct SettingOptionRow: View {
     @ViewBuilder private var control: some View {
         switch option.kind {
         case .toggle:
+            if option.id == "pointing.enabled" {
+                Button { PointingSettings.speakTrail() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say how the pointing trail is set")
+            }
+            if option.id == "talk.seeScreen" {
+                Button { TalkSightVoice.speakSight() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say how talk sight is set")
+            }
+            if option.id == "explanation.enabled" {
+                Button { VisualReadyVoice.speakReady() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say whether visual explanations are on")
+            }
+            if option.id == "present.physicalPointer" {
+                Button { PointerGlideVoice.speakGlide() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say the system pointer switch and engine")
+            }
             if option.id == "general.launchAtLogin" {
                 GlassToggle(isOn: Binding(get: { store.bool(option.id) },
                                           set: { store.set(option.id, $0 ? "true" : "false") }), label: option.title)
@@ -142,6 +172,16 @@ struct SettingOptionRow: View {
                     GlassSegmented(options: pairs, selection: store.stringBinding(option.id))
                 } else {
                     GlassMenu(options: pairs, selection: store.stringBinding(option.id))
+                }
+                if option.id == "pointing.shortcut" {
+                    Button { PointingSettings.speakKeys() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say which keys point")
+                }
+                if option.id == "pointing.provider" {
+                    Button { PointingSettings.speakRoute() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say who pointing asks")
                 }
                 if option.id.hasPrefix("sound."), option.id.hasSuffix("Style") {
                     Button { SoundStyles.preview(option: option.id) } label: { Image(systemName: "play.fill") }

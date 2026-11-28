@@ -3,6 +3,16 @@ import ApplicationServices
 import SwiftUI
 import ZeusCore
 
+/// Muted apps and trusted chats speak the counts. Names and projects stay unspoken.
+enum QuietSetupVoice {
+    static var speakQuiet: () -> Void = {}
+}
+
+/// The Other apps card speaks the mirror, the peek, and details. It does not read Notification Center.
+enum OtherAppsVoice {
+    static var speakApps: () -> Void = {}
+}
+
 /// Settings > Notifications: apps whose notifications stay out of the notch, plus the mirror, quiet-originals and banner rows.
 struct GSOtherAppsCards: View {
     @Bindable var notifications: NotificationsController = .shared
@@ -10,6 +20,10 @@ struct GSOtherAppsCards: View {
 
     var body: some View {
         GSCard("Other apps") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how other-app notices are set") { OtherAppsVoice.speakApps() }
+            }
             GSToggleRow(symbol: "bell.and.waves.left.and.right", title: "Show notifications from other apps in the notch",
                         text: "Reads Notification Center on this Mac. Needs Full Disk Access; nothing leaves your Mac.",
                         isOn: Binding(get: { notifications.enabled }, set: { notifications.enabled = $0 }))
@@ -127,6 +141,10 @@ struct GSTrustedChatsCard: View {
 
     var body: some View {
         GSCard("Trusted chats") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many apps are muted and chats are trusted") { QuietSetupVoice.speakQuiet() }
+            }
             GSRow(symbol: "checkmark.shield", title: "Chats you allowed", text: "\u{201C}Allow this whole chat\u{201D} approves a chat's requests without a card, except risky commands. Cleared when Zeus quits.") {
                 if !trusted.entries.isEmpty {
                     Button("Clear all") { trusted.clear() }.buttonStyle(GSButtonStyle())
