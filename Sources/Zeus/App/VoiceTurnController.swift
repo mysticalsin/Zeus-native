@@ -6549,6 +6549,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Voice glow card, or a spoken "how's the voice glow set", says the switch and the colors. It does not start dictation.
+    func sayVoiceGlow() {
+        presentVoiceGlow(speak: true)
+    }
+
+    private func answerVoiceGlow(speak: Bool) -> TurnResult {
+        presentVoiceGlow(speak: speak)
+        return TurnResult(spoken: voiceGlowLine())
+    }
+
+    private func presentVoiceGlow(speak: Bool) {
+        let parts = voiceGlowParts()
+        let line = VoiceGlowAsk.line(work: parts.work, color: parts.color)
+        let plan = VoiceGlowDraw.plan(work: parts.work, color: parts.color)
+        buddy.idle()
+        showVoiceGlow(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// On or off, and the color menu. An unset switch is on. An unknown stored color is Colorful, the same as the menu.
+    /// Reading them does not start dictation.
+    private func voiceGlowParts() -> (work: String, color: String) {
+        let work = (UserDefaults.standard.object(forKey: VoiceGlowSettings.enabledKey) as? Bool ?? true) ? "On" : "Off"
+        let color = VoiceGlowVariant.resolve(UserDefaults.standard.string(forKey: VoiceGlowSettings.variantKey)).title
+        return (work, color)
+    }
+
+    private func voiceGlowLine() -> String {
+        let parts = voiceGlowParts()
+        return VoiceGlowAsk.line(work: parts.work, color: parts.color)
+    }
+
+    /// Draws Glow, then the switch and the color set. The caller speaks the full line.
+    private func showVoiceGlow(_ plan: VoiceGlowDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVoiceGlow(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVoiceGlow(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVoiceGlow(_ plan: VoiceGlowDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7236,6 +7300,11 @@ final class VoiceTurnController {
         }
         if DictationModeAsk.matches(transcript) {
             let result = answerDictationMode(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VoiceGlowAsk.matches(transcript) {
+            let result = answerVoiceGlow(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

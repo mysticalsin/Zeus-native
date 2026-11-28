@@ -97,6 +97,10 @@ struct DictationSettingsPage: View {
         }
         soundCard
         GSCard("Voice glow") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the voice glow is set") { VoiceGlowSettings.speakGlow() }
+            }
             GSToggleRow(symbol: "sparkles", title: "Voice glow", text: "A soft glow on the recorder that rises with your voice and sweeps while it writes.",
                         isOn: Binding(get: { VoiceGlowSettings.shared.enabled }, set: { VoiceGlowSettings.shared.enabled = $0 }))
             GSDivider()

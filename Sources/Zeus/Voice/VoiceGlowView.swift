@@ -10,6 +10,8 @@ final class VoiceGlowSettings {
     static let shared = VoiceGlowSettings()
     static let enabledKey = "dictation.voiceGlow.enabled"
     static let variantKey = "dictation.voiceGlow.variant"
+    /// The Voice glow card speaks whether it is on and the color set. It does not start dictation.
+    static var speakGlow: () -> Void = {}
 
     var enabled: Bool { didSet { UserDefaults.standard.set(enabled, forKey: Self.enabledKey) } }
     var variant: VoiceGlowVariant { didSet { UserDefaults.standard.set(variant.rawValue, forKey: Self.variantKey) } }
