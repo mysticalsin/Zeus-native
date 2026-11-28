@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The voice style rows speak replies, personality, the orb, and the effect. They do not change the voice.
+enum VoiceStyleVoice {
+    static var speakStyle: () -> Void = {}
+}
+
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
     let navigation: GSNavigation
@@ -43,9 +48,12 @@ struct ZeusVoiceCards: View {
             GSToggleRow(symbol: "speaker.wave.2.fill", title: "Speak replies", text: "Zeus reads its answers aloud instead of only showing them.", isOn: SettingsStore.shared.boolBinding("voice.speakReplies"))
             GSDivider()
             GSRow(symbol: "theatermasks", title: "Personality") {
-                GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
-                    if let choice = ZeusPersonality.allCases.first(where: { $0.title == title }) { voice.personality = choice }
-                }), options: ZeusPersonality.allCases.map(\.title), label: "Personality")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { voice.personality.title }, set: { title in
+                        if let choice = ZeusPersonality.allCases.first(where: { $0.title == title }) { voice.personality = choice }
+                    }), options: ZeusPersonality.allCases.map(\.title), label: "Personality")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the voice is styled") { VoiceStyleVoice.speakStyle() }
+                }
             }
             GSDivider()
             GSRow(symbol: "circle.dashed", title: "Voice orb style") {

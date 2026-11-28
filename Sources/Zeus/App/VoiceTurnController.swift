@@ -7208,6 +7208,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The voice style rows, or a spoken "how's the voice styled", say replies, personality, the orb, and the effect. They do not change the voice.
+    func sayVoiceStyle() {
+        presentVoiceStyle(speak: true)
+    }
+
+    private func answerVoiceStyle(speak: Bool) -> TurnResult {
+        presentVoiceStyle(speak: speak)
+        return TurnResult(spoken: voiceStyleLine())
+    }
+
+    private func presentVoiceStyle(speak: Bool) {
+        let parts = voiceStyleParts()
+        let line = VoiceStyleAsk.line(speak: parts.speak, tone: parts.tone, orb: parts.orb, effect: parts.effect)
+        let plan = VoiceStyleDraw.plan(speak: parts.speak, tone: parts.tone, orb: parts.orb, effect: parts.effect)
+        buddy.idle()
+        showVoiceStyle(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Spoken replies, personality, the orb, and the Ultron effect. An unknown personality is Ultron. An unknown orb is Mascot.
+    /// Reading them does not change the voice.
+    private func voiceStyleParts() -> (speak: String, tone: String, orb: String, effect: String) {
+        let speak = SettingsStore.shared.bool("voice.speakReplies") ? "On" : "Off"
+        let tone = ZeusPersonality.current().title
+        let orb = VoiceOrbStyle.resolve(UserDefaults.standard.string(forKey: VoiceOrbStyle.defaultsKey)).title
+        let effect = UltronVoiceEffect.enabled ? "On" : "Off"
+        return (speak, tone, orb, effect)
+    }
+
+    private func voiceStyleLine() -> String {
+        let parts = voiceStyleParts()
+        return VoiceStyleAsk.line(speak: parts.speak, tone: parts.tone, orb: parts.orb, effect: parts.effect)
+    }
+
+    /// Draws Tone, then speech, personality, the orb, and the effect. The caller speaks the full line.
+    private func showVoiceStyle(_ plan: VoiceStyleDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVoiceStyle(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVoiceStyle(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVoiceStyle(_ plan: VoiceStyleDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7945,6 +8011,11 @@ final class VoiceTurnController {
         }
         if RunningCardAsk.matches(transcript) {
             let result = answerRunningCard(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VoiceStyleAsk.matches(transcript) {
+            let result = answerVoiceStyle(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
