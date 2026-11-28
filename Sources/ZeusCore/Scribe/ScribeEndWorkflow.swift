@@ -14,7 +14,7 @@ public struct ScribeCallProcessIdentity: Equatable, Sendable {
     }
 
     fileprivate var isValid: Bool {
-        pid > 0 && !bundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        pid > 0 && !ScribeBundleIDBox.trimmedBundle(bundleID).isEmpty
             && launchedAt.isFinite && launchedAt >= 0
     }
 }
