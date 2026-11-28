@@ -13,6 +13,11 @@ enum FlickSetupVoice {
     static var speakFlick: () -> Void = {}
 }
 
+/// The name nearby Macs see, and how many Macs are paired. Names stay unspoken. Nothing is removed.
+enum FlingPeerVoice {
+    static var speakPeers: () -> Void = {}
+}
+
 /// Settings › Shelf: the Fling switch, who can see this Mac, where arrivals go, and the paired Macs. Every row is a
 /// catalog row (`scripts/gen-settings-catalog.py`); Fling does nothing until the first switch is on.
 @MainActor
@@ -48,7 +53,10 @@ struct ShelfSettingsPage: View {
             GSDivider()
             GSRow(symbol: "character.cursor.ibeam", title: "Name shown to nearby Macs",
                   text: "Leave empty to use this Mac's name. A paired Mac keeps the name it had when you paired.") {
-                GSTextInput(text: store.stringBinding("fling.deviceName"), placeholder: "This Mac's name", label: "Name shown to nearby Macs")
+                HStack(spacing: 8) {
+                    GSTextInput(text: store.stringBinding("fling.deviceName"), placeholder: "This Mac's name", label: "Name shown to nearby Macs")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Fling name and paired Macs") { FlingPeerVoice.speakPeers() }
+                }
             }
         }
         GSCard("Receiving") {
@@ -89,6 +97,10 @@ struct ShelfSettingsPage: View {
             GSInfo(text: "Zeus never sends on its own. A send needs a click, a drop or a flick from you.")
         }
         GSCard("Paired Macs") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Fling name and paired Macs") { FlingPeerVoice.speakPeers() }
+            }
             let paired = fling?.pairedMacs ?? []
             if paired.isEmpty {
                 GSEmptyState(symbol: "laptopcomputer.and.iphone", title: "No paired Macs yet",

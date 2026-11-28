@@ -11296,6 +11296,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Fling name, or a spoken "how many macs are paired", says whether a name is set and the paired count. Names stay unspoken.
+    func sayFlingPeers() {
+        presentFlingPeers(speak: true)
+    }
+
+    private func answerFlingPeers(speak: Bool) -> TurnResult {
+        presentFlingPeers(speak: speak)
+        return TurnResult(spoken: flingPeerLine())
+    }
+
+    private func presentFlingPeers(speak: Bool) {
+        let parts = flingPeerParts()
+        let line = FlingPeerAsk.line(name: parts.name, macs: parts.macs)
+        let plan = FlingPeerDraw.plan(name: parts.name, macs: parts.macs)
+        buddy.idle()
+        showFlingPeers(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether a display name is stored, and how many Macs are already paired. Reading them does not pair, remove, or advertise.
+    private func flingPeerParts() -> (name: String, macs: String) {
+        let named = !SettingsStore.shared.string("fling.deviceName").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let count = min(FlingService.current?.pairedMacs.count ?? 0, 99)
+        return (named ? "Chosen" : "None", String(count))
+    }
+
+    private func flingPeerLine() -> String {
+        let parts = flingPeerParts()
+        return FlingPeerAsk.line(name: parts.name, macs: parts.macs)
+    }
+
+    /// Draws Peers, then the name and the count. The caller speaks the full line.
+    private func showFlingPeers(_ plan: FlingPeerDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFlingPeers(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFlingPeers(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFlingPeers(_ plan: FlingPeerDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12343,6 +12406,11 @@ final class VoiceTurnController {
         }
         if CloudVoiceAsk.matches(transcript) {
             let result = answerCloudVoice(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FlingPeerAsk.matches(transcript) {
+            let result = answerFlingPeers(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
