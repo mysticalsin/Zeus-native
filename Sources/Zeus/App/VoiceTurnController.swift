@@ -3210,6 +3210,82 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Appearance page, or a spoken "is dark mode on", says whether the Mac is dark.
+    func sayDarkMode() {
+        presentDarkMode(speak: true)
+    }
+
+    private func answerDarkMode(speak: Bool) -> TurnResult {
+        presentDarkMode(speak: speak)
+        return TurnResult(spoken: darkModeLine())
+    }
+
+    /// Nil when macOS has no light-or-dark match.
+    private func macIsDark() -> Bool? {
+        let match = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        if match == .darkAqua { return true }
+        if match == .aqua { return false }
+        return nil
+    }
+
+    private func presentDarkMode(speak: Bool) {
+        guard let dark = macIsDark() else {
+            presentDarkModeUnread(speak: speak)
+            return
+        }
+        let line = DarkModeAsk.line(dark: dark)
+        let plan = DarkModeDraw.plan(dark: dark)
+        buddy.idle()
+        showDarkMode(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func darkModeLine() -> String {
+        guard let dark = macIsDark() else { return DarkModeAsk.unread }
+        return DarkModeAsk.line(dark: dark)
+    }
+
+    private func presentDarkModeUnread(speak: Bool) {
+        let line = DarkModeAsk.unread
+        let plan = DarkModeDraw.unread()
+        buddy.idle()
+        showDarkMode(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws Dark Mode: Mode, then Dark, Light, or Can't. The caller speaks the full line.
+    private func showDarkMode(_ plan: DarkModeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDarkMode(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDarkMode(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDarkMode(_ plan: DarkModeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3637,6 +3713,11 @@ final class VoiceTurnController {
         }
         if let who = RecordingAsk.who(in: transcript) {
             let result = answerRecording(who, speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DarkModeAsk.matches(transcript) {
+            let result = answerDarkMode(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -231,6 +231,12 @@ private struct AppearancePage: View {
             .padding(.bottom, 10)
             GSInfo(text: "Changes apply instantly.")
             GSDivider()
+            GSRow(symbol: "circle.lefthalf.filled", title: "Dark Mode", text: "Whether the Mac is using Dark Mode.") {
+                Button("Say it") { context.topBar?.speakDarkMode() }
+                    .buttonStyle(GSButtonStyle())
+                    .disabled(context.topBar == nil)
+            }
+            GSDivider()
             GSRow(symbol: "rectangle.3.group", title: "Home style", text: "The frame of the Home band: cards, no frame, or no frame with colour.") {
                 GSPopup(selection: SettingsStore.binding("appearance.homeStyle"), options: SettingsCatalog.option("appearance.homeStyle")?.choices ?? []).popupLabel("Home style")
             }
