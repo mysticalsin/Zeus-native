@@ -102,7 +102,7 @@ public struct LearnedShortcutStore: Equatable, Sendable {
     }
 
     static func normalize(_ phrase: String) -> String {
-        phrase.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        LearnedNormalizeBox.trimmedKey(phrase).lowercased()
     }
 }
 
