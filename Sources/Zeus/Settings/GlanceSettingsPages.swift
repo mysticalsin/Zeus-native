@@ -1367,6 +1367,11 @@ enum HaloEntranceVoice {
 }
 
 /// New chats speak whether Claude Code and Codex are offered and connected. Nothing is connected or changed.
+/// Privacy speaks project details, synced lyrics, and Chrome media. It does not fetch or change them.
+enum ShareSetupVoice {
+    static var speakShare: () -> Void = {}
+}
+
 enum OfferSetupVoice {
     static var speakOffer: () -> Void = {}
     static var claudeConnected: () -> Bool = { false }
@@ -1604,6 +1609,10 @@ private struct PrivacyPage: View {
                         text: "Turn off to hide commands and project names on cards.", detail: "Meeting mode hides them too.", isOn: bool("privacy.details"))
         }
         GSCard("Music") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what Zeus shares") { ShareSetupVoice.speakShare() }
+            }
             GSToggleRow(symbol: "text.quote", title: "Synced lyrics",
                         text: "Sends the song title and artist to fetch lyrics kept on this Mac.", detail: "Off until you turn it on.",
                         isOn: bool("privacy.lyrics"))

@@ -9024,6 +9024,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Shared details, or a spoken "what does Zeus share", say project details, lyrics, and Chrome media. Nothing is fetched or changed.
+    func sayShareSetup() {
+        presentShareSetup(speak: true)
+    }
+
+    private func answerShareSetup(speak: Bool) -> TurnResult {
+        presentShareSetup(speak: speak)
+        return TurnResult(spoken: shareSetupLine())
+    }
+
+    private func presentShareSetup(speak: Bool) {
+        let parts = shareSetupParts()
+        let line = ShareSetupAsk.line(details: parts.details, lyrics: parts.lyrics, chrome: parts.chrome)
+        let plan = ShareSetupDraw.plan(details: parts.details, lyrics: parts.lyrics, chrome: parts.chrome)
+        buddy.idle()
+        showShareSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether project details, synced lyrics, and Chrome media are on. Reading them does not fetch lyrics or open Chrome.
+    private func shareSetupParts() -> (details: String, lyrics: String, chrome: String) {
+        let store = SettingsStore.shared
+        func bit(_ id: String) -> String { store.bool(id) ? "On" : "Off" }
+        return (bit("privacy.details"), bit("privacy.lyrics"), bit("music.browserMedia"))
+    }
+
+    private func shareSetupLine() -> String {
+        let parts = shareSetupParts()
+        return ShareSetupAsk.line(details: parts.details, lyrics: parts.lyrics, chrome: parts.chrome)
+    }
+
+    /// Draws Share, then the three privacy switches. The caller speaks the full line.
+    private func showShareSetup(_ plan: ShareSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyShareSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyShareSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyShareSetup(_ plan: ShareSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9901,6 +9964,11 @@ final class VoiceTurnController {
         }
         if OfferSetupAsk.matches(transcript) {
             let result = answerOfferSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ShareSetupAsk.matches(transcript) {
+            let result = answerShareSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
