@@ -1,6 +1,14 @@
 import SwiftUI
 import ZeusCore
 
+/// The Chrome card speaks whether the bridge is registered and whether the extension is loaded.
+/// It does not connect Chrome or ping the extension.
+enum ChromeLinkVoice {
+    static var speakLink: () -> Void = {}
+    static var bridgeOn: () -> Bool = { false }
+    static var extensionOn: () -> Bool = { false }
+}
+
 struct PanelView: View {
     let connections: ConnectionsModel
     let permissions: PermissionsModel
@@ -64,6 +72,12 @@ struct PanelView: View {
             }
 
             Card(title: "Chrome") {
+                HStack {
+                    Spacer()
+                    Button { ChromeLinkVoice.speakLink() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Say how Chrome is connected")
+                }
                 StatusRow(name: "Bridge", ok: permissions.chromeHostInstalled,
                           detail: permissions.chromeHostInstalled ? "Registered" : "Off")
                     .accessibilityElement(children: .combine)

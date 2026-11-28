@@ -13092,6 +13092,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Chrome card, or a spoken "is Chrome connected", says the bridge and the extension already checked.
+    func sayChromeLink() {
+        presentChromeLink(speak: true)
+    }
+
+    private func answerChromeLink(speak: Bool) -> TurnResult {
+        presentChromeLink(speak: speak)
+        return TurnResult(spoken: chromeLinkLine())
+    }
+
+    private func presentChromeLink(speak: Bool) {
+        let parts = chromeLinkParts()
+        let line = ChromeLinkAsk.line(bridge: parts.bridge, loaded: parts.loaded)
+        let plan = ChromeLinkDraw.plan(bridge: parts.bridge, loaded: parts.loaded)
+        buddy.idle()
+        showChromeLink(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The bridge and extension the Chrome card already shows. Reading them does not connect Chrome or ping the extension.
+    private func chromeLinkParts() -> (bridge: String, loaded: String) {
+        let bridge = ChromeLinkVoice.bridgeOn() ? "Registered" : "Off"
+        let loaded = ChromeLinkVoice.extensionOn() ? "Connected" : "Not loaded"
+        return (bridge, loaded)
+    }
+
+    private func chromeLinkLine() -> String {
+        let parts = chromeLinkParts()
+        return ChromeLinkAsk.line(bridge: parts.bridge, loaded: parts.loaded)
+    }
+
+    /// Draws Chrome, then the bridge and the extension. The caller speaks the full line.
+    private func showChromeLink(_ plan: ChromeLinkDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyChromeLink(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyChromeLink(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyChromeLink(_ plan: ChromeLinkDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14274,6 +14337,11 @@ final class VoiceTurnController {
         }
         if ClipboardFilterAsk.matches(transcript) {
             let result = answerClipboardFilter(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ChromeLinkAsk.matches(transcript) {
+            let result = answerChromeLink(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

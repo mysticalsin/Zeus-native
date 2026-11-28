@@ -399,6 +399,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PlaybackModeVoice.speakModes = { [weak self] in self?.voice.sayPlaybackMode() }
             ReminderListVoice.speakList = { [weak self] in self?.voice.sayReminderList() }
             ClipboardFilterVoice.speakFilter = { [weak self] in self?.voice.sayClipboardFilter() }
+            ChromeLinkVoice.bridgeOn = { [weak self] in self?.permissions.chromeHostInstalled ?? false }
+            ChromeLinkVoice.extensionOn = { [weak self] in self?.permissions.chromeConnected ?? false }
+            ChromeLinkVoice.speakLink = { [weak self] in self?.voice.sayChromeLink() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

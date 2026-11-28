@@ -457,6 +457,12 @@ struct SettingsView: View {
                     }
                 }
                 GlassCard(title: "Chrome") {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button { ChromeLinkVoice.speakLink() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say how Chrome is connected")
+                    }
                     GlassRow(title: "Bridge", note: permissions.chromeMessage, icon: ("globe", Color(hex: 0x4285F4))) {
                         HStack(spacing: 8) {
                             GlassStatus(ok: permissions.chromeHostInstalled, text: permissions.chromeHostInstalled ? "Registered" : "Off")
