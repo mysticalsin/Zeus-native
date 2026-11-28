@@ -113,7 +113,7 @@ public enum AgentRouter {
             let name = agent.name.lowercased()
             for lead in ["ask \(name) to ", "ask \(name) ", "hey \(name), ", "hey \(name) ", "\(name), ", "\(name): "] {
                 guard lower.hasPrefix(lead) else { continue }
-                let rest = String(text.dropFirst(lead.count)).trimmingCharacters(in: .whitespaces)
+                let rest = AgentRouterRestBox.trimmedRest(String(text.dropFirst(lead.count)))
                 guard !rest.isEmpty else { return nil }
                 let restLower = rest.lowercased()
                 for cue in ["remember that ", "remember "] where restLower.hasPrefix(cue) {
