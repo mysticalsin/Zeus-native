@@ -3813,6 +3813,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Polyglot page, or a spoken "is translation on", says the phase and the language.
+    func sayPolyglot() {
+        presentPolyglot(speak: true)
+    }
+
+    private func answerPolyglot(speak: Bool) -> TurnResult {
+        presentPolyglot(speak: speak)
+        return TurnResult(spoken: polyglotLine())
+    }
+
+    /// The word the Polyglot page shows, and the language it translates to. Captions stay off.
+    private func polyglotFacts() -> (phase: String, language: String) {
+        let polyglot = PolyglotController.shared
+        let phase: String
+        if polyglot.isStarting { phase = PolyglotStatusAsk.starting }
+        else if polyglot.isListening { phase = "Listening" }
+        else { phase = "Ready" }
+        return (phase, PolyglotLanguage.name(for: polyglot.settings.target))
+    }
+
+    private func presentPolyglot(speak: Bool) {
+        let facts = polyglotFacts()
+        let line = PolyglotStatusAsk.line(seen: true, phase: facts.phase, language: facts.language)
+        let plan = PolyglotStatusDraw.plan(seen: true, phase: facts.phase, language: facts.language)
+        buddy.idle()
+        showPolyglot(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func polyglotLine() -> String {
+        let facts = polyglotFacts()
+        return PolyglotStatusAsk.line(seen: true, phase: facts.phase, language: facts.language)
+    }
+
+    /// Draws Polyglot: Polyglot, then Ready, Listening, or Starting, then the language.
+    private func showPolyglot(_ plan: PolyglotStatusDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPolyglot(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPolyglot(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPolyglot(_ plan: PolyglotStatusDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4285,6 +4351,11 @@ final class VoiceTurnController {
         }
         if DictationLiveAsk.matches(transcript) {
             let result = answerDictation(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PolyglotStatusAsk.matches(transcript) {
+            let result = answerPolyglot(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

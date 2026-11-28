@@ -333,6 +333,8 @@ final class TopBarModel {
     var speakWords: () -> Void = {}
     /// The dictation page speaks whether dictation is on. The words being heard stay off.
     var speakDictation: () -> Void = {}
+    /// The Polyglot page speaks whether live translation is on. Captions stay off.
+    var speakPolyglot: () -> Void = {}
     /// The Scribe and Recordly pages speak whether a recording is running.
     var speakRecording: () -> Void = {}
     /// The Appearance page speaks whether the Mac is using Dark Mode.
