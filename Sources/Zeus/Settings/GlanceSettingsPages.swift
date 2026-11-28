@@ -457,6 +457,10 @@ private struct AppearancePage: View {
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Light thickness")
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the halo meets the screen") { HaloWashVoice.speakWash() }
+            }
             GSToggleRow(symbol: "dot.radiowaves.left.and.right", title: "Light wave to the screen edges", text: "A wave of light leaves the notch when an agent starts or finishes.", detail: "The wave ripples across the screen and fades.", isOn: bool("halo.edgeWave"))
         }
         GSCard("Small moments, softly signaled") {
@@ -1380,6 +1384,11 @@ enum TalkMicVoice {
 /// The halo entrance speaks the animation. It does not play it or change it.
 enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
+}
+
+/// The halo wash speaks the wallpaper match and the edge wave. It does not sample the desktop or flash the wave.
+enum HaloWashVoice {
+    static var speakWash: () -> Void = {}
 }
 
 /// Arrival lights speak the AirDrop glow, the screenshot cue, and whether those folders were asked. Nothing is listed.

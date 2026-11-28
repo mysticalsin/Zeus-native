@@ -9419,6 +9419,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The halo wash, or a spoken "does the halo match the wallpaper", says the match and the edge wave. Nothing is sampled or flashed.
+    func sayHaloWash() {
+        presentHaloWash(speak: true)
+    }
+
+    private func answerHaloWash(speak: Bool) -> TurnResult {
+        presentHaloWash(speak: speak)
+        return TurnResult(spoken: haloWashLine())
+    }
+
+    private func presentHaloWash(speak: Bool) {
+        let parts = haloWashParts()
+        let line = HaloWashAsk.line(wallpaper: parts.wallpaper, edge: parts.edge)
+        let plan = HaloWashDraw.plan(wallpaper: parts.wallpaper, edge: parts.edge)
+        buddy.idle()
+        showHaloWash(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether the halo matches the wallpaper, and whether the edge wave is on. Reading them does not sample the desktop.
+    private func haloWashParts() -> (wallpaper: String, edge: String) {
+        let store = SettingsStore.shared
+        func bit(_ id: String) -> String { store.bool(id) ? "On" : "Off" }
+        return (bit("halo.wallpaper"), bit("halo.edgeWave"))
+    }
+
+    private func haloWashLine() -> String {
+        let parts = haloWashParts()
+        return HaloWashAsk.line(wallpaper: parts.wallpaper, edge: parts.edge)
+    }
+
+    /// Draws Wash, then the wallpaper match and the edge wave. The caller speaks the full line.
+    private func showHaloWash(_ plan: HaloWashDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHaloWash(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHaloWash(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHaloWash(_ plan: HaloWashDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10326,6 +10389,11 @@ final class VoiceTurnController {
         }
         if ArrivalLightsAsk.matches(transcript) {
             let result = answerArrivalLights(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HaloWashAsk.matches(transcript) {
+            let result = answerHaloWash(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
