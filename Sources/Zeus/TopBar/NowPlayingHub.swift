@@ -26,6 +26,8 @@ extension TopBarModel.MusicCommand {
 @MainActor
 final class NowPlayingHub {
     static let followSettingID = "music.follow"
+    /// The Show music from menu speaks which player the notch follows. It does not start playback.
+    static var speakSource: () -> Void = {}
 
     /// Everything the hub does to the outside world. The defaults do nothing, so a test names only what it watches.
     struct Ports {

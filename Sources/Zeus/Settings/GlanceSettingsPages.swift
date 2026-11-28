@@ -421,8 +421,11 @@ private struct AppearancePage: View {
     private var musicSourceCard: some View {
         GSCard("Music source") {
             GSRow(symbol: "music.note.list", title: "Show music from") {
-                GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
-                        options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which player the notch shows") { NowPlayingHub.speakSource() }
+                    GSPopup(selection: SettingsStore.binding(NowPlayingHub.followSettingID),
+                            options: SettingsCatalog.option(NowPlayingHub.followSettingID)?.choices ?? []).popupLabel("Show music from")
+                }
             }
         }
     }
