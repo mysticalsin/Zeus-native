@@ -1036,9 +1036,12 @@ struct ClipboardPage: View {
 
     var body: some View {
         if topBar.clipboard.entries.isEmpty {
-            AccessPrompt(symbol: "doc.on.clipboard", title: "Clipboard empty",
-                         detail: "Copy anything. Click an item to copy it again. Passwords that password managers mark as concealed are never kept.",
-                         button: nil) {}
+            VStack(spacing: 8) {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many clips") { topBar.speakClipboard() }
+                AccessPrompt(symbol: "doc.on.clipboard", title: "Clipboard empty",
+                             detail: "Copy anything. Click an item to copy it again. Passwords that password managers mark as concealed are never kept.",
+                             button: nil) {}
+            }
         } else {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
@@ -1064,6 +1067,7 @@ struct ClipboardPage: View {
                             .frame(width: 130, height: 22)
                             .accessibilityLabel("Search the clipboard")
                     }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many clips") { topBar.speakClipboard() }
                     GlyphButton(symbol: "trash", size: 10, tint: Theme.cloudSecondary, label: "Clear clipboard") {
                         topBar.clipboard.clear()
                     }

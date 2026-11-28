@@ -2784,6 +2784,88 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The clipboard page, or a spoken "how many clips", says the count and draws the kind.
+    /// The words on the clipboard stay off the card.
+    func sayClipboard() {
+        presentClipboard(speak: true)
+    }
+
+    private func answerClipboard(speak: Bool) -> TurnResult {
+        presentClipboard(speak: speak)
+        return TurnResult(spoken: clipboardLine())
+    }
+
+    private func clipboardFacts() -> (count: Int, kind: String) {
+        let entries = notch.topBar?.clipboard.entries ?? []
+        let kind: String
+        switch entries.first?.kind {
+        case .text: kind = "text"
+        case .link: kind = "link"
+        case .image: kind = "image"
+        case .file: kind = "file"
+        case nil: kind = ""
+        }
+        return (entries.count, kind)
+    }
+
+    private func presentClipboard(speak: Bool) {
+        let facts = clipboardFacts()
+        guard let line = ClipboardCountAsk.line(count: facts.count, kind: facts.kind),
+              let plan = ClipboardCountDraw.plan(count: facts.count, kind: facts.kind) else {
+            presentClipboardEmpty(speak: speak)
+            return
+        }
+        buddy.idle()
+        showClipboard(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func clipboardLine() -> String {
+        let facts = clipboardFacts()
+        return ClipboardCountAsk.line(count: facts.count, kind: facts.kind) ?? ClipboardCountAsk.empty
+    }
+
+    private func presentClipboardEmpty(speak: Bool) {
+        let line = ClipboardCountAsk.empty
+        let plan = ClipboardCountDraw.empty()
+        buddy.idle()
+        showClipboard(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the clipboard count: Clips, then the count or the kind. The caller speaks the full line.
+    private func showClipboard(_ plan: ClipboardCountDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyClipboard(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyClipboard(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyClipboard(_ plan: ClipboardCountDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3181,6 +3263,11 @@ final class VoiceTurnController {
         }
         if WeekAsk.matches(transcript) {
             let result = answerWeek(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ClipboardCountAsk.matches(transcript) {
+            let result = answerClipboard(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

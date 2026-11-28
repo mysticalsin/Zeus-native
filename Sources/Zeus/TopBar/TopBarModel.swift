@@ -325,6 +325,8 @@ final class TopBarModel {
     var speakRain: () -> Void = {}
     /// The week grid speaks the week number and how many events it holds.
     var speakWeek: () -> Void = {}
+    /// The clipboard page speaks how many clips are kept, never the words on them.
+    var speakClipboard: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {
