@@ -11148,6 +11148,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Kokoro, or a spoken "how is kokoro set", says whether the model is on this Mac and which voice is chosen.
+    func sayKokoroSetup() {
+        presentKokoroSetup(speak: true)
+    }
+
+    private func answerKokoroSetup(speak: Bool) -> TurnResult {
+        presentKokoroSetup(speak: speak)
+        return TurnResult(spoken: kokoroSetupLine())
+    }
+
+    private func presentKokoroSetup(speak: Bool) {
+        let parts = kokoroSetupParts()
+        let line = KokoroSetupAsk.line(setup: parts.setup, voice: parts.voice)
+        let plan = KokoroSetupDraw.plan(setup: parts.setup, voice: parts.voice)
+        buddy.idle()
+        showKokoroSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The model files and the saved voice. An unknown voice is Michael. Reading them does not download or play.
+    private func kokoroSetupParts() -> (setup: String, voice: String) {
+        let id = UserDefaults.standard.string(forKey: "voice.kokoro.voice") ?? UltronCloudVoice.kokoroVoice
+        let voice = VoiceSettings.kokoroVoices.first { $0.id == id }.map {
+            KokoroVoiceLabels.pickerTitle(voiceID: $0.id, longName: $0.name)
+        } ?? "Michael (US)"
+        return (KokoroWorker.modelFilesPresent() ? "Ready" : "Not set up", voice)
+    }
+
+    private func kokoroSetupLine() -> String {
+        let parts = kokoroSetupParts()
+        return KokoroSetupAsk.line(setup: parts.setup, voice: parts.voice)
+    }
+
+    /// Draws Kokoro, then the setup and the voice. The caller speaks the full line.
+    private func showKokoroSetup(_ plan: KokoroSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyKokoroSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyKokoroSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyKokoroSetup(_ plan: KokoroSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12185,6 +12250,11 @@ final class VoiceTurnController {
         }
         if ChatModelAsk.matches(transcript) {
             let result = answerChatModel(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if KokoroSetupAsk.matches(transcript) {
+            let result = answerKokoroSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

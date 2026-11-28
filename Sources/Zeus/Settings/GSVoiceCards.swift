@@ -16,6 +16,11 @@ enum VoiceTuneVoice {
     static var speakTune: () -> Void = {}
 }
 
+/// Kokoro speaks whether the model is on this Mac and which of the nine voices is chosen. It does not download or play.
+enum KokoroSetupVoice {
+    static var speakKokoro: () -> Void = {}
+}
+
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
     let navigation: GSNavigation
@@ -229,6 +234,10 @@ struct ZeusVoiceCards: View {
             }
             if voice.ttsProvider == .kokoro || voice.kokoroReady || voice.settingUpKokoro {
                 GSDivider()
+                HStack {
+                    Spacer(minLength: 0)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Kokoro is set") { KokoroSetupVoice.speakKokoro() }
+                }
                 GSRow(symbol: "waveform.circle", title: "Kokoro on this Mac", text: kokoroText) {
                     if voice.settingUpKokoro { ProgressView().controlSize(.small) }
                     else if voice.kokoroReady { GSStatus(ok: true, text: "Ready") }
