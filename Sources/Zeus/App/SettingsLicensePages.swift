@@ -20,6 +20,8 @@ struct AssistantSettings: View {
     let account: AssistantAccount
     let drafts: SecretDrafts
     private var store: SettingsStore { .shared }
+    /// The Provider menu speaks who answers. It does not read a key.
+    static var speakProvider: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: Glass.gap) {
@@ -55,8 +57,13 @@ struct AssistantSettings: View {
             }
             GlassCard(title: "Model") {
                 GlassRow(title: "Provider", note: "Who answers in chat and drafts replies.") {
-                    GlassSegmented(options: [("Claude CLI", "Claude CLI"), ("OpenAI", "OpenAI"), ("Anthropic", "Anthropic")],
-                                   selection: store.stringBinding("assistant.provider"))
+                    HStack(spacing: 6) {
+                        Button { AssistantSettings.speakProvider() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say who answers")
+                        GlassSegmented(options: [("Claude CLI", "Claude CLI"), ("OpenAI", "OpenAI"), ("Anthropic", "Anthropic")],
+                                       selection: store.stringBinding("assistant.provider"))
+                    }
                 }
                 GlassDivider()
                 GlassRow(title: "Model", note: modelNote) {

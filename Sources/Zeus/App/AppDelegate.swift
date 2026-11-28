@@ -364,6 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotchController.speakNotch = { [weak self] in self?.voice.sayNotchPlace() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
+            AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
