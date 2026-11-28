@@ -7,6 +7,11 @@ enum RecordlyExportVoice {
     static var speakExport: () -> Void = {}
 }
 
+/// Recordly capture speaks the source and system audio. It does not start a recording or list windows.
+enum RecordlyCaptureVoice {
+    static var speakCapture: () -> Void = {}
+}
+
 struct RecordlyPage: View {
     let topBar: TopBarModel
     let recordly: RecordlyController
@@ -21,6 +26,7 @@ struct RecordlyPage: View {
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many screens") { topBar.speakScreens() }
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if recording") { topBar.speakRecording() }
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Recordly export is set") { RecordlyExportVoice.speakExport() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what Recordly captures") { RecordlyCaptureVoice.speakCapture() }
             }
             HStack(spacing: 8) {
             Tile(padding: 0) {
@@ -298,6 +304,7 @@ private struct RecordlyGrid: View {
         VStack(alignment: .leading, spacing: RecordlyRecordLayout.sectionGap) {
             HStack(spacing: 10) {
                 RecordlySourceSwitcher(recordly: recordly)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what Recordly captures") { RecordlyCaptureVoice.speakCapture() }
                 Spacer(minLength: 8)
                 if !recordly.screenRecordingGranted {
                     RecordlyPermissionPill(recordly: recordly, compact: false).transition(.opacity)

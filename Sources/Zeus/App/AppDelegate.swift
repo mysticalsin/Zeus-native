@@ -390,6 +390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             LiveTouchVoice.speakTouch = { [weak self] in self?.voice.sayLiveTouch() }
             PointerGlideVoice.speakGlide = { [weak self] in self?.voice.sayPointerGlide() }
             RoutineListVoice.speakList = { [weak self] in self?.voice.sayRoutineList() }
+            RecordlyCaptureVoice.speakCapture = { [weak self] in self?.voice.sayRecordlyCapture() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
