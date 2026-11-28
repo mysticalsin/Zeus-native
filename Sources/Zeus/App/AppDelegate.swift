@@ -386,6 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             BeamerSetupVoice.speakSetup = { [weak self] in self?.voice.sayBeamerSetup() }
             PolyglotSettings.speakCaptions = { [weak self] in self?.voice.sayCaptionSetup() }
             PolyglotSettings.speakChord = { [weak self] in self?.voice.sayPolyglotChord() }
+            AwakeHoldVoice.speakHold = { [weak self] in self?.voice.sayAwakeHold() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

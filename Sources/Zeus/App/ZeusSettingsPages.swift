@@ -221,6 +221,11 @@ struct StickiesSettingsPage: View {
     }
 }
 
+/// The keep-awake options speak the display hold and whether agents keep the Mac awake. They do not start a session.
+enum AwakeHoldVoice {
+    static var speakHold: () -> Void = {}
+}
+
 struct KeepAwakeSettingsPage: View {
     private var session: KeepAwakeSession { .shared }
 
@@ -287,6 +292,12 @@ struct KeepAwakeSettingsPage: View {
                 }
             }
             GlassCard(title: "Options") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { AwakeHoldVoice.speakHold() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say the keep awake options")
+                }
                 GlassRow(title: "Also keep the display awake", note: "Uses a separate display assertion. Releases when the session ends.") {
                     GlassToggle(isOn: Binding(
                         get: { session.keepDisplay },
