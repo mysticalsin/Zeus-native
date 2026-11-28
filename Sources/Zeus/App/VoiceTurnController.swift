@@ -12824,6 +12824,73 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The focus lengths, or a spoken "how long is a focus round", say the round and the break. Nothing is started.
+    func sayFocusLength() {
+        presentFocusLength(speak: true)
+    }
+
+    private func answerFocusLength(speak: Bool) -> TurnResult {
+        presentFocusLength(speak: speak)
+        return TurnResult(spoken: focusLengthLine())
+    }
+
+    private func presentFocusLength(speak: Bool) {
+        let parts = focusLengthParts()
+        let line = FocusLengthAsk.line(focus: parts.focus, rest: parts.rest)
+        let plan = FocusLengthDraw.plan(focus: parts.focus, rest: parts.rest)
+        buddy.idle()
+        showFocusLength(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved round and break. A missing clock uses 25 and 5 minutes. Reading them does not start a round.
+    private func focusLengthParts() -> (focus: String, rest: String) {
+        func minutes(_ seconds: TimeInterval) -> Int {
+            min(max(Int((seconds / 60).rounded()), 1), FocusTimer.longestMinutes)
+        }
+        let clock = notch.topBar?.focus
+        let focus = minutes(clock?.focusLength ?? FocusTimerBox.defaultFocusLength)
+        let rest = minutes(clock?.restLength ?? FocusTimerBox.defaultRestLength)
+        return (String(focus), String(rest))
+    }
+
+    private func focusLengthLine() -> String {
+        let parts = focusLengthParts()
+        return FocusLengthAsk.line(focus: parts.focus, rest: parts.rest)
+    }
+
+    /// Draws Round, then the focus and the break. The caller speaks the full line.
+    private func showFocusLength(_ plan: FocusLengthDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFocusLength(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFocusLength(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFocusLength(_ plan: FocusLengthDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -13986,6 +14053,11 @@ final class VoiceTurnController {
         }
         if ModelCapAsk.matches(transcript) {
             let result = answerModelCap(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FocusLengthAsk.matches(transcript) {
+            let result = answerFocusLength(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

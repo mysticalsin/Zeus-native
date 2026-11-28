@@ -1266,6 +1266,11 @@ struct ShelfCell: View {
     }
 }
 
+/// The focus page speaks the round length and the break. It does not start a round.
+enum FocusLengthVoice {
+    static var speakLength: () -> Void = {}
+}
+
 struct FocusPage: View {
     let topBar: TopBarModel
 
@@ -1306,6 +1311,7 @@ struct FocusPage: View {
                         Text("Rounds today: \(timer.roundsToday(at: context.date))").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
                         Spacer(minLength: 0)
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many rounds") { topBar.speakRounds() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the focus and break lengths") { FocusLengthVoice.speakLength() }
                     }
                     Text("Drag the ring to set the time").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
                     HStack(spacing: 6) {

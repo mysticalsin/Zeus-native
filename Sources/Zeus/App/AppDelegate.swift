@@ -395,6 +395,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AskFinishVoice.speakAsks = { [weak self] in self?.voice.sayAskFinish() }
             ShareSeenVoice.speakSeen = { [weak self] in self?.voice.sayShareSeen() }
             ModelCapVoice.speakCap = { [weak self] in self?.voice.sayModelCap() }
+            FocusLengthVoice.speakLength = { [weak self] in self?.voice.sayFocusLength() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
