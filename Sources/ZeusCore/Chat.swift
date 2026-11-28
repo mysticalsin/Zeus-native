@@ -53,7 +53,7 @@ public struct ChatConversation: Codable, Equatable, Identifiable, Sendable {
 
     /// The stored title, else the first thing the person asked, cut at a word near 48 characters.
     public var displayTitle: String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = ChatTitleBox.trimmedTitle(title)
         if !trimmed.isEmpty { return trimmed }
         guard let first = messages.first(where: { $0.role == .user })?.text else { return Self.untitled }
         return Self.shorten(first, to: 48)
