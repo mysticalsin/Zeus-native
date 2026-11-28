@@ -10199,6 +10199,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Muted apps and trusted chats, or a spoken "how many apps are muted", say the two counts. Names stay unspoken.
+    func sayQuietSetup() {
+        presentQuietSetup(speak: true)
+    }
+
+    private func answerQuietSetup(speak: Bool) -> TurnResult {
+        presentQuietSetup(speak: speak)
+        return TurnResult(spoken: quietSetupLine())
+    }
+
+    private func presentQuietSetup(speak: Bool) {
+        let parts = quietSetupParts()
+        let line = QuietSetupAsk.line(muted: parts.muted, trusted: parts.trusted)
+        let plan = QuietSetupDraw.plan(muted: parts.muted, trusted: parts.trusted)
+        buddy.idle()
+        showQuietSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// How many apps are muted, and how many chats are trusted. Reading them does not unmute, clear, or speak a name.
+    private func quietSetupParts() -> (muted: String, trusted: String) {
+        let muted = NotificationPeekRules.mutedSet(SettingsStore.shared.string("notify.mutedApps")).count
+        let trusted = TrustedChatStore.shared.entries.count
+        return (String(muted), String(trusted))
+    }
+
+    private func quietSetupLine() -> String {
+        let parts = quietSetupParts()
+        return QuietSetupAsk.line(muted: parts.muted, trusted: parts.trusted)
+    }
+
+    /// Draws Quiet, then the two counts. The caller speaks the full line.
+    private func showQuietSetup(_ plan: QuietSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyQuietSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyQuietSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyQuietSetup(_ plan: QuietSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11166,6 +11229,11 @@ final class VoiceTurnController {
         }
         if NotchFitAsk.matches(transcript) {
             let result = answerNotchFit(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if QuietSetupAsk.matches(transcript) {
+            let result = answerQuietSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
