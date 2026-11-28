@@ -3,6 +3,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import ZeusCore
 
+/// The visual-explanation switch speaks whether it is on and whether an endpoint is ready. It does not start one.
+enum VisualReadyVoice {
+    static var speakReady: () -> Void = {}
+}
+
 /// The sidebar search capsule.
 struct SettingsSearchField: View {
     let navigation: SettingsNavigation
@@ -138,6 +143,11 @@ struct SettingOptionRow: View {
                 Button { TalkSightVoice.speakSight() } label: { Image(systemName: "speaker.wave.2.fill") }
                     .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
                     .accessibilityLabel("Say how talk sight is set")
+            }
+            if option.id == "explanation.enabled" {
+                Button { VisualReadyVoice.speakReady() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say whether visual explanations are on")
             }
             if option.id == "general.launchAtLogin" {
                 GlassToggle(isOn: Binding(get: { store.bool(option.id) },
