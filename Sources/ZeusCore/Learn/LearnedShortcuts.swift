@@ -121,7 +121,7 @@ public enum NamedShortcutPhrase {
             action = String(rest[rest.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
         } else if let range = rest.lowercased().range(of: " do ") {
             phrase = String(rest[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
-            action = String(rest[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            action = LearnedDoActionCutBox.trimmedDoActionCut(String(rest[range.upperBound...]))
         } else {
             return nil
         }
