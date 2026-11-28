@@ -150,6 +150,11 @@ final class SettingsNavigation {
     }
 }
 
+/// Show me speaks circling on the screen and whether safe steps run without asking. It does not start a mark.
+enum ShowMeVoice {
+    static var speakShow: () -> Void = {}
+}
+
 struct SettingsView: View {
     let connections: ConnectionsModel
     let preferences: Preferences
@@ -320,6 +325,12 @@ struct SettingsView: View {
                 }
             }
             GlassCard(title: "Show me and drive") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { ShowMeVoice.speakShow() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how show me is set")
+                }
                 GlassRow(title: "Draw on screen", note: "Hold the left Control key, then circle or underline anything. ZEUS answers about that spot.") {
                     GlassToggle(isOn: $annotateEnabled, label: "Show me")
                 }
