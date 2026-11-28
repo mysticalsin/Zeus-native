@@ -109,7 +109,7 @@ public struct LearnedShortcutStore: Equatable, Sendable {
 public enum NamedShortcutPhrase {
     /// "When I say focus mode, close Slack and open Notes".
     public static func parse(_ text: String) -> (phrase: String, steps: [String])? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = LearnedUtteranceBox.trimmedUtterance(text)
         let lower = trimmed.lowercased()
         let prefix = "when i say "
         guard lower.hasPrefix(prefix) else { return nil }
