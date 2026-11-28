@@ -7543,6 +7543,84 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The language packs, or a spoken "which language packs", say the four packs. They do not install or remove one.
+    func sayLanguagePacks() {
+        presentLanguagePacks(speak: true)
+    }
+
+    private func answerLanguagePacks(speak: Bool) -> TurnResult {
+        presentLanguagePacks(speak: speak)
+        return TurnResult(spoken: languagePackLine())
+    }
+
+    private func presentLanguagePacks(speak: Bool) {
+        let parts = languagePackParts()
+        let line = LanguagePackAsk.line(english: parts.english, french: parts.french, spanish: parts.spanish, portuguese: parts.portuguese)
+        let plan = LanguagePackDraw.plan(english: parts.english, french: parts.french, spanish: parts.spanish, portuguese: parts.portuguese)
+        buddy.idle()
+        showLanguagePacks(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The four packs in card order. Reading them does not install or remove a pack.
+    private func languagePackParts() -> (english: String, french: String, spanish: String, portuguese: String) {
+        let state = LanguagePackController.shared.state
+        func word(_ status: LanguagePackStatus) -> String {
+            switch status {
+            case .installed: "Installed"
+            case .installing: "Installing"
+            case .queued: "Queued"
+            case .deferredForLowPower: "Waiting"
+            case .failed: "Failed"
+            case .unsupportedOnThisMac: "Unavailable"
+            case .notInstalled: "Missing"
+            }
+        }
+        return (
+            word(state.status(of: .english)),
+            word(state.status(of: .french)),
+            word(state.status(of: .spanish)),
+            word(state.status(of: .portuguese))
+        )
+    }
+
+    private func languagePackLine() -> String {
+        let parts = languagePackParts()
+        return LanguagePackAsk.line(english: parts.english, french: parts.french, spanish: parts.spanish, portuguese: parts.portuguese)
+    }
+
+    /// Draws Packs, then English, French, Spanish and Portuguese. The caller speaks the full line.
+    private func showLanguagePacks(_ plan: LanguagePackDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyLanguagePacks(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyLanguagePacks(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyLanguagePacks(_ plan: LanguagePackDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8305,6 +8383,11 @@ final class VoiceTurnController {
         }
         if ScribeSetupAsk.matches(transcript) {
             let result = answerScribeSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if LanguagePackAsk.matches(transcript) {
+            let result = answerLanguagePacks(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

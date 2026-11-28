@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The Language packs card speaks the four packs. It does not install or remove one.
+enum LanguagePackVoice {
+    static var speakPacks: () -> Void = {}
+}
+
 /// Settings > Dictation: Language packs. English, French, Spanish and Portuguese install after the app, in the
 /// background, from a tap here or the ticks in onboarding. Nothing is bundled and nothing downloads unasked.
 @MainActor
@@ -10,6 +15,10 @@ struct LanguagePacksCard: View {
     var body: some View {
         let state = packs.state
         GSCard("Language packs") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which language packs") { LanguagePackVoice.speakPacks() }
+            }
             ForEach(Array(LanguagePackID.allCases.enumerated()), id: \.element) { index, pack in
                 if index > 0 { GSDivider() }
                 GSRow(symbol: "globe", title: pack.title, text: text(for: state.status(of: pack), pack: pack)) {
