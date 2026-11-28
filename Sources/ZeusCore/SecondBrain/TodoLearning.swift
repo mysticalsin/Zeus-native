@@ -145,7 +145,7 @@ public struct TodoLearning: Codable, Equatable, Sendable {
     /// Split a long title that looks like several tasks joined with "and"/commas.
     public func suggestSplit(_ title: String) -> Suggestion? {
         guard enabled else { return nil }
-        let parts = TodoVoice.split(title).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let parts = TodoVoice.split(title).map { TodoLearningSplitBox.trimmedPart($0) }.filter { !$0.isEmpty }
         guard parts.count >= 2, title.count >= 28 else { return nil }
         return Suggestion(kind: "split", title: title, due: nil,
                           reason: "Looks like \(parts.count) tasks. Split them?",
