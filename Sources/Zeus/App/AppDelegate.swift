@@ -407,6 +407,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ResearchSetupVoice.speakSetup = { [weak self] in self?.voice.sayResearchSetup() }
             ScribeSetupVoice.speakSetup = { [weak self] in self?.voice.sayScribeSetup() }
             LanguagePackVoice.speakPacks = { [weak self] in self?.voice.sayLanguagePacks() }
+            SpeakerSetupVoice.speakSetup = { [weak self] in self?.voice.saySpeakerSetup() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

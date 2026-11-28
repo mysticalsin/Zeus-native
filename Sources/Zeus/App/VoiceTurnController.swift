@@ -7621,6 +7621,80 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Speaker recognition, or a spoken "how's speaker recognition set", says the two models and call-window names. It does not download a model.
+    func saySpeakerSetup() {
+        presentSpeakerSetup(speak: true)
+    }
+
+    private func answerSpeakerSetup(speak: Bool) -> TurnResult {
+        presentSpeakerSetup(speak: speak)
+        return TurnResult(spoken: speakerSetupLine())
+    }
+
+    private func presentSpeakerSetup(speak: Bool) {
+        let parts = speakerSetupParts()
+        let line = SpeakerSetupAsk.line(apart: parts.apart, live: parts.live, names: parts.names)
+        let plan = SpeakerSetupDraw.plan(apart: parts.apart, live: parts.live, names: parts.names)
+        buddy.idle()
+        showSpeakerSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The two model rows and whether call-window names are already on. A refresh only re-reads disk.
+    /// Reading them does not download a model or ask for Accessibility.
+    private func speakerSetupParts() -> (apart: String, live: String, names: String) {
+        let apart = SpeakerModelController.shared
+        let live = StreamingDiarizerModelController.shared
+        apart.refresh()
+        live.refresh()
+        func word(_ state: ModelPreparation.State) -> String {
+            switch state {
+            case .ready: "Ready"
+            case .preparing: "Downloading"
+            case .failed: "Failed"
+            case .idle: "Off"
+            }
+        }
+        return (word(apart.state), word(live.state), SpeakerSetupVoice.namesOn() ? "On" : "Off")
+    }
+
+    private func speakerSetupLine() -> String {
+        let parts = speakerSetupParts()
+        return SpeakerSetupAsk.line(apart: parts.apart, live: parts.live, names: parts.names)
+    }
+
+    /// Draws Speakers, then the two models and call-window names. The caller speaks the full line.
+    private func showSpeakerSetup(_ plan: SpeakerSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flySpeakerSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flySpeakerSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flySpeakerSetup(_ plan: SpeakerSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8388,6 +8462,11 @@ final class VoiceTurnController {
         }
         if LanguagePackAsk.matches(transcript) {
             let result = answerLanguagePacks(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if SpeakerSetupAsk.matches(transcript) {
+            let result = answerSpeakerSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -2,6 +2,13 @@ import ApplicationServices
 import SwiftUI
 import ZeusCore
 
+/// Speaker recognition speaks the two models and call-window names. It does not download a model or ask for Accessibility.
+enum SpeakerSetupVoice {
+    static var speakSetup: () -> Void = {}
+    /// Whether names from the call window are already allowed. Reading this does not ask.
+    static var namesOn: () -> Bool = { AXIsProcessTrusted() }
+}
+
 /// Settings: Speaker recognition for Scribe. One optional model (about 150 MB, on this Mac) that tells similar
 /// voices apart, and the voices the owner chose to remember. The model downloads only when Download is clicked.
 @MainActor
@@ -13,6 +20,10 @@ struct SpeakerRecognitionCard: View {
 
     var body: some View {
         GSCard("Speaker recognition") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how speaker recognition is set") { SpeakerSetupVoice.speakSetup() }
+            }
             modelRow
             GSDivider()
             liveRow
