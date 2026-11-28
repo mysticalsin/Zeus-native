@@ -640,6 +640,10 @@ private struct SoundsPage: View {
             .disabled(!ExtraPreferences.shared.soundsOn)
             .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         GSCard("Your cues") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the cue sounds") { SoundCatalog.speakCues() }
+            }
             cue("play.circle", "Run start", "When an agent starts a new task.", "sound.startStyle", SoundStyles.runStart, .start)
             GSDivider()
             cue("hand.raised", "Requests", "When an agent needs a permission or an answer.", "sound.approvalStyle", SoundStyles.requests, .approval)

@@ -370,6 +370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.topBar.layout.trimmedToRow().tabs.map(\.title) ?? TopBarLayout.standard.trimmedToRow().tabs.map(\.title)
             }
             TopBarLayout.speakTabs = { [weak self] in self?.voice.sayTopBarTabs() }
+            SoundCatalog.speakCues = { [weak self] in self?.voice.sayCueSounds() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }

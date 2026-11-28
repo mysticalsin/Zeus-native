@@ -5154,6 +5154,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The cue rows, or a spoken "what are the cue sounds", say the four styles. They do not play them.
+    func sayCueSounds() {
+        presentCueSounds(speak: true)
+    }
+
+    private func answerCueSounds(speak: Bool) -> TurnResult {
+        presentCueSounds(speak: speak)
+        return TurnResult(spoken: cueSoundsLine())
+    }
+
+    private func presentCueSounds(speak: Bool) {
+        let styles = cueSoundStyles()
+        let line = CueSoundsAsk.line(start: styles.start, requests: styles.requests, answer: styles.answer, done: styles.done)
+        let plan = CueSoundsDraw.plan(start: styles.start, requests: styles.requests, answer: styles.answer, done: styles.done)
+        buddy.idle()
+        showCueSounds(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same names the four menus use. An unknown stored value uses that cue's first sound. Off stays Off.
+    private func cueSoundStyles() -> (start: String, requests: String, answer: String, done: String) {
+        func style(_ id: String, _ slot: SoundSlot) -> String {
+            let value = SettingsStore.shared.string(id)
+            if value == "Off" || SoundCatalog.styleNames(for: slot).contains(value) { return value }
+            return SoundCatalog.styleNames(for: slot).first ?? "Off"
+        }
+        return (style("sound.startStyle", .runStart), style("sound.approvalStyle", .request), style("sound.answerStyle", .answer), style("sound.doneStyle", .done))
+    }
+
+    private func cueSoundsLine() -> String {
+        let styles = cueSoundStyles()
+        return CueSoundsAsk.line(start: styles.start, requests: styles.requests, answer: styles.answer, done: styles.done)
+    }
+
+    /// Draws Sounds, then the four cues. The caller speaks the full line.
+    private func showCueSounds(_ plan: CueSoundsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCueSounds(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCueSounds(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCueSounds(_ plan: CueSoundsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5736,6 +5802,11 @@ final class VoiceTurnController {
         }
         if TopBarTabsAsk.matches(transcript) {
             let result = answerTopBarTabs(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CueSoundsAsk.matches(transcript) {
+            let result = answerCueSounds(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
