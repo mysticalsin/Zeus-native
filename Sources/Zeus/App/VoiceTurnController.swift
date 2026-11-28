@@ -12031,6 +12031,74 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Recordly export, or a spoken "how is recordly export set", says the format, size, quality, and cursor follow.
+    func sayRecordlyExport() {
+        presentRecordlyExport(speak: true)
+    }
+
+    private func answerRecordlyExport(speak: Bool) -> TurnResult {
+        presentRecordlyExport(speak: speak)
+        return TurnResult(spoken: recordlyExportLine())
+    }
+
+    private func presentRecordlyExport(speak: Bool) {
+        let parts = recordlyExportParts()
+        let line = RecordlyExportAsk.line(format: parts.format, size: parts.size, quality: parts.quality, follow: parts.follow)
+        let plan = RecordlyExportDraw.plan(format: parts.format, size: parts.size, quality: parts.quality, follow: parts.follow)
+        buddy.idle()
+        showRecordlyExport(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The export chips on the Recordly page. Reading them does not export or start a recording.
+    private func recordlyExportParts() -> (format: String, size: String, quality: String, follow: String) {
+        let settings = RecordlyController.shared.exportSettings
+        let format: String
+        if settings.formats.contains(.mp4), settings.formats.contains(.gif) { format = "Both" }
+        else if settings.formats.contains(.mp4) { format = "MP4" }
+        else if settings.formats.contains(.gif) { format = "GIF" }
+        else { format = "None" }
+        let quality = settings.quality.rawValue.prefix(1).uppercased() + settings.quality.rawValue.dropFirst()
+        return (format, settings.preset.label, quality, settings.followCursor ? "On" : "Off")
+    }
+
+    private func recordlyExportLine() -> String {
+        let parts = recordlyExportParts()
+        return RecordlyExportAsk.line(format: parts.format, size: parts.size, quality: parts.quality, follow: parts.follow)
+    }
+
+    /// Draws Export, then the four choices. The caller speaks the full line.
+    private func showRecordlyExport(_ plan: RecordlyExportDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyRecordlyExport(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyRecordlyExport(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyRecordlyExport(_ plan: RecordlyExportDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -13133,6 +13201,11 @@ final class VoiceTurnController {
         }
         if HookShowAsk.matches(transcript) {
             let result = answerHookShow(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if RecordlyExportAsk.matches(transcript) {
+            let result = answerRecordlyExport(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

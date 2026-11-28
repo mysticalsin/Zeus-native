@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Recordly export speaks the format, size, quality, and cursor follow. It does not export or start a recording.
+enum RecordlyExportVoice {
+    static var speakExport: () -> Void = {}
+}
+
 struct RecordlyPage: View {
     let topBar: TopBarModel
     let recordly: RecordlyController
@@ -15,6 +20,7 @@ struct RecordlyPage: View {
                 Spacer(minLength: 0)
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many screens") { topBar.speakScreens() }
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if recording") { topBar.speakRecording() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Recordly export is set") { RecordlyExportVoice.speakExport() }
             }
             HStack(spacing: 8) {
             Tile(padding: 0) {
