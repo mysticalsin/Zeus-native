@@ -43,7 +43,7 @@ public struct AgentMemory: Codable, Equatable, Sendable {
 
     /// Adds a note; old unpinned notes fall off first.
     public mutating func remember(_ text: String, pinned: Bool = false, at date: Date = Date()) {
-        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = AgentMemoryNoteBox.trimmedNote(text)
         guard !clean.isEmpty else { return }
         notes.append(Note(date: date, text: String(clean.prefix(400)), pinned: pinned))
         while notes.count > Self.maxNotes {
