@@ -2933,6 +2933,61 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// A spoken Caps Lock ask says On or Off and draws it. The notch cue shows the same flag.
+    private func answerCaps(speak: Bool) -> TurnResult {
+        presentCaps(speak: speak)
+        return TurnResult(spoken: capsLine())
+    }
+
+    private func capsLockOn() -> Bool {
+        NSEvent.modifierFlags.contains(.capsLock)
+    }
+
+    private func presentCaps(speak: Bool) {
+        let on = capsLockOn()
+        let line = CapsLockAsk.line(on: on)
+        let plan = CapsLockDraw.plan(on: on)
+        buddy.idle()
+        showCaps(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func capsLine() -> String {
+        CapsLockAsk.line(on: capsLockOn())
+    }
+
+    /// Draws Caps Lock: Caps, then On or Off. The caller speaks the full line.
+    private func showCaps(_ plan: CapsLockDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCaps(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCaps(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCaps(_ plan: CapsLockDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3340,6 +3395,11 @@ final class VoiceTurnController {
         }
         if FrontAppAsk.matches(transcript) {
             let result = answerFront(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CapsLockAsk.matches(transcript) {
+            let result = answerCaps(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
