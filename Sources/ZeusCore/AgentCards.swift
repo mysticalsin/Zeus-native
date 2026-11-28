@@ -221,7 +221,7 @@ public struct AgentCompletion: Equatable, Sendable {
         self.sessionID = sessionID
         self.agent = agent
         self.project = project
-        let text = (summary ?? "").split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        let text = CompletionSummaryBox.trimmedSummary((summary ?? "").split(whereSeparator: \.isNewline).joined(separator: " "))
         self.summary = text.isEmpty ? "Finished." : (text.count > 160 ? String(text.prefix(159)) + "…" : text)
         duration = startedAt.map { now.timeIntervalSince($0) }
     }
