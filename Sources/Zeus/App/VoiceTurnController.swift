@@ -13414,6 +13414,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The open notch, or a spoken "which tab is open", says the page, the more menu, and tab editing.
+    func sayOpenPage() {
+        presentOpenPage(speak: true)
+    }
+
+    private func answerOpenPage(speak: Bool) -> TurnResult {
+        presentOpenPage(speak: speak)
+        return TurnResult(spoken: openPageLine())
+    }
+
+    private func presentOpenPage(speak: Bool) {
+        let parts = openPageParts()
+        let line = OpenPageAsk.line(page: parts.page, menu: parts.menu, edit: parts.edit)
+        let plan = OpenPageDraw.plan(page: parts.page, menu: parts.menu, edit: parts.edit)
+        buddy.idle()
+        showOpenPage(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The selected page, the more menu, and tab editing. Reading them does not switch a tab or open the menu.
+    private func openPageParts() -> (page: String, menu: String, edit: String) {
+        guard let bar = notch.topBar else { return ("Home", "Off", "Off") }
+        return (bar.selectedTab.title, bar.menuOpen ? "On" : "Off", bar.tabEditing ? "On" : "Off")
+    }
+
+    private func openPageLine() -> String {
+        let parts = openPageParts()
+        return OpenPageAsk.line(page: parts.page, menu: parts.menu, edit: parts.edit)
+    }
+
+    /// Draws Open, then the page, the more menu, and tab editing. The caller speaks the full line.
+    private func showOpenPage(_ plan: OpenPageDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyOpenPage(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyOpenPage(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyOpenPage(_ plan: OpenPageDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14621,6 +14683,11 @@ final class VoiceTurnController {
         }
         if ShelfStackAsk.matches(transcript) {
             let result = answerShelfStacks(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if OpenPageAsk.matches(transcript) {
+            let result = answerOpenPage(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

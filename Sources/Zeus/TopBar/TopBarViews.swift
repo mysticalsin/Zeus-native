@@ -249,6 +249,11 @@ struct ProgressLine: View {
 
 // MARK: Header
 
+/// The open notch speaks the page, the more menu, and tab editing. It does not switch a tab.
+enum OpenPageVoice {
+    static var speakPage: () -> Void = {}
+}
+
 /// Tab icons along the top of the open notch, split around the camera housing like the
 /// menu bar itself. The selected tab sits on a sliding pill.
 struct TopBarHeader: View {
@@ -279,6 +284,7 @@ struct TopBarHeader: View {
             .background(Capsule().fill(GlanceTint.capsule))
             .overlay(Capsule().strokeBorder(GlanceTint.capsuleRim, lineWidth: 1))
             Spacer(minLength: 0)
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which tab is open") { OpenPageVoice.speakPage() }
             Button { MoreMenu.show(topBar: topBar) } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 12, weight: .bold))

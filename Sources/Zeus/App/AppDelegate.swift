@@ -406,6 +406,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ChatHubVoice.speakHub = { [weak self] in self?.voice.sayChatHub() }
             CalendarPageVoice.speakPage = { [weak self] in self?.voice.sayCalendarPage() }
             ShelfStackVoice.speakStacks = { [weak self] in self?.voice.sayShelfStacks() }
+            OpenPageVoice.speakPage = { [weak self] in self?.voice.sayOpenPage() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
