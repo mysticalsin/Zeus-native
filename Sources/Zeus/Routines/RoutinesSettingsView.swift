@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// Saved routines speak how many are saved and how many are on. Names and prompts stay unspoken, and nothing is run.
+enum RoutineListVoice {
+    static var speakList: () -> Void = {}
+}
+
 /// Settings › Routines: saved prompts that run on a schedule through the model router.
 struct RoutinesSettingsView: View {
     let runner = RoutineRunner.shared
@@ -15,6 +20,12 @@ struct RoutinesSettingsView: View {
                 }
             }
             Section {
+                HStack {
+                    Spacer()
+                    Button { RoutineListVoice.speakList() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Say how routines are set")
+                }
                 if runner.routines.isEmpty {
                     Text("No routines yet. A routine is a prompt Zeus runs for you, for example a weekday morning summary.")
                         .foregroundStyle(.secondary)
