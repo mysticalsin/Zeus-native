@@ -25,6 +25,10 @@ final class ResearchRunner {
     var showResearchAsk: (ResearchAskDraw, String, Bool) -> Void = { _, _, _ in }
     /// Draws a report that could not be saved, when there are no source sites. The voice says the line.
     var showReportMiss: (ReportMissDraw, String, Bool) -> Void = { _, _, _ in }
+    /// Draws a research failure that is one of the spoken answer failures. The voice says the line.
+    var showAnswerFail: (AnswerFailDraw, String, Bool) -> Void = { _, _, _ in }
+    /// Draws a research failure that is the missing Claude command-line tool. The voice says the line.
+    var showClaudeTool: (ClaudeToolDraw, String, Bool) -> Void = { _, _, _ in }
 
     private(set) var isRunning = false
     private var task: Task<(ResearchReport.Parsed?, String, String?), Never>?
@@ -192,6 +196,10 @@ final class ResearchRunner {
             showReportMiss(missed, outcome.spoken, speak && !outcome.spoken.isEmpty)
         } else if let ask = ResearchAskDraw.from(line: outcome.spoken) {
             showResearchAsk(ask, outcome.spoken, speak && !outcome.spoken.isEmpty)
+        } else if let failed = AnswerFailDraw.from(message: outcome.spoken) {
+            showAnswerFail(failed, outcome.spoken, speak && !outcome.spoken.isEmpty)
+        } else if let missing = ClaudeToolDraw.from(line: outcome.spoken) {
+            showClaudeTool(missing, outcome.spoken, speak && !outcome.spoken.isEmpty)
         } else if speak, !outcome.spoken.isEmpty {
             say(outcome.spoken)
         }

@@ -3723,6 +3723,22 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws a research failure that is a spoken answer failure, under the pointer.
+    /// The caller passes the spoken line. A saved report is not this card.
+    func showResearchFailure(_ plan: AnswerFailDraw, line: String, speak: Bool) {
+        showAnswerFail(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws a research failure that is the missing Claude command-line tool, under the pointer.
+    /// The caller passes the spoken line. A spoken answer failure is not this card.
+    func showResearchClaudeTool(_ plan: ClaudeToolDraw, line: String, speak: Bool) {
+        showClaudeTool(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     /// Draws a spoken answer failure on the display under the pointer.
     /// The caller speaks the full line. Other sentences are not this card.
     private func showAnswerFail(_ plan: AnswerFailDraw, speak: Bool) {
