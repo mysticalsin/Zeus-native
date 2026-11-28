@@ -561,8 +561,12 @@ private struct TopBarTabsCard: View {
         if let topBar = context.topBar {
             let full = topBar.layout.isFull()
             GSCard("Top bar tabs") {
-                Text("Choose which pages the open notch shows and in what order. Home always comes first.")
-                    .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
+                HStack(alignment: .top, spacing: 8) {
+                    Text("Choose which pages the open notch shows and in what order. Home always comes first.")
+                        .font(GS.rowText).foregroundStyle(GS.secondary)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which tabs are on") { TopBarLayout.speakTabs() }
+                }
+                .padding(.bottom, 4)
                 ForEach(Array(TopBarTab.allCases.enumerated()), id: \.element.id) { index, tab in
                     if index > 0 { GSDivider() }
                     let shown = topBar.layout.contains(tab)

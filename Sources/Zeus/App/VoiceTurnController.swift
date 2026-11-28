@@ -5094,6 +5094,66 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Top bar tabs card, or a spoken "which tabs are on", says the row. It does not switch a tab.
+    func sayTopBarTabs() {
+        presentTopBarTabs(speak: true)
+    }
+
+    private func answerTopBarTabs(speak: Bool) -> TurnResult {
+        presentTopBarTabs(speak: speak)
+        return TurnResult(spoken: topBarTabsLine())
+    }
+
+    private func presentTopBarTabs(speak: Bool) {
+        let words = topBarTabWords()
+        let line = TopBarTabsAsk.line(words: words)
+        let plan = TopBarTabsDraw.plan(words: words)
+        buddy.idle()
+        showTopBarTabs(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same titles the open notch shows, Home first. Reading them does not switch a tab.
+    private func topBarTabWords() -> [String] {
+        TopBarLayout.liveTitles()
+    }
+
+    private func topBarTabsLine() -> String {
+        TopBarTabsAsk.line(words: topBarTabWords())
+    }
+
+    /// Draws Tabs, then up to four names. The caller speaks the full line.
+    private func showTopBarTabs(_ plan: TopBarTabsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTopBarTabs(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTopBarTabs(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTopBarTabs(_ plan: TopBarTabsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5671,6 +5731,11 @@ final class VoiceTurnController {
         }
         if NotchLightsAsk.matches(transcript) {
             let result = answerNotchLights(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TopBarTabsAsk.matches(transcript) {
+            let result = answerTopBarTabs(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

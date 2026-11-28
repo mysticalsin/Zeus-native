@@ -366,6 +366,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             HaloStyle.speakLight = { [weak self] in self?.voice.sayHaloLight() }
             HomeSlots.speakHome = { [weak self] in self?.voice.sayHomeCards() }
             SystemHUDSettings.speakLights = { [weak self] in self?.voice.sayNotchLights() }
+            TopBarLayout.liveTitles = { [weak self] in
+                self?.topBar.layout.trimmedToRow().tabs.map(\.title) ?? TopBarLayout.standard.trimmedToRow().tabs.map(\.title)
+            }
+            TopBarLayout.speakTabs = { [weak self] in self?.voice.sayTopBarTabs() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }

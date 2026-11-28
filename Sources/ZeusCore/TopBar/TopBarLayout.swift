@@ -239,6 +239,11 @@ public struct TopBarLayout: Codable, Equatable, Sendable {
               let raw = try? JSONDecoder().decode([String].self, from: data) else { return .standard }
         return TopBarLayout(tabs: raw.compactMap(TopBarTab.init(rawValue:)))
     }
+
+    /// The titles on the open notch, Home first. The app replaces this with the live row.
+    public static var liveTitles: () -> [String] = { TopBarLayout.standard.trimmedToRow().tabs.map(\.title) }
+    /// The Top bar tabs card speaks that row. It does not switch a tab.
+    public static var speakTabs: () -> Void = {}
 }
 
 /// Small events that light up the closed notch for a moment ("every move, made visible").
