@@ -362,6 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PermissionsModel.speakScreen = { [weak self] in self?.voice.sayScreenRecording() }
             DriveController.speakDrive = { [weak self] in self?.voice.sayDriveAutonomy() }
             NotchController.speakNotch = { [weak self] in self?.voice.sayNotchPlace() }
+            PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

@@ -143,6 +143,11 @@ struct SettingOptionRow: View {
                 } else {
                     GlassMenu(options: pairs, selection: store.stringBinding(option.id))
                 }
+                if option.id == "pointing.shortcut" {
+                    Button { PointingSettings.speakKeys() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say which keys point")
+                }
                 if option.id.hasPrefix("sound."), option.id.hasSuffix("Style") {
                     Button { SoundStyles.preview(option: option.id) } label: { Image(systemName: "play.fill") }
                         .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
