@@ -44,6 +44,8 @@ final class ExtraPreferences {
     static let shared = ExtraPreferences()
     /// The Voice cues card speaks which of the four play. It does not change them.
     static var speakVoiceCues: () -> Void = {}
+    /// The Which events play a sound card speaks requests, completion, and a checked to-do. It does not play one.
+    static var speakEvents: () -> Void = {}
     @ObservationIgnored private let defaults = UserDefaults.standard
     @ObservationIgnored var onShortcutsChange: (() -> Void)?
 

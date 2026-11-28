@@ -680,6 +680,10 @@ private struct SoundsPage: View {
         }
         // These switches still gate playback (ZeusSound.play), whatever style a cue above is set to.
         GSCard("Which events play a sound") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which events play a sound") { ExtraPreferences.speakEvents() }
+            }
             GSToggleRow(symbol: "hand.raised", title: "Play the Requests cue", text: "When an agent needs a permission or an answer.",
                         isOn: Binding(get: { ExtraPreferences.shared.soundApproval }, set: { ExtraPreferences.shared.soundApproval = $0 }))
             GSDivider()

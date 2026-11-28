@@ -6146,6 +6146,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The events card, or a spoken "which events play a sound", says the three switches. It does not play a sound.
+    func saySoundEvents() {
+        presentSoundEvents(speak: true)
+    }
+
+    private func answerSoundEvents(speak: Bool) -> TurnResult {
+        presentSoundEvents(speak: speak)
+        return TurnResult(spoken: soundEventsLine())
+    }
+
+    private func presentSoundEvents(speak: Bool) {
+        let parts = soundEventsParts()
+        let line = SoundEventsAsk.line(requests: parts.requests, done: parts.done, todo: parts.todo)
+        let plan = SoundEventsDraw.plan(requests: parts.requests, done: parts.done, todo: parts.todo)
+        buddy.idle()
+        showSoundEvents(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Requests, completion, and a checked to-do. An unset switch follows the page default, on.
+    /// Reading them does not play a cue.
+    private func soundEventsParts() -> (requests: String, done: String, todo: String) {
+        let prefs = ExtraPreferences.shared
+        let requests = prefs.soundApproval ? "On" : "Off"
+        let done = prefs.soundDone ? "On" : "Off"
+        let todo = prefs.soundTodo ? "On" : "Off"
+        return (requests, done, todo)
+    }
+
+    private func soundEventsLine() -> String {
+        let parts = soundEventsParts()
+        return SoundEventsAsk.line(requests: parts.requests, done: parts.done, todo: parts.todo)
+    }
+
+    /// Draws Events, then requests, completion, and a checked to-do. The caller speaks the full line.
+    private func showSoundEvents(_ plan: SoundEventsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flySoundEvents(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flySoundEvents(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flySoundEvents(_ plan: SoundEventsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6803,6 +6869,11 @@ final class VoiceTurnController {
         }
         if CaptionSetupAsk.matches(transcript) {
             let result = answerCaptionSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if SoundEventsAsk.matches(transcript) {
+            let result = answerSoundEvents(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
