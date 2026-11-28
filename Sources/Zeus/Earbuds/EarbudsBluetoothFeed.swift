@@ -206,6 +206,6 @@ public enum EarbudsBluetoothFeed {
     }
 
     private static func usableAddress(_ address: String) -> Bool {
-        !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !EarbudsAddressBox.trimmedAddress(address).isEmpty
     }
 }
