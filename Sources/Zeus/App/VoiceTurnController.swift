@@ -9937,6 +9937,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Voice tuning, or a spoken "how is the voice tuned", says quality, effect strength, and Kokoro pace. Nothing is played.
+    func sayVoiceTune() {
+        presentVoiceTune(speak: true)
+    }
+
+    private func answerVoiceTune(speak: Bool) -> TurnResult {
+        presentVoiceTune(speak: speak)
+        return TurnResult(spoken: voiceTuneLine())
+    }
+
+    private func presentVoiceTune(speak: Bool) {
+        let parts = voiceTuneParts()
+        let line = VoiceTuneAsk.line(quality: parts.quality, effect: parts.effect, pace: parts.pace)
+        let plan = VoiceTuneDraw.plan(quality: parts.quality, effect: parts.effect, pace: parts.pace)
+        buddy.idle()
+        showVoiceTune(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The quality menu, the effect percent, and the Kokoro pace. Reading them does not play a voice or open a key.
+    private func voiceTuneParts() -> (quality: String, effect: String, pace: String) {
+        let quality = ElevenLabsQuality.resolve(stored: UserDefaults.standard.string(forKey: ElevenLabsQuality.defaultsKey)).title
+        let effect = String(Int(UltronEffectParameters.percent(fromIntensity: UltronVoiceEffect.intensity)))
+        let stored = UserDefaults.standard.object(forKey: "voice.kokoro.speed") as? Double
+        let pace = min(max(stored ?? 0.88, 0.7), 1.3)
+        return (quality, effect, String(format: "%.2f", pace))
+    }
+
+    private func voiceTuneLine() -> String {
+        let parts = voiceTuneParts()
+        return VoiceTuneAsk.line(quality: parts.quality, effect: parts.effect, pace: parts.pace)
+    }
+
+    /// Draws Tune, then quality, effect, and pace. The caller speaks the full line.
+    private func showVoiceTune(_ plan: VoiceTuneDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVoiceTune(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVoiceTune(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVoiceTune(_ plan: VoiceTuneDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10884,6 +10949,11 @@ final class VoiceTurnController {
         }
         if UpdateSetupAsk.matches(transcript) {
             let result = answerUpdateSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VoiceTuneAsk.matches(transcript) {
+            let result = answerVoiceTune(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

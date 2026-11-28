@@ -11,6 +11,11 @@ enum VoiceKeyVoice {
     static var speakKeys: () -> Void = {}
 }
 
+/// Voice tuning speaks quality, effect strength, and Kokoro pace. It does not play a voice.
+enum VoiceTuneVoice {
+    static var speakTune: () -> Void = {}
+}
+
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
     let navigation: GSNavigation
@@ -98,6 +103,10 @@ struct ZeusVoiceCards: View {
                 GSInfo(text: line)
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the voice is tuned") { VoiceTuneVoice.speakTune() }
+            }
             GSRow(symbol: "sparkles", title: "Voice quality", text: voice.elevenQuality.detail) {
                 GSPopup(selection: Binding(get: { voice.elevenQuality.title }, set: { title in
                     if let choice = ElevenLabsQuality.allCases.first(where: { $0.title == title }) { voice.elevenQuality = choice }
