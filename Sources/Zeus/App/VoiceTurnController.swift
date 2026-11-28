@@ -822,6 +822,47 @@ final class VoiceTurnController {
         return TurnResult(spoken: spoken)
     }
 
+    /// Builds a present card's steps under the pointer while each step is spoken.
+    /// A card with no words is not this drawing.
+    private func showPresentSteps(_ plan: PresentStepsDraw, spoken: [String], speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else {
+            if speak {
+                for line in spoken { speaker.speak(Self.voiced(line)) }
+            }
+            return
+        }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPresentSteps(plan, at: 0, shot: shot)
+        if speak {
+            for line in spoken { speaker.speak(Self.voiced(line)) }
+        }
+        buddy.showCaption(plan.boltCaption(at: 0))
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPresentSteps(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPresentSteps(_ plan: PresentStepsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5581,7 +5622,12 @@ final class VoiceTurnController {
                     let beats = PresentCard.parse(action.payload)?.beats() ?? []
                     if !beats.isEmpty { pointed = true }
                     task = Task { @MainActor in
-                        guard let first = beats.first else { return nil }
+                        guard !beats.isEmpty else { return nil }
+                        if let plan = PresentStepsDraw.plan(lines: beats.map(\.bolt)) {
+                            self.showPresentSteps(plan, spoken: beats.map(\.spoken), speak: speak)
+                            return nil
+                        }
+                        let first = beats[0]
                         let anchor = NSEvent.mouseLocation
                         let ring = CGRect(x: anchor.x - 28, y: anchor.y - 18, width: 56, height: 36)
                         self.buddy.point(to: anchor, label: first.bolt, ring: ring)
