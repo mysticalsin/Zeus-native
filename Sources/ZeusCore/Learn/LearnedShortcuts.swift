@@ -55,7 +55,7 @@ public struct LearnedShortcutStore: Equatable, Sendable {
 
     @discardableResult
     public mutating func save(phrase: String, steps: [String], verified: Bool, at: Date = Date()) -> LearnSave {
-        let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+        let phrase = LearnedPhraseBox.trimmedPhrase(phrase)
         let steps = steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard verified else { return .rejected("unverified") }
         guard !phrase.isEmpty, !steps.isEmpty else { return .rejected("empty") }
