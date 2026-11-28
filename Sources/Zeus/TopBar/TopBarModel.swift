@@ -309,6 +309,10 @@ final class TopBarModel {
     var speakAgents: () -> Void = {}
     /// The focus card speaks the time still left.
     var speakTimeLeft: () -> Void = {}
+    /// The Reminders page speaks the next reminder.
+    var speakNextReminder: (_ title: String, _ when: String) -> Void = { _, _ in }
+    var speakNoNextReminder: () -> Void = {}
+    var speakNextReminderAccess: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

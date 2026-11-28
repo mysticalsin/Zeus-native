@@ -1216,6 +1216,66 @@ final class VoiceTurnController {
         buddy.showCaption(plan.boltCaption(at: 0))
     }
 
+    /// The Reminders page, or a spoken "what's my next reminder", says it and draws it.
+    func sayNextReminder(title: String, when: String) {
+        presentNextReminder(title: title, when: when, speak: true)
+    }
+
+    /// No reminder is left. The screen shows Due, then None.
+    func sayNoNextReminder() {
+        presentNoNextReminder(speak: true)
+    }
+
+    /// Reminders access is missing. The screen shows Due, then Access.
+    func sayNextReminderAccess() {
+        presentNextReminderAccess(speak: true)
+    }
+
+    private func answerNextReminder(speak: Bool) -> TurnResult {
+        let reminders = RemindersController.shared
+        if !reminders.allowed && reminders.items.isEmpty {
+            presentNextReminderAccess(speak: speak)
+            return TurnResult(spoken: NextReminderAsk.access)
+        }
+        guard let item = reminders.items.first(where: { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            presentNoNextReminder(speak: speak)
+            return TurnResult(spoken: NextReminderAsk.none)
+        }
+        let when = item.due.map { ReminderAsk.whenLine($0, hasTime: item.hasTime) } ?? ""
+        presentNextReminder(title: item.title, when: when, speak: speak)
+        return TurnResult(spoken: NextReminderAsk.line(title: item.title, when: when) ?? NextReminderAsk.none)
+    }
+
+    private func presentNextReminder(title: String, when: String, speak: Bool) {
+        guard let line = NextReminderAsk.line(title: title, when: when),
+              let plan = NextReminderDraw.plan(title: title, when: when) else {
+            presentNoNextReminder(speak: speak)
+            return
+        }
+        buddy.idle()
+        showNextReminder(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNoNextReminder(speak: Bool) {
+        let line = NextReminderAsk.none
+        let plan = NextReminderDraw.none()
+        buddy.idle()
+        showNextReminder(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNextReminderAccess(speak: Bool) {
+        let line = NextReminderAsk.access
+        let plan = NextReminderDraw.access()
+        buddy.idle()
+        showNextReminder(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -2035,6 +2095,37 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the next reminder: Due, then the title, then the due line. The caller speaks the full line.
+    private func showNextReminder(_ plan: NextReminderDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNextReminder(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNextReminder(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNextReminder(_ plan: NextReminderDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2387,6 +2478,11 @@ final class VoiceTurnController {
         }
         if TimerLeftAsk.matches(transcript) {
             let result = answerTimeLeft(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NextReminderAsk.matches(transcript) {
+            let result = answerNextReminder(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -204,6 +204,7 @@ struct RemindersPage: View {
             } else {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the next reminder") { sayNextReminder() }
                         ForEach(ReminderFilter.allCases) { filter in
                             ReminderChip(title: filter.rawValue, count: reminders.count(for: filter), selected: reminders.filter == filter) { reminders.filter = filter }
                         }
@@ -265,6 +266,19 @@ struct RemindersPage: View {
             }
         }
         .onAppear { reminders.refresh() }
+    }
+
+    private func sayNextReminder() {
+        if !reminders.allowed && reminders.items.isEmpty {
+            topBar.speakNextReminderAccess()
+            return
+        }
+        guard let item = reminders.items.first(where: { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            topBar.speakNoNextReminder()
+            return
+        }
+        let when = item.due.map { ReminderAsk.whenLine($0, hasTime: item.hasTime) } ?? ""
+        topBar.speakNextReminder(item.title, when)
     }
 }
 
