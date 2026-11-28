@@ -1034,6 +1034,11 @@ final class ClipboardSearchState {
     var query = ""
 }
 
+/// The clipboard chips speak which kind is showing and how many clips are pinned. They do not copy or clear.
+enum ClipboardFilterVoice {
+    static var speakFilter: () -> Void = {}
+}
+
 struct ClipboardPage: View {
     let topBar: TopBarModel
 
@@ -1046,6 +1051,7 @@ struct ClipboardPage: View {
         if topBar.clipboard.entries.isEmpty {
             VStack(spacing: 8) {
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many clips") { topBar.speakClipboard() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which clips are showing") { ClipboardFilterVoice.speakFilter() }
                 AccessPrompt(symbol: "doc.on.clipboard", title: "Clipboard empty",
                              detail: "Copy anything. Click an item to copy it again. Passwords that password managers mark as concealed are never kept.",
                              button: nil) {}
@@ -1076,6 +1082,7 @@ struct ClipboardPage: View {
                             .accessibilityLabel("Search the clipboard")
                     }
                     GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many clips") { topBar.speakClipboard() }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which clips are showing") { ClipboardFilterVoice.speakFilter() }
                     GlyphButton(symbol: "trash", size: 10, tint: Theme.cloudSecondary, label: "Clear clipboard") {
                         topBar.clipboard.clear()
                     }

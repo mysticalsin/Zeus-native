@@ -13028,6 +13028,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The clipboard chips, or a spoken "which clips are showing", say the open chip and how many clips are pinned.
+    func sayClipboardFilter() {
+        presentClipboardFilter(speak: true)
+    }
+
+    private func answerClipboardFilter(speak: Bool) -> TurnResult {
+        presentClipboardFilter(speak: speak)
+        return TurnResult(spoken: clipboardFilterLine())
+    }
+
+    private func presentClipboardFilter(speak: Bool) {
+        let parts = clipboardFilterParts()
+        let line = ClipboardFilterAsk.line(chip: parts.chip, pins: parts.pins)
+        let plan = ClipboardFilterDraw.plan(chip: parts.chip, pins: parts.pins)
+        buddy.idle()
+        showClipboardFilter(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The chip on the Clipboard page, and how many clips are pinned. Reading them does not copy or clear.
+    private func clipboardFilterParts() -> (chip: String, pins: String) {
+        let bar = notch.topBar
+        let chip = bar?.clipboardFilter.rawValue ?? "All"
+        let pins = min(bar?.clipboard.entries.filter(\.pinned).count ?? 0, 999)
+        return (chip, String(pins))
+    }
+
+    private func clipboardFilterLine() -> String {
+        let parts = clipboardFilterParts()
+        return ClipboardFilterAsk.line(chip: parts.chip, pins: parts.pins)
+    }
+
+    /// Draws Shown, then the chip and the pin count. The caller speaks the full line.
+    private func showClipboardFilter(_ plan: ClipboardFilterDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyClipboardFilter(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyClipboardFilter(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyClipboardFilter(_ plan: ClipboardFilterDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14205,6 +14269,11 @@ final class VoiceTurnController {
         }
         if ReminderListAsk.matches(transcript) {
             let result = answerReminderList(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ClipboardFilterAsk.matches(transcript) {
+            let result = answerClipboardFilter(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -398,6 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FocusLengthVoice.speakLength = { [weak self] in self?.voice.sayFocusLength() }
             PlaybackModeVoice.speakModes = { [weak self] in self?.voice.sayPlaybackMode() }
             ReminderListVoice.speakList = { [weak self] in self?.voice.sayReminderList() }
+            ClipboardFilterVoice.speakFilter = { [weak self] in self?.voice.sayClipboardFilter() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
