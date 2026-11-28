@@ -529,6 +529,7 @@ final class TopBarServices {
             onTimerFinished()
         } else {
             model.show(.focusFinished(finished == .focus ? "Focus done. Take a break." : "Break over. Back to it."))
+            model.speakFocus(finished == .focus ? .focusDone : .breakOver)
         }
     }
 }

@@ -1295,12 +1295,19 @@ struct FocusPage: View {
                     }
                     HStack(spacing: 8) {
                         if timer.phase == .idle {
-                            NotchActionButton(title: "Start focus", tint: TopBarStyle.violet) { topBar.focus.start() }
+                            NotchActionButton(title: "Start focus", tint: TopBarStyle.violet) { topBar.speakFocus(topBar.beginFocus()) }
                         } else {
                             NotchActionButton(title: timer.isPaused ? "Resume" : "Pause", tint: TopBarStyle.violet) {
-                                timer.isPaused ? topBar.focus.resume() : topBar.focus.pause()
+                                if topBar.focus.isPlainTimer {
+                                    timer.isPaused ? topBar.focus.resume() : topBar.focus.pause()
+                                } else {
+                                    topBar.speakFocus(timer.isPaused ? topBar.resumeFocusSession() : topBar.pauseFocusSession())
+                                }
                             }
-                            NotchActionButton(title: "Stop", tint: Theme.cloudSecondary, filled: false) { topBar.focus.stop() }
+                            NotchActionButton(title: "Stop", tint: Theme.cloudSecondary, filled: false) {
+                                if topBar.focus.isPlainTimer { topBar.focus.stop() }
+                                else { topBar.speakFocus(topBar.endFocusSession()) }
+                            }
                         }
                     }
                 }

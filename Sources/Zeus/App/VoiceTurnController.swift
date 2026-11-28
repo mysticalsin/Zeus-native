@@ -885,6 +885,60 @@ final class VoiceTurnController {
         presentNothingPlaying(speak: true)
     }
 
+    /// The notch focus controls, or a spoken focus command, say the session and draw it.
+    func sayFocus(_ speech: TopBarModel.FocusSpeech) {
+        presentFocus(speech, speak: true)
+    }
+
+    private func performFocus(_ command: FocusSessionAsk.Command, speak: Bool) -> TurnResult {
+        guard let topBar = notch.topBar else {
+            let line = FocusSessionAsk.notRunning
+            presentFocus(.notRunning, speak: speak)
+            return TurnResult(spoken: line)
+        }
+        let speech: TopBarModel.FocusSpeech
+        switch command {
+        case .start(let seconds): speech = topBar.beginFocus(seconds: seconds)
+        case .pause: speech = topBar.pauseFocusSession()
+        case .resume: speech = topBar.resumeFocusSession()
+        case .stop: speech = topBar.endFocusSession()
+        }
+        presentFocus(speech, speak: speak)
+        return TurnResult(spoken: Self.focusLine(speech))
+    }
+
+    private static func focusLine(_ speech: TopBarModel.FocusSpeech) -> String {
+        switch speech {
+        case .length(let seconds, let breakTime): return FocusSessionAsk.lengthLine(seconds: seconds, breakTime: breakTime)
+        case .paused: return FocusSessionAsk.paused
+        case .stopped(let breakTime): return breakTime ? FocusSessionAsk.breakStopped : FocusSessionAsk.focusStopped
+        case .notRunning: return FocusSessionAsk.notRunning
+        case .focusDone: return FocusSessionAsk.focusDone
+        case .breakOver: return FocusSessionAsk.breakOver
+        }
+    }
+
+    private func presentFocus(_ speech: TopBarModel.FocusSpeech, speak: Bool) {
+        let line = Self.focusLine(speech)
+        let plan: FocusSessionDraw?
+        switch speech {
+        case .length(let seconds, let breakTime): plan = FocusSessionDraw.plan(seconds: seconds, breakTime: breakTime)
+        case .paused: plan = FocusSessionDraw.paused()
+        case .stopped(let breakTime): plan = FocusSessionDraw.stopped(breakTime: breakTime)
+        case .notRunning: plan = FocusSessionDraw.ready()
+        case .focusDone: plan = FocusSessionDraw.focusDone()
+        case .breakOver: plan = FocusSessionDraw.breakOver()
+        }
+        buddy.idle()
+        guard let plan else {
+            if speak { say(line) }
+            return
+        }
+        showFocus(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerNowPlaying(speak: Bool) -> TurnResult {
         if let item = notch.topBar?.nowPlaying,
            NowPlayingAsk.line(title: item.title, artist: item.artist, playing: item.isPlaying) != nil {
@@ -948,6 +1002,38 @@ final class VoiceTurnController {
     }
 
     private func flyNowPlaying(_ plan: NowPlayingDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
+    /// Draws a focus session: Focus or Break, then the length, Paused, Stopped, or Done.
+    /// The caller speaks the full line.
+    private func showFocus(_ plan: FocusSessionDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFocus(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFocus(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFocus(_ plan: FocusSessionDraw, at elapsed: TimeInterval, shot: ScreenShot) {
         guard let bolt = plan.guideBolt(at: elapsed) else { return }
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
@@ -1219,6 +1305,12 @@ final class VoiceTurnController {
     /// Everything answered without the LLM, in order: local rules (`FastIntent`), the to-do and
     /// brief phrases (`LocalTurns`), then the decision engine (Jev). nil means "LLM".
     private func understand(_ transcript: String, finalAt: ContinuousClock.Instant, speak: Bool) async -> TurnResult? {
+        if let command = FocusSessionAsk.command(in: transcript) {
+            if CLIAccess.turnRestricted { return refuseRestricted(speak: speak) }
+            let result = performFocus(command, speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
         let fast = FastPath.shared
         if let plan = fast.confirmedPlan(for: transcript) {
             return await perform(plan, engine: "Rules", transcript: transcript, finalAt: finalAt, speak: speak)

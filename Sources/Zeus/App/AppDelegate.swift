@@ -291,6 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice.sayNowPlaying(title: title, artist: artist, playing: playing)
             }
             topBar.speakNothingPlaying = { [weak self] in self?.voice.sayNothingPlaying() }
+            topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
                 case .added(let event): self?.voice.sayAddedEvent(event)

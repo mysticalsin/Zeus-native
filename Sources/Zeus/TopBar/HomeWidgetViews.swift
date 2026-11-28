@@ -184,7 +184,12 @@ struct HomeWidgetCard: View {
                         caption("Focus", running ? (timer.phase == .rest ? "Break" : "Focusing") : "Ready")
                         Spacer()
                         GlanceRoundButton(symbol: running ? "stop.fill" : "play.fill", filled: true, label: running ? "Stop focus" : "Start focus") {
-                            if running { topBar.focus.stop() } else { topBar.focus.start() }
+                            if running {
+                                if topBar.focus.isPlainTimer { topBar.focus.stop() }
+                                else { topBar.speakFocus(topBar.endFocusSession()) }
+                            } else {
+                                topBar.speakFocus(topBar.beginFocus())
+                            }
                         }
                     }
                     Spacer(minLength: 0)

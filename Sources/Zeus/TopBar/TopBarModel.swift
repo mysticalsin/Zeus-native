@@ -280,6 +280,54 @@ final class TopBarModel {
     /// The Music page speaks the track that is on, or that nothing is playing.
     var speakNowPlaying: (_ title: String, _ artist: String, _ playing: Bool) -> Void = { _, _, _ in }
     var speakNothingPlaying: () -> Void = {}
+    /// A focus session speaks and draws. A plain countdown stays on the timer path.
+    var speakFocus: (FocusSpeech) -> Void = { _ in }
+
+    enum FocusSpeech: Equatable {
+        case length(seconds: Int, breakTime: Bool)
+        case paused
+        case stopped(breakTime: Bool)
+        case notRunning
+        case focusDone
+        case breakOver
+    }
+
+    /// Starts a focus round. A plain countdown is cleared first so this round can take a break.
+    @discardableResult
+    func beginFocus(seconds: Int? = nil) -> FocusSpeech {
+        if focus.isPlainTimer { focus.stop() }
+        if let seconds {
+            focus.focusLength = Double(min(max(seconds, 1), FocusTimer.longestMinutes * 60))
+        }
+        focus.start()
+        return .length(seconds: Int(focus.focusLength.rounded()), breakTime: false)
+    }
+
+    /// Pauses the focus or the break. A plain countdown is left alone.
+    @discardableResult
+    func pauseFocusSession() -> FocusSpeech {
+        guard !focus.isPlainTimer else { return .notRunning }
+        if focus.isRunning { focus.pause() }
+        return focus.isPaused ? .paused : .notRunning
+    }
+
+    /// Continues a paused focus or break.
+    @discardableResult
+    func resumeFocusSession() -> FocusSpeech {
+        guard focus.isPaused, !focus.isPlainTimer else { return .notRunning }
+        focus.resume()
+        let seconds = max(0, Int(focus.remaining().rounded()))
+        return .length(seconds: seconds, breakTime: focus.phase == .rest)
+    }
+
+    /// Stops a focus or a break. A plain countdown is left alone.
+    @discardableResult
+    func endFocusSession() -> FocusSpeech {
+        guard focus.phase != .idle, !focus.isPlainTimer else { return .notRunning }
+        let breakTime = focus.phase == .rest
+        focus.stop()
+        return .stopped(breakTime: breakTime)
+    }
     var openSettings: () -> Void = {}
     /// Opens Settings > Permissions, the only in-app place a permission is asked for.
     var openPermissions: () -> Void = {}
