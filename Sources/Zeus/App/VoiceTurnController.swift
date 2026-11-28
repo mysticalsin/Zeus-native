@@ -6212,6 +6212,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Other apps card, or a spoken "how's other apps set", says the three switches. It does not read Notification Center.
+    func sayOtherApps() {
+        presentOtherApps(speak: true)
+    }
+
+    private func answerOtherApps(speak: Bool) -> TurnResult {
+        presentOtherApps(speak: speak)
+        return TurnResult(spoken: otherAppsLine())
+    }
+
+    private func presentOtherApps(speak: Bool) {
+        let parts = otherAppsParts()
+        let line = OtherAppsAsk.line(apps: parts.apps, peek: parts.peek, details: parts.details)
+        let plan = OtherAppsDraw.plan(apps: parts.apps, peek: parts.peek, details: parts.details)
+        buddy.idle()
+        showOtherApps(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The mirror, the peek, and details. An unset peek follows the catalog default, on.
+    /// The mirror is the same key the Other apps switch stores. Reading it does not scan Notification Center.
+    private func otherAppsParts() -> (apps: String, peek: String, details: String) {
+        let apps = UserDefaults.standard.bool(forKey: "notifications.mirror") ? "On" : "Off"
+        let store = SettingsStore.shared
+        let peek = store.bool("notify.peek") ? "On" : "Off"
+        let details = store.bool("notify.peekDetails") ? "On" : "Off"
+        return (apps, peek, details)
+    }
+
+    private func otherAppsLine() -> String {
+        let parts = otherAppsParts()
+        return OtherAppsAsk.line(apps: parts.apps, peek: parts.peek, details: parts.details)
+    }
+
+    /// Draws Apps, then the mirror, the peek, and details. The caller speaks the full line.
+    private func showOtherApps(_ plan: OtherAppsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyOtherApps(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyOtherApps(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyOtherApps(_ plan: OtherAppsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6874,6 +6940,11 @@ final class VoiceTurnController {
         }
         if SoundEventsAsk.matches(transcript) {
             let result = answerSoundEvents(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if OtherAppsAsk.matches(transcript) {
+            let result = answerOtherApps(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
