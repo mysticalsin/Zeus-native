@@ -68,7 +68,7 @@ public struct RecordlyExportSettings: Equatable, Codable, Sendable {
     }
 
     public static func parseFormats(_ string: String) -> [RecordlyExportFormat] {
-        string.split(separator: ",").compactMap { RecordlyExportFormat(rawValue: String($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) }
+        string.split(separator: ",").compactMap { RecordlyExportFormat(rawValue: RecordlyExportFormatBox.trimmedFormat(String($0)).lowercased()) }
     }
 }
 
