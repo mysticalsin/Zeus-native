@@ -286,7 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // The notch mic: same dictation as the key, pasted where you were typing.
         if on(.voiceTurn) {
-            topBar.speakBrief = { [weak self] text in self?.voice.say(text) }
+            topBar.speakBrief = { [weak self] text in self?.voice.sayTodayBrief(text) }
             WelcomeBackCoordinator.shared.speak = { [weak self] text in self?.voice.say(text) }
         }
         if on(.shortcuts) {

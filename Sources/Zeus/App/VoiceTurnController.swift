@@ -822,6 +822,17 @@ final class VoiceTurnController {
         return TurnResult(spoken: spoken)
     }
 
+    /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
+    func sayTodayBrief(_ text: String) {
+        guard let plan = TodayController.shared.board else {
+            say(text)
+            return
+        }
+        showTodayBoard(plan, speak: true)
+        say(text)
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     /// Draws today's brief on the display under the pointer: Today, then the calendar, the to-dos, and the weather.
     /// The caller speaks the full brief. The marks still appear when that speech is off.
     private func showTodayBoard(_ plan: TodayBoardDraw, speak: Bool) {
