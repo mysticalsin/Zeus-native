@@ -11213,6 +11213,89 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The cloud voices, or a spoken "which cloud voices", say the OpenAI and Gemini names. A missing key stays none.
+    func sayCloudVoice() {
+        presentCloudVoice(speak: true)
+    }
+
+    private func answerCloudVoice(speak: Bool) -> TurnResult {
+        presentCloudVoice(speak: speak)
+        return TurnResult(spoken: cloudVoiceLine())
+    }
+
+    private func presentCloudVoice(speak: Bool) {
+        let parts = cloudVoiceParts()
+        let line = CloudVoiceAsk.line(openAI: parts.openAI, gemini: parts.gemini)
+        let plan = CloudVoiceDraw.plan(openAI: parts.openAI, gemini: parts.gemini)
+        buddy.idle()
+        showCloudVoice(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The named voices the pickers show. No key means none. A retired OpenAI model means ended. Nothing is played.
+    private func cloudVoiceParts() -> (openAI: String, gemini: String) {
+        let openAI: String
+        if Keychain.get("openai-tts.api-key") == nil {
+            openAI = "None"
+        } else {
+            let model = UserDefaults.standard.string(forKey: "voice.openai.model") ?? UltronCloudVoice.openAIModel
+            let base = UserDefaults.standard.string(forKey: "voice.openai.baseURL")
+            if OpenAISpeechRetirement.isRetired(model: model, baseURL: base, at: Date()) {
+                openAI = "Ended"
+            } else {
+                let choices = OpenAIVoiceCatalog.voices(forModel: model, baseURL: base, at: Date())
+                let stored = UserDefaults.standard.string(forKey: "voice.openai.voice") ?? UltronCloudVoice.openAIVoice
+                let match = choices.first { $0.id.caseInsensitiveCompare(stored) == .orderedSame } ?? choices.first
+                openAI = match?.title ?? "Ended"
+            }
+        }
+        let gemini: String
+        if Keychain.get("gemini-tts.api-key") == nil {
+            gemini = "None"
+        } else {
+            let id = GeminiVoiceCatalog.resolve(stored: UserDefaults.standard.string(forKey: "voice.gemini.voice"))
+            gemini = GeminiVoiceCatalog.voices.first { $0.id == id }?.title ?? "Kore"
+        }
+        return (openAI, gemini)
+    }
+
+    private func cloudVoiceLine() -> String {
+        let parts = cloudVoiceParts()
+        return CloudVoiceAsk.line(openAI: parts.openAI, gemini: parts.gemini)
+    }
+
+    /// Draws Cast, then the two names. The caller speaks the full line.
+    private func showCloudVoice(_ plan: CloudVoiceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCloudVoice(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCloudVoice(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCloudVoice(_ plan: CloudVoiceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12255,6 +12338,11 @@ final class VoiceTurnController {
         }
         if KokoroSetupAsk.matches(transcript) {
             let result = answerKokoroSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CloudVoiceAsk.matches(transcript) {
+            let result = answerCloudVoice(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

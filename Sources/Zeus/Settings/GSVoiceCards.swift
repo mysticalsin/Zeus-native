@@ -21,6 +21,11 @@ enum KokoroSetupVoice {
     static var speakKokoro: () -> Void = {}
 }
 
+/// The named OpenAI and Gemini voices. A missing key stays none. Nothing is played or saved.
+enum CloudVoiceVoice {
+    static var speakCloud: () -> Void = {}
+}
+
 /// Settings > Voice: one voice section (QA19 simplicity), with takeover TTS provider chain inline.
 struct ZeusVoiceCards: View {
     let navigation: GSNavigation
@@ -157,6 +162,10 @@ struct ZeusVoiceCards: View {
                 GSInfo(text: line)
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the cloud voices") { CloudVoiceVoice.speakCloud() }
+            }
             GSRow(symbol: "key", title: "OpenAI TTS key", text: openAINote ?? (voice.openAIKeySaved ? "Saved in Keychain." : "Backup voice. Create a key at platform.openai.com, then paste it here. Stored only in your Keychain.")) {
                 HStack(spacing: 10) {
                     SecureField(voice.openAIKeySaved ? "Saved" : "Paste a key", text: Binding(get: { voice.openAIKeyDraft }, set: { voice.openAIKeyDraft = $0 }))

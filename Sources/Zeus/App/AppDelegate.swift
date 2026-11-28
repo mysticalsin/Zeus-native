@@ -472,6 +472,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             GatewayVoice.speakGateway = { [weak self] in self?.voice.sayGateway() }
             AssistantSettings.speakModel = { [weak self] in self?.voice.sayChatModel() }
             KokoroSetupVoice.speakKokoro = { [weak self] in self?.voice.sayKokoroSetup() }
+            CloudVoiceVoice.speakCloud = { [weak self] in self?.voice.sayCloudVoice() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }
