@@ -13221,6 +13221,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The chat hub, or a spoken "is chat history showing", says whether history is open and whether a new chat is open.
+    func sayChatHub() {
+        presentChatHub(speak: true)
+    }
+
+    private func answerChatHub(speak: Bool) -> TurnResult {
+        presentChatHub(speak: speak)
+        return TurnResult(spoken: chatHubLine())
+    }
+
+    private func presentChatHub(speak: Bool) {
+        let parts = chatHubParts()
+        let line = ChatHubAsk.line(history: parts.history, fresh: parts.fresh)
+        let plan = ChatHubDraw.plan(history: parts.history, fresh: parts.fresh)
+        buddy.idle()
+        showChatHub(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The History chip and the New chat form. Reading them does not start a chat or read a title.
+    private func chatHubParts() -> (history: String, fresh: String) {
+        let history = UserDefaults.standard.bool(forKey: "chat.page.showHistory") ? "On" : "Off"
+        let fresh = AgentHub.shared.creating ? "On" : "Off"
+        return (history, fresh)
+    }
+
+    private func chatHubLine() -> String {
+        let parts = chatHubParts()
+        return ChatHubAsk.line(history: parts.history, fresh: parts.fresh)
+    }
+
+    /// Draws Hub, then history and a new chat. The caller speaks the full line.
+    private func showChatHub(_ plan: ChatHubDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyChatHub(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyChatHub(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyChatHub(_ plan: ChatHubDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14413,6 +14476,11 @@ final class VoiceTurnController {
         }
         if MemoryLearnAsk.matches(transcript) {
             let result = answerMemoryLearn(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ChatHubAsk.matches(transcript) {
+            let result = answerChatHub(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

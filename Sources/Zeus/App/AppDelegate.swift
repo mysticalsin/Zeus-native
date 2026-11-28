@@ -403,6 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ChromeLinkVoice.extensionOn = { [weak self] in self?.permissions.chromeConnected ?? false }
             ChromeLinkVoice.speakLink = { [weak self] in self?.voice.sayChromeLink() }
             MemoryLearnVoice.speakLearn = { [weak self] in self?.voice.sayMemoryLearn() }
+            ChatHubVoice.speakHub = { [weak self] in self?.voice.sayChatHub() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The chat hub speaks whether history is showing and whether a new chat is open. It does not start a chat.
+enum ChatHubVoice {
+    static var speakHub: () -> Void = {}
+}
+
 /// Chat tab as the agent hub. Running Claude Code, Codex, Gemini and Cursor sessions on the left,
 /// the selected one on the right with a reply field that types into its terminal (after an approval
 /// card); "New chat" picks an agent, a project folder and an instruction and starts it in a terminal.
@@ -28,6 +33,7 @@ struct ChatPage: View {
                 }
                 Spacer(minLength: 0)
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many chats") { chat.speakChats() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether history or a new chat is open") { ChatHubVoice.speakHub() }
                 if chat.isSending {
                     Text("Writing…").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudQuiet).transition(.opacity)
                 }
