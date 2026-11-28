@@ -6,6 +6,11 @@ enum HotspotSetupVoice {
     static var speakHotspot: () -> Void = {}
 }
 
+/// The lid-closed rule speaks whether it is ready and how many apps freeze. Names stay unspoken, and the rule is not installed.
+enum FreezeSetupVoice {
+    static var speakFreeze: () -> Void = {}
+}
+
 /// The Insomnia cards speak lid-closed mode, mute, and Low Power Mode. They do not install the rule.
 enum InsomniaSetupVoice {
     static var speakSetup: () -> Void = {}
@@ -69,6 +74,10 @@ struct InsomniaSettingsPage: View {
                         isOn: Binding(get: { insomnia.lowPowerOnBattery && ruleReady }, set: { insomnia.lowPowerOnBattery = $0 }))
                 .disabled(!ruleReady).opacity(ruleReady ? 1 : 0.55)
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the lid-closed rule is set") { FreezeSetupVoice.speakFreeze() }
+            }
             GSRow(symbol: "snowflake", title: "Freeze these apps", text: "Paused while the lid is closed, resumed when it opens. Zeus, terminals, editors and agents are never frozen.") {
                 Button(page.pickerOpen ? "Done" : "Add from running apps") {
                     page.running = insomnia.freezableRunningApps()

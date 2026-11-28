@@ -448,6 +448,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             CommandSetupVoice.speakCommand = { [weak self] in self?.voice.sayCommandSetup() }
             NotchFitVoice.speakFit = { [weak self] in self?.voice.sayNotchFit() }
             QuietSetupVoice.speakQuiet = { [weak self] in self?.voice.sayQuietSetup() }
+            FreezeSetupVoice.speakFreeze = { [weak self] in self?.voice.sayFreezeSetup() }
             OfferSetupVoice.claudeConnected = { [weak self] in self?.guideServices.isConnected(.claude) ?? false }
             OfferSetupVoice.codexConnected = { [weak self] in self?.guideServices.isConnected(.codex) ?? false }
             MusicLightsVoice.wingsOn = { [weak self] in
