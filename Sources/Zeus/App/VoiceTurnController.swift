@@ -4189,6 +4189,67 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Voice settings, or a spoken "which voice", says the Speaks with choice.
+    func sayVoiceChoice() {
+        presentVoiceChoice(speak: true)
+    }
+
+    private func answerVoiceChoice(speak: Bool) -> TurnResult {
+        presentVoiceChoice(speak: speak)
+        return TurnResult(spoken: voiceChoiceLine())
+    }
+
+    private func presentVoiceChoice(speak: Bool) {
+        let word = voiceChoiceWord()
+        let line = VoiceChoiceAsk.line(word: word)
+        let plan = VoiceChoiceDraw.plan(word: word)
+        buddy.idle()
+        showVoiceChoice(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same choice the Speaks with menu shows. A key is not read.
+    private func voiceChoiceWord() -> String {
+        let voice = VoiceSettings.shared
+        return voice.engineAuto ? VoiceChoiceAsk.automatic : voice.ttsProvider.title
+    }
+
+    private func voiceChoiceLine() -> String {
+        VoiceChoiceAsk.line(word: voiceChoiceWord())
+    }
+
+    /// Draws Voice, then the menu choice. The caller speaks the full line.
+    private func showVoiceChoice(_ plan: VoiceChoiceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVoiceChoice(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVoiceChoice(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVoiceChoice(_ plan: VoiceChoiceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4691,6 +4752,11 @@ final class VoiceTurnController {
         }
         if BeamerPlaceAsk.matches(transcript) {
             let result = answerBeamerPlace(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VoiceChoiceAsk.matches(transcript) {
+            let result = answerVoiceChoice(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

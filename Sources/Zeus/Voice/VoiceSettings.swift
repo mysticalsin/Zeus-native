@@ -52,6 +52,8 @@ final class VoiceSettings {
     /// Automatic (the default): the local voice, then the Mac voice. A saved key does not add a cloud.
     /// Off only after the owner picks one engine; an install that never changed it stays automatic.
     var engineAuto: Bool { didSet { defaults.set(engineAuto, forKey: "voice.engine.auto") } }
+    /// The Speaks with row speaks the choice it shows. A key stays off that line.
+    var speakVoice: () -> Void = {}
     /// How Zeus talks: the prompt's persona section, the instant voice lines and the ElevenLabs delivery.
     var personality: ZeusPersonality { didSet { defaults.set(personality.rawValue, forKey: ZeusPersonality.defaultsKey) } }
     var kokoroVoice: String { didSet { defaults.set(kokoroVoice, forKey: "voice.kokoro.voice") } }

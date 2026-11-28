@@ -9,7 +9,7 @@ struct ZeusVoiceCards: View {
     private var designer: VoiceDesignModel { VoiceDesignModel.shared }
     private var testModel: VoiceTestModel { VoiceTestModel.shared }
     private var preview: VoicePreviewModel { VoicePreviewModel.shared }
-    static let automaticTitle = "Automatic (best working voice)"
+    static let automaticTitle = VoiceChoiceAsk.automatic
     /// Re-read every 30 seconds and on appear, so the OpenAI note and picker flip at the shutdown instant with the window open.
     @State private var now = Date()
     private var openAINote: String? { OpenAISpeechRetirement.settingsNote(model: voice.openAIModel, baseURL: voice.openAIBaseURL, at: now) }
@@ -68,10 +68,13 @@ struct ZeusVoiceCards: View {
             VoiceProvidersCard(embedded: true)
             GSDivider()
             GSRow(symbol: "waveform.path", title: "Speaks with") {
-                GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
-                    if title == Self.automaticTitle { voice.engineAuto = true }
-                    else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
-                }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which voice") { voice.speakVoice() }
+                    GSPopup(selection: Binding(get: { voice.engineAuto ? Self.automaticTitle : voice.ttsProvider.title }, set: { title in
+                        if title == Self.automaticTitle { voice.engineAuto = true }
+                        else if let p = VoiceTTSProvider.allCases.first(where: { $0.title == title }) { voice.ttsProvider = p }
+                    }), options: [Self.automaticTitle] + VoiceTTSProvider.allCases.map(\.title), label: "Speaks with")
+                }
             }
             if let line = OpenAISpeechRetirement.endedChoiceLine(choice: voice.engineChoice, retired: voice.openAIRetired(now: now),
                                                                  effective: voice.routeDecisions().first?.engine.label ?? UltronEngine.system.label) {
