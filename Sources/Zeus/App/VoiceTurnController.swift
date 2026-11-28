@@ -8955,6 +8955,75 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Offered agents, or a spoken "which agents are offered", say Claude Code and Codex. Nothing is connected or changed.
+    func sayOfferSetup() {
+        presentOfferSetup(speak: true)
+    }
+
+    private func answerOfferSetup(speak: Bool) -> TurnResult {
+        presentOfferSetup(speak: speak)
+        return TurnResult(spoken: offerSetupLine())
+    }
+
+    private func presentOfferSetup(speak: Bool) {
+        let parts = offerSetupParts()
+        let line = OfferSetupAsk.line(claude: parts.claude, claudeLink: parts.claudeLink, codex: parts.codex, codexLink: parts.codexLink)
+        let plan = OfferSetupDraw.plan(claude: parts.claude, claudeLink: parts.claudeLink, codex: parts.codex, codexLink: parts.codexLink)
+        buddy.idle()
+        showOfferSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether each agent is offered, and whether its connection is already in place. Reading them does not connect anything.
+    private func offerSetupParts() -> (claude: String, claudeLink: String, codex: String, codexLink: String) {
+        let store = SettingsStore.shared
+        func offer(_ id: String) -> String { store.bool(id) ? "On" : "Off" }
+        func link(_ on: Bool) -> String { on ? "Connected" : "Not connected" }
+        return (
+            offer("integrations.offerClaude"),
+            link(OfferSetupVoice.claudeConnected()),
+            offer("integrations.offerCodex"),
+            link(OfferSetupVoice.codexConnected())
+        )
+    }
+
+    private func offerSetupLine() -> String {
+        let parts = offerSetupParts()
+        return OfferSetupAsk.line(claude: parts.claude, claudeLink: parts.claudeLink, codex: parts.codex, codexLink: parts.codexLink)
+    }
+
+    /// Draws Offer, then Claude Code and Codex. The caller speaks the full line.
+    private func showOfferSetup(_ plan: OfferSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyOfferSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyOfferSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyOfferSetup(_ plan: OfferSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9827,6 +9896,11 @@ final class VoiceTurnController {
         }
         if ScriptSetupAsk.matches(transcript) {
             let result = answerScriptSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if OfferSetupAsk.matches(transcript) {
+            let result = answerOfferSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

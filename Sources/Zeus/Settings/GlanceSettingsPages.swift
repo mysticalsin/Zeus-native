@@ -1119,6 +1119,10 @@ private struct IntegrationsPage: View {
             }
         }
         GSCard("Available apps") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which agents are offered") { OfferSetupVoice.speakOffer() }
+            }
             GSToggleRow(symbol: "plus.bubble", title: "Offer Claude Code for new chats", isOn: bool("integrations.offerClaude"))
             GSDivider()
             GSToggleRow(symbol: "plus.bubble", title: "Offer Codex for new chats", isOn: bool("integrations.offerCodex"))
@@ -1360,6 +1364,13 @@ enum TalkMicVoice {
 /// The halo entrance speaks the animation. It does not play it or change it.
 enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
+}
+
+/// New chats speak whether Claude Code and Codex are offered and connected. Nothing is connected or changed.
+enum OfferSetupVoice {
+    static var speakOffer: () -> Void = {}
+    static var claudeConnected: () -> Bool = { false }
+    static var codexConnected: () -> Bool = { false }
 }
 
 /// Automation speaks Music, Spotify, Keynote, and PowerPoint. It does not ask macOS.

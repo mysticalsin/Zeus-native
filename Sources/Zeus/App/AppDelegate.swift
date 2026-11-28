@@ -428,6 +428,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ExplainSetupVoice.speakSetup = { [weak self] in self?.voice.sayExplainSetup() }
             ProactiveSetupVoice.speakSetup = { [weak self] in self?.voice.sayProactiveSetup() }
             ScriptSetupVoice.speakScript = { [weak self] in self?.voice.sayScriptSetup() }
+            OfferSetupVoice.speakOffer = { [weak self] in self?.voice.sayOfferSetup() }
+            OfferSetupVoice.claudeConnected = { [weak self] in self?.guideServices.isConnected(.claude) ?? false }
+            OfferSetupVoice.codexConnected = { [weak self] in self?.guideServices.isConnected(.codex) ?? false }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }
