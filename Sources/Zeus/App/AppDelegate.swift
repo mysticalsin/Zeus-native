@@ -408,6 +408,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ShelfStackVoice.speakStacks = { [weak self] in self?.voice.sayShelfStacks() }
             OpenPageVoice.speakPage = { [weak self] in self?.voice.sayOpenPage() }
             TodoShownVoice.speakList = { [weak self] in self?.voice.sayTodoShown() }
+            FocusClockVoice.speakClock = { [weak self] in self?.voice.sayFocusClock() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

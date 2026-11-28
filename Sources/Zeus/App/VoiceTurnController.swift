@@ -13538,6 +13538,81 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The focus clock, or a spoken "is focus running", says whether it is going and what kind of round is on.
+    func sayFocusClock() {
+        presentFocusClock(speak: true)
+    }
+
+    private func answerFocusClock(speak: Bool) -> TurnResult {
+        presentFocusClock(speak: speak)
+        return TurnResult(spoken: focusClockLine())
+    }
+
+    private func presentFocusClock(speak: Bool) {
+        let parts = focusClockParts()
+        let line = FocusClockAsk.line(clock: parts.clock, kind: parts.kind)
+        let plan = FocusClockDraw.plan(clock: parts.clock, kind: parts.kind)
+        buddy.idle()
+        showFocusClock(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The clock already on the Focus page. Reading it does not start, pause, or change a round.
+    private func focusClockParts() -> (clock: String, kind: String) {
+        guard let focus = notch.topBar?.focus else { return ("Idle", "None") }
+        let clock = focus.isRunning ? "Running" : (focus.isPaused ? "Paused" : "Idle")
+        let kind: String
+        if clock == "Idle" {
+            kind = "None"
+        } else if focus.isPlainTimer {
+            kind = "Timer"
+        } else {
+            switch focus.phase {
+            case .focus: kind = "Focus"
+            case .rest: kind = "Break"
+            case .idle: kind = "None"
+            }
+        }
+        return (clock, kind)
+    }
+
+    private func focusClockLine() -> String {
+        let parts = focusClockParts()
+        return FocusClockAsk.line(clock: parts.clock, kind: parts.kind)
+    }
+
+    /// Draws Clock, then the run and the round. The caller speaks the full line.
+    private func showFocusClock(_ plan: FocusClockDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFocusClock(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFocusClock(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFocusClock(_ plan: FocusClockDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14755,6 +14830,11 @@ final class VoiceTurnController {
         }
         if TodoShownAsk.matches(transcript) {
             let result = answerTodoShown(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FocusClockAsk.matches(transcript) {
+            let result = answerFocusClock(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

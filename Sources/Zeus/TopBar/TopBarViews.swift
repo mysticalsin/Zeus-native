@@ -1305,6 +1305,11 @@ enum FocusLengthVoice {
     static var speakLength: () -> Void = {}
 }
 
+/// The focus clock speaks whether it is running and what kind of round is on. It does not start a round.
+enum FocusClockVoice {
+    static var speakClock: () -> Void = {}
+}
+
 struct FocusPage: View {
     let topBar: TopBarModel
 
@@ -1346,6 +1351,7 @@ struct FocusPage: View {
                         Spacer(minLength: 0)
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many rounds") { topBar.speakRounds() }
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the focus and break lengths") { FocusLengthVoice.speakLength() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether focus is running") { FocusClockVoice.speakClock() }
                     }
                     Text("Drag the ring to set the time").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
                     HStack(spacing: 6) {
