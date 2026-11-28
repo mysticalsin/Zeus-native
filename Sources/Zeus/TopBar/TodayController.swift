@@ -184,25 +184,44 @@ final class RemindersController {
         if let index = items.firstIndex(where: { $0.id == id }) { items[index].flagged.toggle() }
     }
 
-    func submitDraft() {
-        let parsed = ReminderDraft.parse(draft)
-        guard allowed, !parsed.title.isEmpty, let list = store.defaultCalendarForNewReminders() else { return }
+    /// The Reminders field speaks a reminder that was saved. Access stays on the page.
+    var speakAdded: (AddResult) -> Void = { _ in }
+
+    enum AddResult: Equatable {
+        case added(title: String, when: String)
+        case access
+        case notSaved
+    }
+
+    /// Saves one reminder. A typed time wins; `quick` is the chip above the field.
+    @discardableResult
+    func add(_ text: String, quick: ReminderQuickDue? = nil) -> AddResult {
+        let parsed = ReminderDraft.parse(text)
+        guard allowed else { return .access }
+        guard !parsed.title.isEmpty, let list = store.defaultCalendarForNewReminders() else { return .notSaved }
         let reminder = EKReminder(eventStore: store)
         reminder.title = parsed.title
         reminder.calendar = list
-        // A time typed in the draft ("friday at 5pm") wins; otherwise the quick form picked above the field.
         var due = parsed.due
         var hasTime = parsed.hasTime
-        if due == nil, let quick = pendingDue { due = quick.date(); hasTime = true }
+        if due == nil, let quick { due = quick.date(); hasTime = true }
         if let due {
             let calendar = Calendar(identifier: .gregorian)
             reminder.dueDateComponents = calendar.dateComponents(hasTime ? [.calendar, .year, .month, .day, .hour, .minute] : [.calendar, .year, .month, .day], from: due)
             if hasTime { reminder.addAlarm(EKAlarm(absoluteDate: due)) }
         }
-        guard (try? store.save(reminder, commit: true)) != nil else { return }
+        guard (try? store.save(reminder, commit: true)) != nil else { return .notSaved }
+        refresh()
+        let when = due.map { ReminderAsk.whenLine($0, hasTime: hasTime) } ?? ""
+        return .added(title: parsed.title, when: when)
+    }
+
+    func submitDraft() {
+        let result = add(draft, quick: pendingDue)
+        guard case .added = result else { return }
         draft = ""
         pendingDue = nil
-        refresh()
+        speakAdded(result)
     }
 
     nonisolated private static func hex(_ color: NSColor?) -> UInt32 {

@@ -905,6 +905,43 @@ final class VoiceTurnController {
         presentNoBattery(speak: true)
     }
 
+    /// The Reminders field, or a spoken new reminder, says the title and draws it.
+    func sayReminder(_ result: RemindersController.AddResult) {
+        presentReminder(result, speak: true)
+    }
+
+    private func addSpokenReminder(_ text: String, speak: Bool) -> TurnResult {
+        let result = RemindersController.shared.add(text)
+        presentReminder(result, speak: speak)
+        return TurnResult(spoken: Self.reminderLine(result))
+    }
+
+    private static func reminderLine(_ result: RemindersController.AddResult) -> String {
+        switch result {
+        case .added(let title, let when): return ReminderAsk.added(title: title, when: when) ?? ReminderAsk.notSaved
+        case .access: return ReminderAsk.access
+        case .notSaved: return ReminderAsk.notSaved
+        }
+    }
+
+    private func presentReminder(_ result: RemindersController.AddResult, speak: Bool) {
+        let line = Self.reminderLine(result)
+        let plan: ReminderDraw?
+        switch result {
+        case .added(let title, let when): plan = ReminderDraw.plan(title: title, when: when)
+        case .access: plan = ReminderDraw.access()
+        case .notSaved: plan = ReminderDraw.notSaved()
+        }
+        buddy.idle()
+        guard let plan else {
+            if speak { say(line) }
+            return
+        }
+        showReminder(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerBattery(speak: Bool) -> TurnResult {
         guard let battery = notch.topBar?.battery else {
             presentNoBattery(speak: speak)
@@ -1282,6 +1319,38 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws a saved reminder: Reminder, then the title, then the due line.
+    /// The caller speaks the full line.
+    private func showReminder(_ plan: ReminderDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyReminder(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyReminder(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyReminder(_ plan: ReminderDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1576,6 +1645,12 @@ final class VoiceTurnController {
         }
         if BatteryAsk.matches(transcript) {
             let result = answerBattery(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if let body = ReminderAsk.body(in: transcript) {
+            if CLIAccess.turnRestricted { return refuseRestricted(speak: speak) }
+            let result = addSpokenReminder(body, speak: speak)
             remember(transcript, result.spoken)
             return result
         }

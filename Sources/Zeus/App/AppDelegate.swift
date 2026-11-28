@@ -300,6 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice.sayBattery(level: level, charging: charging, pluggedIn: pluggedIn)
             }
             topBar.speakNoBattery = { [weak self] in self?.voice.sayNoBattery() }
+            RemindersController.shared.speakAdded = { [weak self] result in self?.voice.sayReminder(result) }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
