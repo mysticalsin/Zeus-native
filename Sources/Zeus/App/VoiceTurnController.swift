@@ -5344,6 +5344,76 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Day to day card, or a spoken "what's on day to day", says which switches are on. It does not change them.
+    func sayDayToDay() {
+        presentDayToDay(speak: true)
+    }
+
+    private func answerDayToDay(speak: Bool) -> TurnResult {
+        presentDayToDay(speak: speak)
+        return TurnResult(spoken: dayToDayLine())
+    }
+
+    private func presentDayToDay(speak: Bool) {
+        let words = dayToDayWords()
+        let line = DayToDayAsk.line(words: words)
+        let plan = DayToDayDraw.plan(words: words)
+        buddy.idle()
+        showDayToDay(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Login, awake, music, meeting, sharing, then welcome, for each switch that is on.
+    /// An unset value follows the catalog default. Reading them does not change login or sleep.
+    private func dayToDayWords() -> [String] {
+        let store = SettingsStore.shared
+        let pairs = [
+            ("general.launchAtLogin", "Login"),
+            ("general.keepAwake", "Awake"),
+            ("keepAwake.whileMusic", "Music"),
+            ("general.meetingMode", "Meeting"),
+            ("general.showInScreenSharing", "Sharing"),
+            ("general.welcomeBack", "Welcome"),
+        ]
+        return pairs.compactMap { store.bool($0.0) ? $0.1 : nil }
+    }
+
+    private func dayToDayLine() -> String {
+        DayToDayAsk.line(words: dayToDayWords())
+    }
+
+    /// Draws Day, then up to four switches that are on, or None. The caller speaks the full line.
+    private func showDayToDay(_ plan: DayToDayDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDayToDay(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDayToDay(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDayToDay(_ plan: DayToDayDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5941,6 +6011,11 @@ final class VoiceTurnController {
         }
         if VoiceCuesAsk.matches(transcript) {
             let result = answerVoiceCues(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DayToDayAsk.matches(transcript) {
+            let result = answerDayToDay(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

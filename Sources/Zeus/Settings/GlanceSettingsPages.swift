@@ -3,6 +3,11 @@ import Observation
 import SwiftUI
 import ZeusCore
 
+/// The Day to day card speaks which of its six switches are on. It does not change them.
+enum DayToDayVoice {
+    static var speakDay: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -109,6 +114,10 @@ private struct GeneralPage: View {
             .padding(.bottom, 8)
         }
         GSCard("Day to day") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's on day to day") { DayToDayVoice.speakDay() }
+            }
             GSToggleRow(symbol: "power", title: "Launch Zeus at login", text: "Ready as soon as you sign in to your Mac.", isOn: bool("general.launchAtLogin"))
             GSDivider()
             GSToggleRow(symbol: "cup.and.saucer", title: "Keep the Mac from sleeping", text: "Agents keep working while the screen can still lock.", detail: "Your screen can still turn off and lock.", isOn: bool("general.keepAwake"))

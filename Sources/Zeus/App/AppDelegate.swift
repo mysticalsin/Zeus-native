@@ -373,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SoundCatalog.speakCues = { [weak self] in self?.voice.sayCueSounds() }
             DictationSettings.speakSetup = { [weak self] in self?.voice.sayDictationSetup() }
             ExtraPreferences.speakVoiceCues = { [weak self] in self?.voice.sayVoiceCues() }
+            DayToDayVoice.speakDay = { [weak self] in self?.voice.sayDayToDay() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
