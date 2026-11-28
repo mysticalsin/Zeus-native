@@ -4632,6 +4632,11 @@ final class VoiceTurnController {
                     self.showCalendarEvent(visual, speak: speak)
                     if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
                     self.buddy.showCaption(visual.boltCaption(at: 0))
+                } else if case .addTodos(let items) = plan.intent,
+                          let visual = TodoListDraw.plan(titles: items.map { TodoQuickAdd.parse($0).title }) {
+                    self.showTodoList(visual, speak: speak)
+                    if speak { self.say(ack) } else { self.buddy.showCaption(ack); self.buddy.hideCaption() }
+                    self.buddy.showCaption(visual.boltCaption(at: 0))
                 } else if case .codeAgent(let tool, let project, let task) = plan.intent,
                           let visual = AgentStartDraw.plan(tool: (tool ?? CodingTool.preferred()).title,
                                                            project: project, task: task) {
