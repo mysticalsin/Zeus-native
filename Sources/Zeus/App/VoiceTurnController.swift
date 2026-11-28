@@ -7814,6 +7814,75 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The other notch lights, or a spoken "which other notch lights", say which are on. They do not change them.
+    func sayHudExtras() {
+        presentHudExtras(speak: true)
+    }
+
+    private func answerHudExtras(speak: Bool) -> TurnResult {
+        presentHudExtras(speak: speak)
+        return TurnResult(spoken: hudExtrasLine())
+    }
+
+    private func presentHudExtras(speak: Bool) {
+        let words = hudExtraWords()
+        let line = HudExtrasAsk.line(words: words)
+        let plan = HudExtrasDraw.plan(words: words)
+        buddy.idle()
+        showHudExtras(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Mute, the system HUD, the screen edge, shortcut peeks, and an added event, for each one that is on.
+    /// Reading them does not change the lights.
+    private func hudExtraWords() -> [String] {
+        let store = SettingsStore.shared
+        let pairs = [
+            ("lights.hud.mute", "Mute"),
+            ("lights.hud.replaceSystem", "HUD"),
+            ("lights.hud.screenEdge", "Edge"),
+            ("lights.shortcutPeeks", "Peeks"),
+            ("lights.eventGlow", "Event"),
+        ]
+        return pairs.compactMap { store.bool($0.0) ? $0.1 : nil }
+    }
+
+    private func hudExtrasLine() -> String {
+        HudExtrasAsk.line(words: hudExtraWords())
+    }
+
+    /// Draws Pulse, then up to four lights that are on, or None. The caller speaks the full line.
+    private func showHudExtras(_ plan: HudExtrasDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHudExtras(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHudExtras(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHudExtras(_ plan: HudExtrasDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8596,6 +8665,11 @@ final class VoiceTurnController {
         }
         if ExtraSoundsAsk.matches(transcript) {
             let result = answerExtraSounds(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HudExtrasAsk.matches(transcript) {
+            let result = answerHudExtras(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

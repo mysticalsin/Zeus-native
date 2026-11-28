@@ -538,6 +538,7 @@ private struct AppearancePage: View {
             HStack {
                 Spacer(minLength: 0)
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which notch lights are on") { SystemHUDSettings.speakLights() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which other notch lights are on") { HudExtraVoice.speakExtras() }
             }
             light("lights.hud.volume", "speaker.wave.2", "Volume in the notch", "Level glow and wings when the output volume changes.")
             light("lights.hud.brightness", "sun.max", "Brightness in the notch", "Level glow when the built-in display brightness changes.")
@@ -1311,6 +1312,11 @@ private struct LicensePage: View {
 }
 
 // MARK: Permissions
+
+/// The other notch lights speak mute, the system HUD, the edge, peeks, and an added event. They do not change them.
+enum HudExtraVoice {
+    static var speakExtras: () -> Void = {}
+}
 
 /// The four extra agent sounds speak their switches. Nothing is played.
 enum ExtraSoundVoice {
