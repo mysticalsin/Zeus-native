@@ -14065,6 +14065,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The usage meter, or a spoken "how is the usage meter set", says the comparison and whether alerts are on.
+    func sayUsageMeter() {
+        presentUsageMeter(speak: true)
+    }
+
+    private func answerUsageMeter(speak: Bool) -> TurnResult {
+        presentUsageMeter(speak: speak)
+        return TurnResult(spoken: usageMeterLine())
+    }
+
+    private func presentUsageMeter(speak: Bool) {
+        let parts = usageMeterParts()
+        let line = UsageMeterAsk.line(meter: parts.meter, alerts: parts.alerts)
+        let plan = UsageMeterDraw.plan(meter: parts.meter, alerts: parts.alerts)
+        buddy.idle()
+        showUsageMeter(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The comparison the Usage card shows, and whether limit alerts are on. Reading them does not scan logs or say a token count.
+    private func usageMeterParts() -> (meter: String, alerts: String) {
+        let limit = UserDefaults.standard.integer(forKey: "usage.claudeBlockLimit")
+        let alerts = UserDefaults.standard.object(forKey: "usage.alerts") as? Bool ?? true
+        return (limit > 0 ? "Custom" : "Busiest", alerts ? "On" : "Off")
+    }
+
+    private func usageMeterLine() -> String {
+        let parts = usageMeterParts()
+        return UsageMeterAsk.line(meter: parts.meter, alerts: parts.alerts)
+    }
+
+    /// Draws Usage, then the comparison and the alerts. The caller speaks the full line.
+    private func showUsageMeter(_ plan: UsageMeterDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyUsageMeter(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyUsageMeter(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyUsageMeter(_ plan: UsageMeterDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -15322,6 +15385,11 @@ final class VoiceTurnController {
         }
         if LyricShowAsk.matches(transcript) {
             let result = answerLyricShow(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if UsageMeterAsk.matches(transcript) {
+            let result = answerUsageMeter(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

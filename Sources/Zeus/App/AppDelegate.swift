@@ -421,6 +421,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             ChatPaneVoice.speakPane = { [weak self] in self?.voice.sayChatPane() }
             LyricShowVoice.speakLyrics = { [weak self] in self?.voice.sayLyricShow() }
+            UsageMeterVoice.speakMeter = { [weak self] in self?.voice.sayUsageMeter() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

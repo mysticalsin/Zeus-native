@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The usage meter speaks whether it uses a saved limit and whether alerts are on. It does not scan logs.
+enum UsageMeterVoice {
+    static var speakMeter: () -> Void = {}
+}
+
 /// Usage tab: one card per coding agent with its limit rings, reset countdowns and a
 /// seven-day strip, read from the agents' own logs on this Mac.
 struct UsagePage: View {
@@ -18,6 +23,7 @@ struct UsagePage: View {
                             Text("Reading usage…").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudQuiet)
                             Spacer(minLength: 0)
                             GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say today's usage") { usage.speakToday() }
+                            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the usage meter is set") { UsageMeterVoice.speakMeter() }
                         }
                     }
                 }
@@ -47,6 +53,7 @@ private struct UsageCard: View {
                         .font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.bolt)
                     Text(usage.provider.title.uppercased()).font(TopBarStyle.label(9.5, .bold)).foregroundStyle(Theme.cloudSecondary)
                     GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say today's usage") { UsageModel.shared.speakToday() }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the usage meter is set") { UsageMeterVoice.speakMeter() }
                     if let plan = usage.plan {
                         Text(plan.capitalized).font(TopBarStyle.label(9, .semibold)).foregroundStyle(Theme.storm)
                             .padding(.horizontal, 5).padding(.vertical, 1)
