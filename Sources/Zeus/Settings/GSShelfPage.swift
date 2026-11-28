@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The Fling card speaks whether it is on, who can see this Mac, and where arrivals go. It does not turn Fling on.
+enum FlingVoice {
+    static var speakFling: () -> Void = {}
+}
+
 /// Settings › Shelf: the Fling switch, who can see this Mac, where arrivals go, and the paired Macs. Every row is a
 /// catalog row (`scripts/gen-settings-catalog.py`); Fling does nothing until the first switch is on.
 @MainActor
@@ -12,6 +17,10 @@ struct ShelfSettingsPage: View {
         GSPageHeading(section: .shelf, subtitle: "Send files to nearby Macs from the Shelf.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Fling") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Fling is set") { FlingVoice.speakFling() }
+            }
             GSToggleRow(symbol: "paperplane", title: "Send and receive with nearby Macs",
                         text: "Drag files from the Shelf onto a nearby Mac running Zeus. Off until you turn it on. Turning it on makes macOS ask once for Local Network access.",
                         isOn: store.boolBinding("fling.enabled"))

@@ -378,6 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             BrowserAgentVoice.speakAgent = { [weak self] in self?.voice.sayBrowserAgent() }
             PolyglotSettings.speakSetup = { [weak self] in self?.voice.sayPolyglotSetup() }
             KeepAwakeSession.speakSetup = { [weak self] in self?.voice.sayKeepAwakeSetup() }
+            FlingVoice.speakFling = { [weak self] in self?.voice.sayFlingSetup() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
