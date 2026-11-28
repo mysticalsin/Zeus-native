@@ -1200,7 +1200,7 @@ private struct PermissionsPage: View {
                 context.permissions.request(.camera)
             }
             GSDivider()
-            capturePerm("rectangle.dashed.badge.record", "Screen Recording", "Screenshots during a turn and system audio for Waves", context.permissions.screenPermissionState, .screen) {
+            capturePerm("rectangle.dashed.badge.record", "Screen Recording", "Screenshots during a turn and system audio for Waves", context.permissions.screenPermissionState, .screen, speak: { PermissionsModel.speakScreen() }) {
                 context.permissions.request(.screen)
             }
             GSDivider()
@@ -1294,16 +1294,21 @@ private struct PermissionsPage: View {
     }
 
     /// Camera and Screen Recording: request-only (never starts capture).
-    private func capturePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, allow: @escaping () -> Void) -> some View {
+    private func capturePerm(_ symbol: String, _ title: String, _ text: String, _ state: PermissionState, _ kind: PermissionsModel.Kind, speak: (() -> Void)? = nil, allow: @escaping () -> Void) -> some View {
         GSRow(symbol: symbol, title: title, text: state == .denied ? "Turn \(title) on under Privacy in System Settings." : text) {
-            switch state {
-            case .authorized: GSStatus(ok: true, text: "Allowed")
-            case .notDetermined:
-                Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
-            case .denied:
-                HStack(spacing: 10) {
-                    GSStatus(ok: false, text: "Denied")
-                    Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+            HStack(spacing: 8) {
+                if let speak {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether the screen can be seen") { speak() }
+                }
+                switch state {
+                case .authorized: GSStatus(ok: true, text: "Allowed")
+                case .notDetermined:
+                    Button("Allow", action: allow).buttonStyle(GSButtonStyle()).accessibilityLabel("Allow \(title)")
+                case .denied:
+                    HStack(spacing: 10) {
+                        GSStatus(ok: false, text: "Denied")
+                        Button("Open System Settings") { context.permissions.open(kind) }.buttonStyle(GSButtonStyle()).accessibilityLabel("Open \(title) settings")
+                    }
                 }
             }
         }

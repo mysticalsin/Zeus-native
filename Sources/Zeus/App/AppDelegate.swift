@@ -359,6 +359,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             WakeWordController.shared.speakWake = { [weak self] in self?.voice.sayHeyZeus() }
             VoiceSettings.shared.speakVoice = { [weak self] in self?.voice.sayVoiceChoice() }
             LicenseManager.shared.speakLicense = { [weak self] in self?.voice.sayLicense() }
+            PermissionsModel.speakScreen = { [weak self] in self?.voice.sayScreenRecording() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

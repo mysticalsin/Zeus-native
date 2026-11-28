@@ -4305,6 +4305,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Permissions, or a spoken "can you see the screen", says whether screen recording is allowed.
+    func sayScreenRecording() {
+        presentScreenRecording(speak: true)
+    }
+
+    private func answerScreenRecording(speak: Bool) -> TurnResult {
+        presentScreenRecording(speak: speak)
+        return TurnResult(spoken: screenRecordingLine())
+    }
+
+    private func presentScreenRecording(speak: Bool) {
+        let word = screenRecordingWord()
+        let line = ScreenRecordingAsk.line(word: word)
+        let plan = ScreenRecordingDraw.plan(word: word)
+        buddy.idle()
+        showScreenRecording(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same word the Screen Recording row shows. This does not ask macOS.
+    private func screenRecordingWord() -> String {
+        switch PermissionsModel.CaptureAccess.live.screen() {
+        case .authorized: "Allowed"
+        case .denied: "Denied"
+        case .notDetermined: "Not asked yet"
+        }
+    }
+
+    private func screenRecordingLine() -> String {
+        ScreenRecordingAsk.line(word: screenRecordingWord())
+    }
+
+    /// Draws Screen, then Allowed, Denied, or Not asked yet. The caller speaks the full line.
+    private func showScreenRecording(_ plan: ScreenRecordingDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyScreenRecording(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyScreenRecording(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyScreenRecording(_ plan: ScreenRecordingDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4817,6 +4881,11 @@ final class VoiceTurnController {
         }
         if LicenseAsk.matches(transcript) {
             let result = answerLicense(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ScreenRecordingAsk.matches(transcript) {
+            let result = answerScreenRecording(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -54,6 +54,8 @@ final class PermissionsModel {
     var chromeMessage: String?
 
     private static let screenRequestKey = "permissions.screenCapture.requested"
+    /// The Screen Recording row speaks whether Zeus can see the screen. It does not ask macOS.
+    static var speakScreen: () -> Void = {}
 
     /// Explicit permission boundary. Tests inject state and requests instead of displaying OS prompts.
     @MainActor
