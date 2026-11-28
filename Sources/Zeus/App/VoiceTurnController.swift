@@ -8323,6 +8323,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The agent picker, or a spoken "what's the agent picker shortcut", says keyboard answers and the picker key. It does not change a shortcut.
+    func sayPickerSetup() {
+        presentPickerSetup(speak: true)
+    }
+
+    private func answerPickerSetup(speak: Bool) -> TurnResult {
+        presentPickerSetup(speak: speak)
+        return TurnResult(spoken: pickerSetupLine())
+    }
+
+    private func presentPickerSetup(speak: Bool) {
+        let parts = pickerSetupParts()
+        let line = PickerSetupAsk.line(answer: parts.answer, open: parts.open)
+        let plan = PickerSetupDraw.plan(answer: parts.answer, open: parts.open)
+        buddy.idle()
+        showPickerSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Keyboard answers, and the Open the agent picker menu. An unknown saved shortcut is Option-Command-Z, the same as the menu.
+    /// Reading them does not change a shortcut.
+    private func pickerSetupParts() -> (answer: String, open: String) {
+        let answer = SettingsStore.shared.bool("shortcut.answerKeys") ? "On" : "Off"
+        return (answer, ExtraPreferences.shared.openNotch.title)
+    }
+
+    private func pickerSetupLine() -> String {
+        let parts = pickerSetupParts()
+        return PickerSetupAsk.line(answer: parts.answer, open: parts.open)
+    }
+
+    /// Draws Picker, then keyboard answers and the picker key. The caller speaks the full line.
+    private func showPickerSetup(_ plan: PickerSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPickerSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPickerSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPickerSetup(_ plan: PickerSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9145,6 +9208,11 @@ final class VoiceTurnController {
         }
         if JevSetupAsk.matches(transcript) {
             let result = answerJevSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PickerSetupAsk.matches(transcript) {
+            let result = answerPickerSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

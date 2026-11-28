@@ -1051,6 +1051,10 @@ private struct ShortcutsPage: View {
             }
         }
         GSCard("Keyboard shortcut") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the agent picker shortcut") { PickerSetupVoice.speakPicker() }
+            }
             GSRow(symbol: "rectangle.and.hand.point.up.left", title: "Open the agent picker") {
                 GSPopup(selection: Binding(get: { ExtraPreferences.shared.openNotch.title },
                                            set: { value in ExtraPreferences.shared.openNotch = ShortcutPreset.allCases.first { $0.title == value } ?? .optionCommandZ }),
@@ -1338,6 +1342,11 @@ enum HudExtraVoice {
 /// The four extra agent sounds speak their switches. Nothing is played.
 enum ExtraSoundVoice {
     static var speakExtra: () -> Void = {}
+}
+
+/// The agent picker shortcut and keyboard answers speak together. They do not change a shortcut.
+enum PickerSetupVoice {
+    static var speakPicker: () -> Void = {}
 }
 
 /// Accessibility, Calendar, and Reminders speak their states. Nothing is requested.
