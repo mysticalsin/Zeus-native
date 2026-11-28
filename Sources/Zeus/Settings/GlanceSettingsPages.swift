@@ -155,7 +155,9 @@ private struct GeneralPage: View {
                 }
             }
             GSDivider()
-            GSRow(symbol: "bubble.left.and.bubble.right", title: "Default agent", text: "For new conversations opened from the notch.")
+            GSRow(symbol: "bubble.left.and.bubble.right", title: "Default agent", text: "For new conversations opened from the notch.") {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the default agent") { DefaultAgentVoice.speakAgent() }
+            }
             HStack(spacing: 12) {
                 agentChoice("Codex")
                 agentChoice("Claude Code")
@@ -1342,6 +1344,11 @@ enum HudExtraVoice {
 /// The four extra agent sounds speak their switches. Nothing is played.
 enum ExtraSoundVoice {
     static var speakExtra: () -> Void = {}
+}
+
+/// The default agent for a new chat speaks Claude Code or Codex. It does not open a chat.
+enum DefaultAgentVoice {
+    static var speakAgent: () -> Void = {}
 }
 
 /// The agent picker shortcut and keyboard answers speak together. They do not change a shortcut.
