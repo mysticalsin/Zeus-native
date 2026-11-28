@@ -6082,6 +6082,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Captions card, or a spoken "how's captions set", says the original and the size. It does not start Polyglot.
+    func sayCaptionSetup() {
+        presentCaptionSetup(speak: true)
+    }
+
+    private func answerCaptionSetup(speak: Bool) -> TurnResult {
+        presentCaptionSetup(speak: speak)
+        return TurnResult(spoken: captionSetupLine())
+    }
+
+    private func presentCaptionSetup(speak: Bool) {
+        let parts = captionSetupParts()
+        let line = CaptionSetupAsk.line(original: parts.original, size: parts.size)
+        let plan = CaptionSetupDraw.plan(original: parts.original, size: parts.size)
+        buddy.idle()
+        showCaptionSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The original switch and the size menu. An unknown stored size is Medium, the same as the menu.
+    /// Reading them does not start Polyglot or pop the captions out. Caption text stays off the card.
+    private func captionSetupParts() -> (original: String, size: String) {
+        let settings = PolyglotSettings.shared
+        let original = settings.showOriginal ? "On" : "Off"
+        return (original, settings.captionSize.title)
+    }
+
+    private func captionSetupLine() -> String {
+        let parts = captionSetupParts()
+        return CaptionSetupAsk.line(original: parts.original, size: parts.size)
+    }
+
+    /// Draws Caption, then the original and the size. The caller speaks the full line.
+    private func showCaptionSetup(_ plan: CaptionSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCaptionSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCaptionSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCaptionSetup(_ plan: CaptionSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6734,6 +6798,11 @@ final class VoiceTurnController {
         }
         if BeamerSetupAsk.matches(transcript) {
             let result = answerBeamerSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if CaptionSetupAsk.matches(transcript) {
+            let result = answerCaptionSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

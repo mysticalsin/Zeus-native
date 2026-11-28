@@ -36,6 +36,10 @@ struct PolyglotSettingsPage: View {
             }
         }
         GSCard("Captions") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the captions are set") { PolyglotSettings.speakCaptions() }
+            }
             GSToggleRow(symbol: "text.quote", title: "Show the original text",
                         text: "Keeps what was said, in its own language, under each translation.",
                         isOn: Binding(get: { settings.showOriginal }, set: { settings.showOriginal = $0 }))

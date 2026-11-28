@@ -384,6 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotifySetupVoice.speakNotices = { [weak self] in self?.voice.sayNotifySetup() }
             FlingVoice.speakReceive = { [weak self] in self?.voice.sayReceiveSetup() }
             BeamerSetupVoice.speakSetup = { [weak self] in self?.voice.sayBeamerSetup() }
+            PolyglotSettings.speakCaptions = { [weak self] in self?.voice.sayCaptionSetup() }
             BeamerSetupVoice.continuityOn = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
