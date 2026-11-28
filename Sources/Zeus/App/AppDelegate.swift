@@ -400,6 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             EverydayLightsVoice.speakLights = { [weak self] in self?.voice.sayEverydayLights() }
             HaloArmVoice.speakArm = { [weak self] in self?.voice.sayHaloArm() }
             MusicLightsVoice.speakLights = { [weak self] in self?.voice.sayMusicLights() }
+            RunningCardVoice.speakCard = { [weak self] in self?.voice.sayRunningCard() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

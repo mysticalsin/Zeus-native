@@ -52,6 +52,11 @@ enum MusicLightsVoice {
     }
 }
 
+/// The Running card speaks the look, how the notch opens, and the hover delay. It does not open the notch.
+enum RunningCardVoice {
+    static var speakCard: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -340,6 +345,10 @@ private struct AppearancePage: View {
         }
         if let drawnNotchCard = DrawnNotchCardModel(context: context, navigation: navigation) { DrawnNotchCard(model: drawnNotchCard) }
         GSCard("Running card") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the running card is set") { RunningCardVoice.speakCard() }
+            }
             HStack(spacing: 12) {
                 runningTheme("Wave", "")
                 runningTheme("Essentials", "")
