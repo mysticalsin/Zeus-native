@@ -60,7 +60,7 @@ public enum PeerQuestionSelection {
               case .object(let answers) = value["answers"] else { return false }
         return answers.values.contains { item in
             guard let text = item.stringValue else { return false }
-            return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !PeerQuestionAnswerBox.trimmedAnswer(text).isEmpty
         }
     }
 }
