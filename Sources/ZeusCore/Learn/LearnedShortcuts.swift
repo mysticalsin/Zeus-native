@@ -113,7 +113,7 @@ public enum NamedShortcutPhrase {
         let lower = trimmed.lowercased()
         let prefix = "when i say "
         guard lower.hasPrefix(prefix) else { return nil }
-        var rest = String(trimmed.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        var rest = LearnedRemainderBox.trimmedRemainder(String(trimmed.dropFirst(prefix.count)))
         let phrase: String
         let action: String
         if let comma = rest.firstIndex(of: ",") {
