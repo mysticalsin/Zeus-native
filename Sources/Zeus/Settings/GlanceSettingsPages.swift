@@ -1231,9 +1231,21 @@ private struct VoicePage: View {
             .padding(.bottom, -GS.cardGap)
         ZeusVoiceCards(navigation: navigation)
         GSCard("Talk to Zeus") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how talk sight is set") { TalkSightVoice.speakSight() }
+            }
             ShortcutLinkRow(symbol: "bolt", title: "Talk to Zeus", current: Preferences.shared.pushToTalk, navigation: navigation)
             GSDivider()
             TalkMicrophoneRow()
+            GSDivider()
+            GSToggleRow(symbol: "eye", title: "Let Zeus see my screen when I talk",
+                        text: "Each question can include the screen, so Zeus can see what you see.", detail: "Off answers without looking. The screenshot is never saved.",
+                        isOn: bool("talk.seeScreen"))
+            GSDivider()
+            GSToggleRow(symbol: "pencil.and.outline", title: "Draw on the screen while Zeus answers",
+                        text: "Zeus can ring, arrow, or label what it talks about.", detail: "Off draws nothing. Marks leave a few seconds after the answer.",
+                        isOn: bool("talk.drawOnScreen"))
             GSDivider()
             KeyAccessLinkRow(navigation: navigation)
         }
@@ -1396,6 +1408,11 @@ enum ExtraSoundVoice {
 /// The talk microphone speaks Automatic, this Mac, a chosen input, or unavailable. It does not start listening.
 enum TalkMicVoice {
     static var speakMic: () -> Void = {}
+}
+
+/// Whether talk can see the screen, and whether it draws while answering. Nothing is captured.
+enum TalkSightVoice {
+    static var speakSight: () -> Void = {}
 }
 
 /// The halo entrance speaks the animation. It does not play it or change it.

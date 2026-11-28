@@ -10736,6 +10736,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Talk sight, or a spoken "how is talk sight set", says whether talk can see the screen and draw on it.
+    func sayTalkSight() {
+        presentTalkSight(speak: true)
+    }
+
+    private func answerTalkSight(speak: Bool) -> TurnResult {
+        presentTalkSight(speak: speak)
+        return TurnResult(spoken: talkSightLine())
+    }
+
+    private func presentTalkSight(speak: Bool) {
+        let parts = talkSightParts()
+        let line = TalkSightAsk.line(see: parts.see, draw: parts.draw)
+        let plan = TalkSightDraw.plan(see: parts.see, draw: parts.draw)
+        buddy.idle()
+        showTalkSight(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Seeing the screen, and drawing while an answer is spoken. Reading them does not capture or draw.
+    private func talkSightParts() -> (see: String, draw: String) {
+        func flag(_ on: Bool) -> String { on ? "On" : "Off" }
+        return (flag(FeatureSettings.talkSeeScreen()), flag(FeatureSettings.talkDrawOnScreen()))
+    }
+
+    private func talkSightLine() -> String {
+        let parts = talkSightParts()
+        return TalkSightAsk.line(see: parts.see, draw: parts.draw)
+    }
+
+    /// Draws Sight, then the two switches. The caller speaks the full line.
+    private func showTalkSight(_ plan: TalkSightDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTalkSight(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTalkSight(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTalkSight(_ plan: TalkSightDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11743,6 +11805,11 @@ final class VoiceTurnController {
         }
         if PointTrailAsk.matches(transcript) {
             let result = answerPointTrail(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TalkSightAsk.matches(transcript) {
+            let result = answerTalkSight(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
