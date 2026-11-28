@@ -323,6 +323,8 @@ final class TopBarModel {
     var speakShelf: () -> Void = {}
     /// The weather page speaks whether rain is coming.
     var speakRain: () -> Void = {}
+    /// The week grid speaks the week number and how many events it holds.
+    var speakWeek: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

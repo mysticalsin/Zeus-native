@@ -352,6 +352,7 @@ struct HomeWidgetCard: View {
             HStack(alignment: .top) {
                 caption("This week", "\(calendar.component(.weekOfYear, from: today)) · \(ZeusDates.string(today, template: "MMMM"))")
                 Spacer()
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say this week") { topBar.speakWeek() }
                 openCalendar()
             }
             Spacer(minLength: 0)
