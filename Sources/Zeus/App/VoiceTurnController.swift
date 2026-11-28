@@ -10988,6 +10988,89 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Any LLM, or a spoken "how is any llm set", says whether an address, a model, and a key are set, and where the link goes.
+    func sayGateway() {
+        presentGateway(speak: true)
+    }
+
+    private func answerGateway(speak: Bool) -> TurnResult {
+        presentGateway(speak: speak)
+        return TurnResult(spoken: gatewayLine())
+    }
+
+    private func presentGateway(speak: Bool) {
+        let parts = gatewayParts()
+        let line = GatewayAsk.line(address: parts.address, model: parts.model, key: parts.key, link: parts.link)
+        let plan = GatewayDraw.plan(address: parts.address, model: parts.model, key: parts.key, link: parts.link)
+        buddy.idle()
+        showGateway(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved endpoint. The address, the model name, and the key are never spoken. Reading them does not test or save.
+    private func gatewayParts() -> (address: String, model: String, key: String, link: String) {
+        let config = UserDefaults.standard.data(forKey: AnyLLMConfig.defaultsKey)
+            .flatMap { try? JSONDecoder().decode(AnyLLMConfig.self, from: $0) } ?? AnyLLMConfig()
+        let address = config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : "Set"
+        let model = config.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : "Set"
+        let state = AnyLLMConfig.credentialState(secret: Keychain.get(AnyLLMConfig.keyAccount),
+                                                 boundOrigin: Keychain.get(AnyLLMConfig.originAccount), config: config)
+        let key: String
+        switch state {
+        case .ready: key = "Saved"
+        case .needsReentry: key = "Again"
+        case .absent: key = "None"
+        }
+        let link: String
+        if config.isInsecureRemote {
+            link = "Blocked"
+        } else if let host = config.chatURL?.host, AnyLLMEndpointPolicy.isLoopback(host) {
+            link = "Local"
+        } else if config.chatURL != nil {
+            link = "Remote"
+        } else {
+            link = "Off"
+        }
+        return (address, model, key, link)
+    }
+
+    private func gatewayLine() -> String {
+        let parts = gatewayParts()
+        return GatewayAsk.line(address: parts.address, model: parts.model, key: parts.key, link: parts.link)
+    }
+
+    /// Draws Gateway, then the four choices. The caller speaks the full line.
+    private func showGateway(_ plan: GatewayDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyGateway(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyGateway(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyGateway(_ plan: GatewayDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12015,6 +12098,11 @@ final class VoiceTurnController {
         }
         if CompanionAsk.matches(transcript) {
             let result = answerCompanion(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if GatewayAsk.matches(transcript) {
+            let result = answerGateway(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
