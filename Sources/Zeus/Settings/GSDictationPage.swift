@@ -18,6 +18,11 @@ enum DictationSoundVoice {
     static var speakSound: () -> Void = {}
 }
 
+/// Dictation's microphone and cue volume. A device name stays unspoken, and the cue is not played.
+enum DictateHearVoice {
+    static var speakHear: () -> Void = {}
+}
+
 /// History speaks how long a dictation is kept. It does not open history or delete anything.
 enum DictationKeepVoice {
     static var speakKeep: () -> Void = {}
@@ -138,6 +143,10 @@ struct DictationSettingsPage: View {
             }
         }
         GSCard("Microphone") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the dictation microphone") { DictateHearVoice.speakHear() }
+            }
             GSRow(symbol: "mic.circle", title: "Input") {
                 GSPopup(selection: Binding(get: { micName(settings.microphoneUID) },
                                            set: { name in

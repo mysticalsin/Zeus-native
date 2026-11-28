@@ -10002,6 +10002,77 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Dictation's microphone, or a spoken "which dictation microphone", says the input and the cue volume. Nothing is scanned or played.
+    func sayDictateHear() {
+        presentDictateHear(speak: true)
+    }
+
+    private func answerDictateHear(speak: Bool) -> TurnResult {
+        presentDictateHear(speak: speak)
+        return TurnResult(spoken: dictateHearLine())
+    }
+
+    private func presentDictateHear(speak: Bool) {
+        let parts = dictateHearParts()
+        let line = DictateHearAsk.line(input: parts.input, cue: parts.cue)
+        let plan = DictateHearDraw.plan(input: parts.input, cue: parts.cue)
+        buddy.idle()
+        showDictateHear(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The stored microphone and the cue percent. An unloaded device list is not a scan, and a name is never spoken.
+    private func dictateHearParts() -> (input: String, cue: String) {
+        let settings = DictationSettings.shared
+        let uid = settings.microphoneUID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let input: String
+        if uid.isEmpty {
+            input = "System default"
+        } else {
+            let devices = MicrophoneTester.shared.devices
+            if devices.isEmpty || devices.contains(where: { $0.uid == uid }) { input = "Chosen" }
+            else { input = "Unavailable" }
+        }
+        return (input, String(DictationCueSynth.clampedVolume(settings.cueVolume)))
+    }
+
+    private func dictateHearLine() -> String {
+        let parts = dictateHearParts()
+        return DictateHearAsk.line(input: parts.input, cue: parts.cue)
+    }
+
+    /// Draws Input, then the microphone and the cue. The caller speaks the full line.
+    private func showDictateHear(_ plan: DictateHearDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDictateHear(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDictateHear(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDictateHear(_ plan: DictateHearDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10954,6 +11025,11 @@ final class VoiceTurnController {
         }
         if VoiceTuneAsk.matches(transcript) {
             let result = answerVoiceTune(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DictateHearAsk.matches(transcript) {
+            let result = answerDictateHear(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
