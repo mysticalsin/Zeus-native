@@ -1300,7 +1300,11 @@ struct FocusPage: View {
                     topBar.focus.setTime(minutes: max(5, minutes + (direction == .increment ? 5 : -5)))
                 }
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Rounds today: \(timer.roundsToday(at: context.date))").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                    HStack(spacing: 6) {
+                        Text("Rounds today: \(timer.roundsToday(at: context.date))").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                        Spacer(minLength: 0)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many rounds") { topBar.speakRounds() }
+                    }
                     Text("Drag the ring to set the time").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
                     HStack(spacing: 6) {
                         ForEach([15, 25, 50], id: \.self) { minutes in

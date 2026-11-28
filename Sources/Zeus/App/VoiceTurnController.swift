@@ -2988,6 +2988,76 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Focus page, or a spoken "how many rounds", says how many finished today.
+    func sayRounds() {
+        presentRounds(speak: true)
+    }
+
+    private func answerRounds(speak: Bool) -> TurnResult {
+        presentRounds(speak: speak)
+        return TurnResult(spoken: roundsLine())
+    }
+
+    private func roundsToday() -> Int {
+        notch.topBar?.focus.roundsToday() ?? 0
+    }
+
+    private func presentRounds(speak: Bool) {
+        let count = roundsToday()
+        guard let line = FocusRoundsAsk.line(count: count), let plan = FocusRoundsDraw.plan(count: count) else {
+            presentRoundsNone(speak: speak)
+            return
+        }
+        buddy.idle()
+        showRounds(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func roundsLine() -> String {
+        FocusRoundsAsk.line(count: roundsToday()) ?? FocusRoundsAsk.none
+    }
+
+    private func presentRoundsNone(speak: Bool) {
+        let line = FocusRoundsAsk.none
+        let plan = FocusRoundsDraw.none()
+        buddy.idle()
+        showRounds(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the day's rounds: Rounds, then the count, then Today. The caller speaks the full line.
+    private func showRounds(_ plan: FocusRoundsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyRounds(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyRounds(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyRounds(_ plan: FocusRoundsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3400,6 +3470,11 @@ final class VoiceTurnController {
         }
         if CapsLockAsk.matches(transcript) {
             let result = answerCaps(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FocusRoundsAsk.matches(transcript) {
+            let result = answerRounds(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
