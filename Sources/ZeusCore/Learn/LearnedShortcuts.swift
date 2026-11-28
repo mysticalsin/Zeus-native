@@ -130,7 +130,7 @@ public enum NamedShortcutPhrase {
         let steps = stepsText
             .replacingOccurrences(of: " then ", with: " and ")
             .components(separatedBy: " and ")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { LearnedParseStepBox.trimmedParseStep($0) }
             .filter { !$0.isEmpty }
         guard !phrase.isEmpty, !steps.isEmpty else { return nil }
         return (phrase, steps)
