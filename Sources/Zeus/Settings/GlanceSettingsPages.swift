@@ -23,6 +23,11 @@ enum HomeFrameVoice {
     static var speakFrame: () -> Void = {}
 }
 
+/// The Screen card speaks the bottom-corner rounding and the size. It does not move a window.
+enum ScreenCornerVoice {
+    static var speakCorners: () -> Void = {}
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -453,6 +458,10 @@ private struct AppearancePage: View {
 
     private var screenCard: some View {
         GSCard("Screen") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the screen corners are set") { ScreenCornerVoice.speakCorners() }
+            }
             GSToggleRow(symbol: "rectangle.roundedbottom", title: "Round the bottom screen corners",
                         text: "Rounds the bottom corners of a notched display to match the top.", detail: "The rounded corners are click-through.",
                         isOn: bool("screen.roundBottomCorners"))
