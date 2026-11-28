@@ -13,6 +13,11 @@ enum DictationRecordVoice {
     static var speakRecord: () -> Void = {}
 }
 
+/// The start and stop sound speaks the chosen cue. It does not play it or change it.
+enum DictationSoundVoice {
+    static var speakSound: () -> Void = {}
+}
+
 /// Draft text for the Dictation page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -162,9 +167,12 @@ struct DictationSettingsPage: View {
     @ViewBuilder private var soundCard: some View {
         GSCard("Sounds") {
             GSRow(symbol: "speaker.wave.2", title: "Start and stop sound", text: Self.cueDetail(settings.cueStyle)) {
-                GSPopup(selection: Binding(get: { settings.cueStyle.title },
-                                           set: { title in settings.cueStyle = DictationCueStyle(saved: title) }),
-                        options: DictationCueStyle.allCases.map(\.title), label: "Dictation start and stop sound")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { settings.cueStyle.title },
+                                               set: { title in settings.cueStyle = DictationCueStyle(saved: title) }),
+                            options: DictationCueStyle.allCases.map(\.title), label: "Dictation start and stop sound")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the dictation sound") { DictationSoundVoice.speakSound() }
+                }
             }
             GSDivider()
             GSRow(symbol: "play.circle", title: "Preview", text: "Plays the start sound, then the stop sound.") {
