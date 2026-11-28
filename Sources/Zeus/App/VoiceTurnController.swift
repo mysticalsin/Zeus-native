@@ -11620,6 +11620,89 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The second talk key, or a spoken "what is the second talk key", says that key and the dictation shortcut. Custom chords stay unspoken.
+    func sayExtraKey() {
+        presentExtraKey(speak: true)
+    }
+
+    private func answerExtraKey(speak: Bool) -> TurnResult {
+        presentExtraKey(speak: speak)
+        return TurnResult(spoken: extraKeyLine())
+    }
+
+    private func presentExtraKey(speak: Bool) {
+        let parts = extraKeyParts()
+        let line = ExtraKeyAsk.line(second: parts.second, dictate: parts.dictate)
+        let plan = ExtraKeyDraw.plan(second: parts.second, dictate: parts.dictate)
+        buddy.idle()
+        showExtraKey(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The second talk key and the dictation shortcut. Reading them does not record a key. Dictation's loader is not called, so nothing is written.
+    private func extraKeyParts() -> (second: String, dictate: String) {
+        let second = ShortcutStore.loadSecondTalk(.standard)
+        let secondWord: String
+        if second.key == nil {
+            secondWord = "Off"
+        } else if second.key == ShortcutStore.secondTalkDefault {
+            secondWord = "Default"
+        } else {
+            secondWord = "Chosen"
+        }
+        return (secondWord, extraDictationWord())
+    }
+
+    private func extraDictationWord() -> String {
+        if let text = UserDefaults.standard.string(forKey: ShortcutStore.dictationKey), !text.isEmpty {
+            if text == "off" { return "Off" }
+            if let saved = Shortcut.parse(text) { return saved == .rightCommand ? "Default" : "Chosen" }
+            return "Chosen"
+        }
+        if let name = UserDefaults.standard.string(forKey: ShortcutStore.legacyDictation) {
+            if name == "off" { return "Off" }
+            if let old = Shortcut.legacy(name) { return old == .rightCommand ? "Default" : "Chosen" }
+        }
+        return "Default"
+    }
+
+    private func extraKeyLine() -> String {
+        let parts = extraKeyParts()
+        return ExtraKeyAsk.line(second: parts.second, dictate: parts.dictate)
+    }
+
+    /// Draws Extra, then the two keys. The caller speaks the full line.
+    private func showExtraKey(_ plan: ExtraKeyDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyExtraKey(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyExtraKey(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyExtraKey(_ plan: ExtraKeyDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12692,6 +12775,11 @@ final class VoiceTurnController {
         }
         if TalkHoldAsk.matches(transcript) {
             let result = answerTalkHold(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ExtraKeyAsk.matches(transcript) {
+            let result = answerExtraKey(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

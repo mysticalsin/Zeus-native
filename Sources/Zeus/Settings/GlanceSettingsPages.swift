@@ -952,6 +952,11 @@ private struct GSNotificationsPage: View {
 
 // MARK: Shortcuts
 
+/// The second talk key and the dictation shortcut. Nothing is recorded and listening does not start.
+enum ExtraKeyVoice {
+    static var speakExtra: () -> Void = {}
+}
+
 private struct ShortcutsPage: View {
     /// Mirrors the Chat choice for SwiftUI: the monitor itself is not observable.
     @State private var chat = ChatHotkeyMonitor.shared.hotkey
@@ -1037,6 +1042,10 @@ private struct ShortcutsPage: View {
                 if let new = $0 { Preferences.shared.chooseTalkKey(new) }
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the second talk key and the dictation shortcut") { ExtraKeyVoice.speakExtra() }
+            }
             ShortcutRecorderRow(symbol: "mic", title: "Second talk key",
                                 text: "Hold to talk, let go to send, and double-tap to keep listening.", detail: "Left Option and Right Option with a letter still type as usual.",
                                 shortcut: Preferences.shared.secondTalkKey, defaultValue: ShortcutStore.secondTalkDefault, allowsOff: true,
