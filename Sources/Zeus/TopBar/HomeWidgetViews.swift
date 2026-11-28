@@ -398,17 +398,22 @@ struct HomeWidgetCard: View {
                     Text(context.date.formatted(ZeusDates.style.hour().minute())).font(.system(size: 22, weight: .light).monospacedDigit()).foregroundStyle(.white)
                     Text(ZeusDates.string(context.date, template: "EEEMMMd")).font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
+                .accessibilityElement(children: .combine)
                 Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
             }
-            .frame(maxHeight: .infinity)
-            .accessibilityElement(children: .combine)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
     private var clockDigital: some View {
         TickingView(interval: 1) { context in
             VStack(alignment: .leading, spacing: 0) {
-                caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                HStack(alignment: .top) {
+                    caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
+                }
                 Spacer(minLength: 0)
                 Text(context.date.formatted(ZeusDates.style.hour().minute())).font(GlanceType.numeral).monospacedDigit().foregroundStyle(.white)
             }
@@ -421,7 +426,11 @@ struct HomeWidgetCard: View {
             // A spring on every second: the digits squash, stretch and settle.
             let kick = animatesFreely ? exp(-5 * fraction) * cos(20 * fraction) : 0
             VStack(alignment: .leading, spacing: 0) {
-                caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                HStack(alignment: .top) {
+                    caption("Clock", ZeusDates.string(context.date, template: "EEEEMMMd"))
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
+                }
                 Spacer(minLength: 0)
                 HStack(alignment: .lastTextBaseline, spacing: 2) {
                     Text(context.date.formatted(ZeusDates.style.hour().minute())).font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
@@ -444,7 +453,11 @@ struct HomeWidgetCard: View {
                 .frame(width: 84, height: 84)
                 .accessibilityElement(children: .combine)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ZeusDates.string(context.date, template: "EEEE")).font(GlanceType.media).foregroundStyle(.white)
+                    HStack(alignment: .top, spacing: 4) {
+                        Text(ZeusDates.string(context.date, template: "EEEE")).font(GlanceType.media).foregroundStyle(.white)
+                        Spacer(minLength: 0)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time") { sayClock() }
+                    }
                     Text(ZeusDates.string(context.date, template: "MMMd")).font(GlanceType.title).foregroundStyle(Color.white.opacity(0.55))
                 }
                 Spacer(minLength: 0)
@@ -583,6 +596,11 @@ struct HomeWidgetCard: View {
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
             }
         }
+    }
+
+    private func sayClock() {
+        let parts = ClockAsk.parts(now: Date(), timeZone: .current)
+        topBar.speakClock(parts.time, parts.period)
     }
 
     private func sayNext() {

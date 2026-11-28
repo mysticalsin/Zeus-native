@@ -292,6 +292,8 @@ final class TopBarModel {
     /// The Home calendar card speaks the next event.
     var speakNextEvent: (_ title: String, _ when: String, _ allDay: Bool) -> Void = { _, _, _ in }
     var speakNoNextEvent: () -> Void = {}
+    /// The Home clock speaks the wall time that is already shown.
+    var speakClock: (_ time: String, _ period: String) -> Void = { _, _ in }
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

@@ -915,6 +915,29 @@ final class VoiceTurnController {
         presentNoNextEvent(speak: true)
     }
 
+    /// The Home clock, or a spoken "what time is it", says the time and draws it.
+    func sayClock(time: String, period: String) {
+        presentClock(time: time, period: period, speak: true)
+    }
+
+    private func answerClock(speak: Bool) -> TurnResult {
+        let parts = ClockAsk.parts(now: Date(), timeZone: .current)
+        presentClock(time: parts.time, period: parts.period, speak: speak)
+        return TurnResult(spoken: ClockAsk.line(time: parts.time, period: parts.period) ?? "")
+    }
+
+    private func presentClock(time: String, period: String, speak: Bool) {
+        let line = ClockAsk.line(time: time, period: period) ?? ""
+        guard let plan = ClockDraw.plan(time: time, period: period) else {
+            if speak, !line.isEmpty { say(line) }
+            return
+        }
+        buddy.idle()
+        showClock(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerNextEvent(speak: Bool) -> TurnResult {
         guard let event = notch.topBar?.nextEvent() else {
             presentNoNextEvent(speak: speak)
@@ -1497,6 +1520,37 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the wall clock: Clock, then the digits, then AM or PM. The caller speaks the full line.
+    private func showClock(_ plan: ClockDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyClock(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyClock(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyClock(_ plan: ClockDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1814,6 +1868,11 @@ final class VoiceTurnController {
         if let command = KeepAwakeAsk.command(in: transcript) {
             if CLIAccess.turnRestricted { return refuseRestricted(speak: speak) }
             let result = performKeepAwake(command, speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ClockAsk.matches(transcript) {
+            let result = answerClock(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

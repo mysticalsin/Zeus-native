@@ -307,6 +307,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice.sayNextEvent(title: title, when: when, allDay: allDay)
             }
             topBar.speakNoNextEvent = { [weak self] in self?.voice.sayNoNextEvent() }
+            topBar.speakClock = { [weak self] time, period in
+                self?.voice.sayClock(time: time, period: period)
+            }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
