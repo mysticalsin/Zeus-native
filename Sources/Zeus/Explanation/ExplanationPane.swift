@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// Visual explanation speaks the spoken-request shortcut and whether requests stay on this Mac. It does not start one.
+enum ExplainSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// The real Chat surface. Controls call the production controller; no canned scene
 /// or simulated narration is substituted when a provider/permission is missing.
 @MainActor
@@ -208,6 +213,10 @@ struct ExplanationPane: View {
     }
     private var inputSettings: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how visual explanation is set") { ExplainSetupVoice.speakSetup() }
+            }
             Text(modelDestination).font(.caption.weight(.medium))
             Toggle("Local-only model requests", isOn: Binding(get: { localOnly == "true" }, set: { controller.stop(); localOnly = $0 ? "true" : "false" }))
             Text("Local-only mode refuses remote endpoints. It never substitutes another provider.")
