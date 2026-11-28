@@ -320,6 +320,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakDate = { [weak self] weekday, date in
                 self?.voice.sayDate(weekday: weekday, date: date)
             }
+            topBar.speakNote = { [weak self] text in self?.voice.sayNote(text) }
+            topBar.speakNoNote = { [weak self] in self?.voice.sayNoNote() }
+            topBar.speakSecretNote = { [weak self] in self?.voice.saySecretNote() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

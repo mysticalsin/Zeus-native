@@ -546,7 +546,11 @@ struct HomeWidgetCard: View {
         let text = topBar.note.trimmingCharacters(in: .whitespacesAndNewlines)
         return GlanceCard(tint: kind.tint) {
             VStack(alignment: .leading, spacing: 4) {
-                caption("Note", text.isEmpty ? "Pinned to Home" : "Pinned")
+                HStack(alignment: .top) {
+                    caption("Note", text.isEmpty ? "Pinned to Home" : "Pinned")
+                    Spacer(minLength: 4)
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Read my note") { sayNote() }
+                }
                 if text.isEmpty {
                     Spacer(minLength: 0)
                     Text("Write one in the field below").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.4))
@@ -611,6 +615,17 @@ struct HomeWidgetCard: View {
                 Spacer(minLength: 0)
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
             }
+        }
+    }
+
+    private func sayNote() {
+        let text = topBar.note
+        if NoteAsk.refuses(text) {
+            topBar.speakSecretNote()
+        } else if NoteAsk.line(text) == nil {
+            topBar.speakNoNote()
+        } else {
+            topBar.speakNote(text)
         }
     }
 

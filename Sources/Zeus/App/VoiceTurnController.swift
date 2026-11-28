@@ -1031,6 +1031,68 @@ final class VoiceTurnController {
         buddy.showCaption(plan.boltCaption(at: 0))
     }
 
+    /// The Home note, or a spoken "read my note", says the words and draws them.
+    func sayNote(_ text: String) {
+        presentNote(text, speak: true)
+    }
+
+    /// The pinned note is empty. The screen shows Note, then None.
+    func sayNoNote() {
+        presentNoNote(speak: true)
+    }
+
+    /// The pinned note must not be read. The screen shows Note, then Not stored.
+    func saySecretNote() {
+        presentSecretNote(speak: true)
+    }
+
+    private func answerNote(speak: Bool) -> TurnResult {
+        let text = notch.topBar?.note ?? ""
+        if NoteAsk.refuses(text) {
+            presentSecretNote(speak: speak)
+            return TurnResult(spoken: NoteAsk.secret)
+        }
+        guard let line = NoteAsk.line(text) else {
+            presentNoNote(speak: speak)
+            return TurnResult(spoken: NoteAsk.none)
+        }
+        presentNote(text, speak: speak)
+        return TurnResult(spoken: line)
+    }
+
+    private func presentNote(_ text: String, speak: Bool) {
+        guard let line = NoteAsk.line(text), let plan = NoteDraw.plan(text: text) else {
+            if NoteAsk.refuses(text) {
+                presentSecretNote(speak: speak)
+            } else {
+                presentNoNote(speak: speak)
+            }
+            return
+        }
+        buddy.idle()
+        showNote(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNoNote(speak: Bool) {
+        let line = NoteAsk.none
+        let plan = NoteDraw.none()
+        buddy.idle()
+        showNote(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentSecretNote(speak: Bool) {
+        let line = NoteAsk.secret
+        let plan = NoteDraw.secret()
+        buddy.idle()
+        showNote(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -1756,6 +1818,37 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the pinned note: Note, then the words. The caller speaks the full line.
+    private func showNote(_ plan: NoteDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNote(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNote(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNote(_ plan: NoteDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2093,6 +2186,11 @@ final class VoiceTurnController {
         }
         if DateAsk.matches(transcript) {
             let result = answerDate(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NoteAsk.matches(transcript) {
+            let result = answerNote(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
