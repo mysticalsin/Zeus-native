@@ -11,7 +11,7 @@ public enum ScribeSpeaker: Equatable, Hashable, Sendable {
         case .microphone:
             return .you
         case .system:
-            let trimmed = label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let trimmed = label.map(ScribeSourceLabelBox.trimmedLabel) ?? ""
             return trimmed.isEmpty ? .unknown : .participant(trimmed)
         }
     }
