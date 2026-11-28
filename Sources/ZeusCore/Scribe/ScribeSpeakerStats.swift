@@ -21,7 +21,7 @@ public struct ScribeSpeakerStats: Equatable, Sendable {
         var order: [ScribeSpeaker] = []
         var seconds: [ScribeSpeaker: TimeInterval] = [:]
         var counts: [ScribeSpeaker: Int] = [:]
-        for segment in segments where !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        for segment in segments where !ScribeStatsTextBox.trimmedText(segment.text).isEmpty {
             if counts[segment.speaker] == nil { order.append(segment.speaker) }
             let length = segment.end - segment.start
             seconds[segment.speaker, default: 0] += length.isFinite ? max(0, length) : 0
