@@ -5947,6 +5947,75 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Receiving card, or a spoken "how's receiving set", says which switches are on. It does not turn Fling on.
+    func sayReceiveSetup() {
+        presentReceiveSetup(speak: true)
+    }
+
+    private func answerReceiveSetup(speak: Bool) -> TurnResult {
+        presentReceiveSetup(speak: speak)
+        return TurnResult(spoken: receiveSetupLine())
+    }
+
+    private func presentReceiveSetup(speak: Bool) {
+        let words = receiveSetupWords()
+        let line = ReceiveSetupAsk.line(words: words)
+        let plan = ReceiveSetupDraw.plan(words: words)
+        buddy.idle()
+        showReceiveSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Accept, closed, links, papers, then glow, for each switch that is on.
+    /// An unset value follows the catalog default. Reading them does not turn Fling on.
+    private func receiveSetupWords() -> [String] {
+        let store = SettingsStore.shared
+        let pairs = [
+            ("fling.autoAcceptPaired", "Accept"),
+            ("fling.receiveInBackground", "Closed"),
+            ("fling.openLinks", "Links"),
+            ("fling.papers", "Papers"),
+            ("lights.fling", "Glow"),
+        ]
+        return pairs.compactMap { store.bool($0.0) ? $0.1 : nil }
+    }
+
+    private func receiveSetupLine() -> String {
+        ReceiveSetupAsk.line(words: receiveSetupWords())
+    }
+
+    /// Draws Receive, then up to four switches that are on, or None. The caller speaks the full line.
+    private func showReceiveSetup(_ plan: ReceiveSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyReceiveSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyReceiveSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyReceiveSetup(_ plan: ReceiveSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6589,6 +6658,11 @@ final class VoiceTurnController {
         }
         if NotifySetupAsk.matches(transcript) {
             let result = answerNotifySetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ReceiveSetupAsk.matches(transcript) {
+            let result = answerReceiveSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

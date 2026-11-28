@@ -4,6 +4,8 @@ import ZeusCore
 /// The Fling card speaks whether it is on, who can see this Mac, and where arrivals go. It does not turn Fling on.
 enum FlingVoice {
     static var speakFling: () -> Void = {}
+    /// The Receiving card speaks which arrival switches are on. It does not turn Fling on.
+    static var speakReceive: () -> Void = {}
 }
 
 /// Settings › Shelf: the Fling switch, who can see this Mac, where arrivals go, and the paired Macs. Every row is a
@@ -45,6 +47,10 @@ struct ShelfSettingsPage: View {
             }
         }
         GSCard("Receiving") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Fling receiving is set") { FlingVoice.speakReceive() }
+            }
             GSToggleRow(symbol: "checkmark.circle", title: "Accept from paired Macs without asking",
                         text: "A Mac that is not paired is never accepted this way.", isOn: store.boolBinding("fling.autoAcceptPaired"))
             GSDivider()
