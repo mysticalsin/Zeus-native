@@ -13,7 +13,7 @@ public struct NewChatRequest: Equatable, Sendable {
 
     public var cleanedInstruction: String { instruction.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    public var isValid: Bool { !cleanedInstruction.isEmpty && !directory.trimmingCharacters(in: .whitespaces).isEmpty }
+    public var isValid: Bool { !cleanedInstruction.isEmpty && !NewChatDirectoryBox.trimmedDirectory(directory).isEmpty }
 
     /// The action the app performs: identical to what a spoken "ask codex to ..." produces.
     public var command: CodeCommand? {
