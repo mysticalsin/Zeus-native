@@ -27,6 +27,7 @@ struct ChatPage: View {
                     withAnimation(TopBarStyle.pageSpring) { showHistory.toggle() }
                 }
                 Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many chats") { chat.speakChats() }
                 if chat.isSending {
                     Text("Writing…").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudQuiet).transition(.opacity)
                 }

@@ -14,6 +14,8 @@ final class ChatModel {
     var draft = ""
     var search = ""
     private(set) var isSending = false
+    /// The Chat page speaks how many chats are saved, or that Zeus is writing. Titles stay off.
+    var speakChats: () -> Void = {}
     /// The conversation the in-flight answer belongs to.
     private(set) var sendingID: UUID?
     /// Set by the app delegate; nil in snapshots and tests.

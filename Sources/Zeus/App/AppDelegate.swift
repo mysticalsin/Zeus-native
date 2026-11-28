@@ -210,8 +210,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         topBar.openSettings = { [weak self] in self?.showSettings() }
         topBar.openPermissions = { [weak self] in self?.showPermissions() }
         // Typed chat: one store behind the notch Chat tab and the floating window.
-        if on(.chatBrain) { ChatModel.shared.brain = ClaudeCLIProvider() }
+        if on(.chatBrain) {
+            ChatModel.shared.brain = ClaudeCLIProvider()
+            ChatModel.shared.speakChats = { [weak self] in self?.voice.sayChats() }
+        }
         if on(.chatWindow) {
+            ChatModel.shared.speakChats = { [weak self] in self?.voice.sayChats() }
             ChatModel.shared.openWindow = { [weak self] in self?.chatWindow?.show() }
             chatWindow?.makeExplanation = { [weak self] in self?.visualExplanation() }
             chatWindow?.stopExplanation = { [weak self] in self?.explanation?.stop() }
