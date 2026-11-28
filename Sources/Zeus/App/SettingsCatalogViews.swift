@@ -112,6 +112,11 @@ struct SettingsOptionCards: View {
     }
 }
 
+/// The system pointer speaks the settings switch and the engine. It does not move the pointer.
+enum PointerGlideVoice {
+    static var speakGlide: () -> Void = {}
+}
+
 struct SettingOptionRow: View {
     let option: SettingOption
     private var store: SettingsStore { .shared }
@@ -148,6 +153,11 @@ struct SettingOptionRow: View {
                 Button { VisualReadyVoice.speakReady() } label: { Image(systemName: "speaker.wave.2.fill") }
                     .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
                     .accessibilityLabel("Say whether visual explanations are on")
+            }
+            if option.id == "present.physicalPointer" {
+                Button { PointerGlideVoice.speakGlide() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say the system pointer switch and engine")
             }
             if option.id == "general.launchAtLogin" {
                 GlassToggle(isOn: Binding(get: { store.bool(option.id) },

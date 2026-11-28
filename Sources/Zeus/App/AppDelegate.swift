@@ -388,6 +388,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PolyglotSettings.speakChord = { [weak self] in self?.voice.sayPolyglotChord() }
             AwakeHoldVoice.speakHold = { [weak self] in self?.voice.sayAwakeHold() }
             LiveTouchVoice.speakTouch = { [weak self] in self?.voice.sayLiveTouch() }
+            PointerGlideVoice.speakGlide = { [weak self] in self?.voice.sayPointerGlide() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

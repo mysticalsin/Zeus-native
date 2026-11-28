@@ -12366,6 +12366,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The system pointer, or a spoken "does zeus move the system pointer", says the switch and the engine.
+    func sayPointerGlide() {
+        presentPointerGlide(speak: true)
+    }
+
+    private func answerPointerGlide(speak: Bool) -> TurnResult {
+        presentPointerGlide(speak: speak)
+        return TurnResult(spoken: pointerGlideLine())
+    }
+
+    private func presentPointerGlide(speak: Bool) {
+        let parts = pointerGlideParts()
+        let line = PointerGlideAsk.line(shown: parts.shown, engine: parts.engine)
+        let plan = PointerGlideDraw.plan(shown: parts.shown, engine: parts.engine)
+        buddy.idle()
+        showPointerGlide(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The catalog switch and the engine flag. A missing value is off in both places. Reading them does not move the pointer.
+    private func pointerGlideParts() -> (shown: String, engine: String) {
+        let shown = SettingsStore.shared.bool("present.physicalPointer")
+        let engine = PhysicalPointerSettings.enabled
+        return (shown ? "On" : "Off", engine ? "On" : "Off")
+    }
+
+    private func pointerGlideLine() -> String {
+        let parts = pointerGlideParts()
+        return PointerGlideAsk.line(shown: parts.shown, engine: parts.engine)
+    }
+
+    /// Draws Glide, then the switch and the engine. The caller speaks the full line.
+    private func showPointerGlide(_ plan: PointerGlideDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPointerGlide(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPointerGlide(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPointerGlide(_ plan: PointerGlideDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -13493,6 +13556,11 @@ final class VoiceTurnController {
         }
         if LiveTouchAsk.matches(transcript) {
             let result = answerLiveTouch(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PointerGlideAsk.matches(transcript) {
+            let result = answerPointerGlide(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
