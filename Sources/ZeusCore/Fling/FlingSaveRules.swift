@@ -18,7 +18,7 @@ public enum FlingSaveRules {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = timeZone
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let trimmed = peer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = FlingPeerNameBox.trimmedPeer(peer)
         let name = "\(trimmed.isEmpty ? "Mac" : FlingNames.clean(trimmed, maxBytes: maxPeerNameBytes)) \(formatter.string(from: date))"
         if mode == .downloads && downloadsGranted {
             return root.appendingPathComponent("Fling", isDirectory: true).appendingPathComponent(name, isDirectory: true)
