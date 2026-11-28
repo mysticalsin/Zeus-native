@@ -53,7 +53,7 @@ public struct SentenceSplitter: Sendable {
     /// The first comma or semicolon clause, so speech can start before the sentence ends.
     private mutating func takeEarlyClause() -> String? {
         guard let range = buffer.range(of: ", ") ?? buffer.range(of: "; ") else { return nil }
-        let head = buffer[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+        let head = EarlyClauseBox.trimmedClause(String(buffer[..<range.lowerBound]))
         guard head.split(whereSeparator: \.isWhitespace).count >= 3 else { return nil }
         buffer = String(buffer[range.upperBound...])
         return head + ","
