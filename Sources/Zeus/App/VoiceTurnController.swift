@@ -11703,6 +11703,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// To-do settings, or a spoken "how are to-dos set", say the notch tab, the Reminders mirror, and learning.
+    func sayTodoSetup() {
+        presentTodoSetup(speak: true)
+    }
+
+    private func answerTodoSetup(speak: Bool) -> TurnResult {
+        presentTodoSetup(speak: speak)
+        return TurnResult(spoken: todoSetupLine())
+    }
+
+    private func presentTodoSetup(speak: Bool) {
+        let parts = todoSetupParts()
+        let line = TodoSetupAsk.line(tab: parts.tab, mirror: parts.mirror, learn: parts.learn)
+        let plan = TodoSetupDraw.plan(tab: parts.tab, mirror: parts.mirror, learn: parts.learn)
+        buddy.idle()
+        showTodoSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved tab, mirror, and learning switches. Reading them does not add a to-do, ask for Reminders, or clear learning.
+    private func todoSetupParts() -> (tab: String, mirror: String, learn: String) {
+        let layout = TopBarLayout.decode(UserDefaults.standard.string(forKey: "topBar.tabs"),
+                                         known: UserDefaults.standard.string(forKey: "topBar.tabs.known"))
+        let mirror = UserDefaults.standard.bool(forKey: "todo.reminders")
+        let learn = UserDefaults.standard.object(forKey: "todo.learning") == nil || UserDefaults.standard.bool(forKey: "todo.learning")
+        return (layout.contains(.todo) ? "On" : "Off", mirror ? "On" : "Off", learn ? "On" : "Off")
+    }
+
+    private func todoSetupLine() -> String {
+        let parts = todoSetupParts()
+        return TodoSetupAsk.line(tab: parts.tab, mirror: parts.mirror, learn: parts.learn)
+    }
+
+    /// Draws Tasks, then the three switches. The caller speaks the full line.
+    private func showTodoSetup(_ plan: TodoSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTodoSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTodoSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTodoSetup(_ plan: TodoSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12780,6 +12845,11 @@ final class VoiceTurnController {
         }
         if ExtraKeyAsk.matches(transcript) {
             let result = answerExtraKey(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TodoSetupAsk.matches(transcript) {
+            let result = answerTodoSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

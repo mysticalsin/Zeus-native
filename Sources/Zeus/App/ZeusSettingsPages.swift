@@ -6,12 +6,23 @@ import ZeusCore
 /// Zeus-only Settings pages: To-do, Memory (second brain), Prompter, Agents, Stickies, Routines.
 /// Each one persists real values — no stubs. No @State (toolchain).
 
+/// To-do settings speak the notch tab, the Reminders mirror, and learning. Nothing is added or cleared.
+enum TodoSetupVoice {
+    static var speakTodos: () -> Void = {}
+}
+
 struct TodoSettingsPage: View {
     var topBar: TopBarModel?
 
     var body: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "To-do tab") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { TodoSetupVoice.speakTodos() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how to-dos are set")
+                }
                 GlassRow(title: "Show in the notch", note: "Adds the To-do tab beside Home.") {
                     GlassToggle(isOn: Binding(
                         get: { topBar?.layout.contains(.todo) ?? true },
