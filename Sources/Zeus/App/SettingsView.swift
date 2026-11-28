@@ -155,6 +155,11 @@ enum ShowMeVoice {
     static var speakShow: () -> Void = {}
 }
 
+/// Where Zeus lives speaks the menu bar icon and the date calendar. It does not hide the icon.
+enum LivesVoice {
+    static var speakLives: () -> Void = {}
+}
+
 struct SettingsView: View {
     let connections: ConnectionsModel
     let preferences: Preferences
@@ -310,6 +315,12 @@ struct SettingsView: View {
                 }
             }
             GlassCard(title: "Where ZEUS lives") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { LivesVoice.speakLives() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say the menu bar icon and the calendar")
+                }
                 GlassRow(title: "Show ZEUS in the menu bar",
                          note: preferences.showMenuBarIcon ? nil : "To get back here, open ZEUS again from Applications or Spotlight.") {
                     GlassToggle(isOn: Binding(get: { preferences.showMenuBarIcon }, set: { preferences.showMenuBarIcon = $0 }), label: "Menu bar icon")

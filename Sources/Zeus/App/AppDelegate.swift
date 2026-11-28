@@ -476,6 +476,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FlingPeerVoice.speakPeers = { [weak self] in self?.voice.sayFlingPeers() }
             VisualReadyVoice.speakReady = { [weak self] in self?.voice.sayVisualReady() }
             ShowMeVoice.speakShow = { [weak self] in self?.voice.sayShowMe() }
+            LivesVoice.speakLives = { [weak self] in self?.voice.sayLives() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }
