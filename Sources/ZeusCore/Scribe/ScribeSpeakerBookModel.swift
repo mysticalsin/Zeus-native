@@ -176,7 +176,7 @@ public struct ScribeSpeakerBook: Codable, Equatable, Sendable {
     public mutating func setConfirmed(
         label: String, name: String, source: ScribeNameSource = .manual, confidence: Double = 1
     ) {
-        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = ScribeConfirmedNameBox.trimmedName(name)
         guard !clean.isEmpty else { return }
         identities.removeAll { $0.originalLabel == label }
         // Two voices given one name are one person: keep a single identity for it.
