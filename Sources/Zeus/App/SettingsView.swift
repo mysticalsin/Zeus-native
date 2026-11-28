@@ -606,6 +606,11 @@ private struct TopBarSettings: View {
     }
 }
 
+/// Dictation paste speaks whether the clipboard is put back and how many apps are typed into. It does not write or name the apps.
+enum PasteSetupVoice {
+    static var speakPaste: () -> Void = {}
+}
+
 /// Dictation: key, modes, vocabulary, history.
 private struct DictationSettingsView: View {
     let topBar: TopBarModel
@@ -681,6 +686,12 @@ private struct DictationSettingsView: View {
                 }
             }
             GlassCard(title: "Pasting and history") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { PasteSetupVoice.speakPaste() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say how dictation pastes")
+                }
                 GlassRow(title: "Put the clipboard back after pasting") {
                     GlassToggle(isOn: Binding(get: { settings.restoreClipboard }, set: { settings.restoreClipboard = $0 }), label: "Restore clipboard")
                 }

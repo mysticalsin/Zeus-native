@@ -485,6 +485,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ExtraOfferVoice.speakOffers = { [weak self] in self?.voice.sayExtraOffer() }
             HookShowVoice.speakHooks = { [weak self] in self?.voice.sayHookShow() }
             RecordlyExportVoice.speakExport = { [weak self] in self?.voice.sayRecordlyExport() }
+            PasteSetupVoice.speakPaste = { [weak self] in self?.voice.sayPasteSetup() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }

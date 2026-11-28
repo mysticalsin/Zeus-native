@@ -12099,6 +12099,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Dictation paste, or a spoken "how does dictation paste", says the clipboard and how many apps are typed into.
+    func sayPasteSetup() {
+        presentPasteSetup(speak: true)
+    }
+
+    private func answerPasteSetup(speak: Bool) -> TurnResult {
+        presentPasteSetup(speak: speak)
+        return TurnResult(spoken: pasteSetupLine())
+    }
+
+    private func presentPasteSetup(speak: Bool) {
+        let parts = pasteSetupParts()
+        let line = PasteSetupAsk.line(restore: parts.restore, apps: parts.apps)
+        let plan = PasteSetupDraw.plan(restore: parts.restore, apps: parts.apps)
+        buddy.idle()
+        showPasteSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The clipboard switch and the typed-app count. A missing clipboard value is on, and a missing list uses the built-in apps.
+    /// Reading them does not write, and the app names stay unspoken.
+    private func pasteSetupParts() -> (restore: String, apps: String) {
+        let restore = (UserDefaults.standard.object(forKey: "dictation.restoreClipboard") as? Bool) ?? true
+        let stored = UserDefaults.standard.stringArray(forKey: "dictation.typedApps") ?? KeystrokeTyping.defaultBundleIDs
+        let count = min(max(stored.count, 0), 999)
+        return (restore ? "On" : "Off", String(count))
+    }
+
+    private func pasteSetupLine() -> String {
+        let parts = pasteSetupParts()
+        return PasteSetupAsk.line(restore: parts.restore, apps: parts.apps)
+    }
+
+    /// Draws Paste, then the switch and the count. The caller speaks the full line.
+    private func showPasteSetup(_ plan: PasteSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPasteSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPasteSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPasteSetup(_ plan: PasteSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -13206,6 +13271,11 @@ final class VoiceTurnController {
         }
         if RecordlyExportAsk.matches(transcript) {
             let result = answerRecordlyExport(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PasteSetupAsk.matches(transcript) {
+            let result = answerPasteSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

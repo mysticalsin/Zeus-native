@@ -34,6 +34,12 @@ struct DictationExtrasSection: View {
         .onDisappear { tester.stop() }
 
         Section("Typing") {
+            HStack {
+                Spacer(minLength: 0)
+                Button { PasteSetupVoice.speakPaste() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                    .accessibilityLabel("Say how dictation pastes")
+            }
             Toggle("Show the text to correct before it goes in", isOn: Binding(get: { settings.previewBeforeInsert }, set: { settings.previewBeforeInsert = $0 }))
             Text("Return inserts it into the app you were in, Esc throws it away.")
                 .font(.callout).foregroundStyle(.secondary)
