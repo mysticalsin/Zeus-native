@@ -13,7 +13,7 @@ public enum ScreenCornerSize: CaseIterable, Sendable {
     case small, medium, large
 
     public init(label: String) {
-        switch label.trimmingCharacters(in: .whitespaces).lowercased() {
+        switch ScreenCornerLabelBox.trimmedLabel(label).lowercased() {
         case "small": self = .small
         case "large": self = .large
         default: self = .medium
