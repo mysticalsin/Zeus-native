@@ -673,6 +673,10 @@ private struct SoundsPage: View {
         .disabled(!ExtraPreferences.shared.soundsOn)
         .opacity(ExtraPreferences.shared.soundsOn ? 1 : 0.5)
         GSCard("Voice cues") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which voice cues play") { ExtraPreferences.speakVoiceCues() }
+            }
             voiceCue("ear", "Zeus is listening", "Hey Zeus heard, or the talk key went down.", \.soundListenStart, .listenStart)
             GSDivider()
             voiceCue("ear.badge.checkmark", "Zeus stopped listening", "You let go, or went quiet.", \.soundListenStop, .listenStop)

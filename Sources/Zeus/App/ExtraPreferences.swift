@@ -42,6 +42,8 @@ enum ShortcutPreset: String, CaseIterable, Identifiable {
 @Observable
 final class ExtraPreferences {
     static let shared = ExtraPreferences()
+    /// The Voice cues card speaks which of the four play. It does not change them.
+    static var speakVoiceCues: () -> Void = {}
     @ObservationIgnored private let defaults = UserDefaults.standard
     @ObservationIgnored var onShortcutsChange: (() -> Void)?
 

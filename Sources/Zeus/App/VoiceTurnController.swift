@@ -5282,6 +5282,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Voice cues card, or a spoken "which voice cues", says which of the four play. It does not change them.
+    func sayVoiceCues() {
+        presentVoiceCues(speak: true)
+    }
+
+    private func answerVoiceCues(speak: Bool) -> TurnResult {
+        presentVoiceCues(speak: speak)
+        return TurnResult(spoken: voiceCuesLine())
+    }
+
+    private func presentVoiceCues(speak: Bool) {
+        let words = voiceCueWords()
+        let line = VoiceCuesAsk.line(words: words)
+        let plan = VoiceCuesDraw.plan(words: words)
+        buddy.idle()
+        showVoiceCues(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Listening, stopped, the answer, then an error, for each cue that is on. Unset values follow the page default, on.
+    private func voiceCueWords() -> [String] {
+        let prefs = ExtraPreferences.shared
+        let pairs = [(prefs.soundListenStart, "Listening"), (prefs.soundListenStop, "Stopped"), (prefs.soundVoiceDone, "Answer"), (prefs.soundVoiceError, "Error")]
+        return pairs.compactMap { $0.0 ? $0.1 : nil }
+    }
+
+    private func voiceCuesLine() -> String {
+        VoiceCuesAsk.line(words: voiceCueWords())
+    }
+
+    /// Draws Voice, then each cue that plays, or None. The caller speaks the full line.
+    private func showVoiceCues(_ plan: VoiceCuesDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyVoiceCues(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyVoiceCues(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyVoiceCues(_ plan: VoiceCuesDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5874,6 +5936,11 @@ final class VoiceTurnController {
         }
         if DictationSetupAsk.matches(transcript) {
             let result = answerDictationSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if VoiceCuesAsk.matches(transcript) {
+            let result = answerVoiceCues(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
