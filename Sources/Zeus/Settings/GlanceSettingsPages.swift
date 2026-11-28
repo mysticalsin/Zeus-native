@@ -308,9 +308,12 @@ private struct AppearancePage: View {
         GSCard("Zeus beside the pointer") {
             GSRow(symbol: "cursorarrow.rays", title: "Show Zeus beside the pointer",
                   text: "He stays out of the way until you call him, then fades out.", detail: "He appears for a talk shortcut, a voice turn or when he points, then fades after about 2 seconds.") {
-                GSPopup(selection: Binding(get: { BuddyPreference.shared.show.title },
-                                           set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
-                        options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { BuddyPreference.shared.show.title },
+                                               set: { value in BuddyPreference.shared.show = BuddyShow.allCases.first { $0.title == value } ?? .onCall }),
+                            options: BuddyShow.allCases.map(\.title)).popupLabel("Show Zeus beside the pointer")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say when Zeus appears") { BuddyPreference.speakShow() }
+                }
             }
             GSInfo(text: "The More button (three dots) on the notch has the same choice for a quick change.")
             GSDivider()

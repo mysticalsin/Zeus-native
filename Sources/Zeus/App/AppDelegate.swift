@@ -367,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }
             CardFinish.speakLook = { [weak self] in self?.voice.sayCardStyle() }
+            BuddyPreference.speakShow = { [weak self] in self?.voice.sayPointerBuddy() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
