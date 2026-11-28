@@ -403,6 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             RunningCardVoice.speakCard = { [weak self] in self?.voice.sayRunningCard() }
             VoiceStyleVoice.speakStyle = { [weak self] in self?.voice.sayVoiceStyle() }
             LockChimeVoice.speakChimes = { [weak self] in self?.voice.sayLockChimes() }
+            FacePresenceSetVoice.speakSet = { [weak self] in self?.voice.sayFacePresenceSet() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

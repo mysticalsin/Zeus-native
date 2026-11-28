@@ -7340,6 +7340,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Face presence settings, or a spoken "how's face presence set", say the switch and the lock wait. They do not open the camera or lock the Mac.
+    func sayFacePresenceSet() {
+        presentFacePresenceSet(speak: true)
+    }
+
+    private func answerFacePresenceSet(speak: Bool) -> TurnResult {
+        presentFacePresenceSet(speak: speak)
+        return TurnResult(spoken: facePresenceSetLine())
+    }
+
+    private func presentFacePresenceSet(speak: Bool) {
+        let parts = facePresenceSetParts()
+        let line = FacePresenceSetAsk.line(work: parts.work, wait: parts.wait)
+        let plan = FacePresenceSetDraw.plan(work: parts.work, wait: parts.wait)
+        buddy.idle()
+        showFacePresenceSet(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The face-presence switch and Lock after absent for. An empty wait follows the catalog default.
+    /// Reading them does not open the camera or lock the Mac.
+    private func facePresenceSetParts() -> (work: String, wait: String) {
+        let store = SettingsStore.shared
+        let stored = store.string("face.lockAfter").trimmingCharacters(in: .whitespacesAndNewlines)
+        let wait = stored.isEmpty ? "2 minutes" : stored
+        return (store.bool("face.presence") ? "On" : "Off", wait)
+    }
+
+    private func facePresenceSetLine() -> String {
+        let parts = facePresenceSetParts()
+        return FacePresenceSetAsk.line(work: parts.work, wait: parts.wait)
+    }
+
+    /// Draws Absent, then the switch and the lock wait. The caller speaks the full line.
+    private func showFacePresenceSet(_ plan: FacePresenceSetDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFacePresenceSet(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFacePresenceSet(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFacePresenceSet(_ plan: FacePresenceSetDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8087,6 +8152,11 @@ final class VoiceTurnController {
         }
         if LockChimeAsk.matches(transcript) {
             let result = answerLockChimes(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FacePresenceSetAsk.matches(transcript) {
+            let result = answerFacePresenceSet(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

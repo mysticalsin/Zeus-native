@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The face-presence settings speak the switch and the lock wait. They do not open the camera or lock the Mac.
+enum FacePresenceSetVoice {
+    static var speakSet: () -> Void = {}
+}
+
 /// What the Face presence card shows, as plain values: one status, one row per enrolled face, whether Enroll can be
 /// tapped and which lock choice is picked. Built from the machine and the vault records, so the view has no rules.
 /// Faces carry a name and a switch only: no sample or embedding reaches a view.
@@ -55,6 +60,10 @@ struct GSFacePresenceCard: View {
 
     var body: some View {
         GSCard("Face presence") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how face presence is set") { FacePresenceSetVoice.speakSet() }
+            }
             GSToggleRow(symbol: "person.crop.circle", title: "Face presence", isOn: $isOn)
             GSDivider()
             GSRow(symbol: model.status.symbol, title: "Status") {
