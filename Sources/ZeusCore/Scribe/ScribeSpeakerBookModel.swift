@@ -143,7 +143,7 @@ public struct ScribeSpeakerBook: Codable, Equatable, Sendable {
         label: String, name: String, source: ScribeNameSource, confidence: Double
     ) -> BindResult {
         guard source != .manual else { return .unchanged }  // typed names go through setConfirmed
-        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = ScribeBindNameBox.trimmedName(name)
         guard !clean.isEmpty else { return .unchanged }
         if isDeclined(clean, for: label) { return .declined }
         let value = min(1, max(0, confidence))
