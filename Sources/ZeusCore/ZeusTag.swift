@@ -270,7 +270,7 @@ public enum ZeusTagParser {
     }
 
     static func parsePoint(_ inner: String) -> ZeusTag? {
-        let trimmed = inner.trimmingCharacters(in: .whitespaces)
+        let trimmed = PointInnerBox.trimmedInner(inner)
         if trimmed.lowercased() == "none" { return .point(nil) }
         let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
         let coords = parts[0].split(separator: ",").map { Int($0.trimmingCharacters(in: .whitespaces)) }
