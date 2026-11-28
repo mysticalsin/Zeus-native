@@ -22,6 +22,11 @@ enum ResearchSetupVoice {
     static var speakSetup: () -> Void = {}
 }
 
+/// The Scribe card speaks when a meeting starts and what holds an automatic start. It does not start a meeting.
+enum ScribeSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -203,6 +208,10 @@ struct ScribeAutoStartCard: View {
     var body: some View {
         let mode = ScribeAutoStartMode.parse(selection.wrappedValue)
         GSCard("Scribe") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how Scribe is set") { ScribeSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "calendar.badge.clock", title: "When a meeting starts") {
                 GlassSegmented(options: ScribeAutoStartMode.allCases.map { ($0.title, $0.title) }, selection: selection)
                     .padding(.trailing, 13.5)
