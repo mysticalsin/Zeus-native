@@ -282,7 +282,7 @@ public enum ZeusTagParser {
     static func parseHighlight(_ inner: String) -> ZeusTag? {
         let parts = inner.trimmingCharacters(in: .whitespaces)
             .split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-        let numbers = parts[0].split(separator: ",").map { Int($0.trimmingCharacters(in: .whitespaces)) }
+        let numbers = parts[0].split(separator: ",").map { Int(HighlightNumberBox.trimmedNumber(String($0))) }
         guard numbers.count == 4, let x = numbers[0], let y = numbers[1], let w = numbers[2], let h = numbers[3],
               w > 0, h > 0 else { return nil }
         let (label, screen) = labelAndScreen(Array(parts.dropFirst()))
