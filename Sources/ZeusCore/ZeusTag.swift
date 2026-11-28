@@ -341,7 +341,7 @@ public enum ZeusTagParser {
     }
 
     static func stripTrailingTags(from text: String, into tags: inout [ZeusTag]) -> String {
-        var spoken = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var spoken = ZeusTagSpokenBox.trimmedSpoken(text)
         var trailing: [ZeusTag] = []
         while spoken.hasSuffix("]"), let open = spoken.lastIndex(of: "[") {
             let candidate = spoken[open...]
