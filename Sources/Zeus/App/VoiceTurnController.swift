@@ -3428,6 +3428,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Music page, or a spoken "are my earbuds connected", says whether the output is Bluetooth.
+    func sayEarbuds() {
+        presentEarbuds(speak: true)
+    }
+
+    private func answerEarbuds(speak: Bool) -> TurnResult {
+        presentEarbuds(speak: speak)
+        return TurnResult(spoken: earbudsLine())
+    }
+
+    /// The sound output now. A missing device is unread. Speakers are disconnected, and their name stays off the card.
+    private func earbudFacts() -> (connected: Bool?, name: String) {
+        let link = EarbudsOutputWatch.currentLink()
+        guard link.seen else { return (nil, "") }
+        guard link.connected else { return (false, "") }
+        guard !MeetingState.hideDetails else { return (true, "") }
+        return (true, EarbudsName.display(link.name, hideDetails: false))
+    }
+
+    private func presentEarbuds(speak: Bool) {
+        let facts = earbudFacts()
+        let line = EarbudsStatusAsk.line(connected: facts.connected, name: facts.name)
+        let plan = EarbudsStatusDraw.plan(connected: facts.connected, name: facts.name)
+        buddy.idle()
+        showEarbuds(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func earbudsLine() -> String {
+        let facts = earbudFacts()
+        return EarbudsStatusAsk.line(connected: facts.connected, name: facts.name)
+    }
+
+    /// Draws the connection: Earbuds, then Connected, Disconnected, or Can't. The caller speaks the full line.
+    private func showEarbuds(_ plan: EarbudsStatusDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyEarbuds(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyEarbuds(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyEarbuds(_ plan: EarbudsStatusDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3870,6 +3935,11 @@ final class VoiceTurnController {
         }
         if ScreenCountAsk.matches(transcript) {
             let result = answerScreens(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if EarbudsStatusAsk.matches(transcript) {
+            let result = answerEarbuds(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

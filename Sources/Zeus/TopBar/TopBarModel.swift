@@ -339,6 +339,8 @@ final class TopBarModel {
     var speakTiling: () -> Void = {}
     /// The Recordly page speaks how many displays are attached.
     var speakScreens: () -> Void = {}
+    /// The Music page speaks whether the sound output is earbuds.
+    var speakEarbuds: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

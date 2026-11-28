@@ -12,6 +12,19 @@ final class EarbudsOutputWatch {
     private var primed = false
     private var last = Snap(id: 0, name: "Earbuds", bluetooth: false)
 
+    /// The output Zeus would treat as earbuds right now. `seen` is false when the device cannot be read.
+    /// This does not read a battery.
+    static func currentLink() -> CurrentLink {
+        let snap = read()
+        return CurrentLink(seen: snap.id != 0, connected: snap.bluetooth, name: snap.name)
+    }
+
+    struct CurrentLink: Equatable {
+        var seen: Bool
+        var connected: Bool
+        var name: String
+    }
+
     func poll() {
         let snap = Self.read()
         let previous = last
