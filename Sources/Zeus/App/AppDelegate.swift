@@ -412,6 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ExtraSoundVoice.speakExtra = { [weak self] in self?.voice.sayExtraSounds() }
             HudExtraVoice.speakExtras = { [weak self] in self?.voice.sayHudExtras() }
             WavesSetupVoice.speakWaves = { [weak self] in self?.voice.sayWavesSetup() }
+            NotchlessVoice.speakShape = { [weak self] in self?.voice.sayNotchless() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

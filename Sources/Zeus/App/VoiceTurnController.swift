@@ -7947,6 +7947,76 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Displays without a notch, or a spoken "how's the notchless shape", say Pill or Notch and whether it is shown. They do not change the shape.
+    func sayNotchless() {
+        presentNotchless(speak: true)
+    }
+
+    private func answerNotchless(speak: Bool) -> TurnResult {
+        presentNotchless(speak: speak)
+        return TurnResult(spoken: notchlessLine())
+    }
+
+    private func presentNotchless(speak: Bool) {
+        let parts = notchlessParts()
+        let line = NotchlessAsk.line(shape: parts.shape, see: parts.see)
+        let plan = NotchlessDraw.plan(shape: parts.shape, see: parts.see)
+        buddy.idle()
+        showNotchless(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Shape control, and whether a display without a notch is showing it. Anything but Notch is Pill.
+    /// Reading them does not change the shape or start calibration.
+    private func notchlessParts() -> (shape: String, see: String) {
+        let model = DrawnNotchModel.shared
+        let shape = model.style == .drawn ? "Notch" : "Pill"
+        let see: String
+        switch model.availability {
+        case .ready: see = "Shown"
+        case .notShown: see = "Not shown"
+        case .noDisplay: see = "No display"
+        }
+        return (shape, see)
+    }
+
+    private func notchlessLine() -> String {
+        let parts = notchlessParts()
+        return NotchlessAsk.line(shape: parts.shape, see: parts.see)
+    }
+
+    /// Draws Shape, then Pill or Notch and whether it is shown. The caller speaks the full line.
+    private func showNotchless(_ plan: NotchlessDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNotchless(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNotchless(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNotchless(_ plan: NotchlessDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8739,6 +8809,11 @@ final class VoiceTurnController {
         }
         if WavesSetupAsk.matches(transcript) {
             let result = answerWavesSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NotchlessAsk.matches(transcript) {
+            let result = answerNotchless(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
