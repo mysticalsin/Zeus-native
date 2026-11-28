@@ -7405,6 +7405,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Research settings, or a spoken "how's research set", say the depth and where reports save. They do not start research.
+    func sayResearchSetup() {
+        presentResearchSetup(speak: true)
+    }
+
+    private func answerResearchSetup(speak: Bool) -> TurnResult {
+        presentResearchSetup(speak: speak)
+        return TurnResult(spoken: researchSetupLine())
+    }
+
+    private func presentResearchSetup(speak: Bool) {
+        let parts = researchSetupParts()
+        let line = ResearchSetupAsk.line(depth: parts.depth, save: parts.save)
+        let plan = ResearchSetupDraw.plan(depth: parts.depth, save: parts.save)
+        buddy.idle()
+        showResearchSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Depth menu, and Default when the folder path is empty. A chosen folder is named only as Chosen.
+    /// Reading them does not start research.
+    private func researchSetupParts() -> (depth: String, save: String) {
+        let store = SettingsStore.shared
+        let stored = store.string("research.depth").trimmingCharacters(in: .whitespacesAndNewlines)
+        let depth = stored.isEmpty ? "Quick" : stored
+        let folder = store.string("research.folder").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (depth, folder.isEmpty ? "Default" : "Chosen")
+    }
+
+    private func researchSetupLine() -> String {
+        let parts = researchSetupParts()
+        return ResearchSetupAsk.line(depth: parts.depth, save: parts.save)
+    }
+
+    /// Draws Depth, then the depth and where reports save. The caller speaks the full line.
+    private func showResearchSetup(_ plan: ResearchSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyResearchSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyResearchSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyResearchSetup(_ plan: ResearchSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8157,6 +8223,11 @@ final class VoiceTurnController {
         }
         if FacePresenceSetAsk.matches(transcript) {
             let result = answerFacePresenceSet(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ResearchSetupAsk.matches(transcript) {
+            let result = answerResearchSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

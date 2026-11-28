@@ -17,6 +17,11 @@ enum CodingSetupVoice {
     static var speakSetup: () -> Void = {}
 }
 
+/// The Research card speaks the depth and whether reports use the default folder. It does not start research.
+enum ResearchSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -99,6 +104,10 @@ struct FeaturesSettingsPage: View {
         scribeCard
         SpeakerRecognitionCard()
         GSCard("Research") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how research is set") { ResearchSetupVoice.speakSetup() }
+            }
             GSRow(symbol: "magnifyingglass", title: "Depth", text: "Quick takes a few searches. Deep reads many sources and takes minutes. You can always say \u{201C}deep research\u{201D}.") {
                 GSPopup(selection: store.stringBinding("research.depth"), options: FeatureSettings.researchDepthChoices)
             }
