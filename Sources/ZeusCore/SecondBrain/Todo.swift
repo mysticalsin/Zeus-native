@@ -101,7 +101,7 @@ public enum TodoMarkdown {
         rest = rest.dropFirst()
         guard rest.hasPrefix("]") else { return nil }
         rest = rest.dropFirst()
-        var title = rest.trimmingCharacters(in: .whitespaces)
+        var title = TodoMarkdownTitleBox.trimmedTitle(String(rest))
         var due: String?
         if let range = title.range(of: dueMarker) {
             let after = title[range.upperBound...].trimmingCharacters(in: .whitespaces)
