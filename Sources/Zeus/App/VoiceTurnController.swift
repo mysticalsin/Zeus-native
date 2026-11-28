@@ -5033,6 +5033,67 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The level-light rows, or a spoken "which notch lights", say which of the three are on. They do not change them.
+    func sayNotchLights() {
+        presentNotchLights(speak: true)
+    }
+
+    private func answerNotchLights(speak: Bool) -> TurnResult {
+        presentNotchLights(speak: speak)
+        return TurnResult(spoken: notchLightsLine())
+    }
+
+    private func presentNotchLights(speak: Bool) {
+        let words = notchLightWords()
+        let line = NotchLightsAsk.line(words: words)
+        let plan = NotchLightsDraw.plan(words: words)
+        buddy.idle()
+        showNotchLights(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Volume, then brightness, then the keyboard, for each light that is on. Unset values follow the page default, on.
+    private func notchLightWords() -> [String] {
+        let pairs = [("lights.hud.volume", "Volume"), ("lights.hud.brightness", "Brightness"), ("lights.hud.keyboard", "Keyboard")]
+        return pairs.compactMap { SettingsStore.shared.bool($0.0) ? $0.1 : nil }
+    }
+
+    private func notchLightsLine() -> String {
+        NotchLightsAsk.line(words: notchLightWords())
+    }
+
+    /// Draws Lights, then each light that is on, or None. The caller speaks the full line.
+    private func showNotchLights(_ plan: NotchLightsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNotchLights(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNotchLights(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNotchLights(_ plan: NotchLightsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5605,6 +5666,11 @@ final class VoiceTurnController {
         }
         if HomeCardsAsk.matches(transcript) {
             let result = answerHomeCards(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NotchLightsAsk.matches(transcript) {
+            let result = answerNotchLights(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -90,6 +90,8 @@ public enum SystemHUDSettings {
 
     public static let replaceSystemID = "lights.hud.replaceSystem"
     public static let muteEffectsID = "lights.hud.mute"
+    /// The level-light rows speak which of the three are on. They do not change them.
+    public static var speakLights: () -> Void = {}
     public static let legacyVolumeID = "lights.volume"
     public static let migrationKey = "opt.lights.hud.migrated"
 

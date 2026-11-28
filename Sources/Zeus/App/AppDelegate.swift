@@ -365,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotchController.speakOpen = { [weak self] in self?.voice.sayNotchOpen() }
             HaloStyle.speakLight = { [weak self] in self?.voice.sayHaloLight() }
             HomeSlots.speakHome = { [weak self] in self?.voice.sayHomeCards() }
+            SystemHUDSettings.speakLights = { [weak self] in self?.voice.sayNotchLights() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }

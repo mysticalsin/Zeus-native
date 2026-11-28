@@ -446,6 +446,10 @@ private struct AppearancePage: View {
 
     private var hudCard: some View {
         GSCard("Volume, brightness and keys") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which notch lights are on") { SystemHUDSettings.speakLights() }
+            }
             light("lights.hud.volume", "speaker.wave.2", "Volume in the notch", "Level glow and wings when the output volume changes.")
             light("lights.hud.brightness", "sun.max", "Brightness in the notch", "Level glow when the built-in display brightness changes.")
             light("lights.hud.keyboard", "light.max", "Keyboard backlight in the notch", "Level glow when keyboard illumination changes. Skipped on Macs without a backlight.")
