@@ -289,10 +289,19 @@ final class TopBarModel {
     /// Joining a meeting speaks the title and opens the link.
     var speakMeeting: (_ title: String, _ place: String) -> Void = { _, _ in }
     var speakNoMeeting: () -> Void = {}
+    /// The Home calendar card speaks the next event.
+    var speakNextEvent: (_ title: String, _ when: String, _ allDay: Bool) -> Void = { _, _, _ in }
+    var speakNoNextEvent: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {
         events.filter { $0.meetingURL != nil && $0.end > now }.min { $0.start < $1.start }
+    }
+
+    /// The next event that has not ended. A timed event comes before an all-day one.
+    func nextEvent(now: Date = Date()) -> CalendarItem? {
+        let open = events.filter { $0.end > now }.sorted { $0.start < $1.start }
+        return open.first { !$0.isAllDay } ?? open.first
     }
 
     /// Opens the meeting link and says which one it is.

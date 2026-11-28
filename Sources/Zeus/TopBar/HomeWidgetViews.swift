@@ -327,7 +327,8 @@ struct HomeWidgetCard: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 caption("Calendar", subtitle)
-                Spacer()
+                Spacer(minLength: 4)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's next") { sayNext() }
                 openCalendar()
             }
             Spacer(minLength: 0)
@@ -582,6 +583,15 @@ struct HomeWidgetCard: View {
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
             }
         }
+    }
+
+    private func sayNext() {
+        guard let event = topBar.nextEvent() else {
+            topBar.speakNoNextEvent()
+            return
+        }
+        let when = NextEventAsk.whenLine(event.start, allDay: event.isAllDay)
+        topBar.speakNextEvent(event.title, when, event.isAllDay)
     }
 
     private func sayBattery() {

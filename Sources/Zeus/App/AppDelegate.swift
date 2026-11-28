@@ -303,6 +303,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             RemindersController.shared.speakAdded = { [weak self] result in self?.voice.sayReminder(result) }
             topBar.speakMeeting = { [weak self] title, place in self?.voice.sayMeeting(title: title, place: place) }
             topBar.speakNoMeeting = { [weak self] in self?.voice.sayNoMeeting() }
+            topBar.speakNextEvent = { [weak self] title, when, allDay in
+                self?.voice.sayNextEvent(title: title, when: when, allDay: allDay)
+            }
+            topBar.speakNoNextEvent = { [weak self] in self?.voice.sayNoNextEvent() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

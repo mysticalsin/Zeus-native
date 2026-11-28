@@ -905,6 +905,47 @@ final class VoiceTurnController {
         presentNoBattery(speak: true)
     }
 
+    /// The Home calendar card, or a spoken "what's next", says the next event and draws it.
+    func sayNextEvent(title: String, when: String, allDay: Bool) {
+        presentNextEvent(title: title, when: when, allDay: allDay, speak: true)
+    }
+
+    /// Nothing else is left today. The screen shows Next, then None.
+    func sayNoNextEvent() {
+        presentNoNextEvent(speak: true)
+    }
+
+    private func answerNextEvent(speak: Bool) -> TurnResult {
+        guard let event = notch.topBar?.nextEvent() else {
+            presentNoNextEvent(speak: speak)
+            return TurnResult(spoken: NextEventAsk.none)
+        }
+        let when = NextEventAsk.whenLine(event.start, allDay: event.isAllDay)
+        presentNextEvent(title: event.title, when: when, allDay: event.isAllDay, speak: speak)
+        return TurnResult(spoken: NextEventAsk.line(title: event.title, when: when, allDay: event.isAllDay) ?? NextEventAsk.none)
+    }
+
+    private func presentNextEvent(title: String, when: String, allDay: Bool, speak: Bool) {
+        guard let line = NextEventAsk.line(title: title, when: when, allDay: allDay),
+              let plan = NextEventDraw.plan(title: title, when: when) else {
+            presentNoNextEvent(speak: speak)
+            return
+        }
+        buddy.idle()
+        showNextEvent(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNoNextEvent(speak: Bool) {
+        let line = NextEventAsk.none
+        let plan = NextEventDraw.none()
+        buddy.idle()
+        showNextEvent(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     /// Joining a meeting says the title and draws it.
     func sayMeeting(title: String, place: String) {
         presentMeeting(title: title, place: place, speak: true)
@@ -1425,6 +1466,37 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the next event: Next, then the title, then the time. The caller speaks the full line.
+    private func showNextEvent(_ plan: NextEventDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNextEvent(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNextEvent(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNextEvent(_ plan: NextEventDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1719,6 +1791,11 @@ final class VoiceTurnController {
         }
         if BatteryAsk.matches(transcript) {
             let result = answerBattery(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NextEventAsk.matches(transcript) {
+            let result = answerNextEvent(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
