@@ -37,6 +37,11 @@ enum ScribeSetupVoice {
     static var speakSetup: () -> Void = {}
 }
 
+/// The model cap speaks the Sonnet ceiling and whether a pin is saved. The pin text stays unspoken.
+enum ModelCapVoice {
+    static var speakCap: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -143,6 +148,10 @@ struct FeaturesSettingsPage: View {
             }
         }
         GSCard("Models Zeus uses") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the model cap") { ModelCapVoice.speakCap() }
+            }
             ForEach(Array(RouterEngine.allCases.enumerated()), id: \.element) { index, engine in
                 if index > 0 { GSDivider() }
                 HStack(spacing: 0) {
