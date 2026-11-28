@@ -47,7 +47,7 @@ public struct SentenceChunker: Sendable {
         while index < chars.count {
             let c = chars[index]
             if ".!?".contains(c), index + 1 < chars.count, chars[index + 1].isWhitespace || chars[index + 1] == "\n" {
-                let sentence = String(chars[start...index]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let sentence = ChunkerFeedBox.trimmedFeed(String(chars[start...index]))
                 let lastWord = sentence.dropLast().split(separator: " ").last.map { $0.lowercased() } ?? ""
                 if !Self.abbreviations.contains(lastWord), sentence.count > 1 {
                     out.append(sentence)
