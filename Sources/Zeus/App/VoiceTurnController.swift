@@ -13155,6 +13155,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Memory learning, or a spoken "is memory learning on", says whether it is paused and how many meetings are forgotten.
+    func sayMemoryLearn() {
+        presentMemoryLearn(speak: true)
+    }
+
+    private func answerMemoryLearn(speak: Bool) -> TurnResult {
+        presentMemoryLearn(speak: speak)
+        return TurnResult(spoken: memoryLearnLine())
+    }
+
+    private func presentMemoryLearn(speak: Bool) {
+        let parts = memoryLearnParts()
+        let line = MemoryLearnAsk.line(state: parts.state, forgotten: parts.forgotten)
+        let plan = MemoryLearnDraw.plan(state: parts.state, forgotten: parts.forgotten)
+        buddy.idle()
+        showMemoryLearn(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The learning switch and the forgotten-meeting count. A bad settings file stays unread. Reading them does not learn, reset, or open a page.
+    private func memoryLearnParts() -> (state: String, forgotten: String) {
+        let recovered = WikiStore.standard.loadStateRecovering()
+        guard recovered.error == nil else { return ("Bad", "0") }
+        let state = recovered.state.learningPaused ? "Paused" : "On"
+        let count = recovered.state.forgottenMeetings.count
+        guard (0...999).contains(count) else { return ("On", "1000") }
+        return (state, String(count))
+    }
+
+    private func memoryLearnLine() -> String {
+        let parts = memoryLearnParts()
+        return MemoryLearnAsk.line(state: parts.state, forgotten: parts.forgotten)
+    }
+
+    /// Draws Learn, then the state and the forgotten count. The caller speaks the full line.
+    private func showMemoryLearn(_ plan: MemoryLearnDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyMemoryLearn(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyMemoryLearn(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyMemoryLearn(_ plan: MemoryLearnDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14342,6 +14408,11 @@ final class VoiceTurnController {
         }
         if ChromeLinkAsk.matches(transcript) {
             let result = answerChromeLink(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if MemoryLearnAsk.matches(transcript) {
+            let result = answerMemoryLearn(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

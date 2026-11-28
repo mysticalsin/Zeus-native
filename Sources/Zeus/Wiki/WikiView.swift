@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// Memory learning speaks whether it is on and how many meetings are forgotten. It does not learn, reset, or name a page.
+enum MemoryLearnVoice {
+    static var speakLearn: () -> Void = {}
+}
+
 /// The Memory window: pages on the left, one page on the right. Content state belongs to the
 /// controller; keyboard focus stays with the native view.
 struct WikiView: View {
@@ -57,6 +62,9 @@ private struct WikiTopBar: View {
             .accessibilityHint(controller.settingsUnreadable
                 ? "Unavailable until you reset Memory's settings."
                 : "While on, Zeus adds nothing new to Memory.")
+            Button { MemoryLearnVoice.speakLearn() } label: { Image(systemName: "speaker.wave.2.fill") }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Say whether memory learning is on")
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
     }
