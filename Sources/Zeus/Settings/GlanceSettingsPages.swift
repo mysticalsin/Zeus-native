@@ -286,7 +286,10 @@ private struct AppearancePage: View {
             }
             GSDivider()
             GSRow(symbol: "cursorarrow.click", title: "Open the notch on", text: "Hover opens the notch after the delay.", detail: "Click opens it only when you click the notch.") {
-                GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("notch.openTrigger"), options: SettingsCatalog.option("notch.openTrigger")?.choices ?? []).popupLabel("Open the notch on")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the notch opens") { NotchController.speakOpen() }
+                }
             }
             GSDivider()
             // The delay only applies to hover, so it is subdued while the trigger is Click.

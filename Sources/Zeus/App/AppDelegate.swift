@@ -362,6 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PermissionsModel.speakScreen = { [weak self] in self?.voice.sayScreenRecording() }
             DriveController.speakDrive = { [weak self] in self?.voice.sayDriveAutonomy() }
             NotchController.speakNotch = { [weak self] in self?.voice.sayNotchPlace() }
+            NotchController.speakOpen = { [weak self] in self?.voice.sayNotchOpen() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
