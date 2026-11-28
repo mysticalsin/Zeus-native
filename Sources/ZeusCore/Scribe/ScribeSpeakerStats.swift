@@ -61,7 +61,7 @@ public struct ScribeSpeakerStats: Equatable, Sendable {
 public enum ScribeTickerText {
     /// The "…" a segment shows before its words arrive is not text anyone can read.
     public static func hasWords(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = ScribeTickerTextBox.trimmedText(text)
         return !trimmed.isEmpty && trimmed != "…"
     }
 
