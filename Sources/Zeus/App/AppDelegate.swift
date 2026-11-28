@@ -340,6 +340,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakClipboard = { [weak self] in self?.voice.sayClipboard() }
             topBar.speakRounds = { [weak self] in self?.voice.sayRounds() }
             topBar.speakWords = { [weak self] in self?.voice.sayWords() }
+            topBar.speakDictation = { [weak self] in self?.voice.sayDictation() }
             topBar.speakRecording = { [weak self] in self?.voice.sayRecording() }
             topBar.speakDarkMode = { [weak self] in self?.voice.sayDarkMode() }
             topBar.speakTiling = { [weak self] in self?.voice.sayTiling() }

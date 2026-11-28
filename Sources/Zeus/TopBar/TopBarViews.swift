@@ -1367,6 +1367,8 @@ struct DictationPage: View {
                             Text(status).font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1)
                             Text(hint).font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet).lineLimit(2)
                         }
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if dictation is on") { topBar.speakDictation() }
                     }
                     Text("MODE").font(TopBarStyle.label(9.5, .bold)).foregroundStyle(Theme.cloudQuiet)
                     FlowChips(modes: topBar.dictationModes, selected: topBar.selectedModeKey) { topBar.selectedModeKey = $0 }

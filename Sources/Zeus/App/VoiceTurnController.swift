@@ -3745,6 +3745,74 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The dictation page, or a spoken "is dictation on", says the phase. The heard words stay off.
+    func sayDictation() {
+        presentDictation(speak: true)
+    }
+
+    private func answerDictation(speak: Bool) -> TurnResult {
+        presentDictation(speak: speak)
+        return TurnResult(spoken: dictationLine())
+    }
+
+    /// The phase the dictation page shows. The partial transcript is not included.
+    private func dictationFacts() -> (seen: Bool, phase: String, mode: String) {
+        guard let top = notch.topBar else { return (false, "", "") }
+        switch top.dictationPhase {
+        case .idle, .done: return (true, "Ready", "")
+        case .listening: return (true, "Listening", top.dictationModeName)
+        case .transcribing: return (true, "Transcribing", "")
+        case .rewriting: return (true, "Polishing", top.dictationModeName)
+        case .failed: return (true, "Failed", "")
+        }
+    }
+
+    private func presentDictation(speak: Bool) {
+        let facts = dictationFacts()
+        let line = DictationLiveAsk.line(seen: facts.seen, phase: facts.phase, mode: facts.mode)
+        let plan = DictationLiveDraw.plan(seen: facts.seen, phase: facts.phase, mode: facts.mode)
+        buddy.idle()
+        showDictation(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func dictationLine() -> String {
+        let facts = dictationFacts()
+        return DictationLiveAsk.line(seen: facts.seen, phase: facts.phase, mode: facts.mode)
+    }
+
+    /// Draws dictation: Dictation, then the phase, then the mode when the page shows one.
+    private func showDictation(_ plan: DictationLiveDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDictation(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDictation(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDictation(_ plan: DictationLiveDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4212,6 +4280,11 @@ final class VoiceTurnController {
         }
         if OutputAsk.matches(transcript) {
             let result = answerOutput(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DictationLiveAsk.matches(transcript) {
+            let result = answerDictation(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
