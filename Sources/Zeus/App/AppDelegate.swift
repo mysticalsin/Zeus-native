@@ -379,6 +379,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PolyglotSettings.speakSetup = { [weak self] in self?.voice.sayPolyglotSetup() }
             KeepAwakeSession.speakSetup = { [weak self] in self?.voice.sayKeepAwakeSetup() }
             FlingVoice.speakFling = { [weak self] in self?.voice.sayFlingSetup() }
+            TilingSetupVoice.speakSetup = { [weak self] in self?.voice.sayTilingSetup() }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }

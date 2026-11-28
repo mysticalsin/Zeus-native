@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The Arrange card speaks whether tiling is on, which keys it uses, and the focus ring. It does not move a window.
+enum TilingSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Settings › Tiling: the switch, the keys, the gaps and the split. Every row is a catalog row
 /// (`scripts/gen-settings-catalog.py`) read through `FeatureSettings`; nothing here moves a window.
 @MainActor
@@ -11,6 +16,10 @@ struct TilingSettingsPage: View {
         GSPageHeading(section: .tiling, subtitle: "Arrange your windows from the keyboard.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Arrange") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how tiling is set") { TilingSetupVoice.speakSetup() }
+            }
             GSToggleRow(symbol: "rectangle.split.2x2", title: "Arrange my windows from the keyboard",
                         text: "Snaps the windows on each screen into a tidy grid. Keys move focus, swap windows and flip a split. Off until you turn it on.",
                         isOn: store.boolBinding("tiling.enabled"))

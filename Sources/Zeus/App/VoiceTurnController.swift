@@ -5752,6 +5752,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Arrange card, or a spoken "how's tiling set", says the three choices. It does not move a window.
+    func sayTilingSetup() {
+        presentTilingSetup(speak: true)
+    }
+
+    private func answerTilingSetup(speak: Bool) -> TurnResult {
+        presentTilingSetup(speak: speak)
+        return TurnResult(spoken: tilingSetupLine())
+    }
+
+    private func presentTilingSetup(speak: Bool) {
+        let parts = tilingSetupParts()
+        let line = TilingSetupAsk.line(work: parts.work, keys: parts.keys, ring: parts.ring)
+        let plan = TilingSetupDraw.plan(work: parts.work, keys: parts.keys, ring: parts.ring)
+        buddy.idle()
+        showTilingSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// On or off, the key menu, and the focus ring. An unset value follows the catalog default.
+    /// Reading them does not turn tiling on or move a window.
+    private func tilingSetupParts() -> (work: String, keys: String, ring: String) {
+        let store = SettingsStore.shared
+        let work = store.bool("tiling.enabled") ? "On" : "Off"
+        let ring = store.bool("tiling.focusBorder") ? "On" : "Off"
+        return (work, store.string("tiling.keyBase"), ring)
+    }
+
+    private func tilingSetupLine() -> String {
+        let parts = tilingSetupParts()
+        return TilingSetupAsk.line(work: parts.work, keys: parts.keys, ring: parts.ring)
+    }
+
+    /// Draws Arrange, then work, the keys, and the ring. The caller speaks the full line.
+    private func showTilingSetup(_ plan: TilingSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTilingSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTilingSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTilingSetup(_ plan: TilingSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6379,6 +6444,11 @@ final class VoiceTurnController {
         }
         if FlingSetupAsk.matches(transcript) {
             let result = answerFlingSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TilingSetupAsk.matches(transcript) {
+            let result = answerTilingSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
