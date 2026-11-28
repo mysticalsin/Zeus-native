@@ -466,6 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             PointingSettings.speakTrail = { [weak self] in self?.voice.sayPointTrail() }
             TalkSightVoice.speakSight = { [weak self] in self?.voice.sayTalkSight() }
+            DrawnSizeVoice.speakSize = { [weak self] in self?.voice.sayDrawnSize() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }
