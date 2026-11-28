@@ -56,7 +56,7 @@ public struct LearnedShortcutStore: Equatable, Sendable {
     @discardableResult
     public mutating func save(phrase: String, steps: [String], verified: Bool, at: Date = Date()) -> LearnSave {
         let phrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
-        let steps = steps.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let steps = steps.map { LearnedStepBox.trimmedStep($0) }.filter { !$0.isEmpty }
         guard verified else { return .rejected("unverified") }
         guard !phrase.isEmpty, !steps.isEmpty else { return .rejected("empty") }
         let shortcut = LearnedShortcut(phrase: phrase, steps: steps, savedAt: at)
