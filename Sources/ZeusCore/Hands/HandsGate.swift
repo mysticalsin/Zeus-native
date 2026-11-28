@@ -231,7 +231,7 @@ public enum HandsGate {
 
     /// A button named Send, Delete or Buy waits for the same card as the matching intent.
     public static func intent(clicking label: String) -> HandsIntent? {
-        switch label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        switch HandsClickLabelBox.trimmedLabel(label).lowercased() {
         case "send": return .send(to: "the open draft", text: "Send")
         case "delete": return .delete(files: [label])
         case "buy", "purchase": return .buy(item: label, price: "the shown price")
