@@ -13,6 +13,11 @@ enum NotifySetupVoice {
     static var speakNotices: () -> Void = {}
 }
 
+/// Permission requests and finished-agent banners. It does not ask macOS for notification permission.
+enum AskFinishVoice {
+    static var speakAsks: () -> Void = {}
+}
+
 /// The Weather card speaks the city and the units. It does not fetch a forecast.
 enum WeatherPlaceVoice {
     static var speakPlace: () -> Void = {}
@@ -908,7 +913,10 @@ private struct GSNotificationsPage: View {
             // The old Permission requests and Finished tasks switches had no reader: nothing ever checked them. An agent
             // waits for the answer to a request, so it always shows; finished-task banners follow "Show system notifications".
             GSRow(symbol: "hand.raised", title: "Permission requests", text: "Always shown on the notch, because the agent waits for your answer.") {
-                GSStatus(ok: true, text: "Always on")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how permission requests and finished agents show") { AskFinishVoice.speakAsks() }
+                    GSStatus(ok: true, text: "Always on")
+                }
             }
             GSDivider()
             GSRow(symbol: "checkmark.circle", title: "Finished tasks", text: "A macOS banner when an agent finishes, if Show system notifications below is on.")
