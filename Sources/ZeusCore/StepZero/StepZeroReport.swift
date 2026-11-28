@@ -281,7 +281,7 @@ private func makeQuestions() -> [StepZeroQuestion] {
     return questionRows.split(separator: "\n").map { line in
         let parts = line.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
         let head = parts[0].split(separator: " ")
-        let body = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+        let body = parts.count > 1 ? StepZeroFieldBodyBox.trimmedBody(String(parts[1])) : ""
         let fields: [ProbeField]
         if body.isEmpty {
             fields = []
