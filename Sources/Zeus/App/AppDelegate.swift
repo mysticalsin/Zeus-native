@@ -223,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Usage and limits from the agents' local logs; a cue when a limit gets close.
         if on(.usage) {
             UsageModel.shared.onAlert = { [weak self] text in self?.topBar.show(.usageAlert(text)) }
+            UsageModel.shared.speakToday = { [weak self] in self?.voice.sayUsage() }
             UsageModel.shared.start()
         }
         if on(.proactive) { ProactiveController.shared.start() }
