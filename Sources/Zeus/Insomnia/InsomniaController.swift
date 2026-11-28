@@ -13,6 +13,9 @@ import ZeusCore
 final class InsomniaController {
     static let shared = InsomniaController()
 
+    /// The Insomnia page speaks the lid line it shows.
+    var speakLid: () -> Void = {}
+
     enum EntryMode: String, CaseIterable, Identifiable {
         case length = "For", until = "Until"
         var id: String { rawValue }

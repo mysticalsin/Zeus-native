@@ -203,7 +203,7 @@ private struct InsomniaStatus: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            line("laptopcomputer", "Lid", insomnia.lidText)
+            line("laptopcomputer", "Lid", insomnia.lidText, speak: true)
             line("battery.75percent", "Battery", insomnia.batteryText)
             line("thermometer.medium", "Heat", insomnia.heatText)
             line("flag.checkered", "Ended", insomnia.endText)
@@ -227,10 +227,13 @@ private struct InsomniaStatus: View {
         }
     }
 
-    private func line(_ symbol: String, _ title: String, _ value: String) -> some View {
+    private func line(_ symbol: String, _ title: String, _ value: String, speak: Bool = false) -> some View {
         HStack(spacing: 6) {
             Image(systemName: symbol).font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Theme.cloudQuiet).frame(width: 14)
             Text(title).font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudSecondary)
+            if speak {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the lid") { insomnia.speakLid() }
+            }
             Spacer(minLength: 6)
             Text(value).font(TopBarStyle.label(10.5, .semibold)).foregroundStyle(Theme.cloudPrimary).lineLimit(1).truncationMode(.middle)
         }
