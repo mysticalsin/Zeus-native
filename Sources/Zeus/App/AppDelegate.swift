@@ -424,6 +424,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FastPathVoice.speakPath = { [weak self] in self?.voice.sayFastPath() }
             FlickSetupVoice.speakFlick = { [weak self] in self?.voice.sayFlickSetup() }
             HaloEntranceVoice.speakEntrance = { [weak self] in self?.voice.sayHaloEntrance() }
+            TalkMicVoice.speakMic = { [weak self] in self?.voice.sayTalkMic() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

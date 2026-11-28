@@ -8685,6 +8685,75 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The talk microphone, or a spoken "which talk microphone", says where talk listens. It does not start listening or name a device.
+    func sayTalkMic() {
+        presentTalkMic(speak: true)
+    }
+
+    private func answerTalkMic(speak: Bool) -> TurnResult {
+        presentTalkMic(speak: speak)
+        return TurnResult(spoken: talkMicLine())
+    }
+
+    private func presentTalkMic(speak: Bool) {
+        let hear = talkMicHear()
+        let line = TalkMicAsk.line(hear: hear)
+        let plan = TalkMicDraw.plan(hear: hear)
+        buddy.idle()
+        showTalkMic(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Automatic, this Mac's microphone, a chosen input, or unavailable when a loaded list no longer has it.
+    /// A device name is not spoken. An empty device list does not start a scan. Reading does not start listening.
+    private func talkMicHear() -> String {
+        let choice = TalkMicrophoneChoice(stored: SettingsStore.shared.string(TalkMicrophoneChoice.settingID))
+        switch choice {
+        case .automatic: return "Automatic"
+        case .builtIn: return TalkMicrophoneChoice.builtInTitle
+        case .device(let uid):
+            let devices = MicrophoneTester.shared.devices
+            if !devices.isEmpty, !devices.contains(where: { $0.uid == uid }) { return "Unavailable" }
+            return "Chosen"
+        }
+    }
+
+    private func talkMicLine() -> String {
+        TalkMicAsk.line(hear: talkMicHear())
+    }
+
+    /// Draws Listen, then the microphone. The caller speaks the full line.
+    private func showTalkMic(_ plan: TalkMicDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTalkMic(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTalkMic(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTalkMic(_ plan: TalkMicDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9537,6 +9606,11 @@ final class VoiceTurnController {
         }
         if HaloEntranceAsk.matches(transcript) {
             let result = answerHaloEntrance(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TalkMicAsk.matches(transcript) {
+            let result = answerTalkMic(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

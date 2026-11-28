@@ -1242,12 +1242,15 @@ private struct TalkMicrophoneRow: View {
     var body: some View {
         GSRow(symbol: "mic.circle", title: "Microphone",
               text: "Automatic uses the system input, so a headset can win.", detail: "This Mac's microphone keeps a headset from switching mode. Dictation has its own.") {
-            GSPopup(selection: Binding(get: { choice.title(devices: devices) },
-                                       set: { title in
-                                           guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
-                                           store.set(TalkMicrophoneChoice.settingID, new.stored)
-                                       }),
-                    options: choice.options(devices: devices), label: "Talk microphone")
+            HStack(spacing: 8) {
+                GSPopup(selection: Binding(get: { choice.title(devices: devices) },
+                                           set: { title in
+                                               guard let new = TalkMicrophoneChoice.choice(forTitle: title, devices: devices) else { return }
+                                               store.set(TalkMicrophoneChoice.settingID, new.stored)
+                                           }),
+                        options: choice.options(devices: devices), label: "Talk microphone")
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the talk microphone") { TalkMicVoice.speakMic() }
+            }
         }
         .onAppear { Task { MicrophoneTester.shared.devices = await Task.detached(priority: .userInitiated) { Microphones.all() }.value } }
     }
@@ -1347,6 +1350,11 @@ enum HudExtraVoice {
 /// The four extra agent sounds speak their switches. Nothing is played.
 enum ExtraSoundVoice {
     static var speakExtra: () -> Void = {}
+}
+
+/// The talk microphone speaks Automatic, this Mac, a chosen input, or unavailable. It does not start listening.
+enum TalkMicVoice {
+    static var speakMic: () -> Void = {}
 }
 
 /// The halo entrance speaks the animation. It does not play it or change it.
