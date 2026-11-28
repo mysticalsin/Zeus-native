@@ -15,7 +15,7 @@ public struct LiveWordsHUD: Equatable, Sendable {
     public init() {}
 
     public mutating func applyPartial(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = LiveWordsPartialBox.trimmedPartial(text)
         guard trimmed != visible else { return }
         visible = trimmed
         updates += 1
