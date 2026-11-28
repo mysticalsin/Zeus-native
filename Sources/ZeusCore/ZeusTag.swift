@@ -273,7 +273,7 @@ public enum ZeusTagParser {
         let trimmed = inner.trimmingCharacters(in: .whitespaces)
         if trimmed.lowercased() == "none" { return .point(nil) }
         let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
-        let coords = parts[0].split(separator: ",").map { Int($0.trimmingCharacters(in: .whitespaces)) }
+        let coords = parts[0].split(separator: ",").map { Int(PointCoordBox.trimmedCoord(String($0))) }
         guard coords.count == 2, let x = coords[0], let y = coords[1] else { return nil }
         let (label, screen) = labelAndScreen(Array(parts.dropFirst()))
         return .point(PointTarget(x: x, y: y, label: label, screen: screen))
