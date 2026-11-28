@@ -1340,6 +1340,11 @@ enum ExtraSoundVoice {
     static var speakExtra: () -> Void = {}
 }
 
+/// Accessibility, Calendar, and Reminders speak their states. Nothing is requested.
+enum GrantVoice {
+    static var speakGrants: () -> Void = {}
+}
+
 /// Microphone, speech recognition and the camera speak their states. Nothing is requested.
 enum AccessVoice {
     static var speakAccess: () -> Void = {}
@@ -1375,6 +1380,7 @@ private struct PermissionsPage: View {
             HStack {
                 Spacer(minLength: 0)
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the microphone, speech and camera permissions") { AccessVoice.speakAccess() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say accessibility, calendar and reminders") { GrantVoice.speakGrants() }
             }
             perm("accessibility", "Accessibility", "Shortcuts, volume, brightness and agents", context.services.granted(.accessibility)) { context.permissions.request(.accessibility) }
             GSDivider()

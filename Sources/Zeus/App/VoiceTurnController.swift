@@ -8202,6 +8202,62 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Accessibility, Calendar, and Reminders, or a spoken "which other permissions", say those three. They do not ask macOS.
+    func sayGrantSet() {
+        presentGrantSet(speak: true)
+    }
+
+    private func answerGrantSet(speak: Bool) -> TurnResult {
+        presentGrantSet(speak: speak)
+        return TurnResult(spoken: grantSetLine())
+    }
+
+    private func presentGrantSet(speak: Bool) {
+        let parts = PermissionsModel.grantWords()
+        let line = GrantSetAsk.line(access: parts.access, calendar: parts.calendar, reminders: parts.reminders)
+        let plan = GrantSetDraw.plan(access: parts.access, calendar: parts.calendar, reminders: parts.reminders)
+        buddy.idle()
+        showGrantSet(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func grantSetLine() -> String {
+        let parts = PermissionsModel.grantWords()
+        return GrantSetAsk.line(access: parts.access, calendar: parts.calendar, reminders: parts.reminders)
+    }
+
+    /// Draws Grant, then Accessibility, Calendar, and Reminders. The caller speaks the full line.
+    private func showGrantSet(_ plan: GrantSetDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyGrantSet(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyGrantSet(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyGrantSet(_ plan: GrantSetDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9014,6 +9070,11 @@ final class VoiceTurnController {
         }
         if DictationKeepAsk.matches(transcript) {
             let result = answerDictationKeep(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if GrantSetAsk.matches(transcript) {
+            let result = answerGrantSet(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

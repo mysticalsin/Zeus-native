@@ -164,6 +164,16 @@ final class PermissionsModel {
         Task { chromeConnected = await ChromeBridge.isConnected() }
     }
 
+    /// Accessibility, Calendar, and Reminders as the Access card would show them. Reading does not ask.
+    static func grantWords() -> (access: String, calendar: String, reminders: String) {
+        func flag(_ on: Bool) -> String { on ? "Allowed" : "Off" }
+        return (
+            flag(AXIsProcessTrusted()),
+            flag(EKEventStore.authorizationStatus(for: .event) == .fullAccess),
+            flag(EKEventStore.authorizationStatus(for: .reminder) == .fullAccess)
+        )
+    }
+
     private func refreshAutomationOnly() {
         Automation.scheduleChecksForRunningPlayers()
         granted[.automation] = Automation.allowedAny
