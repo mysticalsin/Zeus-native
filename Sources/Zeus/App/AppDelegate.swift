@@ -399,6 +399,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotchCloseVoice.speakClose = { [weak self] in self?.voice.sayNotchClose() }
             EverydayLightsVoice.speakLights = { [weak self] in self?.voice.sayEverydayLights() }
             HaloArmVoice.speakArm = { [weak self] in self?.voice.sayHaloArm() }
+            MusicLightsVoice.speakLights = { [weak self] in self?.voice.sayMusicLights() }
+            MusicLightsVoice.wingsOn = { [weak self] in
+                self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
+            }
             BeamerSetupVoice.continuityOn = { [weak self] in self?.topBar.layout.contains(.continuity) ?? false }
             PointingSettings.speakKeys = { [weak self] in self?.voice.sayPointingKeys() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }

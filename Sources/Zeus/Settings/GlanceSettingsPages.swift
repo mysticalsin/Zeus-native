@@ -43,6 +43,15 @@ enum HaloArmVoice {
     static var speakArm: () -> Void = {}
 }
 
+/// The Music rows speak the four music lights. They do not start playback.
+enum MusicLightsVoice {
+    static var speakLights: () -> Void = {}
+    /// The live music-wave switch. A missing key is on, the same as the notch.
+    static var wingsOn: () -> Bool = {
+        UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true
+    }
+}
+
 /// What the Settings pages read and do.
 @MainActor
 @Observable
@@ -455,7 +464,12 @@ private struct AppearancePage: View {
             ScreenshotPermissionRow()
             GSDivider()
             light("lights.capsLock", "capslock", "Case-key lights (Caps Lock and Shift)", "Shows Caps Lock changes and Shift held on its own.", last: true)
-            Text("Music").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary).padding(.top, 14)
+            HStack {
+                Text("Music").font(OB.font(13, .semibold)).foregroundStyle(GS.secondary)
+                Spacer(minLength: 8)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which music lights are on") { MusicLightsVoice.speakLights() }
+            }
+            .padding(.top, 14)
             GSToggleRow(symbol: "waveform", title: "Light wave while music plays", text: "A soft wave in the artwork\u{2019}s colors beside the notch while a track plays.", isOn: musicWingsBinding)
             GSDivider()
             light("lights.musicProgress", "circle.dashed", "Progress outline on the music preview", "The outline follows the track\u{2019}s progress.")
