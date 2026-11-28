@@ -276,7 +276,7 @@ public enum BrowserCommand: Equatable, Sendable {
 
     static func tabMatch(_ payload: [String: JSONValue]) -> TabMatch? {
         if let id = payload["tabId"]?.numberValue, id.rounded() == id, id >= 0 { return .id(Int(id)) }
-        if let title = payload["title"]?.stringValue?.trimmingCharacters(in: .whitespaces), !title.isEmpty { return .title(title) }
+        if let title = payload["title"]?.stringValue.map(TabMatchBox.trimmedTitle), !title.isEmpty { return .title(title) }
         return nil
     }
 }
