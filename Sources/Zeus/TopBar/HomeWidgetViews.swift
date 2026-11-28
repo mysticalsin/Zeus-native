@@ -473,7 +473,11 @@ struct HomeWidgetCard: View {
         return GlanceCard(tint: kind.tint) {
             TickingView(interval: 1) { context in
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("World clock").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.70))
+                    HStack(alignment: .top) {
+                        Text("World clock").font(GlanceType.title).foregroundStyle(Color.white.opacity(0.70))
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the world clock") { sayWorld(at: context.date) }
+                    }
                     Spacer(minLength: 0)
                     ForEach(zones.prefix(3), id: \.identifier) { zone in
                         HStack {
@@ -596,6 +600,14 @@ struct HomeWidgetCard: View {
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
             }
         }
+    }
+
+    private func sayWorld(at now: Date) {
+        let readings = WorldClockZones.parse(SettingsStore.shared.string("home.worldClock.zones")).prefix(3).map { zone in
+            let parts = CityTimeAsk.parts(now: now, timeZone: zone)
+            return CityTimeReading(city: CityTimeAsk.placeName(for: zone), time: parts.time, period: parts.period)
+        }
+        topBar.speakWorldClock(Array(readings))
     }
 
     private func sayClock() {

@@ -294,6 +294,8 @@ final class TopBarModel {
     var speakNoNextEvent: () -> Void = {}
     /// The Home clock speaks the wall time that is already shown.
     var speakClock: (_ time: String, _ period: String) -> Void = { _, _ in }
+    /// The Home world clock speaks the cities that are already shown.
+    var speakWorldClock: ([CityTimeReading]) -> Void = { _ in }
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

@@ -920,6 +920,55 @@ final class VoiceTurnController {
         presentClock(time: time, period: period, speak: true)
     }
 
+    /// The Home world clock says each city and draws them.
+    func sayWorldClock(_ readings: [CityTimeReading]) {
+        presentCityTimes(readings, speak: true)
+    }
+
+    private func answerCityTime(_ city: String, speak: Bool) -> TurnResult {
+        guard let zone = CityTimeAsk.zone(named: city) else {
+            presentUnknownCity(speak: speak)
+            return TurnResult(spoken: CityTimeAsk.unknown)
+        }
+        let parts = CityTimeAsk.parts(now: Date(), timeZone: zone)
+        let name = CityTimeAsk.placeName(for: zone)
+        presentCity(name: name, time: parts.time, period: parts.period, speak: speak)
+        return TurnResult(spoken: CityTimeAsk.line(city: name, time: parts.time, period: parts.period) ?? CityTimeAsk.unknown)
+    }
+
+    private func presentCity(name: String, time: String, period: String, speak: Bool) {
+        let line = CityTimeAsk.line(city: name, time: time, period: period) ?? ""
+        guard let plan = CityTimeDraw.plan(city: name, time: time, period: period) else {
+            if speak, !line.isEmpty { say(line) }
+            return
+        }
+        buddy.idle()
+        showCityTime(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentCityTimes(_ readings: [CityTimeReading], speak: Bool) {
+        let line = CityTimeAsk.line(readings: readings) ?? ""
+        guard let plan = CityTimeDraw.plan(readings: readings) else {
+            if speak, !line.isEmpty { say(line) }
+            return
+        }
+        buddy.idle()
+        showCityTime(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentUnknownCity(speak: Bool) {
+        let line = CityTimeAsk.unknown
+        let plan = CityTimeDraw.unknown()
+        buddy.idle()
+        showCityTime(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -1551,6 +1600,38 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws a city time: the city, then the digits, then AM or PM. Several cities start with World.
+    /// The caller speaks the full line.
+    private func showCityTime(_ plan: CityTimeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyCityTime(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyCityTime(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyCityTime(_ plan: CityTimeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1873,6 +1954,11 @@ final class VoiceTurnController {
         }
         if ClockAsk.matches(transcript) {
             let result = answerClock(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if let city = CityTimeAsk.city(in: transcript) {
+            let result = answerCityTime(city, speak: speak)
             remember(transcript, result.spoken)
             return result
         }
