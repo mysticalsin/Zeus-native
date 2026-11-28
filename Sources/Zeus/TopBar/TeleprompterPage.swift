@@ -52,6 +52,7 @@ private struct PrompterSetup: View {
                     HStack {
                         Text("Script").font(TopBarStyle.label(11, .semibold)).foregroundStyle(Theme.cloudSecondary)
                         Spacer()
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the prompter") { topBar.speakScript() }
                         Text("\(script.wordCount) words · ~\(PrompterTiming.minutes(script.readingTime())) · \(script.cues.count) cues")
                             .font(TopBarStyle.label(10.5)).foregroundStyle(Theme.cloudQuiet)
                     }
@@ -195,6 +196,7 @@ private struct PrompterRolling: View {
         return VStack(spacing: 6) {
             Text(status(roll)).font(TopBarStyle.label(10, .semibold)).foregroundStyle(statusColor(roll)).lineLimit(1)
             HStack(spacing: 2) {
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the prompter") { topBar.speakScript() }
                 GlyphButton(symbol: roll.phase == .rolling ? "pause.fill" : "play.fill", size: 12,
                             label: roll.phase == .rolling ? "Pause" : "Resume") {
                     roll.phase == .rolling ? topBar.roll.pause() : topBar.roll.resume()

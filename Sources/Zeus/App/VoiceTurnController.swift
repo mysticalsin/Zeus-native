@@ -3555,6 +3555,81 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The teleprompter, or a spoken "how's the prompter", says the counts or the rolling word.
+    func sayScript() {
+        let facts = scriptFacts(countsOnly: false)
+        presentScript(facts, speak: true)
+    }
+
+    private func answerScript(_ transcript: String, speak: Bool) -> TurnResult {
+        let facts = scriptFacts(countsOnly: PrompterAsk.wantsCounts(transcript))
+        presentScript(facts, speak: speak)
+        return TurnResult(spoken: PrompterAsk.line(seen: facts.seen, words: facts.words, cues: facts.cues, live: facts.live))
+    }
+
+    /// The script counts, and the status word while the prompter is rolling. The text stays off.
+    private func scriptFacts(countsOnly: Bool) -> (seen: Bool, words: Int, cues: Int, live: String?) {
+        guard let top = notch.topBar else { return (false, 0, 0, nil) }
+        let script = PrompterScript(top.script)
+        let live = countsOnly ? nil : scriptLive(top)
+        return (true, script.wordCount, script.cues.count, live)
+    }
+
+    /// The same word the rolling page shows. Idle stays on the counts.
+    private func scriptLive(_ top: TopBarModel) -> String? {
+        let roll = top.roll
+        switch roll.phase {
+        case .idle: return nil
+        case .countdown: return "Get ready"
+        case .paused: return "Paused"
+        case .finished: return "The end"
+        case .rolling:
+            if top.prompterHovered { return "Holding" }
+            if roll.voiceFollow, !roll.isSpeaking() { return "Waiting for you" }
+            return "Rolling"
+        }
+    }
+
+    private func presentScript(_ facts: (seen: Bool, words: Int, cues: Int, live: String?), speak: Bool) {
+        let line = PrompterAsk.line(seen: facts.seen, words: facts.words, cues: facts.cues, live: facts.live)
+        let plan = PrompterDraw.plan(seen: facts.seen, words: facts.words, cues: facts.cues, live: facts.live)
+        buddy.idle()
+        showScript(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the prompter: Script, then the counts or the page's word. The caller speaks the full line.
+    private func showScript(_ plan: PrompterDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyScript(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyScript(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyScript(_ plan: PrompterDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4007,6 +4082,11 @@ final class VoiceTurnController {
         }
         if UsageTodayAsk.matches(transcript) {
             let result = answerUsage(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PrompterAsk.matches(transcript) {
+            let result = answerScript(transcript, speak: speak)
             remember(transcript, result.spoken)
             return result
         }

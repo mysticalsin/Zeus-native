@@ -341,6 +341,8 @@ final class TopBarModel {
     var speakScreens: () -> Void = {}
     /// The Music page speaks whether the sound output is earbuds.
     var speakEarbuds: () -> Void = {}
+    /// The teleprompter speaks the counts, or the status word while it rolls. The script text stays off.
+    var speakScript: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {
