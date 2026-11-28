@@ -11,7 +11,7 @@ public struct NewChatRequest: Equatable, Sendable {
         self.tool = tool; self.directory = directory; self.instruction = instruction
     }
 
-    public var cleanedInstruction: String { instruction.trimmingCharacters(in: .whitespacesAndNewlines) }
+    public var cleanedInstruction: String { NewChatInstructionBox.trimmedInstruction(instruction) }
 
     public var isValid: Bool { !cleanedInstruction.isEmpty && !directory.trimmingCharacters(in: .whitespaces).isEmpty }
 
