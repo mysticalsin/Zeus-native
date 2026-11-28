@@ -9344,6 +9344,81 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Arrival lights, or a spoken "are airdrop lights on", say the two cues and whether the folders were asked. Nothing is listed.
+    func sayArrivalLights() {
+        presentArrivalLights(speak: true)
+    }
+
+    private func answerArrivalLights(speak: Bool) -> TurnResult {
+        presentArrivalLights(speak: speak)
+        return TurnResult(spoken: arrivalLightsLine())
+    }
+
+    private func presentArrivalLights(speak: Bool) {
+        let parts = arrivalLightsParts()
+        let line = ArrivalLightsAsk.line(air: parts.air, downloads: parts.downloads, shot: parts.shot, desktop: parts.desktop)
+        let plan = ArrivalLightsDraw.plan(air: parts.air, downloads: parts.downloads, shot: parts.shot, desktop: parts.desktop)
+        buddy.idle()
+        showArrivalLights(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The two switches, and the folder status that does not list a folder until the owner has already asked. Reading them does not ask macOS.
+    private func arrivalLightsParts() -> (air: String, downloads: String, shot: String, desktop: String) {
+        let store = SettingsStore.shared
+        func bit(_ id: String) -> String { store.bool(id) ? "On" : "Off" }
+        func folder(_ status: FolderAccess.Status) -> String {
+            switch status {
+            case .granted: "Allowed"
+            case .notDetermined: "Not asked"
+            case .denied: "Not allowed"
+            }
+        }
+        return (
+            bit("lights.airDrop"),
+            folder(FolderAccess.status(for: .downloads)),
+            bit("lights.screenshot"),
+            folder(FolderAccess.status(for: .desktop))
+        )
+    }
+
+    private func arrivalLightsLine() -> String {
+        let parts = arrivalLightsParts()
+        return ArrivalLightsAsk.line(air: parts.air, downloads: parts.downloads, shot: parts.shot, desktop: parts.desktop)
+    }
+
+    /// Draws Intake, then the two lights and their folders. The caller speaks the full line.
+    private func showArrivalLights(_ plan: ArrivalLightsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyArrivalLights(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyArrivalLights(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyArrivalLights(_ plan: ArrivalLightsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10246,6 +10321,11 @@ final class VoiceTurnController {
         }
         if DictateSwitchAsk.matches(transcript) {
             let result = answerDictateSwitch(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ArrivalLightsAsk.matches(transcript) {
+            let result = answerArrivalLights(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

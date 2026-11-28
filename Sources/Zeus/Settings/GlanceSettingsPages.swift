@@ -473,6 +473,10 @@ private struct AppearancePage: View {
             light("lights.reminderGlow", "checklist", "Glow when a reminder is added", nil)
             light("lights.copy", "doc.on.doc", "Light sweep on copy", "A white sweep confirms a copy.")
             light("lights.shelf", "tray.and.arrow.down", "Intake light when files land", "A brief glow for Shelf drops.")
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the arrival lights are set") { ArrivalLightsVoice.speakLights() }
+            }
             AirDropPermissionRow()
             GSDivider()
             ScreenshotPermissionRow()
@@ -1376,6 +1380,11 @@ enum TalkMicVoice {
 /// The halo entrance speaks the animation. It does not play it or change it.
 enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
+}
+
+/// Arrival lights speak the AirDrop glow, the screenshot cue, and whether those folders were asked. Nothing is listed.
+enum ArrivalLightsVoice {
+    static var speakLights: () -> Void = {}
 }
 
 /// Sound feedback speaks the master switch and the cue volume. It does not play a sound.
