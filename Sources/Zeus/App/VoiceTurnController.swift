@@ -13876,6 +13876,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Teach Zeus About You, or a spoken "has Zeus been taught about you", says whether a name and a notes folder are saved.
+    func sayTeachYou() {
+        presentTeachYou(speak: true)
+    }
+
+    private func answerTeachYou(speak: Bool) -> TurnResult {
+        presentTeachYou(speak: speak)
+        return TurnResult(spoken: teachYouLine())
+    }
+
+    private func presentTeachYou(speak: Bool) {
+        let parts = teachYouParts()
+        let line = TeachYouAsk.line(name: parts.name, notes: parts.notes)
+        let plan = TeachYouDraw.plan(name: parts.name, notes: parts.notes)
+        buddy.idle()
+        showTeachYou(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether a name and a notes folder were saved. Reading them does not say the name, open the folder, or start the flow.
+    private func teachYouParts() -> (name: String, notes: String) {
+        let defaults = UserDefaults.standard
+        let savedName = defaults.string(forKey: "aboutYou.name")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let notes = defaults.data(forKey: AboutYouModel.bookmarkKey)?.isEmpty == false
+        return (savedName.isEmpty ? "None" : "Set", notes ? "Set" : "None")
+    }
+
+    private func teachYouLine() -> String {
+        let parts = teachYouParts()
+        return TeachYouAsk.line(name: parts.name, notes: parts.notes)
+    }
+
+    /// Draws You, then the name and the notes folder. The caller speaks the full line.
+    private func showTeachYou(_ plan: TeachYouDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTeachYou(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTeachYou(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTeachYou(_ plan: TeachYouDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -15118,6 +15182,11 @@ final class VoiceTurnController {
         }
         if PrompterWindowAsk.matches(transcript) {
             let result = answerPrompterWindow(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TeachYouAsk.matches(transcript) {
+            let result = answerTeachYou(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

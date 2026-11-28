@@ -413,6 +413,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PrompterRollVoice.speakRoll = { [weak self] in self?.voice.sayPrompterRoll() }
             FlingNearbyVoice.speakNearby = { [weak self] in self?.voice.sayFlingNearby() }
             PrompterWindowVoice.speakWindow = { [weak self] in self?.voice.sayPrompterWindow() }
+            TeachYouVoice.speakYou = { [weak self] in self?.voice.sayTeachYou() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

@@ -330,11 +330,21 @@ struct AboutYouView: View {
     }
 }
 
+/// Teach Zeus About You speaks whether a name and a notes folder are saved. It does not say them or open the flow.
+enum TeachYouVoice {
+    static var speakYou: () -> Void = {}
+}
+
 /// Settings › General: re-open the flow.
 struct AboutYouSettingsRow: View {
     var body: some View {
         Section("You") {
-            Button("Teach Zeus About You…") { AboutYouWindow.shared.show() }
+            HStack {
+                Button("Teach Zeus About You…") { AboutYouWindow.shared.show() }
+                Button { TeachYouVoice.speakYou() } label: { Image(systemName: "speaker.wave.2.fill") }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Say whether Zeus has been taught about you")
+            }
             Text("Your name, your work and where your notes live. Nothing leaves this Mac.")
                 .font(.callout).foregroundStyle(.secondary)
         }
