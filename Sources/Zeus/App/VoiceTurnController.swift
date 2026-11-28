@@ -6016,6 +6016,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Zeus and Beamer card, or a spoken "how's beamer set", says the three choices. It does not start Beamer.
+    func sayBeamerSetup() {
+        presentBeamerSetup(speak: true)
+    }
+
+    private func answerBeamerSetup(speak: Bool) -> TurnResult {
+        presentBeamerSetup(speak: speak)
+        return TurnResult(spoken: beamerSetupLine())
+    }
+
+    private func presentBeamerSetup(speak: Bool) {
+        let parts = beamerSetupParts()
+        let line = BeamerSetupAsk.line(start: parts.start, light: parts.light, tab: parts.tab)
+        let plan = BeamerSetupDraw.plan(start: parts.start, light: parts.light, tab: parts.tab)
+        buddy.idle()
+        showBeamerSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Start, the crossing light, and the Continuity tab. An unset switch follows the catalog default.
+    /// Reading them does not start Beamer or move the keyboard. Machine names stay off the card.
+    private func beamerSetupParts() -> (start: String, light: String, tab: String) {
+        let store = SettingsStore.shared
+        let start = store.bool("beamer.autoStart") ? "On" : "Off"
+        let light = store.bool("beamer.cue") ? "On" : "Off"
+        let tab = BeamerSetupVoice.continuityOn() ? "On" : "Off"
+        return (start, light, tab)
+    }
+
+    private func beamerSetupLine() -> String {
+        let parts = beamerSetupParts()
+        return BeamerSetupAsk.line(start: parts.start, light: parts.light, tab: parts.tab)
+    }
+
+    /// Draws Link, then start, the crossing light, and the tab. The caller speaks the full line.
+    private func showBeamerSetup(_ plan: BeamerSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyBeamerSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyBeamerSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyBeamerSetup(_ plan: BeamerSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6663,6 +6729,11 @@ final class VoiceTurnController {
         }
         if ReceiveSetupAsk.matches(transcript) {
             let result = answerReceiveSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if BeamerSetupAsk.matches(transcript) {
+            let result = answerBeamerSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
