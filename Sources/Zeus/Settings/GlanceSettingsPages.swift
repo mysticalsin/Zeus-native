@@ -232,7 +232,11 @@ private struct AppearancePage: View {
                 style("Dashboard B", "")
             }
             .padding(.bottom, 10)
-            GSInfo(text: "Changes apply instantly.")
+            HStack(spacing: 8) {
+                GSInfo(text: "Changes apply instantly.")
+                Spacer(minLength: 8)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the card style") { CardFinish.speakLook() }
+            }
             GSDivider()
             GSRow(symbol: "circle.lefthalf.filled", title: "Dark Mode", text: "Whether the Mac is using Dark Mode.") {
                 Button("Say it") { context.topBar?.speakDarkMode() }
