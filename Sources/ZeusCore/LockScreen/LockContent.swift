@@ -193,7 +193,7 @@ public enum LockText {
         }
         guard limit > 0 else { return nil }
         if kept.count > limit {
-            kept = String(kept.prefix(limit)).trimmingCharacters(in: .whitespaces)
+            kept = LockTextBox.trimmedText(String(kept.prefix(limit)))
         }
         return kept.isEmpty ? nil : kept
     }
