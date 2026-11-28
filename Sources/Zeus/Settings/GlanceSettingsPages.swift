@@ -1346,6 +1346,11 @@ enum ExtraSoundVoice {
     static var speakExtra: () -> Void = {}
 }
 
+/// Location, Full Disk Access, and key access speak their states. Nothing is requested.
+enum LocalAccessVoice {
+    static var speakLocal: () -> Void = {}
+}
+
 /// The default agent for a new chat speaks Claude Code or Codex. It does not open a chat.
 enum DefaultAgentVoice {
     static var speakAgent: () -> Void = {}
@@ -1397,6 +1402,7 @@ private struct PermissionsPage: View {
                 Spacer(minLength: 0)
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the microphone, speech and camera permissions") { AccessVoice.speakAccess() }
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say accessibility, calendar and reminders") { GrantVoice.speakGrants() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say location, disk and key access") { LocalAccessVoice.speakLocal() }
             }
             perm("accessibility", "Accessibility", "Shortcuts, volume, brightness and agents", context.services.granted(.accessibility)) { context.permissions.request(.accessibility) }
             GSDivider()
