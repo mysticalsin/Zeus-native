@@ -495,8 +495,12 @@ private struct HomeAppearanceCard: View {
 
     var body: some View {
         GSCard("Home") {
-            Text("Choose what the four Home cards show. Long-press Home or open the More menu (three dots) to change them right on the notch.")
-                .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 8)
+            HStack(alignment: .top, spacing: 8) {
+                Text("Choose what the four Home cards show. Long-press Home or open the More menu (three dots) to change them right on the notch.")
+                    .font(GS.rowText).foregroundStyle(GS.secondary)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home cards") { HomeSlots.speakHome() }
+            }
+            .padding(.bottom, 8)
             ForEach(1...4, id: \.self) { slot in
                 GSRow(symbol: symbols[slot - 1], title: "Card \(slot)") {
                     GSPopup(selection: SettingsStore.binding(HomeSlots.settingID(slot: slot)), options: SettingsCatalog.option(HomeSlots.settingIDs[slot - 1])?.choices ?? [])
