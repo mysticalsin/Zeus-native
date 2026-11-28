@@ -4429,6 +4429,66 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// General, or a spoken "where's the notch", says which screens show it. It does not move the notch.
+    func sayNotchPlace() {
+        presentNotchPlace(speak: true)
+    }
+
+    private func answerNotchPlace(speak: Bool) -> TurnResult {
+        presentNotchPlace(speak: speak)
+        return TurnResult(spoken: notchPlaceLine())
+    }
+
+    private func presentNotchPlace(speak: Bool) {
+        let word = notchPlaceWord()
+        let line = NotchPlaceAsk.line(word: word)
+        let plan = NotchPlaceDraw.plan(word: word)
+        buddy.idle()
+        showNotchPlace(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same title the General menu shows. An unknown stored value uses the built-in display.
+    private func notchPlaceWord() -> String {
+        NotchDisplayMode(label: SettingsStore.shared.string("notch.displays")).rawValue
+    }
+
+    private func notchPlaceLine() -> String {
+        NotchPlaceAsk.line(word: notchPlaceWord())
+    }
+
+    /// Draws Notch, then Built-in display, Display with the pointer, or All displays. The caller speaks the full line.
+    private func showNotchPlace(_ plan: NotchPlaceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNotchPlace(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNotchPlace(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNotchPlace(_ plan: NotchPlaceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4951,6 +5011,11 @@ final class VoiceTurnController {
         }
         if DriveAutonomyAsk.matches(transcript) {
             let result = answerDriveAutonomy(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NotchPlaceAsk.matches(transcript) {
+            let result = answerNotchPlace(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

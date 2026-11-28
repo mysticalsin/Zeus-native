@@ -95,7 +95,10 @@ private struct GeneralPage: View {
         // Window appearance and Language are not rows: the windows are drawn dark only and Zeus speaks English only.
         GSCard("Your defaults") {
             GSRow(symbol: "display.2", title: "Show the notch on") {
-                GSPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue)).popupLabel("Show the notch on")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the notch is") { NotchController.speakNotch() }
+                    GSPopup(selection: SettingsStore.binding("notch.displays"), options: NotchDisplayMode.allCases.map(\.rawValue)).popupLabel("Show the notch on")
+                }
             }
             GSDivider()
             GSRow(symbol: "bubble.left.and.bubble.right", title: "Default agent", text: "For new conversations opened from the notch.")

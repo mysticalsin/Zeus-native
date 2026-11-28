@@ -6,6 +6,8 @@ import ZeusCore
 /// (or the main screen as a pill on Macs without a notch) and is click-through while closed.
 @MainActor
 final class NotchController {
+    /// The General menu speaks where the notch shows. It does not move the notch.
+    static var speakNotch: () -> Void = {}
     let model = NotchModel()
     /// Set before `start()` to get the full top bar (pages, wings, shelf drop).
     var topBar: TopBarModel?
