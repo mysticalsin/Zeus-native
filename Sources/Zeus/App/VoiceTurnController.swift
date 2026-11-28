@@ -4116,6 +4116,79 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Continuity tab, or a spoken "where's my keyboard", says where the input is.
+    func sayBeamerPlace() {
+        presentBeamerPlace(speak: true)
+    }
+
+    private func answerBeamerPlace(speak: Bool) -> TurnResult {
+        presentBeamerPlace(speak: speak)
+        return TurnResult(spoken: beamerPlaceLine())
+    }
+
+    private func presentBeamerPlace(speak: Bool) {
+        let place = beamerPlace()
+        let line = BeamerPlaceAsk.line(phase: place.phase, name: place.name)
+        let plan = BeamerPlaceDraw.plan(phase: place.phase, name: place.name)
+        buddy.idle()
+        showBeamerPlace(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same place the Continuity headline means. A pause still wins over a crossed link.
+    private func beamerPlace() -> (phase: String, name: String) {
+        let status = BeamerModel.shared.status
+        switch status.availability {
+        case .notInstalled: return ("Not installed", "")
+        case .notRunning: return ("Not running", "")
+        case .needsPermission: return ("Needs access", "")
+        case .ready:
+            if status.paused == true { return ("Paused", "") }
+            switch status.link {
+            case .idle: return ("This Mac", "")
+            case .driving(let name): return ("Driving", name)
+            case .drivenBy(let name): return ("Driven", name)
+            }
+        }
+    }
+
+    private func beamerPlaceLine() -> String {
+        let place = beamerPlace()
+        return BeamerPlaceAsk.line(phase: place.phase, name: place.name)
+    }
+
+    /// Draws Beamer, then where the keyboard is. The caller speaks the full line.
+    private func showBeamerPlace(_ plan: BeamerPlaceDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyBeamerPlace(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyBeamerPlace(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyBeamerPlace(_ plan: BeamerPlaceDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4613,6 +4686,11 @@ final class VoiceTurnController {
         }
         if FaceAsk.matches(transcript) {
             let result = answerFace(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if BeamerPlaceAsk.matches(transcript) {
+            let result = answerBeamerPlace(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

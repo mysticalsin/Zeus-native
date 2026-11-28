@@ -14,6 +14,7 @@ struct ContinuityPage: View {
                     HStack(spacing: 6) {
                         Image(systemName: "rectangle.connected.to.line.below").font(.system(size: 12, weight: .bold)).foregroundStyle(TopBarStyle.violet)
                         Text("Continuity").font(TopBarStyle.label(12, .semibold)).foregroundStyle(Theme.cloudPrimary)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the keyboard is") { beamer.speakPlace() }
                         Spacer()
                         Text(status.version.map { "Beamer \($0)" } ?? "Beamer").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudSecondary)
                     }

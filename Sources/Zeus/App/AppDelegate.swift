@@ -166,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Continuity: a cue from Zeus when Beamer moves your keyboard to another machine.
         if on(.beamer) {
+            BeamerModel.shared.speakPlace = { [weak self] in self?.voice.sayBeamerPlace() }
             BeamerModel.shared.onCrossing = { [weak self] crossed in self?.topBar.flash(.entrance(.sweep, crossed ? .cyan : .mint)) }
             BeamerModel.shared.startBackgroundWatch()
             BeamerModel.shared.startIfWanted()
