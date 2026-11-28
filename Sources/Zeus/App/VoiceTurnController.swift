@@ -9154,6 +9154,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// System banners, or a spoken "how are system notifications set", say the Zeus switch, dismiss, and whether any apps are chosen. Nothing is requested.
+    func sayBannerSetup() {
+        presentBannerSetup(speak: true)
+    }
+
+    private func answerBannerSetup(speak: Bool) -> TurnResult {
+        presentBannerSetup(speak: speak)
+        return TurnResult(spoken: bannerSetupLine())
+    }
+
+    private func presentBannerSetup(speak: Bool) {
+        let parts = bannerSetupParts()
+        let line = BannerSetupAsk.line(system: parts.system, dismiss: parts.dismiss, apps: parts.apps)
+        let plan = BannerSetupDraw.plan(system: parts.system, dismiss: parts.dismiss, apps: parts.apps)
+        buddy.idle()
+        showBannerSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The system-notification switch, banner dismiss, and whether any apps are listed. Reading them does not ask macOS or name the apps.
+    private func bannerSetupParts() -> (system: String, dismiss: String, apps: String) {
+        let store = SettingsStore.shared
+        func bit(_ id: String) -> String { store.bool(id) ? "On" : "Off" }
+        let listed = store.string("notify.dismissApps").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (bit("notify.system"), bit("notify.replaceBanners"), listed.isEmpty ? "None" : "Chosen")
+    }
+
+    private func bannerSetupLine() -> String {
+        let parts = bannerSetupParts()
+        return BannerSetupAsk.line(system: parts.system, dismiss: parts.dismiss, apps: parts.apps)
+    }
+
+    /// Draws Banners, then the three choices. The caller speaks the full line.
+    private func showBannerSetup(_ plan: BannerSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyBannerSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyBannerSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyBannerSetup(_ plan: BannerSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10041,6 +10105,11 @@ final class VoiceTurnController {
         }
         if KeywordSetupAsk.matches(transcript) {
             let result = answerKeywordSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if BannerSetupAsk.matches(transcript) {
+            let result = answerBannerSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -889,6 +889,10 @@ private struct GSNotificationsPage: View {
                         isOn: Binding(get: { ExtraPreferences.shared.quietWhileSharing }, set: { ExtraPreferences.shared.quietWhileSharing = $0 }))
         }
         GSCard("System notifications") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how system notifications are set") { BannerSetupVoice.speakBanners() }
+            }
             GSRow(symbol: "bell.badge", title: "Show system notifications", text: systemNotifications.permissionNote) {
                 HStack(spacing: 10) {
                     Toggle("Show system notifications", isOn: Binding(
@@ -1368,6 +1372,11 @@ enum TalkMicVoice {
 /// The halo entrance speaks the animation. It does not play it or change it.
 enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
+}
+
+/// System banners speak the Zeus switch, banner dismiss, and whether any apps are chosen. App names stay unspoken.
+enum BannerSetupVoice {
+    static var speakBanners: () -> Void = {}
 }
 
 /// Approval keywords speak listening and whether each list is still the default. Custom words stay unspoken.
