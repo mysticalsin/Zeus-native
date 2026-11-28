@@ -26,6 +26,11 @@ final class AgentSettings {
     }
 }
 
+/// Settings › General › Agents. Finished agents speak the card, the sound, full-screen quiet, and voice stop.
+enum AgentFinishVoice {
+    static var speakFinish: () -> Void = {}
+}
+
 /// Settings › General › Agents.
 struct AgentSettingsSection: View {
     let settings = AgentSettings.shared
@@ -33,6 +38,10 @@ struct AgentSettingsSection: View {
 
     var body: some View {
         Section("Agents") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how finished agents are shown") { AgentFinishVoice.speakFinish() }
+            }
             Toggle("Show a card when an agent finishes", isOn: Binding(get: { settings.completionCards }, set: { settings.completionCards = $0 }))
             Toggle("Play a sound when an agent finishes", isOn: Binding(get: { settings.completionSound }, set: { settings.completionSound = $0 }))
             Toggle("Stay quiet while an app is full screen", isOn: Binding(get: { settings.quietInFullScreen }, set: { settings.quietInFullScreen = $0 }))
