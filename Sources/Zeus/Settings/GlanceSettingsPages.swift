@@ -430,6 +430,10 @@ private struct AppearancePage: View {
                 }
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the halo is measured") { HaloMeasureVoice.speakMeasure() }
+            }
             GSRow(symbol: "bolt.fill", title: "Entrance intensity") {
                 OBTickSlider(value: Binding(get: { min(max(store.double("halo.intensity"), 50), 150) }, set: { store.set("halo.intensity", String(Int($0))) }), range: 50...150, step: 10)
                     .frame(width: 260).environment(\.ob, OB.Palette.settings).accessibilityLabel("Entrance intensity")
@@ -1384,6 +1388,11 @@ enum TalkMicVoice {
 /// The halo entrance speaks the animation. It does not play it or change it.
 enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
+}
+
+/// The halo measures speak strength, speed, and thickness. They do not play the entrance.
+enum HaloMeasureVoice {
+    static var speakMeasure: () -> Void = {}
 }
 
 /// The halo wash speaks the wallpaper match and the edge wave. It does not sample the desktop or flash the wave.

@@ -9548,6 +9548,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Halo measures, or a spoken "how strong is the entrance", say strength, speed, and thickness. Nothing is played.
+    func sayHaloMeasure() {
+        presentHaloMeasure(speak: true)
+    }
+
+    private func answerHaloMeasure(speak: Bool) -> TurnResult {
+        presentHaloMeasure(speak: speak)
+        return TurnResult(spoken: haloMeasureLine())
+    }
+
+    private func presentHaloMeasure(speak: Bool) {
+        let parts = haloMeasureParts()
+        let line = HaloMeasureAsk.line(strength: parts.strength, speed: parts.speed, thick: parts.thick)
+        let plan = HaloMeasureDraw.plan(strength: parts.strength, speed: parts.speed, thick: parts.thick)
+        buddy.idle()
+        showHaloMeasure(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The three slider values, clamped to the ranges the controls show. Reading them does not play the entrance.
+    private func haloMeasureParts() -> (strength: String, speed: String, thick: String) {
+        let store = SettingsStore.shared
+        func shown(_ id: String, _ low: Double, _ high: Double) -> String {
+            String(Int(min(max(store.double(id), low), high)))
+        }
+        return (shown("halo.intensity", 50, 150), shown("halo.speed", 50, 200), shown("halo.thickness", 100, 200))
+    }
+
+    private func haloMeasureLine() -> String {
+        let parts = haloMeasureParts()
+        return HaloMeasureAsk.line(strength: parts.strength, speed: parts.speed, thick: parts.thick)
+    }
+
+    /// Draws Measure, then strength, speed, and thickness. The caller speaks the full line.
+    private func showHaloMeasure(_ plan: HaloMeasureDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHaloMeasure(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHaloMeasure(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHaloMeasure(_ plan: HaloMeasureDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10465,6 +10530,11 @@ final class VoiceTurnController {
         }
         if BandSetupAsk.matches(transcript) {
             let result = answerBandSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HaloMeasureAsk.matches(transcript) {
+            let result = answerHaloMeasure(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
