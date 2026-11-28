@@ -411,6 +411,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FocusClockVoice.speakClock = { [weak self] in self?.voice.sayFocusClock() }
             QuickTodoVoice.speakKey = { [weak self] in self?.voice.sayQuickTodo() }
             PrompterRollVoice.speakRoll = { [weak self] in self?.voice.sayPrompterRoll() }
+            FlingNearbyVoice.speakNearby = { [weak self] in self?.voice.sayFlingNearby() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

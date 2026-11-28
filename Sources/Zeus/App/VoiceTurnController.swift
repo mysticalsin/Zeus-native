@@ -13743,6 +13743,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The nearby strip, or a spoken "how many Macs are nearby", says whether Fling is looking and the counts.
+    func sayFlingNearby() {
+        presentFlingNearby(speak: true)
+    }
+
+    private func answerFlingNearby(speak: Bool) -> TurnResult {
+        presentFlingNearby(speak: speak)
+        return TurnResult(spoken: flingNearbyLine())
+    }
+
+    private func presentFlingNearby(speak: Bool) {
+        let parts = flingNearbyParts()
+        let line = FlingNearbyAsk.line(state: parts.state, nearby: parts.nearby, ready: parts.ready)
+        let plan = FlingNearbyDraw.plan(state: parts.state, nearby: parts.nearby, ready: parts.ready)
+        buddy.idle()
+        showFlingNearby(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The strip already on the Shelf. Reading it does not turn Fling on or say a Mac's name.
+    private func flingNearbyParts() -> (state: String, nearby: String, ready: String) {
+        guard let fling = FlingService.current, fling.isEnabled else { return ("Off", "0", "0") }
+        if fling.localNetworkDenied { return ("Denied", "0", "0") }
+        let seen = fling.nearby.count
+        let paired = fling.nearby.filter(\.paired).count
+        guard (0...99).contains(seen), paired <= seen else { return ("Looking", "100", "0") }
+        return ("Looking", String(seen), String(paired))
+    }
+
+    private func flingNearbyLine() -> String {
+        let parts = flingNearbyParts()
+        return FlingNearbyAsk.line(state: parts.state, nearby: parts.nearby, ready: parts.ready)
+    }
+
+    /// Draws Nearby, then the state and the two counts. The caller speaks the full line.
+    private func showFlingNearby(_ plan: FlingNearbyDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFlingNearby(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFlingNearby(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFlingNearby(_ plan: FlingNearbyDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14975,6 +15041,11 @@ final class VoiceTurnController {
         }
         if PrompterRollAsk.matches(transcript) {
             let result = answerPrompterRoll(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FlingNearbyAsk.matches(transcript) {
+            let result = answerFlingNearby(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
