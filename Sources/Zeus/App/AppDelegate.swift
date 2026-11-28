@@ -345,6 +345,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakTiling = { [weak self] in self?.voice.sayTiling() }
             topBar.speakScreens = { [weak self] in self?.voice.sayScreens() }
             topBar.speakEarbuds = { [weak self] in self?.voice.sayEarbuds() }
+            topBar.speakOutput = { [weak self] in self?.voice.sayOutput() }
             topBar.speakScript = { [weak self] in self?.voice.sayScript() }
             InsomniaController.shared.speakLid = { [weak self] in self?.voice.sayLid() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }

@@ -620,6 +620,7 @@ struct MusicPage: View {
                         }
                         Spacer(minLength: 4)
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if earbuds are connected") { topBar.speakEarbuds() }
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say where the sound is going") { topBar.speakOutput() }
                         GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's playing") { sayTrack() }
                     }
                     VStack(alignment: .leading, spacing: 8) {

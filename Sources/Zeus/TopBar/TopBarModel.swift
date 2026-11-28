@@ -341,6 +341,8 @@ final class TopBarModel {
     var speakScreens: () -> Void = {}
     /// The Music page speaks whether the sound output is earbuds.
     var speakEarbuds: () -> Void = {}
+    /// The Music page speaks the output the menu marks.
+    var speakOutput: () -> Void = {}
     /// The teleprompter speaks the counts, or the status word while it rolls. The script text stays off.
     var speakScript: () -> Void = {}
 
