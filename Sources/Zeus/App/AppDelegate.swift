@@ -296,6 +296,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.voice.sayWeather(degrees: degrees, phrase: phrase, place: place)
             }
             topBar.speakWeatherNotReady = { [weak self] in self?.voice.sayWeatherNotReady() }
+            topBar.speakBattery = { [weak self] level, charging, pluggedIn in
+                self?.voice.sayBattery(level: level, charging: charging, pluggedIn: pluggedIn)
+            }
+            topBar.speakNoBattery = { [weak self] in self?.voice.sayNoBattery() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

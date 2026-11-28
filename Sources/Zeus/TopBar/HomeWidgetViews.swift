@@ -543,7 +543,11 @@ struct HomeWidgetCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let level = topBar.battery?.level {
                     let charging = topBar.battery?.charging == true
-                    caption("Battery", charging ? "Charging" : (topBar.battery?.pluggedIn == true ? "Plugged in" : "On battery"))
+                    HStack(alignment: .top) {
+                        caption("Battery", charging ? "Charging" : (topBar.battery?.pluggedIn == true ? "Plugged in" : "On battery"))
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the battery") { sayBattery() }
+                    }
                     Spacer(minLength: 0)
                     HStack(alignment: .lastTextBaseline) {
                         Text("\(level)%").font(GlanceType.numeral).monospacedDigit().foregroundStyle(level <= 20 && !charging ? Theme.danger : .white)
@@ -553,7 +557,11 @@ struct HomeWidgetCard: View {
                     }
                     ProgressBarLine(fraction: Double(level) / 100, tint: level <= 20 && !charging ? Theme.danger : Theme.leaf).padding(.top, 6)
                 } else {
-                    caption("Battery", "No battery on this Mac")
+                    HStack(alignment: .top) {
+                        caption("Battery", "No battery on this Mac")
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the battery") { sayBattery() }
+                    }
                     Spacer(minLength: 0)
                 }
             }
@@ -573,6 +581,14 @@ struct HomeWidgetCard: View {
                 Spacer(minLength: 0)
                 Image(systemName: "bolt.fill").font(.system(size: 26)).foregroundStyle(Theme.glow).accessibilityHidden(true)
             }
+        }
+    }
+
+    private func sayBattery() {
+        if let battery = topBar.battery {
+            topBar.speakBattery(battery.level, battery.charging, battery.pluggedIn)
+        } else {
+            topBar.speakNoBattery()
         }
     }
 }

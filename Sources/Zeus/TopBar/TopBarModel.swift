@@ -283,6 +283,9 @@ final class TopBarModel {
     /// The Weather page speaks the forecast that is already loaded.
     var speakWeather: (_ degrees: Int, _ phrase: String, _ place: String) -> Void = { _, _, _ in }
     var speakWeatherNotReady: () -> Void = {}
+    /// The Home battery card speaks the charge that is already shown.
+    var speakBattery: (_ level: Int, _ charging: Bool, _ pluggedIn: Bool) -> Void = { _, _, _ in }
+    var speakNoBattery: () -> Void = {}
     /// A focus session speaks and draws. A plain countdown stays on the timer path.
     var speakFocus: (FocusSpeech) -> Void = { _ in }
 
