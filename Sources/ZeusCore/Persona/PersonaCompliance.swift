@@ -76,7 +76,7 @@ public enum PersonaCompliance {
         guard let match = regex.firstMatch(in: core, range: range), let whole = Range(match.range, in: core) else {
             return sentence
         }
-        let punctuation = Range(match.range(at: 1), in: core).map { String(core[$0]).trimmingCharacters(in: .whitespaces) } ?? ""
+        let punctuation = Range(match.range(at: 1), in: core).map { PersonaHedgePunctuationBox.trimmedPunctuation(String(core[$0])) } ?? ""
         let head = String(core[..<whole.lowerBound])
         guard !head.trimmingCharacters(in: .whitespaces).isEmpty else { return sentence }
         return head + (punctuation.isEmpty ? "." : punctuation) + trailingSpace
