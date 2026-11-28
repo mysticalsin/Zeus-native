@@ -13,6 +13,11 @@ enum NotifySetupVoice {
     static var speakNotices: () -> Void = {}
 }
 
+/// Screen sharing speaks the share switch, the hide switch, and whether shares show Zeus. It does not change them.
+enum ShareSeenVoice {
+    static var speakSeen: () -> Void = {}
+}
+
 /// Permission requests and finished-agent banners. It does not ask macOS for notification permission.
 enum AskFinishVoice {
     static var speakAsks: () -> Void = {}
@@ -349,6 +354,10 @@ private struct AppearancePage: View {
                     .ownedJourneyControl("settings.appearance.topBarPositionReset")
             }
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether screen sharing hides Zeus") { ShareSeenVoice.speakSeen() }
+            }
             GSToggleRow(symbol: store.bool(ZeusScreenSharePolicy.showInSharingKey) ? "eye" : "eye.slash",
                         title: "Show Zeus in screen shares",
                         text: "People sharing your screen can see Zeus when this is on.", detail: "Off keeps Zeus out of screen sharing and screenshots, including during meetings.",
