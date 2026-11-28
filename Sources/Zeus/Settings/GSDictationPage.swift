@@ -3,6 +3,11 @@ import Observation
 import SwiftUI
 import ZeusCore
 
+/// The Modes card speaks the built-in mode in use and switch by app. It does not start dictation.
+enum DictationModeVoice {
+    static var speakMode: () -> Void = {}
+}
+
 /// Draft text for the Dictation page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -203,6 +208,10 @@ struct DictationSettingsPage: View {
     @ViewBuilder private var modesCard: some View {
         let modes = topBar?.dictationModes ?? DictationMode.builtIns
         GSCard("Modes") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the dictation mode") { DictationModeVoice.speakMode() }
+            }
             Text("A mode decides how your words are written. Voice writes exactly what you said. The others tidy it with your own AI first.")
                 .font(GS.rowText).foregroundStyle(GS.secondary).padding(.bottom, 4)
             ForEach(Array(modes.enumerated()), id: \.element.key) { index, mode in

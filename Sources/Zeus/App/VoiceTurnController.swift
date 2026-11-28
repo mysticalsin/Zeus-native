@@ -6484,6 +6484,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Modes card, or a spoken "which dictation mode", says the built-in mode and switch by app. It does not start dictation.
+    func sayDictationMode() {
+        presentDictationMode(speak: true)
+    }
+
+    private func answerDictationMode(speak: Bool) -> TurnResult {
+        presentDictationMode(speak: speak)
+        return TurnResult(spoken: dictationModeLine())
+    }
+
+    private func presentDictationMode(speak: Bool) {
+        let parts = dictationModeParts()
+        let line = DictationModeAsk.line(mode: parts.mode, apps: parts.apps)
+        let plan = DictationModeDraw.plan(mode: parts.mode, apps: parts.apps)
+        buddy.idle()
+        showDictationMode(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The chosen built-in mode and switch by app. An unset mode is Voice. A custom mode stays unread.
+    /// Reading them does not start dictation, and a mode's instructions stay off the card.
+    private func dictationModeParts() -> (mode: String, apps: String) {
+        let key = UserDefaults.standard.string(forKey: "dictation.mode") ?? "voice"
+        let mode = DictationMode.builtIns.first { $0.key == key }?.name ?? key
+        let apps = (UserDefaults.standard.object(forKey: "dictation.autoSwitch") as? Bool ?? false) ? "On" : "Off"
+        return (mode, apps)
+    }
+
+    private func dictationModeLine() -> String {
+        let parts = dictationModeParts()
+        return DictationModeAsk.line(mode: parts.mode, apps: parts.apps)
+    }
+
+    /// Draws Mode, then the writing mode and switch by app. The caller speaks the full line.
+    private func showDictationMode(_ plan: DictationModeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDictationMode(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDictationMode(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDictationMode(_ plan: DictationModeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -7166,6 +7231,11 @@ final class VoiceTurnController {
         }
         if InsomniaSetupAsk.matches(transcript) {
             let result = answerInsomniaSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DictationModeAsk.matches(transcript) {
+            let result = answerDictationMode(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
