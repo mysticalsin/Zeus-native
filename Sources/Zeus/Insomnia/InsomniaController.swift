@@ -143,11 +143,11 @@ final class InsomniaController {
         message = nil
         armFailure = nil
         save(minutes ?? 0, "insomnia.minutes")
-        session.start(minutes: minutes)
+        session.beginSpoken(minutes: minutes)
         if lidClosedMode { armLid() }
     }
 
-    func stop() { session.end() }
+    func stop() { session.endSpoken() }
 
     func add(minutes: Int) {
         session.add(minutes: minutes)

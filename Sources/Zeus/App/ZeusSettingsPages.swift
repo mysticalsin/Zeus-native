@@ -212,7 +212,7 @@ struct KeepAwakeSettingsPage: View {
                 GlassRow(title: "Start", note: "Blocks idle sleep. The screen can still lock unless display keep-awake is on.") {
                     HStack(spacing: 6) {
                         ForEach(KeepAwakeSession.presets, id: \.self) { minutes in
-                            Button(KeepAwakeLength.label(minutes)) { session.start(minutes: minutes) }
+                            Button(KeepAwakeLength.label(minutes)) { session.beginSpoken(minutes: minutes) }
                                 .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                         }
                     }
@@ -221,10 +221,10 @@ struct KeepAwakeSettingsPage: View {
                 GlassRow(title: "Longer", note: "Indefinitely runs until you end it or a battery or heat rule does.") {
                     HStack(spacing: 6) {
                         ForEach(KeepAwakeSession.longPresets, id: \.self) { minutes in
-                            Button(KeepAwakeLength.label(minutes)) { session.start(minutes: minutes) }
+                            Button(KeepAwakeLength.label(minutes)) { session.beginSpoken(minutes: minutes) }
                                 .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                         }
-                        Button(KeepAwakeLength.label(nil)) { session.start(minutes: nil) }
+                        Button(KeepAwakeLength.label(nil)) { session.beginSpoken(minutes: nil) }
                             .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                     }
                 }
@@ -236,7 +236,7 @@ struct KeepAwakeSettingsPage: View {
                                 Button("+15 min") { session.add(minutes: 15) }
                                     .buttonStyle(GlassButtonStyle(kind: .primary, compact: true))
                             }
-                            Button("End now") { session.end() }
+                            Button("End now") { session.endSpoken() }
                                 .buttonStyle(GlassButtonStyle(kind: .quiet, compact: true))
                         }
                     }

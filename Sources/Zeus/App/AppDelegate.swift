@@ -204,6 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A session that ends (time, battery, heat) also lets the Home cup's display hold go.
         KeepAwakeSession.shared.onEnd = { [weak self] in self?.topBar.keepAwake = false }
         KeepAwakeSession.shared.onNotice = { [weak self] text in self?.topBar.show(.keepAwake(text)) }
+        KeepAwakeSession.shared.speak = { [weak self] speech in self?.voice.sayKeepAwake(speech) }
         // Insomnia: undo a lid-closed session a crash left behind, and read whether the admin rule is set up.
         if on(.insomniaLaunch), !TopBarStyle.isSnapshot { InsomniaController.shared.launch() }
         topBar.openSettings = { [weak self] in self?.showSettings() }

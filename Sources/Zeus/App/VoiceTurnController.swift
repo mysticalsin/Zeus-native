@@ -895,6 +895,70 @@ final class VoiceTurnController {
         presentWeatherNotReady(speak: true)
     }
 
+    /// A keep-awake session the person started or ended. The notch battery notice stays on the notch.
+    func sayKeepAwake(_ speech: KeepAwakeSession.Speech) {
+        presentKeepAwake(speech, speak: true)
+    }
+
+    private func performKeepAwake(_ command: KeepAwakeAsk.Command, speak: Bool) -> TurnResult {
+        let session = KeepAwakeSession.shared
+        switch command {
+        case .startSaved:
+            return beginKeepAwake(minutes: session.homeMinutes, speak: speak)
+        case .start(let minutes):
+            return beginKeepAwake(minutes: minutes, speak: speak)
+        case .stop:
+            if session.isActive {
+                session.end()
+                presentKeepAwake(.stopped, speak: speak)
+                return TurnResult(spoken: KeepAwakeAsk.stopped)
+            }
+            presentKeepAwake(.notOn, speak: speak)
+            return TurnResult(spoken: KeepAwakeAsk.notOn)
+        }
+    }
+
+    private func beginKeepAwake(minutes: Int?, speak: Bool) -> TurnResult {
+        KeepAwakeSession.shared.start(minutes: minutes)
+        if let minutes {
+            let length = max(1, minutes)
+            presentKeepAwake(.length(length), speak: speak)
+            return TurnResult(spoken: KeepAwakeAsk.lengthLine(minutes: length))
+        }
+        presentKeepAwake(.openEnded, speak: speak)
+        return TurnResult(spoken: KeepAwakeAsk.openEnded)
+    }
+
+    private func presentKeepAwake(_ speech: KeepAwakeSession.Speech, speak: Bool) {
+        let line: String
+        let plan: KeepAwakeDraw?
+        switch speech {
+        case .length(let minutes):
+            line = KeepAwakeAsk.lengthLine(minutes: minutes)
+            plan = KeepAwakeDraw.plan(minutes: minutes)
+        case .openEnded:
+            line = KeepAwakeAsk.openEnded
+            plan = KeepAwakeDraw.openEnded()
+        case .stopped:
+            line = KeepAwakeAsk.stopped
+            plan = KeepAwakeDraw.stopped()
+        case .done:
+            line = KeepAwakeAsk.done
+            plan = KeepAwakeDraw.done()
+        case .notOn:
+            line = KeepAwakeAsk.notOn
+            plan = KeepAwakeDraw.stopped()
+        }
+        buddy.idle()
+        guard let plan else {
+            if speak { say(line) }
+            return
+        }
+        showKeepAwake(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerWeather(speak: Bool) -> TurnResult {
         guard let topBar = notch.topBar, let weather = topBar.weather else {
             presentWeatherNotReady(speak: speak)
@@ -1109,6 +1173,38 @@ final class VoiceTurnController {
     }
 
     private func flyWeather(_ plan: WeatherDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
+    /// Draws a keep-awake session: Awake, then the length, On, Off, or Done.
+    /// The caller speaks the full line.
+    private func showKeepAwake(_ plan: KeepAwakeDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyKeepAwake(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyKeepAwake(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyKeepAwake(_ plan: KeepAwakeDraw, at elapsed: TimeInterval, shot: ScreenShot) {
         guard let bolt = plan.guideBolt(at: elapsed) else { return }
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
@@ -1402,6 +1498,12 @@ final class VoiceTurnController {
         }
         if WeatherAsk.matches(transcript) {
             let result = answerWeather(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if let command = KeepAwakeAsk.command(in: transcript) {
+            if CLIAccess.turnRestricted { return refuseRestricted(speak: speak) }
+            let result = performKeepAwake(command, speak: speak)
             remember(transcript, result.spoken)
             return result
         }
