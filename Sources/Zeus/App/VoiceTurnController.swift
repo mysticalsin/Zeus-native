@@ -8564,6 +8564,67 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Flick sensitivity, or a spoken "how's flick set", says Low, Normal, or High. It does not send a file.
+    func sayFlickSetup() {
+        presentFlickSetup(speak: true)
+    }
+
+    private func answerFlickSetup(speak: Bool) -> TurnResult {
+        presentFlickSetup(speak: speak)
+        return TurnResult(spoken: flickSetupLine())
+    }
+
+    private func presentFlickSetup(speak: Bool) {
+        let speed = flickSetupSpeed()
+        let line = FlickSetupAsk.line(speed: speed)
+        let plan = FlickSetupDraw.plan(speed: speed)
+        buddy.idle()
+        showFlickSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Flick sensitivity menu. An empty value is Normal, the catalog default. Reading it does not send a file.
+    private func flickSetupSpeed() -> String {
+        let stored = SettingsStore.shared.string("fling.flickSensitivity").trimmingCharacters(in: .whitespacesAndNewlines)
+        return stored.isEmpty ? "Normal" : stored
+    }
+
+    private func flickSetupLine() -> String {
+        FlickSetupAsk.line(speed: flickSetupSpeed())
+    }
+
+    /// Draws Flick, then Low, Normal, or High. The caller speaks the full line.
+    private func showFlickSetup(_ plan: FlickSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFlickSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFlickSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFlickSetup(_ plan: FlickSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9406,6 +9467,11 @@ final class VoiceTurnController {
         }
         if FastPathAsk.matches(transcript) {
             let result = answerFastPath(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FlickSetupAsk.matches(transcript) {
+            let result = answerFlickSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

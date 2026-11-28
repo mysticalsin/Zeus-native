@@ -8,6 +8,11 @@ enum FlingVoice {
     static var speakReceive: () -> Void = {}
 }
 
+/// Flick sensitivity speaks Low, Normal, or High. It does not send a file.
+enum FlickSetupVoice {
+    static var speakFlick: () -> Void = {}
+}
+
 /// Settings › Shelf: the Fling switch, who can see this Mac, where arrivals go, and the paired Macs. Every row is a
 /// catalog row (`scripts/gen-settings-catalog.py`); Fling does nothing until the first switch is on.
 @MainActor
@@ -75,8 +80,11 @@ struct ShelfSettingsPage: View {
         GSCard("Sending") {
             GSRow(symbol: "hand.point.up.left", title: "Flick sensitivity",
                   text: "How fast a drag must be to count as a flick toward a nearby Mac.") {
-                GSPopup(selection: store.stringBinding("fling.flickSensitivity"),
-                        options: SettingsCatalog.option("fling.flickSensitivity")?.choices ?? [], label: "Flick sensitivity")
+                HStack(spacing: 8) {
+                    GSPopup(selection: store.stringBinding("fling.flickSensitivity"),
+                            options: SettingsCatalog.option("fling.flickSensitivity")?.choices ?? [], label: "Flick sensitivity")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the flick sensitivity") { FlickSetupVoice.speakFlick() }
+                }
             }
             GSInfo(text: "Zeus never sends on its own. A send needs a click, a drop or a flick from you.")
         }
