@@ -69,6 +69,20 @@ final class LicenseManager {
 
     var isLicensed: Bool { status.isLicensed }
 
+    /// The title the license row shows. A key is not part of it.
+    var statusTitle: String {
+        switch status {
+        case .licensed(_, let daysLeft?): daysLeft <= 1 ? "Zeus is yours \u{00B7} last day" : "Zeus is yours \u{00B7} \(daysLeft) days left"
+        case .licensed: "Zeus is yours."
+        case .trial(let days): days <= 1 ? "Trial \u{00B7} last day" : "Trial \u{00B7} \(days) days left"
+        case .trialEnded, .expired: "Your free trial has ended."
+        case .revoked: "This license was turned off."
+        }
+    }
+
+    /// The license row speaks that title.
+    var speakLicense: () -> Void = {}
+
     /// Keychain account holding the origin of the server saved in Settings. The license key is only sent
     /// to a server whose origin equals it, so a `license.server` value written by another program is ignored.
     static let serverOriginAccount = "license.server.origin"

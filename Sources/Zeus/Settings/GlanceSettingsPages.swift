@@ -1126,9 +1126,11 @@ private struct LicensePage: View {
             .padding(.bottom, -GS.cardGap)
         GSCard("Your license") {
             GSRow(symbol: "key", title: status, text: license.isLicensed ? "Your license is kept across updates." : "A one-time purchase for two Macs.") {
-                // Partial credential cleanup must keep its explanation and retry visible.
-                if license.isLicensed || license.deactivationError != nil {
-                    GSDeactivateLicenseControl()
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether Zeus is licensed") { license.speakLicense() }
+                    if license.isLicensed || license.deactivationError != nil {
+                        GSDeactivateLicenseControl()
+                    }
                 }
             }
             if !license.isLicensed {
@@ -1159,15 +1161,7 @@ private struct LicensePage: View {
         }
     }
 
-    private var status: String {
-        switch license.status {
-        case .licensed(_, let daysLeft?): daysLeft <= 1 ? "Zeus is yours \u{00B7} last day" : "Zeus is yours \u{00B7} \(daysLeft) days left"
-        case .licensed: "Zeus is yours."
-        case .trial(let days): days <= 1 ? "Trial \u{00B7} last day" : "Trial \u{00B7} \(days) days left"
-        case .trialEnded, .expired: "Your free trial has ended."
-        case .revoked: "This license was turned off."
-        }
-    }
+    private var status: String { license.statusTitle }
 }
 
 // MARK: Permissions
