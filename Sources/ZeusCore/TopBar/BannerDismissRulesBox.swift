@@ -25,7 +25,7 @@ public enum BannerDismissRulesBox {
     ) -> Bool {
         guard autoDismissEnabled else { return false }
         guard accessibilityTrusted else { return false }
-        let cleanApp = app.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let cleanApp = BannerDismissAppBox.trimmedApp(app).lowercased()
         guard !cleanApp.isEmpty else { return false }
         let matchesApp = tickedApps.contains(cleanApp) || tickedApps.contains(app)
         guard matchesApp else { return false }
