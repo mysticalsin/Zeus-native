@@ -740,6 +740,10 @@ private struct SoundsPage: View {
         GSPageHeading(section: .sounds, subtitle: "")
             .padding(.bottom, -GS.cardGap)
         GSCard("Sound feedback") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how sound feedback is set") { FeedbackSetupVoice.speakFeedback() }
+            }
             GSToggleRow(symbol: "speaker.wave.2", title: "Sound feedback", text: "Short sounds when agents start, ask and finish.",
                         isOn: Binding(get: { ExtraPreferences.shared.soundsOn }, set: { ExtraPreferences.shared.soundsOn = $0 }))
             GSDivider()
@@ -1372,6 +1376,11 @@ enum TalkMicVoice {
 /// The halo entrance speaks the animation. It does not play it or change it.
 enum HaloEntranceVoice {
     static var speakEntrance: () -> Void = {}
+}
+
+/// Sound feedback speaks the master switch and the cue volume. It does not play a sound.
+enum FeedbackSetupVoice {
+    static var speakFeedback: () -> Void = {}
 }
 
 /// System banners speak the Zeus switch, banner dismiss, and whether any apps are chosen. App names stay unspoken.

@@ -9218,6 +9218,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Sound feedback, or a spoken "how is sound feedback set", says the master switch and the cue volume. Nothing is played.
+    func sayFeedbackSetup() {
+        presentFeedbackSetup(speak: true)
+    }
+
+    private func answerFeedbackSetup(speak: Bool) -> TurnResult {
+        presentFeedbackSetup(speak: speak)
+        return TurnResult(spoken: feedbackSetupLine())
+    }
+
+    private func presentFeedbackSetup(speak: Bool) {
+        let parts = feedbackSetupParts()
+        let line = FeedbackSetupAsk.line(feedback: parts.feedback, volume: parts.volume)
+        let plan = FeedbackSetupDraw.plan(feedback: parts.feedback, volume: parts.volume)
+        buddy.idle()
+        showFeedbackSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether cues play, and the percent the volume slider shows. Reading them does not play a sound.
+    private func feedbackSetupParts() -> (feedback: String, volume: String) {
+        let prefs = ExtraPreferences.shared
+        let shown = min(max(prefs.soundVolume, 0), 100)
+        return (prefs.soundsOn ? "On" : "Off", String(shown))
+    }
+
+    private func feedbackSetupLine() -> String {
+        let parts = feedbackSetupParts()
+        return FeedbackSetupAsk.line(feedback: parts.feedback, volume: parts.volume)
+    }
+
+    /// Draws Feedback, then the switch and the percent. The caller speaks the full line.
+    private func showFeedbackSetup(_ plan: FeedbackSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFeedbackSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFeedbackSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFeedbackSetup(_ plan: FeedbackSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10110,6 +10173,11 @@ final class VoiceTurnController {
         }
         if BannerSetupAsk.matches(transcript) {
             let result = answerBannerSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FeedbackSetupAsk.matches(transcript) {
+            let result = answerFeedbackSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
