@@ -2379,6 +2379,73 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// A spoken "how's the brightness" says the level and draws it. The volume stays on its own card.
+    private func answerBrightness(speak: Bool) -> TurnResult {
+        presentBrightness(speak: speak)
+        return TurnResult(spoken: brightnessLine())
+    }
+
+    private func presentBrightness(speak: Bool) {
+        guard let raw = DisplayBrightness.main(),
+              let percent = BrightnessLevelAsk.percent(of: raw),
+              let line = BrightnessLevelAsk.line(percent: percent),
+              let plan = BrightnessLevelDraw.plan(percent: percent) else {
+            presentBrightnessUnread(speak: speak)
+            return
+        }
+        buddy.idle()
+        showBrightness(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func brightnessLine() -> String {
+        guard let raw = DisplayBrightness.main(),
+              let percent = BrightnessLevelAsk.percent(of: raw) else { return BrightnessLevelAsk.unread }
+        return BrightnessLevelAsk.line(percent: percent) ?? BrightnessLevelAsk.unread
+    }
+
+    private func presentBrightnessUnread(speak: Bool) {
+        let line = BrightnessLevelAsk.unread
+        let plan = BrightnessLevelDraw.unread()
+        buddy.idle()
+        showBrightness(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the brightness: Brightness, then the percent, then Dim or Bright.
+    /// The caller speaks the full line.
+    private func showBrightness(_ plan: BrightnessLevelDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyBrightness(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyBrightness(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyBrightness(_ plan: BrightnessLevelDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2751,6 +2818,11 @@ final class VoiceTurnController {
         }
         if VolumeLevelAsk.matches(transcript) {
             let result = answerVolume(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if BrightnessLevelAsk.matches(transcript) {
+            let result = answerBrightness(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
