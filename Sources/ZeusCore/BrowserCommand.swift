@@ -68,7 +68,7 @@ public enum PageText {
         let entities = ["&amp;": "&", "&nbsp;": " ", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'"]
         for (entity, mark) in entities { text = text.replacingOccurrences(of: entity, with: mark) }
         text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return PageTextPlainBox.trimmedText(text)
     }
 }
 
