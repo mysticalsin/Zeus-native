@@ -7751,6 +7751,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The extra agent sounds, or a spoken "which extra sounds", say the four switches. They do not play a sound.
+    func sayExtraSounds() {
+        presentExtraSounds(speak: true)
+    }
+
+    private func answerExtraSounds(speak: Bool) -> TurnResult {
+        presentExtraSounds(speak: speak)
+        return TurnResult(spoken: extraSoundsLine())
+    }
+
+    private func presentExtraSounds(speak: Bool) {
+        let parts = extraSoundParts()
+        let line = ExtraSoundsAsk.line(timer: parts.timer, fail: parts.fail, start: parts.start, loop: parts.loop)
+        let plan = ExtraSoundsDraw.plan(timer: parts.timer, fail: parts.fail, start: parts.start, loop: parts.loop)
+        buddy.idle()
+        showExtraSounds(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Timer alarms, the failure sound, the start chime, and the working loop. Reading them does not play a sound.
+    private func extraSoundParts() -> (timer: String, fail: String, start: String, loop: String) {
+        let store = SettingsStore.shared
+        func flag(_ id: String) -> String { store.bool(id) ? "On" : "Off" }
+        return (flag("sound.timer"), flag("sound.failure"), flag("sound.agentStart"), flag("sound.runningLoop"))
+    }
+
+    private func extraSoundsLine() -> String {
+        let parts = extraSoundParts()
+        return ExtraSoundsAsk.line(timer: parts.timer, fail: parts.fail, start: parts.start, loop: parts.loop)
+    }
+
+    /// Draws Extra, then the four sounds. The caller speaks the full line.
+    private func showExtraSounds(_ plan: ExtraSoundsDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyExtraSounds(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyExtraSounds(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyExtraSounds(_ plan: ExtraSoundsDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8528,6 +8591,11 @@ final class VoiceTurnController {
         }
         if AccessSetAsk.matches(transcript) {
             let result = answerAccessSet(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ExtraSoundsAsk.matches(transcript) {
+            let result = answerExtraSounds(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -749,6 +749,10 @@ private struct SoundsPage: View {
             GSDivider()
             cue("checkmark.seal", "Completion", "The chime for a task completed successfully.", "sound.doneStyle", SoundStyles.done, .done)
             GSDivider()
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which extra sounds") { ExtraSoundVoice.speakExtra() }
+            }
             GSToggleRow(symbol: "timer", title: "Timer alarms", text: "A sound when a focus round ends.", isOn: bool("sound.timer"))
             GSDivider()
             GSToggleRow(symbol: "exclamationmark.octagon", title: "Failure sound", text: "A short sound when an agent turn fails.", isOn: bool("sound.failure"))
@@ -1307,6 +1311,11 @@ private struct LicensePage: View {
 }
 
 // MARK: Permissions
+
+/// The four extra agent sounds speak their switches. Nothing is played.
+enum ExtraSoundVoice {
+    static var speakExtra: () -> Void = {}
+}
 
 /// Microphone, speech recognition and the camera speak their states. Nothing is requested.
 enum AccessVoice {
