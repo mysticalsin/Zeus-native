@@ -55,7 +55,7 @@ public enum BrainToday {
             guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
             let project = projectName(relative)
             for raw in text.split(separator: "\n", omittingEmptySubsequences: true) {
-                let line = raw.trimmingCharacters(in: .whitespaces)
+                let line = BrainTodayLineBox.trimmedLine(String(raw))
                 guard line.hasPrefix("- [ ]") || line.hasPrefix("* [ ]") else { continue }
                 let body = String(line.dropFirst(5))
                 let lower = body.lowercased()
