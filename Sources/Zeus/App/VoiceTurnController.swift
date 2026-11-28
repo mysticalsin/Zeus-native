@@ -2611,6 +2611,94 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The weather page, or a spoken "will it rain", says when the rain arrives and draws it.
+    func sayRain() {
+        presentRain(speak: true)
+    }
+
+    private func answerRain(speak: Bool) -> TurnResult {
+        presentRain(speak: speak)
+        return TurnResult(spoken: rainLine())
+    }
+
+    private enum RainCard { case now, none, notReady, soon(Int) }
+
+    private func rainCard(now: Date = Date()) -> RainCard {
+        guard let weather = notch.topBar?.weather else { return .notReady }
+        switch weather.sky {
+        case .rain, .drizzle, .storm: return .now
+        default: break
+        }
+        guard let hour = weather.rainSoon(after: now),
+              let minutes = RainAsk.minutes(until: hour.time, now: now) else { return .none }
+        return .soon(minutes)
+    }
+
+    private func presentRain(speak: Bool) {
+        switch rainCard() {
+        case .now:
+            presentRainState(line: RainAsk.now, plan: RainDraw.now(), speak: speak)
+        case .none:
+            presentRainState(line: RainAsk.none, plan: RainDraw.none(), speak: speak)
+        case .notReady:
+            presentRainState(line: RainAsk.notReady, plan: RainDraw.notReady(), speak: speak)
+        case .soon(let minutes):
+            guard let line = RainAsk.line(minutes: minutes), let plan = RainDraw.plan(minutes: minutes) else {
+                presentRainState(line: RainAsk.none, plan: RainDraw.none(), speak: speak)
+                return
+            }
+            presentRainState(line: line, plan: plan, speak: speak)
+        }
+    }
+
+    private func rainLine() -> String {
+        switch rainCard() {
+        case .now: return RainAsk.now
+        case .none: return RainAsk.none
+        case .notReady: return RainAsk.notReady
+        case .soon(let minutes): return RainAsk.line(minutes: minutes) ?? RainAsk.none
+        }
+    }
+
+    private func presentRainState(line: String, plan: RainDraw, speak: Bool) {
+        buddy.idle()
+        showRain(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the rain: Rain, then the wait, Now, None, or Wait.
+    /// The caller speaks the full line.
+    private func showRain(_ plan: RainDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyRain(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyRain(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyRain(_ plan: RainDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2998,6 +3086,11 @@ final class VoiceTurnController {
         }
         if ShelfAsk.matches(transcript) {
             let result = answerShelf(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if RainAsk.matches(transcript) {
+            let result = answerRain(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -974,6 +974,7 @@ struct WeatherPage: View {
                     }
                     Spacer()
                     GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the weather") { sayForecast() }
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if rain is coming") { topBar.speakRain() }
                     GlyphButton(symbol: "arrow.clockwise", size: 11, tint: Theme.cloudSecondary, label: "Refresh weather") { topBar.refreshWeather() }
                 }
                 if let rain = weather.rainSoon() {

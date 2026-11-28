@@ -334,6 +334,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             topBar.speakTodoCount = { [weak self] in self?.voice.sayTodoCount() }
             topBar.speakAgenda = { [weak self] in self?.voice.sayAgenda() }
             topBar.speakShelf = { [weak self] in self?.voice.sayShelf() }
+            topBar.speakRain = { [weak self] in self?.voice.sayRain() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
