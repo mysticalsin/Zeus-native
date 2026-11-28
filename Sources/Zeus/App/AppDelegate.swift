@@ -330,6 +330,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             topBar.speakNoNextReminder = { [weak self] in self?.voice.sayNoNextReminder() }
             topBar.speakNextReminderAccess = { [weak self] in self?.voice.sayNextReminderAccess() }
+            topBar.speakAlerts = { [weak self] in self?.voice.sayAlerts() }
             topBar.speakFocus = { [weak self] speech in self?.voice.sayFocus(speech) }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {

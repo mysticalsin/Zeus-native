@@ -289,6 +289,11 @@ struct NotificationsPage: View {
     @Bindable var notifications: NotificationsController
 
     var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many notifications") { topBar.speakAlerts() }
+            }
         Group {
             if !notifications.enabled {
                 GlanceEmpty(symbol: "bell.badge.fill", tint: Theme.bolt,
@@ -321,6 +326,7 @@ struct NotificationsPage: View {
             }
         }
         .onAppear { notifications.refresh() }
+        }
         .task(id: notifications.enabled) {
             // Fresh while the tab is open; stops when it closes.
             while notifications.enabled, !Task.isCancelled {
