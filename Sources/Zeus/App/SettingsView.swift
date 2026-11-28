@@ -160,6 +160,11 @@ enum LivesVoice {
     static var speakLives: () -> Void = {}
 }
 
+/// The talk key and bolt captions. The key is not changed and listening does not start.
+enum TalkHoldVoice {
+    static var speakHold: () -> Void = {}
+}
+
 struct SettingsView: View {
     let connections: ConnectionsModel
     let preferences: Preferences
@@ -306,6 +311,12 @@ struct SettingsView: View {
     private var general: some View {
         VStack(spacing: Glass.gap) {
             GlassCard(title: "Talk to ZEUS") {
+                HStack {
+                    Spacer(minLength: 0)
+                    Button { TalkHoldVoice.speakHold() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say the talk key and captions")
+                }
                 GlassRow(title: "Talk key", note: (DictationSettings.shared.enabled && DictationSettings.shared.key == preferences.pushToTalk ? "Double-tap it, then speak. Holding the same key dictates." : "Hold it, ask, let go. ZEUS answers out loud and points.")) {
                     ShortcutRecorderButton(shortcut: preferences.pushToTalk, onChange: { preferences.chooseTalkKey($0) }, accessibilityName: "Talk key")
                 }

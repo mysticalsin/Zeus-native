@@ -477,6 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             VisualReadyVoice.speakReady = { [weak self] in self?.voice.sayVisualReady() }
             ShowMeVoice.speakShow = { [weak self] in self?.voice.sayShowMe() }
             LivesVoice.speakLives = { [weak self] in self?.voice.sayLives() }
+            TalkHoldVoice.speakHold = { [weak self] in self?.voice.sayTalkHold() }
             ChatHotkeyMonitor.speakChat = { [weak self] in self?.voice.sayChatShortcut() }
             AssistantSettings.speakProvider = { [weak self] in self?.voice.sayProvider() }
             NowPlayingHub.speakSource = { [weak self] in self?.voice.sayMusicSource() }

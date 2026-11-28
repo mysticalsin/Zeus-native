@@ -11549,6 +11549,77 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The talk key, or a spoken "what is the talk key", says whether it is still Control and Option and whether captions are on.
+    func sayTalkHold() {
+        presentTalkHold(speak: true)
+    }
+
+    private func answerTalkHold(speak: Bool) -> TurnResult {
+        presentTalkHold(speak: speak)
+        return TurnResult(spoken: talkHoldLine())
+    }
+
+    private func presentTalkHold(speak: Bool) {
+        let parts = talkHoldParts()
+        let line = TalkHoldAsk.line(key: parts.key, captions: parts.captions)
+        let plan = TalkHoldDraw.plan(key: parts.key, captions: parts.captions)
+        buddy.idle()
+        showTalkHold(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved talk key and bolt captions. A custom chord stays unspoken. Reading them does not change the key.
+    private func talkHoldParts() -> (key: String, captions: String) {
+        let stored = UserDefaults.standard.string(forKey: Shortcut.talkKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let key: String
+        if stored.isEmpty {
+            key = "Default"
+        } else if let parsed = Shortcut.parse(stored), parsed == Shortcut.talkDefault {
+            key = "Default"
+        } else {
+            key = "Chosen"
+        }
+        let captions = (UserDefaults.standard.object(forKey: "showCaptions") as? Bool) ?? true
+        return (key, captions ? "On" : "Off")
+    }
+
+    private func talkHoldLine() -> String {
+        let parts = talkHoldParts()
+        return TalkHoldAsk.line(key: parts.key, captions: parts.captions)
+    }
+
+    /// Draws Hold, then the key and the captions. The caller speaks the full line.
+    private func showTalkHold(_ plan: TalkHoldDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTalkHold(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTalkHold(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTalkHold(_ plan: TalkHoldDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -12616,6 +12687,11 @@ final class VoiceTurnController {
         }
         if LivesAsk.matches(transcript) {
             let result = answerLives(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TalkHoldAsk.matches(transcript) {
+            let result = answerTalkHold(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
