@@ -8140,6 +8140,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Dictation history, or a spoken "how long is dictation kept", says the retention. It does not open history or delete anything.
+    func sayDictationKeep() {
+        presentDictationKeep(speak: true)
+    }
+
+    private func answerDictationKeep(speak: Bool) -> TurnResult {
+        presentDictationKeep(speak: speak)
+        return TurnResult(spoken: dictationKeepLine())
+    }
+
+    private func presentDictationKeep(speak: Bool) {
+        let span = dictationKeepSpan()
+        let line = DictationKeepAsk.line(span: span)
+        let plan = DictationKeepDraw.plan(span: span)
+        buddy.idle()
+        showDictationKeep(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Keep for menu, including a custom day count. Zero or less is Forever, the same as the card.
+    /// Reading it does not open history or delete anything.
+    private func dictationKeepSpan() -> String {
+        let days = DictationSettings.shared.keepDays
+        return days <= 0 ? "Forever" : "\(days) days"
+    }
+
+    private func dictationKeepLine() -> String {
+        DictationKeepAsk.line(span: dictationKeepSpan())
+    }
+
+    /// Draws Keep, then Forever or the day count. The caller speaks the full line.
+    private func showDictationKeep(_ plan: DictationKeepDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyDictationKeep(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyDictationKeep(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyDictationKeep(_ plan: DictationKeepDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8947,6 +9009,11 @@ final class VoiceTurnController {
         }
         if DictationSoundAsk.matches(transcript) {
             let result = answerDictationSound(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if DictationKeepAsk.matches(transcript) {
+            let result = answerDictationKeep(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

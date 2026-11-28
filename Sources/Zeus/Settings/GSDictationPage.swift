@@ -18,6 +18,11 @@ enum DictationSoundVoice {
     static var speakSound: () -> Void = {}
 }
 
+/// History speaks how long a dictation is kept. It does not open history or delete anything.
+enum DictationKeepVoice {
+    static var speakKeep: () -> Void = {}
+}
+
 /// Draft text for the Dictation page (this toolchain has no SwiftUI `@State` macro).
 @MainActor
 @Observable
@@ -358,8 +363,11 @@ struct DictationSettingsPage: View {
     @ViewBuilder private var historyCard: some View {
         GSCard("History") {
             GSRow(symbol: "clock.arrow.circlepath", title: "Keep for", text: "Each dictation is saved on this Mac with its audio so you can write it again with another mode or engine.") {
-                GSPopup(selection: Binding(get: { Self.keepTitle(settings.keepDays) }, set: { settings.keepDays = Self.keepDays(for: $0) }),
-                        options: Self.keepChoices(including: settings.keepDays), label: "Keep history for")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { Self.keepTitle(settings.keepDays) }, set: { settings.keepDays = Self.keepDays(for: $0) }),
+                            options: Self.keepChoices(including: settings.keepDays), label: "Keep history for")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how long dictation is kept") { DictationKeepVoice.speakKeep() }
+                }
             }
             GSDivider()
             GSRow(symbol: "list.bullet.rectangle", title: "History") {
