@@ -320,6 +320,10 @@ private struct AppearancePage: View {
             }
         }
         GSCard("Top bar") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the closed notch is set") { NotchFitVoice.speakFit() }
+            }
             GSRow(symbol: "arrow.up.and.down", title: "Top bar position",
                   text: "Lowers the closed notch with its light, ticker and wings.", detail: "The open panel and the screen edge light stay at the top, on every display.") {
                 HStack(spacing: 10) {
@@ -1652,6 +1656,11 @@ private struct PermissionsPage: View {
 }
 
 // MARK: Privacy
+
+/// The closed notch speaks its drop and the waves' sensitivity. It does not move the bar.
+enum NotchFitVoice {
+    static var speakFit: () -> Void = {}
+}
 
 /// Command-line control speaks the switch and the reset notice. It does not turn the switch on or dismiss the notice.
 enum CommandSetupVoice {

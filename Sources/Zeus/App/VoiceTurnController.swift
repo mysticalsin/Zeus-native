@@ -10136,6 +10136,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The closed notch, or a spoken "how low is the top bar", says the drop and the waves' sensitivity. Nothing is moved.
+    func sayNotchFit() {
+        presentNotchFit(speak: true)
+    }
+
+    private func answerNotchFit(speak: Bool) -> TurnResult {
+        presentNotchFit(speak: speak)
+        return TurnResult(spoken: notchFitLine())
+    }
+
+    private func presentNotchFit(speak: Bool) {
+        let parts = notchFitParts()
+        let line = NotchFitAsk.line(bar: parts.bar, waves: parts.waves)
+        let plan = NotchFitDraw.plan(bar: parts.bar, waves: parts.waves)
+        buddy.idle()
+        showNotchFit(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The drop the top-bar slider shows, and the waves sensitivity. Reading them does not move the bar.
+    private func notchFitParts() -> (bar: String, waves: String) {
+        let drop = Int(TopBarPosition.clamped(TopBarPositionModel.shared.offset))
+        let waves = Int(min(max(SettingsStore.shared.double("waves.sensitivity"), 50), 200))
+        return (String(drop), String(waves))
+    }
+
+    private func notchFitLine() -> String {
+        let parts = notchFitParts()
+        return NotchFitAsk.line(bar: parts.bar, waves: parts.waves)
+    }
+
+    /// Draws Fit, then the drop and the sensitivity. The caller speaks the full line.
+    private func showNotchFit(_ plan: NotchFitDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNotchFit(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNotchFit(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNotchFit(_ plan: NotchFitDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11098,6 +11161,11 @@ final class VoiceTurnController {
         }
         if CommandSetupAsk.matches(transcript) {
             let result = answerCommandSetup(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if NotchFitAsk.matches(transcript) {
+            let result = answerNotchFit(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
