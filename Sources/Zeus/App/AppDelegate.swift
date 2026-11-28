@@ -417,6 +417,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DictationSoundVoice.speakSound = { [weak self] in self?.voice.sayDictationSound() }
             DictationKeepVoice.speakKeep = { [weak self] in self?.voice.sayDictationKeep() }
             GrantVoice.speakGrants = { [weak self] in self?.voice.sayGrantSet() }
+            JevSetupVoice.speakJev = { [weak self] in self?.voice.sayJevSetup() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

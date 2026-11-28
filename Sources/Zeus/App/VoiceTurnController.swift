@@ -8258,6 +8258,71 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Jev, or a spoken "how's jev set", says whether it is on, whether a key is saved, and whether a limit is set. It does not read the key or the amount.
+    func sayJevSetup() {
+        presentJevSetup(speak: true)
+    }
+
+    private func answerJevSetup(speak: Bool) -> TurnResult {
+        presentJevSetup(speak: speak)
+        return TurnResult(spoken: jevSetupLine())
+    }
+
+    private func presentJevSetup(speak: Bool) {
+        let parts = jevSetupParts()
+        let line = JevSetupAsk.line(work: parts.work, key: parts.key, limit: parts.limit)
+        let plan = JevSetupDraw.plan(work: parts.work, key: parts.key, limit: parts.limit)
+        buddy.idle()
+        showJevSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Whether Jev is ready, whether a key is saved, and whether a monthly limit is set. The key and the amount stay unread.
+    private func jevSetupParts() -> (work: String, key: String, limit: String) {
+        let center = IntelligenceCenter.shared
+        let work = center.jevReadiness == .ready ? "On" : "Off"
+        let key = center.hasJevKey ? "Saved" : "None"
+        let limit = (center.jevBudget.monthlyCap ?? 0) > 0 ? "Set" : "None"
+        return (work, key, limit)
+    }
+
+    private func jevSetupLine() -> String {
+        let parts = jevSetupParts()
+        return JevSetupAsk.line(work: parts.work, key: parts.key, limit: parts.limit)
+    }
+
+    /// Draws Jev, then whether it is on, the key, and the limit. The caller speaks the full line.
+    private func showJevSetup(_ plan: JevSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyJevSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyJevSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyJevSetup(_ plan: JevSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9075,6 +9140,11 @@ final class VoiceTurnController {
         }
         if GrantSetAsk.matches(transcript) {
             let result = answerGrantSet(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if JevSetupAsk.matches(transcript) {
+            let result = answerJevSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
