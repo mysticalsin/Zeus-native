@@ -138,7 +138,7 @@ public struct BeamerMenuState: Equatable, Sendable {
     public var canSend: Bool
 
     public static func parse(titles raw: [String]) -> BeamerMenuState {
-        let titles = raw.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && $0 != "missing value" }
+        let titles = raw.map { BeamerMenuTitleBox.trimmedTitle($0) }.filter { !$0.isEmpty && $0 != "missing value" }
         var state = BeamerMenuState(version: nil, link: .idle, paused: nil, targets: [], canSend: false)
         for title in titles {
             if title.hasPrefix("Beamer "), state.version == nil, let first = title.split(separator: " ").dropFirst().first, first.first?.isNumber == true {
