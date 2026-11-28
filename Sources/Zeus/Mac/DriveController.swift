@@ -31,6 +31,9 @@ final class DriveController {
         DriveAutonomy(rawValue: UserDefaults.standard.string(forKey: DriveAutonomy.settingsKey) ?? "") ?? .default
     }
 
+    /// The Privacy menu speaks how much Zeus may drive. It does not start a drive.
+    static var speakDrive: () -> Void = {}
+
     /// Runs the plan; returns what to say when it did not finish.
     func perform(_ plan: DrivePlan, screenshots: [ScreenShot]) async -> String? {
         guard !Task.isCancelled else { return "Stopped." }

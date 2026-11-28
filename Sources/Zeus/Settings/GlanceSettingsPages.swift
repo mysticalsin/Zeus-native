@@ -1366,7 +1366,10 @@ private struct PrivacyPage: View {
             GSDivider()
             GSRow(symbol: "cursorarrow.motionlines", title: "When Zeus may drive your Mac",
                   text: (DriveAutonomy(rawValue: driveAutonomy) ?? .default).explanation) {
-                GSPopup(selection: autonomyTitle, options: DriveAutonomy.allCases.map(\.title)).popupLabel("When Zeus may drive your Mac")
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say when Zeus may drive") { DriveController.speakDrive() }
+                    GSPopup(selection: autonomyTitle, options: DriveAutonomy.allCases.map(\.title)).popupLabel("When Zeus may drive your Mac")
+                }
             }
         }
         GSCard("Command line") {
