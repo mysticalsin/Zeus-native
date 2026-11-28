@@ -11,6 +11,11 @@ enum TilingGapVoice {
     static var speakGaps: () -> Void = {}
 }
 
+/// The left-out list speaks whether any apps are excluded and how many. Bundle ids stay unspoken.
+enum LeftOutVoice {
+    static var speakLeft: () -> Void = {}
+}
+
 /// Settings › Tiling: the switch, the keys, the gaps and the split. Every row is a catalog row
 /// (`scripts/gen-settings-catalog.py`) read through `FeatureSettings`; nothing here moves a window.
 @MainActor
@@ -58,6 +63,10 @@ struct TilingSettingsPage: View {
                         text: "A thin ring around the window the tiling keys act on.", isOn: store.boolBinding("tiling.focusBorder"))
         }
         GSCard("Left out") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say which apps tiling leaves out") { LeftOutVoice.speakLeft() }
+            }
             GSRow(symbol: "minus.circle", title: "Apps Zeus never tiles",
                   text: "Bundle ids, separated by commas. Their windows are left where they are.") {
                 GSTextInput(text: store.stringBinding("tiling.excludedApps"), placeholder: "e.g. com.example.app", label: "Apps Zeus never tiles")

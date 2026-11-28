@@ -10392,6 +10392,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Apps tiling leaves out, or a spoken "which apps does tiling leave out", says whether any are listed and how many. Bundle ids stay unspoken.
+    func sayLeftOut() {
+        presentLeftOut(speak: true)
+    }
+
+    private func answerLeftOut(speak: Bool) -> TurnResult {
+        presentLeftOut(speak: speak)
+        return TurnResult(spoken: leftOutLine())
+    }
+
+    private func presentLeftOut(speak: Bool) {
+        let parts = leftOutParts()
+        let line = LeftOutAsk.line(list: parts.list, count: parts.count)
+        let plan = LeftOutDraw.plan(list: parts.list, count: parts.count)
+        buddy.idle()
+        showLeftOut(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// How many bundle ids are listed. Reading them does not move a window or speak an id.
+    private func leftOutParts() -> (list: String, count: String) {
+        let count = min(LeftOutAsk.appCount(SettingsStore.shared.string("tiling.excludedApps")), 99)
+        return (count == 0 ? "None" : "Some", String(count))
+    }
+
+    private func leftOutLine() -> String {
+        let parts = leftOutParts()
+        return LeftOutAsk.line(list: parts.list, count: parts.count)
+    }
+
+    /// Draws Aside, then the list and the count. The caller speaks the full line.
+    private func showLeftOut(_ plan: LeftOutDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyLeftOut(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyLeftOut(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyLeftOut(_ plan: LeftOutDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -11374,6 +11436,11 @@ final class VoiceTurnController {
         }
         if AskWordsAsk.matches(transcript) {
             let result = answerAskWords(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if LeftOutAsk.matches(transcript) {
+            let result = answerLeftOut(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
