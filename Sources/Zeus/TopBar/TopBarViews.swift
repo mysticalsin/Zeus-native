@@ -973,6 +973,7 @@ struct WeatherPage: View {
                             .font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudSecondary).lineLimit(1)
                     }
                     Spacer()
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the weather") { sayForecast() }
                     GlyphButton(symbol: "arrow.clockwise", size: 11, tint: Theme.cloudSecondary, label: "Refresh weather") { topBar.refreshWeather() }
                 }
                 if let rain = weather.rainSoon() {
@@ -1003,6 +1004,16 @@ struct WeatherPage: View {
                              button: "Try again") { topBar.refreshWeather() }
             }
         }
+    }
+
+    private func sayForecast() {
+        guard let weather = topBar.weather else {
+            topBar.speakWeatherNotReady()
+            return
+        }
+        let celsius = weather.temperature
+        let value = topBar.useCelsius ? celsius : celsius * 9 / 5 + 32
+        topBar.speakWeather(Int(value.rounded()), weather.phrase, topBar.weatherPlace)
     }
 }
 

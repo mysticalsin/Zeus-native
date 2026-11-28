@@ -280,6 +280,9 @@ final class TopBarModel {
     /// The Music page speaks the track that is on, or that nothing is playing.
     var speakNowPlaying: (_ title: String, _ artist: String, _ playing: Bool) -> Void = { _, _, _ in }
     var speakNothingPlaying: () -> Void = {}
+    /// The Weather page speaks the forecast that is already loaded.
+    var speakWeather: (_ degrees: Int, _ phrase: String, _ place: String) -> Void = { _, _, _ in }
+    var speakWeatherNotReady: () -> Void = {}
     /// A focus session speaks and draws. A plain countdown stays on the timer path.
     var speakFocus: (FocusSpeech) -> Void = { _ in }
 

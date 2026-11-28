@@ -885,6 +885,50 @@ final class VoiceTurnController {
         presentNothingPlaying(speak: true)
     }
 
+    /// The Weather page, or a spoken weather ask, says the forecast and draws it.
+    func sayWeather(degrees: Int, phrase: String, place: String) {
+        presentWeather(degrees: degrees, phrase: phrase, place: place, speak: true)
+    }
+
+    /// No forecast is loaded. The screen shows Weather, then Not ready.
+    func sayWeatherNotReady() {
+        presentWeatherNotReady(speak: true)
+    }
+
+    private func answerWeather(speak: Bool) -> TurnResult {
+        guard let topBar = notch.topBar, let weather = topBar.weather else {
+            presentWeatherNotReady(speak: speak)
+            return TurnResult(spoken: WeatherAsk.notReady)
+        }
+        let celsius = weather.temperature
+        let value = topBar.useCelsius ? celsius : celsius * 9 / 5 + 32
+        let degrees = Int(value.rounded())
+        presentWeather(degrees: degrees, phrase: weather.phrase, place: topBar.weatherPlace, speak: speak)
+        let line = WeatherAsk.line(degrees: degrees, phrase: weather.phrase, place: topBar.weatherPlace) ?? WeatherAsk.notReady
+        return TurnResult(spoken: line)
+    }
+
+    private func presentWeather(degrees: Int, phrase: String, place: String, speak: Bool) {
+        guard let line = WeatherAsk.line(degrees: degrees, phrase: phrase, place: place),
+              let plan = WeatherDraw.plan(phrase: phrase, temperature: "\(degrees) degrees") else {
+            presentWeatherNotReady(speak: speak)
+            return
+        }
+        buddy.idle()
+        showWeather(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentWeatherNotReady(speak: Bool) {
+        let line = WeatherAsk.notReady
+        let plan = WeatherDraw.notReady()
+        buddy.idle()
+        showWeather(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     /// The notch focus controls, or a spoken focus command, say the session and draw it.
     func sayFocus(_ speech: TopBarModel.FocusSpeech) {
         presentFocus(speech, speak: true)
@@ -1034,6 +1078,37 @@ final class VoiceTurnController {
     }
 
     private func flyFocus(_ plan: FocusSessionDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
+    /// Draws the forecast: Weather, then the sky, then the degrees. The caller speaks the full line.
+    private func showWeather(_ plan: WeatherDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyWeather(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyWeather(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyWeather(_ plan: WeatherDraw, at elapsed: TimeInterval, shot: ScreenShot) {
         guard let bolt = plan.guideBolt(at: elapsed) else { return }
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
@@ -1322,6 +1397,11 @@ final class VoiceTurnController {
         }
         if NowPlayingAsk.matches(transcript) {
             let result = answerNowPlaying(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if WeatherAsk.matches(transcript) {
+            let result = answerWeather(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
