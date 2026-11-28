@@ -1382,6 +1382,7 @@ struct DictationPage: View {
                         Text("HISTORY").font(TopBarStyle.label(9.5, .bold)).foregroundStyle(Theme.cloudQuiet)
                         Spacer()
                         Text("\(wordsToday) words today").font(TopBarStyle.label(10)).foregroundStyle(Theme.cloudQuiet)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many words") { topBar.speakWords() }
                     }
                     if topBar.dictationHistory.isEmpty {
                         Text("Your dictations appear here, on this Mac only.").font(TopBarStyle.label(11)).foregroundStyle(Theme.cloudQuiet)
