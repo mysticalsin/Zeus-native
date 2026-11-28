@@ -165,6 +165,11 @@ enum TalkHoldVoice {
     static var speakHold: () -> Void = {}
 }
 
+/// Quick cues and the cursor anchor. The buddy's show rule stays its own ask. Nothing is moved.
+enum LiveTouchVoice {
+    static var speakTouch: () -> Void = {}
+}
+
 struct SettingsView: View {
     let connections: ConnectionsModel
     let preferences: Preferences
@@ -382,6 +387,12 @@ struct SettingsView: View {
                     }
                 }
                 GlassCard(title: "Live touches") {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button { LiveTouchVoice.speakTouch() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say the quick cues and whether Zeus sits next to the cursor")
+                    }
                     GlassRow(title: "Quick cues", note: "Copy, caps lock, volume and battery flash beside the notch.") {
                         GlassToggle(isOn: Binding(get: { topBar.cuesEnabled }, set: { topBar.cuesEnabled = $0 }), label: "Quick cues")
                     }

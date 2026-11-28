@@ -12303,6 +12303,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Quick cues, or a spoken "are quick cues on", say the cue flashes and whether Zeus sits next to the cursor.
+    func sayLiveTouch() {
+        presentLiveTouch(speak: true)
+    }
+
+    private func answerLiveTouch(speak: Bool) -> TurnResult {
+        presentLiveTouch(speak: speak)
+        return TurnResult(spoken: liveTouchLine())
+    }
+
+    private func presentLiveTouch(speak: Bool) {
+        let parts = liveTouchParts()
+        let line = LiveTouchAsk.line(cues: parts.cues, cursor: parts.cursor)
+        let plan = LiveTouchDraw.plan(cues: parts.cues, cursor: parts.cursor)
+        buddy.idle()
+        showLiveTouch(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The two switches. A missing cue value is on, and a missing cursor value follows the catalog. Reading them does not move Zeus.
+    private func liveTouchParts() -> (cues: String, cursor: String) {
+        let cues = (UserDefaults.standard.object(forKey: "topBar.cues") as? Bool) ?? true
+        let cursor = SettingsStore.shared.bool("presence.nearCursor")
+        return (cues ? "On" : "Off", cursor ? "On" : "Off")
+    }
+
+    private func liveTouchLine() -> String {
+        let parts = liveTouchParts()
+        return LiveTouchAsk.line(cues: parts.cues, cursor: parts.cursor)
+    }
+
+    /// Draws Touch, then the cues and the cursor. The caller speaks the full line.
+    private func showLiveTouch(_ plan: LiveTouchDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyLiveTouch(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyLiveTouch(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyLiveTouch(_ plan: LiveTouchDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -13425,6 +13488,11 @@ final class VoiceTurnController {
         }
         if AwakeHoldAsk.matches(transcript) {
             let result = answerAwakeHold(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if LiveTouchAsk.matches(transcript) {
+            let result = answerLiveTouch(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
