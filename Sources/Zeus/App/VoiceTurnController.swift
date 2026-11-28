@@ -863,6 +863,18 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Speaks a line the owner asked Zeus to say, and draws the short card.
+    /// A blank line stays spoken only.
+    func sayAloud(_ text: String) {
+        guard let plan = LocalAnswerDraw.plan(answer: text) else {
+            say(text)
+            return
+        }
+        showLocalAnswer(plan, speak: true)
+        say(text)
+        buddy.showCaption(plan.bolt)
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {

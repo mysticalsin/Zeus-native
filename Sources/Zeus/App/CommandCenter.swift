@@ -232,7 +232,7 @@ final class CommandCenter {
             return TodoController.shared.handleCLI(text, id: command.id)
         case .say:
             guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Nothing to say.") }
-            voice.say(text)
+            voice.sayAloud(text)
             return ZeusCommandReply(id: command.id, ok: true, text: "Speaking with the \(voice.voiceDescription).")
         case .ask:
             guard !text.isEmpty else { return ZeusCommandReply(id: command.id, ok: false, text: "Ask Zeus something.") }
