@@ -13613,6 +13613,69 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The quick to-do key, or a spoken "what is the quick to-do key", says the shortcut and whether it matches the agent picker.
+    func sayQuickTodo() {
+        presentQuickTodo(speak: true)
+    }
+
+    private func answerQuickTodo(speak: Bool) -> TurnResult {
+        presentQuickTodo(speak: speak)
+        return TurnResult(spoken: quickTodoLine())
+    }
+
+    private func presentQuickTodo(speak: Bool) {
+        let parts = quickTodoParts()
+        let line = QuickTodoAsk.line(key: parts.key, match: parts.match)
+        let plan = QuickTodoDraw.plan(key: parts.key, match: parts.match)
+        buddy.idle()
+        showQuickTodo(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved quick to-do key and the agent picker key. Reading them does not register or change a shortcut.
+    private func quickTodoParts() -> (key: String, match: String) {
+        let prefs = ExtraPreferences.shared
+        let same = prefs.quickTodo != .off && prefs.quickTodo == prefs.openNotch
+        return (prefs.quickTodo.title, same ? "Same" : "Clear")
+    }
+
+    private func quickTodoLine() -> String {
+        let parts = quickTodoParts()
+        return QuickTodoAsk.line(key: parts.key, match: parts.match)
+    }
+
+    /// Draws Quick, then the key and the match. The caller speaks the full line.
+    private func showQuickTodo(_ plan: QuickTodoDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyQuickTodo(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyQuickTodo(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyQuickTodo(_ plan: QuickTodoDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14835,6 +14898,11 @@ final class VoiceTurnController {
         }
         if FocusClockAsk.matches(transcript) {
             let result = answerFocusClock(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if QuickTodoAsk.matches(transcript) {
+            let result = answerQuickTodo(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

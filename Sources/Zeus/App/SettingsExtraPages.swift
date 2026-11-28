@@ -106,6 +106,11 @@ struct SoundsSettings: View {
     }
 }
 
+/// The quick to-do key speaks the chosen shortcut and whether it matches the agent picker. It does not change either key.
+enum QuickTodoVoice {
+    static var speakKey: () -> Void = {}
+}
+
 struct ShortcutSettings: View {
     let prefs: ExtraPreferences
     let preferences: Preferences
@@ -128,8 +133,13 @@ struct ShortcutSettings: View {
                 }
                 GlassDivider()
                 GlassRow(title: "Quick to-do", note: "Opens the To-do tab ready to type.", icon: ("checklist", Color(hex: 0xF59E0B))) {
-                    GlassMenu(options: ShortcutPreset.allCases.map { ($0, $0.title) },
-                              selection: Binding(get: { prefs.quickTodo }, set: { prefs.quickTodo = $0 }))
+                    HStack(spacing: 8) {
+                        Button { QuickTodoVoice.speakKey() } label: { Image(systemName: "speaker.wave.2.fill") }
+                            .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                            .accessibilityLabel("Say the quick to-do key")
+                        GlassMenu(options: ShortcutPreset.allCases.map { ($0, $0.title) },
+                                  selection: Binding(get: { prefs.quickTodo }, set: { prefs.quickTodo = $0 }))
+                    }
                 }
                 Text("If another app already uses a shortcut, pick a different one.").font(Glass.caption).foregroundStyle(Glass.secondary)
             }
