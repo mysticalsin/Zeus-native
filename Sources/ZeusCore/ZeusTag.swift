@@ -348,7 +348,7 @@ public enum ZeusTagParser {
             guard case .complete(let tag, let length) = matchTag(in: candidate),
                   length == candidate.count else { break }
             if let tag { trailing.insert(tag, at: 0) }
-            spoken = String(spoken[..<open]).trimmingCharacters(in: .whitespacesAndNewlines)
+            spoken = ZeusTagRemainderBox.trimmedRemainder(String(spoken[..<open]))
         }
         tags.append(contentsOf: trailing)
         return spoken
