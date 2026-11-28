@@ -486,7 +486,10 @@ private struct AppearancePage: View {
             light("lights.liveSpectrum", "waveform.path", "React to real sound", "The music wave follows the sound your Mac is playing. Zeus asks for System Audio Recording once, when you turn this on, and listens only while music plays.", last: true)
             GSDivider()
             GSRow(symbol: "chart.bar.fill", title: "Waves style", text: "How the Waves tab draws the spectrum.", detail: "Add the tab under Top bar tabs, further down this page.") {
-                GSPopup(selection: SettingsStore.binding("waves.style"), options: WaveStyle.allCases.map(\.rawValue)).popupLabel("Waves style")
+                HStack(spacing: 8) {
+                    GSPopup(selection: SettingsStore.binding("waves.style"), options: WaveStyle.allCases.map(\.rawValue)).popupLabel("Waves style")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the waves are set") { WavesSetupVoice.speakWaves() }
+                }
             }
             GSDivider()
             GSRow(symbol: "slider.horizontal.3", title: "Sensitivity") {
@@ -1312,6 +1315,11 @@ private struct LicensePage: View {
 }
 
 // MARK: Permissions
+
+/// The waves speak the style and whether system audio is allowed. They do not ask or start the spectrum.
+enum WavesSetupVoice {
+    static var speakWaves: () -> Void = {}
+}
 
 /// The other notch lights speak mute, the system HUD, the edge, peeks, and an added event. They do not change them.
 enum HudExtraVoice {

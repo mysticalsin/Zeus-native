@@ -7883,6 +7883,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The waves, or a spoken "how's the waves set", say the style and whether system audio is allowed. They do not ask or start the spectrum.
+    func sayWavesSetup() {
+        presentWavesSetup(speak: true)
+    }
+
+    private func answerWavesSetup(speak: Bool) -> TurnResult {
+        presentWavesSetup(speak: speak)
+        return TurnResult(spoken: wavesSetupLine())
+    }
+
+    private func presentWavesSetup(speak: Bool) {
+        let parts = wavesSetupParts()
+        let line = WavesSetupAsk.line(style: parts.style, hear: parts.hear)
+        let plan = WavesSetupDraw.plan(style: parts.style, hear: parts.hear)
+        buddy.idle()
+        showWavesSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Waves style menu, and the stored system-audio state. An empty style follows the catalog default.
+    /// Reading them does not ask for system audio or start the spectrum.
+    private func wavesSetupParts() -> (style: String, hear: String) {
+        let stored = SettingsStore.shared.string("waves.style").trimmingCharacters(in: .whitespacesAndNewlines)
+        let style = stored.isEmpty ? "Bars" : stored
+        return (style, AudioSpectrumService.shared.permission.label)
+    }
+
+    private func wavesSetupLine() -> String {
+        let parts = wavesSetupParts()
+        return WavesSetupAsk.line(style: parts.style, hear: parts.hear)
+    }
+
+    /// Draws Spectrum, then the style and system audio. The caller speaks the full line.
+    private func showWavesSetup(_ plan: WavesSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyWavesSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyWavesSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyWavesSetup(_ plan: WavesSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8670,6 +8734,11 @@ final class VoiceTurnController {
         }
         if HudExtrasAsk.matches(transcript) {
             let result = answerHudExtras(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if WavesSetupAsk.matches(transcript) {
+            let result = answerWavesSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
