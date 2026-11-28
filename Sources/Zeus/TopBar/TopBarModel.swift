@@ -331,6 +331,8 @@ final class TopBarModel {
     var speakRounds: () -> Void = {}
     /// The dictation page speaks how many words were dictated today, never the words.
     var speakWords: () -> Void = {}
+    /// The Scribe and Recordly pages speak whether a recording is running.
+    var speakRecording: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

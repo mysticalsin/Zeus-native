@@ -3132,6 +3132,84 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Scribe or Recordly page, or a spoken "are you recording", says who is capturing.
+    /// The words being captured stay off the card.
+    func sayRecording() {
+        presentRecording(.any, speak: true)
+    }
+
+    private func answerRecording(_ who: RecordingAsk.Who, speak: Bool) -> TurnResult {
+        presentRecording(who, speak: speak)
+        return TurnResult(spoken: recordingLine(who))
+    }
+
+    private static func recordingSeconds(_ interval: TimeInterval) -> Int {
+        guard interval.isFinite, interval > 0 else { return 0 }
+        let whole = interval.rounded(.down)
+        guard whole < Double(Int.max) else { return 0 }
+        return Int(whole)
+    }
+
+    private func recordingFacts() -> (scribe: Bool, recordly: Bool, seconds: Int) {
+        let scribeOn = ScribeController.shared.isRecording
+        let recordlyOn = RecordlyController.shared.isRecording
+        let seconds: Int
+        if scribeOn {
+            seconds = Self.recordingSeconds(ScribeController.shared.elapsed)
+        } else if recordlyOn {
+            seconds = Self.recordingSeconds(RecordlyController.shared.elapsed)
+        } else {
+            seconds = 0
+        }
+        return (scribeOn, recordlyOn, seconds)
+    }
+
+    private func presentRecording(_ who: RecordingAsk.Who, speak: Bool) {
+        let facts = recordingFacts()
+        let line = RecordingAsk.line(who: who, scribe: facts.scribe, recordly: facts.recordly, seconds: facts.seconds)
+        let plan = RecordingStatusDraw.plan(who: who, scribe: facts.scribe, recordly: facts.recordly, seconds: facts.seconds)
+        buddy.idle()
+        showRecording(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func recordingLine(_ who: RecordingAsk.Who) -> String {
+        let facts = recordingFacts()
+        return RecordingAsk.line(who: who, scribe: facts.scribe, recordly: facts.recordly, seconds: facts.seconds)
+    }
+
+    /// Draws the recording: Recording, then who, then the clock when one is running.
+    private func showRecording(_ plan: RecordingStatusDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyRecording(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyRecording(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyRecording(_ plan: RecordingStatusDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -3554,6 +3632,11 @@ final class VoiceTurnController {
         }
         if DictationWordsAsk.matches(transcript) {
             let result = answerWords(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if let who = RecordingAsk.who(in: transcript) {
+            let result = answerRecording(who, speak: speak)
             remember(transcript, result.spoken)
             return result
         }

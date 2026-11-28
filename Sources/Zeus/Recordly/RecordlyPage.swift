@@ -10,7 +10,12 @@ struct RecordlyPage: View {
     private var isEditor: Bool { if case .editor = recordly.phase { true } else { false } }
 
     var body: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 6) {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say if recording") { topBar.speakRecording() }
+            }
+            HStack(spacing: 8) {
             Tile(padding: 0) {
                 ZStack(alignment: .topLeading) {
                     RecordlyCardBeam(recordly: recordly)
@@ -24,6 +29,7 @@ struct RecordlyPage: View {
                     .padding(CardFinish.inset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
+            }
             }
         }
         .animation(reduceMotion ? .easeInOut(duration: Motion.crossfadeDuration) : TopBarStyle.pageSpring, value: isEditor)
