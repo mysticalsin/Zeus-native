@@ -875,6 +875,83 @@ final class VoiceTurnController {
         buddy.showCaption(plan.bolt)
     }
 
+    /// The notch Music page, or a spoken "what's playing", says the track and draws it.
+    func sayNowPlaying(title: String, artist: String, playing: Bool) {
+        presentNowPlaying(title: title, artist: artist, playing: playing, speak: true)
+    }
+
+    /// Nothing is on. The screen shows Playing, then Nothing, while Zeus says so.
+    func sayNothingPlaying() {
+        presentNothingPlaying(speak: true)
+    }
+
+    private func answerNowPlaying(speak: Bool) -> TurnResult {
+        if let item = notch.topBar?.nowPlaying,
+           NowPlayingAsk.line(title: item.title, artist: item.artist, playing: item.isPlaying) != nil {
+            presentNowPlaying(title: item.title, artist: item.artist, playing: item.isPlaying, speak: speak)
+            let line = NowPlayingAsk.line(title: item.title, artist: item.artist, playing: item.isPlaying) ?? ""
+            return TurnResult(spoken: line)
+        }
+        presentNothingPlaying(speak: speak)
+        return TurnResult(spoken: NowPlayingAsk.nothing)
+    }
+
+    private func presentNowPlaying(title: String, artist: String, playing: Bool, speak: Bool) {
+        guard let line = NowPlayingAsk.line(title: title, artist: artist, playing: playing) else {
+            presentNothingPlaying(speak: speak)
+            return
+        }
+        buddy.idle()
+        guard let plan = NowPlayingDraw.plan(title: title, artist: artist, playing: playing) else {
+            if speak { say(line) }
+            return
+        }
+        showNowPlaying(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNothingPlaying(speak: Bool) {
+        let line = NowPlayingAsk.nothing
+        let plan = NowPlayingDraw.nothing()
+        buddy.idle()
+        showNowPlaying(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Draws the track that is on: Playing or Paused, then the title, then the artist.
+    /// The caller speaks the full line.
+    private func showNowPlaying(_ plan: NowPlayingDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyNowPlaying(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyNowPlaying(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyNowPlaying(_ plan: NowPlayingDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1150,6 +1227,11 @@ final class VoiceTurnController {
         case .hit(let plan, let engine): return await perform(plan, engine: engine, transcript: transcript, finalAt: finalAt, speak: speak)
         case .ask(let question, let engine): return askBack(question, engine: engine, transcript: transcript, speak: speak)
         case .miss: break
+        }
+        if NowPlayingAsk.matches(transcript) {
+            let result = answerNowPlaying(speak: speak)
+            remember(transcript, result.spoken)
+            return result
         }
         if let answer = PersonaQueries.localAnswer(for: transcript) {
             return speakInstant(answer, transcript: transcript, speak: speak)

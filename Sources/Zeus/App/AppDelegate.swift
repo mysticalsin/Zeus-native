@@ -287,6 +287,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The notch mic: same dictation as the key, pasted where you were typing.
         if on(.voiceTurn) {
             topBar.speakBrief = { [weak self] text in self?.voice.sayTodayBrief(text) }
+            topBar.speakNowPlaying = { [weak self] title, artist, playing in
+                self?.voice.sayNowPlaying(title: title, artist: artist, playing: playing)
+            }
+            topBar.speakNothingPlaying = { [weak self] in self?.voice.sayNothingPlaying() }
             topBar.speakQuickAdd = { [weak self] speech in
                 switch speech {
                 case .added(let event): self?.voice.sayAddedEvent(event)

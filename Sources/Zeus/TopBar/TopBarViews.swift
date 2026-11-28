@@ -612,10 +612,14 @@ struct MusicPage: View {
             AlbumTile(playing: topBar.nowPlaying, size: 132)
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    if let playing = topBar.nowPlaying {
-                        Text(NowPlayingDisplay.sourceLine(playing.source))
-                            .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
-                            .lineLimit(1).truncationMode(.middle)
+                    HStack(spacing: 8) {
+                        if let playing = topBar.nowPlaying {
+                            Text(NowPlayingDisplay.sourceLine(playing.source))
+                                .font(TopBarStyle.label(10, .semibold)).foregroundStyle(Theme.cloudQuiet)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say what's playing") { sayTrack() }
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         if showLyrics {
@@ -670,6 +674,14 @@ struct MusicPage: View {
         .padding(.vertical, 6)
         .onAppear { topBar.musicPageVisible = true }
         .onDisappear { topBar.musicPageVisible = false }
+    }
+
+    private func sayTrack() {
+        if let playing = topBar.nowPlaying {
+            topBar.speakNowPlaying(playing.title, playing.artist, playing.isPlaying)
+        } else {
+            topBar.speakNothingPlaying()
+        }
     }
 }
 

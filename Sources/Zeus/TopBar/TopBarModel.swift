@@ -277,6 +277,9 @@ final class TopBarModel {
     var onOpenTab: (TopBarTab) -> Void = { _ in }
     /// Speaks the daily brief in ZEUS's voice.
     var speakBrief: (String) -> Void = { _ in }
+    /// The Music page speaks the track that is on, or that nothing is playing.
+    var speakNowPlaying: (_ title: String, _ artist: String, _ playing: Bool) -> Void = { _, _, _ in }
+    var speakNothingPlaying: () -> Void = {}
     var openSettings: () -> Void = {}
     /// Opens Settings > Permissions, the only in-app place a permission is asked for.
     var openPermissions: () -> Void = {}
