@@ -44,8 +44,8 @@ enum CLILocator {
             process.terminationHandler = { finished in
                 let data = output.fileHandleForReading.readDataToEndOfFile()
                 let firstLine = String(decoding: data, as: UTF8.self)
-                    .split(whereSeparator: \.isNewline).first.map(String.init)?
-                    .trimmingCharacters(in: .whitespaces)
+                    .split(whereSeparator: \.isNewline).first
+                    .map { CLIVersionLineBox.trimmedLine(String($0)) }
                 continuation.resume(returning: finished.terminationStatus == 0 ? firstLine : nil)
             }
             do {
