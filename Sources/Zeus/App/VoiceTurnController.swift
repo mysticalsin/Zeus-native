@@ -9613,6 +9613,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Tiling gaps, or a spoken "how are the tiling gaps", say the two gaps and the split. Nothing is moved.
+    func sayTilingGaps() {
+        presentTilingGaps(speak: true)
+    }
+
+    private func answerTilingGaps(speak: Bool) -> TurnResult {
+        presentTilingGaps(speak: speak)
+        return TurnResult(spoken: tilingGapLine())
+    }
+
+    private func presentTilingGaps(speak: Bool) {
+        let parts = tilingGapParts()
+        let line = TilingGapAsk.line(between: parts.between, edge: parts.edge, split: parts.split)
+        let plan = TilingGapDraw.plan(between: parts.between, edge: parts.edge, split: parts.split)
+        buddy.idle()
+        showTilingGaps(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The three layout sliders, clamped to the ranges the controls show. Reading them does not move a window.
+    private func tilingGapParts() -> (between: String, edge: String, split: String) {
+        let store = SettingsStore.shared
+        func shown(_ id: String, _ low: Double, _ high: Double, _ fallback: Double) -> String {
+            let raw = Double(store.string(id)).flatMap { $0.isFinite ? $0 : nil } ?? fallback
+            return String(Int(min(max(raw, low), high)))
+        }
+        return (shown("tiling.innerGap", 0, 64, 8), shown("tiling.outerGap", 0, 64, 8), shown("tiling.splitRatio", 30, 70, 50))
+    }
+
+    private func tilingGapLine() -> String {
+        let parts = tilingGapParts()
+        return TilingGapAsk.line(between: parts.between, edge: parts.edge, split: parts.split)
+    }
+
+    /// Draws Gaps, then the two gaps and the split. The caller speaks the full line.
+    private func showTilingGaps(_ plan: TilingGapDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTilingGaps(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTilingGaps(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTilingGaps(_ plan: TilingGapDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -10535,6 +10601,11 @@ final class VoiceTurnController {
         }
         if HaloMeasureAsk.matches(transcript) {
             let result = answerHaloMeasure(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TilingGapAsk.matches(transcript) {
+            let result = answerTilingGaps(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

@@ -6,6 +6,11 @@ enum TilingSetupVoice {
     static var speakSetup: () -> Void = {}
 }
 
+/// The Layout card speaks the two gaps and the default split. It does not move a window.
+enum TilingGapVoice {
+    static var speakGaps: () -> Void = {}
+}
+
 /// Settings › Tiling: the switch, the keys, the gaps and the split. Every row is a catalog row
 /// (`scripts/gen-settings-catalog.py`) read through `FeatureSettings`; nothing here moves a window.
 @MainActor
@@ -35,6 +40,10 @@ struct TilingSettingsPage: View {
             GSInfo(text: "Moving windows uses Accessibility. Zeus never asks for it from here: allow it in Permissions.")
         }
         GSCard("Layout") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the tiling gaps are set") { TilingGapVoice.speakGaps() }
+            }
             sliderRow("tiling.innerGap", symbol: "arrow.left.and.right", title: "Gap between windows",
                       text: "Space between two tiled windows.", unit: "points")
             GSDivider()

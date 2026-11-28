@@ -438,6 +438,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             HaloWashVoice.speakWash = { [weak self] in self?.voice.sayHaloWash() }
             BandSetupVoice.speakBands = { [weak self] in self?.voice.sayBandSetup() }
             HaloMeasureVoice.speakMeasure = { [weak self] in self?.voice.sayHaloMeasure() }
+            TilingGapVoice.speakGaps = { [weak self] in self?.voice.sayTilingGaps() }
             OfferSetupVoice.claudeConnected = { [weak self] in self?.guideServices.isConnected(.claude) ?? false }
             OfferSetupVoice.codexConnected = { [weak self] in self?.guideServices.isConnected(.codex) ?? false }
             MusicLightsVoice.wingsOn = { [weak self] in
