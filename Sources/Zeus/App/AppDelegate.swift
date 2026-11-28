@@ -421,6 +421,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PickerSetupVoice.speakPicker = { [weak self] in self?.voice.sayPickerSetup() }
             DefaultAgentVoice.speakAgent = { [weak self] in self?.voice.sayDefaultAgent() }
             LocalAccessVoice.speakLocal = { [weak self] in self?.voice.sayLocalAccess() }
+            FastPathVoice.speakPath = { [weak self] in self?.voice.sayFastPath() }
             MusicLightsVoice.wingsOn = { [weak self] in
                 self?.topBar.liveMusicWings ?? (UserDefaults.standard.object(forKey: "topBar.musicWings") as? Bool ?? true)
             }

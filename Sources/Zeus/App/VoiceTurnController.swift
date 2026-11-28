@@ -8504,6 +8504,66 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The fast path, or a spoken "is the fast path on", says whether simple commands run at once. It does not run a command.
+    func sayFastPath() {
+        presentFastPath(speak: true)
+    }
+
+    private func answerFastPath(speak: Bool) -> TurnResult {
+        presentFastPath(speak: speak)
+        return TurnResult(spoken: fastPathLine())
+    }
+
+    private func presentFastPath(speak: Bool) {
+        let work = fastPathWork()
+        let line = FastPathAsk.line(work: work)
+        let plan = FastPathDraw.plan(work: work)
+        buddy.idle()
+        showFastPath(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Fast path switch. An unset value is on, the same as the catalog. Reading it does not run a command.
+    private func fastPathWork() -> String {
+        SettingsStore.shared.bool("fastPath.enabled") ? "On" : "Off"
+    }
+
+    private func fastPathLine() -> String {
+        FastPathAsk.line(work: fastPathWork())
+    }
+
+    /// Draws Fast, then on or off. The caller speaks the full line.
+    private func showFastPath(_ plan: FastPathDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyFastPath(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyFastPath(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyFastPath(_ plan: FastPathDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -9341,6 +9401,11 @@ final class VoiceTurnController {
         }
         if LocalAccessAsk.matches(transcript) {
             let result = answerLocalAccess(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if FastPathAsk.matches(transcript) {
+            let result = answerFastPath(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

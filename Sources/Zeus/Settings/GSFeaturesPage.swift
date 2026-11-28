@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// The fast path speaks whether simple commands run at once. It does not run a command or change the switch.
+enum FastPathVoice {
+    static var speakPath: () -> Void = {}
+}
+
 /// The Teleprompter card speaks which of its five switches are on. It does not change them.
 enum PrompterSetupVoice {
     static var speakSetup: () -> Void = {}
@@ -43,6 +48,10 @@ struct FeaturesSettingsPage: View {
         GSPageHeading(section: .features, subtitle: "What Zeus does on its own, and how far it may go.")
             .padding(.bottom, -GS.cardGap)
         GSCard("Instant commands") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the fast path is set") { FastPathVoice.speakPath() }
+            }
             GSToggleRow(symbol: "bolt", title: "Fast path", text: "Simple commands (open an app, volume, timers, to-dos, Beamer) run the moment you finish speaking. Off sends every command to the AI.",
                         isOn: store.boolBinding("fastPath.enabled"))
             GSInfo(text: "Which engine understands you, and its monthly cost cap, are on the Engine page.")
