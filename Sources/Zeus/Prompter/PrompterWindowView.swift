@@ -1,6 +1,11 @@
 import SwiftUI
 import ZeusCore
 
+/// The prompter script speaks the scroll mode, the type size, and the speed. It does not start rolling.
+enum PrompterRollVoice {
+    static var speakRoll: () -> Void = {}
+}
+
 struct PrompterActions {
     let toggle: () -> Void
     let restart: () -> Void
@@ -182,6 +187,7 @@ struct PrompterWindowView: View {
         HStack(spacing: 4) {
             GlyphButton(symbol: model.isRunning ? "pause.fill" : "play.fill", size: 12, tint: Theme.bolt,
                         label: model.isRunning ? "Pause (Space or Control-Option-P)" : "Start (Space or Control-Option-P)", action: actions.toggle)
+            GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the prompter script is set") { PrompterRollVoice.speakRoll() }
             GlyphButton(symbol: "backward.end.fill", size: 10, label: "Previous cue (Left arrow)") { actions.jumpCue(false) }
             GlyphButton(symbol: "forward.end.fill", size: 10, label: "Next cue (Right arrow)") { actions.jumpCue(true) }
             GlyphButton(symbol: "arrow.counterclockwise", size: 10, label: "Start over (R)", action: actions.restart)

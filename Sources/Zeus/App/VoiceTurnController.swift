@@ -13676,6 +13676,73 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The prompter script, or a spoken "how is the prompter script set", says the mode, the type, and the speed.
+    func sayPrompterRoll() {
+        presentPrompterRoll(speak: true)
+    }
+
+    private func answerPrompterRoll(speak: Bool) -> TurnResult {
+        presentPrompterRoll(speak: speak)
+        return TurnResult(spoken: prompterRollLine())
+    }
+
+    private func presentPrompterRoll(speak: Bool) {
+        let parts = prompterRollParts()
+        let line = PrompterRollAsk.line(mode: parts.mode, size: parts.size, speed: parts.speed)
+        let plan = PrompterRollDraw.plan(mode: parts.mode, size: parts.size, speed: parts.speed)
+        buddy.idle()
+        showPrompterRoll(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The saved scroll mode, type size, and speed. Reading them does not open the prompter or read the script.
+    private func prompterRollParts() -> (mode: String, size: String, speed: String) {
+        let defaults = UserDefaults.standard
+        let mode = PrompterFollowMode(rawValue: defaults.string(forKey: "prompterWindow.mode") ?? "") ?? .words
+        let storedSize = defaults.object(forKey: "prompterWindow.font") as? Double ?? 32
+        let storedSpeed = defaults.object(forKey: "prompterWindow.speed") as? Double ?? 40
+        let size = Int((storedSize.isFinite ? min(max(storedSize, 18), 72) : 32).rounded())
+        let speed = Int((storedSpeed.isFinite ? min(max(storedSpeed, 8), 120) : 40).rounded())
+        return (mode.title, String(size), String(speed))
+    }
+
+    private func prompterRollLine() -> String {
+        let parts = prompterRollParts()
+        return PrompterRollAsk.line(mode: parts.mode, size: parts.size, speed: parts.speed)
+    }
+
+    /// Draws Script, then the mode, the type, and the speed. The caller speaks the full line.
+    private func showPrompterRoll(_ plan: PrompterRollDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPrompterRoll(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPrompterRoll(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPrompterRoll(_ plan: PrompterRollDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -14903,6 +14970,11 @@ final class VoiceTurnController {
         }
         if QuickTodoAsk.matches(transcript) {
             let result = answerQuickTodo(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PrompterRollAsk.matches(transcript) {
+            let result = answerPrompterRoll(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
