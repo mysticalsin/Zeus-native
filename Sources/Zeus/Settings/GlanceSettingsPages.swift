@@ -586,6 +586,11 @@ private struct AppearancePage: View {
     }
 }
 
+/// The Home backdrop speaks the drawing and whether it moves. It does not change the backdrop.
+enum HomeBackdropVoice {
+    static var speakBackdrop: () -> Void = {}
+}
+
 /// Home: which widget each of the four cards shows, its style, the backdrop. The same choices as Customize Home on the notch.
 private struct HomeAppearanceCard: View {
     private let symbols = ["1.square", "2.square", "3.square", "4.square"]
@@ -629,6 +634,10 @@ private struct HomeAppearanceCard: View {
             }
         }
         GSCard("Home backdrop") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home backdrop") { HomeBackdropVoice.speakBackdrop() }
+            }
             let current = HomeBackdrop.resolve(SettingsStore.shared.string(HomeBackdrop.settingID))
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                 ForEach(HomeBackdrop.allCases) { backdrop in

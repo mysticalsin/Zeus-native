@@ -8017,6 +8017,68 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Home backdrop, or a spoken "what's the home backdrop", says the drawing and whether it moves. It does not change the backdrop.
+    func sayHomeBackdrop() {
+        presentHomeBackdrop(speak: true)
+    }
+
+    private func answerHomeBackdrop(speak: Bool) -> TurnResult {
+        presentHomeBackdrop(speak: speak)
+        return TurnResult(spoken: homeBackdropLine())
+    }
+
+    private func presentHomeBackdrop(speak: Bool) {
+        let parts = homeBackdropParts()
+        let line = HomeBackdropAsk.line(look: parts.look, motion: parts.motion)
+        let plan = HomeBackdropDraw.plan(look: parts.look, motion: parts.motion)
+        buddy.idle()
+        showHomeBackdrop(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The Home backdrop picture. An unknown stored value is None, the same as the card. Reading it does not change the backdrop.
+    private func homeBackdropParts() -> (look: String, motion: String) {
+        let backdrop = HomeBackdrop.resolve(SettingsStore.shared.string(HomeBackdrop.settingID))
+        return (backdrop.title, backdrop.movesByNature ? "Moves" : "Still")
+    }
+
+    private func homeBackdropLine() -> String {
+        let parts = homeBackdropParts()
+        return HomeBackdropAsk.line(look: parts.look, motion: parts.motion)
+    }
+
+    /// Draws Behind, then the drawing and whether it moves. The caller speaks the full line.
+    private func showHomeBackdrop(_ plan: HomeBackdropDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHomeBackdrop(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHomeBackdrop(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHomeBackdrop(_ plan: HomeBackdropDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -8814,6 +8876,11 @@ final class VoiceTurnController {
         }
         if NotchlessAsk.matches(transcript) {
             let result = answerNotchless(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HomeBackdropAsk.matches(transcript) {
+            let result = answerHomeBackdrop(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
