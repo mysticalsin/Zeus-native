@@ -34,6 +34,7 @@ struct ChatPage: View {
                 Spacer(minLength: 0)
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how many chats") { chat.speakChats() }
                 GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether history or a new chat is open") { ChatHubVoice.speakHub() }
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether the chat window is open") { ChatPaneVoice.speakPane() }
                 if chat.isSending {
                     Text("Writing…").font(TopBarStyle.label(11, .medium)).foregroundStyle(Theme.cloudQuiet).transition(.opacity)
                 }

@@ -13940,6 +13940,70 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The floating chat window, or a spoken "is the chat window open", says whether it is open and how many chats are pinned.
+    func sayChatPane() {
+        presentChatPane(speak: true)
+    }
+
+    private func answerChatPane(speak: Bool) -> TurnResult {
+        presentChatPane(speak: speak)
+        return TurnResult(spoken: chatPaneLine())
+    }
+
+    private func presentChatPane(speak: Bool) {
+        let parts = chatPaneParts()
+        let line = ChatPaneAsk.line(window: parts.window, pins: parts.pins)
+        let plan = ChatPaneDraw.plan(window: parts.window, pins: parts.pins)
+        buddy.idle()
+        showChatPane(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The window already created, and the pinned chats. Reading them does not open the window or say a title.
+    private func chatPaneParts() -> (window: String, pins: String) {
+        let window = ChatPaneVoice.windowOpen() ? "Open" : "Closed"
+        let count = ChatPaneVoice.pinnedCount()
+        guard (0...999).contains(count) else { return (window, "1000") }
+        return (window, String(count))
+    }
+
+    private func chatPaneLine() -> String {
+        let parts = chatPaneParts()
+        return ChatPaneAsk.line(window: parts.window, pins: parts.pins)
+    }
+
+    /// Draws Pane, then the window and the pin count. The caller speaks the full line.
+    private func showChatPane(_ plan: ChatPaneDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyChatPane(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyChatPane(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyChatPane(_ plan: ChatPaneDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -15187,6 +15251,11 @@ final class VoiceTurnController {
         }
         if TeachYouAsk.matches(transcript) {
             let result = answerTeachYou(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if ChatPaneAsk.matches(transcript) {
+            let result = answerChatPane(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

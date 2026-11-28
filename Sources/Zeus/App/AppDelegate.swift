@@ -414,6 +414,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FlingNearbyVoice.speakNearby = { [weak self] in self?.voice.sayFlingNearby() }
             PrompterWindowVoice.speakWindow = { [weak self] in self?.voice.sayPrompterWindow() }
             TeachYouVoice.speakYou = { [weak self] in self?.voice.sayTeachYou() }
+            ChatPaneVoice.windowOpen = { [weak self] in self?.chatWindow?.isShowing ?? false }
+            ChatPaneVoice.pinnedCount = { [weak self] in
+                guard self?.chatWindow != nil else { return 0 }
+                return ChatModel.shared.conversations.filter(\.pinned).count
+            }
+            ChatPaneVoice.speakPane = { [weak self] in self?.voice.sayChatPane() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }
