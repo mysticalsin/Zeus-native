@@ -307,6 +307,8 @@ final class TopBarModel {
     var speakSecretNote: () -> Void = {}
     /// The Home agents card speaks who is running.
     var speakAgents: () -> Void = {}
+    /// The focus card speaks the time still left.
+    var speakTimeLeft: () -> Void = {}
 
     /// The next meeting that still has time and a join link.
     func nextMeeting(now: Date = Date()) -> CalendarItem? {

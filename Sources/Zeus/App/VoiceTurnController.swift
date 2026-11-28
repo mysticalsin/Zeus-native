@@ -1161,6 +1161,61 @@ final class VoiceTurnController {
         buddy.showCaption(plan.boltCaption(at: 0))
     }
 
+    /// The focus card, or a spoken "how much time is left", says the remainder and draws it.
+    func sayTimeLeft() {
+        presentTimeLeft(speak: true)
+    }
+
+    private func answerTimeLeft(speak: Bool) -> TurnResult {
+        presentTimeLeft(speak: speak)
+        return TurnResult(spoken: timeLeftLine())
+    }
+
+    private func presentTimeLeft(speak: Bool) {
+        guard let clock = notch.topBar?.focus, clock.isRunning || clock.isPaused else {
+            presentNoTimeLeft(speak: speak)
+            return
+        }
+        let seconds = max(0, Int(clock.remaining(at: Date()).rounded()))
+        let state = Self.timeLeftState(clock)
+        guard let line = TimerLeftAsk.line(seconds: seconds, state: state),
+              let plan = TimerLeftDraw.plan(seconds: seconds, state: state) else {
+            presentNoTimeLeft(speak: speak)
+            return
+        }
+        buddy.idle()
+        showTimeLeft(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func timeLeftLine() -> String {
+        guard let clock = notch.topBar?.focus, clock.isRunning || clock.isPaused else {
+            return NoTimerDraw.line
+        }
+        let seconds = max(0, Int(clock.remaining(at: Date()).rounded()))
+        return TimerLeftAsk.line(seconds: seconds, state: Self.timeLeftState(clock)) ?? NoTimerDraw.line
+    }
+
+    private static func timeLeftState(_ clock: FocusTimer) -> String {
+        if clock.isPaused { return "Paused" }
+        if clock.phase == .rest { return "Break" }
+        if clock.isPlainTimer { return "Running" }
+        return "Focus"
+    }
+
+    private func presentNoTimeLeft(speak: Bool) {
+        let line = NoTimerDraw.line
+        guard let plan = NoTimerDraw.from(line: line) else {
+            if speak { say(line) }
+            return
+        }
+        buddy.idle()
+        showNoTimer(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     private func answerClock(speak: Bool) -> TurnResult {
         let parts = ClockAsk.parts(now: Date(), timeZone: .current)
         presentClock(time: parts.time, period: parts.period, speak: speak)
@@ -1949,6 +2004,37 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws the time still left: Left, then the length, then the state. The caller speaks the full line.
+    private func showTimeLeft(_ plan: TimerLeftDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyTimeLeft(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyTimeLeft(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyTimeLeft(_ plan: TimerLeftDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -2296,6 +2382,11 @@ final class VoiceTurnController {
         }
         if AgentStatusAsk.matches(transcript) {
             let result = answerAgents(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if TimerLeftAsk.matches(transcript) {
+            let result = answerTimeLeft(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

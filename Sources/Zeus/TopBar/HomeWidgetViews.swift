@@ -182,7 +182,8 @@ struct HomeWidgetCard: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .top) {
                         caption("Focus", running ? (timer.phase == .rest ? "Break" : "Focusing") : "Ready")
-                        Spacer()
+                        Spacer(minLength: 4)
+                        GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the time left") { topBar.speakTimeLeft() }
                         GlanceRoundButton(symbol: running ? "stop.fill" : "play.fill", filled: true, label: running ? "Stop focus" : "Start focus") {
                             if running {
                                 if topBar.focus.isPlainTimer { topBar.focus.stop() }
