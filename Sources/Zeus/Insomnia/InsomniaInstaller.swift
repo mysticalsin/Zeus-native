@@ -80,7 +80,7 @@ struct InsomniaInstaller: Sendable {
         let (tool, args) = InsomniaCommand.sudoAllows()
         let result = runner.run(tool, args)
         if result.ok { return .installed }
-        let detail = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        let detail = InsomniaStatusDetailBox.trimmedDetail(result.stderr)
         return .needsRepair(detail.isEmpty ? "sudo said no" : detail)
     }
 
