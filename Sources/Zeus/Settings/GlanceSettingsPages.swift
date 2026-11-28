@@ -401,12 +401,19 @@ private struct AppearancePage: View {
             GSDivider()
             GSRow(symbol: "circle.circle", title: "Persona and mascot",
                   text: "Classic keeps this mascot; Orb stays off until you choose it.") {
-                GSPopup(selection: Binding(get: { PersonaSetting.shared.displayName },
-                                           set: { PersonaSetting.shared.select(displayName: $0) }),
-                        options: PersonaSetting.choices, label: "Persona and mascot")
+                HStack(spacing: 8) {
+                    GSPopup(selection: Binding(get: { PersonaSetting.shared.displayName },
+                                               set: { PersonaSetting.shared.select(displayName: $0) }),
+                            options: PersonaSetting.choices, label: "Persona and mascot")
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the companion and the agent face") { CompanionVoice.speakCompanion() }
+                }
             }
         }
         GSCard("A face for your agents") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the companion and the agent face") { CompanionVoice.speakCompanion() }
+            }
             HStack(spacing: 12) {
                 avatar("Glyphs", "", mascot: false)
                 avatar("Zeus", "", mascot: true)
@@ -1413,6 +1420,11 @@ enum TalkMicVoice {
 /// Whether talk can see the screen, and whether it draws while answering. Nothing is captured.
 enum TalkSightVoice {
     static var speakSight: () -> Void = {}
+}
+
+/// The companion and the agent face. Nothing is changed.
+enum CompanionVoice {
+    static var speakCompanion: () -> Void = {}
 }
 
 /// The halo entrance speaks the animation. It does not play it or change it.
