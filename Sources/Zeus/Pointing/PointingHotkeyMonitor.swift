@@ -32,6 +32,8 @@ enum PointingSettings {
     static var speakKeys: () -> Void = {}
     /// The trail row speaks pointing, the ink, screenshots, and typed questions. It does not start a turn.
     static var speakTrail: () -> Void = {}
+    /// The provider row speaks who pointing asks, and whether dictation uses Fn and Control. It does not read a key.
+    static var speakRoute: () -> Void = {}
 }
 
 /// Feeds the keyboard stream to `PointingKeyGesture` and reports what the hold did. It owns no

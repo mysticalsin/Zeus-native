@@ -158,6 +158,11 @@ struct SettingOptionRow: View {
                         .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
                         .accessibilityLabel("Say which keys point")
                 }
+                if option.id == "pointing.provider" {
+                    Button { PointingSettings.speakRoute() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
+                        .accessibilityLabel("Say who pointing asks")
+                }
                 if option.id.hasPrefix("sound."), option.id.hasSuffix("Style") {
                     Button { SoundStyles.preview(option: option.id) } label: { Image(systemName: "play.fill") }
                         .buttonStyle(GlassButtonStyle(kind: .secondary, compact: true))
