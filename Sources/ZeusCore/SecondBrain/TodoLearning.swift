@@ -51,9 +51,9 @@ public struct TodoLearning: Codable, Equatable, Sendable {
     }
 
     public static func key(for title: String) -> String {
-        title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-            .lowercased()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        TodoLearningKeyBox.trimmedKey(
+            title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                .lowercased())
     }
 
     public mutating func observeAdd(_ title: String, due: String?, now: Date = Date(), calendar: Calendar = .current) {
