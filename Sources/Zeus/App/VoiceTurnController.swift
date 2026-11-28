@@ -5414,6 +5414,80 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Teleprompter card, or a spoken "how's the prompter set", says which switches are on. It does not change them.
+    func sayPrompterSetup() {
+        presentPrompterSetup(speak: true)
+    }
+
+    private func answerPrompterSetup(speak: Bool) -> TurnResult {
+        presentPrompterSetup(speak: speak)
+        return TurnResult(spoken: prompterSetupLine())
+    }
+
+    private func presentPrompterSetup(speak: Bool) {
+        let words = prompterSetupWords()
+        let line = PrompterSetupAsk.line(words: words)
+        let plan = PrompterSetupDraw.plan(words: words)
+        buddy.idle()
+        showPrompterSetup(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// Follow, slides, private, mirror, then countdown, for each switch that is on.
+    /// A missing key follows the page default. Reading them does not open the prompter.
+    private func prompterSetupWords() -> [String] {
+        let pairs = [
+            ("prompter.followPresentation", "Follow", false),
+            ("prompter.followAdvances", "Slides", false),
+            ("prompterWindow.private", "Private", true),
+            ("prompterWindow.mirror", "Mirror", false),
+            ("prompterWindow.countdown", "Countdown", true),
+        ]
+        return pairs.compactMap { prompterSwitch($0.0, default: $0.2) ? $0.1 : nil }
+    }
+
+    /// The same read as the Teleprompter switches: a missing key keeps the page default.
+    private func prompterSwitch(_ key: String, default fallback: Bool) -> Bool {
+        guard UserDefaults.standard.object(forKey: key) != nil else { return fallback }
+        return UserDefaults.standard.bool(forKey: key)
+    }
+
+    private func prompterSetupLine() -> String {
+        PrompterSetupAsk.line(words: prompterSetupWords())
+    }
+
+    /// Draws Prompt, then up to four switches that are on, or None. The caller speaks the full line.
+    private func showPrompterSetup(_ plan: PrompterSetupDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyPrompterSetup(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyPrompterSetup(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyPrompterSetup(_ plan: PrompterSetupDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6016,6 +6090,11 @@ final class VoiceTurnController {
         }
         if DayToDayAsk.matches(transcript) {
             let result = answerDayToDay(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if PrompterSetupAsk.matches(transcript) {
+            let result = answerPrompterSetup(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

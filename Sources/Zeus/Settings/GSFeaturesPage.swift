@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import ZeusCore
 
+/// The Teleprompter card speaks which of its five switches are on. It does not change them.
+enum PrompterSetupVoice {
+    static var speakSetup: () -> Void = {}
+}
+
 /// Settings › Features: a switch and the options for the things Zeus does on its own.
 @MainActor
 struct FeaturesSettingsPage: View {
@@ -23,6 +28,10 @@ struct FeaturesSettingsPage: View {
             GSInfo(text: "Which engine understands you, and its monthly cost cap, are on the Engine page.")
         }
         GSCard("Teleprompter") {
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say how the prompter is set") { PrompterSetupVoice.speakSetup() }
+            }
             GSToggleRow(symbol: "play.rectangle", title: "Follow my presentation", text: "Opens the prompter on its own when a Keynote or PowerPoint slideshow starts, with each slide\u{2019}s notes.",
                         isOn: prompter($followPresentation))
             GSDivider()
