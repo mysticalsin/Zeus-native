@@ -391,6 +391,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PointerGlideVoice.speakGlide = { [weak self] in self?.voice.sayPointerGlide() }
             RoutineListVoice.speakList = { [weak self] in self?.voice.sayRoutineList() }
             RecordlyCaptureVoice.speakCapture = { [weak self] in self?.voice.sayRecordlyCapture() }
+            AnswerPathVoice.speakPath = { [weak self] in self?.voice.sayAnswerPath() }
             ExtraPreferences.speakEvents = { [weak self] in self?.voice.saySoundEvents() }
             OtherAppsVoice.speakApps = { [weak self] in self?.voice.sayOtherApps() }
             HomeSlots.speakStyles = { [weak self] in self?.voice.sayHomeStyles() }

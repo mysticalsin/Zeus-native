@@ -31,6 +31,11 @@ enum AgentFinishVoice {
     static var speakFinish: () -> Void = {}
 }
 
+/// Question answers speak whether they are filled in or sent as a message. Nothing is reset.
+enum AnswerPathVoice {
+    static var speakPath: () -> Void = {}
+}
+
 /// Settings › General › Agents.
 struct AgentSettingsSection: View {
     let settings = AgentSettings.shared
@@ -52,6 +57,9 @@ struct AgentSettingsSection: View {
                 .font(.callout).foregroundStyle(.secondary)
             LabeledContent("Question answers") {
                 HStack {
+                    Button { AnswerPathVoice.speakPath() } label: { Image(systemName: "speaker.wave.2.fill") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Say how question answers go back")
                     Text(answers.tracker.path == .allowWithAnswers ? "Filled into the question" : "Sent as a message")
                         .foregroundStyle(.secondary)
                     if answers.tracker.path == .denyWithAnswer {
