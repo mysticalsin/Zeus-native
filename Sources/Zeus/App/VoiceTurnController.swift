@@ -3989,6 +3989,72 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Voice settings, or a spoken "is Hey Zeus on", says the pill the card shows.
+    func sayHeyZeus() {
+        presentHeyZeus(speak: true)
+    }
+
+    private func answerHeyZeus(speak: Bool) -> TurnResult {
+        presentHeyZeus(speak: speak)
+        return TurnResult(spoken: heyZeusLine())
+    }
+
+    private func presentHeyZeus(speak: Bool) {
+        let word = heyZeusWord()
+        let line = HeyZeusAsk.line(word: word)
+        let plan = HeyZeusDraw.plan(word: word)
+        buddy.idle()
+        showHeyZeus(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same short word the Settings pill shows. A pause reason stays off the card.
+    private func heyZeusWord() -> String {
+        let wake = WakeWordController.shared
+        if !wake.enabled { return "Off" }
+        if wake.listening { return "Listening" }
+        if wake.needsPermissions {
+            return VoicePermissions.access == .needsPrompt ? "Not asked yet" : "Denied"
+        }
+        return "Paused"
+    }
+
+    private func heyZeusLine() -> String {
+        HeyZeusAsk.line(word: heyZeusWord())
+    }
+
+    /// Draws Hey Zeus, then Off, Listening, Not asked yet, Denied, or Paused. The caller speaks the full line.
+    private func showHeyZeus(_ plan: HeyZeusDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHeyZeus(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHeyZeus(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHeyZeus(_ plan: HeyZeusDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -4476,6 +4542,11 @@ final class VoiceTurnController {
         }
         if HeatAsk.matches(transcript) {
             let result = answerHeat(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HeyZeusAsk.matches(transcript) {
+            let result = answerHeyZeus(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

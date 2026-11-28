@@ -26,6 +26,8 @@ final class WakeWordController {
     }
     /// "Listening", "Paused: dictation", "Off"… for Settings.
     private(set) var status = "Off"
+    /// The Voice settings card speaks the pill it shows.
+    var speakWake: () -> Void = {}
     private(set) var needsPermissions = false
     private(set) var listening = false
 

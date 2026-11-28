@@ -1091,9 +1091,14 @@ private struct WakeWordCard: View {
 
     var body: some View {
         GSCard("Hey Zeus") {
-            GSToggleRow(symbol: "ear", title: "Listen for \u{201C}Hey Zeus\u{201D}",
-                        text: "Nothing is sent while Zeus waits for the phrase.", detail: "Say the phrase, then your request. Off until you turn it on.",
-                        isOn: Binding(get: { wake.enabled }, set: { wake.enabled = $0 }))
+            GSRow(symbol: "ear", title: "Listen for \u{201C}Hey Zeus\u{201D}",
+                  text: "Nothing is sent while Zeus waits for the phrase.", detail: "Say the phrase, then your request. Off until you turn it on.") {
+                HStack(spacing: 8) {
+                    GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say whether Hey Zeus is on") { wake.speakWake() }
+                    Toggle("Listen for Hey Zeus", isOn: Binding(get: { wake.enabled }, set: { wake.enabled = $0 }))
+                        .toggleStyle(GSToggleStyle()).labelsHidden()
+                }
+            }
             if wake.enabled {
                 GSDivider()
                 GSRow(symbol: wake.listening ? "waveform" : "pause.circle", title: "Status", text: statusNote) {
