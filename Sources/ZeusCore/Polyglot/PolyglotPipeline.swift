@@ -321,7 +321,7 @@ public actor PolyglotPipeline {
                 continue
             }
             guard revision == contentRevision else { return }
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = PolyglotHeardBox.trimmedHeard(text)
             guard !PolyglotTextFilter.isPhantom(trimmed) else {
                 emit(.discarded(side: item.side, id: item.id))
                 continue
