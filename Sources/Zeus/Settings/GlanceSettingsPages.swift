@@ -529,6 +529,10 @@ private struct HomeAppearanceCard: View {
                 }
                 GSDivider()
             }
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the Home styles") { HomeSlots.speakStyles() }
+            }
             style("clock", "Clock style", "home.variant.clock")
             GSDivider()
             style("music.note", "Music style", "home.variant.music")

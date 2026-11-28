@@ -6278,6 +6278,74 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The Home style rows, or a spoken "how's home styled", say the four styles. They do not change the cards.
+    func sayHomeStyles() {
+        presentHomeStyles(speak: true)
+    }
+
+    private func answerHomeStyles(speak: Bool) -> TurnResult {
+        presentHomeStyles(speak: speak)
+        return TurnResult(spoken: homeStylesLine())
+    }
+
+    private func presentHomeStyles(speak: Bool) {
+        let parts = homeStylesParts()
+        let line = HomeStylesAsk.line(clock: parts.clock, music: parts.music, weather: parts.weather, calendar: parts.calendar)
+        let plan = HomeStylesDraw.plan(clock: parts.clock, music: parts.music, weather: parts.weather, calendar: parts.calendar)
+        buddy.idle()
+        showHomeStyles(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The four style menus. An unset value follows the catalog default.
+    /// Reading them does not change which Home cards are showing.
+    private func homeStylesParts() -> (clock: String, music: String, weather: String, calendar: String) {
+        let store = SettingsStore.shared
+        return (
+            store.string("home.variant.clock"),
+            store.string("home.variant.music"),
+            store.string("home.variant.weather"),
+            store.string("home.variant.calendar")
+        )
+    }
+
+    private func homeStylesLine() -> String {
+        let parts = homeStylesParts()
+        return HomeStylesAsk.line(clock: parts.clock, music: parts.music, weather: parts.weather, calendar: parts.calendar)
+    }
+
+    /// Draws Styles, then clock, music, weather, and calendar. The caller speaks the full line.
+    private func showHomeStyles(_ plan: HomeStylesDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHomeStyles(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHomeStyles(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHomeStyles(_ plan: HomeStylesDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -6945,6 +7013,11 @@ final class VoiceTurnController {
         }
         if OtherAppsAsk.matches(transcript) {
             let result = answerOtherApps(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HomeStylesAsk.matches(transcript) {
+            let result = answerHomeStyles(speak: speak)
             remember(transcript, result.spoken)
             return result
         }
