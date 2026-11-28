@@ -905,6 +905,48 @@ final class VoiceTurnController {
         presentNoBattery(speak: true)
     }
 
+    /// Joining a meeting says the title and draws it.
+    func sayMeeting(title: String, place: String) {
+        presentMeeting(title: title, place: place, speak: true)
+    }
+
+    /// No meeting is left to join. The screen shows Meeting, then None.
+    func sayNoMeeting() {
+        presentNoMeeting(speak: true)
+    }
+
+    private func joinSpokenMeeting(speak: Bool) -> TurnResult {
+        guard let event = notch.topBar?.nextMeeting(), event.meetingURL != nil else {
+            presentNoMeeting(speak: speak)
+            return TurnResult(spoken: MeetingAsk.none)
+        }
+        let place = MeetingAsk.place(of: event.meetingURL!)
+        notch.topBar?.join(event, announce: speak)
+        if !speak { presentMeeting(title: event.title, place: place, speak: false) }
+        return TurnResult(spoken: MeetingAsk.line(title: event.title, place: place) ?? MeetingAsk.none)
+    }
+
+    private func presentMeeting(title: String, place: String, speak: Bool) {
+        guard let line = MeetingAsk.line(title: title, place: place),
+              let plan = MeetingDraw.plan(title: title, place: place) else {
+            presentNoMeeting(speak: speak)
+            return
+        }
+        buddy.idle()
+        showMeeting(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    private func presentNoMeeting(speak: Bool) {
+        let line = MeetingAsk.none
+        let plan = MeetingDraw.none()
+        buddy.idle()
+        showMeeting(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
     /// The Reminders field, or a spoken new reminder, says the title and draws it.
     func sayReminder(_ result: RemindersController.AddResult) {
         presentReminder(result, speak: true)
@@ -1351,6 +1393,38 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// Draws a meeting join: Meeting, then the title, then the place.
+    /// The caller speaks the full line.
+    private func showMeeting(_ plan: MeetingDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyMeeting(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyMeeting(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyMeeting(_ plan: MeetingDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -1645,6 +1719,12 @@ final class VoiceTurnController {
         }
         if BatteryAsk.matches(transcript) {
             let result = answerBattery(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if MeetingAsk.matches(transcript) {
+            if CLIAccess.turnRestricted { return refuseRestricted(speak: speak) }
+            let result = joinSpokenMeeting(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

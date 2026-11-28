@@ -286,6 +286,24 @@ final class TopBarModel {
     /// The Home battery card speaks the charge that is already shown.
     var speakBattery: (_ level: Int, _ charging: Bool, _ pluggedIn: Bool) -> Void = { _, _, _ in }
     var speakNoBattery: () -> Void = {}
+    /// Joining a meeting speaks the title and opens the link.
+    var speakMeeting: (_ title: String, _ place: String) -> Void = { _, _ in }
+    var speakNoMeeting: () -> Void = {}
+
+    /// The next meeting that still has time and a join link.
+    func nextMeeting(now: Date = Date()) -> CalendarItem? {
+        events.filter { $0.meetingURL != nil && $0.end > now }.min { $0.start < $1.start }
+    }
+
+    /// Opens the meeting link and says which one it is.
+    func join(_ event: CalendarItem, announce: Bool = true) {
+        guard let url = event.meetingURL else {
+            if announce { speakNoMeeting() }
+            return
+        }
+        openURL(url)
+        if announce { speakMeeting(event.title, MeetingAsk.place(of: url)) }
+    }
     /// A focus session speaks and draws. A plain countdown stays on the timer path.
     var speakFocus: (FocusSpeech) -> Void = { _ in }
 

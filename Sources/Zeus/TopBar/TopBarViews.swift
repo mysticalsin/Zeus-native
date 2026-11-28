@@ -863,7 +863,7 @@ private struct CalendarDayList: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(events) { event in
                         Button { topBar.calendarDetailID = event.id } label: {
-                            EventRow(event: event, openURL: topBar.openURL, selected: topBar.calendarDetailID == event.id)
+                            EventRow(event: event, openURL: { _ in topBar.join(event) }, selected: topBar.calendarDetailID == event.id)
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Shows the details.")
@@ -893,8 +893,8 @@ private struct CalendarSidePanel: View {
                 if let notes = event.notes, !notes.isEmpty { detail("note.text", notes) }
                 Spacer(minLength: 0)
                 HStack(spacing: 6) {
-                    if let url = event.meetingURL {
-                        NotchActionButton(title: "Join", tint: Theme.leaf) { topBar.openURL(url) }
+                    if event.meetingURL != nil {
+                        NotchActionButton(title: "Join", tint: Theme.leaf) { topBar.join(event) }
                     }
                     NotchActionButton(title: "Close", tint: Theme.cloudSecondary, filled: false) { topBar.calendarDetailID = nil }
                 }
