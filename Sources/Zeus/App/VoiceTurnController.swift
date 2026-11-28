@@ -4912,6 +4912,66 @@ final class VoiceTurnController {
         buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
     }
 
+    /// The light pictures, or a spoken "what's the halo", say the notch light. They do not change it.
+    func sayHaloLight() {
+        presentHaloLight(speak: true)
+    }
+
+    private func answerHaloLight(speak: Bool) -> TurnResult {
+        presentHaloLight(speak: speak)
+        return TurnResult(spoken: haloLightLine())
+    }
+
+    private func presentHaloLight(speak: Bool) {
+        let word = haloLightWord()
+        let line = HaloLightAsk.line(word: word)
+        let plan = HaloLightDraw.plan(word: word)
+        buddy.idle()
+        showHaloLight(plan, speak: speak)
+        if speak { say(line) } else { buddy.showCaption(line); buddy.hideCaption() }
+        buddy.showCaption(plan.boltCaption(at: 0))
+    }
+
+    /// The same title the selected picture uses. An unknown stored value is Classic halo.
+    private func haloLightWord() -> String {
+        HaloStyle.resolve(SettingsStore.shared.string("halo.style")).title
+    }
+
+    private func haloLightLine() -> String {
+        HaloLightAsk.line(word: haloLightWord())
+    }
+
+    /// Draws Light, then the picture title. The caller speaks the full line.
+    private func showHaloLight(_ plan: HaloLightDraw, speak: Bool) {
+        clearDrawingForNewTurn()
+        let shot = illustrationShot()
+        let draw = ExplainShowcase.scaled(plan.draw, toWidth: shot.pixelWidth, toHeight: shot.pixelHeight)
+        let token = UUID()
+        guard presenter.begin(draw, shot: shot, token: token) else { return }
+        drawActive = true
+        explainBegan = Date()
+        let beats = plan.schedule.indexes
+        if let first = beats.first { presenter.reveal(sentence: first, token: token) }
+        flyHaloLight(plan, at: 0, shot: shot)
+        explainReveal = Task { @MainActor [weak self] in
+            for (offset, beat) in beats.dropFirst().enumerated() {
+                try? await Task.sleep(for: .seconds(ExplainBeatSchedule.gap))
+                guard let self, !Task.isCancelled else { return }
+                self.presenter.reveal(sentence: beat, token: token)
+                let elapsed = Double(offset + 1) * ExplainBeatSchedule.gap
+                self.flyHaloLight(plan, at: elapsed, shot: shot)
+                self.buddy.showCaption(plan.boltCaption(at: elapsed))
+            }
+            guard let self, !Task.isCancelled else { return }
+            await self.finishExplainDrawing(token: token, speak: speak)
+        }
+    }
+
+    private func flyHaloLight(_ plan: HaloLightDraw, at elapsed: TimeInterval, shot: ScreenShot) {
+        guard let bolt = plan.guideBolt(at: elapsed) else { return }
+        buddy.flight(to: boltScreen(bolt, shot: shot), label: plan.boltCaption(at: elapsed))
+    }
+
     /// The notch reads the day aloud. The board built for that brief is drawn while Zeus says it.
     func sayTodayBrief(_ text: String) {
         guard let plan = TodayController.shared.board else {
@@ -5474,6 +5534,11 @@ final class VoiceTurnController {
         }
         if NotchOpenAsk.matches(transcript) {
             let result = answerNotchOpen(speak: speak)
+            remember(transcript, result.spoken)
+            return result
+        }
+        if HaloLightAsk.matches(transcript) {
+            let result = answerHaloLight(speak: speak)
             remember(transcript, result.spoken)
             return result
         }

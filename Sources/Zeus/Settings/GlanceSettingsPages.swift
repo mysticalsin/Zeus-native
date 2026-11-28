@@ -344,6 +344,10 @@ private struct AppearancePage: View {
                 }
             }
             .padding(.bottom, 6)
+            HStack {
+                Spacer(minLength: 0)
+                GlyphButton(symbol: "speaker.wave.2.fill", size: 11, tint: Theme.bolt, label: "Say the notch light") { HaloStyle.speakLight() }
+            }
             GSRow(symbol: "sparkles", title: "Entrance animation") {
                 GSPopup(selection: HaloChoices.entranceTitle, options: HaloChoices.entrances).popupLabel("Entrance animation")
             }

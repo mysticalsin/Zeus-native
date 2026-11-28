@@ -41,6 +41,9 @@ public enum HaloStyle: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The signature-of-light pictures speak the selected light. They do not change it.
+    public static var speakLight: () -> Void = {}
+
     /// How the style is drawn. The live notch, Settings and the welcome guide all pick their drawing from this.
     public enum Renderer: String, Sendable {
         case none, line, rays, prism, cloud, core, grid, depth, dots, aurora, storm
